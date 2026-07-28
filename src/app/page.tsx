@@ -1,0 +1,113 @@
+import {
+  CalendarDays,
+  Users,
+  BellRing,
+  CheckCircle2,
+  ShieldCheck,
+} from "lucide-react";
+
+const features = [
+  {
+    icon: Users,
+    title: "Gestion des membres",
+    description:
+      "Joueurs, parents et équipes centralisés au même endroit, avec un profil clair pour chacun.",
+  },
+  {
+    icon: CalendarDays,
+    title: "Calendrier du club",
+    description:
+      "Tous les matchs et entraînements de l'équipe, visibles en un coup d'œil.",
+  },
+  {
+    icon: BellRing,
+    title: "Convocations",
+    description:
+      "Envoyez les convocations aux matchs et entraînements directement depuis l'app.",
+  },
+  {
+    icon: CheckCircle2,
+    title: "Réponses en temps réel",
+    description:
+      "Présent, Absent ou Retard : chacun répond en un tap, le coach voit tout instantanément.",
+  },
+];
+
+export default function Home() {
+  return (
+    <div className="flex min-h-full flex-1 flex-col bg-white">
+      <header className="sticky top-0 z-10 border-b border-black/5 bg-white/90 backdrop-blur">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
+          <div className="flex items-center gap-2">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ubac-blue text-sm font-bold text-white">
+              U17
+            </span>
+            <span className="text-lg font-semibold text-ubac-blue">
+              UBAC 17
+            </span>
+          </div>
+          <button className="rounded-full bg-ubac-blue px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-ubac-blue-dark">
+            Se connecter
+          </button>
+        </div>
+      </header>
+
+      <main className="flex-1">
+        <section className="bg-ubac-blue">
+          <div className="mx-auto max-w-5xl px-4 py-16 text-center sm:px-6 sm:py-24">
+            <p className="text-sm font-semibold uppercase tracking-wider text-ubac-blue-light">
+              Union Basket Aunis Club
+            </p>
+            <h1 className="mt-3 text-3xl font-bold leading-tight text-white sm:text-5xl">
+              La gestion du club,
+              <br className="hidden sm:block" /> simple pour tout le monde.
+            </h1>
+            <p className="mx-auto mt-4 max-w-xl text-base text-white/80 sm:text-lg">
+              Membres, calendrier, convocations et réponses en temps réel :
+              tout ce dont l&apos;équipe a besoin, dans une seule application.
+            </p>
+            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <button className="w-full rounded-full bg-white px-6 py-3 text-sm font-semibold text-ubac-blue transition-colors hover:bg-zinc-100 sm:w-auto">
+                Se connecter
+              </button>
+              <span className="flex items-center gap-1.5 text-xs text-white/70">
+                <ShieldCheck className="h-4 w-4" />
+                Accès réservé aux membres du club
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-5xl px-4 py-14 sm:px-6">
+          <h2 className="text-center text-2xl font-bold text-zinc-900">
+            Pensé pour le terrain
+          </h2>
+          <p className="mx-auto mt-2 max-w-xl text-center text-sm text-zinc-500">
+            Une V1 concentrée sur l&apos;essentiel pour les équipes du club.
+          </p>
+
+          <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {features.map(({ icon: Icon, title, description }) => (
+              <div
+                key={title}
+                className="flex gap-4 rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm"
+              >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-ubac-blue/10 text-ubac-blue">
+                  <Icon className="h-5 w-5" />
+                </span>
+                <div>
+                  <h3 className="font-semibold text-zinc-900">{title}</h3>
+                  <p className="mt-1 text-sm text-zinc-500">{description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </main>
+
+      <footer className="border-t border-black/5 py-6 text-center text-xs text-zinc-400">
+        UBAC 17 — Union Basket Aunis Club
+      </footer>
+    </div>
+  );
+}
