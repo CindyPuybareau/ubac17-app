@@ -4,6 +4,8 @@ import {
   BellRing,
   CheckCircle2,
   ShieldCheck,
+  MapPin,
+  Trophy,
 } from "lucide-react";
 
 const features = [
@@ -33,6 +35,21 @@ const features = [
   },
 ];
 
+const clubStats = [
+  { value: "200", label: "licenciés" },
+  { value: "10", label: "catégories, du baby basket aux seniors" },
+  { value: "3", label: "communes partenaires" },
+];
+
+const gyms = [
+  { commune: "Angoulins", lieu: "Salle polyvalente, Chemin des Marais" },
+  {
+    commune: "Châtelaillon-Plage",
+    lieu: "Complexe sportif, Allée du Stade",
+  },
+  { commune: "Saint-Vivien", lieu: "Salle polyvalente, 26 Grande Rue" },
+];
+
 export default function Home() {
   return (
     <div className="flex min-h-full flex-1 flex-col bg-white">
@@ -40,13 +57,13 @@ export default function Home() {
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
           <div className="flex items-center gap-2">
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ubac-blue text-sm font-bold text-white">
-              U17
+              U
             </span>
             <span className="text-lg font-semibold text-ubac-blue">
-              UBAC 17
+              UBAC
             </span>
           </div>
-          <button className="rounded-full bg-ubac-blue px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-ubac-blue-dark">
+          <button className="rounded-full bg-ubac-yellow px-5 py-2 text-sm font-semibold text-ubac-blue-dark transition-colors hover:bg-ubac-yellow-dark">
             Se connecter
           </button>
         </div>
@@ -55,19 +72,20 @@ export default function Home() {
       <main className="flex-1">
         <section className="bg-ubac-blue">
           <div className="mx-auto max-w-5xl px-4 py-16 text-center sm:px-6 sm:py-24">
-            <p className="text-sm font-semibold uppercase tracking-wider text-ubac-blue-light">
-              Union Basket Aunis Club
+            <p className="text-sm font-semibold uppercase tracking-wider text-ubac-yellow">
+              Union Basket Angoulins Châtelaillon
             </p>
             <h1 className="mt-3 text-3xl font-bold leading-tight text-white sm:text-5xl">
               La gestion du club,
               <br className="hidden sm:block" /> simple pour tout le monde.
             </h1>
             <p className="mx-auto mt-4 max-w-xl text-base text-white/80 sm:text-lg">
-              Membres, calendrier, convocations et réponses en temps réel :
-              tout ce dont l&apos;équipe a besoin, dans une seule application.
+              Un club familial et à taille humaine : membres, calendrier,
+              convocations et réponses en temps réel, dans une seule
+              application.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <button className="w-full rounded-full bg-white px-6 py-3 text-sm font-semibold text-ubac-blue transition-colors hover:bg-zinc-100 sm:w-auto">
+              <button className="w-full rounded-full bg-ubac-yellow px-6 py-3 text-sm font-semibold text-ubac-blue-dark transition-colors hover:bg-ubac-yellow-dark sm:w-auto">
                 Se connecter
               </button>
               <span className="flex items-center gap-1.5 text-xs text-white/70">
@@ -75,6 +93,17 @@ export default function Home() {
                 Accès réservé aux membres du club
               </span>
             </div>
+          </div>
+        </section>
+
+        <section className="border-b border-zinc-100 bg-zinc-50">
+          <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 px-4 py-10 sm:grid-cols-3 sm:px-6">
+            {clubStats.map(({ value, label }) => (
+              <div key={label} className="text-center">
+                <p className="text-3xl font-bold text-ubac-blue">{value}</p>
+                <p className="mt-1 text-sm text-zinc-500">{label}</p>
+              </div>
+            ))}
           </div>
         </section>
 
@@ -103,10 +132,35 @@ export default function Home() {
             ))}
           </div>
         </section>
+
+        <section className="border-t border-zinc-100 bg-zinc-50">
+          <div className="mx-auto max-w-5xl px-4 py-14 sm:px-6">
+            <div className="flex items-center justify-center gap-2 text-ubac-blue">
+              <Trophy className="h-5 w-5" />
+              <h2 className="text-center text-2xl font-bold text-zinc-900">
+                Nos gymnases
+              </h2>
+            </div>
+            <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              {gyms.map(({ commune, lieu }) => (
+                <div
+                  key={commune}
+                  className="flex gap-3 rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm"
+                >
+                  <MapPin className="h-5 w-5 shrink-0 text-ubac-blue" />
+                  <div>
+                    <h3 className="font-semibold text-zinc-900">{commune}</h3>
+                    <p className="mt-1 text-sm text-zinc-500">{lieu}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
       </main>
 
       <footer className="border-t border-black/5 py-6 text-center text-xs text-zinc-400">
-        UBAC 17 — Union Basket Aunis Club
+        UBAC — Union Basket Angoulins Châtelaillon
       </footer>
     </div>
   );
