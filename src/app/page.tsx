@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   CalendarDays,
   Users,
@@ -63,9 +64,12 @@ export default function Home() {
               UBAC
             </span>
           </div>
-          <button className="rounded-full bg-ubac-yellow px-5 py-2 text-sm font-semibold text-ubac-blue-dark transition-colors hover:bg-ubac-yellow-dark">
+          <Link
+            href="/connexion"
+            className="rounded-full bg-ubac-yellow px-5 py-2 text-sm font-semibold text-ubac-blue-dark transition-colors hover:bg-ubac-yellow-dark"
+          >
             Se connecter
-          </button>
+          </Link>
         </div>
       </header>
 
@@ -85,9 +89,12 @@ export default function Home() {
               application.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <button className="w-full rounded-full bg-ubac-yellow px-6 py-3 text-sm font-semibold text-ubac-blue-dark transition-colors hover:bg-ubac-yellow-dark sm:w-auto">
+              <Link
+                href="/connexion"
+                className="w-full rounded-full bg-ubac-yellow px-6 py-3 text-center text-sm font-semibold text-ubac-blue-dark transition-colors hover:bg-ubac-yellow-dark sm:w-auto"
+              >
                 Se connecter
-              </button>
+              </Link>
               <span className="flex items-center gap-1.5 text-xs text-white/70">
                 <ShieldCheck className="h-4 w-4" />
                 Accès réservé aux membres du club
