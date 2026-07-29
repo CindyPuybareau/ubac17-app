@@ -5,14 +5,11 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
-type Role = "PARENT" | "COACH";
-
 export default function InscriptionPage() {
   const router = useRouter();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
-  const [role, setRole] = useState<Role>("PARENT");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +31,6 @@ export default function InscriptionPage() {
           first_name: firstName,
           last_name: lastName,
           phone,
-          role,
         },
       },
     });
@@ -108,36 +104,6 @@ export default function InscriptionPage() {
               onChange={(e) => setPhone(e.target.value)}
               className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-ubac-blue focus:outline-none focus:ring-1 focus:ring-ubac-blue"
             />
-          </div>
-
-          <div>
-            <span className="mb-1 block text-sm font-medium text-zinc-700">
-              Je suis...
-            </span>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setRole("PARENT")}
-                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                  role === "PARENT"
-                    ? "border-ubac-blue bg-ubac-blue/10 text-ubac-blue"
-                    : "border-zinc-200 text-zinc-600"
-                }`}
-              >
-                Parent / Joueur
-              </button>
-              <button
-                type="button"
-                onClick={() => setRole("COACH")}
-                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                  role === "COACH"
-                    ? "border-ubac-blue bg-ubac-blue/10 text-ubac-blue"
-                    : "border-zinc-200 text-zinc-600"
-                }`}
-              >
-                Coach
-              </button>
-            </div>
           </div>
 
           <div>
