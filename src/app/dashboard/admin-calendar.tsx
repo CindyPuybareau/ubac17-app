@@ -6,16 +6,6 @@ import { parseMatchTitle } from "@/lib/match-display";
 import OpponentDisplay from "./opponent-display";
 import type { AdminUpcomingEvent } from "./page";
 
-type EventFilter = "ALL" | "MATCH" | "TOURNAMENT" | "OTHER" | "TRAINING";
-
-const filterLabels: Record<EventFilter, string> = {
-  ALL: "Tous",
-  MATCH: "Matchs",
-  TOURNAMENT: "Tournois",
-  OTHER: "Événements club",
-  TRAINING: "Entraînements",
-};
-
 const typeStyles: Record<
   string,
   { pill: string; border: string; badge: string; label: string }
@@ -100,27 +90,18 @@ export default function AdminCalendar({
 }: {
   events: AdminUpcomingEvent[];
 }) {
-  const [filter, setFilter] = useState<EventFilter>("ALL");
   const [selectedDate, setSelectedDate] = useState<Date>(today);
-
-  const filteredEvents = useMemo(
-    () =>
-      filter === "ALL"
-        ? events
-        : events.filter((e) => (e.event_type ?? "OTHER") === filter),
-    [events, filter]
-  );
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, AdminUpcomingEvent[]>();
-    filteredEvents.forEach((e) => {
+    events.forEach((e) => {
       const key = toKey(new Date(e.start_time));
       const list = map.get(key) ?? [];
       list.push(e);
       map.set(key, list);
     });
     return map;
-  }, [filteredEvents]);
+  }, [events]);
 
   function goToday() {
     setSelectedDate(new Date());
@@ -150,14 +131,14 @@ export default function AdminCalendar({
           <button
             onClick={() => step(-1)}
             aria-label="Précédent"
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-navy text-white transition-colors hover:bg-navy-dark"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
           <button
             onClick={() => step(1)}
             aria-label="Suivant"
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-navy text-white transition-colors hover:bg-navy-dark"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
@@ -171,22 +152,6 @@ export default function AdminCalendar({
         >
           Aujourd&apos;hui
         </button>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {(Object.keys(filterLabels) as EventFilter[]).map((key) => (
-          <button
-            key={key}
-            onClick={() => setFilter(key)}
-            className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
-              filter === key
-                ? "border-ubac-yellow bg-ubac-yellow/10 text-ubac-yellow-dark"
-                : "border-zinc-200 text-zinc-600"
-            }`}
-          >
-            {filterLabels[key]}
-          </button>
-        ))}
       </div>
 
       <div className="overflow-x-auto">
