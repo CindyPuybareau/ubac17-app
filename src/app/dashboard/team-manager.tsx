@@ -8,6 +8,7 @@ import OpponentDisplay from "./opponent-display";
 import type { AdminUpcomingEvent } from "./page";
 
 const CURRENT_SEASON = "2026-2027";
+const now = Date.now();
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 
@@ -206,7 +207,9 @@ export default function TeamManager({
           const availableCoaches = allProfiles.filter(
             (p) => !team.coaches.some((tc) => tc.id === p.id)
           );
-          const teamEvents = (eventsByTeamId[team.id] ?? []).slice(0, 3);
+          const teamEvents = (eventsByTeamId[team.id] ?? [])
+            .filter((e) => new Date(e.start_time).getTime() >= now)
+            .slice(0, 3);
 
           return (
             <div

@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 type Team = { id: string; name: string | null; category: string | null };
-type EventType = "MATCH" | "TRAINING" | "OTHER";
+type EventType = "MATCH" | "TRAINING" | "OTHER" | "TOURNAMENT";
 
 const defaultTitles: Record<EventType, string> = {
   MATCH: "Match",
   TRAINING: "Entraînement",
   OTHER: "Événement",
+  TOURNAMENT: "Tournoi",
 };
 
 export default function CreateEventForm({ teams }: { teams: Team[] }) {
@@ -93,6 +94,7 @@ export default function CreateEventForm({ teams }: { teams: Team[] }) {
         >
           <option value="MATCH">Match</option>
           <option value="TRAINING">Entraînement</option>
+          <option value="TOURNAMENT">Tournoi / Coupe</option>
           <option value="OTHER">Autre</option>
         </select>
         <input
