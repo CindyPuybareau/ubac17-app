@@ -54,7 +54,7 @@ export default async function DashboardPage() {
         .maybeSingle(),
       supabase
         .from("team_coaches")
-        .select("teams(id, name, category, calendar_url, ffbb_url)")
+        .select("teams(id, name, category, ffbb_url)")
         .eq("coach_id", user.id),
       supabase
         .from("parent_player")
@@ -70,7 +70,6 @@ export default async function DashboardPage() {
     id: string;
     name: string | null;
     category: string | null;
-    calendar_url: string | null;
     ffbb_url: string | null;
   };
 
@@ -130,7 +129,7 @@ export default async function DashboardPage() {
       await Promise.all([
         supabase
           .from("teams")
-          .select("id, name, category, calendar_url, ffbb_url")
+          .select("id, name, category, ffbb_url")
           .order("category"),
         supabase
           .from("players")
@@ -173,7 +172,6 @@ export default async function DashboardPage() {
       id: t.id,
       name: t.name,
       category: t.category,
-      calendar_url: t.calendar_url,
       ffbb_url: t.ffbb_url,
       players: rosterByTeam.get(t.id) ?? [],
       coaches: coachesByTeam.get(t.id) ?? [],

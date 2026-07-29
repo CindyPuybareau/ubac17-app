@@ -1,6 +1,5 @@
 import { Users, CalendarDays, ClipboardCheck } from "lucide-react";
 import CreateEventForm from "./create-event-form";
-import CalendarSync from "./calendar-sync";
 import FfbbSync from "./ffbb-sync";
 import type { UpcomingEvent } from "./family-data";
 
@@ -8,7 +7,6 @@ type Team = {
   id: string;
   name: string | null;
   category: string | null;
-  calendar_url: string | null;
   ffbb_url: string | null;
 };
 
@@ -96,8 +94,7 @@ export default function CoachView({
                   ))}
                 </ul>
               )}
-              <div className="mt-3 flex flex-col gap-2">
-                <CalendarSync teamId={team.id} initialUrl={team.calendar_url} />
+              <div className="mt-3">
                 <FfbbSync teamId={team.id} initialUrl={team.ffbb_url} />
               </div>
             </div>

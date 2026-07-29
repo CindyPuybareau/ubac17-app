@@ -3,7 +3,6 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import CalendarSync from "./calendar-sync";
 import FfbbSync from "./ffbb-sync";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
@@ -12,7 +11,6 @@ export type TeamWithMembers = {
   id: string;
   name: string | null;
   category: string | null;
-  calendar_url: string | null;
   ffbb_url: string | null;
   players: Person[];
   coaches: Person[];
@@ -240,8 +238,7 @@ export default function TeamManager({
                 </div>
               </div>
 
-              <div className="mt-3 flex flex-col gap-2">
-                <CalendarSync teamId={team.id} initialUrl={team.calendar_url} />
+              <div className="mt-3">
                 <FfbbSync teamId={team.id} initialUrl={team.ffbb_url} />
               </div>
             </div>
