@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/client";
 import OpponentDisplay from "./opponent-display";
 import type { AdminUpcomingEvent } from "./page";
 
+const CURRENT_SEASON = "2026-2027";
+
 type Person = { id: string; first_name: string | null; last_name: string | null };
 
 export type TeamWithMembers = {
@@ -24,12 +26,10 @@ function fullName(p: Person) {
 
 export default function TeamManager({
   teams,
-  allPlayers,
   allProfiles,
   eventsByTeamId,
 }: {
   teams: TeamWithMembers[];
-  allPlayers: Person[];
   allProfiles: Person[];
   eventsByTeamId: Record<string, AdminUpcomingEvent[]>;
 }) {
@@ -38,6 +38,81 @@ export default function TeamManager({
   const [category, setCategory] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const [openPlayerFormTeamId, setOpenPlayerFormTeamId] = useState<
+    string | null
+  >(null);
+  const [newPlayerFirstName, setNewPlayerFirstName] = useState("");
+  const [newPlayerLastName, setNewPlayerLastName] = useState("");
+  const [newPlayerBirthDate, setNewPlayerBirthDate] = useState("");
+  const [newPlayerParentEmail, setNewPlayerParentEmail] = useState("");
+  const [newPlayerError, setNewPlayerError] = useState<string | null>(null);
+  const [newPlayerLoading, setNewPlayerLoading] = useState(false);
+
+  function closePlayerForm() {
+    setOpenPlayerFormTeamId(null);
+    setNewPlayerFirstName("");
+    setNewPlayerLastName("");
+    setNewPlayerBirthDate("");
+    setNewPlayerParentEmail("");
+    setNewPlayerError(null);
+  }
+
+  async function createPlayer(team: TeamWithMembers, e: FormEvent) {
+    e.preventDefault();
+    setNewPlayerLoading(true);
+    setNewPlayerError(null);
+
+    const supabase = createClient();
+
+    const { data: player, error: playerError } = await supabase
+      .from("players")
+      .insert({
+        first_name: newPlayerFirstName,
+        last_name: newPlayerLastName,
+        birth_date: newPlayerBirthDate || null,
+        category: team.category,
+        pending_parent_email: newPlayerParentEmail || null,
+      })
+      .select("id")
+      .single();
+
+    if (playerError || !player) {
+      setNewPlayerLoading(false);
+      setNewPlayerError(
+        playerError?.message ?? "Impossible de créer la fiche joueur."
+      );
+      return;
+    }
+
+    const { error: teamPlayerError } = await supabase
+      .from("team_players")
+      .insert({ team_id: team.id, player_id: player.id });
+
+    if (teamPlayerError) {
+      setNewPlayerLoading(false);
+      setNewPlayerError(teamPlayerError.message);
+      return;
+    }
+
+    const { error: cotisationError } = await supabase
+      .from("cotisations")
+      .insert({
+        player_id: player.id,
+        saison: CURRENT_SEASON,
+        statut: "EN_ATTENTE",
+      });
+
+    setNewPlayerLoading(false);
+
+    if (cotisationError) {
+      setNewPlayerError(cotisationError.message);
+      return;
+    }
+
+    closePlayerForm();
+    router.refresh();
+  }
 
   async function handleCreateTeam(e: FormEvent) {
     e.preventDefault();
@@ -58,13 +133,6 @@ export default function TeamManager({
 
     setName("");
     setCategory("");
-    router.refresh();
-  }
-
-  async function addPlayer(teamId: string, playerId: string) {
-    if (!playerId) return;
-    const supabase = createClient();
-    await supabase.from("team_players").insert({ team_id: teamId, player_id: playerId });
     router.refresh();
   }
 
@@ -135,9 +203,6 @@ export default function TeamManager({
 
       <div className="flex flex-col gap-4">
         {teams.map((team) => {
-          const availablePlayers = allPlayers.filter(
-            (p) => !team.players.some((tp) => tp.id === p.id)
-          );
           const availableCoaches = allProfiles.filter(
             (p) => !team.coaches.some((tc) => tc.id === p.id)
           );
@@ -177,24 +242,69 @@ export default function TeamManager({
                       <li className="text-sm text-zinc-400">Aucun joueur</li>
                     )}
                   </ul>
-                  {availablePlayers.length > 0 && (
-                    <select
-                      defaultValue=""
-                      onChange={(e) => {
-                        addPlayer(team.id, e.target.value);
-                        e.target.value = "";
-                      }}
-                      className="mt-2 w-full rounded-lg border border-zinc-200 px-2 py-1.5 text-sm"
+                  {openPlayerFormTeamId === team.id ? (
+                    <form
+                      onSubmit={(e) => createPlayer(team, e)}
+                      className="mt-2 flex flex-col gap-2 rounded-lg bg-zinc-50 p-3"
                     >
-                      <option value="" disabled>
-                        + Ajouter un joueur
-                      </option>
-                      {availablePlayers.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {fullName(p)}
-                        </option>
-                      ))}
-                    </select>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          required
+                          placeholder="Prénom"
+                          value={newPlayerFirstName}
+                          onChange={(e) => setNewPlayerFirstName(e.target.value)}
+                          className="rounded-lg border border-zinc-200 px-2 py-1.5 text-sm"
+                        />
+                        <input
+                          required
+                          placeholder="Nom"
+                          value={newPlayerLastName}
+                          onChange={(e) => setNewPlayerLastName(e.target.value)}
+                          className="rounded-lg border border-zinc-200 px-2 py-1.5 text-sm"
+                        />
+                      </div>
+                      <input
+                        type="date"
+                        value={newPlayerBirthDate}
+                        onChange={(e) => setNewPlayerBirthDate(e.target.value)}
+                        className="rounded-lg border border-zinc-200 px-2 py-1.5 text-sm"
+                      />
+                      <input
+                        type="email"
+                        placeholder="Email du parent (optionnel)"
+                        value={newPlayerParentEmail}
+                        onChange={(e) =>
+                          setNewPlayerParentEmail(e.target.value)
+                        }
+                        className="rounded-lg border border-zinc-200 px-2 py-1.5 text-sm"
+                      />
+                      {newPlayerError && (
+                        <p className="text-xs text-red-600">{newPlayerError}</p>
+                      )}
+                      <div className="flex gap-2">
+                        <button
+                          type="submit"
+                          disabled={newPlayerLoading}
+                          className="rounded-full bg-ubac-yellow px-3 py-1.5 text-xs font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+                        >
+                          {newPlayerLoading ? "Ajout..." : "Ajouter"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={closePlayerForm}
+                          className="rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-white"
+                        >
+                          Annuler
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <button
+                      onClick={() => setOpenPlayerFormTeamId(team.id)}
+                      className="mt-2 w-full rounded-lg border border-dashed border-zinc-300 px-2 py-1.5 text-sm font-medium text-zinc-600 hover:border-ubac-yellow hover:text-ubac-yellow-dark"
+                    >
+                      + Ajouter un joueur
+                    </button>
                   )}
                 </div>
 

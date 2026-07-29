@@ -1,20 +1,13 @@
-import {
-  Shield,
-  LayoutGrid,
-  CalendarDays,
-  Users,
-  Wallet,
-  RefreshCw,
-} from "lucide-react";
+import { LayoutGrid, CalendarDays, Users, Wallet, RefreshCw } from "lucide-react";
 import TeamManager, { type TeamWithMembers } from "./team-manager";
 import ImportInscriptions from "./import-inscriptions";
 import ImportPlanning from "./import-planning";
 import ImportCoaches from "./import-coaches";
-import MembersTable from "./members-table";
 import CotisationsTable from "./cotisations-table";
 import AdminCalendar from "./admin-calendar";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import FfbbManager from "./ffbb-manager";
+import OverviewStats from "./overview-stats";
 import type { AdminCotisation, AdminUpcomingEvent } from "./page";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
@@ -22,14 +15,12 @@ type Person = { id: string; first_name: string | null; last_name: string | null 
 export default function AdminView({
   clubFunction,
   teams,
-  allPlayers,
   allProfiles,
   cotisations,
   upcomingEvents,
 }: {
   clubFunction?: string | null;
   teams: TeamWithMembers[];
-  allPlayers: Person[];
   allProfiles: Person[];
   cotisations: AdminCotisation[];
   upcomingEvents: AdminUpcomingEvent[];
@@ -46,38 +37,15 @@ export default function AdminView({
     (eventsByTeamId[e.teamId] ??= []).push(e);
   });
 
-  const overview = (
-    <div className="grid grid-cols-2 gap-4">
-      <div className="flex items-center gap-3 rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-ubac-yellow/15 text-ubac-yellow-dark">
-          <LayoutGrid className="h-5 w-5" />
-        </span>
-        <div>
-          <p className="text-2xl font-bold text-zinc-900">{teams.length}</p>
-          <p className="text-sm text-zinc-500">Équipes</p>
-        </div>
-      </div>
-      <div className="flex items-center gap-3 rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-ubac-yellow/15 text-ubac-yellow-dark">
-          <Shield className="h-5 w-5" />
-        </span>
-        <div>
-          <p className="text-2xl font-bold text-zinc-900">
-            {allProfiles.length}
-          </p>
-          <p className="text-sm text-zinc-500">Membres</p>
-        </div>
-      </div>
-    </div>
-  );
-
   const iconClass = "h-4 w-4 shrink-0";
   const sections: AdminSection[] = [
     {
       key: "overview",
       label: "Aperçu",
       icon: <LayoutGrid className={iconClass} />,
-      content: overview,
+      content: (
+        <OverviewStats teamsCount={teams.length} members={allProfiles} />
+      ),
     },
     {
       key: "calendar",
@@ -92,17 +60,10 @@ export default function AdminView({
       content: (
         <TeamManager
           teams={teams}
-          allPlayers={allPlayers}
           allProfiles={allProfiles}
           eventsByTeamId={eventsByTeamId}
         />
       ),
-    },
-    {
-      key: "members",
-      label: "Membres",
-      icon: <Shield className={iconClass} />,
-      content: <MembersTable members={allProfiles} />,
     },
     {
       key: "cotisations",

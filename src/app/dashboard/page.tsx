@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import SignOutButton from "./sign-out-button";
-import AddChildForm from "./add-child-form";
 import DashboardTabs, { type DashboardTab } from "./dashboard-tabs";
 import AdminView from "./admin-view";
 import type { TeamWithMembers } from "./team-manager";
@@ -144,7 +143,6 @@ export default async function DashboardPage() {
   );
 
   let adminTeams: TeamWithMembers[] = [];
-  let allPlayersForAdmin: Person[] = [];
   let allProfilesForAdmin: Person[] = [];
   let adminCotisations: AdminCotisation[] = [];
   let adminUpcomingEvents: AdminUpcomingEvent[] = [];
@@ -220,7 +218,6 @@ export default async function DashboardPage() {
       players: rosterByTeam.get(t.id) ?? [],
       coaches: coachesByTeam.get(t.id) ?? [],
     }));
-    allPlayersForAdmin = playersRes.data ?? [];
     allProfilesForAdmin = profilesRes.data ?? [];
 
     adminCotisations = (cotisationsRes.data ?? []).map((c) => {
@@ -272,7 +269,6 @@ export default async function DashboardPage() {
         <AdminView
           clubFunction={clubFunction}
           teams={adminTeams}
-          allPlayers={allPlayersForAdmin}
           allProfiles={allProfilesForAdmin}
           cotisations={adminCotisations}
           upcomingEvents={adminUpcomingEvents}
@@ -378,12 +374,10 @@ export default async function DashboardPage() {
 
       {tabs.length === 0 && (
         <p className="text-sm text-zinc-500">
-          Aucun espace n&apos;est encore rattaché à ton compte. Ajoute un
-          enfant ci-dessous pour commencer à suivre ses matchs.
+          Aucun espace n&apos;est encore rattaché à ton compte. Contacte le
+          Bureau pour qu&apos;il associe ton enfant à ton adresse email.
         </p>
       )}
-
-        <AddChildForm parentId={user.id} />
       </div>
     </div>
   );
