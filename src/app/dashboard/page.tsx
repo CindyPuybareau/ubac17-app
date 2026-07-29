@@ -49,6 +49,7 @@ export type AdminUpcomingEvent = {
   event_type: string | null;
   location: string | null;
   start_time: string;
+  teamId: string | null;
   teamName: string;
 };
 
@@ -180,7 +181,7 @@ export default async function DashboardPage() {
         .order("saison", { ascending: false }),
       supabase
         .from("events")
-        .select("id, title, event_type, location, start_time, teams(name, category)")
+        .select("id, title, event_type, location, start_time, teams(id, name, category)")
         .gte("start_time", new Date().toISOString())
         .order("start_time", { ascending: true })
         .limit(30),
@@ -245,6 +246,7 @@ export default async function DashboardPage() {
 
     adminUpcomingEvents = (upcomingEventsRes.data ?? []).map((e) => {
       const team = e.teams as unknown as {
+        id: string;
         name: string | null;
         category: string | null;
       } | null;
@@ -254,6 +256,7 @@ export default async function DashboardPage() {
         event_type: e.event_type,
         location: e.location,
         start_time: e.start_time,
+        teamId: team?.id ?? null,
         teamName: team?.name ?? "Équipe",
       };
     });
@@ -324,7 +327,7 @@ export default async function DashboardPage() {
         </div>
       </header>
 
-      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
+      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 pt-6 pb-24 sm:px-6 sm:py-10">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-zinc-500">Bienvenue,</p>

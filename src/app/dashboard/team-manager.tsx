@@ -2,8 +2,10 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { CalendarDays } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import FfbbSync from "./ffbb-sync";
+import OpponentDisplay from "./opponent-display";
+import type { AdminUpcomingEvent } from "./page";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 
@@ -24,10 +26,12 @@ export default function TeamManager({
   teams,
   allPlayers,
   allProfiles,
+  eventsByTeamId,
 }: {
   teams: TeamWithMembers[];
   allPlayers: Person[];
   allProfiles: Person[];
+  eventsByTeamId: Record<string, AdminUpcomingEvent[]>;
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -137,6 +141,7 @@ export default function TeamManager({
           const availableCoaches = allProfiles.filter(
             (p) => !team.coaches.some((tc) => tc.id === p.id)
           );
+          const teamEvents = (eventsByTeamId[team.id] ?? []).slice(0, 3);
 
           return (
             <div
@@ -238,8 +243,37 @@ export default function TeamManager({
                 </div>
               </div>
 
-              <div className="mt-3">
-                <FfbbSync teamId={team.id} initialUrl={team.ffbb_url} />
+              <div className="mt-3 border-t border-zinc-100 pt-3">
+                <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  <CalendarDays className="h-3.5 w-3.5" />
+                  Prochains matchs
+                </p>
+                {teamEvents.length > 0 ? (
+                  <ul className="flex flex-col gap-1.5">
+                    {teamEvents.map((e) => (
+                      <li
+                        key={e.id}
+                        className="flex items-center justify-between gap-2 rounded-lg bg-zinc-50 px-2 py-1.5"
+                      >
+                        {e.event_type === "MATCH" ? (
+                          <OpponentDisplay title={e.title} size="sm" />
+                        ) : (
+                          <span className="truncate text-sm font-medium text-zinc-700">
+                            {e.title ?? "Événement"}
+                          </span>
+                        )}
+                        <span className="shrink-0 text-xs text-zinc-500">
+                          {new Date(e.start_time).toLocaleDateString("fr-FR", {
+                            day: "numeric",
+                            month: "short",
+                          })}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-zinc-400">Aucun match à venir</p>
+                )}
               </div>
             </div>
           );

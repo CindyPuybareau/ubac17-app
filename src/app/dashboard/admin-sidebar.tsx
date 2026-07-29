@@ -48,18 +48,26 @@ export default function AdminSidebar({
         <div className="min-w-0 flex-1">{current.content}</div>
       </div>
 
-      {/* Mobile / tablet: everything stacked, sidebar hidden */}
-      <div className="flex flex-col gap-6 lg:hidden">
-        {sections.map((section) => (
-          <div key={section.key}>
-            <h3 className="mb-2 flex items-center gap-2 font-semibold text-zinc-900">
+      {/* Mobile / tablet: one section at a time, switched via the bottom tab bar */}
+      <div className="pb-20 lg:hidden">{current.content}</div>
+
+      <nav className="fixed inset-x-0 bottom-0 z-20 flex gap-1 overflow-x-auto border-t border-navy-dark bg-navy px-1 py-1.5 lg:hidden">
+        {sections.map((section) => {
+          const isActive = section.key === current.key;
+          return (
+            <button
+              key={section.key}
+              onClick={() => setActive(section.key)}
+              className={`flex min-w-[68px] flex-1 flex-col items-center gap-0.5 rounded-lg px-1.5 py-1.5 text-[11px] font-medium transition-colors ${
+                isActive ? "text-ubac-yellow" : "text-white/60"
+              }`}
+            >
               {section.icon}
-              {section.label}
-            </h3>
-            {section.content}
-          </div>
-        ))}
-      </div>
+              <span className="w-full truncate text-center">{section.label}</span>
+            </button>
+          );
+        })}
+      </nav>
     </div>
   );
 }

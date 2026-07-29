@@ -4,7 +4,7 @@ import {
   CalendarDays,
   Users,
   Wallet,
-  Settings,
+  RefreshCw,
 } from "lucide-react";
 import TeamManager, { type TeamWithMembers } from "./team-manager";
 import ImportInscriptions from "./import-inscriptions";
@@ -14,6 +14,7 @@ import MembersTable from "./members-table";
 import CotisationsTable from "./cotisations-table";
 import AdminCalendar from "./admin-calendar";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
+import FfbbManager from "./ffbb-manager";
 import type { AdminCotisation, AdminUpcomingEvent } from "./page";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
@@ -38,6 +39,12 @@ export default function AdminView({
     name: t.name,
     category: t.category,
   }));
+
+  const eventsByTeamId: Record<string, AdminUpcomingEvent[]> = {};
+  upcomingEvents.forEach((e) => {
+    if (!e.teamId) return;
+    (eventsByTeamId[e.teamId] ??= []).push(e);
+  });
 
   const overview = (
     <div className="grid grid-cols-2 gap-4">
@@ -68,7 +75,7 @@ export default function AdminView({
   const sections: AdminSection[] = [
     {
       key: "overview",
-      label: "Vue d'ensemble",
+      label: "Aperçu",
       icon: <LayoutGrid className={iconClass} />,
       content: overview,
     },
@@ -80,14 +87,28 @@ export default function AdminView({
     },
     {
       key: "teams",
-      label: "Équipes & FFBB",
+      label: "Équipes",
       icon: <Users className={iconClass} />,
       content: (
         <TeamManager
           teams={teams}
           allPlayers={allPlayers}
           allProfiles={allProfiles}
+          eventsByTeamId={eventsByTeamId}
         />
+      ),
+    },
+    {
+      key: "ffbb",
+      label: "FFBB",
+      icon: <RefreshCw className={iconClass} />,
+      content: (
+        <div className="flex flex-col gap-4">
+          <FfbbManager teams={teams} />
+          <ImportInscriptions existingTeams={teamRefs} />
+          <ImportPlanning existingTeams={teamRefs} />
+          <ImportCoaches existingTeams={teamRefs} />
+        </div>
       ),
     },
     {
@@ -101,18 +122,6 @@ export default function AdminView({
       label: "Cotisations",
       icon: <Wallet className={iconClass} />,
       content: <CotisationsTable cotisations={cotisations} />,
-    },
-    {
-      key: "imports",
-      label: "Imports",
-      icon: <Settings className={iconClass} />,
-      content: (
-        <div className="flex flex-col gap-4">
-          <ImportInscriptions existingTeams={teamRefs} />
-          <ImportPlanning existingTeams={teamRefs} />
-          <ImportCoaches existingTeams={teamRefs} />
-        </div>
-      ),
     },
   ];
 
