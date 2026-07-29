@@ -6,15 +6,7 @@ import { parseMatchTitle } from "@/lib/match-display";
 import OpponentDisplay from "./opponent-display";
 import type { AdminUpcomingEvent } from "./page";
 
-type ViewMode = "DAY" | "WEEK" | "MONTH" | "SEASON";
 type EventFilter = "ALL" | "MATCH" | "TOURNAMENT" | "OTHER" | "TRAINING";
-
-const viewLabels: Record<ViewMode, string> = {
-  DAY: "Jour",
-  WEEK: "Semaine",
-  MONTH: "Mois",
-  SEASON: "Saison",
-};
 
 const filterLabels: Record<EventFilter, string> = {
   ALL: "Tous",
@@ -99,15 +91,6 @@ function buildMonthGrid(monthDate: Date): Date[] {
   return days;
 }
 
-function buildWeekGrid(anchor: Date): Date[] {
-  const monday = startOfWeekMonday(anchor);
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    return d;
-  });
-}
-
 const weekdayLabels = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 const today = new Date();
 const todayKey = toKey(today);
@@ -117,7 +100,6 @@ export default function AdminCalendar({
 }: {
   events: AdminUpcomingEvent[];
 }) {
-  const [viewMode, setViewMode] = useState<ViewMode>("MONTH");
   const [filter, setFilter] = useState<EventFilter>("ALL");
   const [selectedDate, setSelectedDate] = useState<Date>(today);
 
@@ -146,81 +128,39 @@ export default function AdminCalendar({
 
   function step(amount: number) {
     const d = new Date(selectedDate);
-    if (viewMode === "MONTH") d.setMonth(d.getMonth() + amount);
-    else if (viewMode === "WEEK") d.setDate(d.getDate() + amount * 7);
-    else d.setDate(d.getDate() + amount);
+    d.setMonth(d.getMonth() + amount);
     setSelectedDate(d);
   }
 
   const selectedKey = toKey(selectedDate);
 
-  const headerLabel = useMemo(() => {
-    if (viewMode === "MONTH") {
-      return selectedDate.toLocaleDateString("fr-FR", {
-        month: "long",
-        year: "numeric",
-      });
-    }
-    if (viewMode === "WEEK") {
-      const week = buildWeekGrid(selectedDate);
-      const start = week[0];
-      const end = week[6];
-      const sameMonth = start.getMonth() === end.getMonth();
-      const startLabel = start.toLocaleDateString("fr-FR", {
-        day: "numeric",
-        month: sameMonth ? undefined : "short",
-      });
-      const endLabel = end.toLocaleDateString("fr-FR", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      });
-      return `${startLabel} – ${endLabel}`;
-    }
-    if (viewMode === "DAY") {
-      return selectedDate.toLocaleDateString("fr-FR", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      });
-    }
-    return "Toute la saison";
-  }, [viewMode, selectedDate]);
+  const headerLabel = selectedDate.toLocaleDateString("fr-FR", {
+    month: "long",
+    year: "numeric",
+  });
 
-  const gridDays = useMemo(() => {
-    if (viewMode === "MONTH") return buildMonthGrid(selectedDate);
-    if (viewMode === "WEEK") return buildWeekGrid(selectedDate);
-    return [];
-  }, [viewMode, selectedDate]);
+  const gridDays = useMemo(() => buildMonthGrid(selectedDate), [selectedDate]);
 
-  const detailEvents = useMemo(() => {
-    if (viewMode === "SEASON") return filteredEvents;
-    return eventsByDate.get(selectedKey) ?? [];
-  }, [viewMode, selectedKey, eventsByDate, filteredEvents]);
+  const detailEvents = eventsByDate.get(selectedKey) ?? [];
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          {viewMode !== "SEASON" && (
-            <>
-              <button
-                onClick={() => step(-1)}
-                aria-label="Précédent"
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 text-zinc-600 hover:bg-zinc-50"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => step(1)}
-                aria-label="Suivant"
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 text-zinc-600 hover:bg-zinc-50"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </>
-          )}
+          <button
+            onClick={() => step(-1)}
+            aria-label="Précédent"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => step(1)}
+            aria-label="Suivant"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
           <span className="text-sm font-semibold capitalize text-zinc-900">
             {headerLabel}
           </span>
@@ -231,22 +171,6 @@ export default function AdminCalendar({
         >
           Aujourd&apos;hui
         </button>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {(Object.keys(viewLabels) as ViewMode[]).map((key) => (
-          <button
-            key={key}
-            onClick={() => setViewMode(key)}
-            className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
-              viewMode === key
-                ? "border-navy bg-navy text-white"
-                : "border-zinc-200 text-zinc-600"
-            }`}
-          >
-            {viewLabels[key]}
-          </button>
-        ))}
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -265,89 +189,82 @@ export default function AdminCalendar({
         ))}
       </div>
 
-      {(viewMode === "MONTH" || viewMode === "WEEK") && (
-        <div className="overflow-x-auto">
-          <div className="min-w-[640px]">
-            <div className="grid grid-cols-7 gap-1.5">
-              {weekdayLabels.map((label) => (
-                <div
-                  key={label}
-                  className="px-1 text-center text-xs font-semibold uppercase tracking-wide text-zinc-400"
-                >
-                  {label}
-                </div>
-              ))}
-            </div>
-            <div className="mt-1 grid grid-cols-7 gap-1.5">
-              {gridDays.map((d) => {
-                const key = toKey(d);
-                const dayEvents = eventsByDate.get(key) ?? [];
-                const isCurrentMonth =
-                  viewMode === "WEEK" ||
-                  (d.getMonth() === selectedDate.getMonth() &&
-                    d.getFullYear() === selectedDate.getFullYear());
-                const isToday = key === todayKey;
-                const isSelected = key === selectedKey;
-                const visible = dayEvents.slice(0, 3);
-                const overflow = dayEvents.length - visible.length;
+      <div className="overflow-x-auto">
+        <div className="min-w-[640px]">
+          <div className="grid grid-cols-7 gap-1.5">
+            {weekdayLabels.map((label) => (
+              <div
+                key={label}
+                className="px-1 text-center text-xs font-semibold uppercase tracking-wide text-zinc-400"
+              >
+                {label}
+              </div>
+            ))}
+          </div>
+          <div className="mt-1 grid grid-cols-7 gap-1.5">
+            {gridDays.map((d) => {
+              const key = toKey(d);
+              const dayEvents = eventsByDate.get(key) ?? [];
+              const isCurrentMonth =
+                d.getMonth() === selectedDate.getMonth() &&
+                d.getFullYear() === selectedDate.getFullYear();
+              const isToday = key === todayKey;
+              const isSelected = key === selectedKey;
+              const visible = dayEvents.slice(0, 3);
+              const overflow = dayEvents.length - visible.length;
 
-                return (
-                  <button
-                    key={key}
-                    onClick={() => setSelectedDate(d)}
-                    className={`flex min-h-[76px] flex-col items-start gap-1 rounded-xl border p-1.5 text-left transition-colors sm:min-h-[104px] sm:p-2 ${
-                      isSelected
-                        ? "border-navy bg-navy/5"
-                        : "border-zinc-100 bg-white hover:border-ubac-yellow/50"
-                    } ${!isCurrentMonth ? "opacity-40" : ""}`}
+              return (
+                <button
+                  key={key}
+                  onClick={() => setSelectedDate(d)}
+                  className={`flex min-h-[76px] flex-col items-start gap-1 rounded-xl border p-1.5 text-left transition-colors sm:min-h-[104px] sm:p-2 ${
+                    isSelected
+                      ? "border-navy bg-navy/5"
+                      : "border-zinc-100 bg-white hover:border-ubac-yellow/50"
+                  } ${!isCurrentMonth ? "opacity-40" : ""}`}
+                >
+                  <span
+                    className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
+                      isToday ? "bg-ubac-yellow text-navy" : "text-zinc-700"
+                    }`}
                   >
-                    <span
-                      className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
-                        isToday ? "bg-ubac-yellow text-navy" : "text-zinc-700"
-                      }`}
-                    >
-                      {d.getDate()}
-                    </span>
-                    <div className="flex w-full flex-col gap-0.5">
-                      {visible.map((e) => (
-                        <span
-                          key={e.id}
-                          className={`truncate rounded px-1 py-0.5 text-[10px] font-semibold ${styleFor(e.event_type).pill}`}
-                        >
-                          {pillLabel(e)}
-                        </span>
-                      ))}
-                      {overflow > 0 && (
-                        <span className="text-[10px] font-semibold text-zinc-400">
-                          +{overflow}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+                    {d.getDate()}
+                  </span>
+                  <div className="flex w-full flex-col gap-0.5">
+                    {visible.map((e) => (
+                      <span
+                        key={e.id}
+                        className={`truncate rounded px-1 py-0.5 text-[10px] font-semibold ${styleFor(e.event_type).pill}`}
+                      >
+                        {pillLabel(e)}
+                      </span>
+                    ))}
+                    {overflow > 0 && (
+                      <span className="text-[10px] font-semibold text-zinc-400">
+                        +{overflow}
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
-      )}
+      </div>
 
       <div className="flex flex-col gap-2">
-        {viewMode !== "SEASON" && (
-          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-            {selectedKey === todayKey
-              ? "Aujourd'hui"
-              : selectedDate.toLocaleDateString("fr-FR", {
-                  weekday: "long",
-                  day: "numeric",
-                  month: "long",
-                })}
-          </p>
-        )}
+        <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+          {selectedKey === todayKey
+            ? "Aujourd'hui"
+            : selectedDate.toLocaleDateString("fr-FR", {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+              })}
+        </p>
 
         {detailEvents.length === 0 ? (
-          <p className="text-sm text-zinc-500">
-            Aucun événement{viewMode === "SEASON" ? " pour ce filtre." : " ce jour-là."}
-          </p>
+          <p className="text-sm text-zinc-500">Aucun événement ce jour-là.</p>
         ) : (
           detailEvents.map((event) => {
             const style = styleFor(event.event_type);
