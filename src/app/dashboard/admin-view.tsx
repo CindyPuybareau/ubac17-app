@@ -1,32 +1,18 @@
-import { Users, Shield, LayoutGrid, Settings } from "lucide-react";
+import { Shield, LayoutGrid } from "lucide-react";
+import TeamManager, { type TeamWithMembers } from "./team-manager";
 
-const shortcuts = [
-  {
-    icon: LayoutGrid,
-    title: "Vue d'ensemble du club",
-    description: "Effectifs, équipes et activité récente en un coup d'œil.",
-  },
-  {
-    icon: Users,
-    title: "Gestion globale des équipes",
-    description: "Créer, modifier et affecter les équipes du club.",
-  },
-  {
-    icon: Shield,
-    title: "Tous les membres",
-    description: "Liste complète des coachs, parents et joueurs du club.",
-  },
-  {
-    icon: Settings,
-    title: "Administration",
-    description: "Réglages du club, rôles et paramètres avancés.",
-  },
-];
+type Person = { id: string; first_name: string | null; last_name: string | null };
 
 export default function AdminView({
   clubFunction,
+  teams,
+  allPlayers,
+  allProfiles,
 }: {
   clubFunction?: string | null;
+  teams: TeamWithMembers[];
+  allPlayers: Person[];
+  allProfiles: Person[];
 }) {
   return (
     <div className="flex flex-col gap-4">
@@ -37,21 +23,37 @@ export default function AdminView({
       <p className="text-sm text-zinc-500">
         Accès complet à la gestion du club.
       </p>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {shortcuts.map(({ icon: Icon, title, description }) => (
-          <div
-            key={title}
-            className="flex gap-4 rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm"
-          >
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-100 text-green-700">
-              <Icon className="h-5 w-5" />
-            </span>
-            <div>
-              <h3 className="font-semibold text-zinc-900">{title}</h3>
-              <p className="mt-1 text-sm text-zinc-500">{description}</p>
-            </div>
+
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-2">
+        <div className="flex items-center gap-3 rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-100 text-green-700">
+            <LayoutGrid className="h-5 w-5" />
+          </span>
+          <div>
+            <p className="text-2xl font-bold text-zinc-900">{teams.length}</p>
+            <p className="text-sm text-zinc-500">Équipes</p>
           </div>
-        ))}
+        </div>
+        <div className="flex items-center gap-3 rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-100 text-green-700">
+            <Shield className="h-5 w-5" />
+          </span>
+          <div>
+            <p className="text-2xl font-bold text-zinc-900">
+              {allProfiles.length}
+            </p>
+            <p className="text-sm text-zinc-500">Membres</p>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h3 className="mb-2 font-semibold text-zinc-900">Gestion des équipes</h3>
+        <TeamManager
+          teams={teams}
+          allPlayers={allPlayers}
+          allProfiles={allProfiles}
+        />
       </div>
     </div>
   );

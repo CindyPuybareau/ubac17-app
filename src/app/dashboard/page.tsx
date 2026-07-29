@@ -4,6 +4,7 @@ import SignOutButton from "./sign-out-button";
 import AddChildForm from "./add-child-form";
 import DashboardTabs, { type DashboardTab } from "./dashboard-tabs";
 import AdminView from "./admin-view";
+import type { TeamWithMembers } from "./team-manager";
 import CoachView from "./coach-view";
 import PlayerPanel from "./player-panel";
 import FamilyPanel from "./family-panel";
@@ -15,6 +16,8 @@ import {
   getPlayerTeamIds,
   getRsvpCounts,
   getTeamRoster,
+  getUpcomingEventsForTeam,
+  type UpcomingEvent,
 } from "./family-data";
 
 type PlayerRow = {
@@ -24,6 +27,8 @@ type PlayerRow = {
   category: string | null;
   profile_id: string | null;
 };
+
+type Person = { id: string; first_name: string | null; last_name: string | null };
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -110,13 +115,83 @@ export default async function DashboardPage() {
     })
   );
 
+  const eventsByTeam: Record<string, UpcomingEvent[]> = {};
+  await Promise.all(
+    coachedTeams.map(async (team) => {
+      eventsByTeam[team.id] = await getUpcomingEventsForTeam(supabase, team.id);
+    })
+  );
+
+  let adminTeams: TeamWithMembers[] = [];
+  let allPlayersForAdmin: Person[] = [];
+  let allProfilesForAdmin: Person[] = [];
+
+  if (isAdmin) {
+    const [teamsRes, playersRes, profilesRes, teamPlayersRes, teamCoachesRes] =
+      await Promise.all([
+        supabase.from("teams").select("id, name, category").order("category"),
+        supabase
+          .from("players")
+          .select("id, first_name, last_name")
+          .order("first_name"),
+        supabase
+          .from("profiles")
+          .select("id, first_name, last_name")
+          .order("first_name"),
+        supabase.from("team_players").select("team_id, player_id"),
+        supabase.from("team_coaches").select("team_id, coach_id"),
+      ]);
+
+    const playersById = new Map(
+      (playersRes.data ?? []).map((p) => [p.id, p as Person])
+    );
+    const profilesById = new Map(
+      (profilesRes.data ?? []).map((p) => [p.id, p as Person])
+    );
+
+    const rosterByTeam = new Map<string, Person[]>();
+    (teamPlayersRes.data ?? []).forEach((tp) => {
+      const player = playersById.get(tp.player_id);
+      if (!player) return;
+      const list = rosterByTeam.get(tp.team_id) ?? [];
+      list.push(player);
+      rosterByTeam.set(tp.team_id, list);
+    });
+
+    const coachesByTeam = new Map<string, Person[]>();
+    (teamCoachesRes.data ?? []).forEach((tc) => {
+      const coach = profilesById.get(tc.coach_id);
+      if (!coach) return;
+      const list = coachesByTeam.get(tc.team_id) ?? [];
+      list.push(coach);
+      coachesByTeam.set(tc.team_id, list);
+    });
+
+    adminTeams = (teamsRes.data ?? []).map((t) => ({
+      id: t.id,
+      name: t.name,
+      category: t.category,
+      players: rosterByTeam.get(t.id) ?? [],
+      coaches: coachesByTeam.get(t.id) ?? [],
+    }));
+    allPlayersForAdmin = playersRes.data ?? [];
+    allProfilesForAdmin = profilesRes.data ?? [];
+  }
+
   const tabs: DashboardTab[] = [];
 
   if (isAdmin) {
     tabs.push({
       key: "admin",
       label: "Bureau",
-      content: <AdminView clubFunction={clubFunction} />,
+      content: (
+        <AdminView
+          clubFunction={clubFunction}
+          teams={adminTeams}
+          allPlayers={allPlayersForAdmin}
+          allProfiles={allProfilesForAdmin}
+        />
+      ),
     });
   }
 
@@ -124,7 +199,7 @@ export default async function DashboardPage() {
     tabs.push({
       key: "coach",
       label: "Équipe",
-      content: <CoachView teams={coachedTeams} />,
+      content: <CoachView teams={coachedTeams} eventsByTeam={eventsByTeam} />,
     });
   }
 
