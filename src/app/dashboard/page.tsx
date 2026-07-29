@@ -50,6 +50,12 @@ export type AdminUpcomingEvent = {
   start_time: string;
   teamId: string | null;
   teamName: string;
+  rsvpCounts: {
+    present: number;
+    absent: number;
+    late: number;
+    pending: number;
+  };
 };
 
 export default async function DashboardPage() {
@@ -220,6 +226,31 @@ export default async function DashboardPage() {
     }));
     allProfilesForAdmin = profilesRes.data ?? [];
 
+    const eventIds = (upcomingEventsRes.data ?? []).map((e) => e.id);
+    const rsvpsByEvent = new Map<
+      string,
+      { present: number; absent: number; late: number; answered: number }
+    >();
+    if (eventIds.length > 0) {
+      const { data: rsvpRows } = await supabase
+        .from("rsvps")
+        .select("event_id, status")
+        .in("event_id", eventIds);
+      (rsvpRows ?? []).forEach((r) => {
+        const bucket = rsvpsByEvent.get(r.event_id) ?? {
+          present: 0,
+          absent: 0,
+          late: 0,
+          answered: 0,
+        };
+        bucket.answered += 1;
+        if (r.status === "PRESENT") bucket.present += 1;
+        else if (r.status === "ABSENT") bucket.absent += 1;
+        else if (r.status === "LATE") bucket.late += 1;
+        rsvpsByEvent.set(r.event_id, bucket);
+      });
+    }
+
     adminCotisations = (cotisationsRes.data ?? []).map((c) => {
       const player = c.players as unknown as {
         first_name: string | null;
@@ -247,6 +278,12 @@ export default async function DashboardPage() {
         name: string | null;
         category: string | null;
       } | null;
+      const rosterSize = team ? rosterByTeam.get(team.id)?.length ?? 0 : 0;
+      const rsvp = rsvpsByEvent.get(e.id);
+      const present = rsvp?.present ?? 0;
+      const absent = rsvp?.absent ?? 0;
+      const late = rsvp?.late ?? 0;
+      const answered = rsvp?.answered ?? 0;
       return {
         id: e.id,
         title: e.title,
@@ -255,6 +292,12 @@ export default async function DashboardPage() {
         start_time: e.start_time,
         teamId: team?.id ?? null,
         teamName: team?.name ?? "Équipe",
+        rsvpCounts: {
+          present,
+          absent,
+          late,
+          pending: Math.max(0, rosterSize - answered),
+        },
       };
     });
   }
