@@ -2,6 +2,7 @@ import { Shield, LayoutGrid } from "lucide-react";
 import TeamManager, { type TeamWithMembers } from "./team-manager";
 import ImportInscriptions from "./import-inscriptions";
 import ImportPlanning from "./import-planning";
+import ImportCoaches from "./import-coaches";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 
@@ -58,6 +59,14 @@ export default function AdminView({
       />
 
       <ImportPlanning
+        existingTeams={teams.map((t) => ({
+          id: t.id,
+          name: t.name,
+          category: t.category,
+        }))}
+      />
+
+      <ImportCoaches
         existingTeams={teams.map((t) => ({
           id: t.id,
           name: t.name,
