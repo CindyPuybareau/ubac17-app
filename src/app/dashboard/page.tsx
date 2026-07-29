@@ -54,7 +54,7 @@ export default async function DashboardPage() {
         .maybeSingle(),
       supabase
         .from("team_coaches")
-        .select("teams(id, name, category)")
+        .select("teams(id, name, category, calendar_url)")
         .eq("coach_id", user.id),
       supabase
         .from("parent_player")
@@ -66,18 +66,16 @@ export default async function DashboardPage() {
   const isAdmin = Boolean(adminResult.data);
   const clubFunction = adminResult.data?.club_function ?? null;
 
+  type CoachedTeam = {
+    id: string;
+    name: string | null;
+    category: string | null;
+    calendar_url: string | null;
+  };
+
   const coachedTeams = (coachResult.data ?? [])
-    .map(
-      (row) =>
-        row.teams as unknown as {
-          id: string;
-          name: string | null;
-          category: string | null;
-        } | null
-    )
-    .filter((t): t is { id: string; name: string | null; category: string | null } =>
-      Boolean(t)
-    );
+    .map((row) => row.teams as unknown as CoachedTeam | null)
+    .filter((t): t is CoachedTeam => Boolean(t));
   const isCoach = coachedTeams.length > 0;
 
   const players = (playerLinksResult.data ?? [])
@@ -129,7 +127,10 @@ export default async function DashboardPage() {
   if (isAdmin) {
     const [teamsRes, playersRes, profilesRes, teamPlayersRes, teamCoachesRes] =
       await Promise.all([
-        supabase.from("teams").select("id, name, category").order("category"),
+        supabase
+          .from("teams")
+          .select("id, name, category, calendar_url")
+          .order("category"),
         supabase
           .from("players")
           .select("id, first_name, last_name")
@@ -171,6 +172,7 @@ export default async function DashboardPage() {
       id: t.id,
       name: t.name,
       category: t.category,
+      calendar_url: t.calendar_url,
       players: rosterByTeam.get(t.id) ?? [],
       coaches: coachesByTeam.get(t.id) ?? [],
     }));

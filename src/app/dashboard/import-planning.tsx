@@ -1,0 +1,258 @@
+"use client";
+
+import { useState, type ChangeEvent } from "react";
+import { useRouter } from "next/navigation";
+import * as XLSX from "xlsx";
+import { createClient } from "@/lib/supabase/client";
+
+type Team = { id: string; name: string | null; category: string | null };
+
+type ParsedRow = {
+  division: string;
+  matchNumber: string | null;
+  equipe1: string | null;
+  equipe2: string | null;
+  startTime: string | null;
+  salle: string | null;
+};
+
+function normalize(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toUpperCase();
+}
+
+function excelSerialToDate(serial: number): Date {
+  const utcDays = Math.floor(serial - 25569);
+  return new Date(utcDays * 86400 * 1000);
+}
+
+function parseHeure(value: unknown): { h: number; m: number } {
+  const text = String(value ?? "").trim();
+  const match = text.match(/(\d{1,2})\s*[h:]\s*(\d{0,2})/i);
+  if (!match) return { h: 0, m: 0 };
+  return { h: Number(match[1]), m: match[2] ? Number(match[2]) : 0 };
+}
+
+function combineDateTime(dateValue: unknown, heureValue: unknown): string | null {
+  let base: Date | null = null;
+  if (dateValue instanceof Date) base = dateValue;
+  else if (typeof dateValue === "number") base = excelSerialToDate(dateValue);
+  else if (typeof dateValue === "string" && dateValue.trim()) {
+    const parsed = new Date(dateValue);
+    if (!Number.isNaN(parsed.getTime())) base = parsed;
+  }
+  if (!base) return null;
+
+  const { h, m } = parseHeure(heureValue);
+  const combined = new Date(
+    Date.UTC(
+      base.getUTCFullYear(),
+      base.getUTCMonth(),
+      base.getUTCDate(),
+      h,
+      m
+    )
+  );
+  return combined.toISOString();
+}
+
+function findTeamForDivision(division: string, teams: Team[]): Team | null {
+  const normDivision = normalize(division);
+  return (
+    teams.find((t) => t.category && normDivision.includes(normalize(t.category))) ??
+    null
+  );
+}
+
+export default function ImportPlanning({
+  existingTeams,
+}: {
+  existingTeams: Team[];
+}) {
+  const router = useRouter();
+  const [rows, setRows] = useState<ParsedRow[] | null>(null);
+  const [clubKeyword, setClubKeyword] = useState("UBAC");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+
+  async function handleFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(null);
+    setResult(null);
+
+    const buffer = await file.arrayBuffer();
+    const wb = XLSX.read(buffer, { type: "array", cellDates: true });
+    const ws = wb.Sheets["Planning complet"];
+
+    if (!ws) {
+      setError("Feuille \"Planning complet\" introuvable dans ce fichier.");
+      return;
+    }
+
+    const raw = XLSX.utils.sheet_to_json(ws, {
+      header: 1,
+      defval: null,
+    }) as unknown[][];
+
+    const headerRow = (raw[0] ?? []).map((h) =>
+      typeof h === "string" ? h.trim() : ""
+    );
+    const idx = {
+      division: headerRow.findIndex((h) => h === "Division"),
+      matchNumber: headerRow.findIndex((h) => h.startsWith("N° match")),
+      equipe1: headerRow.findIndex((h) => h === "Equipe 1"),
+      equipe2: headerRow.findIndex((h) => h === "Equipe 2"),
+      date: headerRow.findIndex((h) => h === "Date"),
+      heure: headerRow.findIndex((h) => h === "Heure"),
+      salle: headerRow.findIndex((h) => h === "Salle"),
+    };
+
+    const parsed: ParsedRow[] = [];
+    for (let i = 1; i < raw.length; i++) {
+      const r = raw[i];
+      const division =
+        idx.division >= 0 ? (r[idx.division] as string | null) : null;
+      const dateValue = idx.date >= 0 ? r[idx.date] : null;
+      if (!division || !dateValue) continue;
+
+      const equipe1 = idx.equipe1 >= 0 ? (r[idx.equipe1] as string | null) : null;
+      const equipe2 = idx.equipe2 >= 0 ? (r[idx.equipe2] as string | null) : null;
+      const isOurMatch =
+        (equipe1 && normalize(equipe1).includes(normalize(clubKeyword))) ||
+        (equipe2 && normalize(equipe2).includes(normalize(clubKeyword)));
+      if (!isOurMatch) continue;
+
+      parsed.push({
+        division: String(division).trim(),
+        matchNumber:
+          idx.matchNumber >= 0 ? String(r[idx.matchNumber] ?? "") : null,
+        equipe1,
+        equipe2,
+        startTime: combineDateTime(dateValue, idx.heure >= 0 ? r[idx.heure] : null),
+        salle: idx.salle >= 0 ? (r[idx.salle] as string | null) : null,
+      });
+    }
+
+    setRows(parsed);
+  }
+
+  async function handleImport() {
+    if (!rows) return;
+    setLoading(true);
+    setError(null);
+
+    const supabase = createClient();
+    const unmatched: string[] = [];
+
+    const eventsRows = rows
+      .map((r) => {
+        const team = findTeamForDivision(r.division, existingTeams);
+        if (!team) {
+          unmatched.push(r.division);
+          return null;
+        }
+        const opponent =
+          r.equipe1 && normalize(r.equipe1).includes(normalize(clubKeyword))
+            ? r.equipe2
+            : r.equipe1;
+        return {
+          team_id: team.id,
+          title: opponent ? `vs ${opponent}` : "Match",
+          event_type: "MATCH" as const,
+          location: r.salle,
+          start_time: r.startTime,
+        };
+      })
+      .filter((r): r is NonNullable<typeof r> => Boolean(r));
+
+    if (eventsRows.length > 0) {
+      const { error: insertError } = await supabase
+        .from("events")
+        .insert(eventsRows);
+      if (insertError) {
+        setLoading(false);
+        setError(insertError.message);
+        return;
+      }
+    }
+
+    setLoading(false);
+    setResult(
+      `${eventsRows.length} match(s) importé(s).` +
+        (unmatched.length > 0
+          ? ` ${unmatched.length} ligne(s) ignorée(s) (division non reconnue: ${Array.from(
+              new Set(unmatched)
+            ).join(", ")}).`
+          : "")
+    );
+    setRows(null);
+    router.refresh();
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
+      <h3 className="font-semibold text-zinc-900">
+        Importer le planning (fichier officiel)
+      </h3>
+      <p className="text-sm text-zinc-500">
+        Fichier Excel &quot;Planning complet&quot;, feuille &quot;Planning
+        complet&quot;.
+      </p>
+
+      <div className="flex flex-wrap items-end gap-3">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-zinc-700">
+            Mot-clé du club
+          </label>
+          <input
+            value={clubKeyword}
+            onChange={(e) => setClubKeyword(e.target.value)}
+            className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-zinc-700">
+            Fichier
+          </label>
+          <input
+            type="file"
+            accept=".xlsx"
+            onChange={handleFile}
+            className="text-sm"
+          />
+        </div>
+      </div>
+
+      {rows && (
+        <div className="rounded-xl bg-zinc-50 p-4">
+          <p className="text-sm font-medium text-zinc-700">
+            {rows.length} match(s) détecté(s) pour &quot;{clubKeyword}&quot;.
+          </p>
+          <ul className="mt-2 flex max-h-40 flex-col gap-1 overflow-y-auto text-xs text-zinc-500">
+            {rows.slice(0, 10).map((r, i) => (
+              <li key={i}>
+                {r.division} · {r.equipe1} vs {r.equipe2} ·{" "}
+                {r.startTime ? new Date(r.startTime).toLocaleString("fr-FR") : "date ?"}
+              </li>
+            ))}
+            {rows.length > 10 && <li>... et {rows.length - 10} de plus</li>}
+          </ul>
+          <button
+            onClick={handleImport}
+            disabled={loading}
+            className="mt-3 rounded-full bg-ubac-blue px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-ubac-blue-dark disabled:opacity-60"
+          >
+            {loading ? "Import en cours..." : "Confirmer l'import"}
+          </button>
+        </div>
+      )}
+
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      {result && <p className="text-sm text-green-600">{result}</p>}
+    </div>
+  );
+}

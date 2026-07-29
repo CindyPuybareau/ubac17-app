@@ -1,8 +1,14 @@
 import { Users, CalendarDays, ClipboardCheck } from "lucide-react";
 import CreateEventForm from "./create-event-form";
+import CalendarSync from "./calendar-sync";
 import type { UpcomingEvent } from "./family-data";
 
-type Team = { id: string; name: string | null; category: string | null };
+type Team = {
+  id: string;
+  name: string | null;
+  category: string | null;
+  calendar_url: string | null;
+};
 
 function formatEventDate(iso: string) {
   return new Date(iso).toLocaleString("fr-FR", {
@@ -88,6 +94,9 @@ export default function CoachView({
                   ))}
                 </ul>
               )}
+              <div className="mt-3">
+                <CalendarSync teamId={team.id} initialUrl={team.calendar_url} />
+              </div>
             </div>
           );
         })}

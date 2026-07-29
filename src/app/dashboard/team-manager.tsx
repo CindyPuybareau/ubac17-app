@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import CalendarSync from "./calendar-sync";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 
@@ -10,6 +11,7 @@ export type TeamWithMembers = {
   id: string;
   name: string | null;
   category: string | null;
+  calendar_url: string | null;
   players: Person[];
   coaches: Person[];
 };
@@ -234,6 +236,10 @@ export default function TeamManager({
                     </select>
                   )}
                 </div>
+              </div>
+
+              <div className="mt-3">
+                <CalendarSync teamId={team.id} initialUrl={team.calendar_url} />
               </div>
             </div>
           );
