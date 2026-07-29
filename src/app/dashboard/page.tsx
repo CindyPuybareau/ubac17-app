@@ -30,6 +30,27 @@ type PlayerRow = {
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 
+export type AdminCotisation = {
+  id: string;
+  saison: string;
+  prix: number | null;
+  remise: number | null;
+  paiement: number | null;
+  statut: string | null;
+  mode_paiement: string | null;
+  playerName: string;
+  category: string | null;
+};
+
+export type AdminUpcomingEvent = {
+  id: string;
+  title: string | null;
+  event_type: string | null;
+  location: string | null;
+  start_time: string;
+  teamName: string;
+};
+
 export default async function DashboardPage() {
   const supabase = await createClient();
   const {
@@ -123,25 +144,46 @@ export default async function DashboardPage() {
   let adminTeams: TeamWithMembers[] = [];
   let allPlayersForAdmin: Person[] = [];
   let allProfilesForAdmin: Person[] = [];
+  let adminCotisations: AdminCotisation[] = [];
+  let adminUpcomingEvents: AdminUpcomingEvent[] = [];
 
   if (isAdmin) {
-    const [teamsRes, playersRes, profilesRes, teamPlayersRes, teamCoachesRes] =
-      await Promise.all([
-        supabase
-          .from("teams")
-          .select("id, name, category, ffbb_url")
-          .order("category"),
-        supabase
-          .from("players")
-          .select("id, first_name, last_name")
-          .order("first_name"),
-        supabase
-          .from("profiles")
-          .select("id, first_name, last_name")
-          .order("first_name"),
-        supabase.from("team_players").select("team_id, player_id"),
-        supabase.from("team_coaches").select("team_id, coach_id"),
-      ]);
+    const [
+      teamsRes,
+      playersRes,
+      profilesRes,
+      teamPlayersRes,
+      teamCoachesRes,
+      cotisationsRes,
+      upcomingEventsRes,
+    ] = await Promise.all([
+      supabase
+        .from("teams")
+        .select("id, name, category, ffbb_url")
+        .order("category"),
+      supabase
+        .from("players")
+        .select("id, first_name, last_name")
+        .order("first_name"),
+      supabase
+        .from("profiles")
+        .select("id, first_name, last_name")
+        .order("first_name"),
+      supabase.from("team_players").select("team_id, player_id"),
+      supabase.from("team_coaches").select("team_id, coach_id"),
+      supabase
+        .from("cotisations")
+        .select(
+          "id, saison, prix, remise, paiement, statut, mode_paiement, players(first_name, last_name, category)"
+        )
+        .order("saison", { ascending: false }),
+      supabase
+        .from("events")
+        .select("id, title, event_type, location, start_time, teams(name, category)")
+        .gte("start_time", new Date().toISOString())
+        .order("start_time", { ascending: true })
+        .limit(30),
+    ]);
 
     const playersById = new Map(
       (playersRes.data ?? []).map((p) => [p.id, p as Person])
@@ -178,6 +220,42 @@ export default async function DashboardPage() {
     }));
     allPlayersForAdmin = playersRes.data ?? [];
     allProfilesForAdmin = profilesRes.data ?? [];
+
+    adminCotisations = (cotisationsRes.data ?? []).map((c) => {
+      const player = c.players as unknown as {
+        first_name: string | null;
+        last_name: string | null;
+        category: string | null;
+      } | null;
+      return {
+        id: c.id,
+        saison: c.saison,
+        prix: c.prix,
+        remise: c.remise,
+        paiement: c.paiement,
+        statut: c.statut,
+        mode_paiement: c.mode_paiement,
+        playerName:
+          [player?.first_name, player?.last_name].filter(Boolean).join(" ") ||
+          "Joueur",
+        category: player?.category ?? null,
+      };
+    });
+
+    adminUpcomingEvents = (upcomingEventsRes.data ?? []).map((e) => {
+      const team = e.teams as unknown as {
+        name: string | null;
+        category: string | null;
+      } | null;
+      return {
+        id: e.id,
+        title: e.title,
+        event_type: e.event_type,
+        location: e.location,
+        start_time: e.start_time,
+        teamName: team?.name ?? "Équipe",
+      };
+    });
   }
 
   const tabs: DashboardTab[] = [];
@@ -192,6 +270,8 @@ export default async function DashboardPage() {
           teams={adminTeams}
           allPlayers={allPlayersForAdmin}
           allProfiles={allProfilesForAdmin}
+          cotisations={adminCotisations}
+          upcomingEvents={adminUpcomingEvents}
         />
       ),
     });

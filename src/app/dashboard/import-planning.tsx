@@ -14,6 +14,7 @@ type ParsedRow = {
   equipe2: string | null;
   startTime: string | null;
   salle: string | null;
+  isHome: boolean;
 };
 
 function normalize(s: string): string {
@@ -121,10 +122,13 @@ export default function ImportPlanning({
 
       const equipe1 = idx.equipe1 >= 0 ? (r[idx.equipe1] as string | null) : null;
       const equipe2 = idx.equipe2 >= 0 ? (r[idx.equipe2] as string | null) : null;
-      const isOurMatch =
-        (equipe1 && normalize(equipe1).includes(normalize(clubKeyword))) ||
-        (equipe2 && normalize(equipe2).includes(normalize(clubKeyword)));
-      if (!isOurMatch) continue;
+      const weAreEquipe1 = Boolean(
+        equipe1 && normalize(equipe1).includes(normalize(clubKeyword))
+      );
+      const weAreEquipe2 = Boolean(
+        equipe2 && normalize(equipe2).includes(normalize(clubKeyword))
+      );
+      if (!weAreEquipe1 && !weAreEquipe2) continue;
 
       parsed.push({
         division: String(division).trim(),
@@ -134,6 +138,8 @@ export default function ImportPlanning({
         equipe2,
         startTime: combineDateTime(dateValue, idx.heure >= 0 ? r[idx.heure] : null),
         salle: idx.salle >= 0 ? (r[idx.salle] as string | null) : null,
+        // French club plannings list the home team first.
+        isHome: weAreEquipe1,
       });
     }
 
@@ -155,13 +161,10 @@ export default function ImportPlanning({
           unmatched.push(r.division);
           return null;
         }
-        const opponent =
-          r.equipe1 && normalize(r.equipe1).includes(normalize(clubKeyword))
-            ? r.equipe2
-            : r.equipe1;
+        const opponent = r.isHome ? r.equipe2 : r.equipe1;
         return {
           team_id: team.id,
-          title: opponent ? `vs ${opponent}` : "Match",
+          title: opponent ? `${r.isHome ? "vs" : "@"} ${opponent}` : "Match",
           event_type: "MATCH" as const,
           location: r.salle,
           start_time: r.startTime,

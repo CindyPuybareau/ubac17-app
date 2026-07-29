@@ -1,8 +1,20 @@
-import { Shield, LayoutGrid } from "lucide-react";
+import {
+  Shield,
+  LayoutGrid,
+  CalendarDays,
+  Users,
+  Wallet,
+  Settings,
+} from "lucide-react";
 import TeamManager, { type TeamWithMembers } from "./team-manager";
 import ImportInscriptions from "./import-inscriptions";
 import ImportPlanning from "./import-planning";
 import ImportCoaches from "./import-coaches";
+import MembersTable from "./members-table";
+import CotisationsTable from "./cotisations-table";
+import AdminCalendar from "./admin-calendar";
+import AdminSidebar, { type AdminSection } from "./admin-sidebar";
+import type { AdminCotisation, AdminUpcomingEvent } from "./page";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 
@@ -11,12 +23,99 @@ export default function AdminView({
   teams,
   allPlayers,
   allProfiles,
+  cotisations,
+  upcomingEvents,
 }: {
   clubFunction?: string | null;
   teams: TeamWithMembers[];
   allPlayers: Person[];
   allProfiles: Person[];
+  cotisations: AdminCotisation[];
+  upcomingEvents: AdminUpcomingEvent[];
 }) {
+  const teamRefs = teams.map((t) => ({
+    id: t.id,
+    name: t.name,
+    category: t.category,
+  }));
+
+  const overview = (
+    <div className="grid grid-cols-2 gap-4">
+      <div className="flex items-center gap-3 rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-100 text-green-700">
+          <LayoutGrid className="h-5 w-5" />
+        </span>
+        <div>
+          <p className="text-2xl font-bold text-zinc-900">{teams.length}</p>
+          <p className="text-sm text-zinc-500">Équipes</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-3 rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-100 text-green-700">
+          <Shield className="h-5 w-5" />
+        </span>
+        <div>
+          <p className="text-2xl font-bold text-zinc-900">
+            {allProfiles.length}
+          </p>
+          <p className="text-sm text-zinc-500">Membres</p>
+        </div>
+      </div>
+    </div>
+  );
+
+  const iconClass = "h-4 w-4 shrink-0";
+  const sections: AdminSection[] = [
+    {
+      key: "overview",
+      label: "Vue d'ensemble",
+      icon: <LayoutGrid className={iconClass} />,
+      content: overview,
+    },
+    {
+      key: "calendar",
+      label: "Calendrier",
+      icon: <CalendarDays className={iconClass} />,
+      content: <AdminCalendar events={upcomingEvents} />,
+    },
+    {
+      key: "teams",
+      label: "Équipes & FFBB",
+      icon: <Users className={iconClass} />,
+      content: (
+        <TeamManager
+          teams={teams}
+          allPlayers={allPlayers}
+          allProfiles={allProfiles}
+        />
+      ),
+    },
+    {
+      key: "members",
+      label: "Membres",
+      icon: <Shield className={iconClass} />,
+      content: <MembersTable members={allProfiles} />,
+    },
+    {
+      key: "cotisations",
+      label: "Cotisations",
+      icon: <Wallet className={iconClass} />,
+      content: <CotisationsTable cotisations={cotisations} />,
+    },
+    {
+      key: "imports",
+      label: "Imports",
+      icon: <Settings className={iconClass} />,
+      content: (
+        <div className="flex flex-col gap-4">
+          <ImportInscriptions existingTeams={teamRefs} />
+          <ImportPlanning existingTeams={teamRefs} />
+          <ImportCoaches existingTeams={teamRefs} />
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="flex flex-col gap-4">
       <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-green-700">
@@ -27,61 +126,7 @@ export default function AdminView({
         Accès complet à la gestion du club.
       </p>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-2">
-        <div className="flex items-center gap-3 rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-100 text-green-700">
-            <LayoutGrid className="h-5 w-5" />
-          </span>
-          <div>
-            <p className="text-2xl font-bold text-zinc-900">{teams.length}</p>
-            <p className="text-sm text-zinc-500">Équipes</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-100 text-green-700">
-            <Shield className="h-5 w-5" />
-          </span>
-          <div>
-            <p className="text-2xl font-bold text-zinc-900">
-              {allProfiles.length}
-            </p>
-            <p className="text-sm text-zinc-500">Membres</p>
-          </div>
-        </div>
-      </div>
-
-      <ImportInscriptions
-        existingTeams={teams.map((t) => ({
-          id: t.id,
-          name: t.name,
-          category: t.category,
-        }))}
-      />
-
-      <ImportPlanning
-        existingTeams={teams.map((t) => ({
-          id: t.id,
-          name: t.name,
-          category: t.category,
-        }))}
-      />
-
-      <ImportCoaches
-        existingTeams={teams.map((t) => ({
-          id: t.id,
-          name: t.name,
-          category: t.category,
-        }))}
-      />
-
-      <div>
-        <h3 className="mb-2 font-semibold text-zinc-900">Gestion des équipes</h3>
-        <TeamManager
-          teams={teams}
-          allPlayers={allPlayers}
-          allProfiles={allProfiles}
-        />
-      </div>
+      <AdminSidebar sections={sections} />
     </div>
   );
 }

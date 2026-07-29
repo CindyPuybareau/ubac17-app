@@ -1,6 +1,7 @@
 import { Users, CalendarDays, ClipboardCheck } from "lucide-react";
 import CreateEventForm from "./create-event-form";
 import FfbbSync from "./ffbb-sync";
+import OpponentDisplay from "./opponent-display";
 import type { UpcomingEvent } from "./family-data";
 
 type Team = {
@@ -79,13 +80,17 @@ export default function CoachView({
                   {events.map((event) => (
                     <li
                       key={event.id}
-                      className="flex items-center justify-between rounded-lg bg-zinc-50 px-3 py-2 text-sm"
+                      className="flex flex-wrap items-center justify-between gap-1 rounded-lg bg-zinc-50 px-3 py-2 text-sm"
                     >
-                      <span className="font-medium text-zinc-700">
-                        {event.title ??
-                          eventTypeLabels[event.event_type ?? ""] ??
-                          "Événement"}
-                      </span>
+                      {event.event_type === "MATCH" ? (
+                        <OpponentDisplay title={event.title} size="sm" />
+                      ) : (
+                        <span className="font-medium text-zinc-700">
+                          {event.title ??
+                            eventTypeLabels[event.event_type ?? ""] ??
+                            "Événement"}
+                        </span>
+                      )}
                       <span className="text-zinc-500">
                         {formatEventDate(event.start_time)}
                         {event.location ? ` · ${event.location}` : ""}

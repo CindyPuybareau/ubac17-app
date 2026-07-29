@@ -1,5 +1,6 @@
 import { CalendarDays, MapPin } from "lucide-react";
 import RsvpButtons from "./rsvp-buttons";
+import OpponentDisplay from "./opponent-display";
 import type { UpcomingEvent } from "./family-data";
 
 function formatEventDate(iso: string) {
@@ -28,10 +29,15 @@ export default function NextConvocationCard({
       <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow-dark">
         Prochaine convocation · {playerName}
       </p>
-      <h3 className="mt-1 text-lg font-bold text-zinc-900">
-        {event.title ??
-          (event.event_type === "MATCH" ? "Match" : "Entraînement")}
-      </h3>
+      <div className="mt-1">
+        {event.event_type === "MATCH" ? (
+          <OpponentDisplay title={event.title} />
+        ) : (
+          <h3 className="text-lg font-bold text-zinc-900">
+            {event.title ?? "Entraînement"}
+          </h3>
+        )}
+      </div>
       <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-500">
         <span className="flex items-center gap-1">
           <CalendarDays className="h-4 w-4" />
