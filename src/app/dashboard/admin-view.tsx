@@ -1,4 +1,4 @@
-import { LayoutGrid, CalendarDays, Users, Wallet, RefreshCw } from "lucide-react";
+import { CalendarDays, Users, Wallet, RefreshCw } from "lucide-react";
 import TeamManager, { type TeamWithMembers } from "./team-manager";
 import ImportInscriptions from "./import-inscriptions";
 import ImportPlanning from "./import-planning";
@@ -7,7 +7,6 @@ import CotisationsTable from "./cotisations-table";
 import AdminCalendar from "./admin-calendar";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import FfbbManager from "./ffbb-manager";
-import OverviewStats from "./overview-stats";
 import type { AdminCotisation, AdminUpcomingEvent } from "./page";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
@@ -39,14 +38,6 @@ export default function AdminView({
 
   const iconClass = "h-4 w-4 shrink-0";
   const sections: AdminSection[] = [
-    {
-      key: "overview",
-      label: "Aperçu",
-      icon: <LayoutGrid className={iconClass} />,
-      content: (
-        <OverviewStats teamsCount={teams.length} members={allProfiles} />
-      ),
-    },
     {
       key: "calendar",
       label: "Calendrier",
