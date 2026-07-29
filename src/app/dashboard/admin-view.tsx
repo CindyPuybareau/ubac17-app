@@ -99,6 +99,18 @@ export default function AdminView({
       ),
     },
     {
+      key: "members",
+      label: "Membres",
+      icon: <Shield className={iconClass} />,
+      content: <MembersTable members={allProfiles} />,
+    },
+    {
+      key: "cotisations",
+      label: "Cotisations",
+      icon: <Wallet className={iconClass} />,
+      content: <CotisationsTable cotisations={cotisations} />,
+    },
+    {
       key: "ffbb",
       label: "FFBB",
       icon: <RefreshCw className={iconClass} />,
@@ -110,18 +122,6 @@ export default function AdminView({
           <ImportCoaches existingTeams={teamRefs} />
         </div>
       ),
-    },
-    {
-      key: "members",
-      label: "Membres",
-      icon: <Shield className={iconClass} />,
-      content: <MembersTable members={allProfiles} />,
-    },
-    {
-      key: "cotisations",
-      label: "Cotisations",
-      icon: <Wallet className={iconClass} />,
-      content: <CotisationsTable cotisations={cotisations} />,
     },
   ];
 
