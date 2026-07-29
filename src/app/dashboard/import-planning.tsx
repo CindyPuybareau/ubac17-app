@@ -247,7 +247,7 @@ export default function ImportPlanning({
           <button
             onClick={handleImport}
             disabled={loading}
-            className="mt-3 rounded-full bg-ubac-yellow px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+            className="mt-3 rounded-full bg-ubac-yellow px-4 py-2 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
           >
             {loading ? "Import en cours..." : "Confirmer l'import"}
           </button>

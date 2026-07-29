@@ -8,8 +8,8 @@ export default function manifest(): MetadataRoute.Manifest {
       "Application du club UBAC : membres, calendrier et convocations.",
     start_url: "/",
     display: "standalone",
-    background_color: "#1e4fa8",
-    theme_color: "#1e4fa8",
+    background_color: "#ffffff",
+    theme_color: "#203090",
     orientation: "portrait",
     icons: [
       {

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import {
   CalendarDays,
@@ -57,16 +58,14 @@ export default function Home() {
       <header className="sticky top-0 z-10 border-b border-black/5 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
           <div className="flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ubac-blue text-sm font-bold text-white">
-              U
-            </span>
+            <Image src="/logo.png" alt="UBAC 17" width={36} height={36} className="h-9 w-9 object-contain" priority />
             <span className="text-lg font-semibold text-ubac-blue">
               UBAC
             </span>
           </div>
           <Link
             href="/connexion"
-            className="rounded-full bg-ubac-yellow px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-ubac-yellow-dark"
+            className="rounded-full bg-ubac-yellow px-5 py-2 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark"
           >
             Se connecter
           </Link>
@@ -91,7 +90,7 @@ export default function Home() {
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link
                 href="/connexion"
-                className="w-full rounded-full bg-ubac-yellow px-6 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-ubac-yellow-dark sm:w-auto"
+                className="w-full rounded-full bg-ubac-yellow px-6 py-3 text-center text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark sm:w-auto"
               >
                 Se connecter
               </Link>

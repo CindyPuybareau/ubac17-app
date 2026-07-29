@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
@@ -57,9 +58,7 @@ export default function InscriptionPage() {
     <div className="flex flex-1 flex-col items-center justify-center bg-zinc-50 px-4 py-16">
       <div className="w-full max-w-sm rounded-2xl border border-zinc-100 bg-white p-6 shadow-sm">
         <div className="mb-6 text-center">
-          <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-ubac-blue text-sm font-bold text-white">
-            U
-          </span>
+          <Image src="/logo.png" alt="UBAC 17" width={48} height={48} className="mx-auto h-12 w-12 object-contain" priority />
           <h1 className="mt-3 text-xl font-bold text-zinc-900">
             Inscription
           </h1>
@@ -138,7 +137,7 @@ export default function InscriptionPage() {
           <button
             type="submit"
             disabled={loading}
-            className="mt-2 w-full rounded-full bg-ubac-yellow px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+            className="mt-2 w-full rounded-full bg-ubac-yellow px-5 py-2.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
           >
             {loading ? "Création..." : "Créer mon compte"}
           </button>

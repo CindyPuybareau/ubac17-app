@@ -1,14 +1,16 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f8fafc;
-  --foreground: #0f223d;
-  --navy: #0f223d;
-  --navy-dark: #0a1729;
-  --navy-light: #1c3a63;
-  --accent: #10b981;
-  --accent-dark: #059669;
-  --accent-light: #34d399;
+  --background: #ffffff;
+  --foreground: #0f172a;
+  /* Bleu Nuit / Marine Profond — sampled from the official logo & ubac17.fr */
+  --navy: #203090;
+  --navy-dark: #162365;
+  --navy-light: #4a5cba;
+  /* Jaune Gold / Or UBAC — exact CTA color used on ubac17.fr */
+  --accent: #f4c430;
+  --accent-dark: #cfa629;
+  --accent-light: #f7d466;
 }
 
 @theme inline {

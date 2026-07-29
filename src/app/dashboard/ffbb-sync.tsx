@@ -92,7 +92,7 @@ export default function FfbbSync({
         <button
           onClick={syncNow}
           disabled={syncing || !initialUrl}
-          className="rounded-full bg-ubac-yellow px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+          className="rounded-full bg-ubac-yellow px-3 py-2 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
         >
           {syncing ? "Synchronisation..." : "🔄 Synchroniser avec la FFBB"}
         </button>

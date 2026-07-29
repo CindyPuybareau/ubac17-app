@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import SignOutButton from "./sign-out-button";
 import AddChildForm from "./add-child-form";
@@ -314,9 +315,7 @@ export default async function DashboardPage() {
       <header className="sticky top-0 z-10 bg-navy px-4 py-3 sm:px-6">
         <div className="mx-auto flex w-full max-w-3xl items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm font-bold text-navy">
-              U
-            </span>
+            <Image src="/logo.png" alt="UBAC 17" width={32} height={32} className="h-8 w-8 object-contain" priority />
             <span className="text-sm font-semibold text-white">UBAC 17</span>
           </div>
           <div className="hidden sm:block">
@@ -339,11 +338,11 @@ export default async function DashboardPage() {
         </div>
 
         {isAdmin && (
-          <div className="flex items-center justify-between rounded-2xl border border-green-200 bg-green-50 px-4 py-3">
-            <span className="text-sm font-semibold text-green-700">
+          <div className="flex items-center justify-between rounded-2xl border border-ubac-yellow/40 bg-ubac-yellow/10 px-4 py-3">
+            <span className="text-sm font-semibold text-ubac-yellow-dark">
               Espace Bureau{clubFunction ? ` · ${clubFunction}` : ""}
             </span>
-            <span className="text-xs text-green-600">Voir l&apos;onglet Bureau</span>
+            <span className="text-xs text-ubac-yellow-dark">Voir l&apos;onglet Bureau</span>
           </div>
         )}
 

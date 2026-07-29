@@ -42,7 +42,7 @@ export default function AdminView({
   const overview = (
     <div className="grid grid-cols-2 gap-4">
       <div className="flex items-center gap-3 rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-100 text-green-700">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-ubac-yellow/15 text-ubac-yellow-dark">
           <LayoutGrid className="h-5 w-5" />
         </span>
         <div>
@@ -51,7 +51,7 @@ export default function AdminView({
         </div>
       </div>
       <div className="flex items-center gap-3 rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-100 text-green-700">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-ubac-yellow/15 text-ubac-yellow-dark">
           <Shield className="h-5 w-5" />
         </span>
         <div>
@@ -118,7 +118,7 @@ export default function AdminView({
 
   return (
     <div className="flex flex-col gap-4">
-      <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-green-700">
+      <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-ubac-yellow/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-ubac-yellow-dark">
         Espace Bureau
         {clubFunction ? ` · ${clubFunction}` : ""}
       </span>

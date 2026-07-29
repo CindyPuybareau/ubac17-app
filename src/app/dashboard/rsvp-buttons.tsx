@@ -51,8 +51,8 @@ export default function RsvpButtons({
         onClick={() => respond("PRESENT")}
         className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-60 ${
           status === "PRESENT"
-            ? "bg-green-600 text-white"
-            : "border border-green-600 text-green-700 hover:bg-green-50"
+            ? "bg-ubac-yellow text-navy"
+            : "border border-ubac-yellow text-ubac-yellow-dark hover:bg-ubac-yellow/10"
         }`}
       >
         ✅ Présent
