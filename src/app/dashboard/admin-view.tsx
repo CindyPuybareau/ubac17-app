@@ -1,5 +1,6 @@
 import { Shield, LayoutGrid } from "lucide-react";
 import TeamManager, { type TeamWithMembers } from "./team-manager";
+import ImportInscriptions from "./import-inscriptions";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 
@@ -46,6 +47,14 @@ export default function AdminView({
           </div>
         </div>
       </div>
+
+      <ImportInscriptions
+        existingTeams={teams.map((t) => ({
+          id: t.id,
+          name: t.name,
+          category: t.category,
+        }))}
+      />
 
       <div>
         <h3 className="mb-2 font-semibold text-zinc-900">Gestion des équipes</h3>
