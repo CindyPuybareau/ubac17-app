@@ -138,7 +138,7 @@ export default function InscriptionPage() {
           <button
             type="submit"
             disabled={loading}
-            className="mt-2 w-full rounded-full bg-ubac-yellow px-5 py-2.5 text-sm font-semibold text-ubac-blue-dark transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+            className="mt-2 w-full rounded-full bg-ubac-yellow px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
           >
             {loading ? "Création..." : "Créer mon compte"}
           </button>

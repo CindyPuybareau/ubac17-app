@@ -230,28 +230,45 @@ export default async function DashboardPage() {
   const hasPriorityContent = convocationCards.length > 0 || coachCards.length > 0;
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-10 sm:px-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-zinc-500">Bienvenue,</p>
-          <h1 className="text-2xl font-bold text-zinc-900">
-            {profile?.first_name ?? user.email}
-          </h1>
+    <div className="flex flex-1 flex-col">
+      <header className="sticky top-0 z-10 bg-navy px-4 py-3 sm:px-6">
+        <div className="mx-auto flex w-full max-w-3xl items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm font-bold text-navy">
+              U
+            </span>
+            <span className="text-sm font-semibold text-white">UBAC 17</span>
+          </div>
+          <div className="hidden sm:block">
+            <SignOutButton />
+          </div>
         </div>
-        <SignOutButton />
-      </div>
+      </header>
 
-      {isAdmin && (
-        <div className="flex items-center justify-between rounded-2xl border border-green-200 bg-green-50 px-4 py-3">
-          <span className="text-sm font-semibold text-green-700">
-            Espace Bureau{clubFunction ? ` · ${clubFunction}` : ""}
-          </span>
-          <span className="text-xs text-green-600">Voir l&apos;onglet Bureau</span>
+      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-zinc-500">Bienvenue,</p>
+            <h1 className="text-2xl font-bold text-zinc-900">
+              {profile?.first_name ?? user.email}
+            </h1>
+          </div>
+          <div className="sm:hidden">
+            <SignOutButton />
+          </div>
         </div>
-      )}
 
-      {hasPriorityContent && (
-        <div className="flex flex-col gap-4">
+        {isAdmin && (
+          <div className="flex items-center justify-between rounded-2xl border border-green-200 bg-green-50 px-4 py-3">
+            <span className="text-sm font-semibold text-green-700">
+              Espace Bureau{clubFunction ? ` · ${clubFunction}` : ""}
+            </span>
+            <span className="text-xs text-green-600">Voir l&apos;onglet Bureau</span>
+          </div>
+        )}
+
+        {hasPriorityContent && (
+          <div className="flex flex-col gap-4">
           {convocationCards.map(({ player, event, status }) => (
             <NextConvocationCard
               key={player.id}
@@ -284,7 +301,8 @@ export default async function DashboardPage() {
         </p>
       )}
 
-      <AddChildForm parentId={user.id} />
+        <AddChildForm parentId={user.id} />
+      </div>
     </div>
   );
 }

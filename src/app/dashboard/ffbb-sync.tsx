@@ -71,8 +71,8 @@ export default function FfbbSync({
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl bg-orange-50 p-3">
-      <label className="text-xs font-semibold uppercase tracking-wide text-orange-700">
+    <div className="flex flex-col gap-2 rounded-xl bg-ubac-yellow/10 p-3">
+      <label className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow-dark">
         Lien de la fiche équipe FFBB (competitions.ffbb.com)
       </label>
       <div className="flex flex-wrap gap-2">
@@ -80,7 +80,7 @@ export default function FfbbSync({
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="https://competitions.ffbb.com/.../equipes/..."
-          className="min-w-[200px] flex-1 rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+          className="min-w-[200px] flex-1 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
         />
         <button
           onClick={saveUrl}
@@ -92,7 +92,7 @@ export default function FfbbSync({
         <button
           onClick={syncNow}
           disabled={syncing || !initialUrl}
-          className="rounded-full bg-orange-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-700 disabled:opacity-60"
+          className="rounded-full bg-ubac-yellow px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
         >
           {syncing ? "Synchronisation..." : "🔄 Synchroniser avec la FFBB"}
         </button>

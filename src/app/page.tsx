@@ -66,7 +66,7 @@ export default function Home() {
           </div>
           <Link
             href="/connexion"
-            className="rounded-full bg-ubac-yellow px-5 py-2 text-sm font-semibold text-ubac-blue-dark transition-colors hover:bg-ubac-yellow-dark"
+            className="rounded-full bg-ubac-yellow px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-ubac-yellow-dark"
           >
             Se connecter
           </Link>
@@ -91,7 +91,7 @@ export default function Home() {
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link
                 href="/connexion"
-                className="w-full rounded-full bg-ubac-yellow px-6 py-3 text-center text-sm font-semibold text-ubac-blue-dark transition-colors hover:bg-ubac-yellow-dark sm:w-auto"
+                className="w-full rounded-full bg-ubac-yellow px-6 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-ubac-yellow-dark sm:w-auto"
               >
                 Se connecter
               </Link>
