@@ -14,7 +14,13 @@ const defaultTitles: Record<EventType, string> = {
   TOURNAMENT: "Tournoi",
 };
 
-export default function CreateEventForm({ teams }: { teams: Team[] }) {
+export default function CreateEventForm({
+  teams,
+  allowClubWide = false,
+}: {
+  teams: Team[];
+  allowClubWide?: boolean;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [teamId, setTeamId] = useState(teams[0]?.id ?? "");
@@ -32,7 +38,7 @@ export default function CreateEventForm({ teams }: { teams: Team[] }) {
 
     const supabase = createClient();
     const { error } = await supabase.from("events").insert({
-      team_id: teamId,
+      team_id: teamId || null,
       title: title || defaultTitles[eventType],
       event_type: eventType,
       location: location || null,
@@ -71,12 +77,15 @@ export default function CreateEventForm({ teams }: { teams: Team[] }) {
     >
       <h3 className="font-semibold text-zinc-900">Créer un événement</h3>
 
-      {teams.length > 1 && (
+      {(teams.length > 1 || allowClubWide) && (
         <select
           value={teamId}
           onChange={(e) => setTeamId(e.target.value)}
           className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
         >
+          {allowClubWide && (
+            <option value="">Tous les groupes (stage club)</option>
+          )}
           {teams.map((t) => (
             <option key={t.id} value={t.id}>
               {t.name}

@@ -54,7 +54,9 @@ export default function AdminView({
       key: "calendar",
       label: "Calendrier",
       icon: <CalendarDays className={iconClass} />,
-      content: <CalendarView events={upcomingEvents} createTeams={teamRefs} />,
+      content: (
+        <CalendarView events={upcomingEvents} createTeams={teamRefs} allowClubWide />
+      ),
     },
     {
       key: "members",

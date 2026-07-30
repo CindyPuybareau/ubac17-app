@@ -22,16 +22,23 @@ export type RsvpCounts = {
   late: number;
 };
 
+// Club-wide events (team_id null — e.g. a summer stage open to every
+// category) must surface alongside a team's own events for every role,
+// not just the Bureau. PostgREST's .in() alone excludes NULL rows, so we
+// build an explicit "team_id is null OR team_id in (...)" filter instead.
+export function teamOrClubWideFilter(teamIds: string[]): string {
+  if (teamIds.length === 0) return "team_id.is.null";
+  return `team_id.is.null,team_id.in.(${teamIds.join(",")})`;
+}
+
 export async function getNextEventForTeams(
   supabase: SupabaseClient,
   teamIds: string[]
 ): Promise<UpcomingEvent | null> {
-  if (teamIds.length === 0) return null;
-
   const { data } = await supabase
     .from("events")
     .select("id, title, event_type, location, start_time, team_id")
-    .in("team_id", teamIds)
+    .or(teamOrClubWideFilter(teamIds))
     .gte("start_time", new Date().toISOString())
     .order("start_time", { ascending: true })
     .limit(1)

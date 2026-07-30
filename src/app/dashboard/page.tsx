@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import SignOutButton from "./sign-out-button";
+import RealtimeSync from "./realtime-sync";
 import DashboardTabs, { type DashboardTab } from "./dashboard-tabs";
 import AdminView from "./admin-view";
 import type { RosterPlayer, TeamWithMembers } from "./team-manager";
@@ -18,6 +19,7 @@ import {
   getPlayerTeamIds,
   getRsvpCounts,
   getTeamRoster,
+  teamOrClubWideFilter,
 } from "./family-data";
 import {
   getCarpoolOffersByEventId,
@@ -630,7 +632,7 @@ export default async function DashboardPage() {
         location: e.location,
         start_time: e.start_time,
         teamId: team?.id ?? null,
-        teamName: team?.name ?? "Équipe",
+        teamName: team?.name ?? "Tous les groupes",
         rsvpCounts: buildRsvpCounts(rsvpsByEvent, e.id, rosterSize),
       };
     });
@@ -665,7 +667,7 @@ export default async function DashboardPage() {
         .select(
           "id, title, event_type, location, start_time, teams(id, name, category)"
         )
-        .in("team_id", coachedTeamIds)
+        .or(teamOrClubWideFilter(coachedTeamIds))
         .order("start_time", { ascending: true }),
     ]);
 
@@ -897,7 +899,7 @@ export default async function DashboardPage() {
         location: e.location,
         start_time: e.start_time,
         teamId: team?.id ?? null,
-        teamName: team?.name ?? "Équipe",
+        teamName: team?.name ?? "Tous les groupes",
         rsvpCounts: buildRsvpCounts(rsvpsByEvent, e.id, rosterSize),
       };
     });
@@ -920,48 +922,46 @@ export default async function DashboardPage() {
 
     const allTeamIds = Array.from(new Set(playerTeamIdsList.flat()));
 
-    if (allTeamIds.length > 0) {
-      const { data: eventsData } = await supabase
-        .from("events")
-        .select(
-          "id, title, event_type, location, start_time, teams(id, name, category)"
-        )
-        .in("team_id", allTeamIds)
-        .order("start_time", { ascending: true });
+    const { data: eventsData } = await supabase
+      .from("events")
+      .select(
+        "id, title, event_type, location, start_time, teams(id, name, category)"
+      )
+      .or(teamOrClubWideFilter(allTeamIds))
+      .order("start_time", { ascending: true });
 
-      const eventIds = (eventsData ?? []).map((e) => e.id);
-      const familyPlayerIds = players.map((p) => p.id);
+    const eventIds = (eventsData ?? []).map((e) => e.id);
+    const familyPlayerIds = players.map((p) => p.id);
 
-      if (eventIds.length > 0 && familyPlayerIds.length > 0) {
-        const { data: rsvpRows } = await supabase
-          .from("rsvps")
-          .select("event_id, player_id, status")
-          .in("event_id", eventIds)
-          .in("player_id", familyPlayerIds);
+    if (eventIds.length > 0 && familyPlayerIds.length > 0) {
+      const { data: rsvpRows } = await supabase
+        .from("rsvps")
+        .select("event_id, player_id, status")
+        .in("event_id", eventIds)
+        .in("player_id", familyPlayerIds);
 
-        (rsvpRows ?? []).forEach((r) => {
-          familyRsvpStatusByKey[`${r.event_id}:${r.player_id}`] = r.status;
-        });
-      }
-
-      familyEvents = (eventsData ?? []).map((e) => {
-        const team = e.teams as unknown as {
-          id: string;
-          name: string | null;
-          category: string | null;
-        } | null;
-        return {
-          id: e.id,
-          title: e.title,
-          event_type: e.event_type,
-          location: e.location,
-          start_time: e.start_time,
-          teamId: team?.id ?? null,
-          teamName: team?.name ?? "Équipe",
-          rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
-        };
+      (rsvpRows ?? []).forEach((r) => {
+        familyRsvpStatusByKey[`${r.event_id}:${r.player_id}`] = r.status;
       });
     }
+
+    familyEvents = (eventsData ?? []).map((e) => {
+      const team = e.teams as unknown as {
+        id: string;
+        name: string | null;
+        category: string | null;
+      } | null;
+      return {
+        id: e.id,
+        title: e.title,
+        event_type: e.event_type,
+        location: e.location,
+        start_time: e.start_time,
+        teamId: team?.id ?? null,
+        teamName: team?.name ?? "Tous les groupes",
+        rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
+      };
+    });
   }
 
   const nextMatchIso =
@@ -1048,6 +1048,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-1 flex-col">
+      <RealtimeSync />
       <header className="sticky top-0 z-10 bg-navy px-4 py-3 sm:px-6">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between">
           <div className="flex items-center gap-2">

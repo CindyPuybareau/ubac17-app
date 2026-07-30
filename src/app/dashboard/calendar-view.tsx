@@ -130,6 +130,7 @@ export default function CalendarView({
   createTeams,
   rsvp,
   contactEmailByPlayerId,
+  allowClubWide = false,
 }: {
   events: AdminUpcomingEvent[];
   createTeams?: CalendarTeamRef[];
@@ -138,6 +139,7 @@ export default function CalendarView({
     statusByKey: Record<string, string>;
   };
   contactEmailByPlayerId?: Record<string, string>;
+  allowClubWide?: boolean;
 }) {
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState<Date>(today);
@@ -149,6 +151,7 @@ export default function CalendarView({
   const [editType, setEditType] = useState("MATCH");
   const [editLocation, setEditLocation] = useState("");
   const [editStartTime, setEditStartTime] = useState("");
+  const [editTeamId, setEditTeamId] = useState("");
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
@@ -158,6 +161,7 @@ export default function CalendarView({
     setEditType(event.event_type ?? "MATCH");
     setEditLocation(event.location ?? "");
     setEditStartTime(toDatetimeLocal(event.start_time));
+    setEditTeamId(event.teamId ?? "");
     setEditError(null);
   }
 
@@ -173,6 +177,7 @@ export default function CalendarView({
         event_type: editType,
         location: editLocation || null,
         start_time: new Date(editStartTime).toISOString(),
+        ...(allowClubWide ? { team_id: editTeamId || null } : {}),
       })
       .eq("id", editingEvent.id);
     setEditSaving(false);
@@ -278,7 +283,7 @@ export default function CalendarView({
       </div>
 
       {createTeams && createTeams.length > 0 && (
-        <CreateEventForm teams={createTeams} />
+        <CreateEventForm teams={createTeams} allowClubWide={allowClubWide} />
       )}
 
       <div className="w-full max-w-full overflow-hidden">
@@ -576,6 +581,26 @@ export default function CalendarView({
                   className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
                 />
               </div>
+              {allowClubWide && createTeams && (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-zinc-600">
+                    Groupe
+                  </label>
+                  <select
+                    value={editTeamId}
+                    onChange={(e) => setEditTeamId(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+                  >
+                    <option value="">Tous les groupes (stage club)</option>
+                    {createTeams.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                        {t.category ? ` · ${t.category}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               {editError && <p className="text-xs text-red-600">{editError}</p>}
               <button
                 onClick={confirmEdit}
