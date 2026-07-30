@@ -19,7 +19,9 @@ import { parseMatchTitle } from "@/lib/match-display";
 import OpponentDisplay from "./opponent-display";
 import CreateEventForm from "./create-event-form";
 import RsvpButtons from "./rsvp-buttons";
+import BirthdayWidget from "./birthday-widget";
 import type { AdminUpcomingEvent } from "./page";
+import type { BirthdayEntry, BirthdaySource } from "./birthdays";
 
 const eventTypeOptions: { value: string; label: string }[] = [
   { value: "MATCH", label: "Match" },
@@ -131,6 +133,7 @@ export default function CalendarView({
   rsvp,
   contactEmailByPlayerId,
   allowClubWide = false,
+  birthdayEntries = [],
 }: {
   events: AdminUpcomingEvent[];
   createTeams?: CalendarTeamRef[];
@@ -140,6 +143,7 @@ export default function CalendarView({
   };
   contactEmailByPlayerId?: Record<string, string>;
   allowClubWide?: boolean;
+  birthdayEntries?: BirthdayEntry<BirthdaySource>[];
 }) {
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState<Date>(today);
@@ -357,6 +361,8 @@ export default function CalendarView({
           })}
         </div>
       </div>
+
+      {birthdayEntries.length > 0 && <BirthdayWidget entries={birthdayEntries} />}
 
       <div className="flex flex-col gap-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">

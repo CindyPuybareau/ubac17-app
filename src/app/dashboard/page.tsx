@@ -10,8 +10,7 @@ import CoachView from "./coach-view";
 import CalendarView from "./calendar-view";
 import NextConvocationCard from "./next-convocation-card";
 import CoachNextMatchCard from "./coach-next-match-card";
-import BirthdayWidget from "./birthday-widget";
-import { upcomingBirthdays, type BirthdaySource } from "./birthdays";
+import { upcomingBirthdays, type BirthdayEntry, type BirthdaySource } from "./birthdays";
 import {
   getNextEventForTeams,
   getPlayerRsvpStatus,
@@ -908,6 +907,7 @@ export default async function DashboardPage() {
   let familyEvents: AdminUpcomingEvent[] = [];
   let familyRsvpPlayers: { id: string; name: string; teamIds: string[] }[] = [];
   const familyRsvpStatusByKey: Record<string, string> = {};
+  let familyBirthdayEntries: BirthdayEntry<BirthdaySource>[] = [];
 
   if (players.length > 0) {
     const playerTeamIdsList = await Promise.all(
@@ -920,6 +920,33 @@ export default async function DashboardPage() {
     }));
 
     const allTeamIds = Array.from(new Set(playerTeamIdsList.flat()));
+
+    if (allTeamIds.length > 0) {
+      const { data: teammateRows } = await supabase
+        .from("team_players")
+        .select("players(id, first_name, last_name, birth_date)")
+        .in("team_id", allTeamIds);
+
+      const seenTeammateIds = new Set<string>();
+      const teammates: BirthdaySource[] = [];
+      (teammateRows ?? []).forEach((row) => {
+        const p = row.players as unknown as {
+          id: string;
+          first_name: string | null;
+          last_name: string | null;
+          birth_date: string | null;
+        } | null;
+        if (!p || seenTeammateIds.has(p.id)) return;
+        seenTeammateIds.add(p.id);
+        teammates.push({
+          id: p.id,
+          firstName: p.first_name,
+          lastName: p.last_name,
+          birthDate: p.birth_date,
+        });
+      });
+      familyBirthdayEntries = upcomingBirthdays(teammates);
+    }
 
     const { data: eventsData } = await supabase
       .from("events")
@@ -963,24 +990,29 @@ export default async function DashboardPage() {
     });
   }
 
-  const birthdaySourceMembers: BirthdaySource[] = isAdmin
-    ? adminMembers
-        .filter((m) => !m.archivedAt)
-        .map((m) => ({
+  const adminBirthdayEntries = isAdmin
+    ? upcomingBirthdays(
+        adminMembers
+          .filter((m) => !m.archivedAt)
+          .map((m) => ({
+            id: m.id,
+            firstName: m.firstName,
+            lastName: m.lastName,
+            birthDate: m.birthDate,
+          }))
+      )
+    : [];
+
+  const coachBirthdayEntries = isCoach
+    ? upcomingBirthdays(
+        Object.values(coachMemberDetailsByPlayerId).map((m) => ({
           id: m.id,
           firstName: m.firstName,
           lastName: m.lastName,
           birthDate: m.birthDate,
         }))
-    : isCoach
-      ? Object.values(coachMemberDetailsByPlayerId).map((m) => ({
-          id: m.id,
-          firstName: m.firstName,
-          lastName: m.lastName,
-          birthDate: m.birthDate,
-        }))
-      : [];
-  const birthdayEntries = upcomingBirthdays(birthdaySourceMembers);
+      )
+    : [];
 
   const showWidgetsZone = isAdmin || isCoach || players.length > 0;
 
@@ -1000,6 +1032,7 @@ export default async function DashboardPage() {
           upcomingEvents={adminUpcomingEvents}
           contactPhoneByPlayerId={adminContactPhoneByPlayerId}
           members={adminMembers}
+          birthdayEntries={adminBirthdayEntries}
         />
       ),
     });
@@ -1019,6 +1052,7 @@ export default async function DashboardPage() {
           rsvpPlayers={coachRsvpPlayers}
           rsvpStatusByKey={coachRsvpStatusByKey}
           taskTallyByTeamId={coachTaskTallyByTeamId}
+          birthdayEntries={coachBirthdayEntries}
         />
       ),
     });
@@ -1032,6 +1066,7 @@ export default async function DashboardPage() {
         <CalendarView
           events={familyEvents}
           rsvp={{ players: familyRsvpPlayers, statusByKey: familyRsvpStatusByKey }}
+          birthdayEntries={familyBirthdayEntries}
         />
       ),
     });
@@ -1067,9 +1102,6 @@ export default async function DashboardPage() {
 
         {showWidgetsZone && (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {birthdayEntries.length > 0 && (
-              <BirthdayWidget entries={birthdayEntries} />
-            )}
             {convocationCards.map(({ player, event, status }) => (
               <NextConvocationCard
                 key={player.id}
