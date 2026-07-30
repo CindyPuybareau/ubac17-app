@@ -565,9 +565,7 @@ export default async function DashboardPage() {
   return (
     <div className="flex flex-1 flex-col">
       <header className="sticky top-0 z-10 bg-navy px-4 py-3 sm:px-6">
-        <div
-          className={`mx-auto flex w-full items-center justify-between ${isAdmin ? "max-w-6xl" : "max-w-3xl"}`}
-        >
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between">
           <div className="flex items-center gap-2">
             <Image src="/logo.png" alt="UBAC 17" width={32} height={32} className="h-8 w-8 object-contain" priority />
             <span className="text-sm font-semibold text-white">UBAC 17</span>
@@ -578,9 +576,7 @@ export default async function DashboardPage() {
         </div>
       </header>
 
-      <div
-        className={`mx-auto flex w-full flex-1 flex-col gap-6 px-4 pt-6 pb-24 sm:px-6 sm:py-10 ${isAdmin ? "max-w-6xl" : "max-w-3xl"}`}
-      >
+      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 pt-6 pb-24 sm:px-6 sm:py-10">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-zinc-500">Bienvenue,</p>
