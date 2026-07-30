@@ -427,8 +427,16 @@ export default async function DashboardPage() {
         playerCharterAccepted: player.player_charter_accepted,
         parentCharterAccepted: player.parent_charter_accepted,
         teams: teamsByPlayerId.get(player.id) ?? [],
-        email: contactProfileId ? emailByProfileId.get(contactProfileId) ?? null : null,
-        phone: contactProfileId ? phoneByProfileId.get(contactProfileId) ?? null : null,
+        // Prefer a linked account's live contact info; fall back to the
+        // registration-form snapshot when no parent/self account exists yet.
+        email:
+          (contactProfileId ? emailByProfileId.get(contactProfileId) : null) ??
+          player.registration_email,
+        phone:
+          (contactProfileId ? phoneByProfileId.get(contactProfileId) : null) ??
+          player.registration_phone ??
+          player.mother_phone ??
+          player.father_phone,
         hasParent: parentIds.length > 0,
         pendingParentEmail: player.pending_parent_email,
       };

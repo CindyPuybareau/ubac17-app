@@ -16,6 +16,26 @@ type ParsedRow = {
   paiement: number | null;
   statutClub: string | null;
   modePaiement: string | null;
+  sex: string | null;
+  registrationEmail: string | null;
+  registrationPhone: string | null;
+  address: string | null;
+  postalCode: string | null;
+  city: string | null;
+  secondaryEmail: string | null;
+  motherPhone: string | null;
+  fatherPhone: string | null;
+  otherPhones: string | null;
+  secondaryAddress: string | null;
+  licenseType: string | null;
+  membershipType: string | null;
+  fbiStatus: string | null;
+  medicalNotes: string | null;
+  otherNotes: string | null;
+  imageRights: string | null;
+  playerCharterAccepted: string | null;
+  parentCharterAccepted: string | null;
+  horodatage: number;
 };
 
 type Team = { id: string; name: string | null; category: string | null };
@@ -33,6 +53,24 @@ function normalizeStatut(raw: string | null): string | null {
   return raw;
 }
 
+// French mobile numbers come through as a number with the leading 0
+// stripped (Excel treats the "Licencié"/"Mère"/"Père" columns as
+// numeric). Re-add it; leave genuinely free-text phone notes untouched.
+function formatPhoneValue(v: unknown): string | null {
+  if (v === null || v === undefined || v === "") return null;
+  if (typeof v === "number") {
+    const digits = String(Math.trunc(v));
+    return digits.length === 9 ? `0${digits}` : digits;
+  }
+  return String(v).trim() || null;
+}
+
+function strOrNull(v: unknown): string | null {
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim();
+  return s || null;
+}
+
 export default function ImportInscriptions({
   existingTeams,
 }: {
@@ -40,6 +78,7 @@ export default function ImportInscriptions({
 }) {
   const router = useRouter();
   const [rows, setRows] = useState<ParsedRow[] | null>(null);
+  const [duplicateCount, setDuplicateCount] = useState(0);
   const [season, setSeason] = useState("2026-2027");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -74,6 +113,7 @@ export default function ImportInscriptions({
       headerRow.findIndex((h) => h.startsWith(prefix));
 
     const idx = {
+      horodatage: findExact("Horodatage"),
       email: findExact("Adresse e-mail"),
       nom: findExact("Nom"),
       prenom: findExact("Prénom"),
@@ -84,7 +124,27 @@ export default function ImportInscriptions({
       prix: findPrefix("Prix à payer\n"),
       remise: findPrefix("Remise\n"),
       paiement: findPrefix("Paiement\n"),
+      sexe: findExact("Sexe"),
+      typeLicence: findExact("Type de Licence demandée"),
+      adressePrincipale: findPrefix("Adresse principale"),
+      codePostal: findExact("Code postal"),
+      commune: findExact("Commune"),
+      emailSecondaire: findExact("Adresse mail secondaire"),
+      licencie: findExact("Licencié"),
+      mere: findExact("Mère/conjointe"),
+      pere: findExact("Père/conjoint"),
+      particularitesMedicales: findExact("Particularités Médicales"),
+      adresseSecondaire: findExact("Adresse secondaire"),
+      autresTelephones: findExact("Autres Téléphones"),
+      autresInfos: findPrefix("Autres informations utiles"),
+      droitImage: findExact("Droit à l'image"),
+      charteJoueur: findPrefix("Acceptation Charte Joueur"),
+      charteParent: findPrefix("Acceptation Charte Parent"),
+      typeAdhesion: findExact("Type Adhésion"),
+      statutFbi: findExact("Statut FBI"),
     };
+
+    const get = (r: unknown[], i: number) => (i >= 0 ? r[i] : null);
 
     const parsed: ParsedRow[] = [];
     for (let i = 1; i < raw.length; i++) {
@@ -100,6 +160,14 @@ export default function ImportInscriptions({
       } else if (typeof birthRaw === "number") {
         birthDate = excelSerialToISODate(birthRaw);
       }
+
+      const horodatageRaw = get(r, idx.horodatage);
+      const horodatage =
+        horodatageRaw instanceof Date
+          ? horodatageRaw.getTime()
+          : typeof horodatageRaw === "number"
+            ? horodatageRaw
+            : 0;
 
       const numOrNull = (v: unknown) => (typeof v === "number" ? v : null);
 
@@ -119,10 +187,44 @@ export default function ImportInscriptions({
           idx.modePaiement >= 0
             ? (r[idx.modePaiement] as string | null)
             : null,
+        sex: strOrNull(get(r, idx.sexe)),
+        registrationEmail: strOrNull(get(r, idx.email)),
+        registrationPhone: formatPhoneValue(get(r, idx.licencie)),
+        address: strOrNull(get(r, idx.adressePrincipale)),
+        postalCode: strOrNull(get(r, idx.codePostal)),
+        city: strOrNull(get(r, idx.commune)),
+        secondaryEmail: strOrNull(get(r, idx.emailSecondaire)),
+        motherPhone: formatPhoneValue(get(r, idx.mere)),
+        fatherPhone: formatPhoneValue(get(r, idx.pere)),
+        otherPhones: strOrNull(get(r, idx.autresTelephones)),
+        secondaryAddress: strOrNull(get(r, idx.adresseSecondaire)),
+        licenseType: strOrNull(get(r, idx.typeLicence)),
+        membershipType: strOrNull(get(r, idx.typeAdhesion)),
+        fbiStatus: strOrNull(get(r, idx.statutFbi)),
+        medicalNotes: strOrNull(get(r, idx.particularitesMedicales)),
+        otherNotes: strOrNull(get(r, idx.autresInfos)),
+        imageRights: strOrNull(get(r, idx.droitImage)),
+        playerCharterAccepted: strOrNull(get(r, idx.charteJoueur)),
+        parentCharterAccepted: strOrNull(get(r, idx.charteParent)),
+        horodatage,
       });
     }
 
-    setRows(parsed);
+    // The registration form can be submitted more than once for the same
+    // person (correction, duplicate submission). Keep only the most
+    // recent submission per (nom, prénom, catégorie).
+    const byKey = new Map<string, ParsedRow>();
+    for (const row of parsed) {
+      const key = `${row.firstName.toLowerCase()}|${row.lastName.toLowerCase()}|${row.category.toLowerCase()}`;
+      const existing = byKey.get(key);
+      if (!existing || row.horodatage >= existing.horodatage) {
+        byKey.set(key, row);
+      }
+    }
+    const deduped = Array.from(byKey.values());
+
+    setDuplicateCount(parsed.length - deduped.length);
+    setRows(deduped);
   }
 
   async function handleImport() {
@@ -169,6 +271,25 @@ export default function ImportInscriptions({
         birth_date: r.birthDate,
         category: r.category,
         pending_parent_email: r.parentEmail,
+        sex: r.sex,
+        registration_email: r.registrationEmail,
+        registration_phone: r.registrationPhone,
+        address: r.address,
+        postal_code: r.postalCode,
+        city: r.city,
+        secondary_email: r.secondaryEmail,
+        mother_phone: r.motherPhone,
+        father_phone: r.fatherPhone,
+        other_phones: r.otherPhones,
+        secondary_address: r.secondaryAddress,
+        license_type: r.licenseType,
+        membership_type: r.membershipType,
+        fbi_status: r.fbiStatus,
+        medical_notes: r.medicalNotes,
+        other_notes: r.otherNotes,
+        image_rights: r.imageRights,
+        player_charter_accepted: r.playerCharterAccepted,
+        parent_charter_accepted: r.parentCharterAccepted,
       }))
     );
 
@@ -240,7 +361,9 @@ export default function ImportInscriptions({
       </h3>
       <p className="text-sm text-zinc-500">
         Fichier Excel &quot;Suivi des inscriptions&quot;, feuille &quot;Suivi
-        Inscriptions&quot;.
+        Inscriptions&quot;. Récupère aussi les contacts, l&apos;adresse, la
+        licence et les infos médicales pour la fiche complète de chaque
+        membre.
       </p>
 
       <div className="flex flex-wrap items-end gap-3">
@@ -270,7 +393,11 @@ export default function ImportInscriptions({
       {rows && (
         <div className="rounded-xl bg-zinc-50 p-4">
           <p className="text-sm font-medium text-zinc-700">
-            {rows.length} inscriptions détectées :
+            {rows.length} inscriptions détectées
+            {duplicateCount > 0
+              ? ` (${duplicateCount} doublon${duplicateCount > 1 ? "s" : ""} ignoré${duplicateCount > 1 ? "s" : ""}, la soumission la plus récente est gardée)`
+              : ""}
+            :
           </p>
           <ul className="mt-1 flex flex-wrap gap-2">
             {categoryCounts.map(([cat, count]) => (
