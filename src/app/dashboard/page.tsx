@@ -74,6 +74,15 @@ export type AdminMember = MemberDetail & {
   archivedAt: string | null;
 };
 
+export type CollecteType = "STAGE" | "EVENEMENT" | "BOUTIQUE";
+
+export type AdminCollecte = {
+  id: string;
+  name: string;
+  type: CollecteType;
+  prix: number | null;
+};
+
 export type AdminCotisation = {
   id: string;
   saison: string;
@@ -84,6 +93,11 @@ export type AdminCotisation = {
   mode_paiement: string | null;
   playerName: string;
   category: string | null;
+  playerId: string;
+  licenseNumber: string | null;
+  collecteId: string | null;
+  collecteType: CollecteType | null;
+  collecteName: string | null;
 };
 
 export type AdminUpcomingEvent = {
@@ -241,6 +255,7 @@ export default async function DashboardPage() {
   let adminTeams: TeamWithMembers[] = [];
   let allProfilesForAdmin: Person[] = [];
   let adminCotisations: AdminCotisation[] = [];
+  let adminCollectes: AdminCollecte[] = [];
   let adminUpcomingEvents: AdminUpcomingEvent[] = [];
   let adminMembers: AdminMember[] = [];
   const adminContactPhoneByPlayerId: Record<string, string> = {};
@@ -253,6 +268,7 @@ export default async function DashboardPage() {
       teamPlayersRes,
       teamCoachesRes,
       cotisationsRes,
+      collectesRes,
       upcomingEventsRes,
       parentPlayerRes,
     ] = await Promise.all([
@@ -275,9 +291,13 @@ export default async function DashboardPage() {
       supabase
         .from("cotisations")
         .select(
-          "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, players(first_name, last_name, category)"
+          "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, collecte_id, players(first_name, last_name, category, license_number), collectes(id, name, type)"
         )
         .order("saison", { ascending: false }),
+      supabase
+        .from("collectes")
+        .select("id, name, type, prix")
+        .order("created_at", { ascending: false }),
       supabase
         .from("events")
         .select("id, title, event_type, location, start_time, teams(id, name, category)")
@@ -359,11 +379,12 @@ export default async function DashboardPage() {
     );
 
     // cotisationsRes is ordered by saison desc, so the first row seen per
-    // player is their most recent season's club status.
+    // player is their most recent season's club status. Skip collecte-linked
+    // rows (stage/event/boutique) — those aren't the season membership.
     const clubStatusByPlayerId = new Map<string, string | null>();
     (cotisationsRes.data ?? []).forEach((c) => {
       const playerId = (c as { player_id: string | null }).player_id;
-      if (!playerId || clubStatusByPlayerId.has(playerId)) return;
+      if (!playerId || c.collecte_id || clubStatusByPlayerId.has(playerId)) return;
       clubStatusByPlayerId.set(playerId, c.statut);
     });
 
@@ -458,6 +479,12 @@ export default async function DashboardPage() {
         first_name: string | null;
         last_name: string | null;
         category: string | null;
+        license_number: string | null;
+      } | null;
+      const collecte = c.collectes as unknown as {
+        id: string;
+        name: string;
+        type: CollecteType;
       } | null;
       return {
         id: c.id,
@@ -467,12 +494,24 @@ export default async function DashboardPage() {
         paiement: c.paiement,
         statut: c.statut,
         mode_paiement: c.mode_paiement,
+        playerId: c.player_id,
+        licenseNumber: player?.license_number ?? null,
+        collecteId: c.collecte_id,
+        collecteType: collecte?.type ?? null,
+        collecteName: collecte?.name ?? null,
         playerName:
           [player?.first_name, player?.last_name].filter(Boolean).join(" ") ||
           "Joueur",
         category: player?.category ?? null,
       };
     });
+
+    adminCollectes = (collectesRes.data ?? []).map((c) => ({
+      id: c.id,
+      name: c.name,
+      type: c.type as CollecteType,
+      prix: c.prix,
+    }));
 
     adminUpcomingEvents = (upcomingEventsRes.data ?? []).map((e) => {
       const team = e.teams as unknown as {
@@ -766,6 +805,7 @@ export default async function DashboardPage() {
           teams={adminTeams}
           allProfiles={allProfilesForAdmin}
           cotisations={adminCotisations}
+          collectes={adminCollectes}
           upcomingEvents={adminUpcomingEvents}
           contactPhoneByPlayerId={adminContactPhoneByPlayerId}
           members={adminMembers}

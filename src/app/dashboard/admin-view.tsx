@@ -3,12 +3,17 @@ import TeamManager, { type TeamWithMembers } from "./team-manager";
 import ImportInscriptions from "./import-inscriptions";
 import ImportPlanning from "./import-planning";
 import ImportCoaches from "./import-coaches";
-import CotisationsTable from "./cotisations-table";
+import CotisationsManager from "./cotisations-manager";
 import CalendarView from "./calendar-view";
 import MembersTable from "./members-table";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import FfbbManager from "./ffbb-manager";
-import type { AdminCotisation, AdminMember, AdminUpcomingEvent } from "./page";
+import type {
+  AdminCollecte,
+  AdminCotisation,
+  AdminMember,
+  AdminUpcomingEvent,
+} from "./page";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 
@@ -17,6 +22,7 @@ export default function AdminView({
   teams,
   allProfiles,
   cotisations,
+  collectes,
   upcomingEvents,
   contactPhoneByPlayerId,
   members,
@@ -25,6 +31,7 @@ export default function AdminView({
   teams: TeamWithMembers[];
   allProfiles: Person[];
   cotisations: AdminCotisation[];
+  collectes: AdminCollecte[];
   upcomingEvents: AdminUpcomingEvent[];
   contactPhoneByPlayerId: Record<string, string>;
   members: AdminMember[];
@@ -72,7 +79,13 @@ export default function AdminView({
       key: "cotisations",
       label: "Cotisations",
       icon: <Wallet className={iconClass} />,
-      content: <CotisationsTable cotisations={cotisations} />,
+      content: (
+        <CotisationsManager
+          cotisations={cotisations}
+          collectes={collectes}
+          members={members}
+        />
+      ),
     },
     {
       key: "ffbb",
