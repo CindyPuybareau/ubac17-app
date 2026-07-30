@@ -146,7 +146,7 @@ export default function CalendarView({
   const detailEvents = eventsByDate.get(selectedKey) ?? [];
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex w-full max-w-full min-w-0 flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <button
@@ -179,48 +179,57 @@ export default function CalendarView({
         <CreateEventForm teams={createTeams} />
       )}
 
-      <div className="overflow-x-auto">
-        <div className="min-w-[640px]">
-          <div className="grid grid-cols-7 gap-1.5">
-            {weekdayLabels.map((label) => (
-              <div
-                key={label}
-                className="px-1 text-center text-xs font-semibold uppercase tracking-wide text-zinc-400"
-              >
-                {label}
-              </div>
-            ))}
-          </div>
-          <div className="mt-1 grid grid-cols-7 gap-1.5">
-            {gridDays.map((d) => {
-              const key = toKey(d);
-              const dayEvents = eventsByDate.get(key) ?? [];
-              const isCurrentMonth =
-                d.getMonth() === selectedDate.getMonth() &&
-                d.getFullYear() === selectedDate.getFullYear();
-              const isToday = key === todayKey;
-              const isSelected = key === selectedKey;
-              const visible = dayEvents.slice(0, 3);
-              const overflow = dayEvents.length - visible.length;
+      <div className="w-full max-w-full overflow-hidden">
+        <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+          {weekdayLabels.map((label) => (
+            <div
+              key={label}
+              className="truncate px-0.5 text-center text-[10px] font-semibold uppercase tracking-wide text-zinc-400 sm:text-xs"
+            >
+              <span className="sm:hidden">{label.slice(0, 1)}</span>
+              <span className="hidden sm:inline">{label}</span>
+            </div>
+          ))}
+        </div>
+        <div className="mt-1 grid grid-cols-7 gap-1 sm:gap-1.5">
+          {gridDays.map((d) => {
+            const key = toKey(d);
+            const dayEvents = eventsByDate.get(key) ?? [];
+            const isCurrentMonth =
+              d.getMonth() === selectedDate.getMonth() &&
+              d.getFullYear() === selectedDate.getFullYear();
+            const isToday = key === todayKey;
+            const isSelected = key === selectedKey;
+            const visible = dayEvents.slice(0, 3);
+            const overflow = dayEvents.length - visible.length;
 
-              return (
-                <button
-                  key={key}
-                  onClick={() => setSelectedDate(d)}
-                  className={`flex min-h-[76px] flex-col items-start gap-1 rounded-xl border p-1.5 text-left transition-colors sm:min-h-[104px] sm:p-2 ${
-                    isSelected
-                      ? "border-navy bg-navy/5"
-                      : "border-zinc-100 bg-white hover:border-ubac-yellow/50"
-                  } ${!isCurrentMonth ? "opacity-40" : ""}`}
+            return (
+              <button
+                key={key}
+                onClick={() => setSelectedDate(d)}
+                className={`flex min-h-[52px] w-full min-w-0 flex-col items-start gap-1 rounded-lg border p-1 text-left transition-colors sm:min-h-[104px] sm:rounded-xl sm:p-2 ${
+                  isSelected
+                    ? "border-navy bg-navy/5"
+                    : "border-zinc-100 bg-white hover:border-ubac-yellow/50"
+                } ${!isCurrentMonth ? "opacity-40" : ""}`}
+              >
+                <span
+                  className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold sm:h-6 sm:w-6 sm:text-xs ${
+                    isToday ? "bg-ubac-yellow text-navy" : "text-zinc-700"
+                  }`}
                 >
-                  <span
-                    className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
-                      isToday ? "bg-ubac-yellow text-navy" : "text-zinc-700"
-                    }`}
-                  >
-                    {d.getDate()}
-                  </span>
-                  <div className="flex w-full flex-col gap-0.5">
+                  {d.getDate()}
+                </span>
+                <div className="flex w-full min-w-0 flex-col gap-0.5">
+                  <div className="flex flex-wrap gap-0.5 sm:hidden">
+                    {visible.map((e) => (
+                      <span
+                        key={e.id}
+                        className={`h-1.5 w-1.5 shrink-0 rounded-full ${styleFor(e.event_type).pill.split(" ")[0]}`}
+                      />
+                    ))}
+                  </div>
+                  <div className="hidden sm:flex sm:flex-col sm:gap-0.5">
                     {visible.map((e) => (
                       <span
                         key={e.id}
@@ -229,16 +238,16 @@ export default function CalendarView({
                         {pillLabel(e)}
                       </span>
                     ))}
-                    {overflow > 0 && (
-                      <span className="text-[10px] font-semibold text-zinc-400">
-                        +{overflow}
-                      </span>
-                    )}
                   </div>
-                </button>
-              );
-            })}
-          </div>
+                  {overflow > 0 && (
+                    <span className="text-[9px] font-semibold text-zinc-400 sm:text-[10px]">
+                      +{overflow}
+                    </span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
 
