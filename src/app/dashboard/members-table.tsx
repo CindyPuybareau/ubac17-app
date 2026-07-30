@@ -69,6 +69,7 @@ export default function MembersTable({
   const [reassignIds, setReassignIds] = useState<string[] | null>(null);
   const [reassignTeamId, setReassignTeamId] = useState("");
   const [reassignSaving, setReassignSaving] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     let list = members;
@@ -121,29 +122,73 @@ export default function MembersTable({
   async function confirmReassign() {
     if (!reassignIds || !reassignTeamId) return;
     setReassignSaving(true);
+    setActionError(null);
     const supabase = createClient();
-    await supabase.from("team_players").delete().in("player_id", reassignIds);
-    await supabase
+    const { error: deleteError } = await supabase
+      .from("team_players")
+      .delete()
+      .in("player_id", reassignIds);
+    if (deleteError) {
+      setReassignSaving(false);
+      setActionError(`Changement d'équipe impossible : ${deleteError.message}`);
+      return;
+    }
+    const { error: insertError } = await supabase
       .from("team_players")
       .insert(reassignIds.map((pid) => ({ team_id: reassignTeamId, player_id: pid })));
     setReassignSaving(false);
+    if (insertError) {
+      setActionError(`Changement d'équipe impossible : ${insertError.message}`);
+      return;
+    }
     setReassignIds(null);
     setSelectedIds(new Set());
     router.refresh();
   }
 
+  // RLS silently returns 0 affected rows instead of an error when a policy
+  // blocks a write, so a plain .error check isn't enough here — request the
+  // deleted rows back and compare the count to know it actually happened.
   async function handleDelete(ids: string[]) {
     const label = ids.length > 1 ? `ces ${ids.length} membres` : "ce membre";
     const ok = window.confirm(
       `Supprimer définitivement ${label} du club ? Cette action est irréversible.`
     );
     if (!ok) return;
+    setActionError(null);
     const supabase = createClient();
-    await supabase.from("rsvps").delete().in("player_id", ids);
-    await supabase.from("team_players").delete().in("player_id", ids);
-    await supabase.from("parent_player").delete().in("player_id", ids);
-    await supabase.from("cotisations").delete().in("player_id", ids);
-    await supabase.from("players").delete().in("id", ids);
+
+    const dependents: [string, ReturnType<typeof supabase.from>][] = [
+      ["rsvps", supabase.from("rsvps")],
+      ["team_players", supabase.from("team_players")],
+      ["parent_player", supabase.from("parent_player")],
+      ["cotisations", supabase.from("cotisations")],
+    ];
+    for (const [table, query] of dependents) {
+      const { error } = await query.delete().in("player_id", ids);
+      if (error) {
+        setActionError(`Suppression impossible (${table}) : ${error.message}`);
+        return;
+      }
+    }
+
+    const { data: deleted, error: playersError } = await supabase
+      .from("players")
+      .delete()
+      .in("id", ids)
+      .select("id");
+
+    if (playersError) {
+      setActionError(`Suppression impossible : ${playersError.message}`);
+      return;
+    }
+    if ((deleted?.length ?? 0) < ids.length) {
+      setActionError(
+        "Suppression bloquée par les droits d'accès (RLS). Vérifie que la migration 20260731030000_members_table_support.sql a bien été exécutée dans Supabase (SQL Editor), puis réessaie."
+      );
+      return;
+    }
+
     setSelectedIds((prev) => {
       const next = new Set(prev);
       ids.forEach((id) => next.delete(id));
@@ -163,6 +208,17 @@ export default function MembersTable({
 
   return (
     <div className="flex flex-col gap-4">
+      {actionError && (
+        <div className="flex items-start justify-between gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">
+          <span>{actionError}</span>
+          <button
+            onClick={() => setActionError(null)}
+            className="shrink-0 rounded-full p-1 text-red-400 hover:bg-red-100 hover:text-red-600"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative min-w-[200px] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
