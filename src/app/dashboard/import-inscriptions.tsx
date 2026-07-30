@@ -35,6 +35,7 @@ type ParsedRow = {
   imageRights: string | null;
   playerCharterAccepted: string | null;
   parentCharterAccepted: string | null;
+  licenseNumber: string | null;
   horodatage: number;
 };
 
@@ -69,6 +70,18 @@ function strOrNull(v: unknown): string | null {
   if (v === null || v === undefined) return null;
   const s = String(v).trim();
   return s || null;
+}
+
+// Unique-member key used both to dedupe rows within the same file and to
+// match a row against an already-imported player: nom + prénom + date de
+// naissance, normalized. License number is preferred when available (see
+// resolveMatch), but the source file doesn't always carry one.
+function nameBirthKey(
+  firstName: string,
+  lastName: string,
+  birthDate: string | null
+) {
+  return `${firstName.trim().toLowerCase()}|${lastName.trim().toLowerCase()}|${birthDate ?? ""}`;
 }
 
 export default function ImportInscriptions({
@@ -111,6 +124,13 @@ export default function ImportInscriptions({
       headerRow.findIndex((h) => h.trim() === name);
     const findPrefix = (prefix: string) =>
       headerRow.findIndex((h) => h.startsWith(prefix));
+    const findAny = (names: string[]) => {
+      for (const name of names) {
+        const i = findExact(name);
+        if (i >= 0) return i;
+      }
+      return -1;
+    };
 
     const idx = {
       horodatage: findExact("Horodatage"),
@@ -142,6 +162,14 @@ export default function ImportInscriptions({
       charteParent: findPrefix("Acceptation Charte Parent"),
       typeAdhesion: findExact("Type Adhésion"),
       statutFbi: findExact("Statut FBI"),
+      numeroLicence: findAny([
+        "N° Licence",
+        "Numéro de Licence",
+        "Numero de Licence",
+        "N Licence",
+        "Licence N°",
+        "Numero_Licence",
+      ]),
     };
 
     const get = (r: unknown[], i: number) => (i >= 0 ? r[i] : null);
@@ -206,16 +234,19 @@ export default function ImportInscriptions({
         imageRights: strOrNull(get(r, idx.droitImage)),
         playerCharterAccepted: strOrNull(get(r, idx.charteJoueur)),
         parentCharterAccepted: strOrNull(get(r, idx.charteParent)),
+        licenseNumber: strOrNull(get(r, idx.numeroLicence)),
         horodatage,
       });
     }
 
     // The registration form can be submitted more than once for the same
     // person (correction, duplicate submission). Keep only the most
-    // recent submission per (nom, prénom, catégorie).
+    // recent submission per (nom, prénom, date de naissance).
     const byKey = new Map<string, ParsedRow>();
     for (const row of parsed) {
-      const key = `${row.firstName.toLowerCase()}|${row.lastName.toLowerCase()}|${row.category.toLowerCase()}`;
+      const key = row.licenseNumber
+        ? `license:${row.licenseNumber}`
+        : nameBirthKey(row.firstName, row.lastName, row.birthDate);
       const existing = byKey.get(key);
       if (!existing || row.horodatage >= existing.horodatage) {
         byKey.set(key, row);
@@ -259,87 +290,212 @@ export default function ImportInscriptions({
       });
     }
 
-    // Client-generated ids so we can pair each row with its own player
-    // without depending on database RETURNING order.
-    const rowsWithIds = rows.map((r) => ({ ...r, id: crypto.randomUUID() }));
+    // Match every row against players already in the club (upsert, never
+    // duplicate): prefer the license number when the file has one, else
+    // fall back to nom + prénom + date de naissance.
+    const { data: existingPlayers, error: existingError } = await supabase
+      .from("players")
+      .select("id, first_name, last_name, birth_date, license_number");
 
-    const { error: playersError } = await supabase.from("players").insert(
-      rowsWithIds.map((r) => ({
-        id: r.id,
-        first_name: r.firstName,
-        last_name: r.lastName,
-        birth_date: r.birthDate,
-        category: r.category,
-        pending_parent_email: r.parentEmail,
-        sex: r.sex,
-        registration_email: r.registrationEmail,
-        registration_phone: r.registrationPhone,
-        address: r.address,
-        postal_code: r.postalCode,
-        city: r.city,
-        secondary_email: r.secondaryEmail,
-        mother_phone: r.motherPhone,
-        father_phone: r.fatherPhone,
-        other_phones: r.otherPhones,
-        secondary_address: r.secondaryAddress,
-        license_type: r.licenseType,
-        membership_type: r.membershipType,
-        fbi_status: r.fbiStatus,
-        medical_notes: r.medicalNotes,
-        other_notes: r.otherNotes,
-        image_rights: r.imageRights,
-        player_charter_accepted: r.playerCharterAccepted,
-        parent_charter_accepted: r.parentCharterAccepted,
-      }))
-    );
-
-    if (playersError) {
+    if (existingError) {
       setLoading(false);
-      setError(playersError.message);
+      setError(existingError.message);
       return;
     }
 
-    const teamPlayersRows = rowsWithIds
-      .map((r) => {
-        const teamId = teamIdByCategory.get(r.category);
-        return teamId ? { team_id: teamId, player_id: r.id } : null;
-      })
-      .filter((r): r is { team_id: string; player_id: string } => Boolean(r));
+    const existingByLicense = new Map<string, string>();
+    const existingByNameBirth = new Map<string, string>();
+    (existingPlayers ?? []).forEach((p) => {
+      if (p.license_number) existingByLicense.set(p.license_number, p.id);
+      existingByNameBirth.set(
+        nameBirthKey(p.first_name ?? "", p.last_name ?? "", p.birth_date),
+        p.id
+      );
+    });
 
-    if (teamPlayersRows.length > 0) {
-      const { error: teamPlayersError } = await supabase
-        .from("team_players")
-        .insert(teamPlayersRows);
-      if (teamPlayersError) {
+    function resolveExistingId(r: ParsedRow): string | null {
+      if (r.licenseNumber && existingByLicense.has(r.licenseNumber)) {
+        return existingByLicense.get(r.licenseNumber) ?? null;
+      }
+      const key = nameBirthKey(r.firstName, r.lastName, r.birthDate);
+      return existingByNameBirth.get(key) ?? null;
+    }
+
+    const toInsert: (ParsedRow & { id: string })[] = [];
+    const toUpdate: (ParsedRow & { id: string })[] = [];
+    for (const r of rows) {
+      const existingId = resolveExistingId(r);
+      if (existingId) {
+        toUpdate.push({ ...r, id: existingId });
+      } else {
+        toInsert.push({ ...r, id: crypto.randomUUID() });
+      }
+    }
+
+    const playerFields = (r: ParsedRow) => ({
+      first_name: r.firstName,
+      last_name: r.lastName,
+      birth_date: r.birthDate,
+      category: r.category,
+      pending_parent_email: r.parentEmail,
+      sex: r.sex,
+      registration_email: r.registrationEmail,
+      registration_phone: r.registrationPhone,
+      address: r.address,
+      postal_code: r.postalCode,
+      city: r.city,
+      secondary_email: r.secondaryEmail,
+      mother_phone: r.motherPhone,
+      father_phone: r.fatherPhone,
+      other_phones: r.otherPhones,
+      secondary_address: r.secondaryAddress,
+      license_type: r.licenseType,
+      membership_type: r.membershipType,
+      fbi_status: r.fbiStatus,
+      medical_notes: r.medicalNotes,
+      other_notes: r.otherNotes,
+      image_rights: r.imageRights,
+      player_charter_accepted: r.playerCharterAccepted,
+      parent_charter_accepted: r.parentCharterAccepted,
+      license_number: r.licenseNumber,
+    });
+
+    if (toInsert.length > 0) {
+      const { error: insertError } = await supabase.from("players").insert(
+        toInsert.map((r) => ({ id: r.id, ...playerFields(r) }))
+      );
+      if (insertError) {
         setLoading(false);
-        setError(teamPlayersError.message);
+        setError(insertError.message);
         return;
       }
     }
 
-    const cotisationsRows = rowsWithIds.map((r) => ({
-      player_id: r.id,
-      saison: season,
+    // Overwrite the existing member's data with the file's values, and
+    // un-archive them if they'd been archived (they're registering again).
+    const updateResults = await Promise.all(
+      toUpdate.map((r) =>
+        supabase
+          .from("players")
+          .update({ ...playerFields(r), archived_at: null })
+          .eq("id", r.id)
+      )
+    );
+    const updateError = updateResults.find((res) => res.error)?.error;
+    if (updateError) {
+      setLoading(false);
+      setError(updateError.message);
+      return;
+    }
+
+    const allRows = [...toInsert, ...toUpdate];
+    const allIds = allRows.map((r) => r.id);
+
+    if (allIds.length > 0) {
+      const { error: clearTeamPlayersError } = await supabase
+        .from("team_players")
+        .delete()
+        .in("player_id", allIds);
+      if (clearTeamPlayersError) {
+        setLoading(false);
+        setError(clearTeamPlayersError.message);
+        return;
+      }
+
+      const teamPlayersRows = allRows
+        .map((r) => {
+          const teamId = teamIdByCategory.get(r.category);
+          return teamId ? { team_id: teamId, player_id: r.id } : null;
+        })
+        .filter((r): r is { team_id: string; player_id: string } => Boolean(r));
+
+      if (teamPlayersRows.length > 0) {
+        const { error: teamPlayersError } = await supabase
+          .from("team_players")
+          .insert(teamPlayersRows);
+        if (teamPlayersError) {
+          setLoading(false);
+          setError(teamPlayersError.message);
+          return;
+        }
+      }
+    }
+
+    // Cotisations: one row per player per season. Update this season's row
+    // if it already exists (re-import correcting the same season) instead
+    // of adding a duplicate; insert a new one otherwise.
+    const { data: existingCotisations, error: cotisationsFetchError } =
+      allIds.length > 0
+        ? await supabase
+            .from("cotisations")
+            .select("id, player_id")
+            .eq("saison", season)
+            .in("player_id", allIds)
+        : { data: [] as { id: string; player_id: string }[], error: null };
+
+    if (cotisationsFetchError) {
+      setLoading(false);
+      setError(cotisationsFetchError.message);
+      return;
+    }
+
+    const cotisationIdByPlayerId = new Map(
+      (existingCotisations ?? []).map((c) => [c.player_id, c.id])
+    );
+
+    const cotisationFields = (r: ParsedRow & { id: string }) => ({
       prix: r.prix,
       remise: r.remise,
       paiement: r.paiement,
       statut: normalizeStatut(r.statutClub),
       mode_paiement: r.modePaiement,
-    }));
+    });
 
-    const { error: cotisationsError } = await supabase
-      .from("cotisations")
-      .insert(cotisationsRows);
+    const cotisationsToInsert = allRows.filter(
+      (r) => !cotisationIdByPlayerId.has(r.id)
+    );
+    const cotisationsToUpdate = allRows.filter((r) =>
+      cotisationIdByPlayerId.has(r.id)
+    );
+
+    if (cotisationsToInsert.length > 0) {
+      const { error: cotisationsInsertError } = await supabase
+        .from("cotisations")
+        .insert(
+          cotisationsToInsert.map((r) => ({
+            player_id: r.id,
+            saison: season,
+            ...cotisationFields(r),
+          }))
+        );
+      if (cotisationsInsertError) {
+        setLoading(false);
+        setError(cotisationsInsertError.message);
+        return;
+      }
+    }
+
+    const cotisationsUpdateResults = await Promise.all(
+      cotisationsToUpdate.map((r) =>
+        supabase
+          .from("cotisations")
+          .update(cotisationFields(r))
+          .eq("id", cotisationIdByPlayerId.get(r.id))
+      )
+    );
+    const cotisationsUpdateError = cotisationsUpdateResults.find(
+      (res) => res.error
+    )?.error;
 
     setLoading(false);
 
-    if (cotisationsError) {
-      setError(cotisationsError.message);
+    if (cotisationsUpdateError) {
+      setError(cotisationsUpdateError.message);
       return;
     }
 
     setResult(
-      `${rowsWithIds.length} joueurs importés dans ${teamIdByCategory.size} équipes pour la saison ${season}.`
+      `${toInsert.length} nouveau${toInsert.length > 1 ? "x" : ""} membre${toInsert.length > 1 ? "s" : ""}, ${toUpdate.length} mis à jour, dans ${teamIdByCategory.size} équipes pour la saison ${season}.`
     );
     setRows(null);
     router.refresh();
@@ -361,9 +517,9 @@ export default function ImportInscriptions({
       </h3>
       <p className="text-sm text-zinc-500">
         Fichier Excel &quot;Suivi des inscriptions&quot;, feuille &quot;Suivi
-        Inscriptions&quot;. Récupère aussi les contacts, l&apos;adresse, la
-        licence et les infos médicales pour la fiche complète de chaque
-        membre.
+        Inscriptions&quot;. Un membre déjà présent (même n° de licence, ou
+        même nom + prénom + date de naissance) est mis à jour, jamais
+        dupliqué.
       </p>
 
       <div className="flex flex-wrap items-end gap-3">
@@ -395,7 +551,7 @@ export default function ImportInscriptions({
           <p className="text-sm font-medium text-zinc-700">
             {rows.length} inscriptions détectées
             {duplicateCount > 0
-              ? ` (${duplicateCount} doublon${duplicateCount > 1 ? "s" : ""} ignoré${duplicateCount > 1 ? "s" : ""}, la soumission la plus récente est gardée)`
+              ? ` (${duplicateCount} doublon${duplicateCount > 1 ? "s" : ""} ignoré${duplicateCount > 1 ? "s" : ""} dans le fichier, la soumission la plus récente est gardée)`
               : ""}
             :
           </p>

@@ -3,6 +3,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Archive,
   ChevronDown,
   ChevronUp,
   Mail,
@@ -10,7 +11,6 @@ import {
   Phone,
   RefreshCw,
   Search,
-  Trash2,
   Users,
   X,
 } from "lucide-react";
@@ -60,6 +60,7 @@ export default function MembersTable({
 
   const [search, setSearch] = useState("");
   const [teamFilter, setTeamFilter] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -72,7 +73,7 @@ export default function MembersTable({
   const [actionError, setActionError] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
-    let list = members;
+    let list = showArchived ? members : members.filter((m) => !m.archivedAt);
     if (teamFilter) {
       list = list.filter((m) => m.teams.some((t) => t.id === teamFilter));
     }
@@ -88,7 +89,7 @@ export default function MembersTable({
       const cmp = fullLastName(a).localeCompare(fullLastName(b), "fr");
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [members, teamFilter, search, sortDir]);
+  }, [members, teamFilter, search, sortDir, showArchived]);
 
   const allFilteredSelected =
     filtered.length > 0 && filtered.every((m) => selectedIds.has(m.id));
@@ -146,45 +147,31 @@ export default function MembersTable({
     router.refresh();
   }
 
+  // Members are never hard-deleted from the Bureau's table — archiving
+  // keeps every past cotisation, RSVP and team assignment intact and can be
+  // undone, instead of risking an accidental mass data loss.
+  //
   // RLS silently returns 0 affected rows instead of an error when a policy
   // blocks a write, so a plain .error check isn't enough here — request the
-  // deleted rows back and compare the count to know it actually happened.
-  async function handleDelete(ids: string[]) {
-    const label = ids.length > 1 ? `ces ${ids.length} membres` : "ce membre";
-    const ok = window.confirm(
-      `Supprimer définitivement ${label} du club ? Cette action est irréversible.`
-    );
-    if (!ok) return;
+  // updated rows back and compare the count to know it actually happened.
+  async function setArchived(ids: string[], archived: boolean) {
     setActionError(null);
     const supabase = createClient();
-
-    const dependents: [string, ReturnType<typeof supabase.from>][] = [
-      ["rsvps", supabase.from("rsvps")],
-      ["team_players", supabase.from("team_players")],
-      ["parent_player", supabase.from("parent_player")],
-      ["cotisations", supabase.from("cotisations")],
-    ];
-    for (const [table, query] of dependents) {
-      const { error } = await query.delete().in("player_id", ids);
-      if (error) {
-        setActionError(`Suppression impossible (${table}) : ${error.message}`);
-        return;
-      }
-    }
-
-    const { data: deleted, error: playersError } = await supabase
+    const { data: updated, error } = await supabase
       .from("players")
-      .delete()
+      .update({ archived_at: archived ? new Date().toISOString() : null })
       .in("id", ids)
       .select("id");
 
-    if (playersError) {
-      setActionError(`Suppression impossible : ${playersError.message}`);
+    if (error) {
+      setActionError(
+        `${archived ? "Archivage" : "Réactivation"} impossible : ${error.message}`
+      );
       return;
     }
-    if ((deleted?.length ?? 0) < ids.length) {
+    if ((updated?.length ?? 0) < ids.length) {
       setActionError(
-        "Suppression bloquée par les droits d'accès (RLS). Vérifie que la migration 20260731030000_members_table_support.sql a bien été exécutée dans Supabase (SQL Editor), puis réessaie."
+        "Action bloquée par les droits d'accès (RLS). Vérifie que la migration 20260731030000_members_table_support.sql a bien été exécutée dans Supabase (SQL Editor), puis réessaie."
       );
       return;
     }
@@ -195,6 +182,23 @@ export default function MembersTable({
       return next;
     });
     router.refresh();
+  }
+
+  async function handleArchive(ids: string[]) {
+    const label = ids.length > 1 ? `ces ${ids.length} membres` : "ce membre";
+    const ok = window.confirm(
+      `Archiver ${label} ? Il${ids.length > 1 ? "s" : ""} n'apparaîtra${
+        ids.length > 1 ? "ont" : ""
+      } plus dans la liste par défaut, mais ${
+        ids.length > 1 ? "leurs données restent" : "ses données restent"
+      } conservées et tu peux réactiver à tout moment.`
+    );
+    if (!ok) return;
+    await setArchived(ids, true);
+  }
+
+  async function handleReactivate(ids: string[]) {
+    await setArchived(ids, false);
   }
 
   const selectedMembers = members.filter((m) => selectedIds.has(m.id));
@@ -242,6 +246,15 @@ export default function MembersTable({
             </option>
           ))}
         </select>
+        <label className="flex items-center gap-1.5 text-xs font-medium text-zinc-500">
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(e) => setShowArchived(e.target.checked)}
+            className="h-3.5 w-3.5 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
+          />
+          Afficher les archivés
+        </label>
         <span className="text-xs font-medium text-zinc-400">
           {filtered.length} membre{filtered.length > 1 ? "s" : ""}
         </span>
@@ -274,11 +287,11 @@ export default function MembersTable({
               Changer d&apos;équipe
             </button>
             <button
-              onClick={() => handleDelete(Array.from(selectedIds))}
+              onClick={() => handleArchive(Array.from(selectedIds))}
               className="flex items-center gap-1.5 rounded-full border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
             >
-              <Trash2 className="h-3.5 w-3.5" />
-              Supprimer la sélection
+              <Archive className="h-3.5 w-3.5" />
+              Archiver la sélection
             </button>
             <button
               onClick={() => setSelectedIds(new Set())}
@@ -341,7 +354,9 @@ export default function MembersTable({
               <tr
                 key={m.id}
                 onClick={() => setDetailMemberId(m.id)}
-                className="cursor-pointer border-b border-zinc-50 last:border-0 hover:bg-zinc-50/60"
+                className={`cursor-pointer border-b border-zinc-50 last:border-0 hover:bg-zinc-50/60 ${
+                  m.archivedAt ? "opacity-50" : ""
+                }`}
               >
                 <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
                   <input
@@ -372,6 +387,11 @@ export default function MembersTable({
                   title={fullLastName(m)}
                 >
                   {fullLastName(m)}
+                  {m.archivedAt && (
+                    <span className="ml-1.5 rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-zinc-500">
+                      Archivé
+                    </span>
+                  )}
                 </td>
                 <td className="truncate px-2 py-2 text-zinc-700" title={m.firstName ?? undefined}>
                   {m.firstName ?? "—"}
@@ -461,15 +481,27 @@ export default function MembersTable({
                         >
                           Changer d&apos;équipe
                         </button>
-                        <button
-                          onClick={() => {
-                            setOpenMenuId(null);
-                            handleDelete([m.id]);
-                          }}
-                          className={`${menuItemClass} text-red-600 hover:bg-red-50`}
-                        >
-                          Supprimer du club
-                        </button>
+                        {m.archivedAt ? (
+                          <button
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              handleReactivate([m.id]);
+                            }}
+                            className={menuItemClass}
+                          >
+                            Réactiver le membre
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              handleArchive([m.id]);
+                            }}
+                            className={`${menuItemClass} text-red-600 hover:bg-red-50`}
+                          >
+                            Archiver le membre
+                          </button>
+                        )}
                       </div>
                     </>
                   )}

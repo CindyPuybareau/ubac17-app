@@ -62,6 +62,7 @@ export type MemberDetail = {
   imageRights: string | null;
   playerCharterAccepted: string | null;
   parentCharterAccepted: string | null;
+  licenseNumber: string | null;
   teams: AdminMemberTeam[];
 };
 
@@ -70,6 +71,7 @@ export type AdminMember = MemberDetail & {
   phone: string | null;
   hasParent: boolean;
   pendingParentEmail: string | null;
+  archivedAt: string | null;
 };
 
 export type AdminCotisation = {
@@ -261,7 +263,7 @@ export default async function DashboardPage() {
       supabase
         .from("players")
         .select(
-          "id, first_name, last_name, profile_id, pending_parent_email, birth_date, category, sex, registration_email, registration_phone, address, postal_code, city, secondary_email, mother_phone, father_phone, other_phones, secondary_address, license_type, membership_type, fbi_status, medical_notes, other_notes, image_rights, player_charter_accepted, parent_charter_accepted"
+          "id, first_name, last_name, profile_id, pending_parent_email, birth_date, category, sex, registration_email, registration_phone, address, postal_code, city, secondary_email, mother_phone, father_phone, other_phones, secondary_address, license_type, membership_type, fbi_status, medical_notes, other_notes, image_rights, player_charter_accepted, parent_charter_accepted, license_number, archived_at"
         )
         .order("first_name"),
       supabase
@@ -393,6 +395,8 @@ export default async function DashboardPage() {
         image_rights: string | null;
         player_charter_accepted: string | null;
         parent_charter_accepted: string | null;
+        license_number: string | null;
+        archived_at: string | null;
       };
       // Exclude self-link rows: a self-registered adult player is linked to
       // their own parent_player row, which isn't a "parent" for display.
@@ -426,6 +430,8 @@ export default async function DashboardPage() {
         imageRights: player.image_rights,
         playerCharterAccepted: player.player_charter_accepted,
         parentCharterAccepted: player.parent_charter_accepted,
+        licenseNumber: player.license_number,
+        archivedAt: player.archived_at,
         teams: teamsByPlayerId.get(player.id) ?? [],
         // Prefer a linked account's live contact info; fall back to the
         // registration-form snapshot when no parent/self account exists yet.
@@ -525,7 +531,7 @@ export default async function DashboardPage() {
         ? supabase
             .from("players")
             .select(
-              "id, first_name, last_name, birth_date, category, sex, registration_email, registration_phone, address, postal_code, city, secondary_email, mother_phone, father_phone, other_phones, secondary_address, license_type, membership_type, fbi_status, medical_notes, other_notes, image_rights, player_charter_accepted, parent_charter_accepted"
+              "id, first_name, last_name, birth_date, category, sex, registration_email, registration_phone, address, postal_code, city, secondary_email, mother_phone, father_phone, other_phones, secondary_address, license_type, membership_type, fbi_status, medical_notes, other_notes, image_rights, player_charter_accepted, parent_charter_accepted, license_number"
             )
             .in("id", playerIds)
         : Promise.resolve({ data: [] as Person[] }),
@@ -614,6 +620,7 @@ export default async function DashboardPage() {
         image_rights: string | null;
         player_charter_accepted: string | null;
         parent_charter_accepted: string | null;
+        license_number: string | null;
       };
       coachMemberDetailsByPlayerId[player.id] = {
         id: player.id,
@@ -641,6 +648,7 @@ export default async function DashboardPage() {
         imageRights: player.image_rights,
         playerCharterAccepted: player.player_charter_accepted,
         parentCharterAccepted: player.parent_charter_accepted,
+        licenseNumber: player.license_number,
         teams: coachTeamRefsByPlayerId.get(player.id) ?? [],
       };
     });

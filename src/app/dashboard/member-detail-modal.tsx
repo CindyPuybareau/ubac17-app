@@ -127,6 +127,7 @@ export default function MemberDetailModal({
     medicalNotes: member.medicalNotes ?? "",
     otherNotes: member.otherNotes ?? "",
     imageRights: member.imageRights ?? "",
+    licenseNumber: member.licenseNumber ?? "",
   });
 
   const editable = !readOnly;
@@ -162,6 +163,7 @@ export default function MemberDetailModal({
         medical_notes: form.medicalNotes || null,
         other_notes: form.otherNotes || null,
         image_rights: form.imageRights || null,
+        license_number: form.licenseNumber || null,
       })
       .eq("id", member.id);
 
@@ -390,6 +392,12 @@ export default function MemberDetailModal({
                   {member.clubStatus ?? "—"}
                 </span>
               </ReadOnlyField>
+              <Field
+                label="N° Licence"
+                value={form.licenseNumber}
+                editable={editable}
+                onChange={(v) => set("licenseNumber", v)}
+              />
             </div>
           )}
 
