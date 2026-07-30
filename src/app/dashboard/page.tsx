@@ -593,15 +593,6 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {isAdmin && (
-          <div className="flex items-center justify-between rounded-2xl border border-ubac-yellow/40 bg-ubac-yellow/10 px-4 py-3">
-            <span className="text-sm font-semibold text-ubac-yellow-dark">
-              Espace Bureau{clubFunction ? ` · ${clubFunction}` : ""}
-            </span>
-            <span className="text-xs text-ubac-yellow-dark">Voir l&apos;onglet Bureau</span>
-          </div>
-        )}
-
         {hasPriorityContent && (
           <div className="flex flex-col gap-4">
           {convocationCards.map(({ player, event, status }) => (
