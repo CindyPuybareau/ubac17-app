@@ -2,11 +2,12 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, Phone } from "lucide-react";
+import { CalendarDays, FileText, Phone } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import OpponentDisplay from "./opponent-display";
 import FfbbSync from "./ffbb-sync";
-import type { AdminUpcomingEvent } from "./page";
+import MemberDetailModal from "./member-detail-modal";
+import type { AdminUpcomingEvent, MemberDetail } from "./page";
 import type { TeamWithMembers } from "./team-manager";
 
 const CURRENT_SEASON = "2026-2027";
@@ -25,6 +26,7 @@ export default function TeamCard({
   contactPhoneByPlayerId,
   createCotisationOnNewPlayer = true,
   showFfbbSync = false,
+  memberDetailsByPlayerId,
 }: {
   team: TeamWithMembers;
   allProfiles: Person[];
@@ -32,8 +34,10 @@ export default function TeamCard({
   contactPhoneByPlayerId: Record<string, string>;
   createCotisationOnNewPlayer?: boolean;
   showFfbbSync?: boolean;
+  memberDetailsByPlayerId?: Record<string, MemberDetail>;
 }) {
   const router = useRouter();
+  const [detailPlayerId, setDetailPlayerId] = useState<string | null>(null);
 
   const [openPlayerForm, setOpenPlayerForm] = useState(false);
   const [newPlayerFirstName, setNewPlayerFirstName] = useState("");
@@ -175,12 +179,23 @@ export default function TeamCard({
                       </span>
                     )}
                   </span>
-                  <button
-                    onClick={() => removePlayer(p.id)}
-                    className="shrink-0 text-xs font-medium text-red-600 hover:underline"
-                  >
-                    Retirer
-                  </button>
+                  <span className="flex shrink-0 items-center gap-2">
+                    {memberDetailsByPlayerId?.[p.id] && (
+                      <button
+                        onClick={() => setDetailPlayerId(p.id)}
+                        title="Voir la fiche complète"
+                        className="rounded-full p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => removePlayer(p.id)}
+                      className="text-xs font-medium text-red-600 hover:underline"
+                    >
+                      Retirer
+                    </button>
+                  </span>
                 </li>
               );
             })}
@@ -335,6 +350,19 @@ export default function TeamCard({
           <FfbbSync teamId={team.id} initialUrl={team.ffbb_url} />
         </div>
       )}
+
+      {detailPlayerId &&
+        memberDetailsByPlayerId?.[detailPlayerId] &&
+        (() => {
+          const detail = memberDetailsByPlayerId[detailPlayerId];
+          return (
+            <MemberDetailModal
+              member={detail}
+              readOnly
+              onClose={() => setDetailPlayerId(null)}
+            />
+          );
+        })()}
     </div>
   );
 }

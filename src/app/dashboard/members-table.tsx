@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import MemberDetailModal from "./member-detail-modal";
 import type { AdminMember, AdminMemberTeam } from "./page";
 
 function fullLastName(m: AdminMember) {
@@ -63,10 +64,7 @@ export default function MembersTable({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
-  const [editingMember, setEditingMember] = useState<AdminMember | null>(null);
-  const [editFirstName, setEditFirstName] = useState("");
-  const [editLastName, setEditLastName] = useState("");
-  const [editSaving, setEditSaving] = useState(false);
+  const [detailMemberId, setDetailMemberId] = useState<string | null>(null);
 
   const [reassignIds, setReassignIds] = useState<string[] | null>(null);
   const [reassignTeamId, setReassignTeamId] = useState("");
@@ -113,25 +111,6 @@ export default function MembersTable({
       else next.add(id);
       return next;
     });
-  }
-
-  function openEdit(m: AdminMember) {
-    setEditingMember(m);
-    setEditFirstName(m.firstName ?? "");
-    setEditLastName(m.lastName ?? "");
-  }
-
-  async function saveEdit() {
-    if (!editingMember) return;
-    setEditSaving(true);
-    const supabase = createClient();
-    await supabase
-      .from("players")
-      .update({ first_name: editFirstName, last_name: editLastName })
-      .eq("id", editingMember.id);
-    setEditSaving(false);
-    setEditingMember(null);
-    router.refresh();
   }
 
   function openReassign(ids: string[]) {
@@ -294,9 +273,10 @@ export default function MembersTable({
             {filtered.map((m, index) => (
               <tr
                 key={m.id}
-                className="border-b border-zinc-50 last:border-0 hover:bg-zinc-50/60"
+                onClick={() => setDetailMemberId(m.id)}
+                className="cursor-pointer border-b border-zinc-50 last:border-0 hover:bg-zinc-50/60"
               >
-                <td className="px-3 py-2">
+                <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                   <input
                     type="checkbox"
                     checked={selectedIds.has(m.id)}
@@ -357,7 +337,7 @@ export default function MembersTable({
                     <span className="text-zinc-300">—</span>
                   )}
                 </td>
-                <td className="relative px-2 py-2">
+                <td className="relative px-2 py-2" onClick={(e) => e.stopPropagation()}>
                   <button
                     onClick={() =>
                       setOpenMenuId((cur) => (cur === m.id ? null : m.id))
@@ -376,7 +356,7 @@ export default function MembersTable({
                         <button
                           onClick={() => {
                             setOpenMenuId(null);
-                            openEdit(m);
+                            setDetailMemberId(m.id);
                           }}
                           className={menuItemClass}
                         >
@@ -435,31 +415,18 @@ export default function MembersTable({
         </table>
       </div>
 
-      {editingMember && (
-        <Modal title="Modifier le profil" onClose={() => setEditingMember(null)}>
-          <div className="flex flex-col gap-2">
-            <input
-              value={editFirstName}
-              onChange={(e) => setEditFirstName(e.target.value)}
-              placeholder="Prénom"
-              className="rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+      {detailMemberId &&
+        (() => {
+          const detailMember = members.find((m) => m.id === detailMemberId);
+          if (!detailMember) return null;
+          return (
+            <MemberDetailModal
+              member={detailMember}
+              readOnly={false}
+              onClose={() => setDetailMemberId(null)}
             />
-            <input
-              value={editLastName}
-              onChange={(e) => setEditLastName(e.target.value)}
-              placeholder="Nom"
-              className="rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
-            />
-            <button
-              onClick={saveEdit}
-              disabled={editSaving}
-              className="mt-1 rounded-full bg-ubac-yellow px-3 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
-            >
-              {editSaving ? "Enregistrement..." : "Enregistrer"}
-            </button>
-          </div>
-        </Modal>
-      )}
+          );
+        })()}
 
       {reassignIds && (
         <Modal

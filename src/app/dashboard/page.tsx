@@ -33,11 +33,39 @@ export type AdminMemberTeam = {
   category: string | null;
 };
 
-export type AdminMember = {
+// Full registration record, mirroring the club's official enrollment form
+// ("Suivi des Inscriptions"). Shared by the Bureau's editable member detail
+// modal and the coach's read-only version.
+export type MemberDetail = {
   id: string;
   firstName: string | null;
   lastName: string | null;
+  birthDate: string | null;
+  category: string | null;
+  sex: string | null;
+  registrationEmail: string | null;
+  registrationPhone: string | null;
+  address: string | null;
+  postalCode: string | null;
+  city: string | null;
+  secondaryEmail: string | null;
+  motherPhone: string | null;
+  fatherPhone: string | null;
+  otherPhones: string | null;
+  secondaryAddress: string | null;
+  licenseType: string | null;
+  membershipType: string | null;
+  fbiStatus: string | null;
+  clubStatus: string | null;
+  medicalNotes: string | null;
+  otherNotes: string | null;
+  imageRights: string | null;
+  playerCharterAccepted: string | null;
+  parentCharterAccepted: string | null;
   teams: AdminMemberTeam[];
+};
+
+export type AdminMember = MemberDetail & {
   email: string | null;
   phone: string | null;
   hasParent: boolean;
@@ -232,7 +260,9 @@ export default async function DashboardPage() {
         .order("category"),
       supabase
         .from("players")
-        .select("id, first_name, last_name, profile_id, pending_parent_email")
+        .select(
+          "id, first_name, last_name, profile_id, pending_parent_email, birth_date, category, sex, registration_email, registration_phone, address, postal_code, city, secondary_email, mother_phone, father_phone, other_phones, secondary_address, license_type, membership_type, fbi_status, medical_notes, other_notes, image_rights, player_charter_accepted, parent_charter_accepted"
+        )
         .order("first_name"),
       supabase
         .from("profiles")
@@ -243,7 +273,7 @@ export default async function DashboardPage() {
       supabase
         .from("cotisations")
         .select(
-          "id, saison, prix, remise, paiement, statut, mode_paiement, players(first_name, last_name, category)"
+          "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, players(first_name, last_name, category)"
         )
         .order("saison", { ascending: false }),
       supabase
@@ -326,6 +356,15 @@ export default async function DashboardPage() {
       ])
     );
 
+    // cotisationsRes is ordered by saison desc, so the first row seen per
+    // player is their most recent season's club status.
+    const clubStatusByPlayerId = new Map<string, string | null>();
+    (cotisationsRes.data ?? []).forEach((c) => {
+      const playerId = (c as { player_id: string | null }).player_id;
+      if (!playerId || clubStatusByPlayerId.has(playerId)) return;
+      clubStatusByPlayerId.set(playerId, c.statut);
+    });
+
     adminMembers = (playersRes.data ?? []).map((row) => {
       const player = row as {
         id: string;
@@ -333,6 +372,27 @@ export default async function DashboardPage() {
         last_name: string | null;
         profile_id: string | null;
         pending_parent_email: string | null;
+        birth_date: string | null;
+        category: string | null;
+        sex: string | null;
+        registration_email: string | null;
+        registration_phone: string | null;
+        address: string | null;
+        postal_code: string | null;
+        city: string | null;
+        secondary_email: string | null;
+        mother_phone: string | null;
+        father_phone: string | null;
+        other_phones: string | null;
+        secondary_address: string | null;
+        license_type: string | null;
+        membership_type: string | null;
+        fbi_status: string | null;
+        medical_notes: string | null;
+        other_notes: string | null;
+        image_rights: string | null;
+        player_charter_accepted: string | null;
+        parent_charter_accepted: string | null;
       };
       // Exclude self-link rows: a self-registered adult player is linked to
       // their own parent_player row, which isn't a "parent" for display.
@@ -344,6 +404,28 @@ export default async function DashboardPage() {
         id: player.id,
         firstName: player.first_name,
         lastName: player.last_name,
+        birthDate: player.birth_date,
+        category: player.category,
+        sex: player.sex,
+        registrationEmail: player.registration_email,
+        registrationPhone: player.registration_phone,
+        address: player.address,
+        postalCode: player.postal_code,
+        city: player.city,
+        secondaryEmail: player.secondary_email,
+        motherPhone: player.mother_phone,
+        fatherPhone: player.father_phone,
+        otherPhones: player.other_phones,
+        secondaryAddress: player.secondary_address,
+        licenseType: player.license_type,
+        membershipType: player.membership_type,
+        fbiStatus: player.fbi_status,
+        clubStatus: clubStatusByPlayerId.get(player.id) ?? null,
+        medicalNotes: player.medical_notes,
+        otherNotes: player.other_notes,
+        imageRights: player.image_rights,
+        playerCharterAccepted: player.player_charter_accepted,
+        parentCharterAccepted: player.parent_charter_accepted,
         teams: teamsByPlayerId.get(player.id) ?? [],
         email: contactProfileId ? emailByProfileId.get(contactProfileId) ?? null : null,
         phone: contactProfileId ? phoneByProfileId.get(contactProfileId) ?? null : null,
@@ -401,6 +483,7 @@ export default async function DashboardPage() {
   let coachTeamsWithRoster: TeamWithMembers[] = [];
   let coachEvents: AdminUpcomingEvent[] = [];
   const coachContactPhoneByPlayerId: Record<string, string> = {};
+  const coachMemberDetailsByPlayerId: Record<string, MemberDetail> = {};
 
   if (isCoach) {
     const coachedTeamIds = coachedTeams.map((t) => t.id);
@@ -433,7 +516,9 @@ export default async function DashboardPage() {
       playerIds.length > 0
         ? supabase
             .from("players")
-            .select("id, first_name, last_name")
+            .select(
+              "id, first_name, last_name, birth_date, category, sex, registration_email, registration_phone, address, postal_code, city, secondary_email, mother_phone, father_phone, other_phones, secondary_address, license_type, membership_type, fbi_status, medical_notes, other_notes, image_rights, player_charter_accepted, parent_charter_accepted"
+            )
             .in("id", playerIds)
         : Promise.resolve({ data: [] as Person[] }),
       coachIds.length > 0
@@ -483,6 +568,74 @@ export default async function DashboardPage() {
       players: rosterByTeam.get(t.id) ?? [],
       coaches: coachesByTeam.get(t.id) ?? [],
     }));
+
+    const coachTeamRefsByPlayerId = new Map<string, AdminMemberTeam[]>();
+    (teamPlayersRes.data ?? []).forEach((tp) => {
+      const team = coachedTeams.find((t) => t.id === tp.team_id);
+      if (!team) return;
+      const list = coachTeamRefsByPlayerId.get(tp.player_id) ?? [];
+      list.push({ id: team.id, name: team.name, category: team.category });
+      coachTeamRefsByPlayerId.set(tp.player_id, list);
+    });
+
+    // Coaches have no read access to cotisations (financial/payment data
+    // stays Bureau-only), so clubStatus is always null in this view.
+    (playersRes.data ?? []).forEach((row) => {
+      const player = row as {
+        id: string;
+        first_name: string | null;
+        last_name: string | null;
+        birth_date: string | null;
+        category: string | null;
+        sex: string | null;
+        registration_email: string | null;
+        registration_phone: string | null;
+        address: string | null;
+        postal_code: string | null;
+        city: string | null;
+        secondary_email: string | null;
+        mother_phone: string | null;
+        father_phone: string | null;
+        other_phones: string | null;
+        secondary_address: string | null;
+        license_type: string | null;
+        membership_type: string | null;
+        fbi_status: string | null;
+        medical_notes: string | null;
+        other_notes: string | null;
+        image_rights: string | null;
+        player_charter_accepted: string | null;
+        parent_charter_accepted: string | null;
+      };
+      coachMemberDetailsByPlayerId[player.id] = {
+        id: player.id,
+        firstName: player.first_name,
+        lastName: player.last_name,
+        birthDate: player.birth_date,
+        category: player.category,
+        sex: player.sex,
+        registrationEmail: player.registration_email,
+        registrationPhone: player.registration_phone,
+        address: player.address,
+        postalCode: player.postal_code,
+        city: player.city,
+        secondaryEmail: player.secondary_email,
+        motherPhone: player.mother_phone,
+        fatherPhone: player.father_phone,
+        otherPhones: player.other_phones,
+        secondaryAddress: player.secondary_address,
+        licenseType: player.license_type,
+        membershipType: player.membership_type,
+        fbiStatus: player.fbi_status,
+        clubStatus: null,
+        medicalNotes: player.medical_notes,
+        otherNotes: player.other_notes,
+        imageRights: player.image_rights,
+        playerCharterAccepted: player.player_charter_accepted,
+        parentCharterAccepted: player.parent_charter_accepted,
+        teams: coachTeamRefsByPlayerId.get(player.id) ?? [],
+      };
+    });
 
     const parentIds = Array.from(
       new Set((parentPlayerRes.data ?? []).map((r) => r.parent_id))
@@ -614,6 +767,7 @@ export default async function DashboardPage() {
           teams={coachTeamsWithRoster}
           events={coachEvents}
           contactPhoneByPlayerId={coachContactPhoneByPlayerId}
+          memberDetailsByPlayerId={coachMemberDetailsByPlayerId}
         />
       ),
     });

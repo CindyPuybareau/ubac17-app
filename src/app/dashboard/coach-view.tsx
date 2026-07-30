@@ -3,16 +3,18 @@ import CalendarView from "./calendar-view";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import CoachTeams from "./coach-teams";
 import type { TeamWithMembers } from "./team-manager";
-import type { AdminUpcomingEvent } from "./page";
+import type { AdminUpcomingEvent, MemberDetail } from "./page";
 
 export default function CoachView({
   teams,
   events,
   contactPhoneByPlayerId,
+  memberDetailsByPlayerId,
 }: {
   teams: TeamWithMembers[];
   events: AdminUpcomingEvent[];
   contactPhoneByPlayerId: Record<string, string>;
+  memberDetailsByPlayerId: Record<string, MemberDetail>;
 }) {
   const createTeams = teams.map((t) => ({
     id: t.id,
@@ -44,6 +46,7 @@ export default function CoachView({
           allProfiles={[]}
           eventsByTeamId={eventsByTeamId}
           contactPhoneByPlayerId={contactPhoneByPlayerId}
+          memberDetailsByPlayerId={memberDetailsByPlayerId}
         />
       ),
     },

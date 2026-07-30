@@ -3,7 +3,7 @@
 import { useState } from "react";
 import TeamCard from "./team-card";
 import type { TeamWithMembers } from "./team-manager";
-import type { AdminUpcomingEvent } from "./page";
+import type { AdminUpcomingEvent, MemberDetail } from "./page";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 
@@ -12,11 +12,13 @@ export default function CoachTeams({
   allProfiles,
   eventsByTeamId,
   contactPhoneByPlayerId,
+  memberDetailsByPlayerId,
 }: {
   teams: TeamWithMembers[];
   allProfiles: Person[];
   eventsByTeamId: Record<string, AdminUpcomingEvent[]>;
   contactPhoneByPlayerId: Record<string, string>;
+  memberDetailsByPlayerId: Record<string, MemberDetail>;
 }) {
   const [activeId, setActiveId] = useState(teams[0]?.id);
   const active = teams.find((t) => t.id === activeId) ?? teams[0];
@@ -56,6 +58,7 @@ export default function CoachTeams({
         contactPhoneByPlayerId={contactPhoneByPlayerId}
         createCotisationOnNewPlayer={false}
         showFfbbSync
+        memberDetailsByPlayerId={memberDetailsByPlayerId}
       />
     </div>
   );
