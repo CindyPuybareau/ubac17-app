@@ -9,6 +9,9 @@ import CoachView from "./coach-view";
 import CalendarView from "./calendar-view";
 import NextConvocationCard from "./next-convocation-card";
 import CoachNextMatchCard from "./coach-next-match-card";
+import WeatherWidget from "./weather-widget";
+import BirthdayWidget from "./birthday-widget";
+import { upcomingBirthdays, type BirthdaySource } from "./birthdays";
 import {
   getNextEventForTeams,
   getPlayerRsvpStatus,
@@ -910,6 +913,35 @@ export default async function DashboardPage() {
     }
   }
 
+  const nextMatchIso =
+    [
+      ...convocationCards.map((c) => c.event.start_time),
+      ...coachCards
+        .map((c) => c.event?.start_time)
+        .filter((s): s is string => Boolean(s)),
+    ].sort()[0] ?? null;
+
+  const birthdaySourceMembers: BirthdaySource[] = isAdmin
+    ? adminMembers
+        .filter((m) => !m.archivedAt)
+        .map((m) => ({
+          id: m.id,
+          firstName: m.firstName,
+          lastName: m.lastName,
+          birthDate: m.birthDate,
+        }))
+    : isCoach
+      ? Object.values(coachMemberDetailsByPlayerId).map((m) => ({
+          id: m.id,
+          firstName: m.firstName,
+          lastName: m.lastName,
+          birthDate: m.birthDate,
+        }))
+      : [];
+  const birthdayEntries = upcomingBirthdays(birthdaySourceMembers);
+
+  const showWidgetsZone = isAdmin || isCoach || players.length > 0;
+
   const tabs: DashboardTab[] = [];
 
   if (isAdmin) {
@@ -962,8 +994,6 @@ export default async function DashboardPage() {
     });
   }
 
-  const hasPriorityContent = convocationCards.length > 0 || coachCards.length > 0;
-
   return (
     <div className="flex flex-1 flex-col">
       <header className="sticky top-0 z-10 bg-navy px-4 py-3 sm:px-6">
@@ -991,30 +1021,34 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {hasPriorityContent && (
-          <div className="flex flex-col gap-4">
-          {convocationCards.map(({ player, event, status }) => (
-            <NextConvocationCard
-              key={player.id}
-              playerName={player.isSelf ? "toi" : player.name}
-              playerId={player.id}
-              event={event}
-              status={status}
-            />
-          ))}
-          {coachCards.map(({ team, event, counts, roster }) => (
-            <CoachNextMatchCard
-              key={team.id}
-              teamName={`${team.name ?? "Équipe"}${
-                team.category ? ` · ${team.category}` : ""
-              }`}
-              event={event}
-              counts={counts}
-              roster={roster}
-            />
-          ))}
-        </div>
-      )}
+        {showWidgetsZone && (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <WeatherWidget nextMatchIso={nextMatchIso} />
+            {birthdayEntries.length > 0 && (
+              <BirthdayWidget entries={birthdayEntries} />
+            )}
+            {convocationCards.map(({ player, event, status }) => (
+              <NextConvocationCard
+                key={player.id}
+                playerName={player.isSelf ? "toi" : player.name}
+                playerId={player.id}
+                event={event}
+                status={status}
+              />
+            ))}
+            {coachCards.map(({ team, event, counts, roster }) => (
+              <CoachNextMatchCard
+                key={team.id}
+                teamName={`${team.name ?? "Équipe"}${
+                  team.category ? ` · ${team.category}` : ""
+                }`}
+                event={event}
+                counts={counts}
+                roster={roster}
+              />
+            ))}
+          </div>
+        )}
 
       <DashboardTabs tabs={tabs} />
 

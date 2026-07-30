@@ -1,5 +1,6 @@
 import { CalendarDays, MapPin, Users } from "lucide-react";
 import OpponentDisplay from "./opponent-display";
+import NextMatchActions from "./next-match-actions";
 import type { RosterPlayer, RsvpCounts, UpcomingEvent } from "./family-data";
 
 export default function CoachNextMatchCard({
@@ -49,6 +50,10 @@ export default function CoachNextMatchCard({
               {counts.late > 0 ? ` · ${counts.late} Retards` : ""}
             </p>
           )}
+          <NextMatchActions
+            location={event.location}
+            context={event.title ?? "match"}
+          />
         </>
       ) : (
         <p className="mt-1 text-sm text-zinc-500">Aucun événement à venir.</p>

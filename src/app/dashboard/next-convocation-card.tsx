@@ -1,6 +1,7 @@
 import { CalendarDays, MapPin } from "lucide-react";
 import RsvpButtons from "./rsvp-buttons";
 import OpponentDisplay from "./opponent-display";
+import NextMatchActions from "./next-match-actions";
 import type { UpcomingEvent } from "./family-data";
 
 function formatEventDate(iso: string) {
@@ -57,6 +58,10 @@ export default function NextConvocationCard({
           currentStatus={status}
         />
       </div>
+      <NextMatchActions
+        location={event.location}
+        context={event.title ?? "match"}
+      />
     </div>
   );
 }
