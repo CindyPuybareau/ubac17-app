@@ -2,15 +2,15 @@
 
 import { useState, type ChangeEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { X } from "lucide-react";
+import { AlertTriangle, Shield, User, Users, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { MemberDetail } from "./page";
 
 const TABS = [
-  { key: "identity", label: "👤 Identité" },
-  { key: "family", label: "👨‍👩‍👧 Parents & Urgence" },
-  { key: "license", label: "🏀 Licence & Équipe" },
-  { key: "medical", label: "⚠️ Santé & Chartes" },
+  { key: "identity", label: "Identité", icon: User },
+  { key: "family", label: "Parents & Urgence", icon: Users },
+  { key: "license", label: "Licence & Équipe", icon: Shield },
+  { key: "medical", label: "Santé & Chartes", icon: AlertTriangle },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -209,15 +209,17 @@ export default function MemberDetailModal({
 
         <div className="flex flex-nowrap items-center gap-1 overflow-x-auto border-b border-zinc-100 px-3 py-2 md:justify-between">
           {TABS.map((t) => {
+            const Icon = t.icon;
             const active = tab === t.key;
             return (
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
-                className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 text-xs font-semibold transition-colors md:text-sm ${
+                className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1.5 text-xs font-semibold transition-colors md:text-sm ${
                   active ? "bg-navy text-white" : "text-zinc-500 hover:bg-zinc-100"
                 }`}
               >
+                <Icon className="h-3.5 w-3.5 shrink-0" />
                 {t.label}
               </button>
             );
