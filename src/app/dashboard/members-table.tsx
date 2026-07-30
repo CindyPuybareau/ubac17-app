@@ -11,7 +11,6 @@ import {
   Phone,
   RefreshCw,
   Search,
-  Users,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -309,7 +308,6 @@ export default function MembersTable({
           <colgroup>
             <col className="w-10" />
             <col className="w-10" />
-            <col className="w-28" />
             <col />
             <col />
             <col className="w-32" />
@@ -328,7 +326,6 @@ export default function MembersTable({
                 />
               </th>
               <th className="px-2 py-2.5">#</th>
-              <th className="px-2 py-2.5">Parent</th>
               <th
                 className="cursor-pointer select-none px-2 py-2.5"
                 onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
@@ -367,21 +364,6 @@ export default function MembersTable({
                   />
                 </td>
                 <td className="px-2 py-2 text-xs text-zinc-400">{index + 1}</td>
-                <td className="px-2 py-2">
-                  {m.hasParent ? (
-                    <span
-                      title="Rattaché à un parent"
-                      className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-600"
-                    >
-                      <Users className="h-3 w-3" />
-                      Parent
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-500">
-                      Autonome
-                    </span>
-                  )}
-                </td>
                 <td
                   className="truncate px-2 py-2 font-semibold text-zinc-900"
                   title={fullLastName(m)}
@@ -510,7 +492,7 @@ export default function MembersTable({
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-2 py-8 text-center text-sm text-zinc-400">
+                <td colSpan={8} className="px-2 py-8 text-center text-sm text-zinc-400">
                   Aucun membre trouvé.
                 </td>
               </tr>
