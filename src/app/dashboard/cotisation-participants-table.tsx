@@ -4,6 +4,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import {
+  Contact,
   CreditCard,
   FileText,
   Mail,
@@ -14,7 +15,8 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import type { AdminCotisation } from "./page";
+import MemberDetailModal from "./member-detail-modal";
+import type { AdminCotisation, AdminMember } from "./page";
 
 type StatusKey = "PAYE" | "OFFERT" | "EN_ATTENTE";
 
@@ -130,10 +132,12 @@ function openReceiptWindow(c: AdminCotisation, contactEmail: string | null) {
 export default function CotisationParticipantsTable({
   cotisations,
   contactEmailByPlayerId,
+  members,
   emptyLabel = "Aucune cotisation.",
 }: {
   cotisations: AdminCotisation[];
   contactEmailByPlayerId: Record<string, string>;
+  members: AdminMember[];
   emptyLabel?: string;
 }) {
   const router = useRouter();
@@ -143,6 +147,12 @@ export default function CotisationParticipantsTable({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [detailPlayerId, setDetailPlayerId] = useState<string | null>(null);
+
+  const membersById = useMemo(
+    () => new Map(members.map((m) => [m.id, m])),
+    [members]
+  );
 
   const [paymentIds, setPaymentIds] = useState<string[] | null>(null);
   const [paymentAmount, setPaymentAmount] = useState("");
@@ -415,18 +425,15 @@ export default function CotisationParticipantsTable({
       )}
 
       <div className="w-full overflow-x-auto rounded-2xl border border-zinc-100">
-        <table className="w-full min-w-[850px] table-fixed border-collapse text-sm">
+        <table className="w-full min-w-[700px] table-fixed border-collapse text-sm">
           <colgroup>
             <col className="w-10" />
             <col />
-            <col className="w-20" />
-            <col className="w-28" />
-            <col className="w-32" />
-            <col className="w-20" />
-            <col className="w-20" />
-            <col className="w-20" />
-            <col className="w-28" />
             <col className="w-24" />
+            <col className="w-24" />
+            <col className="w-24" />
+            <col className="w-28" />
+            <col className="w-28" />
             <col className="w-10" />
           </colgroup>
           <thead>
@@ -440,9 +447,6 @@ export default function CotisationParticipantsTable({
                 />
               </th>
               <th className="px-2 py-2.5">Nom &amp; Prénom</th>
-              <th className="px-2 py-2.5">Catégorie</th>
-              <th className="px-2 py-2.5">Type Adhésion</th>
-              <th className="px-2 py-2.5">Statut FBI</th>
               <th className="px-2 py-2.5">Tarif</th>
               <th className="px-2 py-2.5">Remise</th>
               <th className="px-2 py-2.5">Payé</th>
@@ -458,9 +462,10 @@ export default function CotisationParticipantsTable({
               return (
                 <tr
                   key={c.id}
-                  className="border-b border-zinc-50 last:border-0 hover:bg-zinc-50/60"
+                  onClick={() => setDetailPlayerId(c.playerId)}
+                  className="cursor-pointer border-b border-zinc-50 last:border-0 hover:bg-zinc-50/60"
                 >
-                  <td className="px-2 py-2">
+                  <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       checked={selectedIds.has(c.id)}
@@ -470,15 +475,6 @@ export default function CotisationParticipantsTable({
                   </td>
                   <td className="truncate px-2 py-2 font-semibold text-zinc-900" title={c.playerName}>
                     {c.playerName}
-                  </td>
-                  <td className="truncate px-2 py-2 text-zinc-600">
-                    {c.category ?? "—"}
-                  </td>
-                  <td className="truncate px-2 py-2 text-zinc-600" title={c.membershipType ?? undefined}>
-                    {c.membershipType ?? "—"}
-                  </td>
-                  <td className="truncate px-2 py-2 text-zinc-600" title={c.fbiStatus ?? undefined}>
-                    {c.fbiStatus ?? "—"}
                   </td>
                   <td className="px-2 py-2 text-zinc-600">{formatAmount(c.prix)}</td>
                   <td className="px-2 py-2 text-zinc-600">{formatAmount(c.remise)}</td>
@@ -491,7 +487,7 @@ export default function CotisationParticipantsTable({
                       {status.label}
                     </span>
                   </td>
-                  <td className="relative px-2 py-2">
+                  <td className="relative px-2 py-2" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => setOpenMenuId((cur) => (cur === c.id ? null : c.id))}
                       className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
@@ -505,6 +501,16 @@ export default function CotisationParticipantsTable({
                           onClick={() => setOpenMenuId(null)}
                         />
                         <div className="absolute right-0 z-40 mt-1 w-60 rounded-xl border border-zinc-100 bg-white p-1.5 text-left shadow-lg">
+                          <button
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              setDetailPlayerId(c.playerId);
+                            }}
+                            className={menuItemClass}
+                          >
+                            <Contact className="h-3.5 w-3.5" />
+                            Voir la fiche membre
+                          </button>
                           <button
                             onClick={() => {
                               setOpenMenuId(null);
@@ -562,7 +568,7 @@ export default function CotisationParticipantsTable({
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={11} className="px-2 py-8 text-center text-sm text-zinc-400">
+                <td colSpan={8} className="px-2 py-8 text-center text-sm text-zinc-400">
                   {emptyLabel}
                 </td>
               </tr>
@@ -652,6 +658,19 @@ export default function CotisationParticipantsTable({
           </div>
         </Modal>
       )}
+
+      {detailPlayerId &&
+        (() => {
+          const detailMember = membersById.get(detailPlayerId);
+          if (!detailMember) return null;
+          return (
+            <MemberDetailModal
+              member={detailMember}
+              readOnly={false}
+              onClose={() => setDetailPlayerId(null)}
+            />
+          );
+        })()}
     </div>
   );
 }

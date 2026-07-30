@@ -248,6 +248,7 @@ export default function CotisationsManager({
           <CotisationParticipantsTable
             cotisations={seasonCotisations}
             contactEmailByPlayerId={contactEmailByPlayerId}
+            members={members}
             emptyLabel="Aucune cotisation pour la saison en cours."
           />
         </div>
@@ -385,6 +386,7 @@ export default function CotisationsManager({
               <CotisationParticipantsTable
                 cotisations={collecteCotisations}
                 contactEmailByPlayerId={contactEmailByPlayerId}
+                members={members}
                 emptyLabel="Aucun participant pour cette collecte."
               />
             </div>
