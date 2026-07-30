@@ -4,7 +4,7 @@ import ImportInscriptions from "./import-inscriptions";
 import ImportPlanning from "./import-planning";
 import ImportCoaches from "./import-coaches";
 import CotisationsTable from "./cotisations-table";
-import AdminCalendar from "./admin-calendar";
+import CalendarView from "./calendar-view";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import FfbbManager from "./ffbb-manager";
 import type { AdminCotisation, AdminUpcomingEvent } from "./page";
@@ -17,12 +17,14 @@ export default function AdminView({
   allProfiles,
   cotisations,
   upcomingEvents,
+  contactPhoneByPlayerId,
 }: {
   clubFunction?: string | null;
   teams: TeamWithMembers[];
   allProfiles: Person[];
   cotisations: AdminCotisation[];
   upcomingEvents: AdminUpcomingEvent[];
+  contactPhoneByPlayerId: Record<string, string>;
 }) {
   const teamRefs = teams.map((t) => ({
     id: t.id,
@@ -42,7 +44,7 @@ export default function AdminView({
       key: "calendar",
       label: "Calendrier",
       icon: <CalendarDays className={iconClass} />,
-      content: <AdminCalendar events={upcomingEvents} />,
+      content: <CalendarView events={upcomingEvents} createTeams={teamRefs} />,
     },
     {
       key: "teams",
@@ -53,6 +55,7 @@ export default function AdminView({
           teams={teams}
           allProfiles={allProfiles}
           eventsByTeamId={eventsByTeamId}
+          contactPhoneByPlayerId={contactPhoneByPlayerId}
         />
       ),
     },

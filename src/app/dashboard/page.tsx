@@ -6,8 +6,7 @@ import DashboardTabs, { type DashboardTab } from "./dashboard-tabs";
 import AdminView from "./admin-view";
 import type { TeamWithMembers } from "./team-manager";
 import CoachView from "./coach-view";
-import PlayerPanel from "./player-panel";
-import FamilyPanel from "./family-panel";
+import CalendarView from "./calendar-view";
 import NextConvocationCard from "./next-convocation-card";
 import CoachNextMatchCard from "./coach-next-match-card";
 import {
@@ -16,8 +15,6 @@ import {
   getPlayerTeamIds,
   getRsvpCounts,
   getTeamRoster,
-  getUpcomingEventsForTeam,
-  type UpcomingEvent,
 } from "./family-data";
 
 type PlayerRow = {
@@ -57,6 +54,59 @@ export type AdminUpcomingEvent = {
     pending: number;
   };
 };
+
+function buildRsvpCounts(
+  rsvpsByEvent: Map<
+    string,
+    { present: number; absent: number; late: number; answered: number }
+  >,
+  eventId: string,
+  rosterSize: number
+) {
+  const rsvp = rsvpsByEvent.get(eventId);
+  const present = rsvp?.present ?? 0;
+  const absent = rsvp?.absent ?? 0;
+  const late = rsvp?.late ?? 0;
+  const answered = rsvp?.answered ?? 0;
+  return {
+    present,
+    absent,
+    late,
+    pending: Math.max(0, rosterSize - answered),
+  };
+}
+
+async function fetchRsvpsByEvent(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  eventIds: string[]
+) {
+  const rsvpsByEvent = new Map<
+    string,
+    { present: number; absent: number; late: number; answered: number }
+  >();
+  if (eventIds.length === 0) return rsvpsByEvent;
+
+  const { data: rsvpRows } = await supabase
+    .from("rsvps")
+    .select("event_id, status")
+    .in("event_id", eventIds);
+
+  (rsvpRows ?? []).forEach((r) => {
+    const bucket = rsvpsByEvent.get(r.event_id) ?? {
+      present: 0,
+      absent: 0,
+      late: 0,
+      answered: 0,
+    };
+    bucket.answered += 1;
+    if (r.status === "PRESENT") bucket.present += 1;
+    else if (r.status === "ABSENT") bucket.absent += 1;
+    else if (r.status === "LATE") bucket.late += 1;
+    rsvpsByEvent.set(r.event_id, bucket);
+  });
+
+  return rsvpsByEvent;
+}
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -141,17 +191,11 @@ export default async function DashboardPage() {
     })
   );
 
-  const eventsByTeam: Record<string, UpcomingEvent[]> = {};
-  await Promise.all(
-    coachedTeams.map(async (team) => {
-      eventsByTeam[team.id] = await getUpcomingEventsForTeam(supabase, team.id);
-    })
-  );
-
   let adminTeams: TeamWithMembers[] = [];
   let allProfilesForAdmin: Person[] = [];
   let adminCotisations: AdminCotisation[] = [];
   let adminUpcomingEvents: AdminUpcomingEvent[] = [];
+  const adminContactPhoneByPlayerId: Record<string, string> = {};
 
   if (isAdmin) {
     const [
@@ -162,6 +206,7 @@ export default async function DashboardPage() {
       teamCoachesRes,
       cotisationsRes,
       upcomingEventsRes,
+      parentPlayerRes,
     ] = await Promise.all([
       supabase
         .from("teams")
@@ -173,7 +218,7 @@ export default async function DashboardPage() {
         .order("first_name"),
       supabase
         .from("profiles")
-        .select("id, first_name, last_name")
+        .select("id, first_name, last_name, phone")
         .order("first_name"),
       supabase.from("team_players").select("team_id, player_id"),
       supabase.from("team_coaches").select("team_id, coach_id"),
@@ -187,6 +232,7 @@ export default async function DashboardPage() {
         .from("events")
         .select("id, title, event_type, location, start_time, teams(id, name, category)")
         .order("start_time", { ascending: true }),
+      supabase.from("parent_player").select("parent_id, player_id"),
     ]);
 
     const playersById = new Map(
@@ -194,6 +240,12 @@ export default async function DashboardPage() {
     );
     const profilesById = new Map(
       (profilesRes.data ?? []).map((p) => [p.id, p as Person])
+    );
+    const phoneByProfileId = new Map(
+      (profilesRes.data ?? []).map((p) => [
+        p.id,
+        (p as { phone: string | null }).phone,
+      ])
     );
 
     const rosterByTeam = new Map<string, Person[]>();
@@ -224,30 +276,15 @@ export default async function DashboardPage() {
     }));
     allProfilesForAdmin = profilesRes.data ?? [];
 
-    const eventIds = (upcomingEventsRes.data ?? []).map((e) => e.id);
-    const rsvpsByEvent = new Map<
-      string,
-      { present: number; absent: number; late: number; answered: number }
-    >();
-    if (eventIds.length > 0) {
-      const { data: rsvpRows } = await supabase
-        .from("rsvps")
-        .select("event_id, status")
-        .in("event_id", eventIds);
-      (rsvpRows ?? []).forEach((r) => {
-        const bucket = rsvpsByEvent.get(r.event_id) ?? {
-          present: 0,
-          absent: 0,
-          late: 0,
-          answered: 0,
-        };
-        bucket.answered += 1;
-        if (r.status === "PRESENT") bucket.present += 1;
-        else if (r.status === "ABSENT") bucket.absent += 1;
-        else if (r.status === "LATE") bucket.late += 1;
-        rsvpsByEvent.set(r.event_id, bucket);
-      });
-    }
+    (parentPlayerRes.data ?? []).forEach((pp) => {
+      const phone = phoneByProfileId.get(pp.parent_id);
+      if (phone) adminContactPhoneByPlayerId[pp.player_id] = phone;
+    });
+
+    const rsvpsByEvent = await fetchRsvpsByEvent(
+      supabase,
+      (upcomingEventsRes.data ?? []).map((e) => e.id)
+    );
 
     adminCotisations = (cotisationsRes.data ?? []).map((c) => {
       const player = c.players as unknown as {
@@ -277,11 +314,6 @@ export default async function DashboardPage() {
         category: string | null;
       } | null;
       const rosterSize = team ? rosterByTeam.get(team.id)?.length ?? 0 : 0;
-      const rsvp = rsvpsByEvent.get(e.id);
-      const present = rsvp?.present ?? 0;
-      const absent = rsvp?.absent ?? 0;
-      const late = rsvp?.late ?? 0;
-      const answered = rsvp?.answered ?? 0;
       return {
         id: e.id,
         title: e.title,
@@ -290,14 +322,196 @@ export default async function DashboardPage() {
         start_time: e.start_time,
         teamId: team?.id ?? null,
         teamName: team?.name ?? "Équipe",
-        rsvpCounts: {
-          present,
-          absent,
-          late,
-          pending: Math.max(0, rosterSize - answered),
-        },
+        rsvpCounts: buildRsvpCounts(rsvpsByEvent, e.id, rosterSize),
       };
     });
+  }
+
+  let coachTeamsWithRoster: TeamWithMembers[] = [];
+  let coachEvents: AdminUpcomingEvent[] = [];
+  const coachContactPhoneByPlayerId: Record<string, string> = {};
+
+  if (isCoach) {
+    const coachedTeamIds = coachedTeams.map((t) => t.id);
+    const [teamPlayersRes, teamCoachesRes, eventsRes] = await Promise.all([
+      supabase
+        .from("team_players")
+        .select("team_id, player_id")
+        .in("team_id", coachedTeamIds),
+      supabase
+        .from("team_coaches")
+        .select("team_id, coach_id")
+        .in("team_id", coachedTeamIds),
+      supabase
+        .from("events")
+        .select(
+          "id, title, event_type, location, start_time, teams(id, name, category)"
+        )
+        .in("team_id", coachedTeamIds)
+        .order("start_time", { ascending: true }),
+    ]);
+
+    const playerIds = Array.from(
+      new Set((teamPlayersRes.data ?? []).map((r) => r.player_id))
+    );
+    const coachIds = Array.from(
+      new Set((teamCoachesRes.data ?? []).map((r) => r.coach_id))
+    );
+
+    const [playersRes, coachProfilesRes, parentPlayerRes] = await Promise.all([
+      playerIds.length > 0
+        ? supabase
+            .from("players")
+            .select("id, first_name, last_name")
+            .in("id", playerIds)
+        : Promise.resolve({ data: [] as Person[] }),
+      coachIds.length > 0
+        ? supabase
+            .from("profiles")
+            .select("id, first_name, last_name")
+            .in("id", coachIds)
+        : Promise.resolve({ data: [] as Person[] }),
+      playerIds.length > 0
+        ? supabase
+            .from("parent_player")
+            .select("parent_id, player_id")
+            .in("player_id", playerIds)
+        : Promise.resolve({ data: [] as { parent_id: string; player_id: string }[] }),
+    ]);
+
+    const playersById = new Map(
+      (playersRes.data ?? []).map((p) => [p.id, p as Person])
+    );
+    const coachProfilesById = new Map(
+      (coachProfilesRes.data ?? []).map((p) => [p.id, p as Person])
+    );
+
+    const rosterByTeam = new Map<string, Person[]>();
+    (teamPlayersRes.data ?? []).forEach((tp) => {
+      const player = playersById.get(tp.player_id);
+      if (!player) return;
+      const list = rosterByTeam.get(tp.team_id) ?? [];
+      list.push(player);
+      rosterByTeam.set(tp.team_id, list);
+    });
+
+    const coachesByTeam = new Map<string, Person[]>();
+    (teamCoachesRes.data ?? []).forEach((tc) => {
+      const coach = coachProfilesById.get(tc.coach_id);
+      if (!coach) return;
+      const list = coachesByTeam.get(tc.team_id) ?? [];
+      list.push(coach);
+      coachesByTeam.set(tc.team_id, list);
+    });
+
+    coachTeamsWithRoster = coachedTeams.map((t) => ({
+      id: t.id,
+      name: t.name,
+      category: t.category,
+      ffbb_url: t.ffbb_url,
+      players: rosterByTeam.get(t.id) ?? [],
+      coaches: coachesByTeam.get(t.id) ?? [],
+    }));
+
+    const parentIds = Array.from(
+      new Set((parentPlayerRes.data ?? []).map((r) => r.parent_id))
+    );
+    const { data: parentProfiles } =
+      parentIds.length > 0
+        ? await supabase.from("profiles").select("id, phone").in("id", parentIds)
+        : { data: [] as { id: string; phone: string | null }[] };
+    const phoneByParentId = new Map(
+      (parentProfiles ?? []).map((p) => [p.id, p.phone])
+    );
+    (parentPlayerRes.data ?? []).forEach((pp) => {
+      const phone = phoneByParentId.get(pp.parent_id);
+      if (phone) coachContactPhoneByPlayerId[pp.player_id] = phone;
+    });
+
+    const rsvpsByEvent = await fetchRsvpsByEvent(
+      supabase,
+      (eventsRes.data ?? []).map((e) => e.id)
+    );
+
+    coachEvents = (eventsRes.data ?? []).map((e) => {
+      const team = e.teams as unknown as {
+        id: string;
+        name: string | null;
+        category: string | null;
+      } | null;
+      const rosterSize = team ? rosterByTeam.get(team.id)?.length ?? 0 : 0;
+      return {
+        id: e.id,
+        title: e.title,
+        event_type: e.event_type,
+        location: e.location,
+        start_time: e.start_time,
+        teamId: team?.id ?? null,
+        teamName: team?.name ?? "Équipe",
+        rsvpCounts: buildRsvpCounts(rsvpsByEvent, e.id, rosterSize),
+      };
+    });
+  }
+
+  // Parent/joueur: un seul calendrier lecture-seule + RSVP, tous enfants confondus.
+  let familyEvents: AdminUpcomingEvent[] = [];
+  let familyRsvpPlayers: { id: string; name: string; teamIds: string[] }[] = [];
+  const familyRsvpStatusByKey: Record<string, string> = {};
+
+  if (players.length > 0) {
+    const playerTeamIdsList = await Promise.all(
+      players.map((p) => getPlayerTeamIds(supabase, p.id))
+    );
+    familyRsvpPlayers = players.map((p, i) => ({
+      id: p.id,
+      name: p.isSelf ? "Toi" : p.name,
+      teamIds: playerTeamIdsList[i],
+    }));
+
+    const allTeamIds = Array.from(new Set(playerTeamIdsList.flat()));
+
+    if (allTeamIds.length > 0) {
+      const { data: eventsData } = await supabase
+        .from("events")
+        .select(
+          "id, title, event_type, location, start_time, teams(id, name, category)"
+        )
+        .in("team_id", allTeamIds)
+        .order("start_time", { ascending: true });
+
+      const eventIds = (eventsData ?? []).map((e) => e.id);
+      const familyPlayerIds = players.map((p) => p.id);
+
+      if (eventIds.length > 0 && familyPlayerIds.length > 0) {
+        const { data: rsvpRows } = await supabase
+          .from("rsvps")
+          .select("event_id, player_id, status")
+          .in("event_id", eventIds)
+          .in("player_id", familyPlayerIds);
+
+        (rsvpRows ?? []).forEach((r) => {
+          familyRsvpStatusByKey[`${r.event_id}:${r.player_id}`] = r.status;
+        });
+      }
+
+      familyEvents = (eventsData ?? []).map((e) => {
+        const team = e.teams as unknown as {
+          id: string;
+          name: string | null;
+          category: string | null;
+        } | null;
+        return {
+          id: e.id,
+          title: e.title,
+          event_type: e.event_type,
+          location: e.location,
+          start_time: e.start_time,
+          teamId: team?.id ?? null,
+          teamName: team?.name ?? "Équipe",
+          rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
+        };
+      });
+    }
   }
 
   const tabs: DashboardTab[] = [];
@@ -313,6 +527,7 @@ export default async function DashboardPage() {
           allProfiles={allProfilesForAdmin}
           cotisations={adminCotisations}
           upcomingEvents={adminUpcomingEvents}
+          contactPhoneByPlayerId={adminContactPhoneByPlayerId}
         />
       ),
     });
@@ -322,27 +537,24 @@ export default async function DashboardPage() {
     tabs.push({
       key: "coach",
       label: "Équipe",
-      content: <CoachView teams={coachedTeams} eventsByTeam={eventsByTeam} />,
+      content: (
+        <CoachView
+          teams={coachTeamsWithRoster}
+          events={coachEvents}
+          contactPhoneByPlayerId={coachContactPhoneByPlayerId}
+        />
+      ),
     });
   }
 
-  players.forEach((p) => {
+  if (players.length > 0) {
     tabs.push({
-      key: `player-${p.id}`,
-      label: p.isSelf ? "Mes matchs" : p.name,
+      key: "family-calendar",
+      label: "Mes matchs",
       content: (
-        <PlayerPanel name={p.isSelf ? "toi" : p.name} category={p.category} />
-      ),
-    });
-  });
-
-  if (players.length > 1) {
-    tabs.push({
-      key: "family",
-      label: "Vue famille",
-      content: (
-        <FamilyPanel
-          names={players.map((p) => ({ label: p.name, isSelf: p.isSelf }))}
+        <CalendarView
+          events={familyEvents}
+          rsvp={{ players: familyRsvpPlayers, statusByKey: familyRsvpStatusByKey }}
         />
       ),
     });
