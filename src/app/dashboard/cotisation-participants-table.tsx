@@ -27,8 +27,12 @@ const statusBadge: Record<StatusKey, { label: string; className: string }> = {
 
 const paymentModes = ["Chèque", "Espèces", "Virement", "Pass Sport", "Carte bancaire", "Autre"];
 
+export function roundCents(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
 function due(c: AdminCotisation) {
-  return Math.max(0, (c.prix ?? 0) - (c.remise ?? 0));
+  return Math.max(0, roundCents((c.prix ?? 0) - (c.remise ?? 0)));
 }
 
 export function computeStatus(c: AdminCotisation): StatusKey {
@@ -40,8 +44,15 @@ export function computeStatus(c: AdminCotisation): StatusKey {
   return "IMPAYE";
 }
 
-function formatAmount(value: number | null | undefined) {
-  return value === null || value === undefined ? "0 €" : `${value} €`;
+// Amounts are derived from floating-point arithmetic (prix - remise,
+// running sums), which produces values like 2613.0899999999997 — round to
+// cents and use French thousands/decimal separators.
+export function formatAmount(value: number | null | undefined) {
+  const cents = Math.round((value ?? 0) * 100);
+  return (cents / 100).toLocaleString("fr-FR", {
+    style: "currency",
+    currency: "EUR",
+  });
 }
 
 function Modal({
@@ -203,7 +214,7 @@ export default function CotisationParticipantsTable({
         setPaymentSaving(false);
         return;
       }
-      const newPaid = (c.paiement ?? 0) + amount;
+      const newPaid = roundCents((c.paiement ?? 0) + amount);
       const newStatut = newPaid >= due(c) && due(c) > 0 ? "PAYE" : newPaid > 0 ? "EN_ATTENTE" : "IMPAYE";
       const { error } = await supabase
         .from("cotisations")
@@ -396,7 +407,7 @@ export default function CotisationParticipantsTable({
       )}
 
       <div className="w-full overflow-x-auto rounded-2xl border border-zinc-100">
-        <table className="w-full table-fixed border-collapse text-sm">
+        <table className="w-full min-w-[650px] table-fixed border-collapse text-sm">
           <colgroup>
             <col className="w-10" />
             <col />

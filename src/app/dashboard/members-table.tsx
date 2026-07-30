@@ -304,7 +304,7 @@ export default function MembersTable({
       )}
 
       <div className="w-full overflow-x-auto rounded-2xl border border-zinc-100">
-        <table className="w-full table-fixed border-collapse text-sm">
+        <table className="w-full min-w-[650px] table-fixed border-collapse text-sm">
           <colgroup>
             <col className="w-10" />
             <col className="w-10" />

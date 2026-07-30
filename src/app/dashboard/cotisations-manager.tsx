@@ -2,11 +2,13 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Search, Tag, Ticket, X } from "lucide-react";
+import { Plus, Search, Tag, Target, Ticket, Wallet, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import GaugeChart from "./gauge-chart";
 import CotisationParticipantsTable, {
   computeStatus,
+  formatAmount,
+  roundCents,
 } from "./cotisation-participants-table";
 import type { AdminCollecte, AdminCotisation, AdminMember, CollecteType } from "./page";
 
@@ -28,8 +30,8 @@ function computeKpis(list: AdminCotisation[]) {
     if (status === "PAYE" || status === "OFFERT") payeCount++;
     else if (status === "EN_ATTENTE") enAttenteCount++;
     else impayeCount++;
-    totalDue += Math.max(0, (c.prix ?? 0) - (c.remise ?? 0));
-    totalCollected += c.paiement ?? 0;
+    totalDue = roundCents(totalDue + Math.max(0, (c.prix ?? 0) - (c.remise ?? 0)));
+    totalCollected = roundCents(totalCollected + (c.paiement ?? 0));
   });
 
   const percentage =
@@ -50,30 +52,41 @@ function KpiHeader({ cotisations }: { cotisations: AdminCotisation[] }) {
   const kpis = useMemo(() => computeKpis(cotisations), [cotisations]);
 
   return (
-    <div className="grid grid-cols-1 gap-5 rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm sm:grid-cols-[auto_1fr] sm:items-center">
-      <div className="flex justify-center">
-        <GaugeChart percentage={kpis.percentage} label="Collecté" color="#F4C430" />
-      </div>
-      <div className="flex flex-col gap-3">
-        <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-xl bg-green-50 p-3 text-center">
-            <p className="text-2xl font-bold text-green-700">{kpis.payeCount}</p>
-            <p className="text-xs font-medium text-green-600">Payés</p>
-          </div>
-          <div className="rounded-xl bg-amber-50 p-3 text-center">
-            <p className="text-2xl font-bold text-amber-700">{kpis.enAttenteCount}</p>
-            <p className="text-xs font-medium text-amber-600">En attente</p>
-          </div>
-          <div className="rounded-xl bg-red-50 p-3 text-center">
-            <p className="text-2xl font-bold text-red-700">{kpis.impayeCount}</p>
-            <p className="text-xs font-medium text-red-600">Non payés</p>
+    <div className="rounded-2xl border border-zinc-100 bg-white p-3 shadow-sm md:p-6">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="flex items-center justify-center rounded-xl bg-zinc-50 p-3 sm:col-span-2 lg:col-span-1">
+          <GaugeChart percentage={kpis.percentage} label="Collecté" color="#F4C430" />
+        </div>
+        <div className="rounded-xl bg-green-50 p-3 text-center md:p-4">
+          <p className="text-xl font-bold text-green-700 sm:text-2xl">{kpis.payeCount}</p>
+          <p className="text-xs font-medium text-green-600 sm:text-sm">Payés</p>
+        </div>
+        <div className="rounded-xl bg-amber-50 p-3 text-center md:p-4">
+          <p className="text-xl font-bold text-amber-700 sm:text-2xl">{kpis.enAttenteCount}</p>
+          <p className="text-xs font-medium text-amber-600 sm:text-sm">En attente</p>
+        </div>
+        <div className="rounded-xl bg-red-50 p-3 text-center md:p-4">
+          <p className="text-xl font-bold text-red-700 sm:text-2xl">{kpis.impayeCount}</p>
+          <p className="text-xs font-medium text-red-600 sm:text-sm">Non payés</p>
+        </div>
+        <div className="flex items-center gap-2.5 rounded-xl bg-ubac-yellow/10 p-3 md:p-4">
+          <Wallet className="h-5 w-5 shrink-0 text-ubac-yellow-dark" />
+          <div>
+            <p className="text-xs font-medium text-ubac-yellow-dark sm:text-sm">Collecté</p>
+            <p className="text-base font-bold text-zinc-900 sm:text-lg">
+              {formatAmount(kpis.totalCollected)}
+            </p>
           </div>
         </div>
-        <p className="text-sm text-zinc-600">
-          <span className="font-semibold text-zinc-900">{kpis.totalCollected} €</span>{" "}
-          collectés sur{" "}
-          <span className="font-semibold text-zinc-900">{kpis.totalDue} €</span> attendus
-        </p>
+        <div className="flex items-center gap-2.5 rounded-xl bg-navy/5 p-3 md:p-4">
+          <Target className="h-5 w-5 shrink-0 text-navy" />
+          <div>
+            <p className="text-xs font-medium text-navy sm:text-sm">Attendu</p>
+            <p className="text-base font-bold text-zinc-900 sm:text-lg">
+              {formatAmount(kpis.totalDue)}
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
