@@ -236,10 +236,21 @@ export default function MembersTable({
       )}
 
       <div className="w-full overflow-x-auto rounded-2xl border border-zinc-100">
-        <table className="w-full min-w-[880px] border-collapse text-sm">
+        <table className="w-full table-fixed border-collapse text-sm">
+          <colgroup>
+            <col className="w-10" />
+            <col className="w-10" />
+            <col className="w-28" />
+            <col />
+            <col />
+            <col className="w-32" />
+            <col />
+            <col />
+            <col className="w-12" />
+          </colgroup>
           <thead>
             <tr className="border-b border-zinc-100 bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-400">
-              <th className="w-10 px-3 py-2.5">
+              <th className="px-2 py-2.5">
                 <input
                   type="checkbox"
                   checked={allFilteredSelected}
@@ -247,8 +258,8 @@ export default function MembersTable({
                   className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
                 />
               </th>
-              <th className="w-10 px-2 py-2.5">#</th>
-              <th className="w-14 px-2 py-2.5">Parent</th>
+              <th className="px-2 py-2.5">#</th>
+              <th className="px-2 py-2.5">Parent</th>
               <th
                 className="cursor-pointer select-none px-2 py-2.5"
                 onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
@@ -256,9 +267,9 @@ export default function MembersTable({
                 <span className="flex items-center gap-1">
                   Nom
                   {sortDir === "asc" ? (
-                    <ChevronUp className="h-3.5 w-3.5" />
+                    <ChevronUp className="h-3.5 w-3.5 shrink-0" />
                   ) : (
-                    <ChevronDown className="h-3.5 w-3.5" />
+                    <ChevronDown className="h-3.5 w-3.5 shrink-0" />
                   )}
                 </span>
               </th>
@@ -266,7 +277,7 @@ export default function MembersTable({
               <th className="px-2 py-2.5">Équipe</th>
               <th className="px-2 py-2.5">Email</th>
               <th className="px-2 py-2.5">Téléphone</th>
-              <th className="w-10 px-2 py-2.5" />
+              <th className="px-2 py-2.5" />
             </tr>
           </thead>
           <tbody>
@@ -276,7 +287,7 @@ export default function MembersTable({
                 onClick={() => setDetailMemberId(m.id)}
                 className="cursor-pointer border-b border-zinc-50 last:border-0 hover:bg-zinc-50/60"
               >
-                <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
                   <input
                     type="checkbox"
                     checked={selectedIds.has(m.id)}
@@ -300,19 +311,24 @@ export default function MembersTable({
                     </span>
                   )}
                 </td>
-                <td className="px-2 py-2 font-semibold text-zinc-900">
+                <td
+                  className="truncate px-2 py-2 font-semibold text-zinc-900"
+                  title={fullLastName(m)}
+                >
                   {fullLastName(m)}
                 </td>
-                <td className="px-2 py-2 text-zinc-700">{m.firstName ?? "—"}</td>
+                <td className="truncate px-2 py-2 text-zinc-700" title={m.firstName ?? undefined}>
+                  {m.firstName ?? "—"}
+                </td>
                 <td className="px-2 py-2">
-                  <div className="flex flex-wrap gap-1">
+                  <div className="flex flex-wrap gap-1 overflow-hidden">
                     {m.teams.length === 0 ? (
                       <span className="text-xs text-zinc-400">—</span>
                     ) : (
                       m.teams.map((t) => (
                         <span
                           key={t.id}
-                          className="rounded-full bg-navy/10 px-2 py-0.5 text-xs font-semibold text-navy"
+                          className="max-w-full truncate rounded-full bg-navy/10 px-2 py-0.5 text-xs font-semibold text-navy"
                         >
                           {t.category ?? t.name ?? "Équipe"}
                         </span>
@@ -320,18 +336,18 @@ export default function MembersTable({
                     )}
                   </div>
                 </td>
-                <td className="px-2 py-2 text-zinc-600">
+                <td className="truncate px-2 py-2 text-zinc-600" title={m.email ?? undefined}>
                   {m.email ? (
                     <span className="truncate">{m.email}</span>
                   ) : (
                     <span className="text-zinc-300">—</span>
                   )}
                 </td>
-                <td className="px-2 py-2 text-zinc-600">
+                <td className="truncate px-2 py-2 text-zinc-600" title={m.phone ?? undefined}>
                   {m.phone ? (
                     <span className="flex items-center gap-1">
                       <Phone className="h-3 w-3 shrink-0 text-zinc-400" />
-                      {m.phone}
+                      <span className="truncate">{m.phone}</span>
                     </span>
                   ) : (
                     <span className="text-zinc-300">—</span>
