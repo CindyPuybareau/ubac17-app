@@ -304,12 +304,13 @@ export default function MembersTable({
       )}
 
       <div className="w-full overflow-x-auto rounded-2xl border border-zinc-100">
-        <table className="w-full min-w-[650px] table-fixed border-collapse text-sm">
+        <table className="w-full min-w-[850px] table-fixed border-collapse text-sm">
           <colgroup>
             <col className="w-10" />
             <col className="w-10" />
             <col />
             <col />
+            <col className="w-28" />
             <col className="w-32" />
             <col />
             <col />
@@ -340,6 +341,7 @@ export default function MembersTable({
                 </span>
               </th>
               <th className="px-2 py-2.5">Prénom</th>
+              <th className="px-2 py-2.5">Commune</th>
               <th className="px-2 py-2.5">Équipe</th>
               <th className="px-2 py-2.5">Email</th>
               <th className="px-2 py-2.5">Téléphone</th>
@@ -377,6 +379,9 @@ export default function MembersTable({
                 </td>
                 <td className="truncate px-2 py-2 text-zinc-700" title={m.firstName ?? undefined}>
                   {m.firstName ?? "—"}
+                </td>
+                <td className="truncate px-2 py-2 text-zinc-600" title={m.city ?? undefined}>
+                  {m.city ?? "—"}
                 </td>
                 <td className="px-2 py-2">
                   <div className="flex flex-wrap gap-1 overflow-hidden">
@@ -492,7 +497,7 @@ export default function MembersTable({
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-2 py-8 text-center text-sm text-zinc-400">
+                <td colSpan={9} className="px-2 py-8 text-center text-sm text-zinc-400">
                   Aucun membre trouvé.
                 </td>
               </tr>

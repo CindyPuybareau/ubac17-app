@@ -18,19 +18,23 @@ const collecteTypeLabels: Record<CollecteType, string> = {
   BOUTIQUE: "Boutique",
 };
 
+// Matches the club's own Statut Club vocabulary exactly: Payé/Payé (-) →
+// PAYE, Offerte dirigeant/coach → OFFERT, En attente paiement → EN_ATTENTE.
 function computeKpis(list: AdminCotisation[]) {
   let payeCount = 0;
+  let offertCount = 0;
   let enAttenteCount = 0;
-  let impayeCount = 0;
   let totalDue = 0;
   let totalCollected = 0;
 
   list.forEach((c) => {
     const status = computeStatus(c);
-    if (status === "PAYE" || status === "OFFERT") payeCount++;
-    else if (status === "EN_ATTENTE") enAttenteCount++;
-    else impayeCount++;
-    totalDue = roundCents(totalDue + Math.max(0, (c.prix ?? 0) - (c.remise ?? 0)));
+    if (status === "PAYE") payeCount++;
+    else if (status === "OFFERT") offertCount++;
+    else enAttenteCount++;
+    // Attendu / Collecté are raw totals of Prix à payer / Paiement — not
+    // netted against remise, per the club's own accounting convention.
+    totalDue = roundCents(totalDue + (c.prix ?? 0));
     totalCollected = roundCents(totalCollected + (c.paiement ?? 0));
   });
 
@@ -40,8 +44,8 @@ function computeKpis(list: AdminCotisation[]) {
   return {
     total: list.length,
     payeCount,
+    offertCount,
     enAttenteCount,
-    impayeCount,
     totalDue,
     totalCollected,
     percentage,
@@ -62,12 +66,12 @@ function KpiHeader({ cotisations }: { cotisations: AdminCotisation[] }) {
           <p className="text-xs font-medium text-green-600 sm:text-sm">Payés</p>
         </div>
         <div className="rounded-xl bg-amber-50 p-3 text-center md:p-4">
-          <p className="text-xl font-bold text-amber-700 sm:text-2xl">{kpis.enAttenteCount}</p>
-          <p className="text-xs font-medium text-amber-600 sm:text-sm">En attente</p>
+          <p className="text-xl font-bold text-amber-700 sm:text-2xl">{kpis.offertCount}</p>
+          <p className="text-xs font-medium text-amber-600 sm:text-sm">Offerts / Dispensés</p>
         </div>
         <div className="rounded-xl bg-red-50 p-3 text-center md:p-4">
-          <p className="text-xl font-bold text-red-700 sm:text-2xl">{kpis.impayeCount}</p>
-          <p className="text-xs font-medium text-red-600 sm:text-sm">Non payés</p>
+          <p className="text-xl font-bold text-red-700 sm:text-2xl">{kpis.enAttenteCount}</p>
+          <p className="text-xs font-medium text-red-600 sm:text-sm">En attente / Non payés</p>
         </div>
         <div className="flex items-center gap-2.5 rounded-xl bg-ubac-yellow/10 p-3 md:p-4">
           <Wallet className="h-5 w-5 shrink-0 text-ubac-yellow-dark" />
@@ -195,7 +199,7 @@ export default function CotisationsManager({
       prix: selectedCollecte.prix,
       remise: 0,
       paiement: 0,
-      statut: "IMPAYE",
+      statut: null,
     }));
     const { error: insertError } = await supabase.from("cotisations").insert(rows);
     setAddingSaving(false);

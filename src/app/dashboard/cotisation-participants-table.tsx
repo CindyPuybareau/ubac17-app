@@ -16,13 +16,12 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import type { AdminCotisation } from "./page";
 
-type StatusKey = "PAYE" | "OFFERT" | "EN_ATTENTE" | "IMPAYE";
+type StatusKey = "PAYE" | "OFFERT" | "EN_ATTENTE";
 
 const statusBadge: Record<StatusKey, { label: string; className: string }> = {
   PAYE: { label: "Payé", className: "bg-green-100 text-green-700" },
-  OFFERT: { label: "Offert", className: "bg-blue-100 text-blue-700" },
-  EN_ATTENTE: { label: "En attente", className: "bg-amber-100 text-amber-700" },
-  IMPAYE: { label: "Impayé", className: "bg-red-100 text-red-700" },
+  OFFERT: { label: "Offert", className: "bg-amber-100 text-amber-700" },
+  EN_ATTENTE: { label: "En attente", className: "bg-red-100 text-red-700" },
 };
 
 const paymentModes = ["Chèque", "Espèces", "Virement", "Pass Sport", "Carte bancaire", "Autre"];
@@ -35,13 +34,18 @@ function due(c: AdminCotisation) {
   return Math.max(0, roundCents((c.prix ?? 0) - (c.remise ?? 0)));
 }
 
+// Trust the club's own Statut Club value when it's one of the three real
+// statuses it uses (Payé/Payé (-), Offerte dirigeant/coach, En attente
+// paiement — already normalized to these codes on import). Only fall back
+// to deriving from amounts for rows with no recognized statut yet (e.g. a
+// participant just added to a stage/event collecte).
 export function computeStatus(c: AdminCotisation): StatusKey {
-  if (c.statut === "OFFERT") return "OFFERT";
+  if (c.statut === "PAYE" || c.statut === "OFFERT" || c.statut === "EN_ATTENTE") {
+    return c.statut;
+  }
   const d = due(c);
   const paid = c.paiement ?? 0;
-  if (d <= 0 || paid >= d) return "PAYE";
-  if (paid > 0) return "EN_ATTENTE";
-  return "IMPAYE";
+  return d <= 0 || paid >= d ? "PAYE" : "EN_ATTENTE";
 }
 
 // Amounts are derived from floating-point arithmetic (prix - remise,
@@ -107,7 +111,7 @@ function openReceiptWindow(c: AdminCotisation, contactEmail: string | null) {
   <table>
     <tr><th>Membre</th><td>${c.playerName}</td></tr>
     <tr><th>Catégorie</th><td>${c.category ?? "—"}</td></tr>
-    ${c.licenseNumber ? `<tr><th>N° Licence</th><td>${c.licenseNumber}</td></tr>` : ""}
+    ${c.membershipType ? `<tr><th>Type d'adhésion</th><td>${c.membershipType}</td></tr>` : ""}
     ${contactEmail ? `<tr><th>Contact</th><td>${contactEmail}</td></tr>` : ""}
     <tr><th>Tarif</th><td>${formatAmount(c.prix)}</td></tr>
     <tr><th>Remise</th><td>${formatAmount(c.remise)}</td></tr>
@@ -215,7 +219,7 @@ export default function CotisationParticipantsTable({
         return;
       }
       const newPaid = roundCents((c.paiement ?? 0) + amount);
-      const newStatut = newPaid >= due(c) && due(c) > 0 ? "PAYE" : newPaid > 0 ? "EN_ATTENTE" : "IMPAYE";
+      const newStatut = newPaid >= due(c) ? "PAYE" : "EN_ATTENTE";
       const { error } = await supabase
         .from("cotisations")
         .update({ paiement: newPaid, mode_paiement: paymentMode, statut: newStatut })
@@ -266,8 +270,8 @@ export default function CotisationParticipantsTable({
     const supabase = createClient();
     const c = byId.get(remiseId);
     const paid = c?.paiement ?? 0;
-    const newDue = Math.max(0, (c?.prix ?? 0) - amount);
-    const newStatut = paid >= newDue && newDue > 0 ? "PAYE" : paid > 0 ? "EN_ATTENTE" : "IMPAYE";
+    const newDue = Math.max(0, roundCents((c?.prix ?? 0) - amount));
+    const newStatut = paid >= newDue ? "PAYE" : "EN_ATTENTE";
     const { error } = await supabase
       .from("cotisations")
       .update({ remise: amount, statut: newStatut })
@@ -285,20 +289,24 @@ export default function CotisationParticipantsTable({
     const items = cotisations.filter((c) => ids.includes(c.id));
     const header = [
       "Nom & Prénom",
-      "N° Licence",
       "Catégorie",
+      "Type Adhésion",
+      "Statut FBI",
       "Tarif",
       "Remise",
       "Payé",
+      "Mode de Paiement",
       "Statut",
     ];
     const rows = items.map((c) => [
       c.playerName,
-      c.licenseNumber ?? "",
       c.category ?? "",
+      c.membershipType ?? "",
+      c.fbiStatus ?? "",
       c.prix ?? 0,
       c.remise ?? 0,
       c.paiement ?? 0,
+      c.mode_paiement ?? "",
       statusBadge[computeStatus(c)].label,
     ]);
     const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
@@ -407,16 +415,18 @@ export default function CotisationParticipantsTable({
       )}
 
       <div className="w-full overflow-x-auto rounded-2xl border border-zinc-100">
-        <table className="w-full min-w-[650px] table-fixed border-collapse text-sm">
+        <table className="w-full min-w-[850px] table-fixed border-collapse text-sm">
           <colgroup>
             <col className="w-10" />
             <col />
+            <col className="w-20" />
+            <col className="w-28" />
+            <col className="w-32" />
+            <col className="w-20" />
+            <col className="w-20" />
+            <col className="w-20" />
             <col className="w-28" />
             <col className="w-24" />
-            <col className="w-20" />
-            <col className="w-20" />
-            <col className="w-20" />
-            <col className="w-28" />
             <col className="w-10" />
           </colgroup>
           <thead>
@@ -430,11 +440,13 @@ export default function CotisationParticipantsTable({
                 />
               </th>
               <th className="px-2 py-2.5">Nom &amp; Prénom</th>
-              <th className="px-2 py-2.5">N° Licence</th>
               <th className="px-2 py-2.5">Catégorie</th>
+              <th className="px-2 py-2.5">Type Adhésion</th>
+              <th className="px-2 py-2.5">Statut FBI</th>
               <th className="px-2 py-2.5">Tarif</th>
               <th className="px-2 py-2.5">Remise</th>
               <th className="px-2 py-2.5">Payé</th>
+              <th className="px-2 py-2.5">Mode Paiement</th>
               <th className="px-2 py-2.5">Statut</th>
               <th className="px-2 py-2.5" />
             </tr>
@@ -460,14 +472,20 @@ export default function CotisationParticipantsTable({
                     {c.playerName}
                   </td>
                   <td className="truncate px-2 py-2 text-zinc-600">
-                    {c.licenseNumber ?? "—"}
-                  </td>
-                  <td className="truncate px-2 py-2 text-zinc-600">
                     {c.category ?? "—"}
+                  </td>
+                  <td className="truncate px-2 py-2 text-zinc-600" title={c.membershipType ?? undefined}>
+                    {c.membershipType ?? "—"}
+                  </td>
+                  <td className="truncate px-2 py-2 text-zinc-600" title={c.fbiStatus ?? undefined}>
+                    {c.fbiStatus ?? "—"}
                   </td>
                   <td className="px-2 py-2 text-zinc-600">{formatAmount(c.prix)}</td>
                   <td className="px-2 py-2 text-zinc-600">{formatAmount(c.remise)}</td>
                   <td className="px-2 py-2 text-zinc-600">{formatAmount(c.paiement)}</td>
+                  <td className="truncate px-2 py-2 text-zinc-600" title={c.mode_paiement ?? undefined}>
+                    {c.mode_paiement ?? "—"}
+                  </td>
                   <td className="px-2 py-2">
                     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${status.className}`}>
                       {status.label}
@@ -544,7 +562,7 @@ export default function CotisationParticipantsTable({
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-2 py-8 text-center text-sm text-zinc-400">
+                <td colSpan={11} className="px-2 py-8 text-center text-sm text-zinc-400">
                   {emptyLabel}
                 </td>
               </tr>

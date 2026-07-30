@@ -94,7 +94,8 @@ export type AdminCotisation = {
   playerName: string;
   category: string | null;
   playerId: string;
-  licenseNumber: string | null;
+  membershipType: string | null;
+  fbiStatus: string | null;
   collecteId: string | null;
   collecteType: CollecteType | null;
   collecteName: string | null;
@@ -291,7 +292,7 @@ export default async function DashboardPage() {
       supabase
         .from("cotisations")
         .select(
-          "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, collecte_id, players(first_name, last_name, category, license_number), collectes(id, name, type)"
+          "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, collecte_id, players(first_name, last_name, category, membership_type, fbi_status), collectes(id, name, type)"
         )
         .order("saison", { ascending: false }),
       supabase
@@ -479,7 +480,8 @@ export default async function DashboardPage() {
         first_name: string | null;
         last_name: string | null;
         category: string | null;
-        license_number: string | null;
+        membership_type: string | null;
+        fbi_status: string | null;
       } | null;
       const collecte = c.collectes as unknown as {
         id: string;
@@ -495,7 +497,8 @@ export default async function DashboardPage() {
         statut: c.statut,
         mode_paiement: c.mode_paiement,
         playerId: c.player_id,
-        licenseNumber: player?.license_number ?? null,
+        membershipType: player?.membership_type ?? null,
+        fbiStatus: player?.fbi_status ?? null,
         collecteId: c.collecte_id,
         collecteType: collecte?.type ?? null,
         collecteName: collecte?.name ?? null,
