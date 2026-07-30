@@ -57,7 +57,6 @@ export default function CoachTeams({
         eventsByTeamId={eventsByTeamId}
         contactPhoneByPlayerId={contactPhoneByPlayerId}
         createCotisationOnNewPlayer={false}
-        showFfbbSync
         memberDetailsByPlayerId={memberDetailsByPlayerId}
       />
     </div>
