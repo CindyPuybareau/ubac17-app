@@ -1,13 +1,14 @@
-import { CalendarDays, Users, Wallet, RefreshCw } from "lucide-react";
+import { CalendarDays, Contact, Users, Wallet, RefreshCw } from "lucide-react";
 import TeamManager, { type TeamWithMembers } from "./team-manager";
 import ImportInscriptions from "./import-inscriptions";
 import ImportPlanning from "./import-planning";
 import ImportCoaches from "./import-coaches";
 import CotisationsTable from "./cotisations-table";
 import CalendarView from "./calendar-view";
+import MembersTable from "./members-table";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import FfbbManager from "./ffbb-manager";
-import type { AdminCotisation, AdminUpcomingEvent } from "./page";
+import type { AdminCotisation, AdminMember, AdminUpcomingEvent } from "./page";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 
@@ -18,6 +19,7 @@ export default function AdminView({
   cotisations,
   upcomingEvents,
   contactPhoneByPlayerId,
+  members,
 }: {
   clubFunction?: string | null;
   teams: TeamWithMembers[];
@@ -25,6 +27,7 @@ export default function AdminView({
   cotisations: AdminCotisation[];
   upcomingEvents: AdminUpcomingEvent[];
   contactPhoneByPlayerId: Record<string, string>;
+  members: AdminMember[];
 }) {
   const teamRefs = teams.map((t) => ({
     id: t.id,
@@ -45,6 +48,12 @@ export default function AdminView({
       label: "Calendrier",
       icon: <CalendarDays className={iconClass} />,
       content: <CalendarView events={upcomingEvents} createTeams={teamRefs} />,
+    },
+    {
+      key: "members",
+      label: "Membres",
+      icon: <Contact className={iconClass} />,
+      content: <MembersTable members={members} teams={teamRefs} />,
     },
     {
       key: "teams",

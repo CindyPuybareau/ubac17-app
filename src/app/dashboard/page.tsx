@@ -27,6 +27,23 @@ type PlayerRow = {
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 
+export type AdminMemberTeam = {
+  id: string;
+  name: string | null;
+  category: string | null;
+};
+
+export type AdminMember = {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  teams: AdminMemberTeam[];
+  email: string | null;
+  phone: string | null;
+  hasParent: boolean;
+  pendingParentEmail: string | null;
+};
+
 export type AdminCotisation = {
   id: string;
   saison: string;
@@ -195,6 +212,7 @@ export default async function DashboardPage() {
   let allProfilesForAdmin: Person[] = [];
   let adminCotisations: AdminCotisation[] = [];
   let adminUpcomingEvents: AdminUpcomingEvent[] = [];
+  let adminMembers: AdminMember[] = [];
   const adminContactPhoneByPlayerId: Record<string, string> = {};
 
   if (isAdmin) {
@@ -214,11 +232,11 @@ export default async function DashboardPage() {
         .order("category"),
       supabase
         .from("players")
-        .select("id, first_name, last_name")
+        .select("id, first_name, last_name, profile_id, pending_parent_email")
         .order("first_name"),
       supabase
         .from("profiles")
-        .select("id, first_name, last_name, phone")
+        .select("id, first_name, last_name, phone, email")
         .order("first_name"),
       supabase.from("team_players").select("team_id, player_id"),
       supabase.from("team_coaches").select("team_id, coach_id"),
@@ -279,6 +297,59 @@ export default async function DashboardPage() {
     (parentPlayerRes.data ?? []).forEach((pp) => {
       const phone = phoneByProfileId.get(pp.parent_id);
       if (phone) adminContactPhoneByPlayerId[pp.player_id] = phone;
+    });
+
+    const teamsById = new Map(
+      (teamsRes.data ?? []).map((t) => [
+        t.id,
+        { id: t.id, name: t.name, category: t.category },
+      ])
+    );
+    const teamsByPlayerId = new Map<string, AdminMemberTeam[]>();
+    (teamPlayersRes.data ?? []).forEach((tp) => {
+      const team = teamsById.get(tp.team_id);
+      if (!team) return;
+      const list = teamsByPlayerId.get(tp.player_id) ?? [];
+      list.push(team);
+      teamsByPlayerId.set(tp.player_id, list);
+    });
+    const parentIdsByPlayerId = new Map<string, string[]>();
+    (parentPlayerRes.data ?? []).forEach((pp) => {
+      const list = parentIdsByPlayerId.get(pp.player_id) ?? [];
+      list.push(pp.parent_id);
+      parentIdsByPlayerId.set(pp.player_id, list);
+    });
+    const emailByProfileId = new Map(
+      (profilesRes.data ?? []).map((p) => [
+        p.id,
+        (p as { email: string | null }).email,
+      ])
+    );
+
+    adminMembers = (playersRes.data ?? []).map((row) => {
+      const player = row as {
+        id: string;
+        first_name: string | null;
+        last_name: string | null;
+        profile_id: string | null;
+        pending_parent_email: string | null;
+      };
+      // Exclude self-link rows: a self-registered adult player is linked to
+      // their own parent_player row, which isn't a "parent" for display.
+      const parentIds = (parentIdsByPlayerId.get(player.id) ?? []).filter(
+        (pid) => pid !== player.profile_id
+      );
+      const contactProfileId = player.profile_id ?? parentIds[0] ?? null;
+      return {
+        id: player.id,
+        firstName: player.first_name,
+        lastName: player.last_name,
+        teams: teamsByPlayerId.get(player.id) ?? [],
+        email: contactProfileId ? emailByProfileId.get(contactProfileId) ?? null : null,
+        phone: contactProfileId ? phoneByProfileId.get(contactProfileId) ?? null : null,
+        hasParent: parentIds.length > 0,
+        pendingParentEmail: player.pending_parent_email,
+      };
     });
 
     const rsvpsByEvent = await fetchRsvpsByEvent(
@@ -528,6 +599,7 @@ export default async function DashboardPage() {
           cotisations={adminCotisations}
           upcomingEvents={adminUpcomingEvents}
           contactPhoneByPlayerId={adminContactPhoneByPlayerId}
+          members={adminMembers}
         />
       ),
     });
