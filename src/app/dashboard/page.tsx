@@ -10,7 +10,6 @@ import CoachView from "./coach-view";
 import CalendarView from "./calendar-view";
 import NextConvocationCard from "./next-convocation-card";
 import CoachNextMatchCard from "./coach-next-match-card";
-import WeatherWidget from "./weather-widget";
 import BirthdayWidget from "./birthday-widget";
 import { upcomingBirthdays, type BirthdaySource } from "./birthdays";
 import {
@@ -964,14 +963,6 @@ export default async function DashboardPage() {
     });
   }
 
-  const nextMatchIso =
-    [
-      ...convocationCards.map((c) => c.event.start_time),
-      ...coachCards
-        .map((c) => c.event?.start_time)
-        .filter((s): s is string => Boolean(s)),
-    ].sort()[0] ?? null;
-
   const birthdaySourceMembers: BirthdaySource[] = isAdmin
     ? adminMembers
         .filter((m) => !m.archivedAt)
@@ -1076,7 +1067,6 @@ export default async function DashboardPage() {
 
         {showWidgetsZone && (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <WeatherWidget nextMatchIso={nextMatchIso} />
             {birthdayEntries.length > 0 && (
               <BirthdayWidget entries={birthdayEntries} />
             )}
