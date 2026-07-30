@@ -7,7 +7,7 @@ import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import type { TeamWithMembers } from "./team-manager";
 import type { AdminUpcomingEvent, MemberDetail } from "./page";
 import type { SeasonTaskTally } from "./event-tasks";
-import type { BirthdayEntry, BirthdaySource } from "./birthdays";
+import type { BirthdaySource } from "./birthdays";
 
 export default function CoachView({
   teams,
@@ -18,7 +18,7 @@ export default function CoachView({
   rsvpPlayers,
   rsvpStatusByKey,
   taskTallyByTeamId,
-  birthdayEntries,
+  birthdayMembers,
 }: {
   teams: TeamWithMembers[];
   events: AdminUpcomingEvent[];
@@ -28,7 +28,7 @@ export default function CoachView({
   rsvpPlayers: { id: string; name: string; teamIds: string[] }[];
   rsvpStatusByKey: Record<string, string>;
   taskTallyByTeamId: Record<string, SeasonTaskTally>;
-  birthdayEntries: BirthdayEntry<BirthdaySource>[];
+  birthdayMembers: BirthdaySource[];
 }) {
   const createTeams = teams.map((t) => ({
     id: t.id,
@@ -54,7 +54,7 @@ export default function CoachView({
           createTeams={createTeams}
           rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
           contactEmailByPlayerId={contactEmailByPlayerId}
-          birthdayEntries={birthdayEntries}
+          birthdayMembers={birthdayMembers}
         />
       ),
     },

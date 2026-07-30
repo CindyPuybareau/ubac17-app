@@ -3,7 +3,29 @@ export type BirthdaySource = {
   firstName: string | null;
   lastName: string | null;
   birthDate: string | null;
+  category?: string | null;
 };
+
+// Groups members by their birthday's month/day (e.g. "05-12"), ignoring
+// year, so a calendar can mark every occurrence of a recurring birthday
+// regardless of which month is currently being viewed. birth_date is a
+// plain "YYYY-MM-DD" date column — split as a string to sidestep any
+// Date-parsing timezone ambiguity entirely.
+export function groupBirthdaysByMonthDay<T extends BirthdaySource>(
+  members: T[]
+): Map<string, T[]> {
+  const map = new Map<string, T[]>();
+  members.forEach((m) => {
+    if (!m.birthDate) return;
+    const parts = m.birthDate.split("-");
+    if (parts.length < 3) return;
+    const key = `${parts[1]}-${parts[2]}`;
+    const list = map.get(key) ?? [];
+    list.push(m);
+    map.set(key, list);
+  });
+  return map;
+}
 
 export type BirthdayEntry<T> = T & { daysUntil: number };
 

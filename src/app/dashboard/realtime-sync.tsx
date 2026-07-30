@@ -14,6 +14,7 @@ const WATCHED_TABLES = [
   "cotisations",
   "team_players",
   "team_coaches",
+  "players",
 ] as const;
 
 // Mounted once at the dashboard root (src/app/dashboard/page.tsx) so it

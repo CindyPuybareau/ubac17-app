@@ -14,7 +14,7 @@ import type {
   AdminMember,
   AdminUpcomingEvent,
 } from "./page";
-import type { BirthdayEntry, BirthdaySource } from "./birthdays";
+import type { BirthdaySource } from "./birthdays";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 
@@ -27,7 +27,7 @@ export default function AdminView({
   upcomingEvents,
   contactPhoneByPlayerId,
   members,
-  birthdayEntries,
+  birthdayMembers,
 }: {
   clubFunction?: string | null;
   teams: TeamWithMembers[];
@@ -37,7 +37,7 @@ export default function AdminView({
   upcomingEvents: AdminUpcomingEvent[];
   contactPhoneByPlayerId: Record<string, string>;
   members: AdminMember[];
-  birthdayEntries: BirthdayEntry<BirthdaySource>[];
+  birthdayMembers: BirthdaySource[];
 }) {
   const teamRefs = teams.map((t) => ({
     id: t.id,
@@ -62,7 +62,7 @@ export default function AdminView({
           events={upcomingEvents}
           createTeams={teamRefs}
           allowClubWide
-          birthdayEntries={birthdayEntries}
+          birthdayMembers={birthdayMembers}
         />
       ),
     },

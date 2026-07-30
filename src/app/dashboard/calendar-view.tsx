@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CalendarDays,
+  Cake,
   Check,
   Clock,
   Mail,
@@ -21,7 +22,11 @@ import CreateEventForm from "./create-event-form";
 import RsvpButtons from "./rsvp-buttons";
 import BirthdayWidget from "./birthday-widget";
 import type { AdminUpcomingEvent } from "./page";
-import type { BirthdayEntry, BirthdaySource } from "./birthdays";
+import {
+  groupBirthdaysByMonthDay,
+  upcomingBirthdays,
+  type BirthdaySource,
+} from "./birthdays";
 
 const eventTypeOptions: { value: string; label: string }[] = [
   { value: "MATCH", label: "Match" },
@@ -84,6 +89,14 @@ function toKey(d: Date) {
   return `${y}-${m}-${day}`;
 }
 
+// Matches groupBirthdaysByMonthDay's "MM-DD" key format so a Date on the
+// grid can be looked up regardless of year.
+function monthDayKey(d: Date) {
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${m}-${day}`;
+}
+
 function startOfWeekMonday(d: Date) {
   const date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const day = date.getDay(); // 0=Sun..6=Sat
@@ -133,7 +146,7 @@ export default function CalendarView({
   rsvp,
   contactEmailByPlayerId,
   allowClubWide = false,
-  birthdayEntries = [],
+  birthdayMembers = [],
 }: {
   events: AdminUpcomingEvent[];
   createTeams?: CalendarTeamRef[];
@@ -143,10 +156,11 @@ export default function CalendarView({
   };
   contactEmailByPlayerId?: Record<string, string>;
   allowClubWide?: boolean;
-  birthdayEntries?: BirthdayEntry<BirthdaySource>[];
+  birthdayMembers?: BirthdaySource[];
 }) {
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState<Date>(today);
+  const [openBirthday, setOpenBirthday] = useState<BirthdaySource | null>(null);
 
   const canManage = Boolean(createTeams && createTeams.length > 0);
 
@@ -235,6 +249,16 @@ export default function CalendarView({
     return map;
   }, [events]);
 
+  const birthdaysByMonthDay = useMemo(
+    () => groupBirthdaysByMonthDay(birthdayMembers),
+    [birthdayMembers]
+  );
+
+  const birthdayWidgetEntries = useMemo(
+    () => upcomingBirthdays(birthdayMembers),
+    [birthdayMembers]
+  );
+
   function goToday() {
     setSelectedDate(new Date());
   }
@@ -255,6 +279,7 @@ export default function CalendarView({
   const gridDays = useMemo(() => buildMonthGrid(selectedDate), [selectedDate]);
 
   const detailEvents = eventsByDate.get(selectedKey) ?? [];
+  const detailBirthdays = birthdaysByMonthDay.get(monthDayKey(selectedDate)) ?? [];
 
   return (
     <div className="flex w-full max-w-full min-w-0 flex-col gap-4">
@@ -306,6 +331,7 @@ export default function CalendarView({
           {gridDays.map((d) => {
             const key = toKey(d);
             const dayEvents = eventsByDate.get(key) ?? [];
+            const dayBirthdays = birthdaysByMonthDay.get(monthDayKey(d)) ?? [];
             const isCurrentMonth =
               d.getMonth() === selectedDate.getMonth() &&
               d.getFullYear() === selectedDate.getFullYear();
@@ -339,6 +365,9 @@ export default function CalendarView({
                         className={`h-1.5 w-1.5 shrink-0 rounded-full ${styleFor(e.event_type).pill.split(" ")[0]}`}
                       />
                     ))}
+                    {dayBirthdays.length > 0 && (
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-purple-400" />
+                    )}
                   </div>
                   <div className="hidden sm:flex sm:flex-col sm:gap-0.5">
                     {visible.map((e) => (
@@ -349,6 +378,14 @@ export default function CalendarView({
                         {pillLabel(e)}
                       </span>
                     ))}
+                    {dayBirthdays.length > 0 && (
+                      <span className="flex items-center gap-0.5 truncate rounded bg-purple-100 px-1 py-0.5 text-[10px] font-semibold text-purple-700">
+                        <Cake className="h-2.5 w-2.5 shrink-0" />
+                        {dayBirthdays.length === 1
+                          ? dayBirthdays[0].firstName
+                          : `${dayBirthdays.length} anniv.`}
+                      </span>
+                    )}
                   </div>
                   {overflow > 0 && (
                     <span className="text-[9px] font-semibold text-zinc-400 sm:text-[10px]">
@@ -362,7 +399,9 @@ export default function CalendarView({
         </div>
       </div>
 
-      {birthdayEntries.length > 0 && <BirthdayWidget entries={birthdayEntries} />}
+      {birthdayWidgetEntries.length > 0 && (
+        <BirthdayWidget entries={birthdayWidgetEntries} />
+      )}
 
       <div className="flex flex-col gap-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
@@ -375,7 +414,25 @@ export default function CalendarView({
               })}
         </p>
 
-        {detailEvents.length === 0 ? (
+        {detailBirthdays.length > 0 && (
+          <div className="flex flex-col gap-2">
+            {detailBirthdays.map((m) => (
+              <button
+                key={m.id}
+                onClick={() => setOpenBirthday(m)}
+                className="flex items-center gap-2 rounded-xl border border-purple-100 bg-purple-50/60 px-3 py-2.5 text-left transition-colors hover:border-purple-200"
+              >
+                <Cake className="h-4 w-4 shrink-0 text-purple-600" />
+                <span className="text-sm font-medium text-zinc-900">
+                  Anniversaire : {[m.firstName, m.lastName].filter(Boolean).join(" ")}
+                  {m.category ? ` · ${m.category}` : ""}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {detailEvents.length === 0 && detailBirthdays.length === 0 ? (
           <p className="text-sm text-zinc-500">Aucun événement ce jour-là.</p>
         ) : (
           detailEvents.map((event) => {
@@ -616,6 +673,41 @@ export default function CalendarView({
                 {editSaving ? "Enregistrement..." : "Enregistrer"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {openBirthday && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setOpenBirthday(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Cake className="h-5 w-5 text-purple-600" />
+                <h3 className="font-semibold text-zinc-900">Anniversaire</h3>
+              </div>
+              <button
+                onClick={() => setOpenBirthday(null)}
+                className="rounded-full p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="text-sm text-zinc-700">
+              {selectedKey === todayKey
+                ? "Aujourd'hui"
+                : `Le ${selectedDate.toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}`}
+              , c&apos;est l&apos;anniversaire de{" "}
+              <span className="font-semibold">
+                {[openBirthday.firstName, openBirthday.lastName].filter(Boolean).join(" ")}
+              </span>
+              {openBirthday.category ? ` - ${openBirthday.category}` : ""} !
+            </p>
           </div>
         </div>
       )}

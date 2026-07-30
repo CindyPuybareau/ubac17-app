@@ -10,7 +10,7 @@ import CoachView from "./coach-view";
 import CalendarView from "./calendar-view";
 import NextConvocationCard from "./next-convocation-card";
 import CoachNextMatchCard from "./coach-next-match-card";
-import { upcomingBirthdays, type BirthdayEntry, type BirthdaySource } from "./birthdays";
+import type { BirthdaySource } from "./birthdays";
 import {
   getNextEventForTeams,
   getPlayerRsvpStatus,
@@ -907,7 +907,7 @@ export default async function DashboardPage() {
   let familyEvents: AdminUpcomingEvent[] = [];
   let familyRsvpPlayers: { id: string; name: string; teamIds: string[] }[] = [];
   const familyRsvpStatusByKey: Record<string, string> = {};
-  let familyBirthdayEntries: BirthdayEntry<BirthdaySource>[] = [];
+  const familyBirthdayMembers: BirthdaySource[] = [];
 
   if (players.length > 0) {
     const playerTeamIdsList = await Promise.all(
@@ -924,28 +924,28 @@ export default async function DashboardPage() {
     if (allTeamIds.length > 0) {
       const { data: teammateRows } = await supabase
         .from("team_players")
-        .select("players(id, first_name, last_name, birth_date)")
+        .select("players(id, first_name, last_name, birth_date, category)")
         .in("team_id", allTeamIds);
 
       const seenTeammateIds = new Set<string>();
-      const teammates: BirthdaySource[] = [];
       (teammateRows ?? []).forEach((row) => {
         const p = row.players as unknown as {
           id: string;
           first_name: string | null;
           last_name: string | null;
           birth_date: string | null;
+          category: string | null;
         } | null;
         if (!p || seenTeammateIds.has(p.id)) return;
         seenTeammateIds.add(p.id);
-        teammates.push({
+        familyBirthdayMembers.push({
           id: p.id,
           firstName: p.first_name,
           lastName: p.last_name,
           birthDate: p.birth_date,
+          category: p.category,
         });
       });
-      familyBirthdayEntries = upcomingBirthdays(teammates);
     }
 
     const { data: eventsData } = await supabase
@@ -990,28 +990,26 @@ export default async function DashboardPage() {
     });
   }
 
-  const adminBirthdayEntries = isAdmin
-    ? upcomingBirthdays(
-        adminMembers
-          .filter((m) => !m.archivedAt)
-          .map((m) => ({
-            id: m.id,
-            firstName: m.firstName,
-            lastName: m.lastName,
-            birthDate: m.birthDate,
-          }))
-      )
-    : [];
-
-  const coachBirthdayEntries = isCoach
-    ? upcomingBirthdays(
-        Object.values(coachMemberDetailsByPlayerId).map((m) => ({
+  const adminBirthdayMembers: BirthdaySource[] = isAdmin
+    ? adminMembers
+        .filter((m) => !m.archivedAt)
+        .map((m) => ({
           id: m.id,
           firstName: m.firstName,
           lastName: m.lastName,
           birthDate: m.birthDate,
+          category: m.category,
         }))
-      )
+    : [];
+
+  const coachBirthdayMembers: BirthdaySource[] = isCoach
+    ? Object.values(coachMemberDetailsByPlayerId).map((m) => ({
+        id: m.id,
+        firstName: m.firstName,
+        lastName: m.lastName,
+        birthDate: m.birthDate,
+        category: m.category,
+      }))
     : [];
 
   const showWidgetsZone = isAdmin || isCoach || players.length > 0;
@@ -1032,7 +1030,7 @@ export default async function DashboardPage() {
           upcomingEvents={adminUpcomingEvents}
           contactPhoneByPlayerId={adminContactPhoneByPlayerId}
           members={adminMembers}
-          birthdayEntries={adminBirthdayEntries}
+          birthdayMembers={adminBirthdayMembers}
         />
       ),
     });
@@ -1052,7 +1050,7 @@ export default async function DashboardPage() {
           rsvpPlayers={coachRsvpPlayers}
           rsvpStatusByKey={coachRsvpStatusByKey}
           taskTallyByTeamId={coachTaskTallyByTeamId}
-          birthdayEntries={coachBirthdayEntries}
+          birthdayMembers={coachBirthdayMembers}
         />
       ),
     });
@@ -1066,7 +1064,7 @@ export default async function DashboardPage() {
         <CalendarView
           events={familyEvents}
           rsvp={{ players: familyRsvpPlayers, statusByKey: familyRsvpStatusByKey }}
-          birthdayEntries={familyBirthdayEntries}
+          birthdayMembers={familyBirthdayMembers}
         />
       ),
     });
