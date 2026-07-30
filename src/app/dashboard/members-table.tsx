@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Search,
   Trash2,
+  Users,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -306,11 +307,17 @@ export default function MembersTable({
                 <td className="px-2 py-2 text-xs text-zinc-400">{index + 1}</td>
                 <td className="px-2 py-2">
                   {m.hasParent ? (
-                    <span title="Rattaché à un parent" className="text-base">
-                      👨‍👩‍👧
+                    <span
+                      title="Rattaché à un parent"
+                      className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-600"
+                    >
+                      <Users className="h-3 w-3" />
+                      Parent
                     </span>
                   ) : (
-                    <span className="text-xs text-zinc-400">Autonome</span>
+                    <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-500">
+                      Autonome
+                    </span>
                   )}
                 </td>
                 <td className="px-2 py-2 font-semibold text-zinc-900">
