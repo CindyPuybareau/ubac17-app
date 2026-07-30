@@ -6,6 +6,7 @@ import CoachFfbb from "./coach-ffbb";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import type { TeamWithMembers } from "./team-manager";
 import type { AdminUpcomingEvent, MemberDetail } from "./page";
+import type { SeasonTaskTally } from "./event-tasks";
 
 export default function CoachView({
   teams,
@@ -15,6 +16,7 @@ export default function CoachView({
   memberDetailsByPlayerId,
   rsvpPlayers,
   rsvpStatusByKey,
+  taskTallyByTeamId,
 }: {
   teams: TeamWithMembers[];
   events: AdminUpcomingEvent[];
@@ -23,6 +25,7 @@ export default function CoachView({
   memberDetailsByPlayerId: Record<string, MemberDetail>;
   rsvpPlayers: { id: string; name: string; teamIds: string[] }[];
   rsvpStatusByKey: Record<string, string>;
+  taskTallyByTeamId: Record<string, SeasonTaskTally>;
 }) {
   const createTeams = teams.map((t) => ({
     id: t.id,
@@ -62,6 +65,7 @@ export default function CoachView({
           eventsByTeamId={eventsByTeamId}
           contactPhoneByPlayerId={contactPhoneByPlayerId}
           memberDetailsByPlayerId={memberDetailsByPlayerId}
+          taskTallyByTeamId={taskTallyByTeamId}
         />
       ),
     },

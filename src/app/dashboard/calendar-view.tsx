@@ -6,6 +6,8 @@ import {
   ChevronLeft,
   ChevronRight,
   CalendarDays,
+  Check,
+  Clock,
   Mail,
   MapPin,
   Pencil,
@@ -457,21 +459,25 @@ export default function CalendarView({
 
                 {hasRoster && (
                   <div className="flex flex-wrap gap-1.5">
-                    <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
-                      ✅ {rsvpCounts.present} présent
+                    <span className="flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
+                      <Check className="h-3 w-3" />
+                      {rsvpCounts.present} présent
                       {rsvpCounts.present > 1 ? "s" : ""}
                     </span>
                     {rsvpCounts.late > 0 && (
-                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
-                        ⏰ {rsvpCounts.late} en retard
+                      <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                        <Clock className="h-3 w-3" />
+                        {rsvpCounts.late} en retard
                       </span>
                     )}
-                    <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
-                      ❌ {rsvpCounts.absent} absent
+                    <span className="flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                      <X className="h-3 w-3" />
+                      {rsvpCounts.absent} absent
                       {rsvpCounts.absent > 1 ? "s" : ""}
                     </span>
-                    <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-600">
-                      ⏳ {rsvpCounts.pending} en attente
+                    <span className="flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-600">
+                      <Clock className="h-3 w-3" />
+                      {rsvpCounts.pending} en attente
                     </span>
                   </div>
                 )}
@@ -483,10 +489,10 @@ export default function CalendarView({
                         rsvp?.statusByKey[`${event.id}:${p.id}`] ?? "PENDING";
                       const badge =
                         playerStatus === "PRESENT"
-                          ? { label: "🟢 Présent", className: "bg-green-100 text-green-700" }
+                          ? { label: "Présent", dotClassName: "bg-green-500", className: "bg-green-100 text-green-700" }
                           : playerStatus === "ABSENT"
-                            ? { label: "🔴 Absent", className: "bg-red-100 text-red-700" }
-                            : { label: "🟠 En attente", className: "bg-amber-100 text-amber-700" };
+                            ? { label: "Absent", dotClassName: "bg-red-500", className: "bg-red-100 text-red-700" }
+                            : { label: "En attente", dotClassName: "bg-amber-500", className: "bg-amber-100 text-amber-700" };
                       return (
                         <div key={p.id} className="flex flex-wrap items-center gap-2">
                           {respondingPlayers.length > 1 && (
@@ -495,8 +501,9 @@ export default function CalendarView({
                             </span>
                           )}
                           <span
-                            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${badge.className}`}
+                            className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${badge.className}`}
                           >
+                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${badge.dotClassName}`} />
                             {badge.label}
                           </span>
                           <RsvpButtons

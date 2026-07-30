@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Check, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 export default function RsvpButtons({
@@ -49,24 +50,26 @@ export default function RsvpButtons({
       <button
         disabled={loading}
         onClick={() => respond("PRESENT")}
-        className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-60 ${
+        className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-60 ${
           status === "PRESENT"
             ? "bg-ubac-yellow text-navy"
             : "border border-ubac-yellow text-ubac-yellow-dark hover:bg-ubac-yellow/10"
         }`}
       >
-        ✅ Présent
+        <Check className="h-4 w-4" />
+        Présent
       </button>
       <button
         disabled={loading}
         onClick={() => respond("ABSENT")}
-        className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-60 ${
+        className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-60 ${
           status === "ABSENT"
             ? "bg-red-600 text-white"
             : "border border-red-600 text-red-700 hover:bg-red-50"
         }`}
       >
-        ❌ Absent
+        <X className="h-4 w-4" />
+        Absent
       </button>
     </div>
   );

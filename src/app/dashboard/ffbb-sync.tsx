@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { RefreshCw } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 export default function FfbbSync({
@@ -92,9 +93,10 @@ export default function FfbbSync({
         <button
           onClick={syncNow}
           disabled={syncing || !initialUrl}
-          className="rounded-full bg-ubac-yellow px-3 py-2 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+          className="flex items-center gap-1.5 rounded-full bg-ubac-yellow px-3 py-2 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
         >
-          {syncing ? "Synchronisation..." : "🔄 Synchroniser avec la FFBB"}
+          <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+          {syncing ? "Synchronisation..." : "Synchroniser avec la FFBB"}
         </button>
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}

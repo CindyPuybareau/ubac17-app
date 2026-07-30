@@ -6,6 +6,7 @@ export type UpcomingEvent = {
   event_type: string | null;
   location: string | null;
   start_time: string;
+  team_id: string | null;
 };
 
 export type RosterPlayer = {
@@ -29,7 +30,7 @@ export async function getNextEventForTeams(
 
   const { data } = await supabase
     .from("events")
-    .select("id, title, event_type, location, start_time")
+    .select("id, title, event_type, location, start_time, team_id")
     .in("team_id", teamIds)
     .gte("start_time", new Date().toISOString())
     .order("start_time", { ascending: true })
@@ -46,7 +47,7 @@ export async function getUpcomingEventsForTeam(
 ): Promise<UpcomingEvent[]> {
   const { data } = await supabase
     .from("events")
-    .select("id, title, event_type, location, start_time")
+    .select("id, title, event_type, location, start_time, team_id")
     .eq("team_id", teamId)
     .gte("start_time", new Date().toISOString())
     .order("start_time", { ascending: true })

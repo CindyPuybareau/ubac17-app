@@ -2,7 +2,9 @@ import { CalendarDays, MapPin } from "lucide-react";
 import RsvpButtons from "./rsvp-buttons";
 import OpponentDisplay from "./opponent-display";
 import NextMatchActions from "./next-match-actions";
+import MatchTasksPanel from "./match-tasks-panel";
 import type { UpcomingEvent } from "./family-data";
+import type { CarpoolOffer, EventTasksState } from "./event-tasks";
 
 function formatEventDate(iso: string) {
   return new Date(iso).toLocaleString("fr-FR", {
@@ -19,11 +21,17 @@ export default function NextConvocationCard({
   playerId,
   event,
   status,
+  roster,
+  tasks,
+  carpool,
 }: {
   playerName: string;
   playerId: string;
   event: UpcomingEvent;
   status: string;
+  roster: { id: string; name: string }[];
+  tasks: EventTasksState;
+  carpool: CarpoolOffer[];
 }) {
   return (
     <div className="rounded-2xl border border-ubac-yellow/40 bg-ubac-yellow/5 p-5 shadow-sm">
@@ -61,6 +69,14 @@ export default function NextConvocationCard({
       <NextMatchActions
         location={event.location}
         context={event.title ?? "match"}
+      />
+      <MatchTasksPanel
+        eventId={event.id}
+        roster={roster}
+        myPlayerIds={[playerId]}
+        canAssignAnyone={false}
+        initialTasks={tasks}
+        initialCarpool={carpool}
       />
     </div>
   );

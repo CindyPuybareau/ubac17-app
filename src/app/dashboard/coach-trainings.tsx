@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, MapPin, X } from "lucide-react";
+import { CalendarDays, Check, Clock, MapPin, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { AdminUpcomingEvent } from "./page";
 import type { TeamWithMembers } from "./team-manager";
@@ -11,11 +11,14 @@ type AttendanceStatus = "PENDING" | "PRESENT" | "ABSENT" | "LATE";
 
 const statusCycle: AttendanceStatus[] = ["PENDING", "PRESENT", "ABSENT", "LATE"];
 
-const statusStyles: Record<AttendanceStatus, { label: string; className: string }> = {
-  PENDING: { label: "En attente", className: "bg-zinc-100 text-zinc-500" },
-  PRESENT: { label: "🟢 Présent", className: "bg-green-100 text-green-700" },
-  ABSENT: { label: "🔴 Absent", className: "bg-red-100 text-red-700" },
-  LATE: { label: "🟠 Retard", className: "bg-amber-100 text-amber-700" },
+const statusStyles: Record<
+  AttendanceStatus,
+  { label: string; dotClassName: string | null; className: string }
+> = {
+  PENDING: { label: "En attente", dotClassName: null, className: "bg-zinc-100 text-zinc-500" },
+  PRESENT: { label: "Présent", dotClassName: "bg-green-500", className: "bg-green-100 text-green-700" },
+  ABSENT: { label: "Absent", dotClassName: "bg-red-500", className: "bg-red-100 text-red-700" },
+  LATE: { label: "Retard", dotClassName: "bg-amber-500", className: "bg-amber-100 text-amber-700" },
 };
 
 export default function CoachTrainings({
@@ -139,14 +142,17 @@ export default function CoachTrainings({
               )}
             </div>
             <div className="mt-3 flex flex-wrap gap-1.5">
-              <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
-                ✅ {e.rsvpCounts.present} présent{e.rsvpCounts.present > 1 ? "s" : ""}
+              <span className="flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
+                <Check className="h-3 w-3" />
+                {e.rsvpCounts.present} présent{e.rsvpCounts.present > 1 ? "s" : ""}
               </span>
-              <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
-                ❌ {e.rsvpCounts.absent} absent{e.rsvpCounts.absent > 1 ? "s" : ""}
+              <span className="flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                <X className="h-3 w-3" />
+                {e.rsvpCounts.absent} absent{e.rsvpCounts.absent > 1 ? "s" : ""}
               </span>
-              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-600">
-                ⏳ {e.rsvpCounts.pending} en attente
+              <span className="flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-600">
+                <Clock className="h-3 w-3" />
+                {e.rsvpCounts.pending} en attente
               </span>
             </div>
             <button
@@ -191,8 +197,11 @@ export default function CoachTrainings({
                           {[p.first_name, p.last_name].filter(Boolean).join(" ") || "Sans nom"}
                         </span>
                         <span
-                          className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${style.className}`}
+                          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${style.className}`}
                         >
+                          {style.dotClassName && (
+                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${style.dotClassName}`} />
+                          )}
                           {style.label}
                         </span>
                       </button>

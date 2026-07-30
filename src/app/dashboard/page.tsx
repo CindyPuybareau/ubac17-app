@@ -19,6 +19,13 @@ import {
   getRsvpCounts,
   getTeamRoster,
 } from "./family-data";
+import {
+  getCarpoolOffersByEventId,
+  getEventTasksByEventId,
+  getSeasonTaskTallyByTeamIds,
+  type EventTasksState,
+  type SeasonTaskTally,
+} from "./event-tasks";
 
 type PlayerRow = {
   id: string;
@@ -271,6 +278,45 @@ export default async function DashboardPage() {
         ? await getRsvpCounts(supabase, event.id, roster.length)
         : null;
       return { team, event, counts, roster };
+    })
+  );
+
+  // Match-day parent tasks (jerseys/snacks/carpool) for every event shown
+  // in the priority zone above.
+  const priorityEventIds = Array.from(
+    new Set(
+      [
+        ...convocationCards.map((c) => c.event.id),
+        ...coachCards
+          .map((c) => c.event?.id)
+          .filter((id): id is string => Boolean(id)),
+      ]
+    )
+  );
+
+  const [eventTasksByEventId, carpoolOffersByEventId] = await Promise.all([
+    getEventTasksByEventId(supabase, priorityEventIds),
+    getCarpoolOffersByEventId(supabase, priorityEventIds),
+  ]);
+  const emptyEventTasks: EventTasksState = { JERSEYS: null, SNACKS: null };
+
+  // Convocation cards need the convened-players list of their own event's
+  // team, for the task-assignment picker's context.
+  const convocationRosterByEventId: Record<
+    string,
+    { id: string; name: string }[]
+  > = {};
+  await Promise.all(
+    convocationCards.map(async (c) => {
+      if (!c.event.team_id) {
+        convocationRosterByEventId[c.event.id] = [];
+        return;
+      }
+      const roster = await getTeamRoster(supabase, c.event.team_id);
+      convocationRosterByEventId[c.event.id] = roster.map((p) => ({
+        id: p.id,
+        name: [p.first_name, p.last_name].filter(Boolean).join(" ") || "Sans nom",
+      }));
     })
   );
 
@@ -593,6 +639,7 @@ export default async function DashboardPage() {
   let coachTeamsWithRoster: TeamWithMembers[] = [];
   let coachEvents: AdminUpcomingEvent[] = [];
   let coachRsvpPlayers: { id: string; name: string; teamIds: string[] }[] = [];
+  let coachTaskTallyByTeamId: Record<string, SeasonTaskTally> = {};
   const coachContactPhoneByPlayerId: Record<string, string> = {};
   const coachContactEmailByPlayerId: Record<string, string> = {};
   const coachMemberDetailsByPlayerId: Record<string, MemberDetail> = {};
@@ -600,6 +647,10 @@ export default async function DashboardPage() {
 
   if (isCoach) {
     const coachedTeamIds = coachedTeams.map((t) => t.id);
+    coachTaskTallyByTeamId = await getSeasonTaskTallyByTeamIds(
+      supabase,
+      coachedTeamIds
+    );
     const [teamPlayersRes, teamCoachesRes, eventsRes] = await Promise.all([
       supabase
         .from("team_players")
@@ -976,6 +1027,7 @@ export default async function DashboardPage() {
           memberDetailsByPlayerId={coachMemberDetailsByPlayerId}
           rsvpPlayers={coachRsvpPlayers}
           rsvpStatusByKey={coachRsvpStatusByKey}
+          taskTallyByTeamId={coachTaskTallyByTeamId}
         />
       ),
     });
@@ -1034,6 +1086,9 @@ export default async function DashboardPage() {
                 playerId={player.id}
                 event={event}
                 status={status}
+                roster={convocationRosterByEventId[event.id] ?? []}
+                tasks={eventTasksByEventId[event.id] ?? emptyEventTasks}
+                carpool={carpoolOffersByEventId[event.id] ?? []}
               />
             ))}
             {coachCards.map(({ team, event, counts, roster }) => (
@@ -1045,6 +1100,12 @@ export default async function DashboardPage() {
                 event={event}
                 counts={counts}
                 roster={roster}
+                tasks={
+                  event
+                    ? (eventTasksByEventId[event.id] ?? emptyEventTasks)
+                    : emptyEventTasks
+                }
+                carpool={event ? (carpoolOffersByEventId[event.id] ?? []) : []}
               />
             ))}
           </div>

@@ -2,13 +2,14 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, FileText, Phone } from "lucide-react";
+import { CalendarDays, FileText, Phone, Shirt, Utensils } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import OpponentDisplay from "./opponent-display";
 import FfbbSync from "./ffbb-sync";
 import MemberDetailModal from "./member-detail-modal";
 import type { AdminUpcomingEvent, MemberDetail } from "./page";
 import type { RosterPlayer, TeamWithMembers } from "./team-manager";
+import type { SeasonTaskTally } from "./event-tasks";
 
 const CURRENT_SEASON = "2026-2027";
 const now = Date.now();
@@ -21,15 +22,15 @@ function fullName(p: Person) {
 
 function presenceBadge(status: string | null) {
   if (status === "PRESENT") {
-    return { label: "🟢 Présent", className: "bg-green-100 text-green-700" };
+    return { label: "Présent", dotClassName: "bg-green-500", className: "bg-green-100 text-green-700" };
   }
   if (status === "ABSENT") {
-    return { label: "🔴 Absent", className: "bg-red-100 text-red-700" };
+    return { label: "Absent", dotClassName: "bg-red-500", className: "bg-red-100 text-red-700" };
   }
   if (status) {
-    return { label: "🟠 En attente", className: "bg-amber-100 text-amber-700" };
+    return { label: "En attente", dotClassName: "bg-amber-500", className: "bg-amber-100 text-amber-700" };
   }
-  return { label: "—", className: "bg-zinc-100 text-zinc-400" };
+  return { label: "—", dotClassName: "bg-zinc-300", className: "bg-zinc-100 text-zinc-400" };
 }
 
 export default function TeamCard({
@@ -40,6 +41,7 @@ export default function TeamCard({
   createCotisationOnNewPlayer = true,
   showFfbbSync = false,
   memberDetailsByPlayerId,
+  taskTallyByPlayerId,
 }: {
   team: TeamWithMembers;
   allProfiles: Person[];
@@ -48,6 +50,7 @@ export default function TeamCard({
   createCotisationOnNewPlayer?: boolean;
   showFfbbSync?: boolean;
   memberDetailsByPlayerId?: Record<string, MemberDetail>;
+  taskTallyByPlayerId?: SeasonTaskTally;
 }) {
   const router = useRouter();
   const [detailPlayerId, setDetailPlayerId] = useState<string | null>(null);
@@ -252,8 +255,9 @@ export default function TeamCard({
                     </td>
                     <td className="px-2 py-2">
                       <span
-                        className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${presence.className}`}
+                        className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${presence.className}`}
                       >
+                        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${presence.dotClassName}`} />
                         {presence.label}
                       </span>
                     </td>
@@ -440,6 +444,54 @@ export default function TeamCard({
           )}
         </div>
       </div>
+
+      {taskTallyByPlayerId && (
+        <div className="mt-4 border-t border-zinc-100 pt-3">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            Tour de rôle — maillots &amp; goûter (saison)
+          </p>
+          <div className="overflow-x-auto rounded-xl border border-zinc-100">
+            <table className="w-full min-w-[380px] border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-zinc-100 bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                  <th className="px-2 py-2">Famille</th>
+                  <th className="px-2 py-2">
+                    <span className="flex items-center gap-1">
+                      <Shirt className="h-3.5 w-3.5 text-sky-600" />
+                      Maillots
+                    </span>
+                  </th>
+                  <th className="px-2 py-2">
+                    <span className="flex items-center gap-1">
+                      <Utensils className="h-3.5 w-3.5 text-amber-600" />
+                      Goûter
+                    </span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {team.players.map((p) => {
+                  const tally = taskTallyByPlayerId[p.id] ?? { jerseys: 0, snacks: 0 };
+                  return (
+                    <tr key={p.id} className="border-b border-zinc-50 last:border-0">
+                      <td className="truncate px-2 py-2 text-zinc-700">{fullName(p)}</td>
+                      <td className="px-2 py-2 font-semibold text-zinc-900">{tally.jerseys}</td>
+                      <td className="px-2 py-2 font-semibold text-zinc-900">{tally.snacks}</td>
+                    </tr>
+                  );
+                })}
+                {team.players.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="px-2 py-4 text-center text-sm text-zinc-400">
+                      Aucun joueur
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {showFfbbSync && (
         <div className="mt-3 border-t border-zinc-100 pt-3">

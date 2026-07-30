@@ -1,18 +1,28 @@
 import { CalendarDays, MapPin, Users } from "lucide-react";
 import OpponentDisplay from "./opponent-display";
 import NextMatchActions from "./next-match-actions";
+import MatchTasksPanel from "./match-tasks-panel";
 import type { RosterPlayer, RsvpCounts, UpcomingEvent } from "./family-data";
+import type { CarpoolOffer, EventTasksState } from "./event-tasks";
+
+function fullName(p: RosterPlayer) {
+  return [p.first_name, p.last_name].filter(Boolean).join(" ") || "Sans nom";
+}
 
 export default function CoachNextMatchCard({
   teamName,
   event,
   counts,
   roster,
+  tasks,
+  carpool,
 }: {
   teamName: string;
   event: UpcomingEvent | null;
   counts: RsvpCounts | null;
   roster: RosterPlayer[];
+  tasks: EventTasksState;
+  carpool: CarpoolOffer[];
 }) {
   return (
     <div className="rounded-2xl border border-ubac-blue/30 bg-ubac-blue/5 p-5 shadow-sm">
@@ -53,6 +63,14 @@ export default function CoachNextMatchCard({
           <NextMatchActions
             location={event.location}
             context={event.title ?? "match"}
+          />
+          <MatchTasksPanel
+            eventId={event.id}
+            roster={roster.map((p) => ({ id: p.id, name: fullName(p) }))}
+            myPlayerIds={[]}
+            canAssignAnyone
+            initialTasks={tasks}
+            initialCarpool={carpool}
           />
         </>
       ) : (
