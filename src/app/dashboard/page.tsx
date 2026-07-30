@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import SignOutButton from "./sign-out-button";
 import DashboardTabs, { type DashboardTab } from "./dashboard-tabs";
 import AdminView from "./admin-view";
-import type { TeamWithMembers } from "./team-manager";
+import type { RosterPlayer, TeamWithMembers } from "./team-manager";
 import CoachView from "./coach-view";
 import CalendarView from "./calendar-view";
 import NextConvocationCard from "./next-convocation-card";
@@ -116,6 +116,24 @@ export type AdminUpcomingEvent = {
     pending: number;
   };
 };
+
+// Plain (non-component) helper so the "now" read doesn't happen inside the
+// page component's own render body — matches the existing family-data.ts
+// pattern of computing dates in ordinary functions, not inline in JSX/page
+// logic.
+function findNextEventIdByTeamId(
+  eventRows: { id: string; start_time: string; teams: unknown }[]
+): Map<string, string> {
+  const nowTs = Date.now();
+  const map = new Map<string, string>();
+  eventRows.forEach((e) => {
+    const team = e.teams as unknown as { id: string } | null;
+    if (!team || map.has(team.id)) return;
+    if (new Date(e.start_time).getTime() < nowTs) return;
+    map.set(team.id, e.id);
+  });
+  return map;
+}
 
 function buildRsvpCounts(
   rsvpsByEvent: Map<
@@ -287,7 +305,9 @@ export default async function DashboardPage() {
         .from("profiles")
         .select("id, first_name, last_name, phone, email")
         .order("first_name"),
-      supabase.from("team_players").select("team_id, player_id"),
+      supabase
+        .from("team_players")
+        .select("team_id, player_id, jersey_number, position"),
       supabase.from("team_coaches").select("team_id, coach_id"),
       supabase
         .from("cotisations")
@@ -319,13 +339,44 @@ export default async function DashboardPage() {
       ])
     );
 
-    const rosterByTeam = new Map<string, Person[]>();
+    const rosterByTeam = new Map<string, RosterPlayer[]>();
     (teamPlayersRes.data ?? []).forEach((tp) => {
       const player = playersById.get(tp.player_id);
       if (!player) return;
       const list = rosterByTeam.get(tp.team_id) ?? [];
-      list.push(player);
+      list.push({
+        id: player.id,
+        first_name: player.first_name,
+        last_name: player.last_name,
+        jerseyNumber: tp.jersey_number,
+        position: tp.position,
+        nextEventStatus: null,
+      });
       rosterByTeam.set(tp.team_id, list);
+    });
+
+    // Each team's next upcoming event (upcomingEventsRes is ordered
+    // ascending) drives the roster table's "Statut Présence" badge, so a
+    // coach/Bureau can see at a glance who's confirmed for the next match
+    // without drilling into the calendar.
+    const adminNextEventIdByTeamId = findNextEventIdByTeamId(
+      upcomingEventsRes.data ?? []
+    );
+    const adminNextEventIds = Array.from(adminNextEventIdByTeamId.values());
+    const { data: adminNextEventRsvpRows } =
+      adminNextEventIds.length > 0
+        ? await supabase
+            .from("rsvps")
+            .select("player_id, status")
+            .in("event_id", adminNextEventIds)
+        : { data: [] as { player_id: string; status: string }[] };
+    const adminNextEventStatusByPlayerId = new Map(
+      (adminNextEventRsvpRows ?? []).map((r) => [r.player_id, r.status])
+    );
+    rosterByTeam.forEach((list) => {
+      list.forEach((p) => {
+        p.nextEventStatus = adminNextEventStatusByPlayerId.get(p.id) ?? null;
+      });
     });
 
     const coachesByTeam = new Map<string, Person[]>();
@@ -538,15 +589,18 @@ export default async function DashboardPage() {
 
   let coachTeamsWithRoster: TeamWithMembers[] = [];
   let coachEvents: AdminUpcomingEvent[] = [];
+  let coachRsvpPlayers: { id: string; name: string; teamIds: string[] }[] = [];
   const coachContactPhoneByPlayerId: Record<string, string> = {};
+  const coachContactEmailByPlayerId: Record<string, string> = {};
   const coachMemberDetailsByPlayerId: Record<string, MemberDetail> = {};
+  const coachRsvpStatusByKey: Record<string, string> = {};
 
   if (isCoach) {
     const coachedTeamIds = coachedTeams.map((t) => t.id);
     const [teamPlayersRes, teamCoachesRes, eventsRes] = await Promise.all([
       supabase
         .from("team_players")
-        .select("team_id, player_id")
+        .select("team_id, player_id, jersey_number, position")
         .in("team_id", coachedTeamIds),
       supabase
         .from("team_coaches")
@@ -598,13 +652,39 @@ export default async function DashboardPage() {
       (coachProfilesRes.data ?? []).map((p) => [p.id, p as Person])
     );
 
-    const rosterByTeam = new Map<string, Person[]>();
+    const rosterByTeam = new Map<string, RosterPlayer[]>();
     (teamPlayersRes.data ?? []).forEach((tp) => {
       const player = playersById.get(tp.player_id);
       if (!player) return;
       const list = rosterByTeam.get(tp.team_id) ?? [];
-      list.push(player);
+      list.push({
+        id: player.id,
+        first_name: player.first_name,
+        last_name: player.last_name,
+        jerseyNumber: tp.jersey_number,
+        position: tp.position,
+        nextEventStatus: null,
+      });
       rosterByTeam.set(tp.team_id, list);
+    });
+
+    // Same "next event per team" presence badge as the Bureau's roster.
+    const coachNextEventIdByTeamId = findNextEventIdByTeamId(eventsRes.data ?? []);
+    const coachNextEventIds = Array.from(coachNextEventIdByTeamId.values());
+    const { data: coachNextEventRsvpRows } =
+      coachNextEventIds.length > 0
+        ? await supabase
+            .from("rsvps")
+            .select("player_id, status")
+            .in("event_id", coachNextEventIds)
+        : { data: [] as { player_id: string; status: string }[] };
+    const coachNextEventStatusByPlayerId = new Map(
+      (coachNextEventRsvpRows ?? []).map((r) => [r.player_id, r.status])
+    );
+    rosterByTeam.forEach((list) => {
+      list.forEach((p) => {
+        p.nextEventStatus = coachNextEventStatusByPlayerId.get(p.id) ?? null;
+      });
     });
 
     const coachesByTeam = new Map<string, Person[]>();
@@ -700,20 +780,54 @@ export default async function DashboardPage() {
     );
     const { data: parentProfiles } =
       parentIds.length > 0
-        ? await supabase.from("profiles").select("id, phone").in("id", parentIds)
-        : { data: [] as { id: string; phone: string | null }[] };
+        ? await supabase.from("profiles").select("id, phone, email").in("id", parentIds)
+        : { data: [] as { id: string; phone: string | null; email: string | null }[] };
     const phoneByParentId = new Map(
       (parentProfiles ?? []).map((p) => [p.id, p.phone])
+    );
+    const emailByParentId = new Map(
+      (parentProfiles ?? []).map((p) => [p.id, p.email])
     );
     (parentPlayerRes.data ?? []).forEach((pp) => {
       const phone = phoneByParentId.get(pp.parent_id);
       if (phone) coachContactPhoneByPlayerId[pp.player_id] = phone;
+      const email = emailByParentId.get(pp.parent_id);
+      if (email) coachContactEmailByPlayerId[pp.player_id] = email;
     });
 
     const rsvpsByEvent = await fetchRsvpsByEvent(
       supabase,
       (eventsRes.data ?? []).map((e) => e.id)
     );
+
+    // Full per-player attendance map (not just aggregate counts), for the
+    // Calendrier convocation list and the Entraînements "appel express".
+    const coachEventIds = (eventsRes.data ?? []).map((e) => e.id);
+    const { data: coachRsvpRows } =
+      coachEventIds.length > 0
+        ? await supabase
+            .from("rsvps")
+            .select("event_id, player_id, status")
+            .in("event_id", coachEventIds)
+        : { data: [] as { event_id: string; player_id: string; status: string }[] };
+    (coachRsvpRows ?? []).forEach((r) => {
+      coachRsvpStatusByKey[`${r.event_id}:${r.player_id}`] = r.status;
+    });
+
+    const coachRosterPlayerIds = Array.from(
+      new Set((teamPlayersRes.data ?? []).map((tp) => tp.player_id))
+    );
+    coachRsvpPlayers = coachRosterPlayerIds
+      .map((playerId) => {
+        const player = playersById.get(playerId);
+        if (!player) return null;
+        return {
+          id: playerId,
+          name: [player.first_name, player.last_name].filter(Boolean).join(" ") || "Joueur",
+          teamIds: (coachTeamRefsByPlayerId.get(playerId) ?? []).map((t) => t.id),
+        };
+      })
+      .filter((p): p is { id: string; name: string; teamIds: string[] } => Boolean(p));
 
     coachEvents = (eventsRes.data ?? []).map((e) => {
       const team = e.teams as unknown as {
@@ -826,7 +940,10 @@ export default async function DashboardPage() {
           teams={coachTeamsWithRoster}
           events={coachEvents}
           contactPhoneByPlayerId={coachContactPhoneByPlayerId}
+          contactEmailByPlayerId={coachContactEmailByPlayerId}
           memberDetailsByPlayerId={coachMemberDetailsByPlayerId}
+          rsvpPlayers={coachRsvpPlayers}
+          rsvpStatusByKey={coachRsvpStatusByKey}
         />
       ),
     });

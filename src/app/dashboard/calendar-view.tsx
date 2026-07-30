@@ -1,12 +1,36 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, CalendarDays, MapPin } from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  ChevronLeft,
+  ChevronRight,
+  CalendarDays,
+  Mail,
+  MapPin,
+  Pencil,
+  Trash2,
+  X,
+} from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 import { parseMatchTitle } from "@/lib/match-display";
 import OpponentDisplay from "./opponent-display";
 import CreateEventForm from "./create-event-form";
 import RsvpButtons from "./rsvp-buttons";
 import type { AdminUpcomingEvent } from "./page";
+
+const eventTypeOptions: { value: string; label: string }[] = [
+  { value: "MATCH", label: "Match" },
+  { value: "TRAINING", label: "Entraînement" },
+  { value: "OTHER", label: "Événement club" },
+  { value: "TOURNAMENT", label: "Tournoi" },
+];
+
+function toDatetimeLocal(iso: string) {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 const typeStyles: Record<
   string,
@@ -103,6 +127,7 @@ export default function CalendarView({
   events,
   createTeams,
   rsvp,
+  contactEmailByPlayerId,
 }: {
   events: AdminUpcomingEvent[];
   createTeams?: CalendarTeamRef[];
@@ -110,8 +135,83 @@ export default function CalendarView({
     players: CalendarRsvpPlayer[];
     statusByKey: Record<string, string>;
   };
+  contactEmailByPlayerId?: Record<string, string>;
 }) {
+  const router = useRouter();
   const [selectedDate, setSelectedDate] = useState<Date>(today);
+
+  const canManage = Boolean(createTeams && createTeams.length > 0);
+
+  const [editingEvent, setEditingEvent] = useState<AdminUpcomingEvent | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editType, setEditType] = useState("MATCH");
+  const [editLocation, setEditLocation] = useState("");
+  const [editStartTime, setEditStartTime] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  function openEdit(event: AdminUpcomingEvent) {
+    setEditingEvent(event);
+    setEditTitle(event.title ?? "");
+    setEditType(event.event_type ?? "MATCH");
+    setEditLocation(event.location ?? "");
+    setEditStartTime(toDatetimeLocal(event.start_time));
+    setEditError(null);
+  }
+
+  async function confirmEdit() {
+    if (!editingEvent) return;
+    setEditSaving(true);
+    setEditError(null);
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("events")
+      .update({
+        title: editTitle || null,
+        event_type: editType,
+        location: editLocation || null,
+        start_time: new Date(editStartTime).toISOString(),
+      })
+      .eq("id", editingEvent.id);
+    setEditSaving(false);
+    if (error) {
+      setEditError(error.message);
+      return;
+    }
+    setEditingEvent(null);
+    router.refresh();
+  }
+
+  async function handleDeleteEvent(eventId: string) {
+    const ok = window.confirm(
+      "Supprimer définitivement cet événement ? Cette action est irréversible."
+    );
+    if (!ok) return;
+    const supabase = createClient();
+    await supabase.from("events").delete().eq("id", eventId);
+    router.refresh();
+  }
+
+  function relanceMailto(event: AdminUpcomingEvent) {
+    if (!rsvp || !contactEmailByPlayerId || !event.teamId) return null;
+    const emails = rsvp.players
+      .filter((p) => event.teamId && p.teamIds.includes(event.teamId))
+      .map((p) => contactEmailByPlayerId[p.id])
+      .filter((e): e is string => Boolean(e));
+    if (emails.length === 0) return null;
+    const when = new Date(event.start_time).toLocaleString("fr-FR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    return `mailto:?bcc=${encodeURIComponent(emails.join(","))}&subject=${encodeURIComponent(
+      `UBAC 17 - Convocation ${event.teamName}`
+    )}&body=${encodeURIComponent(
+      `Bonjour,\n\nMerci de confirmer votre présence pour : ${event.title ?? styleFor(event.event_type).label}, le ${when}${event.location ? ` (${event.location})` : ""}.\n\nSportivement,\nLe coach`
+    )}`;
+  }
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, AdminUpcomingEvent[]>();
@@ -280,28 +380,59 @@ export default function CalendarView({
                 )
               : [];
 
+            const mailto = relanceMailto(event);
+
             return (
               <div
                 key={event.id}
                 className={`flex flex-col gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm border-l-4 ${style.border}`}
               >
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                    {event.teamName}
-                  </span>
-                  {event.event_type === "MATCH" ? (
-                    <OpponentDisplay title={event.title} size="sm" />
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${style.badge}`}
-                      >
-                        {style.label}
-                      </span>
-                      <span className="font-semibold text-zinc-900">
-                        {event.title ?? style.label}
-                      </span>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                      {event.teamName}
                     </span>
+                    {event.event_type === "MATCH" ? (
+                      <OpponentDisplay title={event.title} size="sm" />
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${style.badge}`}
+                        >
+                          {style.label}
+                        </span>
+                        <span className="font-semibold text-zinc-900">
+                          {event.title ?? style.label}
+                        </span>
+                      </span>
+                    )}
+                  </div>
+                  {canManage && (
+                    <div className="flex shrink-0 items-center gap-1">
+                      {mailto && (
+                        <a
+                          href={mailto}
+                          title="Relancer les convoqués"
+                          className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+                        >
+                          <Mail className="h-4 w-4" />
+                        </a>
+                      )}
+                      <button
+                        onClick={() => openEdit(event)}
+                        title="Modifier"
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteEvent(event.id)}
+                        title="Supprimer"
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-red-400 hover:bg-red-50 hover:text-red-600"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   )}
                 </div>
 
@@ -347,23 +478,35 @@ export default function CalendarView({
 
                 {respondingPlayers.length > 0 && (
                   <div className="flex flex-col gap-2 border-t border-zinc-100 pt-2">
-                    {respondingPlayers.map((p) => (
-                      <div key={p.id} className="flex items-center gap-2">
-                        {respondingPlayers.length > 1 && (
-                          <span className="text-xs font-medium text-zinc-500">
-                            {p.name}
+                    {respondingPlayers.map((p) => {
+                      const playerStatus =
+                        rsvp?.statusByKey[`${event.id}:${p.id}`] ?? "PENDING";
+                      const badge =
+                        playerStatus === "PRESENT"
+                          ? { label: "🟢 Présent", className: "bg-green-100 text-green-700" }
+                          : playerStatus === "ABSENT"
+                            ? { label: "🔴 Absent", className: "bg-red-100 text-red-700" }
+                            : { label: "🟠 En attente", className: "bg-amber-100 text-amber-700" };
+                      return (
+                        <div key={p.id} className="flex flex-wrap items-center gap-2">
+                          {respondingPlayers.length > 1 && (
+                            <span className="min-w-0 truncate text-xs font-medium text-zinc-500">
+                              {p.name}
+                            </span>
+                          )}
+                          <span
+                            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${badge.className}`}
+                          >
+                            {badge.label}
                           </span>
-                        )}
-                        <RsvpButtons
-                          eventId={event.id}
-                          playerId={p.id}
-                          currentStatus={
-                            rsvp?.statusByKey[`${event.id}:${p.id}`] ??
-                            "PENDING"
-                          }
-                        />
-                      </div>
-                    ))}
+                          <RsvpButtons
+                            eventId={event.id}
+                            playerId={p.id}
+                            currentStatus={playerStatus}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -371,6 +514,73 @@ export default function CalendarView({
           })
         )}
       </div>
+
+      {editingEvent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="font-semibold text-zinc-900">Modifier l&apos;événement</h3>
+              <button
+                onClick={() => setEditingEvent(null)}
+                className="rounded-full p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex flex-col gap-2">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-600">Titre</label>
+                <input
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-600">Type</label>
+                <select
+                  value={editType}
+                  onChange={(e) => setEditType(e.target.value)}
+                  className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+                >
+                  {eventTypeOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-600">Lieu</label>
+                <input
+                  value={editLocation}
+                  onChange={(e) => setEditLocation(e.target.value)}
+                  className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-600">
+                  Date &amp; heure
+                </label>
+                <input
+                  type="datetime-local"
+                  value={editStartTime}
+                  onChange={(e) => setEditStartTime(e.target.value)}
+                  className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+                />
+              </div>
+              {editError && <p className="text-xs text-red-600">{editError}</p>}
+              <button
+                onClick={confirmEdit}
+                disabled={editSaving}
+                className="mt-1 rounded-full bg-ubac-yellow px-3 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+              >
+                {editSaving ? "Enregistrement..." : "Enregistrer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

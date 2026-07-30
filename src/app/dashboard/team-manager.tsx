@@ -9,12 +9,20 @@ import type { AdminUpcomingEvent } from "./page";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 
+export type RosterPlayer = Person & {
+  jerseyNumber: number | null;
+  position: string | null;
+  // RSVP status for this team's next upcoming event, or null if there
+  // isn't one — drives the "Statut Présence" badge in the roster table.
+  nextEventStatus: string | null;
+};
+
 export type TeamWithMembers = {
   id: string;
   name: string | null;
   category: string | null;
   ffbb_url: string | null;
-  players: Person[];
+  players: RosterPlayer[];
   coaches: Person[];
 };
 
@@ -135,6 +143,7 @@ export default function TeamManager({
             allProfiles={allProfiles}
             eventsByTeamId={eventsByTeamId}
             contactPhoneByPlayerId={contactPhoneByPlayerId}
+            showFfbbSync
           />
         ))}
         {teams.length === 0 && (

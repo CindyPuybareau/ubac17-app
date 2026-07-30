@@ -8,7 +8,7 @@ import OpponentDisplay from "./opponent-display";
 import FfbbSync from "./ffbb-sync";
 import MemberDetailModal from "./member-detail-modal";
 import type { AdminUpcomingEvent, MemberDetail } from "./page";
-import type { TeamWithMembers } from "./team-manager";
+import type { RosterPlayer, TeamWithMembers } from "./team-manager";
 
 const CURRENT_SEASON = "2026-2027";
 const now = Date.now();
@@ -17,6 +17,19 @@ type Person = { id: string; first_name: string | null; last_name: string | null 
 
 function fullName(p: Person) {
   return [p.first_name, p.last_name].filter(Boolean).join(" ") || "Sans nom";
+}
+
+function presenceBadge(status: string | null) {
+  if (status === "PRESENT") {
+    return { label: "🟢 Présent", className: "bg-green-100 text-green-700" };
+  }
+  if (status === "ABSENT") {
+    return { label: "🔴 Absent", className: "bg-red-100 text-red-700" };
+  }
+  if (status) {
+    return { label: "🟠 En attente", className: "bg-amber-100 text-amber-700" };
+  }
+  return { label: "—", className: "bg-zinc-100 text-zinc-400" };
 }
 
 export default function TeamCard({
@@ -124,6 +137,20 @@ export default function TeamCard({
     router.refresh();
   }
 
+  async function updateRosterField(
+    playerId: string,
+    field: "jersey_number" | "position",
+    value: number | string | null
+  ) {
+    const supabase = createClient();
+    await supabase
+      .from("team_players")
+      .update({ [field]: value })
+      .eq("team_id", team.id)
+      .eq("player_id", playerId);
+    router.refresh();
+  }
+
   async function addCoach(coachId: string) {
     if (!coachId) return;
     const supabase = createClient();
@@ -157,116 +184,185 @@ export default function TeamCard({
         {team.category ? ` · ${team.category}` : ""}
       </h3>
 
-      <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-            Joueurs
-          </p>
-          <ul className="mt-1 flex flex-col gap-1">
-            {team.players.map((p) => {
-              const phone = contactPhoneByPlayerId[p.id];
-              return (
-                <li
-                  key={p.id}
-                  className="flex items-center justify-between gap-2 rounded-lg bg-zinc-50 px-2 py-1 text-sm"
-                >
-                  <span className="flex min-w-0 flex-col">
-                    <span className="truncate">{fullName(p)}</span>
-                    {phone && (
-                      <span className="flex items-center gap-1 text-xs text-zinc-500">
-                        <Phone className="h-3 w-3 shrink-0" />
-                        {phone}
-                      </span>
-                    )}
-                  </span>
-                  <span className="flex shrink-0 items-center gap-2">
-                    {memberDetailsByPlayerId?.[p.id] && (
-                      <button
-                        onClick={() => setDetailPlayerId(p.id)}
-                        title="Voir la fiche complète"
-                        className="rounded-full p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+      <div className="mt-3">
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          Joueurs
+        </p>
+        <div className="w-full overflow-x-auto rounded-xl border border-zinc-100">
+          <table className="w-full min-w-[650px] table-fixed border-collapse text-sm">
+            <colgroup>
+              <col />
+              <col />
+              <col className="w-20" />
+              <col className="w-28" />
+              <col className="w-28" />
+              <col className="w-28" />
+            </colgroup>
+            <thead>
+              <tr className="border-b border-zinc-100 bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                <th className="px-2 py-2">Nom</th>
+                <th className="px-2 py-2">Prénom</th>
+                <th className="px-2 py-2">N° Maillot</th>
+                <th className="px-2 py-2">Poste</th>
+                <th className="px-2 py-2">Présence</th>
+                <th className="px-2 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {team.players.map((p: RosterPlayer) => {
+                const phone = contactPhoneByPlayerId[p.id];
+                const presence = presenceBadge(p.nextEventStatus);
+                return (
+                  <tr key={p.id} className="border-b border-zinc-50 last:border-0">
+                    <td className="truncate px-2 py-2 font-medium text-zinc-900">
+                      {p.last_name ?? "—"}
+                    </td>
+                    <td className="truncate px-2 py-2 text-zinc-700">
+                      {p.first_name ?? "—"}
+                    </td>
+                    <td className="px-2 py-2">
+                      <input
+                        type="number"
+                        defaultValue={p.jerseyNumber ?? ""}
+                        onBlur={(e) => {
+                          const val = e.target.value.trim();
+                          updateRosterField(
+                            p.id,
+                            "jersey_number",
+                            val ? Number(val) : null
+                          );
+                        }}
+                        placeholder="—"
+                        className="w-14 rounded-lg border border-zinc-200 px-1.5 py-1 text-sm"
+                      />
+                    </td>
+                    <td className="px-2 py-2">
+                      <input
+                        defaultValue={p.position ?? ""}
+                        onBlur={(e) =>
+                          updateRosterField(
+                            p.id,
+                            "position",
+                            e.target.value.trim() || null
+                          )
+                        }
+                        placeholder="Poste"
+                        className="w-full rounded-lg border border-zinc-200 px-1.5 py-1 text-sm"
+                      />
+                    </td>
+                    <td className="px-2 py-2">
+                      <span
+                        className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${presence.className}`}
                       >
-                        <FileText className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => removePlayer(p.id)}
-                      className="text-xs font-medium text-red-600 hover:underline"
-                    >
-                      Retirer
-                    </button>
-                  </span>
-                </li>
-              );
-            })}
-            {team.players.length === 0 && (
-              <li className="text-sm text-zinc-400">Aucun joueur</li>
-            )}
-          </ul>
-          {openPlayerForm ? (
-            <form
-              onSubmit={createPlayer}
-              className="mt-2 flex flex-col gap-2 rounded-lg bg-zinc-50 p-3"
-            >
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  required
-                  placeholder="Prénom"
-                  value={newPlayerFirstName}
-                  onChange={(e) => setNewPlayerFirstName(e.target.value)}
-                  className="rounded-lg border border-zinc-200 px-2 py-1.5 text-sm"
-                />
-                <input
-                  required
-                  placeholder="Nom"
-                  value={newPlayerLastName}
-                  onChange={(e) => setNewPlayerLastName(e.target.value)}
-                  className="rounded-lg border border-zinc-200 px-2 py-1.5 text-sm"
-                />
-              </div>
-              <input
-                type="date"
-                value={newPlayerBirthDate}
-                onChange={(e) => setNewPlayerBirthDate(e.target.value)}
-                className="rounded-lg border border-zinc-200 px-2 py-1.5 text-sm"
-              />
-              <input
-                type="email"
-                placeholder="Email du parent (optionnel)"
-                value={newPlayerParentEmail}
-                onChange={(e) => setNewPlayerParentEmail(e.target.value)}
-                className="rounded-lg border border-zinc-200 px-2 py-1.5 text-sm"
-              />
-              {newPlayerError && (
-                <p className="text-xs text-red-600">{newPlayerError}</p>
+                        {presence.label}
+                      </span>
+                    </td>
+                    <td className="px-2 py-2">
+                      <div className="flex items-center gap-1">
+                        {phone && (
+                          <a
+                            href={`tel:${phone}`}
+                            title="Appeler le parent"
+                            className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+                          >
+                            <Phone className="h-3.5 w-3.5" />
+                          </a>
+                        )}
+                        {memberDetailsByPlayerId?.[p.id] && (
+                          <button
+                            onClick={() => setDetailPlayerId(p.id)}
+                            title="Voir la fiche complète"
+                            className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+                          >
+                            <FileText className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => removePlayer(p.id)}
+                          className="shrink-0 text-xs font-medium text-red-600 hover:underline"
+                        >
+                          Retirer
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {team.players.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-2 py-4 text-center text-sm text-zinc-400">
+                    Aucun joueur
+                  </td>
+                </tr>
               )}
-              <div className="flex gap-2">
-                <button
-                  type="submit"
-                  disabled={newPlayerLoading}
-                  className="rounded-full bg-ubac-yellow px-3 py-1.5 text-xs font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
-                >
-                  {newPlayerLoading ? "Ajout..." : "Ajouter"}
-                </button>
-                <button
-                  type="button"
-                  onClick={closePlayerForm}
-                  className="rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-white"
-                >
-                  Annuler
-                </button>
-              </div>
-            </form>
-          ) : (
-            <button
-              onClick={() => setOpenPlayerForm(true)}
-              className="mt-2 w-full rounded-lg border border-dashed border-zinc-300 px-2 py-1.5 text-sm font-medium text-zinc-600 hover:border-ubac-yellow hover:text-ubac-yellow-dark"
-            >
-              + Ajouter un joueur
-            </button>
-          )}
+            </tbody>
+          </table>
         </div>
+        {openPlayerForm ? (
+          <form
+            onSubmit={createPlayer}
+            className="mt-2 flex flex-col gap-2 rounded-lg bg-zinc-50 p-3"
+          >
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                required
+                placeholder="Prénom"
+                value={newPlayerFirstName}
+                onChange={(e) => setNewPlayerFirstName(e.target.value)}
+                className="rounded-lg border border-zinc-200 px-2 py-1.5 text-sm"
+              />
+              <input
+                required
+                placeholder="Nom"
+                value={newPlayerLastName}
+                onChange={(e) => setNewPlayerLastName(e.target.value)}
+                className="rounded-lg border border-zinc-200 px-2 py-1.5 text-sm"
+              />
+            </div>
+            <input
+              type="date"
+              value={newPlayerBirthDate}
+              onChange={(e) => setNewPlayerBirthDate(e.target.value)}
+              className="rounded-lg border border-zinc-200 px-2 py-1.5 text-sm"
+            />
+            <input
+              type="email"
+              placeholder="Email du parent (optionnel)"
+              value={newPlayerParentEmail}
+              onChange={(e) => setNewPlayerParentEmail(e.target.value)}
+              className="rounded-lg border border-zinc-200 px-2 py-1.5 text-sm"
+            />
+            {newPlayerError && (
+              <p className="text-xs text-red-600">{newPlayerError}</p>
+            )}
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={newPlayerLoading}
+                className="rounded-full bg-ubac-yellow px-3 py-1.5 text-xs font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+              >
+                {newPlayerLoading ? "Ajout..." : "Ajouter"}
+              </button>
+              <button
+                type="button"
+                onClick={closePlayerForm}
+                className="rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-white"
+              >
+                Annuler
+              </button>
+            </div>
+          </form>
+        ) : (
+          <button
+            onClick={() => setOpenPlayerForm(true)}
+            className="mt-2 w-full rounded-lg border border-dashed border-zinc-300 px-2 py-1.5 text-sm font-medium text-zinc-600 hover:border-ubac-yellow hover:text-ubac-yellow-dark"
+          >
+            + Ajouter un joueur
+          </button>
+        )}
+      </div>
 
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
             Coachs
@@ -310,39 +406,39 @@ export default function TeamCard({
             </select>
           )}
         </div>
-      </div>
 
-      <div className="mt-3 border-t border-zinc-100 pt-3">
-        <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-          <CalendarDays className="h-3.5 w-3.5" />
-          Prochains matchs
-        </p>
-        {teamEvents.length > 0 ? (
-          <ul className="flex flex-col gap-1.5">
-            {teamEvents.map((e) => (
-              <li
-                key={e.id}
-                className="flex items-center justify-between gap-2 rounded-lg bg-zinc-50 px-2 py-1.5"
-              >
-                {e.event_type === "MATCH" ? (
-                  <OpponentDisplay title={e.title} size="sm" />
-                ) : (
-                  <span className="truncate text-sm font-medium text-zinc-700">
-                    {e.title ?? "Événement"}
+        <div>
+          <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            <CalendarDays className="h-3.5 w-3.5" />
+            Prochains matchs
+          </p>
+          {teamEvents.length > 0 ? (
+            <ul className="flex flex-col gap-1.5">
+              {teamEvents.map((e) => (
+                <li
+                  key={e.id}
+                  className="flex items-center justify-between gap-2 rounded-lg bg-zinc-50 px-2 py-1.5"
+                >
+                  {e.event_type === "MATCH" ? (
+                    <OpponentDisplay title={e.title} size="sm" />
+                  ) : (
+                    <span className="truncate text-sm font-medium text-zinc-700">
+                      {e.title ?? "Événement"}
+                    </span>
+                  )}
+                  <span className="shrink-0 text-xs text-zinc-500">
+                    {new Date(e.start_time).toLocaleDateString("fr-FR", {
+                      day: "numeric",
+                      month: "short",
+                    })}
                   </span>
-                )}
-                <span className="shrink-0 text-xs text-zinc-500">
-                  {new Date(e.start_time).toLocaleDateString("fr-FR", {
-                    day: "numeric",
-                    month: "short",
-                  })}
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-zinc-400">Aucun match à venir</p>
-        )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-zinc-400">Aucun match à venir</p>
+          )}
+        </div>
       </div>
 
       {showFfbbSync && (
