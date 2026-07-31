@@ -1151,8 +1151,9 @@ export default async function DashboardPage() {
       </header>
 
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 pt-6 pb-24 sm:px-6 sm:py-10">
-        <h1 className="text-2xl font-bold text-slate-800">
-          Bienvenue, {profile?.first_name ?? user.email}
+        <h1 className="text-2xl font-bold text-zinc-900">
+          <span className="font-medium text-zinc-500">Bienvenue</span>{" "}
+          <span className="text-navy">{profile?.first_name ?? user.email}</span>
         </h1>
 
 
