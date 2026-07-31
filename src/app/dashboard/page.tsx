@@ -1130,9 +1130,7 @@ export default async function DashboardPage() {
             <Image src="/logo.png" alt="UBAC 17" width={32} height={32} className="h-8 w-8 object-contain" priority />
             <span className="text-sm font-semibold text-white">UBAC 17</span>
           </div>
-          <div className="hidden sm:block">
-            <SignOutButton />
-          </div>
+          <SignOutButton />
         </div>
       </header>
 
@@ -1144,9 +1142,7 @@ export default async function DashboardPage() {
               {profile?.first_name ?? user.email}
             </h1>
           </div>
-          <div className="sm:hidden">
-            <SignOutButton />
-          </div>
+          <SignOutButton variant="inline" />
         </div>
 
 
