@@ -1230,28 +1230,10 @@ export default async function DashboardPage() {
       <DashboardTabs tabs={tabs} />
 
       {tabs.length === 0 && (
-        <>
-          <p className="text-sm text-zinc-500">
-            Aucun espace n&apos;est encore rattaché à ton compte. Contacte le
-            Bureau pour qu&apos;il associe ton enfant à ton adresse email.
-          </p>
-          {/* TEMPORARY DEBUG — remove once the empty-tabs report is diagnosed */}
-          <pre className="mt-2 whitespace-pre-wrap rounded-lg bg-zinc-100 p-3 text-xs text-zinc-600">
-            {JSON.stringify(
-              {
-                userId: user.id,
-                userEmail: user.email,
-                isAdmin,
-                isCoach,
-                playersLength: players.length,
-                playerLinksError: playerLinksResult.error?.message ?? null,
-                playerLinksRaw: playerLinksResult.data,
-              },
-              null,
-              2
-            )}
-          </pre>
-        </>
+        <p className="text-sm text-zinc-500">
+          Aucun espace n&apos;est encore rattaché à ton compte. Contacte le
+          Bureau pour qu&apos;il associe ton enfant à ton adresse email.
+        </p>
       )}
       </div>
     </div>
