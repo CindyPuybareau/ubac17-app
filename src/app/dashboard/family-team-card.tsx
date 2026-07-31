@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Clock, ExternalLink, MessageCircle, Users } from "lucide-react";
 import WhatsAppButton from "./whatsapp-button";
 import WhatsAppBulkModal from "./whatsapp-bulk-modal";
+import WhatsAppGroupButton from "./whatsapp-group-button";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 type CoachContact = Person & { phone: string | null };
@@ -103,6 +104,14 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
             )}
           </ul>
         </div>
+      </div>
+
+      <div className="mt-3">
+        <WhatsAppGroupButton
+          teamName={card.teamName ?? "l'équipe"}
+          defaultMessage={`Bonjour à tous, je suis un parent de l'équipe ${card.teamName ?? ""}.`}
+          className="flex items-center gap-1.5 rounded-full border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
+        />
       </div>
 
       {card.ffbbUrl && (

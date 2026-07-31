@@ -17,6 +17,7 @@ import FfbbSync from "./ffbb-sync";
 import MemberDetailModal from "./member-detail-modal";
 import WhatsAppButton from "./whatsapp-button";
 import WhatsAppBulkModal from "./whatsapp-bulk-modal";
+import WhatsAppGroupButton from "./whatsapp-group-button";
 import type { AdminUpcomingEvent, MemberDetail } from "./page";
 import type { RosterPlayer, TeamWithMembers } from "./team-manager";
 import type { SeasonTaskTally } from "./event-tasks";
@@ -500,13 +501,19 @@ export default function TeamCard({
             {groupLinkSaving ? "..." : "Enregistrer"}
           </button>
         </div>
-        <button
-          onClick={() => setContactTeamOpen(true)}
-          className="mt-2 flex items-center gap-1.5 rounded-full border border-emerald-200 px-3 py-1.5 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
-        >
-          <MessageCircle className="h-4 w-4" />
-          Contacter l&apos;équipe sur WhatsApp
-        </button>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button
+            onClick={() => setContactTeamOpen(true)}
+            className="flex items-center gap-1.5 rounded-full border border-emerald-200 px-3 py-1.5 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
+          >
+            <MessageCircle className="h-4 w-4" />
+            Contacter l&apos;équipe sur WhatsApp
+          </button>
+          <WhatsAppGroupButton
+            teamName={team.name ?? "l'équipe"}
+            defaultMessage={`Bonjour à tous, ici le coach de ${team.name ?? "l'équipe"}.`}
+          />
+        </div>
       </div>
 
       {taskTallyByPlayerId && (

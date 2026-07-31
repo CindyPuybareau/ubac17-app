@@ -31,3 +31,13 @@ export function buildWhatsAppLink(
   if (!formatted) return null;
   return `https://wa.me/${formatted}?text=${encodeURIComponent(message)}`;
 }
+
+// A WhatsApp group invite link (chat.whatsapp.com/...) can't carry a
+// pre-filled message — that query param only exists on the single-contact
+// wa.me/<phone> form. Omitting the phone number instead opens WhatsApp's
+// own forward/share picker with the text ready to go, letting the user
+// pick the target group themselves and hit send with one tap — the
+// closest honest equivalent to "prefilled 1-click send to a group".
+export function buildWhatsAppForwardLink(message: string): string {
+  return `https://wa.me/?text=${encodeURIComponent(message)}`;
+}
