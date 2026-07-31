@@ -11,7 +11,11 @@
 --   - "z.Sénior" (archived-looking team) skipped
 --   - U07 and Friday's "À définir" slot skipped (no schedule data given)
 with season as (
-  select generate_series('2026-09-01'::date, '2027-06-30'::date, interval '1 day') as day
+  -- generate_series() over date bounds actually returns timestamptz
+  -- (UTC-anchored), not a plain date — casting back to ::date here avoids
+  -- start_time below silently doing UTC arithmetic instead of Europe/Paris
+  -- local time (previously caused a 4h offset in stored training times).
+  select generate_series('2026-09-01'::date, '2027-06-30'::date, interval '1 day')::date as day
 ),
 slots(team_name, weekday, start_time, salle) as (
   values
