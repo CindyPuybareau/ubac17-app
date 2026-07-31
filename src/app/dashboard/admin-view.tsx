@@ -13,6 +13,7 @@ import type {
   AdminCotisation,
   AdminMember,
   AdminUpcomingEvent,
+  ProfileDirectoryEntry,
 } from "./page";
 import type { BirthdaySource } from "./birthdays";
 
@@ -28,6 +29,7 @@ export default function AdminView({
   contactPhoneByPlayerId,
   members,
   birthdayMembers,
+  profileDirectory,
 }: {
   clubFunction?: string | null;
   teams: TeamWithMembers[];
@@ -38,6 +40,7 @@ export default function AdminView({
   contactPhoneByPlayerId: Record<string, string>;
   members: AdminMember[];
   birthdayMembers: BirthdaySource[];
+  profileDirectory: ProfileDirectoryEntry[];
 }) {
   const teamRefs = teams.map((t) => ({
     id: t.id,
@@ -70,7 +73,13 @@ export default function AdminView({
       key: "members",
       label: "Membres",
       icon: <Contact className={iconClass} />,
-      content: <MembersTable members={members} teams={teamRefs} />,
+      content: (
+        <MembersTable
+          members={members}
+          teams={teamRefs}
+          profileDirectory={profileDirectory}
+        />
+      ),
     },
     {
       key: "teams",

@@ -84,6 +84,19 @@ export type AdminMember = MemberDetail & {
   // email against a coach account's email — display-only (see the Membres
   // table's "Coach" badges), doesn't grant or reflect any actual access.
   coachTeams: AdminMemberTeam[];
+  // This player's own login account, if any (players.profile_id) — lets the
+  // Bureau manage that account's Coach/Bureau roles from the member modal.
+  profileId: string | null;
+  // Whether this member's linked account is in the club_administrators
+  // whitelist (Bureau access).
+  isBureau: boolean;
+};
+
+export type ProfileDirectoryEntry = {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
 };
 
 export type CollecteType = "STAGE" | "EVENEMENT" | "BOUTIQUE";
@@ -333,6 +346,7 @@ export default async function DashboardPage() {
   let adminCollectes: AdminCollecte[] = [];
   let adminUpcomingEvents: AdminUpcomingEvent[] = [];
   let adminMembers: AdminMember[] = [];
+  let profileDirectory: ProfileDirectoryEntry[] = [];
   const adminContactPhoneByPlayerId: Record<string, string> = {};
 
   if (isAdmin) {
@@ -346,6 +360,7 @@ export default async function DashboardPage() {
       collectesRes,
       upcomingEventsRes,
       parentPlayerRes,
+      clubAdminsRes,
     ] = await Promise.all([
       supabase
         .from("teams")
@@ -381,7 +396,12 @@ export default async function DashboardPage() {
         .select("id, title, event_type, location, salle, start_time, teams(id, name, category)")
         .order("start_time", { ascending: true }),
       supabase.from("parent_player").select("parent_id, player_id"),
+      supabase.from("club_administrators").select("email"),
     ]);
+
+    const adminEmailsLower = new Set(
+      (clubAdminsRes.data ?? []).map((a) => a.email.toLowerCase())
+    );
 
     const playersById = new Map(
       (playersRes.data ?? []).map((p) => [p.id, p as Person])
@@ -585,6 +605,7 @@ export default async function DashboardPage() {
         coachTeams: memberEmail
           ? (coachTeamsByEmailLower.get(memberEmail.toLowerCase()) ?? [])
           : [],
+        isBureau: memberEmail ? adminEmailsLower.has(memberEmail.toLowerCase()) : false,
         // Prefer a linked account's live contact info; fall back to the
         // registration-form snapshot when no parent/self account exists yet.
         email: memberEmail,
@@ -595,8 +616,16 @@ export default async function DashboardPage() {
           player.father_phone,
         hasParent: parentIds.length > 0,
         pendingParentEmail: player.pending_parent_email,
+        profileId: player.profile_id,
       };
     });
+
+    profileDirectory = (profilesRes.data ?? []).map((p) => ({
+      id: p.id,
+      firstName: p.first_name,
+      lastName: p.last_name,
+      email: (p as { email: string | null }).email,
+    }));
 
     const rsvpsByEvent = await fetchRsvpsByEvent(
       supabase,
@@ -680,6 +709,23 @@ export default async function DashboardPage() {
       supabase,
       coachedTeamIds
     );
+
+    // A coach who's also a registered player (players.profile_id linked to
+    // their own account) sees their own team's events in this same
+    // calendar too — without that team appearing as one they coach in the
+    // Équipe(s) tab below, which stays scoped to coachedTeamIds only.
+    const { data: ownPlayerRow } = await supabase
+      .from("players")
+      .select("id")
+      .eq("profile_id", user.id)
+      .maybeSingle();
+    const ownTeamIds = ownPlayerRow
+      ? await getPlayerTeamIds(supabase, ownPlayerRow.id)
+      : [];
+    const coachCalendarTeamIds = Array.from(
+      new Set([...coachedTeamIds, ...ownTeamIds])
+    );
+
     const [teamPlayersRes, teamCoachesRes, eventsRes] = await Promise.all([
       supabase
         .from("team_players")
@@ -694,7 +740,7 @@ export default async function DashboardPage() {
         .select(
           "id, title, event_type, location, salle, start_time, teams(id, name, category)"
         )
-        .or(teamOrClubWideFilter(coachedTeamIds))
+        .or(teamOrClubWideFilter(coachCalendarTeamIds))
         .order("start_time", { ascending: true }),
     ]);
 
@@ -1112,6 +1158,7 @@ export default async function DashboardPage() {
           contactPhoneByPlayerId={adminContactPhoneByPlayerId}
           members={adminMembers}
           birthdayMembers={adminBirthdayMembers}
+          profileDirectory={profileDirectory}
         />
       ),
     });
