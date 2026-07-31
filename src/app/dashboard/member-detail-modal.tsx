@@ -121,13 +121,13 @@ export default function MemberDetailModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [teamId, setTeamId] = useState(member.teams[0]?.id ?? "");
-  // The "Équipe" select only ever lists the 13 canonical teams — if this
-  // member is still on a legacy one (z.Sénior, U13...), it wouldn't match
-  // any <option>, so the browser silently displays "Aucune équipe" while
-  // teamId still holds the legacy id. Save would then see no change and
-  // do nothing. Surface the current legacy team as an extra option so it
-  // genuinely shows selected, and switching away from it (including to
-  // "Aucune équipe") actually fires onChange.
+  // The "Équipe" select only lists teams with a sort_order set — if this
+  // member is still on a leftover row without one, it wouldn't match any
+  // <option>, so the browser silently displays "Aucune équipe" while
+  // teamId still holds that id. Save would then see no change and do
+  // nothing. Surface the current team as an extra option so it genuinely
+  // shows selected, and switching away from it (including to "Aucune
+  // équipe") actually fires onChange.
   const currentTeam = member.teams[0];
   const teamOptions =
     currentTeam && !teams.some((t) => t.id === currentTeam.id)

@@ -344,11 +344,10 @@ export default async function DashboardPage() {
   let adminUpcomingEvents: AdminUpcomingEvent[] = [];
   let adminMembers: AdminMember[] = [];
   // The Membres table's team pickers (filter + "Modifier le profil") only
-  // ever offer the 13 official teams — the legacy category rows left over
-  // from the original import (z.Sénior, U13, U18...) have sort_order null
-  // and are deliberately excluded here, even though they still exist in
-  // adminTeams/the Équipes tab until every member is manually migrated off
-  // them.
+  // offer teams with a sort_order set — any future leftover/legacy import
+  // row without one is excluded here (though still visible in the
+  // Équipes tab) until it's renamed into the canonical order, the same
+  // way z.Sénior/U18/U13 became Séniors M/U18M/U13M.
   let canonicalTeamRefs: AdminMemberTeam[] = [];
   const adminContactPhoneByPlayerId: Record<string, string> = {};
 
