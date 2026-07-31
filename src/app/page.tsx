@@ -1,39 +1,39 @@
 import Image from "next/image";
 import Link from "next/link";
 import {
-  CalendarDays,
-  Users,
-  BellRing,
+  Building2,
+  ClipboardList,
+  HeartHandshake,
   CheckCircle2,
   ShieldCheck,
   MapPin,
   Trophy,
 } from "lucide-react";
 
-const features = [
+const roles = [
   {
-    icon: Users,
-    title: "Gestion des membres",
-    description:
-      "Joueurs, parents et équipes centralisés au même endroit, avec un profil clair pour chacun.",
+    icon: Building2,
+    title: "Pour le Bureau",
+    points: [
+      "Vision globale à 360° sur tout le club",
+      "Centralisation des entraînements, des gymnases et des membres",
+    ],
   },
   {
-    icon: CalendarDays,
-    title: "Calendrier du club",
-    description:
-      "Tous les matchs et entraînements de l'équipe, visibles en un coup d'œil.",
+    icon: ClipboardList,
+    title: "Pour les Coachs",
+    points: [
+      "Gestion de leur équipe et suivi des présences",
+      "Envoi simple des convocations pour matchs et entraînements",
+    ],
   },
   {
-    icon: BellRing,
-    title: "Convocations",
-    description:
-      "Envoyez les convocations aux matchs et entraînements directement depuis l'app.",
-  },
-  {
-    icon: CheckCircle2,
-    title: "Réponses en temps réel",
-    description:
-      "Présent, Absent ou Retard : chacun répond en un tap, le coach voit tout instantanément.",
+    icon: HeartHandshake,
+    title: "Pour les Parents & Joueurs",
+    points: [
+      "Réponse instantanée aux convocations (Présent / Absent)",
+      "Organisation ultra simple de l'équipe : covoiturage, goûter, maillots",
+    ],
   },
 ];
 
@@ -109,25 +109,34 @@ export default function Home() {
 
         <section className="mx-auto max-w-5xl px-4 py-14 sm:px-6">
           <h2 className="text-center text-2xl font-bold text-zinc-900">
-            Pensé pour le terrain
+            Une application pensée pour chaque membre du club
           </h2>
           <p className="mx-auto mt-2 max-w-xl text-center text-sm text-zinc-500">
-            Une V1 concentrée sur l&apos;essentiel pour les équipes du club.
+            Bureau, coachs, parents et joueurs : à chacun son espace, simple
+            et clair.
           </p>
 
-          <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {features.map(({ icon: Icon, title, description }) => (
+          <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-3">
+            {roles.map(({ icon: Icon, title, points }) => (
               <div
                 key={title}
-                className="flex gap-4 rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm"
+                className="flex flex-col gap-4 rounded-2xl border border-zinc-100 bg-white p-6 shadow-sm"
               >
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-ubac-blue/10 text-ubac-blue">
-                  <Icon className="h-5 w-5" />
+                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-ubac-blue/10 text-ubac-blue">
+                  <Icon className="h-6 w-6" />
                 </span>
-                <div>
-                  <h3 className="font-semibold text-zinc-900">{title}</h3>
-                  <p className="mt-1 text-sm text-zinc-500">{description}</p>
-                </div>
+                <h3 className="font-semibold text-zinc-900">{title}</h3>
+                <ul className="flex flex-col gap-2.5">
+                  {points.map((point) => (
+                    <li
+                      key={point}
+                      className="flex items-start gap-2 text-sm text-zinc-600"
+                    >
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-ubac-yellow-dark" />
+                      {point}
+                    </li>
+                  ))}
+                </ul>
               </div>
             ))}
           </div>
