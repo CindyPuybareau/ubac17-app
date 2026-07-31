@@ -437,8 +437,8 @@ export default function CotisationParticipantsTable({
             <col className="w-10" />
           </colgroup>
           <thead>
-            <tr className="border-b border-zinc-100 bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-400">
-              <th className="px-2 py-2.5">
+            <tr className="border-b border-slate-100 bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-400">
+              <th className="px-3 py-3">
                 <input
                   type="checkbox"
                   checked={allFilteredSelected}
@@ -446,26 +446,28 @@ export default function CotisationParticipantsTable({
                   className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
                 />
               </th>
-              <th className="px-2 py-2.5">Nom &amp; Prénom</th>
-              <th className="px-2 py-2.5">Tarif</th>
-              <th className="px-2 py-2.5">Remise</th>
-              <th className="px-2 py-2.5">Payé</th>
-              <th className="px-2 py-2.5">Mode Paiement</th>
-              <th className="px-2 py-2.5">Statut</th>
-              <th className="px-2 py-2.5" />
+              <th className="px-3 py-3">Nom &amp; Prénom</th>
+              <th className="px-3 py-3">Tarif</th>
+              <th className="px-3 py-3">Remise</th>
+              <th className="px-3 py-3">Payé</th>
+              <th className="px-3 py-3">Mode Paiement</th>
+              <th className="px-3 py-3">Statut</th>
+              <th className="px-3 py-3" />
             </tr>
           </thead>
           <tbody>
-            {filtered.map((c) => {
+            {filtered.map((c, index) => {
               const status = statusBadge[computeStatus(c)];
               const contactEmail = contactEmailByPlayerId[c.playerId] ?? null;
               return (
                 <tr
                   key={c.id}
                   onClick={() => setDetailPlayerId(c.playerId)}
-                  className="cursor-pointer border-b border-zinc-50 last:border-0 hover:bg-zinc-50/60"
+                  className={`cursor-pointer border-b border-slate-100 last:border-0 transition-colors duration-150 hover:bg-amber-50/40 ${
+                    index % 2 === 1 ? "bg-slate-50/50" : ""
+                  }`}
                 >
-                  <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                  <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       checked={selectedIds.has(c.id)}
@@ -473,21 +475,21 @@ export default function CotisationParticipantsTable({
                       className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
                     />
                   </td>
-                  <td className="truncate px-2 py-2 font-semibold text-zinc-900" title={c.playerName}>
+                  <td className="truncate px-3 py-3 font-semibold text-zinc-900" title={c.playerName}>
                     {c.playerName}
                   </td>
-                  <td className="px-2 py-2 text-zinc-600">{formatAmount(c.prix)}</td>
-                  <td className="px-2 py-2 text-zinc-600">{formatAmount(c.remise)}</td>
-                  <td className="px-2 py-2 text-zinc-600">{formatAmount(c.paiement)}</td>
-                  <td className="truncate px-2 py-2 text-zinc-600" title={c.mode_paiement ?? undefined}>
+                  <td className="px-3 py-3 text-zinc-600">{formatAmount(c.prix)}</td>
+                  <td className="px-3 py-3 text-zinc-600">{formatAmount(c.remise)}</td>
+                  <td className="px-3 py-3 text-zinc-600">{formatAmount(c.paiement)}</td>
+                  <td className="truncate px-3 py-3 text-zinc-600" title={c.mode_paiement ?? undefined}>
                     {c.mode_paiement ?? "—"}
                   </td>
-                  <td className="px-2 py-2">
+                  <td className="px-3 py-3">
                     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${status.className}`}>
                       {status.label}
                     </span>
                   </td>
-                  <td className="relative px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                  <td className="relative px-3 py-3" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => setOpenMenuId((cur) => (cur === c.id ? null : c.id))}
                       className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
