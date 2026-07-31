@@ -4,7 +4,7 @@ import { useState, type ChangeEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Shield, User, Users, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import type { MemberDetail } from "./page";
+import type { AdminMemberTeam, MemberDetail } from "./page";
 
 const TABS = [
   { key: "identity", label: "Identité", icon: User },
@@ -97,15 +97,18 @@ export default function MemberDetailModal({
   member,
   readOnly,
   onClose,
+  teams = [],
 }: {
   member: MemberDetail;
   readOnly: boolean;
   onClose: () => void;
+  teams?: AdminMemberTeam[];
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>("identity");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [teamId, setTeamId] = useState(member.teams[0]?.id ?? "");
   const [form, setForm] = useState({
     firstName: member.firstName ?? "",
     lastName: member.lastName ?? "",
@@ -167,11 +170,36 @@ export default function MemberDetailModal({
       })
       .eq("id", member.id);
 
-    setSaving(false);
     if (updateError) {
+      setSaving(false);
       setError(updateError.message);
       return;
     }
+
+    const currentTeamId = member.teams[0]?.id ?? "";
+    if (teamId !== currentTeamId) {
+      const { error: deleteError } = await supabase
+        .from("team_players")
+        .delete()
+        .eq("player_id", member.id);
+      if (deleteError) {
+        setSaving(false);
+        setError(`Équipe non mise à jour : ${deleteError.message}`);
+        return;
+      }
+      if (teamId) {
+        const { error: insertError } = await supabase
+          .from("team_players")
+          .insert({ team_id: teamId, player_id: member.id });
+        if (insertError) {
+          setSaving(false);
+          setError(`Équipe non mise à jour : ${insertError.message}`);
+          return;
+        }
+      }
+    }
+
+    setSaving(false);
     router.refresh();
     onClose();
   }
@@ -340,22 +368,43 @@ export default function MemberDetailModal({
                   {member.category ?? "—"}
                 </span>
               </ReadOnlyField>
-              <ReadOnlyField label="Équipe(s)">
-                <div className="flex flex-wrap gap-1">
-                  {member.teams.length === 0 ? (
-                    <span className="text-sm text-zinc-400">—</span>
-                  ) : (
-                    member.teams.map((t) => (
-                      <span
-                        key={t.id}
-                        className="rounded-full bg-navy/10 px-2 py-0.5 text-xs font-semibold text-navy"
-                      >
-                        {t.category ?? t.name ?? "Équipe"}
-                      </span>
-                    ))
-                  )}
+              {editable ? (
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                    Équipe
+                  </span>
+                  <select
+                    value={teamId}
+                    onChange={(e) => setTeamId(e.target.value)}
+                    className="rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+                  >
+                    <option value="">Aucune équipe</option>
+                    {teams.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                        {t.category ? ` · ${t.category}` : ""}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              </ReadOnlyField>
+              ) : (
+                <ReadOnlyField label="Équipe(s)">
+                  <div className="flex flex-wrap gap-1">
+                    {member.teams.length === 0 ? (
+                      <span className="text-sm text-zinc-400">—</span>
+                    ) : (
+                      member.teams.map((t) => (
+                        <span
+                          key={t.id}
+                          className="rounded-full bg-navy/10 px-2 py-0.5 text-xs font-semibold text-navy"
+                        >
+                          {t.category ?? t.name ?? "Équipe"}
+                        </span>
+                      ))
+                    )}
+                  </div>
+                </ReadOnlyField>
+              )}
               <Field
                 label="Type de licence demandée"
                 value={form.licenseType}

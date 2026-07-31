@@ -459,15 +459,6 @@ export default function MembersTable({
                             Relancer / Renvoyer invitation
                           </span>
                         )}
-                        <button
-                          onClick={() => {
-                            setOpenMenuId(null);
-                            openReassign([m.id]);
-                          }}
-                          className={menuItemClass}
-                        >
-                          Changer d&apos;équipe
-                        </button>
                         {m.archivedAt ? (
                           <button
                             onClick={() => {
@@ -515,6 +506,7 @@ export default function MembersTable({
               member={detailMember}
               readOnly={false}
               onClose={() => setDetailMemberId(null)}
+              teams={teams}
             />
           );
         })()}
