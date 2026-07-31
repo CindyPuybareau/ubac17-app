@@ -16,7 +16,6 @@ import OpponentDisplay from "./opponent-display";
 import FfbbSync from "./ffbb-sync";
 import MemberDetailModal from "./member-detail-modal";
 import WhatsAppButton from "./whatsapp-button";
-import WhatsAppBulkModal from "./whatsapp-bulk-modal";
 import WhatsAppGroupButton from "./whatsapp-group-button";
 import type { AdminUpcomingEvent, MemberDetail } from "./page";
 import type { RosterPlayer, TeamWithMembers } from "./team-manager";
@@ -65,7 +64,6 @@ export default function TeamCard({
 }) {
   const router = useRouter();
   const [detailPlayerId, setDetailPlayerId] = useState<string | null>(null);
-  const [contactTeamOpen, setContactTeamOpen] = useState(false);
   const [groupLinkInput, setGroupLinkInput] = useState(team.whatsAppGroupLink ?? "");
   const [groupLinkSaving, setGroupLinkSaving] = useState(false);
 
@@ -501,14 +499,7 @@ export default function TeamCard({
             {groupLinkSaving ? "..." : "Enregistrer"}
           </button>
         </div>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <button
-            onClick={() => setContactTeamOpen(true)}
-            className="flex items-center gap-1.5 rounded-full border border-emerald-200 px-3 py-1.5 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
-          >
-            <MessageCircle className="h-4 w-4" />
-            Contacter l&apos;équipe sur WhatsApp
-          </button>
+        <div className="mt-2">
           <WhatsAppGroupButton
             teamName={team.name ?? "l'équipe"}
             defaultMessage={`Bonjour à tous, ici le coach de ${team.name ?? "l'équipe"}.`}
@@ -583,19 +574,6 @@ export default function TeamCard({
           );
         })()}
 
-      {contactTeamOpen && (
-        <WhatsAppBulkModal
-          title={`Contacter ${team.name ?? "l'équipe"}`}
-          contacts={team.players.map((p) => ({
-            id: p.id,
-            name: fullName(p),
-            phone: contactPhoneByPlayerId[p.id] ?? null,
-          }))}
-          defaultMessage={`Bonjour, ici le coach de ${team.name ?? "l'équipe"}.`}
-          groupLink={team.whatsAppGroupLink}
-          onClose={() => setContactTeamOpen(false)}
-        />
-      )}
     </div>
   );
 }
