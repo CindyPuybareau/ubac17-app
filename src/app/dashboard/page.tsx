@@ -80,6 +80,10 @@ export type AdminMember = MemberDetail & {
   hasParent: boolean;
   pendingParentEmail: string | null;
   archivedAt: string | null;
+  // Teams this member also coaches, detected by matching their contact
+  // email against a coach account's email — display-only (see the Membres
+  // table's "Coach" badges), doesn't grant or reflect any actual access.
+  coachTeams: AdminMemberTeam[];
 };
 
 export type CollecteType = "STAGE" | "EVENEMENT" | "BOUTIQUE";
@@ -484,6 +488,21 @@ export default async function DashboardPage() {
       ])
     );
 
+    // Display-only: teams coached by whoever shares this email, so a member
+    // who's both a player and a coach (e.g. Basile) shows both badges in the
+    // Membres table. Doesn't grant access — actual coach rights are still
+    // only ever set via team_coaches (Équipes tab).
+    const coachTeamsByEmailLower = new Map<string, AdminMemberTeam[]>();
+    (teamCoachesRes.data ?? []).forEach((tc) => {
+      const email = emailByProfileId.get(tc.coach_id);
+      const team = teamsById.get(tc.team_id);
+      if (!email || !team) return;
+      const key = email.toLowerCase();
+      const list = coachTeamsByEmailLower.get(key) ?? [];
+      list.push(team);
+      coachTeamsByEmailLower.set(key, list);
+    });
+
     // cotisationsRes is ordered by saison desc, so the first row seen per
     // player is their most recent season's club status. Skip collecte-linked
     // rows (stage/event/boutique) — those aren't the season membership.
@@ -531,6 +550,9 @@ export default async function DashboardPage() {
         (pid) => pid !== player.profile_id
       );
       const contactProfileId = player.profile_id ?? parentIds[0] ?? null;
+      const memberEmail =
+        (contactProfileId ? emailByProfileId.get(contactProfileId) : null) ??
+        player.registration_email;
       return {
         id: player.id,
         firstName: player.first_name,
@@ -560,11 +582,12 @@ export default async function DashboardPage() {
         licenseNumber: player.license_number,
         archivedAt: player.archived_at,
         teams: teamsByPlayerId.get(player.id) ?? [],
+        coachTeams: memberEmail
+          ? (coachTeamsByEmailLower.get(memberEmail.toLowerCase()) ?? [])
+          : [],
         // Prefer a linked account's live contact info; fall back to the
         // registration-form snapshot when no parent/self account exists yet.
-        email:
-          (contactProfileId ? emailByProfileId.get(contactProfileId) : null) ??
-          player.registration_email,
+        email: memberEmail,
         phone:
           (contactProfileId ? phoneByProfileId.get(contactProfileId) : null) ??
           player.registration_phone ??

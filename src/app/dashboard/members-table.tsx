@@ -74,7 +74,11 @@ export default function MembersTable({
   const filtered = useMemo(() => {
     let list = showArchived ? members : members.filter((m) => !m.archivedAt);
     if (teamFilter) {
-      list = list.filter((m) => m.teams.some((t) => t.id === teamFilter));
+      list = list.filter(
+        (m) =>
+          m.teams.some((t) => t.id === teamFilter) ||
+          m.coachTeams.some((t) => t.id === teamFilter)
+      );
     }
     const q = search.trim().toLowerCase();
     if (q) {
@@ -385,17 +389,27 @@ export default function MembersTable({
                 </td>
                 <td className="px-2 py-2">
                   <div className="flex flex-wrap gap-1 overflow-hidden">
-                    {m.teams.length === 0 ? (
+                    {m.teams.length === 0 && m.coachTeams.length === 0 ? (
                       <span className="text-xs text-zinc-400">—</span>
                     ) : (
-                      m.teams.map((t) => (
-                        <span
-                          key={t.id}
-                          className="max-w-full truncate rounded-full bg-navy/10 px-2 py-0.5 text-xs font-semibold text-navy"
-                        >
-                          {t.category ?? t.name ?? "Équipe"}
-                        </span>
-                      ))
+                      <>
+                        {m.teams.map((t) => (
+                          <span
+                            key={`player-${t.id}`}
+                            className="max-w-full truncate rounded-full bg-navy/10 px-2 py-0.5 text-xs font-semibold text-navy"
+                          >
+                            {t.category ?? t.name ?? "Équipe"}
+                          </span>
+                        ))}
+                        {m.coachTeams.map((t) => (
+                          <span
+                            key={`coach-${t.id}`}
+                            className="max-w-full truncate rounded-full bg-purple-100 px-2 py-0.5 text-xs font-semibold text-purple-700"
+                          >
+                            Coach {t.category ?? t.name ?? "Équipe"}
+                          </span>
+                        ))}
+                      </>
                     )}
                   </div>
                 </td>
