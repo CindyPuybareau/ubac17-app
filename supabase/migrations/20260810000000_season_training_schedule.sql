@@ -42,7 +42,7 @@ select
   'TRAINING',
   s.salle,
   (season.day + s.start_time) at time zone 'Europe/Paris',
-  'season-2026-2027-' || t.id || '-' || s.weekday || '-' || s.start_time
+  'season-2026-2027-' || t.id || '-' || season.day || '-' || s.start_time
 from season
 join slots s on extract(dow from season.day) = s.weekday
 join public.teams t on t.name = s.team_name
