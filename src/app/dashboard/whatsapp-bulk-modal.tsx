@@ -31,20 +31,6 @@ export default function WhatsAppBulkModal({
     setSentIds((prev) => new Set(prev).add(id));
   }
 
-  function sendToAll() {
-    // wa.me has no real multi-recipient send, so this opens one tab per
-    // contact — staggered, since browsers silently drop window.open calls
-    // fired back-to-back beyond the first in some popup-blocker configs.
-    reachable.forEach((c, i) => {
-      const link = buildWhatsAppLink(c.phone, text);
-      if (!link) return;
-      setTimeout(() => {
-        window.open(link, "_blank", "noopener,noreferrer");
-        markSent(c.id);
-      }, i * 350);
-    });
-  }
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
@@ -80,7 +66,7 @@ export default function WhatsAppBulkModal({
         )}
 
         <label className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-          Message (envoyé à tout le monde)
+          Message (repris pour chaque envoi)
         </label>
         <textarea
           value={text}
@@ -89,19 +75,9 @@ export default function WhatsAppBulkModal({
           className="mb-3 w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
         />
 
-        {reachable.length >= 2 && (
-          <button
-            onClick={sendToAll}
-            className="mb-3 flex items-center justify-center gap-1.5 rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
-          >
-            <Send className="h-4 w-4" />
-            Envoyer à tout le monde ({reachable.length})
-          </button>
-        )}
-
         <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-400">
           <Users className="h-3.5 w-3.5" />
-          Contacts individuels
+          Membres sélectionnés
         </p>
 
         <div className="flex flex-col gap-1 overflow-y-auto">
@@ -111,6 +87,7 @@ export default function WhatsAppBulkModal({
           {reachable.map((c) => {
             const sent = sentIds.has(c.id);
             const link = buildWhatsAppLink(c.phone, text);
+            const firstName = c.name.split(" ")[0] || c.name;
             return (
               <div
                 key={c.id}
@@ -129,7 +106,7 @@ export default function WhatsAppBulkModal({
                   }`}
                 >
                   {sent ? <Check className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
-                  {sent ? "Envoyé" : "Envoyer"}
+                  {sent ? "Envoyé" : `Envoyer à ${firstName}`}
                 </a>
               </div>
             );

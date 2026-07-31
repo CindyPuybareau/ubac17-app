@@ -455,30 +455,31 @@ export default function MembersTable({
                 <td
                   className="truncate px-2 py-2 text-zinc-600"
                   title={m.phone ?? undefined}
-                  onClick={(e) => e.stopPropagation()}
                 >
                   {m.phone ? (
                     <span className="flex items-center gap-1">
                       <Phone className="h-3 w-3 shrink-0 text-zinc-400" />
                       <span className="truncate">{m.phone}</span>
-                      <WhatsAppButton
-                        phone={m.phone}
-                        message={`Bonjour ${m.firstName ?? ""}, ici l'UBAC.`}
-                      />
                     </span>
                   ) : (
                     <span className="text-zinc-300">—</span>
                   )}
                 </td>
                 <td className="relative px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    onClick={() =>
-                      setOpenMenuId((cur) => (cur === m.id ? null : m.id))
-                    }
-                    className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
-                  >
-                    <MoreVertical className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center justify-end gap-1">
+                    <WhatsAppButton
+                      phone={m.phone}
+                      message={`Bonjour ${m.firstName ?? ""}, ici l'UBAC.`}
+                    />
+                    <button
+                      onClick={() =>
+                        setOpenMenuId((cur) => (cur === m.id ? null : m.id))
+                      }
+                      className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </button>
+                  </div>
                   {openMenuId === m.id && (
                     <>
                       <div
