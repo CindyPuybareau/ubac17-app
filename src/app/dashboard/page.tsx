@@ -1242,7 +1242,7 @@ export default async function DashboardPage() {
     <div className="flex flex-1 flex-col">
       <RealtimeSync />
       <header className="sticky top-0 z-10 bg-navy px-4 py-3 sm:px-6">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between">
+        <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between">
           <div className="flex items-center gap-2">
             <Image src="/logo.png" alt="UBAC" width={32} height={32} className="h-8 w-8 object-contain" priority />
             <span className="text-sm font-semibold text-white">UBAC</span>
@@ -1251,7 +1251,7 @@ export default async function DashboardPage() {
         </div>
       </header>
 
-      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 pt-6 pb-24 sm:px-6 sm:py-10">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-6 px-4 pt-6 pb-24 sm:px-6 sm:py-10">
         <h1 className="text-2xl font-bold text-zinc-900">
           <span className="font-medium text-zinc-500">Bienvenue</span>{" "}
           <span className="text-navy">{profile?.first_name ?? user.email}</span>
