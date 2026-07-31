@@ -90,6 +90,10 @@ export type AdminMember = MemberDetail & {
   // Whether this member's linked account is in the club_administrators
   // whitelist (Bureau access).
   isBureau: boolean;
+  // Teams this member's own player row is designated to coach before they
+  // have a real account (teams.pending_coach_player_id) — display-only,
+  // mirrors the free-text pending_coach_names shown on team cards.
+  pendingCoachTeams: AdminMemberTeam[];
 };
 
 export type ProfileDirectoryEntry = {
@@ -371,7 +375,9 @@ export default async function DashboardPage() {
     ] = await Promise.all([
       supabase
         .from("teams")
-        .select("id, name, category, ffbb_url, pending_coach_names, sort_order")
+        .select(
+          "id, name, category, ffbb_url, pending_coach_names, sort_order, pending_coach_player_id"
+        )
         .order("sort_order", { ascending: true, nullsFirst: false })
         .order("category"),
       supabase
@@ -533,6 +539,20 @@ export default async function DashboardPage() {
       coachTeamsByEmailLower.set(key, list);
     });
 
+    // Display-only: a named coach without a real account yet, designated
+    // directly on their own player row via teams.pending_coach_player_id.
+    const pendingCoachTeamsByPlayerId = new Map<string, AdminMemberTeam[]>();
+    (teamsRes.data ?? []).forEach((t) => {
+      const playerId = (t as { pending_coach_player_id: string | null })
+        .pending_coach_player_id;
+      if (!playerId) return;
+      const team = teamsById.get(t.id);
+      if (!team) return;
+      const list = pendingCoachTeamsByPlayerId.get(playerId) ?? [];
+      list.push(team);
+      pendingCoachTeamsByPlayerId.set(playerId, list);
+    });
+
     // cotisationsRes is ordered by saison desc, so the first row seen per
     // player is their most recent season's club status. Skip collecte-linked
     // rows (stage/event/boutique) — those aren't the season membership.
@@ -616,6 +636,7 @@ export default async function DashboardPage() {
           ? (coachTeamsByEmailLower.get(memberEmail.toLowerCase()) ?? [])
           : [],
         isBureau: memberEmail ? adminEmailsLower.has(memberEmail.toLowerCase()) : false,
+        pendingCoachTeams: pendingCoachTeamsByPlayerId.get(player.id) ?? [],
         // Prefer a linked account's live contact info; fall back to the
         // registration-form snapshot when no parent/self account exists yet.
         email: memberEmail,

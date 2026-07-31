@@ -6,6 +6,7 @@ import {
   Archive,
   ChevronDown,
   ChevronUp,
+  Clock,
   Mail,
   MoreVertical,
   Phone,
@@ -79,7 +80,8 @@ export default function MembersTable({
       list = list.filter(
         (m) =>
           m.teams.some((t) => t.id === teamFilter) ||
-          m.coachTeams.some((t) => t.id === teamFilter)
+          m.coachTeams.some((t) => t.id === teamFilter) ||
+          m.pendingCoachTeams.some((t) => t.id === teamFilter)
       );
     }
     const q = search.trim().toLowerCase();
@@ -391,7 +393,9 @@ export default function MembersTable({
                 </td>
                 <td className="px-2 py-2">
                   <div className="flex flex-wrap gap-1 overflow-hidden">
-                    {m.teams.length === 0 && m.coachTeams.length === 0 ? (
+                    {m.teams.length === 0 &&
+                    m.coachTeams.length === 0 &&
+                    m.pendingCoachTeams.length === 0 ? (
                       <span className="text-xs text-zinc-400">—</span>
                     ) : (
                       <>
@@ -408,6 +412,15 @@ export default function MembersTable({
                             key={`coach-${t.id}`}
                             className="max-w-full truncate rounded-full bg-purple-100 px-2 py-0.5 text-xs font-semibold text-purple-700"
                           >
+                            Coach {t.category ?? t.name ?? "Équipe"}
+                          </span>
+                        ))}
+                        {m.pendingCoachTeams.map((t) => (
+                          <span
+                            key={`pending-coach-${t.id}`}
+                            className="flex max-w-full items-center gap-1 truncate rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700"
+                          >
+                            <Clock className="h-3 w-3 shrink-0" />
                             Coach {t.category ?? t.name ?? "Équipe"}
                           </span>
                         ))}
