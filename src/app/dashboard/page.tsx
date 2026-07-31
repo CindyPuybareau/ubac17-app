@@ -372,12 +372,11 @@ export default async function DashboardPage() {
       upcomingEventsRes,
       parentPlayerRes,
       clubAdminsRes,
+      teamPendingCoachesRes,
     ] = await Promise.all([
       supabase
         .from("teams")
-        .select(
-          "id, name, category, ffbb_url, pending_coach_names, sort_order, pending_coach_player_id"
-        )
+        .select("id, name, category, ffbb_url, pending_coach_names, sort_order")
         .order("sort_order", { ascending: true, nullsFirst: false })
         .order("category"),
       supabase
@@ -410,6 +409,7 @@ export default async function DashboardPage() {
         .order("start_time", { ascending: true }),
       supabase.from("parent_player").select("parent_id, player_id"),
       supabase.from("club_administrators").select("email"),
+      supabase.from("team_pending_coaches").select("team_id, player_id"),
     ]);
 
     const adminEmailsLower = new Set(
@@ -539,18 +539,17 @@ export default async function DashboardPage() {
       coachTeamsByEmailLower.set(key, list);
     });
 
-    // Display-only: a named coach without a real account yet, designated
-    // directly on their own player row via teams.pending_coach_player_id.
+    // Display-only: named coaches without a real account yet, designated
+    // directly on their own player row via team_pending_coaches — a
+    // many-to-many join (mirroring team_coaches) since a team can have
+    // more than one pending co-coach.
     const pendingCoachTeamsByPlayerId = new Map<string, AdminMemberTeam[]>();
-    (teamsRes.data ?? []).forEach((t) => {
-      const playerId = (t as { pending_coach_player_id: string | null })
-        .pending_coach_player_id;
-      if (!playerId) return;
-      const team = teamsById.get(t.id);
+    (teamPendingCoachesRes.data ?? []).forEach((tpc) => {
+      const team = teamsById.get(tpc.team_id);
       if (!team) return;
-      const list = pendingCoachTeamsByPlayerId.get(playerId) ?? [];
+      const list = pendingCoachTeamsByPlayerId.get(tpc.player_id) ?? [];
       list.push(team);
-      pendingCoachTeamsByPlayerId.set(playerId, list);
+      pendingCoachTeamsByPlayerId.set(tpc.player_id, list);
     });
 
     // cotisationsRes is ordered by saison desc, so the first row seen per
