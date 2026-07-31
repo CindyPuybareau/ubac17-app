@@ -63,12 +63,6 @@ export default function Home() {
               UBAC
             </span>
           </div>
-          <Link
-            href="/connexion"
-            className="rounded-full bg-ubac-yellow px-5 py-2 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark"
-          >
-            Se connecter
-          </Link>
         </div>
       </header>
 
@@ -76,7 +70,7 @@ export default function Home() {
         <section className="bg-ubac-blue">
           <div className="mx-auto max-w-5xl px-4 py-16 text-center sm:px-6 sm:py-24">
             <p className="text-sm font-semibold uppercase tracking-wider text-ubac-yellow">
-              Union Basket Angoulins Châtelaillon
+              Union Basket Angoulins Châtelaillon Saint-Vivien
             </p>
             <h1 className="mt-3 text-3xl font-bold leading-tight text-white sm:text-5xl">
               La gestion du club,
@@ -166,7 +160,7 @@ export default function Home() {
       </main>
 
       <footer className="border-t border-black/5 py-6 text-center text-xs text-zinc-400">
-        UBAC — Union Basket Angoulins Châtelaillon
+        UBAC — Union Basket Angoulins Châtelaillon Saint-Vivien
       </footer>
     </div>
   );
