@@ -11,8 +11,8 @@ where p.first_name = 'Tommy' and p.last_name = 'ROBIN'
 -- in the Membres table, then designate them as pending coaches like the
 -- others.
 with new_cyril as (
-  insert into public.players (first_name)
-  values ('Cyril')
+  insert into public.players (first_name, last_name)
+  values ('Cyril', '')
   returning id
 )
 update public.teams
@@ -20,8 +20,8 @@ set pending_coach_player_id = (select id from new_cyril)
 where name = 'Loisirs F';
 
 with new_leane as (
-  insert into public.players (first_name)
-  values ('Léane')
+  insert into public.players (first_name, last_name)
+  values ('Léane', '')
   returning id
 )
 update public.teams
