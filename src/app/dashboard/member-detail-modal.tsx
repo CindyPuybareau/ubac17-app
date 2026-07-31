@@ -117,6 +117,18 @@ export default function MemberDetailModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [teamId, setTeamId] = useState(member.teams[0]?.id ?? "");
+  // The "Équipe" select only ever lists the 13 canonical teams — if this
+  // member is still on a legacy one (z.Sénior, U13...), it wouldn't match
+  // any <option>, so the browser silently displays "Aucune équipe" while
+  // teamId still holds the legacy id. Save would then see no change and
+  // do nothing. Surface the current legacy team as an extra option so it
+  // genuinely shows selected, and switching away from it (including to
+  // "Aucune équipe") actually fires onChange.
+  const currentTeam = member.teams[0];
+  const teamOptions =
+    currentTeam && !teams.some((t) => t.id === currentTeam.id)
+      ? [...teams, currentTeam]
+      : teams;
   const [profileId, setProfileId] = useState(initialProfileId ?? "");
   const [coachChecked, setCoachChecked] = useState(initialCoachTeams.length > 0);
   const [coachTeamIds, setCoachTeamIds] = useState<Set<string>>(
@@ -474,7 +486,7 @@ export default function MemberDetailModal({
                     className="rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
                   >
                     <option value="">Aucune équipe</option>
-                    {teams.map((t) => (
+                    {teamOptions.map((t) => (
                       <option key={t.id} value={t.id}>
                         {t.name}
                         {t.category ? ` · ${t.category}` : ""}
