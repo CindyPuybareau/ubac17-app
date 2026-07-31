@@ -221,7 +221,9 @@ export default async function DashboardPage() {
         .maybeSingle(),
       supabase
         .from("team_coaches")
-        .select("teams(id, name, category, ffbb_url, sort_order)")
+        .select(
+          "teams(id, name, category, ffbb_url, sort_order, pending_coach_names)"
+        )
         .eq("coach_id", user.id),
       supabase
         .from("parent_player")
@@ -239,6 +241,7 @@ export default async function DashboardPage() {
     category: string | null;
     ffbb_url: string | null;
     sort_order: number | null;
+    pending_coach_names: string | null;
   };
 
   const coachedTeams = (coachResult.data ?? [])
@@ -342,7 +345,7 @@ export default async function DashboardPage() {
     ] = await Promise.all([
       supabase
         .from("teams")
-        .select("id, name, category, ffbb_url")
+        .select("id, name, category, ffbb_url, pending_coach_names")
         .order("sort_order", { ascending: true, nullsFirst: false })
         .order("category"),
       supabase
@@ -445,6 +448,7 @@ export default async function DashboardPage() {
       ffbb_url: t.ffbb_url,
       players: rosterByTeam.get(t.id) ?? [],
       coaches: coachesByTeam.get(t.id) ?? [],
+      pendingCoachNames: t.pending_coach_names,
     }));
     allProfilesForAdmin = profilesRes.data ?? [];
 
@@ -759,6 +763,7 @@ export default async function DashboardPage() {
       ffbb_url: t.ffbb_url,
       players: rosterByTeam.get(t.id) ?? [],
       coaches: coachesByTeam.get(t.id) ?? [],
+      pendingCoachNames: t.pending_coach_names,
     }));
 
     const coachTeamRefsByPlayerId = new Map<string, AdminMemberTeam[]>();
@@ -929,7 +934,7 @@ export default async function DashboardPage() {
       const [teamsRes, teammateRowsRes, teamCoachesRes] = await Promise.all([
         supabase
           .from("teams")
-          .select("id, name, category, ffbb_url, sort_order")
+          .select("id, name, category, ffbb_url, sort_order, pending_coach_names")
           .in("id", allTeamIds),
         supabase
           .from("team_players")
@@ -993,6 +998,7 @@ export default async function DashboardPage() {
             roster: rosterByTeamId.get(teamId) ?? [],
             ffbbUrl: team.ffbb_url,
             sortOrder: team.sort_order,
+            pendingCoachNames: team.pending_coach_names,
           });
         });
       });

@@ -24,6 +24,7 @@ export type TeamWithMembers = {
   ffbb_url: string | null;
   players: RosterPlayer[];
   coaches: Person[];
+  pendingCoachNames: string | null;
 };
 
 export default function TeamManager({

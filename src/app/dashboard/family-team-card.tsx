@@ -1,4 +1,4 @@
-import { ExternalLink, Users } from "lucide-react";
+import { Clock, ExternalLink, Users } from "lucide-react";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 
@@ -12,6 +12,7 @@ export type FamilyTeamCardData = {
   roster: Person[];
   ffbbUrl: string | null;
   sortOrder: number | null;
+  pendingCoachNames: string | null;
 };
 
 function fullName(p: Person) {
@@ -43,7 +44,14 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
                 {fullName(c)}
               </li>
             ))}
-            {card.coaches.length === 0 && (
+            {card.pendingCoachNames && (
+              <li className="flex items-center gap-1.5 truncate rounded-lg bg-amber-50 px-2 py-1 text-sm text-amber-700">
+                <Clock className="h-3.5 w-3.5 shrink-0" />
+                {card.pendingCoachNames}
+                <span className="text-xs text-amber-500">(en attente de compte)</span>
+              </li>
+            )}
+            {card.coaches.length === 0 && !card.pendingCoachNames && (
               <li className="text-sm text-zinc-400">Aucun coach assigné</li>
             )}
           </ul>

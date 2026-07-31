@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, FileText, Phone, Shirt, Utensils } from "lucide-react";
+import { CalendarDays, Clock, FileText, Phone, Shirt, Utensils } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import OpponentDisplay from "./opponent-display";
 import FfbbSync from "./ffbb-sync";
@@ -386,7 +386,14 @@ export default function TeamCard({
                 </button>
               </li>
             ))}
-            {team.coaches.length === 0 && (
+            {team.pendingCoachNames && (
+              <li className="flex items-center gap-1.5 truncate rounded-lg bg-amber-50 px-2 py-1 text-sm text-amber-700">
+                <Clock className="h-3.5 w-3.5 shrink-0" />
+                {team.pendingCoachNames}
+                <span className="text-xs text-amber-500">(en attente de compte)</span>
+              </li>
+            )}
+            {team.coaches.length === 0 && !team.pendingCoachNames && (
               <li className="text-sm text-zinc-400">Aucun coach</li>
             )}
           </ul>
