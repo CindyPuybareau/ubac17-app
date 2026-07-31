@@ -161,6 +161,7 @@ export default function CalendarView({
   birthdayMembers?: BirthdaySource[];
 }) {
   const router = useRouter();
+  const [viewMonth, setViewMonth] = useState<Date>(today);
   const [selectedDate, setSelectedDate] = useState<Date>(today);
   const [openBirthday, setOpenBirthday] = useState<BirthdaySource | null>(null);
 
@@ -265,23 +266,26 @@ export default function CalendarView({
   );
 
   function goToday() {
-    setSelectedDate(new Date());
+    const now = new Date();
+    setViewMonth(now);
+    setSelectedDate(now);
   }
 
   function step(amount: number) {
-    const d = new Date(selectedDate);
+    const d = new Date(viewMonth);
     d.setMonth(d.getMonth() + amount);
+    setViewMonth(d);
     setSelectedDate(d);
   }
 
   const selectedKey = toKey(selectedDate);
 
-  const headerLabel = selectedDate.toLocaleDateString("fr-FR", {
+  const headerLabel = viewMonth.toLocaleDateString("fr-FR", {
     month: "long",
     year: "numeric",
   });
 
-  const gridDays = useMemo(() => buildMonthGrid(selectedDate), [selectedDate]);
+  const gridDays = useMemo(() => buildMonthGrid(viewMonth), [viewMonth]);
 
   const detailEvents = eventsByDate.get(selectedKey) ?? [];
   const detailBirthdays = birthdaysByMonthDay.get(monthDayKey(selectedDate)) ?? [];
@@ -338,8 +342,8 @@ export default function CalendarView({
             const dayEvents = eventsByDate.get(key) ?? [];
             const dayBirthdays = birthdaysByMonthDay.get(monthDayKey(d)) ?? [];
             const isCurrentMonth =
-              d.getMonth() === selectedDate.getMonth() &&
-              d.getFullYear() === selectedDate.getFullYear();
+              d.getMonth() === viewMonth.getMonth() &&
+              d.getFullYear() === viewMonth.getFullYear();
             const isToday = key === todayKey;
             const isSelected = key === selectedKey;
             const visible = dayEvents.slice(0, 3);
