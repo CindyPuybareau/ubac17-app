@@ -312,13 +312,14 @@ export default function MembersTable({
       )}
 
       <div className="w-full overflow-x-auto rounded-2xl border border-zinc-100">
-        <table className="w-full min-w-[850px] table-fixed border-collapse text-sm">
+        <table className="w-full min-w-[950px] table-fixed border-collapse text-sm">
           <colgroup>
             <col className="w-10" />
             <col className="w-10" />
             <col />
             <col />
             <col className="w-28" />
+            <col className="w-32" />
             <col className="w-32" />
             <col />
             <col />
@@ -350,6 +351,7 @@ export default function MembersTable({
               </th>
               <th className="px-2 py-2.5">Prénom</th>
               <th className="px-2 py-2.5">Commune</th>
+              <th className="px-2 py-2.5">Coach de</th>
               <th className="px-2 py-2.5">Équipe</th>
               <th className="px-2 py-2.5">Email</th>
               <th className="px-2 py-2.5">Téléphone</th>
@@ -393,26 +395,16 @@ export default function MembersTable({
                 </td>
                 <td className="px-2 py-2">
                   <div className="flex flex-wrap gap-1 overflow-hidden">
-                    {m.teams.length === 0 &&
-                    m.coachTeams.length === 0 &&
-                    m.pendingCoachTeams.length === 0 ? (
+                    {m.coachTeams.length === 0 && m.pendingCoachTeams.length === 0 ? (
                       <span className="text-xs text-zinc-400">—</span>
                     ) : (
                       <>
-                        {m.teams.map((t) => (
-                          <span
-                            key={`player-${t.id}`}
-                            className="max-w-full truncate rounded-full bg-navy/10 px-2 py-0.5 text-xs font-semibold text-navy"
-                          >
-                            {t.category ?? t.name ?? "Équipe"}
-                          </span>
-                        ))}
                         {m.coachTeams.map((t) => (
                           <span
                             key={`coach-${t.id}`}
                             className="max-w-full truncate rounded-full bg-purple-100 px-2 py-0.5 text-xs font-semibold text-purple-700"
                           >
-                            Coach {t.category ?? t.name ?? "Équipe"}
+                            {t.category ?? t.name ?? "Équipe"}
                           </span>
                         ))}
                         {m.pendingCoachTeams.map((t) => (
@@ -421,10 +413,26 @@ export default function MembersTable({
                             className="flex max-w-full items-center gap-1 truncate rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700"
                           >
                             <Clock className="h-3 w-3 shrink-0" />
-                            Coach {t.category ?? t.name ?? "Équipe"}
+                            {t.category ?? t.name ?? "Équipe"}
                           </span>
                         ))}
                       </>
+                    )}
+                  </div>
+                </td>
+                <td className="px-2 py-2">
+                  <div className="flex flex-wrap gap-1 overflow-hidden">
+                    {m.teams.length === 0 ? (
+                      <span className="text-xs text-zinc-400">—</span>
+                    ) : (
+                      m.teams.map((t) => (
+                        <span
+                          key={`player-${t.id}`}
+                          className="max-w-full truncate rounded-full bg-navy/10 px-2 py-0.5 text-xs font-semibold text-navy"
+                        >
+                          {t.category ?? t.name ?? "Équipe"}
+                        </span>
+                      ))
                     )}
                   </div>
                 </td>
@@ -517,7 +525,7 @@ export default function MembersTable({
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-2 py-8 text-center text-sm text-zinc-400">
+                <td colSpan={10} className="px-2 py-8 text-center text-sm text-zinc-400">
                   Aucun membre trouvé.
                 </td>
               </tr>
