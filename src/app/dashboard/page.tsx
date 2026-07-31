@@ -594,9 +594,16 @@ export default async function DashboardPage() {
         (pid) => pid !== player.profile_id
       );
       const contactProfileId = player.profile_id ?? parentIds[0] ?? null;
+      // This row's own registration_email — the field the Bureau edits per
+      // member — must win over a linked account's email, for the same
+      // reason as phone below: for a child, contactProfileId resolves to
+      // the PARENT's account, so favoring it would shadow an email that
+      // is genuinely the child's own (e.g. Léonie has her own email,
+      // distinct from her parent's login) behind the parent's address.
       const memberEmail =
+        player.registration_email ??
         (contactProfileId ? emailByProfileId.get(contactProfileId) : null) ??
-        player.registration_email;
+        null;
       return {
         id: player.id,
         firstName: player.first_name,
@@ -631,15 +638,6 @@ export default async function DashboardPage() {
           : [],
         isBureau: memberEmail ? adminEmailsLower.has(memberEmail.toLowerCase()) : false,
         pendingCoachTeams: pendingCoachTeamsByPlayerId.get(player.id) ?? [],
-        // Prefer a linked account's live contact info for email (a child's
-        // registration_email is typically the parent's anyway). Phone is
-        // the opposite: this row's OWN registration_phone is what the
-        // Bureau edits per-member, so it must win — otherwise, for a
-        // child, contactProfileId resolves to the PARENT's account and
-        // every one of that parent's kids would show the parent's own
-        // phone instead of the number just entered for that specific
-        // child (and for a self-linked adult, their possibly blank/wrong
-        // signup phone would shadow the correct club registration one).
         email: memberEmail,
         phone:
           player.registration_phone ??
