@@ -45,12 +45,21 @@ begin
   );
 
   -- Auto-link: a brand new account whose email matches an existing
-  -- player's registration email is that player's own account.
+  -- player's registration email is that player's own account. Guarded to
+  -- only that email's OWN row (registration_email is often the parent's
+  -- email shared across several siblings' player rows, and profile_id is
+  -- unique — linking more than one row to the same profile would violate
+  -- players_profile_id_unique).
   update public.players
   set profile_id = new.id
   where profile_id is null
     and registration_email is not null
-    and lower(registration_email) = lower(new.email);
+    and lower(registration_email) = lower(new.email)
+    and (
+      select count(*) from public.players p2
+      where p2.registration_email is not null
+        and lower(p2.registration_email) = lower(new.email)
+    ) = 1;
 
   return new;
 end;
@@ -58,13 +67,19 @@ $$;
 
 -- One-time catch-up for accounts/players that already existed before this
 -- migration (e.g. Basile, if his registration email matches his login email).
+-- Same uniqueness guard as above.
 update public.players p
 set profile_id = pr.id
 from public.profiles pr
 where p.profile_id is null
   and p.registration_email is not null
   and pr.email is not null
-  and lower(p.registration_email) = lower(pr.email);
+  and lower(p.registration_email) = lower(pr.email)
+  and (
+    select count(*) from public.players p2
+    where p2.registration_email is not null
+      and lower(p2.registration_email) = lower(pr.email)
+  ) = 1;
 
 -- Lets the Bureau grant/revoke Bureau access to someone else (the "Bureau"
 -- role checkbox in the member profile modal) — mirrors the same
