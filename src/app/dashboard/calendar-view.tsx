@@ -27,6 +27,8 @@ import {
   upcomingBirthdays,
   type BirthdaySource,
 } from "./birthdays";
+import { SALLES } from "./salles";
+import SalleBadge from "./salle-badge";
 
 const eventTypeOptions: { value: string; label: string }[] = [
   { value: "MATCH", label: "Match" },
@@ -168,6 +170,7 @@ export default function CalendarView({
   const [editTitle, setEditTitle] = useState("");
   const [editType, setEditType] = useState("MATCH");
   const [editLocation, setEditLocation] = useState("");
+  const [editSalle, setEditSalle] = useState("");
   const [editStartTime, setEditStartTime] = useState("");
   const [editTeamId, setEditTeamId] = useState("");
   const [editSaving, setEditSaving] = useState(false);
@@ -178,6 +181,7 @@ export default function CalendarView({
     setEditTitle(event.title ?? "");
     setEditType(event.event_type ?? "MATCH");
     setEditLocation(event.location ?? "");
+    setEditSalle(event.salle ?? "");
     setEditStartTime(toDatetimeLocal(event.start_time));
     setEditTeamId(event.teamId ?? "");
     setEditError(null);
@@ -194,6 +198,7 @@ export default function CalendarView({
         title: editTitle || null,
         event_type: editType,
         location: editLocation || null,
+        salle: editSalle || null,
         start_time: new Date(editStartTime).toISOString(),
         ...(allowClubWide ? { team_id: editTeamId || null } : {}),
       })
@@ -523,6 +528,7 @@ export default function CalendarView({
                       {event.location}
                     </span>
                   )}
+                  {event.salle && <SalleBadge salle={event.salle} />}
                 </div>
 
                 {hasRoster && (
@@ -632,6 +638,21 @@ export default function CalendarView({
                   onChange={(e) => setEditLocation(e.target.value)}
                   className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
                 />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-600">Salle</label>
+                <select
+                  value={editSalle}
+                  onChange={(e) => setEditSalle(e.target.value)}
+                  className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+                >
+                  <option value="">—</option>
+                  {SALLES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-zinc-600">

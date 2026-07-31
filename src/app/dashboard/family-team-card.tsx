@@ -1,0 +1,85 @@
+import { ExternalLink, Users } from "lucide-react";
+
+type Person = { id: string; first_name: string | null; last_name: string | null };
+
+export type FamilyTeamCardData = {
+  playerId: string;
+  playerName: string;
+  teamId: string;
+  teamName: string | null;
+  category: string | null;
+  coaches: Person[];
+  roster: Person[];
+  ffbbUrl: string | null;
+};
+
+function fullName(p: Person) {
+  return [p.first_name, p.last_name].filter(Boolean).join(" ") || "Sans nom";
+}
+
+export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
+  return (
+    <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
+      <p className="text-xs font-semibold uppercase tracking-wide text-ubac-blue">
+        Équipe de {card.playerName}
+      </p>
+      <h3 className="mt-1 font-semibold text-zinc-900">
+        {card.teamName ?? "Équipe"}
+        {card.category ? ` · ${card.category}` : ""}
+      </h3>
+
+      <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            Coachs
+          </p>
+          <ul className="mt-1 flex flex-col gap-1">
+            {card.coaches.map((c) => (
+              <li
+                key={c.id}
+                className="truncate rounded-lg bg-zinc-50 px-2 py-1 text-sm text-zinc-700"
+              >
+                {fullName(c)}
+              </li>
+            ))}
+            {card.coaches.length === 0 && (
+              <li className="text-sm text-zinc-400">Aucun coach assigné</li>
+            )}
+          </ul>
+        </div>
+
+        <div>
+          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            <Users className="h-3.5 w-3.5" />
+            Joueurs
+          </p>
+          <ul className="mt-1 flex flex-col gap-1">
+            {card.roster.map((p) => (
+              <li
+                key={p.id}
+                className="truncate rounded-lg bg-zinc-50 px-2 py-1 text-sm text-zinc-700"
+              >
+                {fullName(p)}
+              </li>
+            ))}
+            {card.roster.length === 0 && (
+              <li className="text-sm text-zinc-400">Aucun joueur</li>
+            )}
+          </ul>
+        </div>
+      </div>
+
+      {card.ffbbUrl && (
+        <a
+          href={card.ffbbUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-ubac-blue hover:underline"
+        >
+          <ExternalLink className="h-4 w-4" />
+          Voir la fiche équipe FFBB
+        </a>
+      )}
+    </div>
+  );
+}

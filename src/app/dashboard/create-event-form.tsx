@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { SALLES } from "./salles";
 
 type Team = { id: string; name: string | null; category: string | null };
 type EventType = "MATCH" | "TRAINING" | "OTHER" | "TOURNAMENT";
@@ -27,6 +28,7 @@ export default function CreateEventForm({
   const [title, setTitle] = useState("");
   const [eventType, setEventType] = useState<EventType>("MATCH");
   const [location, setLocation] = useState("");
+  const [salle, setSalle] = useState("");
   const [startTime, setStartTime] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -42,6 +44,7 @@ export default function CreateEventForm({
       title: title || defaultTitles[eventType],
       event_type: eventType,
       location: location || null,
+      salle: salle || null,
       start_time: new Date(startTime).toISOString(),
     });
 
@@ -54,6 +57,7 @@ export default function CreateEventForm({
 
     setTitle("");
     setLocation("");
+    setSalle("");
     setStartTime("");
     setOpen(false);
     router.refresh();
@@ -114,12 +118,26 @@ export default function CreateEventForm({
         />
       </div>
 
-      <input
-        placeholder="Lieu"
-        value={location}
-        onChange={(e) => setLocation(e.target.value)}
-        className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-      />
+      <div className="grid grid-cols-2 gap-3">
+        <input
+          placeholder="Lieu"
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+          className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+        />
+        <select
+          value={salle}
+          onChange={(e) => setSalle(e.target.value)}
+          className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+        >
+          <option value="">Salle (optionnel)</option>
+          {SALLES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+      </div>
 
       <input
         type="datetime-local"

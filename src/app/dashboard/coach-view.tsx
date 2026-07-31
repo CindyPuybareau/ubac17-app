@@ -1,12 +1,13 @@
-import { CalendarDays, Dumbbell, Trophy, Users } from "lucide-react";
+import { CalendarDays, ClipboardList, Dumbbell, Trophy, Users } from "lucide-react";
 import CalendarView from "./calendar-view";
 import CoachTeams from "./coach-teams";
 import CoachTrainings from "./coach-trainings";
 import CoachFfbb from "./coach-ffbb";
+import CoachOrganisation, { type CoachTeamMatchCard } from "./coach-organisation";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import type { TeamWithMembers } from "./team-manager";
 import type { AdminUpcomingEvent, MemberDetail } from "./page";
-import type { SeasonTaskTally } from "./event-tasks";
+import type { CarpoolOffer, EventTasksState, SeasonTaskTally } from "./event-tasks";
 import type { BirthdaySource } from "./birthdays";
 
 export default function CoachView({
@@ -19,6 +20,9 @@ export default function CoachView({
   rsvpStatusByKey,
   taskTallyByTeamId,
   birthdayMembers,
+  organisationCards,
+  tasksByEventId,
+  carpoolByEventId,
 }: {
   teams: TeamWithMembers[];
   events: AdminUpcomingEvent[];
@@ -29,6 +33,9 @@ export default function CoachView({
   rsvpStatusByKey: Record<string, string>;
   taskTallyByTeamId: Record<string, SeasonTaskTally>;
   birthdayMembers: BirthdaySource[];
+  organisationCards: CoachTeamMatchCard[];
+  tasksByEventId: Record<string, EventTasksState>;
+  carpoolByEventId: Record<string, CarpoolOffer[]>;
 }) {
   const createTeams = teams.map((t) => ({
     id: t.id,
@@ -70,6 +77,18 @@ export default function CoachView({
           contactPhoneByPlayerId={contactPhoneByPlayerId}
           memberDetailsByPlayerId={memberDetailsByPlayerId}
           taskTallyByTeamId={taskTallyByTeamId}
+        />
+      ),
+    },
+    {
+      key: "organisation",
+      label: "Organisation",
+      icon: <ClipboardList className={iconClass} />,
+      content: (
+        <CoachOrganisation
+          cards={organisationCards}
+          tasksByEventId={tasksByEventId}
+          carpoolByEventId={carpoolByEventId}
         />
       ),
     },

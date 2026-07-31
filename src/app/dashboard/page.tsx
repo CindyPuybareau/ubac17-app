@@ -7,9 +7,8 @@ import DashboardTabs, { type DashboardTab } from "./dashboard-tabs";
 import AdminView from "./admin-view";
 import type { RosterPlayer, TeamWithMembers } from "./team-manager";
 import CoachView from "./coach-view";
-import CalendarView from "./calendar-view";
-import NextConvocationCard from "./next-convocation-card";
-import CoachNextMatchCard from "./coach-next-match-card";
+import FamilyView from "./family-view";
+import type { FamilyTeamCardData } from "./family-team-card";
 import type { BirthdaySource } from "./birthdays";
 import {
   getNextEventForTeams,
@@ -23,7 +22,6 @@ import {
   getCarpoolOffersByEventId,
   getEventTasksByEventId,
   getSeasonTaskTallyByTeamIds,
-  type EventTasksState,
   type SeasonTaskTally,
 } from "./event-tasks";
 
@@ -116,6 +114,7 @@ export type AdminUpcomingEvent = {
   title: string | null;
   event_type: string | null;
   location: string | null;
+  salle: string | null;
   start_time: string;
   teamId: string | null;
   teamName: string;
@@ -298,7 +297,6 @@ export default async function DashboardPage() {
     getEventTasksByEventId(supabase, priorityEventIds),
     getCarpoolOffersByEventId(supabase, priorityEventIds),
   ]);
-  const emptyEventTasks: EventTasksState = { JERSEYS: null, SNACKS: null };
 
   // Convocation cards need the convened-players list of their own event's
   // team, for the task-assignment picker's context.
@@ -370,7 +368,7 @@ export default async function DashboardPage() {
         .order("created_at", { ascending: false }),
       supabase
         .from("events")
-        .select("id, title, event_type, location, start_time, teams(id, name, category)")
+        .select("id, title, event_type, location, salle, start_time, teams(id, name, category)")
         .order("start_time", { ascending: true }),
       supabase.from("parent_player").select("parent_id, player_id"),
     ]);
@@ -628,6 +626,7 @@ export default async function DashboardPage() {
         title: e.title,
         event_type: e.event_type,
         location: e.location,
+        salle: e.salle,
         start_time: e.start_time,
         teamId: team?.id ?? null,
         teamName: team?.name ?? "Tous les groupes",
@@ -663,7 +662,7 @@ export default async function DashboardPage() {
       supabase
         .from("events")
         .select(
-          "id, title, event_type, location, start_time, teams(id, name, category)"
+          "id, title, event_type, location, salle, start_time, teams(id, name, category)"
         )
         .or(teamOrClubWideFilter(coachedTeamIds))
         .order("start_time", { ascending: true }),
@@ -895,6 +894,7 @@ export default async function DashboardPage() {
         title: e.title,
         event_type: e.event_type,
         location: e.location,
+        salle: e.salle,
         start_time: e.start_time,
         teamId: team?.id ?? null,
         teamName: team?.name ?? "Tous les groupes",
@@ -908,6 +908,7 @@ export default async function DashboardPage() {
   let familyRsvpPlayers: { id: string; name: string; teamIds: string[] }[] = [];
   const familyRsvpStatusByKey: Record<string, string> = {};
   const familyBirthdayMembers: BirthdaySource[] = [];
+  const familyTeamCards: FamilyTeamCardData[] = [];
 
   if (players.length > 0) {
     const playerTeamIdsList = await Promise.all(
@@ -922,13 +923,24 @@ export default async function DashboardPage() {
     const allTeamIds = Array.from(new Set(playerTeamIdsList.flat()));
 
     if (allTeamIds.length > 0) {
-      const { data: teammateRows } = await supabase
-        .from("team_players")
-        .select("players(id, first_name, last_name, birth_date, category)")
-        .in("team_id", allTeamIds);
+      const [teamsRes, teammateRowsRes, teamCoachesRes] = await Promise.all([
+        supabase.from("teams").select("id, name, category, ffbb_url").in("id", allTeamIds),
+        supabase
+          .from("team_players")
+          .select("team_id, players(id, first_name, last_name, birth_date, category)")
+          .in("team_id", allTeamIds),
+        supabase
+          .from("team_coaches")
+          .select("team_id, profiles(id, first_name, last_name)")
+          .in("team_id", allTeamIds),
+      ]);
 
+      const teamsById = new Map(
+        (teamsRes.data ?? []).map((t) => [t.id, t])
+      );
+      const rosterByTeamId = new Map<string, Person[]>();
       const seenTeammateIds = new Set<string>();
-      (teammateRows ?? []).forEach((row) => {
+      (teammateRowsRes.data ?? []).forEach((row) => {
         const p = row.players as unknown as {
           id: string;
           first_name: string | null;
@@ -936,7 +948,12 @@ export default async function DashboardPage() {
           birth_date: string | null;
           category: string | null;
         } | null;
-        if (!p || seenTeammateIds.has(p.id)) return;
+        if (!p) return;
+        const list = rosterByTeamId.get(row.team_id) ?? [];
+        list.push({ id: p.id, first_name: p.first_name, last_name: p.last_name });
+        rosterByTeamId.set(row.team_id, list);
+
+        if (seenTeammateIds.has(p.id)) return;
         seenTeammateIds.add(p.id);
         familyBirthdayMembers.push({
           id: p.id,
@@ -946,12 +963,38 @@ export default async function DashboardPage() {
           category: p.category,
         });
       });
+
+      const coachesByTeamId = new Map<string, Person[]>();
+      (teamCoachesRes.data ?? []).forEach((row) => {
+        const p = row.profiles as unknown as Person | null;
+        if (!p) return;
+        const list = coachesByTeamId.get(row.team_id) ?? [];
+        list.push(p);
+        coachesByTeamId.set(row.team_id, list);
+      });
+
+      players.forEach((p, i) => {
+        playerTeamIdsList[i].forEach((teamId) => {
+          const team = teamsById.get(teamId);
+          if (!team) return;
+          familyTeamCards.push({
+            playerId: p.id,
+            playerName: p.isSelf ? "Toi" : p.name,
+            teamId,
+            teamName: team.name,
+            category: team.category,
+            coaches: coachesByTeamId.get(teamId) ?? [],
+            roster: rosterByTeamId.get(teamId) ?? [],
+            ffbbUrl: team.ffbb_url,
+          });
+        });
+      });
     }
 
     const { data: eventsData } = await supabase
       .from("events")
       .select(
-        "id, title, event_type, location, start_time, teams(id, name, category)"
+        "id, title, event_type, location, salle, start_time, teams(id, name, category)"
       )
       .or(teamOrClubWideFilter(allTeamIds))
       .order("start_time", { ascending: true });
@@ -982,6 +1025,7 @@ export default async function DashboardPage() {
         title: e.title,
         event_type: e.event_type,
         location: e.location,
+        salle: e.salle,
         start_time: e.start_time,
         teamId: team?.id ?? null,
         teamName: team?.name ?? "Tous les groupes",
@@ -1011,8 +1055,6 @@ export default async function DashboardPage() {
         category: m.category,
       }))
     : [];
-
-  const showWidgetsZone = isAdmin || isCoach || players.length > 0;
 
   const tabs: DashboardTab[] = [];
 
@@ -1051,6 +1093,9 @@ export default async function DashboardPage() {
           rsvpStatusByKey={coachRsvpStatusByKey}
           taskTallyByTeamId={coachTaskTallyByTeamId}
           birthdayMembers={coachBirthdayMembers}
+          organisationCards={coachCards}
+          tasksByEventId={eventTasksByEventId}
+          carpoolByEventId={carpoolOffersByEventId}
         />
       ),
     });
@@ -1058,13 +1103,19 @@ export default async function DashboardPage() {
 
   if (players.length > 0) {
     tabs.push({
-      key: "family-calendar",
-      label: "Mes matchs",
+      key: "family",
+      label: "Mon espace",
       content: (
-        <CalendarView
+        <FamilyView
           events={familyEvents}
-          rsvp={{ players: familyRsvpPlayers, statusByKey: familyRsvpStatusByKey }}
+          rsvpPlayers={familyRsvpPlayers}
+          rsvpStatusByKey={familyRsvpStatusByKey}
           birthdayMembers={familyBirthdayMembers}
+          teamCards={familyTeamCards}
+          convocationCards={convocationCards}
+          rosterByEventId={convocationRosterByEventId}
+          tasksByEventId={eventTasksByEventId}
+          carpoolByEventId={carpoolOffersByEventId}
         />
       ),
     });
@@ -1098,39 +1149,6 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {showWidgetsZone && (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {convocationCards.map(({ player, event, status }) => (
-              <NextConvocationCard
-                key={player.id}
-                playerName={player.isSelf ? "toi" : player.name}
-                playerId={player.id}
-                event={event}
-                status={status}
-                roster={convocationRosterByEventId[event.id] ?? []}
-                tasks={eventTasksByEventId[event.id] ?? emptyEventTasks}
-                carpool={carpoolOffersByEventId[event.id] ?? []}
-              />
-            ))}
-            {coachCards.map(({ team, event, counts, roster }) => (
-              <CoachNextMatchCard
-                key={team.id}
-                teamName={`${team.name ?? "Équipe"}${
-                  team.category ? ` · ${team.category}` : ""
-                }`}
-                event={event}
-                counts={counts}
-                roster={roster}
-                tasks={
-                  event
-                    ? (eventTasksByEventId[event.id] ?? emptyEventTasks)
-                    : emptyEventTasks
-                }
-                carpool={event ? (carpoolOffersByEventId[event.id] ?? []) : []}
-              />
-            ))}
-          </div>
-        )}
 
       <DashboardTabs tabs={tabs} />
 

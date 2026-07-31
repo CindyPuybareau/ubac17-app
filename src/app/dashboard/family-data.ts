@@ -5,6 +5,7 @@ export type UpcomingEvent = {
   title: string | null;
   event_type: string | null;
   location: string | null;
+  salle: string | null;
   start_time: string;
   team_id: string | null;
 };
@@ -37,7 +38,7 @@ export async function getNextEventForTeams(
 ): Promise<UpcomingEvent | null> {
   const { data } = await supabase
     .from("events")
-    .select("id, title, event_type, location, start_time, team_id")
+    .select("id, title, event_type, location, salle, start_time, team_id")
     .or(teamOrClubWideFilter(teamIds))
     .gte("start_time", new Date().toISOString())
     .order("start_time", { ascending: true })
@@ -54,7 +55,7 @@ export async function getUpcomingEventsForTeam(
 ): Promise<UpcomingEvent[]> {
   const { data } = await supabase
     .from("events")
-    .select("id, title, event_type, location, start_time, team_id")
+    .select("id, title, event_type, location, salle, start_time, team_id")
     .eq("team_id", teamId)
     .gte("start_time", new Date().toISOString())
     .order("start_time", { ascending: true })
