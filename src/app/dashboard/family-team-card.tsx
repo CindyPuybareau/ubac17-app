@@ -11,6 +11,7 @@ export type FamilyTeamCardData = {
   coaches: Person[];
   roster: Person[];
   ffbbUrl: string | null;
+  sortOrder: number | null;
 };
 
 function fullName(p: Person) {

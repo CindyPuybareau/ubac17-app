@@ -221,7 +221,7 @@ export default async function DashboardPage() {
         .maybeSingle(),
       supabase
         .from("team_coaches")
-        .select("teams(id, name, category, ffbb_url)")
+        .select("teams(id, name, category, ffbb_url, sort_order)")
         .eq("coach_id", user.id),
       supabase
         .from("parent_player")
@@ -238,11 +238,13 @@ export default async function DashboardPage() {
     name: string | null;
     category: string | null;
     ffbb_url: string | null;
+    sort_order: number | null;
   };
 
   const coachedTeams = (coachResult.data ?? [])
     .map((row) => row.teams as unknown as CoachedTeam | null)
-    .filter((t): t is CoachedTeam => Boolean(t));
+    .filter((t): t is CoachedTeam => Boolean(t))
+    .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999));
   const isCoach = coachedTeams.length > 0;
 
   const players = (playerLinksResult.data ?? [])
@@ -341,6 +343,7 @@ export default async function DashboardPage() {
       supabase
         .from("teams")
         .select("id, name, category, ffbb_url")
+        .order("sort_order", { ascending: true, nullsFirst: false })
         .order("category"),
       supabase
         .from("players")
@@ -924,7 +927,10 @@ export default async function DashboardPage() {
 
     if (allTeamIds.length > 0) {
       const [teamsRes, teammateRowsRes, teamCoachesRes] = await Promise.all([
-        supabase.from("teams").select("id, name, category, ffbb_url").in("id", allTeamIds),
+        supabase
+          .from("teams")
+          .select("id, name, category, ffbb_url, sort_order")
+          .in("id", allTeamIds),
         supabase
           .from("team_players")
           .select("team_id, players(id, first_name, last_name, birth_date, category)")
@@ -986,9 +992,13 @@ export default async function DashboardPage() {
             coaches: coachesByTeamId.get(teamId) ?? [],
             roster: rosterByTeamId.get(teamId) ?? [],
             ffbbUrl: team.ffbb_url,
+            sortOrder: team.sort_order,
           });
         });
       });
+      familyTeamCards.sort(
+        (a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999)
+      );
     }
 
     const { data: eventsData } = await supabase
