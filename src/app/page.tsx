@@ -58,7 +58,7 @@ export default function Home() {
       <header className="sticky top-0 z-10 border-b border-black/5 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
           <div className="flex items-center gap-2">
-            <Image src="/logo.png" alt="UBAC 17" width={36} height={36} className="h-9 w-9 object-contain" priority />
+            <Image src="/logo.png" alt="UBAC" width={36} height={36} className="h-9 w-9 object-contain" priority />
             <span className="text-lg font-semibold text-ubac-blue">
               UBAC
             </span>

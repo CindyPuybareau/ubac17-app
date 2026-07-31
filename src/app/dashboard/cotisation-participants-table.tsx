@@ -108,7 +108,7 @@ function openReceiptWindow(c: AdminCotisation, contactEmail: string | null) {
 </style>
 </head>
 <body>
-  <h1>UBAC 17 — Union Basket Angoulins Châtelaillon</h1>
+  <h1>UBAC — Union Basket Angoulins Châtelaillon</h1>
   <p class="muted">Reçu / Facture — ${c.collecteName ?? `Cotisation ${c.saison}`}</p>
   <table>
     <tr><th>Membre</th><td>${c.playerName}</td></tr>
@@ -331,9 +331,9 @@ export default function CotisationParticipantsTable({
       .filter((e): e is string => Boolean(e));
     if (emails.length === 0) return null;
     return `mailto:?bcc=${encodeURIComponent(emails.join(","))}&subject=${encodeURIComponent(
-      "UBAC 17 - Rappel de cotisation"
+      "UBAC - Rappel de cotisation"
     )}&body=${encodeURIComponent(
-      "Bonjour,\n\nNous vous rappelons qu'un règlement est encore attendu pour la cotisation en cours. Merci de régulariser votre situation auprès du Bureau.\n\nSportivement,\nUBAC 17"
+      "Bonjour,\n\nNous vous rappelons qu'un règlement est encore attendu pour la cotisation en cours. Merci de régulariser votre situation auprès du Bureau.\n\nSportivement,\nUBAC"
     )}`;
   }
 

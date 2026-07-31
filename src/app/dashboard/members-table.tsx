@@ -444,7 +444,7 @@ export default function MembersTable({
                         {m.pendingParentEmail || m.email ? (
                           <a
                             href={`mailto:${m.pendingParentEmail ?? m.email}?subject=${encodeURIComponent(
-                              "UBAC 17 - Rejoins ton espace membre"
+                              "UBAC - Rejoins ton espace membre"
                             )}`}
                             onClick={() => setOpenMenuId(null)}
                             className={menuItemClass}

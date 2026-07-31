@@ -59,7 +59,7 @@ export default function InscriptionPage() {
     <div className="flex flex-1 flex-col items-center justify-center bg-zinc-50 px-4 py-16">
       <div className="w-full max-w-sm rounded-2xl border border-zinc-100 bg-white p-6 shadow-sm">
         <div className="mb-6 text-center">
-          <Image src="/logo.png" alt="UBAC 17" width={48} height={48} className="mx-auto h-12 w-12 object-contain" priority />
+          <Image src="/logo.png" alt="UBAC" width={48} height={48} className="mx-auto h-12 w-12 object-contain" priority />
           <h1 className="mt-3 text-xl font-bold text-zinc-900">
             Inscription
           </h1>

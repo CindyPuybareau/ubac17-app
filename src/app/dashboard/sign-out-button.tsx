@@ -4,11 +4,7 @@ import { LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-export default function SignOutButton({
-  variant = "header",
-}: {
-  variant?: "header" | "inline";
-}) {
+export default function SignOutButton() {
   const router = useRouter();
 
   async function handleSignOut() {
@@ -16,18 +12,6 @@ export default function SignOutButton({
     await supabase.auth.signOut();
     router.push("/");
     router.refresh();
-  }
-
-  if (variant === "inline") {
-    return (
-      <button
-        onClick={handleSignOut}
-        className="flex items-center gap-1.5 rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50"
-      >
-        <LogOut className="h-3.5 w-3.5 shrink-0" />
-        Déconnexion
-      </button>
-    );
   }
 
   return (

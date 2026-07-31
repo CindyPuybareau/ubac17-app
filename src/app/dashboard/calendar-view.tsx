@@ -237,7 +237,7 @@ export default function CalendarView({
       minute: "2-digit",
     });
     return `mailto:?bcc=${encodeURIComponent(emails.join(","))}&subject=${encodeURIComponent(
-      `UBAC 17 - Convocation ${event.teamName}`
+      `UBAC - Convocation ${event.teamName}`
     )}&body=${encodeURIComponent(
       `Bonjour,\n\nMerci de confirmer votre présence pour : ${event.title ?? styleFor(event.event_type).label}, le ${when}${event.location ? ` (${event.location})` : ""}.\n\nSportivement,\nLe coach`
     )}`;

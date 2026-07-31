@@ -1143,23 +1143,17 @@ export default async function DashboardPage() {
       <header className="sticky top-0 z-10 bg-navy px-4 py-3 sm:px-6">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between">
           <div className="flex items-center gap-2">
-            <Image src="/logo.png" alt="UBAC 17" width={32} height={32} className="h-8 w-8 object-contain" priority />
-            <span className="text-sm font-semibold text-white">UBAC 17</span>
+            <Image src="/logo.png" alt="UBAC" width={32} height={32} className="h-8 w-8 object-contain" priority />
+            <span className="text-sm font-semibold text-white">UBAC</span>
           </div>
           <SignOutButton />
         </div>
       </header>
 
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 pt-6 pb-24 sm:px-6 sm:py-10">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-zinc-500">Bienvenue,</p>
-            <h1 className="text-2xl font-bold text-zinc-900">
-              {profile?.first_name ?? user.email}
-            </h1>
-          </div>
-          <SignOutButton variant="inline" />
-        </div>
+        <h1 className="text-2xl font-bold text-slate-800">
+          Bienvenue, {profile?.first_name ?? user.email}
+        </h1>
 
 
       <DashboardTabs tabs={tabs} />
