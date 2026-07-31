@@ -347,6 +347,13 @@ export default async function DashboardPage() {
   let adminUpcomingEvents: AdminUpcomingEvent[] = [];
   let adminMembers: AdminMember[] = [];
   let profileDirectory: ProfileDirectoryEntry[] = [];
+  // The Membres table's team pickers (filter + "Modifier le profil") only
+  // ever offer the 13 official teams — the legacy category rows left over
+  // from the original import (z.Sénior, U13, U18...) have sort_order null
+  // and are deliberately excluded here, even though they still exist in
+  // adminTeams/the Équipes tab until every member is manually migrated off
+  // them.
+  let canonicalTeamRefs: AdminMemberTeam[] = [];
   const adminContactPhoneByPlayerId: Record<string, string> = {};
 
   if (isAdmin) {
@@ -364,7 +371,7 @@ export default async function DashboardPage() {
     ] = await Promise.all([
       supabase
         .from("teams")
-        .select("id, name, category, ffbb_url, pending_coach_names")
+        .select("id, name, category, ffbb_url, pending_coach_names, sort_order")
         .order("sort_order", { ascending: true, nullsFirst: false })
         .order("category"),
       supabase
@@ -475,6 +482,9 @@ export default async function DashboardPage() {
       pendingCoachNames: t.pending_coach_names,
     }));
     allProfilesForAdmin = profilesRes.data ?? [];
+    canonicalTeamRefs = (teamsRes.data ?? [])
+      .filter((t) => t.sort_order !== null)
+      .map((t) => ({ id: t.id, name: t.name, category: t.category }));
 
     (parentPlayerRes.data ?? []).forEach((pp) => {
       const phone = phoneByProfileId.get(pp.parent_id);
@@ -1159,6 +1169,7 @@ export default async function DashboardPage() {
           members={adminMembers}
           birthdayMembers={adminBirthdayMembers}
           profileDirectory={profileDirectory}
+          canonicalTeamRefs={canonicalTeamRefs}
         />
       ),
     });

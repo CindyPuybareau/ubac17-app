@@ -30,6 +30,7 @@ export default function AdminView({
   members,
   birthdayMembers,
   profileDirectory,
+  canonicalTeamRefs,
 }: {
   clubFunction?: string | null;
   teams: TeamWithMembers[];
@@ -41,6 +42,7 @@ export default function AdminView({
   members: AdminMember[];
   birthdayMembers: BirthdaySource[];
   profileDirectory: ProfileDirectoryEntry[];
+  canonicalTeamRefs: { id: string; name: string | null; category: string | null }[];
 }) {
   const teamRefs = teams.map((t) => ({
     id: t.id,
@@ -76,7 +78,7 @@ export default function AdminView({
       content: (
         <MembersTable
           members={members}
-          teams={teamRefs}
+          teams={canonicalTeamRefs}
           profileDirectory={profileDirectory}
         />
       ),
