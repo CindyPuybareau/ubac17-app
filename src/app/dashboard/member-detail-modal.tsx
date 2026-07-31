@@ -8,8 +8,8 @@ import type { AdminMemberTeam, MemberDetail, ProfileDirectoryEntry } from "./pag
 
 const TABS = [
   { key: "identity", label: "Identité", icon: User },
-  { key: "family", label: "Parents & Urgence", icon: Users },
   { key: "license", label: "Licence & Équipe", icon: Shield },
+  { key: "family", label: "Parents & Urgence", icon: Users },
   { key: "medical", label: "Santé & Chartes", icon: AlertTriangle },
 ] as const;
 
