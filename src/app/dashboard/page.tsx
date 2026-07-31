@@ -631,12 +631,19 @@ export default async function DashboardPage() {
           : [],
         isBureau: memberEmail ? adminEmailsLower.has(memberEmail.toLowerCase()) : false,
         pendingCoachTeams: pendingCoachTeamsByPlayerId.get(player.id) ?? [],
-        // Prefer a linked account's live contact info; fall back to the
-        // registration-form snapshot when no parent/self account exists yet.
+        // Prefer a linked account's live contact info for email (a child's
+        // registration_email is typically the parent's anyway). Phone is
+        // the opposite: this row's OWN registration_phone is what the
+        // Bureau edits per-member, so it must win — otherwise, for a
+        // child, contactProfileId resolves to the PARENT's account and
+        // every one of that parent's kids would show the parent's own
+        // phone instead of the number just entered for that specific
+        // child (and for a self-linked adult, their possibly blank/wrong
+        // signup phone would shadow the correct club registration one).
         email: memberEmail,
         phone:
-          (contactProfileId ? phoneByProfileId.get(contactProfileId) : null) ??
           player.registration_phone ??
+          (contactProfileId ? phoneByProfileId.get(contactProfileId) : null) ??
           player.mother_phone ??
           player.father_phone,
         hasParent: parentIds.length > 0,
