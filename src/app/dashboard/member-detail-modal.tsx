@@ -2,9 +2,9 @@
 
 import { useState, type ChangeEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Shield, User, Users, X } from "lucide-react";
+import { AlertTriangle, Shield, Trash2, User, Users, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import type { AdminMemberTeam, MemberDetail, ProfileDirectoryEntry } from "./page";
+import type { AdminMemberTeam, MemberDetail } from "./page";
 
 const TABS = [
   { key: "identity", label: "Identité", icon: User },
@@ -97,20 +97,24 @@ export default function MemberDetailModal({
   member,
   readOnly,
   onClose,
+  onArchive,
+  archivedAt = null,
   teams = [],
-  profileDirectory = [],
-  profileId: initialProfileId = null,
+  profileId = null,
   isBureau: initialIsBureau = false,
   coachTeams: initialCoachTeams = [],
+  pendingCoachTeams: initialPendingCoachTeams = [],
 }: {
   member: MemberDetail;
   readOnly: boolean;
   onClose: () => void;
+  onArchive?: () => void;
+  archivedAt?: string | null;
   teams?: AdminMemberTeam[];
-  profileDirectory?: ProfileDirectoryEntry[];
   profileId?: string | null;
   isBureau?: boolean;
   coachTeams?: AdminMemberTeam[];
+  pendingCoachTeams?: AdminMemberTeam[];
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>("identity");
@@ -129,10 +133,8 @@ export default function MemberDetailModal({
     currentTeam && !teams.some((t) => t.id === currentTeam.id)
       ? [...teams, currentTeam]
       : teams;
-  const [profileId, setProfileId] = useState(initialProfileId ?? "");
-  const [coachChecked, setCoachChecked] = useState(initialCoachTeams.length > 0);
   const [coachTeamIds, setCoachTeamIds] = useState<Set<string>>(
-    () => new Set(initialCoachTeams.map((t) => t.id))
+    () => new Set([...initialCoachTeams, ...initialPendingCoachTeams].map((t) => t.id))
   );
   const [bureauChecked, setBureauChecked] = useState(initialIsBureau);
   const [form, setForm] = useState({
@@ -174,12 +176,15 @@ export default function MemberDetailModal({
     });
   }
 
-  function handleCoachCheckboxChange(checked: boolean) {
-    setCoachChecked(checked);
-    if (!checked) setCoachTeamIds(new Set());
+  async function handleArchiveClick() {
+    const name = [member.firstName, member.lastName].filter(Boolean).join(" ") || "ce membre";
+    const ok = window.confirm(
+      `Archiver la fiche de ${name} ? Elle n'apparaîtra plus dans la liste par défaut, mais ses données restent conservées et tu peux réactiver à tout moment.`
+    );
+    if (!ok || !onArchive) return;
+    onArchive();
+    onClose();
   }
-
-  const linkedProfile = profileDirectory.find((p) => p.id === profileId);
 
   async function handleSave() {
     setSaving(true);
@@ -241,67 +246,66 @@ export default function MemberDetailModal({
       }
     }
 
-    if (profileId !== (initialProfileId ?? "")) {
-      const { error: linkError } = await supabase
-        .from("players")
-        .update({ profile_id: profileId || null })
-        .eq("id", member.id);
-      if (linkError) {
+    // Coach team assignment works whether or not this member has a real
+    // login account yet: linked -> real team_coaches (grants access),
+    // unlinked -> team_pending_coaches (display-only badge, same table the
+    // "en attente de compte" pastille reads from). The players<->profiles
+    // auto-link runs silently in the background at signup — nothing here
+    // needs to know about it.
+    const initialCombinedCoachIds = new Set(
+      [...initialCoachTeams, ...initialPendingCoachTeams].map((t) => t.id)
+    );
+    const desiredCoachIds = coachTeamIds;
+    const toRemove = Array.from(initialCombinedCoachIds).filter(
+      (id) => !desiredCoachIds.has(id)
+    );
+    const toAdd = Array.from(desiredCoachIds).filter(
+      (id) => !initialCombinedCoachIds.has(id)
+    );
+    const coachTable = profileId ? "team_coaches" : "team_pending_coaches";
+    const coachIdColumn = profileId ? "coach_id" : "player_id";
+    const coachIdValue = profileId ?? member.id;
+
+    if (toRemove.length > 0) {
+      const { error: removeError } = await supabase
+        .from(coachTable)
+        .delete()
+        .eq(coachIdColumn, coachIdValue)
+        .in("team_id", toRemove);
+      if (removeError) {
         setSaving(false);
-        setError(`Liaison du compte impossible : ${linkError.message}`);
+        setError(`Équipes coachées non mises à jour : ${removeError.message}`);
+        return;
+      }
+    }
+    if (toAdd.length > 0) {
+      const { error: addError } = await supabase
+        .from(coachTable)
+        .insert(toAdd.map((tid) => ({ team_id: tid, [coachIdColumn]: coachIdValue })));
+      if (addError) {
+        setSaving(false);
+        setError(`Équipes coachées non mises à jour : ${addError.message}`);
         return;
       }
     }
 
-    if (profileId) {
-      const initialCoachIds = new Set(initialCoachTeams.map((t) => t.id));
-      const desiredCoachIds = coachChecked ? coachTeamIds : new Set<string>();
-      const toRemove = Array.from(initialCoachIds).filter(
-        (id) => !desiredCoachIds.has(id)
-      );
-      const toAdd = Array.from(desiredCoachIds).filter(
-        (id) => !initialCoachIds.has(id)
-      );
-
-      if (toRemove.length > 0) {
-        const { error: removeError } = await supabase
-          .from("team_coaches")
-          .delete()
-          .eq("coach_id", profileId)
-          .in("team_id", toRemove);
-        if (removeError) {
+    // Bureau access is pre-provisioned by email (same pattern as coach
+    // invites) — works before the member ever signs up.
+    if (bureauChecked !== initialIsBureau) {
+      const email = form.registrationEmail || member.registrationEmail;
+      if (email) {
+        const { error: bureauError } = bureauChecked
+          ? await supabase
+              .from("club_administrators")
+              .insert({ email, role: "ADMIN" })
+          : await supabase
+              .from("club_administrators")
+              .delete()
+              .eq("email", email);
+        if (bureauError) {
           setSaving(false);
-          setError(`Équipes coachées non mises à jour : ${removeError.message}`);
+          setError(`Accès Bureau non mis à jour : ${bureauError.message}`);
           return;
-        }
-      }
-      if (toAdd.length > 0) {
-        const { error: addError } = await supabase
-          .from("team_coaches")
-          .insert(toAdd.map((tid) => ({ team_id: tid, coach_id: profileId })));
-        if (addError) {
-          setSaving(false);
-          setError(`Équipes coachées non mises à jour : ${addError.message}`);
-          return;
-        }
-      }
-
-      if (bureauChecked !== initialIsBureau) {
-        const linkedEmail = profileDirectory.find((p) => p.id === profileId)?.email;
-        if (linkedEmail) {
-          const { error: bureauError } = bureauChecked
-            ? await supabase
-                .from("club_administrators")
-                .insert({ email: linkedEmail, role: "ADMIN" })
-            : await supabase
-                .from("club_administrators")
-                .delete()
-                .eq("email", linkedEmail);
-          if (bureauError) {
-            setSaving(false);
-            setError(`Accès Bureau non mis à jour : ${bureauError.message}`);
-            return;
-          }
         }
       }
     }
@@ -515,86 +519,42 @@ export default function MemberDetailModal({
 
               {editable && (
                 <div className="flex flex-col gap-3 rounded-xl border border-zinc-100 bg-zinc-50 p-3 sm:col-span-2">
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-1.5">
                     <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                      Compte de connexion
+                      Équipes coachées par ce membre
                     </span>
-                    {linkedProfile ? (
-                      <p className="text-sm text-zinc-800">
-                        Lié à{" "}
-                        <span className="font-medium">
-                          {linkedProfile.email ?? "compte sans email"}
-                        </span>
-                      </p>
-                    ) : (
-                      <>
-                        <p className="text-sm text-zinc-400">Aucun compte lié</p>
-                        <select
-                          value=""
-                          onChange={(e) => setProfileId(e.target.value)}
-                          className="rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+                    <div className="flex flex-wrap gap-2">
+                      {teams.map((t) => (
+                        <label
+                          key={t.id}
+                          className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
+                            coachTeamIds.has(t.id)
+                              ? "border-purple-300 bg-purple-100 text-purple-700"
+                              : "border-zinc-200 text-zinc-600"
+                          }`}
                         >
-                          <option value="" disabled>
-                            Lier à un compte existant...
-                          </option>
-                          {profileDirectory.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {[p.firstName, p.lastName].filter(Boolean).join(" ") ||
-                                "Sans nom"}
-                              {p.email ? ` · ${p.email}` : ""}
-                            </option>
-                          ))}
-                        </select>
-                      </>
-                    )}
+                          <input
+                            type="checkbox"
+                            checked={coachTeamIds.has(t.id)}
+                            onChange={() => toggleCoachTeam(t.id)}
+                            className="h-3.5 w-3.5 rounded border-zinc-300"
+                          />
+                          {t.name}
+                          {t.category ? ` · ${t.category}` : ""}
+                        </label>
+                      ))}
+                    </div>
                   </div>
 
-                  {linkedProfile && (
-                    <div className="flex flex-col gap-2">
-                      <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
-                        <input
-                          type="checkbox"
-                          checked={coachChecked}
-                          onChange={(e) => handleCoachCheckboxChange(e.target.checked)}
-                          className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
-                        />
-                        Coach
-                      </label>
-                      {coachChecked && (
-                        <div className="ml-6 flex flex-wrap gap-2">
-                          {teams.map((t) => (
-                            <label
-                              key={t.id}
-                              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
-                                coachTeamIds.has(t.id)
-                                  ? "border-purple-300 bg-purple-100 text-purple-700"
-                                  : "border-zinc-200 text-zinc-600"
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={coachTeamIds.has(t.id)}
-                                onChange={() => toggleCoachTeam(t.id)}
-                                className="h-3.5 w-3.5 rounded border-zinc-300"
-                              />
-                              {t.name}
-                              {t.category ? ` · ${t.category}` : ""}
-                            </label>
-                          ))}
-                        </div>
-                      )}
-
-                      <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
-                        <input
-                          type="checkbox"
-                          checked={bureauChecked}
-                          onChange={(e) => setBureauChecked(e.target.checked)}
-                          className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
-                        />
-                        Bureau
-                      </label>
-                    </div>
-                  )}
+                  <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
+                    <input
+                      type="checkbox"
+                      checked={bureauChecked}
+                      onChange={(e) => setBureauChecked(e.target.checked)}
+                      className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
+                    />
+                    Bureau
+                  </label>
                 </div>
               )}
 
@@ -681,13 +641,25 @@ export default function MemberDetailModal({
         {editable && (
           <div className="border-t border-zinc-100 px-5 py-3">
             {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="w-full rounded-full bg-ubac-yellow px-4 py-2 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
-            >
-              {saving ? "Enregistrement..." : "Enregistrer"}
-            </button>
+            <div className="flex items-center gap-2">
+              {onArchive && !archivedAt && (
+                <button
+                  type="button"
+                  onClick={handleArchiveClick}
+                  className="flex shrink-0 items-center gap-1.5 rounded-full border border-red-200 px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Supprimer ce membre
+                </button>
+              )}
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="flex-1 rounded-full bg-ubac-yellow px-4 py-2 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+              >
+                {saving ? "Enregistrement..." : "Enregistrer"}
+              </button>
+            </div>
           </div>
         )}
       </div>

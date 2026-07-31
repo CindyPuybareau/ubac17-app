@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import MemberDetailModal from "./member-detail-modal";
-import type { AdminMember, AdminMemberTeam, ProfileDirectoryEntry } from "./page";
+import type { AdminMember, AdminMemberTeam } from "./page";
 
 function fullLastName(m: AdminMember) {
   return (m.lastName ?? "").toUpperCase() || "—";
@@ -52,11 +52,9 @@ function Modal({
 export default function MembersTable({
   members,
   teams,
-  profileDirectory,
 }: {
   members: AdminMember[];
   teams: AdminMemberTeam[];
-  profileDirectory: ProfileDirectoryEntry[];
 }) {
   const router = useRouter();
 
@@ -543,11 +541,13 @@ export default function MembersTable({
               member={detailMember}
               readOnly={false}
               onClose={() => setDetailMemberId(null)}
+              onArchive={() => handleArchive([detailMember.id])}
+              archivedAt={detailMember.archivedAt}
               teams={teams}
-              profileDirectory={profileDirectory}
               profileId={detailMember.profileId}
               isBureau={detailMember.isBureau}
               coachTeams={detailMember.coachTeams}
+              pendingCoachTeams={detailMember.pendingCoachTeams}
             />
           );
         })()}

@@ -91,16 +91,9 @@ export type AdminMember = MemberDetail & {
   // whitelist (Bureau access).
   isBureau: boolean;
   // Teams this member's own player row is designated to coach before they
-  // have a real account (teams.pending_coach_player_id) — display-only,
-  // mirrors the free-text pending_coach_names shown on team cards.
+  // have a real account (team_pending_coaches) — display-only, mirrors
+  // the free-text pending_coach_names shown on team cards.
   pendingCoachTeams: AdminMemberTeam[];
-};
-
-export type ProfileDirectoryEntry = {
-  id: string;
-  firstName: string | null;
-  lastName: string | null;
-  email: string | null;
 };
 
 export type CollecteType = "STAGE" | "EVENEMENT" | "BOUTIQUE";
@@ -350,7 +343,6 @@ export default async function DashboardPage() {
   let adminCollectes: AdminCollecte[] = [];
   let adminUpcomingEvents: AdminUpcomingEvent[] = [];
   let adminMembers: AdminMember[] = [];
-  let profileDirectory: ProfileDirectoryEntry[] = [];
   // The Membres table's team pickers (filter + "Modifier le profil") only
   // ever offer the 13 official teams — the legacy category rows left over
   // from the original import (z.Sénior, U13, U18...) have sort_order null
@@ -649,13 +641,6 @@ export default async function DashboardPage() {
         profileId: player.profile_id,
       };
     });
-
-    profileDirectory = (profilesRes.data ?? []).map((p) => ({
-      id: p.id,
-      firstName: p.first_name,
-      lastName: p.last_name,
-      email: (p as { email: string | null }).email,
-    }));
 
     const rsvpsByEvent = await fetchRsvpsByEvent(
       supabase,
@@ -1188,7 +1173,6 @@ export default async function DashboardPage() {
           contactPhoneByPlayerId={adminContactPhoneByPlayerId}
           members={adminMembers}
           birthdayMembers={adminBirthdayMembers}
-          profileDirectory={profileDirectory}
           canonicalTeamRefs={canonicalTeamRefs}
         />
       ),
