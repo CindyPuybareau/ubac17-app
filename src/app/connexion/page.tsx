@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import PasswordInput from "@/components/password-input";
 
 export default function ConnexionPage() {
   const router = useRouter();
@@ -71,11 +72,10 @@ export default function ConnexionPage() {
                 Mot de passe oublié ?
               </Link>
             </div>
-            <input
-              type="password"
+            <PasswordInput
               required
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={setPassword}
               className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-ubac-blue focus:outline-none focus:ring-1 focus:ring-ubac-blue"
             />
           </div>
