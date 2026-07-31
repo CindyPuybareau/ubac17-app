@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ChangeEvent, type ReactNode } from "react";
+import { useEffect, useState, type ChangeEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Shield, Trash2, User, Users, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -145,6 +145,25 @@ export default function MemberDetailModal({
   const [coachTeamIds, setCoachTeamIds] = useState<Set<string>>(
     () => new Set([...initialCoachTeams, ...initialPendingCoachTeams].map((t) => t.id))
   );
+  const [isCoach, setIsCoach] = useState(() => coachTeamIds.size > 0);
+  // Fades the coached-teams block in on the frame after it mounts, rather
+  // than mounting it already at full opacity — a plain conditional render
+  // has nothing to transition from otherwise.
+  const [coachTeamsVisible, setCoachTeamsVisible] = useState(isCoach);
+
+  useEffect(() => {
+    if (!isCoach) {
+      setCoachTeamsVisible(false);
+      return;
+    }
+    const id = setTimeout(() => setCoachTeamsVisible(true), 10);
+    return () => clearTimeout(id);
+  }, [isCoach]);
+
+  function handleCoachToggle(checked: boolean) {
+    setIsCoach(checked);
+    if (!checked) setCoachTeamIds(new Set());
+  }
   const [bureauRole, setBureauRole] = useState(initialBureauRole ?? "");
   // Guard against the classic controlled-<select> pitfall (already hit
   // once with the Équipe picker): if a legacy row's club_function doesn't
@@ -540,29 +559,57 @@ export default function MemberDetailModal({
 
               {editable && (
                 <div className="flex flex-col gap-1.5 rounded-xl border border-zinc-100 bg-zinc-50 p-3 sm:col-span-2">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                    Équipes coachées par ce membre
-                  </span>
-                  <div className="flex flex-wrap gap-2">
-                    {teams.map((t) => (
-                      <label
-                        key={t.id}
-                        className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
-                          coachTeamIds.has(t.id)
-                            ? "border-purple-300 bg-purple-100 text-purple-700"
-                            : "border-zinc-200 text-zinc-600"
+                  <label className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium text-zinc-700">
+                      Ce membre est Entraîneur / Coach
+                    </span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={isCoach}
+                      onClick={() => handleCoachToggle(!isCoach)}
+                      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                        isCoach ? "bg-navy" : "bg-zinc-300"
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                          isCoach ? "translate-x-5" : "translate-x-0"
                         }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={coachTeamIds.has(t.id)}
-                          onChange={() => toggleCoachTeam(t.id)}
-                          className="h-3.5 w-3.5 rounded border-zinc-300"
-                        />
-                        {teamLabel(t)}
-                      </label>
-                    ))}
-                  </div>
+                      />
+                    </button>
+                  </label>
+                  {isCoach && (
+                    <div
+                      className={`mt-1.5 transition-opacity duration-300 ${
+                        coachTeamsVisible ? "opacity-100" : "opacity-0"
+                      }`}
+                    >
+                      <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                        Équipes coachées par ce membre
+                      </span>
+                      <div className="mt-1.5 flex flex-wrap gap-2">
+                        {teams.map((t) => (
+                          <label
+                            key={t.id}
+                            className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
+                              coachTeamIds.has(t.id)
+                                ? "border-purple-300 bg-purple-100 text-purple-700"
+                                : "border-zinc-200 text-zinc-600"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={coachTeamIds.has(t.id)}
+                              onChange={() => toggleCoachTeam(t.id)}
+                              className="h-3.5 w-3.5 rounded border-zinc-300"
+                            />
+                            {teamLabel(t)}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
