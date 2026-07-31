@@ -87,9 +87,11 @@ export type AdminMember = MemberDetail & {
   // This player's own login account, if any (players.profile_id) — lets the
   // Bureau manage that account's Coach/Bureau roles from the member modal.
   profileId: string | null;
-  // Whether this member's linked account is in the club_administrators
-  // whitelist (Bureau access).
-  isBureau: boolean;
+  // This member's role in club_administrators (Bureau access), or null if
+  // they have none. The specific label (Président, Trésorier...) is
+  // stored in club_administrators.club_function; any non-null value
+  // grants Bureau access today, ahead of finer-grained permissions.
+  bureauRole: string | null;
   // Teams this member's own player row is designated to coach before they
   // have a real account (team_pending_coaches) — display-only, mirrors
   // the free-text pending_coach_names shown on team cards.
@@ -402,12 +404,17 @@ export default async function DashboardPage() {
         .select("id, title, event_type, location, salle, start_time, teams(id, name, category)")
         .order("start_time", { ascending: true }),
       supabase.from("parent_player").select("parent_id, player_id"),
-      supabase.from("club_administrators").select("email"),
+      supabase.from("club_administrators").select("email, club_function"),
       supabase.from("team_pending_coaches").select("team_id, player_id"),
     ]);
 
-    const adminEmailsLower = new Set(
-      (clubAdminsRes.data ?? []).map((a) => a.email.toLowerCase())
+    const bureauRoleByEmailLower = new Map(
+      (
+        clubAdminsRes.data as
+          | { email: string; club_function: string | null }[]
+          | null
+          ?? []
+      ).map((a) => [a.email.toLowerCase(), a.club_function ?? "Membre du Bureau"])
     );
 
     const playersById = new Map(
@@ -636,7 +643,9 @@ export default async function DashboardPage() {
         coachTeams: memberEmail
           ? (coachTeamsByEmailLower.get(memberEmail.toLowerCase()) ?? [])
           : [],
-        isBureau: memberEmail ? adminEmailsLower.has(memberEmail.toLowerCase()) : false,
+        bureauRole: memberEmail
+          ? (bureauRoleByEmailLower.get(memberEmail.toLowerCase()) ?? null)
+          : null,
         pendingCoachTeams: pendingCoachTeamsByPlayerId.get(player.id) ?? [],
         email: memberEmail,
         phone:

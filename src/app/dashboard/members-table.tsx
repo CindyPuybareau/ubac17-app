@@ -13,6 +13,7 @@ import {
   Phone,
   RefreshCw,
   Search,
+  Shield,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -334,17 +335,17 @@ export default function MembersTable({
       )}
 
       <div className="w-full overflow-x-auto rounded-2xl border border-zinc-100">
-        <table className="w-full min-w-[880px] table-fixed border-collapse text-sm">
+        <table className="w-full min-w-[860px] table-fixed border-collapse text-sm">
           <colgroup>
             <col className="w-9" />
             <col className="w-9" />
             <col />
-            <col />
             <col className="w-24" />
+            <col className="w-20" />
             <col className="w-28" />
             <col className="w-28" />
             <col />
-            <col />
+            <col className="w-40" />
             <col className="w-10" />
           </colgroup>
           <thead>
@@ -400,9 +401,16 @@ export default function MembersTable({
                 <td className="px-2 py-2 text-xs text-zinc-400">{index + 1}</td>
                 <td
                   className="truncate px-2 py-2 font-semibold text-zinc-900"
-                  title={fullLastName(m)}
+                  title={
+                    m.bureauRole ? `${fullLastName(m)} — ${m.bureauRole}` : fullLastName(m)
+                  }
                 >
-                  {fullLastName(m)}
+                  <span className="inline-flex items-center gap-1">
+                    {fullLastName(m)}
+                    {m.bureauRole && (
+                      <Shield className="h-3.5 w-3.5 shrink-0 text-ubac-yellow-dark" />
+                    )}
+                  </span>
                   {m.archivedAt && (
                     <span className="ml-1.5 rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-zinc-500">
                       Archivé
@@ -468,22 +476,23 @@ export default function MembersTable({
                 <td
                   className="truncate px-2 py-2 text-zinc-600"
                   title={m.phone ?? undefined}
+                  onClick={(e) => e.stopPropagation()}
                 >
                   {m.phone ? (
-                    <span className="flex items-center gap-1">
+                    <span className="flex items-center gap-1.5">
                       <Phone className="h-3 w-3 shrink-0 text-zinc-400" />
                       <span className="truncate">{m.phone}</span>
+                      <WhatsAppButton
+                        phone={m.phone}
+                        message={`Bonjour ${m.firstName ?? ""}, ici l'UBAC.`}
+                      />
                     </span>
                   ) : (
                     <span className="text-zinc-300">—</span>
                   )}
                 </td>
                 <td className="relative px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                  <div className="flex items-center justify-end gap-1">
-                    <WhatsAppButton
-                      phone={m.phone}
-                      message={`Bonjour ${m.firstName ?? ""}, ici l'UBAC.`}
-                    />
+                  <div className="flex items-center justify-end">
                     <button
                       onClick={() =>
                         setOpenMenuId((cur) => (cur === m.id ? null : m.id))
@@ -578,7 +587,7 @@ export default function MembersTable({
               archivedAt={detailMember.archivedAt}
               teams={teams}
               profileId={detailMember.profileId}
-              isBureau={detailMember.isBureau}
+              bureauRole={detailMember.bureauRole}
               coachTeams={detailMember.coachTeams}
               pendingCoachTeams={detailMember.pendingCoachTeams}
             />

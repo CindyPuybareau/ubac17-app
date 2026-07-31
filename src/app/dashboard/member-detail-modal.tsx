@@ -7,6 +7,14 @@ import { createClient } from "@/lib/supabase/client";
 import { teamLabel } from "@/lib/teams";
 import type { AdminMemberTeam, MemberDetail } from "./page";
 
+const BUREAU_ROLE_OPTIONS = [
+  "Président / Vice-Président",
+  "Trésorier / Trésorier Adjoint",
+  "Secrétaire / Secrétaire Adjoint",
+  "Membre du Bureau",
+  "Responsable Commission (Sponsors, Com, Animations, etc.)",
+];
+
 const TABS = [
   { key: "identity", label: "Identité", icon: User },
   { key: "license", label: "Licence & Équipe", icon: Shield },
@@ -102,7 +110,7 @@ export default function MemberDetailModal({
   archivedAt = null,
   teams = [],
   profileId = null,
-  isBureau: initialIsBureau = false,
+  bureauRole: initialBureauRole = null,
   coachTeams: initialCoachTeams = [],
   pendingCoachTeams: initialPendingCoachTeams = [],
 }: {
@@ -113,7 +121,7 @@ export default function MemberDetailModal({
   archivedAt?: string | null;
   teams?: AdminMemberTeam[];
   profileId?: string | null;
-  isBureau?: boolean;
+  bureauRole?: string | null;
   coachTeams?: AdminMemberTeam[];
   pendingCoachTeams?: AdminMemberTeam[];
 }) {
@@ -137,7 +145,15 @@ export default function MemberDetailModal({
   const [coachTeamIds, setCoachTeamIds] = useState<Set<string>>(
     () => new Set([...initialCoachTeams, ...initialPendingCoachTeams].map((t) => t.id))
   );
-  const [bureauChecked, setBureauChecked] = useState(initialIsBureau);
+  const [bureauRole, setBureauRole] = useState(initialBureauRole ?? "");
+  // Guard against the classic controlled-<select> pitfall (already hit
+  // once with the Équipe picker): if a legacy row's club_function doesn't
+  // match any of the current options, surface it as an extra option so
+  // the select shows the real value instead of silently falling back.
+  const bureauRoleOptions =
+    initialBureauRole && !BUREAU_ROLE_OPTIONS.includes(initialBureauRole)
+      ? [...BUREAU_ROLE_OPTIONS, initialBureauRole]
+      : BUREAU_ROLE_OPTIONS;
   const [form, setForm] = useState({
     firstName: member.firstName ?? "",
     lastName: member.lastName ?? "",
@@ -291,14 +307,19 @@ export default function MemberDetailModal({
     }
 
     // Bureau access is pre-provisioned by email (same pattern as coach
-    // invites) — works before the member ever signs up.
-    if (bureauChecked !== initialIsBureau) {
+    // invites) — works before the member ever signs up. club_function
+    // holds the specific role for display today, ahead of the
+    // finer-grained permissions it'll eventually drive.
+    if (bureauRole !== (initialBureauRole ?? "")) {
       const email = form.registrationEmail || member.registrationEmail;
       if (email) {
-        const { error: bureauError } = bureauChecked
+        const { error: bureauError } = bureauRole
           ? await supabase
               .from("club_administrators")
-              .insert({ email, role: "ADMIN" })
+              .upsert(
+                { email, role: "ADMIN", club_function: bureauRole },
+                { onConflict: "email" }
+              )
           : await supabase
               .from("club_administrators")
               .delete()
@@ -546,40 +567,23 @@ export default function MemberDetailModal({
               )}
 
               {editable && (
-                <div className="flex flex-col gap-2 rounded-xl border-2 border-ubac-yellow/50 bg-gradient-to-br from-ubac-yellow/10 to-navy/5 p-3.5 sm:col-span-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-navy">
-                        <Shield className="h-3.5 w-3.5" />
-                        Membre du Bureau
-                      </span>
-                      <p className="mt-0.5 text-xs text-zinc-500">
-                        Président, vice-président, secrétaire, secrétaire
-                        adjointe, comptable, comptable adjoint...
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={bureauChecked}
-                      onClick={() => setBureauChecked((v) => !v)}
-                      className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
-                        bureauChecked ? "bg-navy" : "bg-zinc-300"
-                      }`}
-                    >
-                      <span
-                        className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
-                          bureauChecked ? "translate-x-5" : "translate-x-0"
-                        }`}
-                      />
-                    </button>
-                  </div>
-                  {bureauChecked && (
-                    <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-ubac-yellow px-3 py-1 text-xs font-bold text-navy">
-                      <Shield className="h-3.5 w-3.5" />
-                      Ce membre fait partie du Bureau du club
-                    </span>
-                  )}
+                <div className="flex flex-col gap-1.5 rounded-xl border-2 border-ubac-yellow/50 bg-gradient-to-br from-ubac-yellow/10 to-navy/5 p-3.5 sm:col-span-2">
+                  <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-navy">
+                    <Shield className="h-3.5 w-3.5" />
+                    Rôle au Bureau / Administration
+                  </span>
+                  <select
+                    value={bureauRole}
+                    onChange={(e) => setBureauRole(e.target.value)}
+                    className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-sm"
+                  >
+                    <option value="">Aucun (Par défaut)</option>
+                    {bureauRoleOptions.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               )}
 
