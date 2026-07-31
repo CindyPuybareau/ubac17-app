@@ -22,6 +22,7 @@ export type TeamWithMembers = {
   name: string | null;
   category: string | null;
   ffbb_url: string | null;
+  whatsAppGroupLink: string | null;
   players: RosterPlayer[];
   coaches: Person[];
   pendingCoachNames: string | null;

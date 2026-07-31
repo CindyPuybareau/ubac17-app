@@ -8,6 +8,7 @@ import {
   ChevronUp,
   Clock,
   Mail,
+  MessageCircle,
   MoreVertical,
   Phone,
   RefreshCw,
@@ -16,6 +17,8 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import MemberDetailModal from "./member-detail-modal";
+import WhatsAppButton from "./whatsapp-button";
+import WhatsAppBulkModal from "./whatsapp-bulk-modal";
 import type { AdminMember, AdminMemberTeam } from "./page";
 
 function fullLastName(m: AdminMember) {
@@ -71,6 +74,7 @@ export default function MembersTable({
   const [reassignTeamId, setReassignTeamId] = useState("");
   const [reassignSaving, setReassignSaving] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [whatsappBulkOpen, setWhatsappBulkOpen] = useState(false);
 
   const filtered = useMemo(() => {
     let list = showArchived ? members : members.filter((m) => !m.archivedAt);
@@ -285,6 +289,13 @@ export default function MembersTable({
               Envoyer un e-mail
             </a>
             <button
+              onClick={() => setWhatsappBulkOpen(true)}
+              className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+            >
+              <MessageCircle className="h-3.5 w-3.5" />
+              WhatsApp
+            </button>
+            <button
               onClick={() => openReassign(Array.from(selectedIds))}
               className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
             >
@@ -441,11 +452,19 @@ export default function MembersTable({
                     <span className="text-zinc-300">—</span>
                   )}
                 </td>
-                <td className="truncate px-2 py-2 text-zinc-600" title={m.phone ?? undefined}>
+                <td
+                  className="truncate px-2 py-2 text-zinc-600"
+                  title={m.phone ?? undefined}
+                  onClick={(e) => e.stopPropagation()}
+                >
                   {m.phone ? (
                     <span className="flex items-center gap-1">
                       <Phone className="h-3 w-3 shrink-0 text-zinc-400" />
                       <span className="truncate">{m.phone}</span>
+                      <WhatsAppButton
+                        phone={m.phone}
+                        message={`Bonjour ${m.firstName ?? ""}, ici l'UBAC.`}
+                      />
                     </span>
                   ) : (
                     <span className="text-zinc-300">—</span>
@@ -589,6 +608,21 @@ export default function MembersTable({
             </button>
           </div>
         </Modal>
+      )}
+
+      {whatsappBulkOpen && (
+        <WhatsAppBulkModal
+          title={`WhatsApp (${selectedMembers.length} membre${
+            selectedMembers.length > 1 ? "s" : ""
+          })`}
+          contacts={selectedMembers.map((m) => ({
+            id: m.id,
+            name: `${m.firstName ?? ""} ${m.lastName ?? ""}`.trim() || "Membre",
+            phone: m.phone,
+          }))}
+          defaultMessage="Bonjour, ici l'UBAC."
+          onClose={() => setWhatsappBulkOpen(false)}
+        />
       )}
     </div>
   );

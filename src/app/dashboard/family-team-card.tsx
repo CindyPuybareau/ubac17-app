@@ -1,6 +1,12 @@
-import { Clock, ExternalLink, Users } from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { Clock, ExternalLink, MessageCircle, Users } from "lucide-react";
+import WhatsAppButton from "./whatsapp-button";
+import WhatsAppBulkModal from "./whatsapp-bulk-modal";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
+type CoachContact = Person & { phone: string | null };
 
 export type FamilyTeamCardData = {
   playerId: string;
@@ -8,7 +14,7 @@ export type FamilyTeamCardData = {
   teamId: string;
   teamName: string | null;
   category: string | null;
-  coaches: Person[];
+  coaches: CoachContact[];
   roster: Person[];
   ffbbUrl: string | null;
   sortOrder: number | null;
@@ -20,6 +26,9 @@ function fullName(p: Person) {
 }
 
 export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
+  const [contactCoachesOpen, setContactCoachesOpen] = useState(false);
+  const reachableCoaches = card.coaches.filter((c) => c.phone);
+
   return (
     <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
       <p className="text-xs font-semibold uppercase tracking-wide text-ubac-blue">
@@ -55,6 +64,24 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
               <li className="text-sm text-zinc-400">Aucun coach assigné</li>
             )}
           </ul>
+          {reachableCoaches.length === 1 ? (
+            <WhatsAppButton
+              phone={reachableCoaches[0].phone}
+              message={`Bonjour, je suis un parent de l'équipe ${card.teamName ?? ""}.`}
+              label="Contacter le coach"
+              className="mt-2 flex items-center gap-1.5 rounded-full border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+            />
+          ) : (
+            reachableCoaches.length > 1 && (
+              <button
+                onClick={() => setContactCoachesOpen(true)}
+                className="mt-2 flex items-center gap-1.5 rounded-full border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+              >
+                <MessageCircle className="h-3.5 w-3.5" />
+                Contacter les coachs
+              </button>
+            )
+          )}
         </div>
 
         <div>
@@ -88,6 +115,19 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
           <ExternalLink className="h-4 w-4" />
           Voir la fiche équipe FFBB
         </a>
+      )}
+
+      {contactCoachesOpen && (
+        <WhatsAppBulkModal
+          title="Contacter les coachs"
+          contacts={card.coaches.map((c) => ({
+            id: c.id,
+            name: fullName(c),
+            phone: c.phone,
+          }))}
+          defaultMessage={`Bonjour, je suis un parent de l'équipe ${card.teamName ?? ""}.`}
+          onClose={() => setContactCoachesOpen(false)}
+        />
       )}
     </div>
   );

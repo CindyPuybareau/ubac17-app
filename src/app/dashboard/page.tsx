@@ -236,7 +236,7 @@ export default async function DashboardPage() {
       supabase
         .from("team_coaches")
         .select(
-          "teams(id, name, category, ffbb_url, sort_order, pending_coach_names)"
+          "teams(id, name, category, ffbb_url, sort_order, pending_coach_names, whatsapp_group_link)"
         )
         .eq("coach_id", user.id),
       supabase
@@ -256,6 +256,7 @@ export default async function DashboardPage() {
     ffbb_url: string | null;
     sort_order: number | null;
     pending_coach_names: string | null;
+    whatsapp_group_link: string | null;
   };
 
   const coachedTeams = (coachResult.data ?? [])
@@ -367,7 +368,9 @@ export default async function DashboardPage() {
     ] = await Promise.all([
       supabase
         .from("teams")
-        .select("id, name, category, ffbb_url, pending_coach_names, sort_order")
+        .select(
+          "id, name, category, ffbb_url, pending_coach_names, sort_order, whatsapp_group_link"
+        )
         .order("sort_order", { ascending: true, nullsFirst: false })
         .order("category"),
       supabase
@@ -474,6 +477,7 @@ export default async function DashboardPage() {
       name: t.name,
       category: t.category,
       ffbb_url: t.ffbb_url,
+      whatsAppGroupLink: t.whatsapp_group_link,
       players: rosterByTeam.get(t.id) ?? [],
       coaches: coachesByTeam.get(t.id) ?? [],
       pendingCoachNames: t.pending_coach_names,
@@ -844,6 +848,7 @@ export default async function DashboardPage() {
       name: t.name,
       category: t.category,
       ffbb_url: t.ffbb_url,
+      whatsAppGroupLink: t.whatsapp_group_link,
       players: rosterByTeam.get(t.id) ?? [],
       coaches: coachesByTeam.get(t.id) ?? [],
       pendingCoachNames: t.pending_coach_names,
@@ -1025,7 +1030,7 @@ export default async function DashboardPage() {
           .in("team_id", allTeamIds),
         supabase
           .from("team_coaches")
-          .select("team_id, profiles(id, first_name, last_name)")
+          .select("team_id, profiles(id, first_name, last_name, phone)")
           .in("team_id", allTeamIds),
       ]);
 
@@ -1058,9 +1063,14 @@ export default async function DashboardPage() {
         });
       });
 
-      const coachesByTeamId = new Map<string, Person[]>();
+      const coachesByTeamId = new Map<
+        string,
+        (Person & { phone: string | null })[]
+      >();
       (teamCoachesRes.data ?? []).forEach((row) => {
-        const p = row.profiles as unknown as Person | null;
+        const p = row.profiles as unknown as
+          | (Person & { phone: string | null })
+          | null;
         if (!p) return;
         const list = coachesByTeamId.get(row.team_id) ?? [];
         list.push(p);

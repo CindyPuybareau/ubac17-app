@@ -2,11 +2,21 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, Clock, FileText, Phone, Shirt, Utensils } from "lucide-react";
+import {
+  CalendarDays,
+  Clock,
+  FileText,
+  MessageCircle,
+  Phone,
+  Shirt,
+  Utensils,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import OpponentDisplay from "./opponent-display";
 import FfbbSync from "./ffbb-sync";
 import MemberDetailModal from "./member-detail-modal";
+import WhatsAppButton from "./whatsapp-button";
+import WhatsAppBulkModal from "./whatsapp-bulk-modal";
 import type { AdminUpcomingEvent, MemberDetail } from "./page";
 import type { RosterPlayer, TeamWithMembers } from "./team-manager";
 import type { SeasonTaskTally } from "./event-tasks";
@@ -54,6 +64,20 @@ export default function TeamCard({
 }) {
   const router = useRouter();
   const [detailPlayerId, setDetailPlayerId] = useState<string | null>(null);
+  const [contactTeamOpen, setContactTeamOpen] = useState(false);
+  const [groupLinkInput, setGroupLinkInput] = useState(team.whatsAppGroupLink ?? "");
+  const [groupLinkSaving, setGroupLinkSaving] = useState(false);
+
+  async function saveGroupLink() {
+    setGroupLinkSaving(true);
+    const supabase = createClient();
+    await supabase
+      .from("teams")
+      .update({ whatsapp_group_link: groupLinkInput || null })
+      .eq("id", team.id);
+    setGroupLinkSaving(false);
+    router.refresh();
+  }
 
   const [openPlayerForm, setOpenPlayerForm] = useState(false);
   const [newPlayerFirstName, setNewPlayerFirstName] = useState("");
@@ -272,6 +296,10 @@ export default function TeamCard({
                             <Phone className="h-3.5 w-3.5" />
                           </a>
                         )}
+                        <WhatsAppButton
+                          phone={phone}
+                          message={`Bonjour, ici le coach de ${team.name ?? "l'équipe"}.`}
+                        />
                         {memberDetailsByPlayerId?.[p.id] && (
                           <button
                             onClick={() => setDetailPlayerId(p.id)}
@@ -452,6 +480,35 @@ export default function TeamCard({
         </div>
       </div>
 
+      <div className="mt-4 border-t border-zinc-100 pt-3">
+        <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
+          Communication
+        </p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <input
+            value={groupLinkInput}
+            onChange={(e) => setGroupLinkInput(e.target.value)}
+            placeholder="Lien du groupe WhatsApp (optionnel)"
+            className="flex-1 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+          />
+          <button
+            onClick={saveGroupLink}
+            disabled={groupLinkSaving || groupLinkInput === (team.whatsAppGroupLink ?? "")}
+            className="shrink-0 rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-50"
+          >
+            {groupLinkSaving ? "..." : "Enregistrer"}
+          </button>
+        </div>
+        <button
+          onClick={() => setContactTeamOpen(true)}
+          className="mt-2 flex items-center gap-1.5 rounded-full border border-emerald-200 px-3 py-1.5 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
+        >
+          <MessageCircle className="h-4 w-4" />
+          Contacter l&apos;équipe sur WhatsApp
+        </button>
+      </div>
+
       {taskTallyByPlayerId && (
         <div className="mt-4 border-t border-zinc-100 pt-3">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
@@ -518,6 +575,20 @@ export default function TeamCard({
             />
           );
         })()}
+
+      {contactTeamOpen && (
+        <WhatsAppBulkModal
+          title={`Contacter ${team.name ?? "l'équipe"}`}
+          contacts={team.players.map((p) => ({
+            id: p.id,
+            name: fullName(p),
+            phone: contactPhoneByPlayerId[p.id] ?? null,
+          }))}
+          defaultMessage={`Bonjour, ici le coach de ${team.name ?? "l'équipe"}.`}
+          groupLink={team.whatsAppGroupLink}
+          onClose={() => setContactTeamOpen(false)}
+        />
+      )}
     </div>
   );
 }
