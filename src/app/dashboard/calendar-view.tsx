@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { parseMatchTitle } from "@/lib/match-display";
+import { teamLabel } from "@/lib/teams";
 import OpponentDisplay from "./opponent-display";
 import CreateEventForm from "./create-event-form";
 import RsvpButtons from "./rsvp-buttons";
@@ -682,8 +683,7 @@ export default function CalendarView({
                     <option value="">Tous les groupes (stage club)</option>
                     {createTeams.map((t) => (
                       <option key={t.id} value={t.id}>
-                        {t.name}
-                        {t.category ? ` · ${t.category}` : ""}
+                        {teamLabel(t)}
                       </option>
                     ))}
                   </select>

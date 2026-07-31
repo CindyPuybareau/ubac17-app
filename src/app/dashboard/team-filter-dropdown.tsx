@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { teamLabel } from "@/lib/teams";
 
 export type TeamOption = {
   id: string;
@@ -75,10 +76,7 @@ export default function TeamFilterDropdown({
                       onChange={() => toggle(t.id)}
                       className="h-4 w-4 shrink-0 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
                     />
-                    <span className="truncate">
-                      {t.name}
-                      {t.category ? ` · ${t.category}` : ""}
-                    </span>
+                    <span className="truncate">{teamLabel(t)}</span>
                   </label>
                 </li>
               ))}

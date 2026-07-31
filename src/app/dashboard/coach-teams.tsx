@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { teamLabel } from "@/lib/teams";
 import TeamCard from "./team-card";
 import type { TeamWithMembers } from "./team-manager";
 import type { AdminUpcomingEvent, MemberDetail } from "./page";
@@ -48,8 +49,7 @@ export default function CoachTeams({
                   : "border-zinc-200 text-zinc-600"
               }`}
             >
-              {t.name}
-              {t.category ? ` · ${t.category}` : ""}
+              {teamLabel(t)}
             </button>
           ))}
         </div>

@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { teamLabel } from "@/lib/teams";
 import { SALLES } from "./salles";
 
 type Team = { id: string; name: string | null; category: string | null };
@@ -92,8 +93,7 @@ export default function CreateEventForm({
           )}
           {teams.map((t) => (
             <option key={t.id} value={t.id}>
-              {t.name}
-              {t.category ? ` · ${t.category}` : ""}
+              {teamLabel(t)}
             </option>
           ))}
         </select>

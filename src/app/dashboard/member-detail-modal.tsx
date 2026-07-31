@@ -4,6 +4,7 @@ import { useState, type ChangeEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Shield, Trash2, User, Users, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { teamLabel } from "@/lib/teams";
 import type { AdminMemberTeam, MemberDetail } from "./page";
 
 const TABS = [
@@ -492,8 +493,7 @@ export default function MemberDetailModal({
                     <option value="">Aucune équipe</option>
                     {teamOptions.map((t) => (
                       <option key={t.id} value={t.id}>
-                        {t.name}
-                        {t.category ? ` · ${t.category}` : ""}
+                        {teamLabel(t)}
                       </option>
                     ))}
                   </select>
@@ -518,43 +518,68 @@ export default function MemberDetailModal({
               )}
 
               {editable && (
-                <div className="flex flex-col gap-3 rounded-xl border border-zinc-100 bg-zinc-50 p-3 sm:col-span-2">
-                  <div className="flex flex-col gap-1.5">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                      Équipes coachées par ce membre
-                    </span>
-                    <div className="flex flex-wrap gap-2">
-                      {teams.map((t) => (
-                        <label
-                          key={t.id}
-                          className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
-                            coachTeamIds.has(t.id)
-                              ? "border-purple-300 bg-purple-100 text-purple-700"
-                              : "border-zinc-200 text-zinc-600"
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={coachTeamIds.has(t.id)}
-                            onChange={() => toggleCoachTeam(t.id)}
-                            className="h-3.5 w-3.5 rounded border-zinc-300"
-                          />
-                          {t.name}
-                          {t.category ? ` · ${t.category}` : ""}
-                        </label>
-                      ))}
-                    </div>
+                <div className="flex flex-col gap-1.5 rounded-xl border border-zinc-100 bg-zinc-50 p-3 sm:col-span-2">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                    Équipes coachées par ce membre
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {teams.map((t) => (
+                      <label
+                        key={t.id}
+                        className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
+                          coachTeamIds.has(t.id)
+                            ? "border-purple-300 bg-purple-100 text-purple-700"
+                            : "border-zinc-200 text-zinc-600"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={coachTeamIds.has(t.id)}
+                          onChange={() => toggleCoachTeam(t.id)}
+                          className="h-3.5 w-3.5 rounded border-zinc-300"
+                        />
+                        {teamLabel(t)}
+                      </label>
+                    ))}
                   </div>
+                </div>
+              )}
 
-                  <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
-                    <input
-                      type="checkbox"
-                      checked={bureauChecked}
-                      onChange={(e) => setBureauChecked(e.target.checked)}
-                      className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
-                    />
-                    Bureau
-                  </label>
+              {editable && (
+                <div className="flex flex-col gap-2 rounded-xl border-2 border-ubac-yellow/50 bg-gradient-to-br from-ubac-yellow/10 to-navy/5 p-3.5 sm:col-span-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-navy">
+                        <Shield className="h-3.5 w-3.5" />
+                        Membre du Bureau
+                      </span>
+                      <p className="mt-0.5 text-xs text-zinc-500">
+                        Président, vice-président, secrétaire, secrétaire
+                        adjointe, comptable, comptable adjoint...
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={bureauChecked}
+                      onClick={() => setBureauChecked((v) => !v)}
+                      className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+                        bureauChecked ? "bg-navy" : "bg-zinc-300"
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                          bureauChecked ? "translate-x-5" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  {bureauChecked && (
+                    <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-ubac-yellow px-3 py-1 text-xs font-bold text-navy">
+                      <Shield className="h-3.5 w-3.5" />
+                      Ce membre fait partie du Bureau du club
+                    </span>
+                  )}
                 </div>
               )}
 

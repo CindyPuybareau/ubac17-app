@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { teamLabel } from "@/lib/teams";
 import MemberDetailModal from "./member-detail-modal";
 import WhatsAppButton from "./whatsapp-button";
 import WhatsAppBulkModal from "./whatsapp-bulk-modal";
@@ -251,8 +252,7 @@ export default function MembersTable({
           <option value="">Toutes les équipes</option>
           {teams.map((t) => (
             <option key={t.id} value={t.id}>
-              {t.name}
-              {t.category ? ` · ${t.category}` : ""}
+              {teamLabel(t)}
             </option>
           ))}
         </select>
@@ -603,8 +603,7 @@ export default function MembersTable({
               </option>
               {teams.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.name}
-                  {t.category ? ` · ${t.category}` : ""}
+                  {teamLabel(t)}
                 </option>
               ))}
             </select>
