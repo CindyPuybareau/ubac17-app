@@ -41,6 +41,20 @@ export type AdminMemberTeam = {
   category: string | null;
 };
 
+export type WhatsAppGroup = {
+  id: string;
+  name: string;
+  category: "EQUIPE" | "COMMISSION";
+  teamId: string | null;
+  inviteLink: string | null;
+  sortOrder: number;
+  // Whether the CURRENT user (Bureau, or the coach of this group's team)
+  // may edit the invite link and membership — computed server-side since
+  // RLS already narrows which groups appear at all.
+  canManage: boolean;
+  members: { id: string; firstName: string | null; lastName: string | null }[];
+};
+
 // Full registration record, mirroring the club's official enrollment form
 // ("Suivi des Inscriptions"). Shared by the Bureau's editable member detail
 // modal and the coach's read-only version.
@@ -276,6 +290,51 @@ export default async function DashboardPage() {
       category: p.category,
       isSelf: p.profile_id === user.id,
     }));
+
+  const coachedTeamIds = new Set(coachedTeams.map((t) => t.id));
+
+  // A single query, unconditional on role: RLS already narrows the result
+  // to exactly what this user may see (everything for Bureau, their own
+  // team's + own memberships for a Coach, only their own family's
+  // memberships for everyone else) — see is_whatsapp_group_member() /
+  // is_whatsapp_group_team_coach() in the whatsapp_groups migration.
+  const whatsappGroupsRes = await supabase
+    .from("whatsapp_groups")
+    .select(
+      "id, name, category, team_id, invite_link, sort_order, whatsapp_group_members(player_id, players(id, first_name, last_name))"
+    )
+    .order("sort_order", { ascending: true });
+
+  type WhatsAppGroupRow = {
+    id: string;
+    name: string;
+    category: string;
+    team_id: string | null;
+    invite_link: string | null;
+    sort_order: number;
+    whatsapp_group_members: {
+      player_id: string;
+      players: { id: string; first_name: string | null; last_name: string | null } | null;
+    }[];
+  };
+
+  const whatsappGroups: WhatsAppGroup[] = (
+    (whatsappGroupsRes.data ?? []) as unknown as WhatsAppGroupRow[]
+  ).map((g) => ({
+    id: g.id,
+    name: g.name,
+    category: g.category === "COMMISSION" ? "COMMISSION" : "EQUIPE",
+    teamId: g.team_id,
+    inviteLink: g.invite_link,
+    sortOrder: g.sort_order,
+    canManage: isAdmin || (g.team_id !== null && coachedTeamIds.has(g.team_id)),
+    members: g.whatsapp_group_members
+      .map((m) => m.players)
+      .filter((p): p is { id: string; first_name: string | null; last_name: string | null } =>
+        Boolean(p)
+      )
+      .map((p) => ({ id: p.id, firstName: p.first_name, lastName: p.last_name })),
+  }));
 
   // Priority zone: next convocation per linked player.
   const convocationCards = (
@@ -1197,6 +1256,7 @@ export default async function DashboardPage() {
           members={adminMembers}
           birthdayMembers={adminBirthdayMembers}
           canonicalTeamRefs={canonicalTeamRefs}
+          whatsappGroups={whatsappGroups}
         />
       ),
     });
@@ -1220,6 +1280,7 @@ export default async function DashboardPage() {
           organisationCards={coachCards}
           tasksByEventId={eventTasksByEventId}
           carpoolByEventId={carpoolOffersByEventId}
+          whatsappGroups={whatsappGroups}
         />
       ),
     });
@@ -1240,6 +1301,7 @@ export default async function DashboardPage() {
           rosterByEventId={convocationRosterByEventId}
           tasksByEventId={eventTasksByEventId}
           carpoolByEventId={carpoolOffersByEventId}
+          whatsappGroups={whatsappGroups}
         />
       ),
     });

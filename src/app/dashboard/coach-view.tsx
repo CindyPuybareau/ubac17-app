@@ -1,12 +1,13 @@
-import { CalendarDays, ClipboardList, Dumbbell, Trophy, Users } from "lucide-react";
+import { CalendarDays, ClipboardList, Dumbbell, MessageCircle, Trophy, Users } from "lucide-react";
 import CalendarView from "./calendar-view";
 import CoachTeams from "./coach-teams";
 import CoachTrainings from "./coach-trainings";
 import CoachFfbb from "./coach-ffbb";
 import CoachOrganisation, { type CoachTeamMatchCard } from "./coach-organisation";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
+import WhatsAppGroupsManager from "./whatsapp-groups-manager";
 import type { TeamWithMembers } from "./team-manager";
-import type { AdminUpcomingEvent, MemberDetail } from "./page";
+import type { AdminUpcomingEvent, MemberDetail, WhatsAppGroup } from "./page";
 import type { CarpoolOffer, EventTasksState, SeasonTaskTally } from "./event-tasks";
 import type { BirthdaySource } from "./birthdays";
 
@@ -23,6 +24,7 @@ export default function CoachView({
   organisationCards,
   tasksByEventId,
   carpoolByEventId,
+  whatsappGroups,
 }: {
   teams: TeamWithMembers[];
   events: AdminUpcomingEvent[];
@@ -36,6 +38,7 @@ export default function CoachView({
   organisationCards: CoachTeamMatchCard[];
   tasksByEventId: Record<string, EventTasksState>;
   carpoolByEventId: Record<string, CarpoolOffer[]>;
+  whatsappGroups: WhatsAppGroup[];
 }) {
   const createTeams = teams.map((t) => ({
     id: t.id,
@@ -48,6 +51,21 @@ export default function CoachView({
     if (!e.teamId) return;
     (eventsByTeamId[e.teamId] ??= []).push(e);
   });
+
+  const whatsappCandidatesById = new Map<
+    string,
+    { id: string; firstName: string | null; lastName: string | null }
+  >();
+  teams.forEach((t) => {
+    t.players.forEach((p) => {
+      whatsappCandidatesById.set(p.id, {
+        id: p.id,
+        firstName: p.first_name,
+        lastName: p.last_name,
+      });
+    });
+  });
+  const whatsappCandidates = Array.from(whatsappCandidatesById.values());
 
   const iconClass = "h-4 w-4 shrink-0";
   const sections: AdminSection[] = [
@@ -105,6 +123,14 @@ export default function CoachView({
       label: "FFBB",
       icon: <Trophy className={iconClass} />,
       content: <CoachFfbb teams={teams} />,
+    },
+    {
+      key: "whatsapp",
+      label: "Groupes WhatsApp",
+      icon: <MessageCircle className={iconClass} />,
+      content: (
+        <WhatsAppGroupsManager groups={whatsappGroups} candidates={whatsappCandidates} />
+      ),
     },
   ];
 

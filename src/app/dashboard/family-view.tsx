@@ -1,10 +1,11 @@
-import { CalendarDays, ClipboardList, Dumbbell, Users } from "lucide-react";
+import { CalendarDays, ClipboardList, Dumbbell, MessageCircle, Users } from "lucide-react";
 import CalendarView, { type CalendarRsvpPlayer } from "./calendar-view";
 import FamilyTeamCard, { type FamilyTeamCardData } from "./family-team-card";
 import FamilyTrainings from "./family-trainings";
 import NextConvocationCard from "./next-convocation-card";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
-import type { AdminUpcomingEvent } from "./page";
+import WhatsAppGroupsFamily from "./whatsapp-groups-family";
+import type { AdminUpcomingEvent, WhatsAppGroup } from "./page";
 import type { UpcomingEvent } from "./family-data";
 import type { BirthdaySource } from "./birthdays";
 import type { CarpoolOffer, EventTasksState } from "./event-tasks";
@@ -27,6 +28,7 @@ export default function FamilyView({
   rosterByEventId,
   tasksByEventId,
   carpoolByEventId,
+  whatsappGroups,
 }: {
   events: AdminUpcomingEvent[];
   rsvpPlayers: CalendarRsvpPlayer[];
@@ -37,6 +39,7 @@ export default function FamilyView({
   rosterByEventId: Record<string, { id: string; name: string }[]>;
   tasksByEventId: Record<string, EventTasksState>;
   carpoolByEventId: Record<string, CarpoolOffer[]>;
+  whatsappGroups: WhatsAppGroup[];
 }) {
   const iconClass = "h-4 w-4 shrink-0";
   const sections: AdminSection[] = [
@@ -100,6 +103,12 @@ export default function FamilyView({
           )}
         </div>
       ),
+    },
+    {
+      key: "whatsapp",
+      label: "Groupes WhatsApp",
+      icon: <MessageCircle className={iconClass} />,
+      content: <WhatsAppGroupsFamily groups={whatsappGroups} />,
     },
   ];
 

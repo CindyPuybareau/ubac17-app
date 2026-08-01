@@ -17,6 +17,8 @@ const WATCHED_TABLES = [
   "players",
   "team_pending_coaches",
   "club_administrators",
+  "whatsapp_groups",
+  "whatsapp_group_members",
 ] as const;
 
 // Mounted once at the dashboard root (src/app/dashboard/page.tsx) so it

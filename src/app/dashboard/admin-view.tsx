@@ -1,4 +1,4 @@
-import { CalendarDays, Contact, Users, Wallet, RefreshCw } from "lucide-react";
+import { CalendarDays, Contact, MessageCircle, Users, Wallet, RefreshCw } from "lucide-react";
 import TeamManager, { type TeamWithMembers } from "./team-manager";
 import ImportInscriptions from "./import-inscriptions";
 import ImportPlanning from "./import-planning";
@@ -8,11 +8,13 @@ import CalendarView from "./calendar-view";
 import MembersTable from "./members-table";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import FfbbManager from "./ffbb-manager";
+import WhatsAppGroupsManager from "./whatsapp-groups-manager";
 import type {
   AdminCollecte,
   AdminCotisation,
   AdminMember,
   AdminUpcomingEvent,
+  WhatsAppGroup,
 } from "./page";
 import type { BirthdaySource } from "./birthdays";
 
@@ -29,6 +31,7 @@ export default function AdminView({
   members,
   birthdayMembers,
   canonicalTeamRefs,
+  whatsappGroups,
 }: {
   clubFunction?: string | null;
   teams: TeamWithMembers[];
@@ -40,6 +43,7 @@ export default function AdminView({
   members: AdminMember[];
   birthdayMembers: BirthdaySource[];
   canonicalTeamRefs: { id: string; name: string | null; category: string | null }[];
+  whatsappGroups: WhatsAppGroup[];
 }) {
   const teamRefs = teams.map((t) => ({
     id: t.id,
@@ -112,6 +116,21 @@ export default function AdminView({
           <ImportPlanning existingTeams={teamRefs} />
           <ImportCoaches existingTeams={teamRefs} />
         </div>
+      ),
+    },
+    {
+      key: "whatsapp",
+      label: "Groupes WhatsApp",
+      icon: <MessageCircle className={iconClass} />,
+      content: (
+        <WhatsAppGroupsManager
+          groups={whatsappGroups}
+          candidates={members.map((m) => ({
+            id: m.id,
+            firstName: m.firstName,
+            lastName: m.lastName,
+          }))}
+        />
       ),
     },
   ];
