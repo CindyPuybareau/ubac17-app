@@ -18,9 +18,8 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { teamLabel } from "@/lib/teams";
+import { buildWhatsAppLink } from "@/lib/whatsapp";
 import MemberDetailModal from "./member-detail-modal";
-import WhatsAppButton from "./whatsapp-button";
-import WhatsAppBulkModal from "./whatsapp-bulk-modal";
 import WhatsAppGroupButton from "./whatsapp-group-button";
 import type { AdminMember, AdminMemberTeam } from "./page";
 
@@ -77,7 +76,6 @@ export default function MembersTable({
   const [reassignTeamId, setReassignTeamId] = useState("");
   const [reassignSaving, setReassignSaving] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [whatsappBulkOpen, setWhatsappBulkOpen] = useState(false);
 
   const filtered = useMemo(() => {
     let list = showArchived ? members : members.filter((m) => !m.archivedAt);
@@ -303,13 +301,6 @@ export default function MembersTable({
               Envoyer un e-mail
             </a>
             <button
-              onClick={() => setWhatsappBulkOpen(true)}
-              className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
-            >
-              <MessageCircle className="h-3.5 w-3.5" />
-              WhatsApp
-            </button>
-            <button
               onClick={() => openReassign(Array.from(selectedIds))}
               className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
             >
@@ -482,10 +473,6 @@ export default function MembersTable({
                     <span className="flex items-center gap-1.5">
                       <Phone className="h-3 w-3 shrink-0 text-zinc-400" />
                       <span className="truncate">{m.phone}</span>
-                      <WhatsAppButton
-                        phone={m.phone}
-                        message={`Bonjour ${m.firstName ?? ""}, ici l'UBAC.`}
-                      />
                     </span>
                   ) : (
                     <span className="text-zinc-300">—</span>
@@ -518,6 +505,31 @@ export default function MembersTable({
                         >
                           Voir / Modifier le profil
                         </button>
+                        {buildWhatsAppLink(m.phone, `Bonjour ${m.firstName ?? ""}, ici l'UBAC.`) ? (
+                          <a
+                            href={
+                              buildWhatsAppLink(
+                                m.phone,
+                                `Bonjour ${m.firstName ?? ""}, ici l'UBAC.`
+                              ) ?? undefined
+                            }
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={() => setOpenMenuId(null)}
+                            className={menuItemClass}
+                          >
+                            <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
+                            Contacter sur WhatsApp
+                          </a>
+                        ) : (
+                          <span
+                            title="Aucun numéro de téléphone connu"
+                            className={`${menuItemClass} cursor-not-allowed text-zinc-300 hover:bg-transparent`}
+                          >
+                            <MessageCircle className="h-3.5 w-3.5" />
+                            Contacter sur WhatsApp
+                          </span>
+                        )}
                         {m.pendingParentEmail || m.email ? (
                           <a
                             href={`mailto:${m.pendingParentEmail ?? m.email}?subject=${encodeURIComponent(
@@ -630,21 +642,6 @@ export default function MembersTable({
             </button>
           </div>
         </Modal>
-      )}
-
-      {whatsappBulkOpen && (
-        <WhatsAppBulkModal
-          title={`WhatsApp (${selectedMembers.length} membre${
-            selectedMembers.length > 1 ? "s" : ""
-          })`}
-          contacts={selectedMembers.map((m) => ({
-            id: m.id,
-            name: `${m.firstName ?? ""} ${m.lastName ?? ""}`.trim() || "Membre",
-            phone: m.phone,
-          }))}
-          defaultMessage="Bonjour, ici l'UBAC."
-          onClose={() => setWhatsappBulkOpen(false)}
-        />
       )}
     </div>
   );
