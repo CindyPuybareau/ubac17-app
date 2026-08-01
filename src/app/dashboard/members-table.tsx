@@ -19,6 +19,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { teamLabel } from "@/lib/teams";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
+import EmailTemplateModal from "./email-template-modal";
 import MemberDetailModal from "./member-detail-modal";
 import WhatsAppGroupButton from "./whatsapp-group-button";
 import type { AdminMember, AdminMemberTeam } from "./page";
@@ -71,6 +72,7 @@ export default function MembersTable({
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const [detailMemberId, setDetailMemberId] = useState<string | null>(null);
+  const [emailModalMemberId, setEmailModalMemberId] = useState<string | null>(null);
 
   const [reassignIds, setReassignIds] = useState<string[] | null>(null);
   const [reassignTeamId, setReassignTeamId] = useState("");
@@ -531,21 +533,23 @@ export default function MembersTable({
                           </span>
                         )}
                         {m.pendingParentEmail || m.email ? (
-                          <a
-                            href={`mailto:${m.pendingParentEmail ?? m.email}?subject=${encodeURIComponent(
-                              "UBAC - Rejoins ton espace membre"
-                            )}`}
-                            onClick={() => setOpenMenuId(null)}
+                          <button
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              setEmailModalMemberId(m.id);
+                            }}
                             className={menuItemClass}
                           >
-                            Relancer / Renvoyer invitation
-                          </a>
+                            <Mail className="h-3.5 w-3.5 text-navy" />
+                            Envoyer un e-mail
+                          </button>
                         ) : (
                           <span
                             title="Aucun email connu pour ce membre"
                             className={`${menuItemClass} cursor-not-allowed text-zinc-300 hover:bg-transparent`}
                           >
-                            Relancer / Renvoyer invitation
+                            <Mail className="h-3.5 w-3.5" />
+                            Envoyer un e-mail
                           </span>
                         )}
                         {m.archivedAt ? (
@@ -602,6 +606,21 @@ export default function MembersTable({
               bureauRole={detailMember.bureauRole}
               coachTeams={detailMember.coachTeams}
               pendingCoachTeams={detailMember.pendingCoachTeams}
+            />
+          );
+        })()}
+
+      {emailModalMemberId &&
+        (() => {
+          const emailMember = members.find((m) => m.id === emailModalMemberId);
+          const emailTo = emailMember?.pendingParentEmail ?? emailMember?.email;
+          if (!emailMember || !emailTo) return null;
+          return (
+            <EmailTemplateModal
+              toEmail={emailTo}
+              recipientFirstName={emailMember.firstName}
+              canUseBureauTemplates
+              onClose={() => setEmailModalMemberId(null)}
             />
           );
         })()}
