@@ -6,7 +6,6 @@ import {
   CalendarDays,
   Clock,
   FileText,
-  MessageCircle,
   Phone,
   Shirt,
   Utensils,
@@ -16,7 +15,6 @@ import OpponentDisplay from "./opponent-display";
 import FfbbSync from "./ffbb-sync";
 import MemberDetailModal from "./member-detail-modal";
 import WhatsAppButton from "./whatsapp-button";
-import WhatsAppGroupButton from "./whatsapp-group-button";
 import type { AdminUpcomingEvent, MemberDetail } from "./page";
 import type { RosterPlayer, TeamWithMembers } from "./team-manager";
 import type { SeasonTaskTally } from "./event-tasks";
@@ -464,21 +462,6 @@ export default function TeamCard({
             <p className="text-sm text-zinc-400">Aucun match à venir</p>
           )}
         </div>
-      </div>
-
-      <div className="mt-4 border-t border-zinc-100 pt-3">
-        <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-          <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
-          Communication
-        </p>
-        <p className="mb-2 text-xs text-zinc-400">
-          Le lien d&apos;invitation et les membres du groupe WhatsApp de cette
-          équipe se gèrent depuis l&apos;onglet «&nbsp;Groupes WhatsApp&nbsp;».
-        </p>
-        <WhatsAppGroupButton
-          teamName={team.name ?? "l'équipe"}
-          defaultMessage={`Bonjour à tous, ici le coach de ${team.name ?? "l'équipe"}.`}
-        />
       </div>
 
       {taskTallyByPlayerId && (

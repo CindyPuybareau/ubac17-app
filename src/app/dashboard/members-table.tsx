@@ -22,7 +22,6 @@ import { teamLabel } from "@/lib/teams";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 import EmailTemplateModal from "./email-template-modal";
 import MemberDetailModal from "./member-detail-modal";
-import WhatsAppGroupButton from "./whatsapp-group-button";
 import type { AdminMember, AdminMemberTeam } from "./page";
 
 function fullLastName(m: AdminMember) {
@@ -270,18 +269,6 @@ export default function MembersTable({
         <span className="text-xs font-medium text-zinc-400">
           {filtered.length} membre{filtered.length > 1 ? "s" : ""}
         </span>
-        {teamFilter &&
-          (() => {
-            const filteredTeam = teams.find((t) => t.id === teamFilter);
-            const teamLabel =
-              filteredTeam?.category ?? filteredTeam?.name ?? "l'équipe";
-            return (
-              <WhatsAppGroupButton
-                teamName={teamLabel}
-                defaultMessage={`Bonjour à tous, ici le Bureau UBAC.`}
-              />
-            );
-          })()}
       </div>
 
       {selectedIds.size > 0 && (
