@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { buildGmailComposeLink } from "@/lib/email";
 import MemberDetailModal from "./member-detail-modal";
 import type { AdminCotisation, AdminMember } from "./page";
 
@@ -330,11 +331,11 @@ export default function CotisationParticipantsTable({
       .map((id) => contactEmailByPlayerId[byId.get(id)?.playerId ?? ""])
       .filter((e): e is string => Boolean(e));
     if (emails.length === 0) return null;
-    return `mailto:?bcc=${encodeURIComponent(emails.join(","))}&subject=${encodeURIComponent(
-      "UBAC - Rappel de cotisation"
-    )}&body=${encodeURIComponent(
-      "Bonjour,\n\nNous vous rappelons qu'un règlement est encore attendu pour la cotisation en cours. Merci de régulariser votre situation auprès du Bureau.\n\nSportivement,\nUBAC"
-    )}`;
+    return buildGmailComposeLink({
+      bcc: emails.join(","),
+      subject: "UBAC - Rappel de cotisation",
+      body: "Bonjour,\n\nNous vous rappelons qu'un règlement est encore attendu pour la cotisation en cours. Merci de régulariser votre situation auprès du Bureau.\n\nSportivement,\nUBAC",
+    });
   }
 
   const menuItemClass =
@@ -398,6 +399,8 @@ export default function CotisationParticipantsTable({
             </button>
             <a
               href={selectedBulkMailto ?? undefined}
+              target="_blank"
+              rel="noreferrer"
               aria-disabled={!selectedBulkMailto}
               className={`flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 ${
                 !selectedBulkMailto ? "cursor-not-allowed opacity-50" : "hover:bg-zinc-50"
@@ -526,6 +529,8 @@ export default function CotisationParticipantsTable({
                           {contactEmail ? (
                             <a
                               href={relanceMailto([c.id]) ?? undefined}
+                              target="_blank"
+                              rel="noreferrer"
                               onClick={() => setOpenMenuId(null)}
                               className={menuItemClass}
                             >

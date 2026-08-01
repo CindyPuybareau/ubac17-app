@@ -2,15 +2,16 @@
 
 import { useState } from "react";
 import { Navigation, Car } from "lucide-react";
+import { buildGmailComposeLink } from "@/lib/email";
 
 function carpoolMailto(kind: "offer" | "request", context: string) {
-  const subject = encodeURIComponent(`Covoiturage - ${context}`);
-  const body = encodeURIComponent(
-    kind === "offer"
-      ? "Bonjour à tous,\n\nJe propose des places dans ma voiture pour ce déplacement. Répondez-moi si vous êtes intéressé(e) !\n\nMerci."
-      : "Bonjour à tous,\n\nJe recherche une place pour ce déplacement. Merci de me faire signe si vous avez de la place disponible !"
-  );
-  return `mailto:?subject=${subject}&body=${body}`;
+  return buildGmailComposeLink({
+    subject: `Covoiturage - ${context}`,
+    body:
+      kind === "offer"
+        ? "Bonjour à tous,\n\nJe propose des places dans ma voiture pour ce déplacement. Répondez-moi si vous êtes intéressé(e) !\n\nMerci."
+        : "Bonjour à tous,\n\nJe recherche une place pour ce déplacement. Merci de me faire signe si vous avez de la place disponible !",
+  });
 }
 
 export default function NextMatchActions({
@@ -49,6 +50,8 @@ export default function NextMatchActions({
           <div className="absolute left-0 top-full z-10 mt-1 flex w-48 flex-col gap-1 rounded-xl border border-zinc-100 bg-white p-1.5 shadow-lg">
             <a
               href={carpoolMailto("offer", context)}
+              target="_blank"
+              rel="noreferrer"
               onClick={() => setOpenCarpool(false)}
               className="rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-zinc-700 hover:bg-zinc-50"
             >
@@ -56,6 +59,8 @@ export default function NextMatchActions({
             </a>
             <a
               href={carpoolMailto("request", context)}
+              target="_blank"
+              rel="noreferrer"
               onClick={() => setOpenCarpool(false)}
               className="rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-zinc-700 hover:bg-zinc-50"
             >

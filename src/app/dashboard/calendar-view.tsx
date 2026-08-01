@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { buildGmailComposeLink } from "@/lib/email";
 import { parseMatchTitle } from "@/lib/match-display";
 import { teamLabel } from "@/lib/teams";
 import OpponentDisplay from "./opponent-display";
@@ -238,11 +239,11 @@ export default function CalendarView({
       hour: "2-digit",
       minute: "2-digit",
     });
-    return `mailto:?bcc=${encodeURIComponent(emails.join(","))}&subject=${encodeURIComponent(
-      `UBAC - Convocation ${event.teamName}`
-    )}&body=${encodeURIComponent(
-      `Bonjour,\n\nMerci de confirmer votre présence pour : ${event.title ?? styleFor(event.event_type).label}, le ${when}${event.location ? ` (${event.location})` : ""}.\n\nSportivement,\nLe coach`
-    )}`;
+    return buildGmailComposeLink({
+      bcc: emails.join(","),
+      subject: `UBAC - Convocation ${event.teamName}`,
+      body: `Bonjour,\n\nMerci de confirmer votre présence pour : ${event.title ?? styleFor(event.event_type).label}, le ${when}${event.location ? ` (${event.location})` : ""}.\n\nSportivement,\nLe coach`,
+    });
   }
 
   const eventsByDate = useMemo(() => {
@@ -492,6 +493,8 @@ export default function CalendarView({
                       {mailto && (
                         <a
                           href={mailto}
+                          target="_blank"
+                          rel="noreferrer"
                           title="Relancer les convoqués"
                           className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
                         >

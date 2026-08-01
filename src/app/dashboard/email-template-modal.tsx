@@ -13,6 +13,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { buildGmailComposeLink } from "@/lib/email";
 
 type Template = {
   id: string;
@@ -106,7 +107,7 @@ export default function EmailTemplateModal({
     setBody(bodyFor(template, recipientFirstName));
   }
 
-  const mailto = `mailto:${toEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  const gmailComposeLink = buildGmailComposeLink({ to: toEmail, subject, body });
 
   async function handleSend() {
     setSending(true);
@@ -216,11 +217,13 @@ export default function EmailTemplateModal({
 
         {result && !result.ok && (
           <a
-            href={mailto}
+            href={gmailComposeLink}
+            target="_blank"
+            rel="noreferrer"
             onClick={onClose}
             className="text-center text-xs text-zinc-400 underline hover:text-zinc-600"
           >
-            Ou envoyer via ta messagerie habituelle
+            Ou ouvrir un brouillon Gmail pré-rempli
           </a>
         )}
       </div>

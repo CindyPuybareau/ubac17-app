@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { buildGmailComposeLink } from "@/lib/email";
 import { teamLabel } from "@/lib/teams";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 import EmailTemplateModal from "./email-template-modal";
@@ -217,7 +218,7 @@ export default function MembersTable({
   const bulkEmails = selectedMembers
     .map((m) => m.email)
     .filter((e): e is string => Boolean(e));
-  const bulkMailto = `mailto:?bcc=${encodeURIComponent(bulkEmails.join(","))}`;
+  const bulkMailto = buildGmailComposeLink({ bcc: bulkEmails.join(",") });
 
   const menuItemClass =
     "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-zinc-700 hover:bg-zinc-50";
@@ -292,6 +293,8 @@ export default function MembersTable({
           <div className="flex flex-wrap items-center gap-2">
             <a
               href={bulkEmails.length > 0 ? bulkMailto : undefined}
+              target="_blank"
+              rel="noreferrer"
               aria-disabled={bulkEmails.length === 0}
               className={`flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 ${
                 bulkEmails.length === 0
