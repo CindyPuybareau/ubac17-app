@@ -252,7 +252,7 @@ export default async function DashboardPage() {
       supabase
         .from("team_coaches")
         .select(
-          "teams(id, name, category, ffbb_url, sort_order, pending_coach_names, whatsapp_group_link)"
+          "teams(id, name, category, ffbb_url, sort_order, pending_coach_names)"
         )
         .eq("coach_id", user.id),
       supabase
@@ -272,7 +272,6 @@ export default async function DashboardPage() {
     ffbb_url: string | null;
     sort_order: number | null;
     pending_coach_names: string | null;
-    whatsapp_group_link: string | null;
   };
 
   const coachedTeams = (coachResult.data ?? [])
@@ -430,7 +429,7 @@ export default async function DashboardPage() {
       supabase
         .from("teams")
         .select(
-          "id, name, category, ffbb_url, pending_coach_names, sort_order, whatsapp_group_link"
+          "id, name, category, ffbb_url, pending_coach_names, sort_order"
         )
         .order("sort_order", { ascending: true, nullsFirst: false })
         .order("category"),
@@ -543,7 +542,6 @@ export default async function DashboardPage() {
       name: t.name,
       category: t.category,
       ffbb_url: t.ffbb_url,
-      whatsAppGroupLink: t.whatsapp_group_link,
       players: rosterByTeam.get(t.id) ?? [],
       coaches: coachesByTeam.get(t.id) ?? [],
       pendingCoachNames: t.pending_coach_names,
@@ -921,7 +919,6 @@ export default async function DashboardPage() {
       name: t.name,
       category: t.category,
       ffbb_url: t.ffbb_url,
-      whatsAppGroupLink: t.whatsapp_group_link,
       players: rosterByTeam.get(t.id) ?? [],
       coaches: coachesByTeam.get(t.id) ?? [],
       pendingCoachNames: t.pending_coach_names,

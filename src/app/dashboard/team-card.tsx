@@ -64,19 +64,6 @@ export default function TeamCard({
 }) {
   const router = useRouter();
   const [detailPlayerId, setDetailPlayerId] = useState<string | null>(null);
-  const [groupLinkInput, setGroupLinkInput] = useState(team.whatsAppGroupLink ?? "");
-  const [groupLinkSaving, setGroupLinkSaving] = useState(false);
-
-  async function saveGroupLink() {
-    setGroupLinkSaving(true);
-    const supabase = createClient();
-    await supabase
-      .from("teams")
-      .update({ whatsapp_group_link: groupLinkInput || null })
-      .eq("id", team.id);
-    setGroupLinkSaving(false);
-    router.refresh();
-  }
 
   const [openPlayerForm, setOpenPlayerForm] = useState(false);
   const [newPlayerFirstName, setNewPlayerFirstName] = useState("");
@@ -484,27 +471,14 @@ export default function TeamCard({
           <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
           Communication
         </p>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <input
-            value={groupLinkInput}
-            onChange={(e) => setGroupLinkInput(e.target.value)}
-            placeholder="Lien du groupe WhatsApp (optionnel)"
-            className="flex-1 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
-          />
-          <button
-            onClick={saveGroupLink}
-            disabled={groupLinkSaving || groupLinkInput === (team.whatsAppGroupLink ?? "")}
-            className="shrink-0 rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-50"
-          >
-            {groupLinkSaving ? "..." : "Enregistrer"}
-          </button>
-        </div>
-        <div className="mt-2">
-          <WhatsAppGroupButton
-            teamName={team.name ?? "l'équipe"}
-            defaultMessage={`Bonjour à tous, ici le coach de ${team.name ?? "l'équipe"}.`}
-          />
-        </div>
+        <p className="mb-2 text-xs text-zinc-400">
+          Le lien d&apos;invitation et les membres du groupe WhatsApp de cette
+          équipe se gèrent depuis l&apos;onglet «&nbsp;Groupes WhatsApp&nbsp;».
+        </p>
+        <WhatsAppGroupButton
+          teamName={team.name ?? "l'équipe"}
+          defaultMessage={`Bonjour à tous, ici le coach de ${team.name ?? "l'équipe"}.`}
+        />
       </div>
 
       {taskTallyByPlayerId && (
