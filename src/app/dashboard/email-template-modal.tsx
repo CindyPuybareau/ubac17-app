@@ -96,6 +96,8 @@ export default function EmailTemplateModal({
   const [templateId, setTemplateId] = useState("blank");
   const [subject, setSubject] = useState("UBAC - Message");
   const [body, setBody] = useState(bodyFor(null, recipientFirstName));
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   function handleTemplateChange(id: string) {
     setTemplateId(id);
@@ -105,6 +107,28 @@ export default function EmailTemplateModal({
   }
 
   const mailto = `mailto:${toEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+  async function handleSend() {
+    setSending(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: toEmail, subject, body }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setResult({ ok: false, message: data.error ?? "Envoi impossible." });
+      } else {
+        setResult({ ok: true, message: "E-mail envoyé depuis ubac17.basket@gmail.com." });
+      }
+    } catch {
+      setResult({ ok: false, message: "Envoi impossible (problème de connexion)." });
+    } finally {
+      setSending(false);
+    }
+  }
 
   return (
     <div
@@ -171,21 +195,34 @@ export default function EmailTemplateModal({
         </div>
 
         <p className="text-xs text-zinc-400">
-          L&apos;e-mail s&apos;ouvre dans ton application de messagerie habituelle —
-          pense à envoyer depuis le compte{" "}
-          <span className="font-medium text-zinc-500">ubac17.basket@gmail.com</span> si tu
-          veux que ce soit l&apos;adresse expéditrice (une page web ne peut pas
-          l&apos;imposer à ta place).
+          Envoyé automatiquement depuis{" "}
+          <span className="font-medium text-zinc-500">ubac17.basket@gmail.com</span>.
         </p>
 
-        <a
-          href={mailto}
-          onClick={onClose}
-          className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-full bg-ubac-yellow px-4 py-2 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark"
+        {result && (
+          <p className={`text-sm ${result.ok ? "text-emerald-600" : "text-red-600"}`}>
+            {result.message}
+          </p>
+        )}
+
+        <button
+          onClick={handleSend}
+          disabled={sending}
+          className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-full bg-ubac-yellow px-4 py-2 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
         >
           <Send className="h-4 w-4" />
-          Envoyer
-        </a>
+          {sending ? "Envoi..." : "Envoyer"}
+        </button>
+
+        {result && !result.ok && (
+          <a
+            href={mailto}
+            onClick={onClose}
+            className="text-center text-xs text-zinc-400 underline hover:text-zinc-600"
+          >
+            Ou envoyer via ta messagerie habituelle
+          </a>
+        )}
       </div>
     </div>
   );
