@@ -616,7 +616,13 @@ export default function MembersTable({
       {emailModalMemberId &&
         (() => {
           const emailMember = members.find((m) => m.id === emailModalMemberId);
-          const emailTo = emailMember?.pendingParentEmail ?? emailMember?.email;
+          // This row's own contact email (m.email, already the corrected
+          // "registration_email wins" field — see the earlier phone/email
+          // fix) must come first: pendingParentEmail is specifically the
+          // address an account INVITE goes to (often a parent's, on
+          // purpose), which isn't what a general-purpose message should
+          // default to for a member who already has their own contact info.
+          const emailTo = emailMember?.email ?? emailMember?.pendingParentEmail;
           if (!emailMember || !emailTo) return null;
           return (
             <EmailTemplateModal
