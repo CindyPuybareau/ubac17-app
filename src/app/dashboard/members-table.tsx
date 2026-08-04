@@ -325,17 +325,18 @@ export default function MembersTable({
       )}
 
       <div className="w-full overflow-x-auto rounded-2xl border border-zinc-100">
-        <table className="w-full min-w-[900px] table-fixed border-collapse text-sm">
+        <table className="w-full min-w-[1050px] table-fixed border-collapse text-sm">
           <colgroup>
             <col className="w-9" />
             <col className="w-9" />
-            <col />
+            <col className="w-36" />
             <col className="w-24" />
-            <col className="w-32" />
             <col className="w-28" />
             <col className="w-28" />
+            <col className="w-24" />
+            <col className="w-36" />
             <col />
-            <col className="w-40" />
+            <col className="w-32" />
             <col className="w-10" />
           </colgroup>
           <thead>
@@ -365,7 +366,8 @@ export default function MembersTable({
               <th className="px-3 py-3">Prénom</th>
               <th className="px-3 py-3">Commune</th>
               <th className="px-3 py-3">Coach de</th>
-              <th className="px-3 py-3">Équipe</th>
+              <th className="px-3 py-3">Catégorie</th>
+              <th className="px-3 py-3">Statut</th>
               <th className="px-3 py-3">Email</th>
               <th className="px-3 py-3">Téléphone</th>
               <th className="px-3 py-3" />
@@ -454,11 +456,13 @@ export default function MembersTable({
                         </span>
                       ))
                     )}
-                    <PlayerYearBadge
-                      birthDate={m.birthDate}
-                      category={m.teams[0]?.category ?? m.category}
-                    />
                   </div>
+                </td>
+                <td className="px-3 py-3">
+                  <PlayerYearBadge
+                    birthDate={m.birthDate}
+                    category={m.teams[0]?.category ?? m.category}
+                  />
                 </td>
                 <td className="truncate px-3 py-3 text-zinc-600" title={m.email ?? undefined}>
                   {m.email ? (
@@ -575,7 +579,7 @@ export default function MembersTable({
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-2 py-8 text-center text-sm text-zinc-400">
+                <td colSpan={11} className="px-2 py-8 text-center text-sm text-zinc-400">
                   Aucun membre trouvé.
                 </td>
               </tr>
