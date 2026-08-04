@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
+  BadgeCheck,
   CalendarDays,
   Clock,
   FileText,
@@ -12,7 +13,6 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import OpponentDisplay from "./opponent-display";
-import FfbbSync from "./ffbb-sync";
 import MemberDetailModal from "./member-detail-modal";
 import WhatsAppButton from "./whatsapp-button";
 import type { AdminUpcomingEvent, MemberDetail } from "./page";
@@ -26,6 +26,24 @@ type Person = { id: string; first_name: string | null; last_name: string | null 
 
 function fullName(p: Person) {
   return [p.first_name, p.last_name].filter(Boolean).join(" ") || "Sans nom";
+}
+
+// Gives each category its own soft pastel identity (badge + card border)
+// so the Équipes list reads at a glance instead of as a wall of identical
+// white cards — same "quiet color, not loud" palette used for presence
+// badges elsewhere in the app.
+function categoryTheme(category: string | null): { badge: string; border: string } {
+  const c = (category ?? "").toLowerCase();
+  if (c.startsWith("séniors") || c.startsWith("seniors"))
+    return { badge: "bg-navy/10 text-navy", border: "border-navy/10" };
+  if (c.startsWith("u18")) return { badge: "bg-purple-100 text-purple-700", border: "border-purple-100" };
+  if (c.startsWith("u15")) return { badge: "bg-blue-100 text-blue-700", border: "border-blue-100" };
+  if (c.startsWith("u13")) return { badge: "bg-teal-100 text-teal-700", border: "border-teal-100" };
+  if (c.startsWith("u11")) return { badge: "bg-emerald-100 text-emerald-700", border: "border-emerald-100" };
+  if (c.startsWith("u9")) return { badge: "bg-amber-100 text-amber-700", border: "border-amber-100" };
+  if (c.startsWith("baby")) return { badge: "bg-pink-100 text-pink-700", border: "border-pink-100" };
+  if (c.startsWith("loisirs")) return { badge: "bg-zinc-100 text-zinc-600", border: "border-zinc-100" };
+  return { badge: "bg-ubac-yellow/15 text-ubac-yellow-dark", border: "border-ubac-yellow/20" };
 }
 
 function presenceBadge(status: string | null) {
@@ -47,7 +65,6 @@ export default function TeamCard({
   eventsByTeamId,
   contactPhoneByPlayerId,
   createCotisationOnNewPlayer = true,
-  showFfbbSync = false,
   memberDetailsByPlayerId,
   taskTallyByPlayerId,
 }: {
@@ -56,7 +73,6 @@ export default function TeamCard({
   eventsByTeamId: Record<string, AdminUpcomingEvent[]>;
   contactPhoneByPlayerId: Record<string, string>;
   createCotisationOnNewPlayer?: boolean;
-  showFfbbSync?: boolean;
   memberDetailsByPlayerId?: Record<string, MemberDetail>;
   taskTallyByPlayerId?: SeasonTaskTally;
 }) {
@@ -148,20 +164,6 @@ export default function TeamCard({
     router.refresh();
   }
 
-  async function updateRosterField(
-    playerId: string,
-    field: "jersey_number" | "position",
-    value: number | string | null
-  ) {
-    const supabase = createClient();
-    await supabase
-      .from("team_players")
-      .update({ [field]: value })
-      .eq("team_id", team.id)
-      .eq("player_id", playerId);
-    router.refresh();
-  }
-
   async function addCoach(coachId: string) {
     if (!coachId) return;
     const supabase = createClient();
@@ -188,35 +190,41 @@ export default function TeamCard({
     .filter((e) => new Date(e.start_time).getTime() >= now)
     .slice(0, 3);
 
+  const theme = categoryTheme(team.category);
+
   return (
-    <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
-      <h3 className="font-semibold text-zinc-900">
-        {team.name}
-        {team.category ? ` · ${team.category}` : ""}
-      </h3>
+    <div
+      className={`rounded-2xl border ${theme.border} bg-white p-5 shadow-sm transition-all hover:shadow-md`}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="font-semibold text-zinc-900">{team.name}</h3>
+        {team.category && (
+          <span
+            className={`inline-flex w-fit items-center rounded-full px-2.5 py-1 text-xs font-semibold ${theme.badge}`}
+          >
+            {team.category}
+          </span>
+        )}
+      </div>
 
       <div className="mt-3">
         <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">
           Joueurs
         </p>
         <div className="w-full overflow-x-auto rounded-xl border border-zinc-100">
-          <table className="w-full min-w-[650px] table-fixed border-collapse text-sm">
+          <table className="w-full min-w-[420px] table-fixed border-collapse text-sm">
             <colgroup>
               <col />
               <col />
-              <col className="w-20" />
-              <col className="w-28" />
-              <col className="w-28" />
-              <col className="w-28" />
+              <col className="w-32" />
+              <col className="w-32" />
             </colgroup>
             <thead>
               <tr className="border-b border-zinc-100 bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                <th className="px-2 py-2">Nom</th>
-                <th className="px-2 py-2">Prénom</th>
-                <th className="px-2 py-2">N° Maillot</th>
-                <th className="px-2 py-2">Poste</th>
-                <th className="px-2 py-2">Présence</th>
-                <th className="px-2 py-2" />
+                <th className="px-3 py-2.5">Nom</th>
+                <th className="px-3 py-2.5">Prénom</th>
+                <th className="px-3 py-2.5">Présence</th>
+                <th className="px-3 py-2.5" />
               </tr>
             </thead>
             <tbody>
@@ -225,43 +233,13 @@ export default function TeamCard({
                 const presence = presenceBadge(p.nextEventStatus);
                 return (
                   <tr key={p.id} className="border-b border-zinc-50 last:border-0">
-                    <td className="truncate px-2 py-2 font-medium text-zinc-900">
+                    <td className="truncate px-3 py-2.5 font-medium text-zinc-900">
                       {p.last_name ?? "—"}
                     </td>
-                    <td className="truncate px-2 py-2 text-zinc-700">
+                    <td className="truncate px-3 py-2.5 text-zinc-700">
                       {p.first_name ?? "—"}
                     </td>
-                    <td className="px-2 py-2">
-                      <input
-                        type="number"
-                        defaultValue={p.jerseyNumber ?? ""}
-                        onBlur={(e) => {
-                          const val = e.target.value.trim();
-                          updateRosterField(
-                            p.id,
-                            "jersey_number",
-                            val ? Number(val) : null
-                          );
-                        }}
-                        placeholder="—"
-                        className="w-14 rounded-lg border border-zinc-200 px-1.5 py-1 text-sm"
-                      />
-                    </td>
-                    <td className="px-2 py-2">
-                      <input
-                        defaultValue={p.position ?? ""}
-                        onBlur={(e) =>
-                          updateRosterField(
-                            p.id,
-                            "position",
-                            e.target.value.trim() || null
-                          )
-                        }
-                        placeholder="Poste"
-                        className="w-full rounded-lg border border-zinc-200 px-1.5 py-1 text-sm"
-                      />
-                    </td>
-                    <td className="px-2 py-2">
+                    <td className="px-3 py-2.5">
                       <span
                         className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${presence.className}`}
                       >
@@ -269,7 +247,7 @@ export default function TeamCard({
                         {presence.label}
                       </span>
                     </td>
-                    <td className="px-2 py-2">
+                    <td className="px-3 py-2.5">
                       <div className="flex items-center gap-1">
                         {phone && (
                           <a
@@ -307,7 +285,7 @@ export default function TeamCard({
               })}
               {team.players.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-2 py-4 text-center text-sm text-zinc-400">
+                  <td colSpan={4} className="px-3 py-4 text-center text-sm text-zinc-400">
                     Aucun joueur
                   </td>
                 </tr>
@@ -388,12 +366,21 @@ export default function TeamCard({
             {team.coaches.map((p) => (
               <li
                 key={p.id}
-                className="flex items-center justify-between rounded-lg bg-zinc-50 px-2 py-1 text-sm"
+                className="flex items-center justify-between gap-2 rounded-lg bg-zinc-50 px-2 py-1 text-sm"
               >
-                {fullName(p)}
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate">{fullName(p)}</span>
+                  <span
+                    title="Coach avec un compte UBAC actif"
+                    className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700"
+                  >
+                    <BadgeCheck className="h-3 w-3" />
+                    Coach Officiel
+                  </span>
+                </span>
                 <button
                   onClick={() => removeCoach(p.id)}
-                  className="text-xs font-medium text-red-600 hover:underline"
+                  className="shrink-0 text-xs font-medium text-red-600 hover:underline"
                 >
                   Retirer
                 </button>
@@ -510,12 +497,6 @@ export default function TeamCard({
               </tbody>
             </table>
           </div>
-        </div>
-      )}
-
-      {showFfbbSync && (
-        <div className="mt-3 border-t border-zinc-100 pt-3">
-          <FfbbSync teamId={team.id} initialUrl={team.ffbb_url} />
         </div>
       )}
 

@@ -94,6 +94,32 @@ export default function TeamManager({
 
   return (
     <div className="flex flex-col gap-4">
+      <TeamFilterDropdown
+        teams={teams}
+        selectedIds={selectedTeamIds}
+        onChange={setSelectedTeamIds}
+      />
+
+      <div className="flex flex-col gap-4">
+        {filteredTeams.map((team) => (
+          <TeamCard
+            key={team.id}
+            team={team}
+            allProfiles={allProfiles}
+            eventsByTeamId={eventsByTeamId}
+            contactPhoneByPlayerId={contactPhoneByPlayerId}
+          />
+        ))}
+        {teams.length === 0 && (
+          <p className="text-sm text-zinc-500">Aucune équipe pour le moment.</p>
+        )}
+        {teams.length > 0 && filteredTeams.length === 0 && (
+          <p className="text-sm text-zinc-500">
+            Aucune équipe sélectionnée dans le filtre.
+          </p>
+        )}
+      </div>
+
       <form
         onSubmit={handleCreateTeam}
         className="flex flex-col gap-3 rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm sm:flex-row sm:items-end"
@@ -129,33 +155,6 @@ export default function TeamManager({
         </button>
       </form>
       {error && <p className="text-sm text-red-600">{error}</p>}
-
-      <TeamFilterDropdown
-        teams={teams}
-        selectedIds={selectedTeamIds}
-        onChange={setSelectedTeamIds}
-      />
-
-      <div className="flex flex-col gap-4">
-        {filteredTeams.map((team) => (
-          <TeamCard
-            key={team.id}
-            team={team}
-            allProfiles={allProfiles}
-            eventsByTeamId={eventsByTeamId}
-            contactPhoneByPlayerId={contactPhoneByPlayerId}
-            showFfbbSync
-          />
-        ))}
-        {teams.length === 0 && (
-          <p className="text-sm text-zinc-500">Aucune équipe pour le moment.</p>
-        )}
-        {teams.length > 0 && filteredTeams.length === 0 && (
-          <p className="text-sm text-zinc-500">
-            Aucune équipe sélectionnée dans le filtre.
-          </p>
-        )}
-      </div>
     </div>
   );
 }
