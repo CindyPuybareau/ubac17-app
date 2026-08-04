@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, type ChangeEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
 import {
   AlertTriangle,
   Copy,
@@ -306,6 +307,8 @@ export default function MemberDetailModal({
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>("identity");
   const [linkCopied, setLinkCopied] = useState(false);
+  const tabBodyRef = useRef<HTMLDivElement>(null);
+  useScrollTopOnChange(tab, tabBodyRef);
 
   function copyAppLink() {
     navigator.clipboard
@@ -604,7 +607,7 @@ export default function MemberDetailModal({
           })}
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-4">
+        <div ref={tabBodyRef} className="flex-1 overflow-y-auto px-5 py-4">
           {tab === "identity" && (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field

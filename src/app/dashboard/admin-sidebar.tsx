@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
+import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
 
 export type AdminSection = {
   key: string;
@@ -35,6 +36,11 @@ export default function AdminSidebar({
     return sections[0]?.key;
   });
   const current = sections.find((s) => s.key === active) ?? sections[0];
+
+  // Every role's top-level tab bar (Calendrier/Membres/Équipes/...) runs
+  // through this one shared component, so this single hook covers the
+  // scroll-to-top requirement for Bureau, Coach, and Famille alike.
+  useScrollTopOnChange(active);
 
   if (!current) return null;
 

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Search, Tag, Target, Ticket, Wallet, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
 import GaugeChart from "./gauge-chart";
 import CotisationParticipantsTable, {
   computeStatus,
@@ -107,6 +108,7 @@ export default function CotisationsManager({
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<"cotisations" | "collectes">("cotisations");
+  useScrollTopOnChange(tab);
   const [selectedCollecteId, setSelectedCollecteId] = useState<string | null>(
     collectes[0]?.id ?? null
   );

@@ -37,11 +37,12 @@ export default function PlayerYearBadge({
   }
 
   if (status.kind === "OLD_SOLDIER") {
-    // Named "Vétéran" in the UI (kept distinct from Sparring Partner's
-    // purple so the two never look alike at a glance).
+    // Kept distinct from Sparring Partner's purple so the two never look
+    // alike at a glance. Label stays "Old Soldier" (title case, not
+    // ALL CAPS) per Cindy's request.
     return (
       <span className={`${BADGE_BASE} border-slate-200 bg-slate-100 text-slate-700`}>
-        Vétéran
+        Old Soldier
       </span>
     );
   }

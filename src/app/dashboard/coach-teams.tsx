@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { teamLabel } from "@/lib/teams";
+import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
 import TeamCard from "./team-card";
 import type { TeamWithMembers } from "./team-manager";
 import type { AdminUpcomingEvent, MemberDetail } from "./page";
@@ -26,6 +27,8 @@ export default function CoachTeams({
 }) {
   const [activeId, setActiveId] = useState(teams[0]?.id);
   const active = teams.find((t) => t.id === activeId) ?? teams[0];
+
+  useScrollTopOnChange(activeId);
 
   if (!active) {
     return (
