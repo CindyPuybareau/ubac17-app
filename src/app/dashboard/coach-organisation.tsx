@@ -33,7 +33,9 @@ export default function CoachOrganisation({
       {cards.map(({ team, event, counts, roster }) => (
         <CoachNextMatchCard
           key={team.id}
-          teamName={`${team.name ?? "Équipe"}${team.category ? ` · ${team.category}` : ""}`}
+          teamName={`${team.name ?? "Équipe"}${
+            team.category && team.category !== team.name ? ` · ${team.category}` : ""
+          }`}
           event={event}
           counts={counts}
           roster={roster}

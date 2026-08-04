@@ -5,9 +5,11 @@ import { Clock, ExternalLink, MessageCircle, Users } from "lucide-react";
 import WhatsAppButton from "./whatsapp-button";
 import WhatsAppBulkModal from "./whatsapp-bulk-modal";
 import WhatsAppGroupButton from "./whatsapp-group-button";
+import PlayerYearBadge from "./player-year-badge";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 type CoachContact = Person & { phone: string | null };
+type RosterMate = Person & { birthDate: string | null };
 
 export type FamilyTeamCardData = {
   playerId: string;
@@ -16,7 +18,7 @@ export type FamilyTeamCardData = {
   teamName: string | null;
   category: string | null;
   coaches: CoachContact[];
-  roster: Person[];
+  roster: RosterMate[];
   ffbbUrl: string | null;
   sortOrder: number | null;
   pendingCoachNames: string | null;
@@ -37,7 +39,7 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
       </p>
       <h3 className="mt-1 font-semibold text-zinc-900">
         {card.teamName ?? "Équipe"}
-        {card.category ? ` · ${card.category}` : ""}
+        {card.category && card.category !== card.teamName ? ` · ${card.category}` : ""}
       </h3>
 
       <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -94,9 +96,10 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
             {card.roster.map((p) => (
               <li
                 key={p.id}
-                className="truncate rounded-lg bg-zinc-50 px-2 py-1 text-sm text-zinc-700"
+                className="flex items-center justify-between gap-2 rounded-lg bg-zinc-50 px-2 py-1 text-sm text-zinc-700"
               >
-                {fullName(p)}
+                <span className="truncate">{fullName(p)}</span>
+                <PlayerYearBadge birthDate={p.birthDate} category={card.category} />
               </li>
             ))}
             {card.roster.length === 0 && (

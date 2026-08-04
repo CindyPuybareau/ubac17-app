@@ -12,14 +12,15 @@ import {
   Utensils,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { getCurrentSeasonLabel } from "@/lib/season";
 import OpponentDisplay from "./opponent-display";
 import MemberDetailModal from "./member-detail-modal";
+import PlayerYearBadge from "./player-year-badge";
 import WhatsAppButton from "./whatsapp-button";
 import type { AdminUpcomingEvent, MemberDetail } from "./page";
 import type { RosterPlayer, TeamWithMembers } from "./team-manager";
 import type { SeasonTaskTally } from "./event-tasks";
 
-const CURRENT_SEASON = "2026-2027";
 const now = Date.now();
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
@@ -138,7 +139,7 @@ export default function TeamCard({
         .from("cotisations")
         .insert({
           player_id: player.id,
-          saison: CURRENT_SEASON,
+          saison: getCurrentSeasonLabel(),
           statut: "EN_ATTENTE",
         });
 
@@ -198,7 +199,7 @@ export default function TeamCard({
     >
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="font-semibold text-zinc-900">{team.name}</h3>
-        {team.category && (
+        {team.category && team.category !== team.name && (
           <span
             className={`inline-flex w-fit items-center rounded-full px-2.5 py-1 text-xs font-semibold ${theme.badge}`}
           >
@@ -216,6 +217,7 @@ export default function TeamCard({
             <colgroup>
               <col />
               <col />
+              <col className="w-28" />
               <col className="w-32" />
               <col className="w-32" />
             </colgroup>
@@ -223,6 +225,7 @@ export default function TeamCard({
               <tr className="border-b border-zinc-100 bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-400">
                 <th className="px-3 py-2.5">Nom</th>
                 <th className="px-3 py-2.5">Prénom</th>
+                <th className="px-3 py-2.5">Année</th>
                 <th className="px-3 py-2.5">Présence</th>
                 <th className="px-3 py-2.5" />
               </tr>
@@ -238,6 +241,9 @@ export default function TeamCard({
                     </td>
                     <td className="truncate px-3 py-2.5 text-zinc-700">
                       {p.first_name ?? "—"}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <PlayerYearBadge birthDate={p.birthDate} category={team.category} />
                     </td>
                     <td className="px-3 py-2.5">
                       <span
@@ -285,7 +291,7 @@ export default function TeamCard({
               })}
               {team.players.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-3 py-4 text-center text-sm text-zinc-400">
+                  <td colSpan={5} className="px-3 py-4 text-center text-sm text-zinc-400">
                     Aucun joueur
                   </td>
                 </tr>
@@ -419,7 +425,7 @@ export default function TeamCard({
         </div>
 
         <div>
-          <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-blue-700">
             <CalendarDays className="h-3.5 w-3.5" />
             Prochains matchs
           </p>
@@ -428,16 +434,19 @@ export default function TeamCard({
               {teamEvents.map((e) => (
                 <li
                   key={e.id}
-                  className="flex items-center justify-between gap-2 rounded-lg bg-zinc-50 px-2 py-1.5"
+                  className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50/60 px-2.5 py-2"
                 >
-                  {e.event_type === "MATCH" ? (
-                    <OpponentDisplay title={e.title} size="sm" />
-                  ) : (
-                    <span className="truncate text-sm font-medium text-zinc-700">
-                      {e.title ?? "Événement"}
-                    </span>
-                  )}
-                  <span className="shrink-0 text-xs text-zinc-500">
+                  <CalendarDays className="h-4 w-4 shrink-0 text-blue-600" />
+                  <div className="min-w-0 flex-1">
+                    {e.event_type === "MATCH" ? (
+                      <OpponentDisplay title={e.title} size="sm" />
+                    ) : (
+                      <span className="truncate text-sm font-medium text-blue-900">
+                        {e.title ?? "Événement"}
+                      </span>
+                    )}
+                  </div>
+                  <span className="shrink-0 text-xs font-semibold text-blue-700">
                     {new Date(e.start_time).toLocaleDateString("fr-FR", {
                       day: "numeric",
                       month: "short",

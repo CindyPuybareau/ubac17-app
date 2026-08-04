@@ -4,6 +4,7 @@ import { useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import { createClient } from "@/lib/supabase/client";
+import { getCurrentSeasonLabel } from "@/lib/season";
 
 type ParsedRow = {
   firstName: string;
@@ -92,7 +93,7 @@ export default function ImportInscriptions({
   const router = useRouter();
   const [rows, setRows] = useState<ParsedRow[] | null>(null);
   const [duplicateCount, setDuplicateCount] = useState(0);
-  const [season, setSeason] = useState("2026-2027");
+  const [season, setSeason] = useState(() => getCurrentSeasonLabel());
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);

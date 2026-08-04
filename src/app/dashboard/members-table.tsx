@@ -21,6 +21,7 @@ import { buildGmailComposeLink } from "@/lib/email";
 import { teamLabel } from "@/lib/teams";
 import EmailTemplateModal from "./email-template-modal";
 import MemberDetailModal from "./member-detail-modal";
+import PlayerYearBadge from "./player-year-badge";
 import WhatsAppButton from "./whatsapp-button";
 import type { AdminMember, AdminMemberTeam } from "./page";
 
@@ -440,7 +441,7 @@ export default function MembersTable({
                   </div>
                 </td>
                 <td className="px-3 py-3">
-                  <div className="flex flex-wrap gap-1 overflow-hidden">
+                  <div className="flex flex-wrap items-center gap-1 overflow-hidden">
                     {m.teams.length === 0 ? (
                       <span className="text-xs text-zinc-400">—</span>
                     ) : (
@@ -453,6 +454,10 @@ export default function MembersTable({
                         </span>
                       ))
                     )}
+                    <PlayerYearBadge
+                      birthDate={m.birthDate}
+                      category={m.teams[0]?.category ?? m.category}
+                    />
                   </div>
                 </td>
                 <td className="truncate px-3 py-3 text-zinc-600" title={m.email ?? undefined}>

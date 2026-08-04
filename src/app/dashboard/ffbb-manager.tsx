@@ -17,7 +17,7 @@ export default function FfbbManager({ teams }: { teams: TeamRef[] }) {
         >
           <h3 className="font-semibold text-zinc-900">
             {team.name}
-            {team.category ? ` · ${team.category}` : ""}
+            {team.category && team.category !== team.name ? ` · ${team.category}` : ""}
           </h3>
           <div className="mt-3">
             <FfbbSync teamId={team.id} initialUrl={team.ffbb_url} />

@@ -476,7 +476,10 @@ export default async function DashboardPage() {
     );
 
     const playersById = new Map(
-      (playersRes.data ?? []).map((p) => [p.id, p as Person])
+      (playersRes.data ?? []).map((p) => [
+        p.id,
+        p as Person & { birth_date: string | null },
+      ])
     );
     const profilesById = new Map(
       (profilesRes.data ?? []).map((p) => [p.id, p as Person])
@@ -500,6 +503,7 @@ export default async function DashboardPage() {
         jerseyNumber: tp.jersey_number,
         position: tp.position,
         nextEventStatus: null,
+        birthDate: player.birth_date,
       });
       rosterByTeam.set(tp.team_id, list);
     });
@@ -865,7 +869,10 @@ export default async function DashboardPage() {
     ]);
 
     const playersById = new Map(
-      (playersRes.data ?? []).map((p) => [p.id, p as Person])
+      (playersRes.data ?? []).map((p) => [
+        p.id,
+        p as Person & { birth_date: string | null },
+      ])
     );
     const coachProfilesById = new Map(
       (coachProfilesRes.data ?? []).map((p) => [p.id, p as Person])
@@ -888,6 +895,7 @@ export default async function DashboardPage() {
         jerseyNumber: tp.jersey_number,
         position: tp.position,
         nextEventStatus: null,
+        birthDate: player.birth_date,
       });
       rosterByTeam.set(tp.team_id, list);
     });
@@ -1113,7 +1121,10 @@ export default async function DashboardPage() {
       const teamsById = new Map(
         (teamsRes.data ?? []).map((t) => [t.id, t])
       );
-      const rosterByTeamId = new Map<string, Person[]>();
+      const rosterByTeamId = new Map<
+        string,
+        (Person & { birthDate: string | null })[]
+      >();
       const seenTeammateIds = new Set<string>();
       (teammateRowsRes.data ?? []).forEach((row) => {
         const p = row.players as unknown as {
@@ -1125,7 +1136,12 @@ export default async function DashboardPage() {
         } | null;
         if (!p) return;
         const list = rosterByTeamId.get(row.team_id) ?? [];
-        list.push({ id: p.id, first_name: p.first_name, last_name: p.last_name });
+        list.push({
+          id: p.id,
+          first_name: p.first_name,
+          last_name: p.last_name,
+          birthDate: p.birth_date,
+        });
         rosterByTeamId.set(row.team_id, list);
 
         if (seenTeammateIds.has(p.id)) return;

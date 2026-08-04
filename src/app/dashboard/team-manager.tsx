@@ -15,6 +15,9 @@ export type RosterPlayer = Person & {
   // RSVP status for this team's next upcoming event, or null if there
   // isn't one — drives the "Statut Présence" badge in the roster table.
   nextEventStatus: string | null;
+  // Drives the "Année/Statut" badge (1ère année, ROOKIE, Sparring
+  // Partner...) via computePlayerYearStatus — see src/lib/season.ts.
+  birthDate: string | null;
 };
 
 export type TeamWithMembers = {
