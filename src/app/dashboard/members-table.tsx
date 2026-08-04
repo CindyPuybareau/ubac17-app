@@ -404,7 +404,7 @@ export default function MembersTable({
                     )}
                   </span>
                   {m.archivedAt && (
-                    <span className="ml-1.5 rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-zinc-500">
+                    <span className="ml-1.5 inline-flex items-center justify-center whitespace-nowrap rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none text-zinc-500">
                       Archivé
                     </span>
                   )}
@@ -424,7 +424,7 @@ export default function MembersTable({
                         {m.coachTeams.map((t) => (
                           <span
                             key={`coach-${t.id}`}
-                            className="max-w-full truncate rounded-full bg-purple-100 px-2 py-0.5 text-xs font-semibold text-purple-700"
+                            className="inline-flex max-w-full items-center justify-center truncate whitespace-nowrap rounded-full bg-purple-100 px-2 py-0.5 text-xs font-semibold leading-none text-purple-700"
                           >
                             {t.category ?? t.name ?? "Équipe"}
                           </span>
@@ -432,7 +432,7 @@ export default function MembersTable({
                         {m.pendingCoachTeams.map((t) => (
                           <span
                             key={`pending-coach-${t.id}`}
-                            className="flex max-w-full items-center gap-1 truncate rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700"
+                            className="inline-flex max-w-full items-center justify-center gap-1 truncate whitespace-nowrap rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold leading-none text-amber-700"
                           >
                             <Clock className="h-3 w-3 shrink-0" />
                             {t.category ?? t.name ?? "Équipe"}
@@ -450,7 +450,7 @@ export default function MembersTable({
                       m.teams.map((t) => (
                         <span
                           key={`player-${t.id}`}
-                          className="max-w-full truncate rounded-full bg-navy/10 px-2 py-0.5 text-xs font-semibold text-navy"
+                          className="inline-flex max-w-full items-center justify-center truncate whitespace-nowrap rounded-full bg-navy/10 px-2 py-0.5 text-xs font-semibold leading-none text-navy"
                         >
                           {t.category ?? t.name ?? "Équipe"}
                         </span>

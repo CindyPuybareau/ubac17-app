@@ -4,7 +4,7 @@ export default function SalleBadge({ salle }: { salle: string }) {
   const meta = SALLE_META[salle as Salle];
   return (
     <span
-      className={`flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${meta?.badge ?? "bg-zinc-100 text-zinc-600"}`}
+      className={`inline-flex w-fit items-center justify-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold leading-none ${meta?.badge ?? "bg-zinc-100 text-zinc-600"}`}
     >
       <span
         className="h-1.5 w-1.5 shrink-0 rounded-full"

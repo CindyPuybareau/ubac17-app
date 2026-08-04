@@ -546,7 +546,7 @@ export default function MemberDetailModal({
 
   const charterBadge = (value: string | null) => (
     <span
-      className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+      className={`inline-flex w-fit items-center justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold leading-none ${
         value ? "bg-emerald-50 text-emerald-700" : "bg-zinc-100 text-zinc-500"
       }`}
     >
@@ -745,7 +745,7 @@ export default function MemberDetailModal({
                       member.teams.map((t) => (
                         <span
                           key={t.id}
-                          className="rounded-full bg-navy/10 px-2 py-0.5 text-xs font-semibold text-navy"
+                          className="inline-flex items-center justify-center whitespace-nowrap rounded-full bg-navy/10 px-2 py-0.5 text-xs font-semibold leading-none text-navy"
                         >
                           {t.category ?? t.name ?? "Équipe"}
                         </span>

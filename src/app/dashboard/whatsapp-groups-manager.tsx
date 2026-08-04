@@ -89,7 +89,7 @@ function GroupRow({
       >
         <span className="truncate text-sm font-medium text-zinc-800">{group.name}</span>
         <span className="flex shrink-0 items-center gap-2">
-          <span className="flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-500">
+          <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold leading-none text-zinc-500">
             <Users className="h-3 w-3" />
             {group.members.length}
           </span>

@@ -488,7 +488,7 @@ export default function CotisationParticipantsTable({
                     {c.mode_paiement ?? "—"}
                   </td>
                   <td className="px-3 py-3">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${status.className}`}>
+                    <span className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold leading-none ${status.className}`}>
                       {status.label}
                     </span>
                   </td>

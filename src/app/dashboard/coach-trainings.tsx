@@ -119,7 +119,7 @@ export default function CoachTrainings({
                   {e.title ?? "Entraînement"}
                 </h3>
               </div>
-              <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-green-700">
+              <span className="inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold uppercase leading-none tracking-wide text-green-700">
                 Entraînement
               </span>
             </div>
@@ -142,15 +142,15 @@ export default function CoachTrainings({
               )}
             </div>
             <div className="mt-3 flex flex-wrap gap-1.5">
-              <span className="flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
+              <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold leading-none text-green-700">
                 <Check className="h-3 w-3" />
                 {e.rsvpCounts.present} présent{e.rsvpCounts.present > 1 ? "s" : ""}
               </span>
-              <span className="flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+              <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold leading-none text-red-700">
                 <X className="h-3 w-3" />
                 {e.rsvpCounts.absent} absent{e.rsvpCounts.absent > 1 ? "s" : ""}
               </span>
-              <span className="flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-600">
+              <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold leading-none text-zinc-600">
                 <Clock className="h-3 w-3" />
                 {e.rsvpCounts.pending} en attente
               </span>

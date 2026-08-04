@@ -201,7 +201,7 @@ export default function TeamCard({
         <h3 className="font-semibold text-zinc-900">{team.name}</h3>
         {team.category && team.category !== team.name && (
           <span
-            className={`inline-flex w-fit items-center rounded-full px-2.5 py-1 text-xs font-semibold ${theme.badge}`}
+            className={`inline-flex w-fit items-center justify-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold leading-none ${theme.badge}`}
           >
             {team.category}
           </span>
@@ -247,7 +247,7 @@ export default function TeamCard({
                     </td>
                     <td className="px-3 py-2.5">
                       <span
-                        className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${presence.className}`}
+                        className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold leading-none ${presence.className}`}
                       >
                         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${presence.dotClassName}`} />
                         {presence.label}
@@ -378,7 +378,7 @@ export default function TeamCard({
                   <span className="truncate">{fullName(p)}</span>
                   <span
                     title="Coach avec un compte UBAC actif"
-                    className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700"
+                    className="inline-flex shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold leading-none text-emerald-700"
                   >
                     <BadgeCheck className="h-3 w-3" />
                     Coach Officiel

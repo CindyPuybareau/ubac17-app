@@ -384,13 +384,13 @@ export default function CalendarView({
                     {visible.map((e) => (
                       <span
                         key={e.id}
-                        className={`truncate rounded px-1 py-0.5 text-[10px] font-semibold ${styleFor(e.event_type).pill}`}
+                        className={`inline-flex items-center justify-center truncate whitespace-nowrap rounded px-1 py-0.5 text-[10px] font-semibold leading-none ${styleFor(e.event_type).pill}`}
                       >
                         {pillLabel(e)}
                       </span>
                     ))}
                     {dayBirthdays.length > 0 && (
-                      <span className="flex items-center gap-0.5 truncate rounded bg-purple-100 px-1 py-0.5 text-[10px] font-semibold text-purple-700">
+                      <span className="inline-flex items-center justify-center gap-0.5 truncate whitespace-nowrap rounded bg-purple-100 px-1 py-0.5 text-[10px] font-semibold leading-none text-purple-700">
                         <Cake className="h-2.5 w-2.5 shrink-0" />
                         {dayBirthdays.length === 1
                           ? dayBirthdays[0].firstName
@@ -541,23 +541,23 @@ export default function CalendarView({
 
                 {hasRoster && (
                   <div className="flex flex-wrap gap-1.5">
-                    <span className="flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
+                    <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold leading-none text-green-700">
                       <Check className="h-3 w-3" />
                       {rsvpCounts.present} présent
                       {rsvpCounts.present > 1 ? "s" : ""}
                     </span>
                     {rsvpCounts.late > 0 && (
-                      <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                      <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold leading-none text-amber-700">
                         <Clock className="h-3 w-3" />
                         {rsvpCounts.late} en retard
                       </span>
                     )}
-                    <span className="flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                    <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold leading-none text-red-700">
                       <X className="h-3 w-3" />
                       {rsvpCounts.absent} absent
                       {rsvpCounts.absent > 1 ? "s" : ""}
                     </span>
-                    <span className="flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-600">
+                    <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold leading-none text-zinc-600">
                       <Clock className="h-3 w-3" />
                       {rsvpCounts.pending} en attente
                     </span>
