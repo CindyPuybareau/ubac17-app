@@ -29,6 +29,14 @@ export default function PlayerYearBadge({
     );
   }
 
+  if (status.kind === "OLD_SOLDIER") {
+    return (
+      <span className="inline-flex w-fit items-center whitespace-nowrap rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+        Old Soldier
+      </span>
+    );
+  }
+
   return (
     <span className="inline-flex w-fit items-center whitespace-nowrap rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold text-sky-700">
       {status.label}

@@ -24,7 +24,8 @@ export function getCurrentSeasonLabel(referenceDate: Date = new Date()): string 
 export type PlayerYearStatus =
   | { kind: "ANNEE"; label: string }
   | { kind: "ROOKIE" }
-  | { kind: "SPARRING" };
+  | { kind: "SPARRING" }
+  | { kind: "OLD_SOLDIER" };
 
 // Each youth category spans a fixed number of birth years ("années"),
 // starting at a fixed age on the 1er juillet of the season. Séniors and
@@ -38,6 +39,11 @@ const AGE_CATEGORIES: { prefix: string; baseAge: number; years: number }[] = [
 ];
 const ANNEE_LABELS = ["1ère année", "2ème année", "3ème année"];
 const SENIOR_ROOKIE_AGE = 18;
+// 40 ans et plus au 1er juillet de la saison — pour 2026/2027 ça revient
+// à "né(e) en 1986 ou avant", mais exprimé en âge (pas en année codée en
+// dur) pour que le seuil avance tout seul chaque saison, comme le reste
+// de ce fichier.
+const OLD_SOLDIER_AGE = 40;
 
 // Returns null when there's nothing meaningful to show (missing data,
 // Babys, Loisirs, or a "regular" — not brand-new — senior) rather than a
@@ -71,6 +77,7 @@ export function computePlayerYearStatus(
   if (c.startsWith("séniors") || c.startsWith("seniors")) {
     if (age === SENIOR_ROOKIE_AGE) return { kind: "ROOKIE" };
     if (age < SENIOR_ROOKIE_AGE) return { kind: "SPARRING" };
+    if (age >= OLD_SOLDIER_AGE) return { kind: "OLD_SOLDIER" };
     return null;
   }
 
