@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Archive,
   ChevronDown,
@@ -19,9 +19,9 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { buildGmailComposeLink } from "@/lib/email";
 import { teamLabel } from "@/lib/teams";
-import { buildWhatsAppLink } from "@/lib/whatsapp";
 import EmailTemplateModal from "./email-template-modal";
 import MemberDetailModal from "./member-detail-modal";
+import WhatsAppButton from "./whatsapp-button";
 import type { AdminMember, AdminMemberTeam } from "./page";
 
 function fullLastName(m: AdminMember) {
@@ -63,6 +63,7 @@ export default function MembersTable({
   teams: AdminMemberTeam[];
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [search, setSearch] = useState("");
   const [teamFilter, setTeamFilter] = useState("");
@@ -71,7 +72,12 @@ export default function MembersTable({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
-  const [detailMemberId, setDetailMemberId] = useState<string | null>(null);
+  // Deep-link support: "?openMember=<id>" (see buildAppDeepLink) opens
+  // that member's fiche straight away — the one-click "come back here"
+  // link pasted into a WhatsApp message.
+  const [detailMemberId, setDetailMemberId] = useState<string | null>(
+    () => searchParams.get("openMember")
+  );
   const [emailModalMemberId, setEmailModalMemberId] = useState<string | null>(null);
 
   const [reassignIds, setReassignIds] = useState<string[] | null>(null);
@@ -497,22 +503,15 @@ export default function MembersTable({
                         >
                           Voir / Modifier le profil
                         </button>
-                        {buildWhatsAppLink(m.phone, `Bonjour ${m.firstName ?? ""}, ici l'UBAC.`) ? (
-                          <a
-                            href={
-                              buildWhatsAppLink(
-                                m.phone,
-                                `Bonjour ${m.firstName ?? ""}, ici l'UBAC.`
-                              ) ?? undefined
-                            }
-                            target="_blank"
-                            rel="noreferrer"
-                            onClick={() => setOpenMenuId(null)}
+                        {m.phone ? (
+                          <WhatsAppButton
+                            phone={m.phone}
+                            message={`Bonjour ${m.firstName ?? ""}, ici l'UBAC.`}
+                            label="Contacter sur WhatsApp"
+                            playerId={m.id}
+                            onTriggerClick={() => setOpenMenuId(null)}
                             className={menuItemClass}
-                          >
-                            <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
-                            Contacter sur WhatsApp
-                          </a>
+                          />
                         ) : (
                           <span
                             title="Aucun numéro de téléphone connu"

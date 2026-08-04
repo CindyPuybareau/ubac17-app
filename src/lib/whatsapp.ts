@@ -41,3 +41,17 @@ export function buildWhatsAppLink(
 export function buildWhatsAppForwardLink(message: string): string {
   return `https://wa.me/?text=${encodeURIComponent(message)}`;
 }
+
+// Shareable "come back here in one click" link into the app itself — the
+// other half of the WhatsApp bridge (open WhatsApp from UBAC; get back to
+// the right UBAC screen from anywhere the link is pasted). It only ever
+// carries an id, never personal data, and the destination is still gated
+// by the normal login + RLS, so pasting it into a WhatsApp chat is safe.
+export function buildAppDeepLink(
+  section: string,
+  params: Record<string, string>
+): string {
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const query = new URLSearchParams({ section, ...params });
+  return `${origin}/dashboard?${query.toString()}`;
+}

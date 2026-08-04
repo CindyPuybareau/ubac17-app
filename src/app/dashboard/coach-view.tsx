@@ -25,6 +25,7 @@ export default function CoachView({
   tasksByEventId,
   carpoolByEventId,
   whatsappGroups,
+  archivedPlayerIds,
 }: {
   teams: TeamWithMembers[];
   events: AdminUpcomingEvent[];
@@ -39,6 +40,11 @@ export default function CoachView({
   tasksByEventId: Record<string, EventTasksState>;
   carpoolByEventId: Record<string, CarpoolOffer[]>;
   whatsappGroups: WhatsAppGroup[];
+  // Archived members shouldn't be offered in "Ajouter un membre" on the
+  // Groupes WhatsApp screen — see admin-view.tsx's equivalent filter,
+  // done here from a plain id list since a coach's roster (RosterPlayer)
+  // doesn't carry archived status itself.
+  archivedPlayerIds: string[];
 }) {
   const createTeams = teams.map((t) => ({
     id: t.id,
@@ -52,12 +58,14 @@ export default function CoachView({
     (eventsByTeamId[e.teamId] ??= []).push(e);
   });
 
+  const archivedPlayerIdSet = new Set(archivedPlayerIds);
   const whatsappCandidatesById = new Map<
     string,
     { id: string; firstName: string | null; lastName: string | null }
   >();
   teams.forEach((t) => {
     t.players.forEach((p) => {
+      if (archivedPlayerIdSet.has(p.id)) return;
       whatsappCandidatesById.set(p.id, {
         id: p.id,
         firstName: p.first_name,

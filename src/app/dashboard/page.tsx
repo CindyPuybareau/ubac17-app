@@ -791,6 +791,7 @@ export default async function DashboardPage() {
   const coachContactEmailByPlayerId: Record<string, string> = {};
   const coachMemberDetailsByPlayerId: Record<string, MemberDetail> = {};
   const coachRsvpStatusByKey: Record<string, string> = {};
+  let coachArchivedPlayerIds: string[] = [];
 
   if (isCoach) {
     const coachedTeamIds = coachedTeams.map((t) => t.id);
@@ -845,7 +846,7 @@ export default async function DashboardPage() {
         ? supabase
             .from("players")
             .select(
-              "id, first_name, last_name, birth_date, category, sex, registration_email, registration_phone, address, postal_code, city, secondary_email, mother_phone, father_phone, other_phones, secondary_address, license_type, membership_type, fbi_status, medical_notes, other_notes, image_rights, player_charter_accepted, parent_charter_accepted, license_number"
+              "id, first_name, last_name, birth_date, category, sex, registration_email, registration_phone, address, postal_code, city, secondary_email, mother_phone, father_phone, other_phones, secondary_address, license_type, membership_type, fbi_status, medical_notes, other_notes, image_rights, player_charter_accepted, parent_charter_accepted, license_number, archived_at"
             )
             .in("id", playerIds)
         : Promise.resolve({ data: [] as Person[] }),
@@ -869,6 +870,11 @@ export default async function DashboardPage() {
     const coachProfilesById = new Map(
       (coachProfilesRes.data ?? []).map((p) => [p.id, p as Person])
     );
+    coachArchivedPlayerIds = (
+      (playersRes.data ?? []) as unknown as { id: string; archived_at: string | null }[]
+    )
+      .filter((p) => p.archived_at)
+      .map((p) => p.id);
 
     const rosterByTeam = new Map<string, RosterPlayer[]>();
     (teamPlayersRes.data ?? []).forEach((tp) => {
@@ -1278,6 +1284,7 @@ export default async function DashboardPage() {
           tasksByEventId={eventTasksByEventId}
           carpoolByEventId={carpoolOffersByEventId}
           whatsappGroups={whatsappGroups}
+          archivedPlayerIds={coachArchivedPlayerIds}
         />
       ),
     });

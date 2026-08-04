@@ -1,9 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronUp, ExternalLink, Plus, Users, X } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  ExternalLink,
+  Plus,
+  Users,
+  X,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { buildAppDeepLink } from "@/lib/whatsapp";
 import type { WhatsAppGroup } from "./page";
 
 type Candidate = { id: string; firstName: string | null; lastName: string | null };
@@ -15,15 +24,27 @@ function fullName(p: Candidate) {
 function GroupRow({
   group,
   candidates,
+  autoExpand,
 }: {
   group: WhatsAppGroup;
   candidates: Candidate[];
+  autoExpand: boolean;
 }) {
   const router = useRouter();
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(autoExpand);
   const [linkInput, setLinkInput] = useState(group.inviteLink ?? "");
   const [saving, setSaving] = useState(false);
   const [addingId, setAddingId] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  function copyAppLink() {
+    navigator.clipboard
+      .writeText(buildAppDeepLink("whatsapp", { openGroup: group.id }))
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      });
+  }
 
   async function saveLink() {
     setSaving(true);
@@ -112,6 +133,16 @@ function GroupRow({
             )
           )}
 
+          <button
+            type="button"
+            onClick={copyAppLink}
+            title="Copier un lien à partager (ex: dans WhatsApp) pour revenir directement sur ce groupe dans UBAC"
+            className="flex w-fit items-center gap-1.5 rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50"
+          >
+            <Copy className="h-3.5 w-3.5" />
+            {copied ? "Lien copié !" : "Copier le lien de ce groupe (UBAC)"}
+          </button>
+
           <div className="flex flex-wrap gap-1.5">
             {group.members.length === 0 ? (
               <span className="text-xs text-zinc-400">Aucun membre pour le moment.</span>
@@ -172,6 +203,8 @@ export default function WhatsAppGroupsManager({
   groups: WhatsAppGroup[];
   candidates: Candidate[];
 }) {
+  const searchParams = useSearchParams();
+  const openGroupId = searchParams.get("openGroup");
   const equipeGroups = groups.filter((g) => g.category === "EQUIPE");
   const commissionGroups = groups.filter((g) => g.category === "COMMISSION");
 
@@ -183,7 +216,12 @@ export default function WhatsAppGroupsManager({
         </h3>
         <div className="flex flex-col gap-2">
           {equipeGroups.map((g) => (
-            <GroupRow key={g.id} group={g} candidates={candidates} />
+            <GroupRow
+              key={g.id}
+              group={g}
+              candidates={candidates}
+              autoExpand={g.id === openGroupId}
+            />
           ))}
           {equipeGroups.length === 0 && (
             <p className="text-sm text-zinc-400">Aucun groupe.</p>
@@ -196,7 +234,12 @@ export default function WhatsAppGroupsManager({
         </h3>
         <div className="flex flex-col gap-2">
           {commissionGroups.map((g) => (
-            <GroupRow key={g.id} group={g} candidates={candidates} />
+            <GroupRow
+              key={g.id}
+              group={g}
+              candidates={candidates}
+              autoExpand={g.id === openGroupId}
+            />
           ))}
           {commissionGroups.length === 0 && (
             <p className="text-sm text-zinc-400">Aucun groupe.</p>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
 
 export type AdminSection = {
   key: string;
@@ -14,7 +15,25 @@ export default function AdminSidebar({
 }: {
   sections: AdminSection[];
 }) {
-  const [active, setActive] = useState(sections[0]?.key);
+  // Deep-link support (see buildAppDeepLink in lib/whatsapp.ts): a shared
+  // "?section=…" URL — or an "?openMember=…" / "?openGroup=…" link, which
+  // implies its natural section — jumps straight to the right tab on
+  // first render. Read once via lazy initial state, not an effect, so
+  // there's no flash of the default section first.
+  const searchParams = useSearchParams();
+  const [active, setActive] = useState(() => {
+    const sectionParam = searchParams.get("section");
+    if (sectionParam && sections.some((s) => s.key === sectionParam)) {
+      return sectionParam;
+    }
+    if (searchParams.get("openMember") && sections.some((s) => s.key === "members")) {
+      return "members";
+    }
+    if (searchParams.get("openGroup") && sections.some((s) => s.key === "whatsapp")) {
+      return "whatsapp";
+    }
+    return sections[0]?.key;
+  });
   const current = sections.find((s) => s.key === active) ?? sections[0];
 
   if (!current) return null;

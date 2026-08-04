@@ -125,11 +125,13 @@ export default function AdminView({
       content: (
         <WhatsAppGroupsManager
           groups={whatsappGroups}
-          candidates={members.map((m) => ({
-            id: m.id,
-            firstName: m.firstName,
-            lastName: m.lastName,
-          }))}
+          candidates={members
+            .filter((m) => !m.archivedAt)
+            .map((m) => ({
+              id: m.id,
+              firstName: m.firstName,
+              lastName: m.lastName,
+            }))}
         />
       ),
     },

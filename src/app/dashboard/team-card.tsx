@@ -283,6 +283,7 @@ export default function TeamCard({
                         <WhatsAppButton
                           phone={phone}
                           message={`Bonjour, ici le coach de ${team.name ?? "l'équipe"}.`}
+                          playerId={p.id}
                         />
                         {memberDetailsByPlayerId?.[p.id] && (
                           <button

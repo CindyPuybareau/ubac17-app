@@ -3,20 +3,44 @@
 import { useState } from "react";
 import { MessageCircle, Send, X } from "lucide-react";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
+import { createClient } from "@/lib/supabase/client";
 
 export default function WhatsAppButton({
   phone,
   message,
   label,
   className,
+  playerId,
+  onTriggerClick,
 }: {
   phone: string | null | undefined;
   message: string;
   label?: string;
   className?: string;
+  // When set, the exact text actually sent gets logged to this member's
+  // "Historique WhatsApp" tab (fire-and-forget — the wa.me tab still opens
+  // immediately either way, logging never blocks or breaks the send).
+  playerId?: string;
+  // Fires when the trigger is clicked, before the compose modal opens —
+  // e.g. to close a parent dropdown menu the trigger lives inside.
+  onTriggerClick?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState(message);
+
+  function logSend(sentText: string) {
+    if (!playerId) return;
+    const supabase = createClient();
+    supabase
+      .from("whatsapp_messages")
+      .insert({
+        player_id: playerId,
+        direction: "ENVOYE",
+        source: "APP",
+        content: sentText,
+      })
+      .then(() => {});
+  }
 
   if (!phone) return null;
   const link = buildWhatsAppLink(phone, text);
@@ -27,6 +51,7 @@ export default function WhatsAppButton({
       <button
         type="button"
         onClick={() => {
+          onTriggerClick?.();
           setText(message);
           setOpen(true);
         }}
@@ -71,7 +96,10 @@ export default function WhatsAppButton({
               href={buildWhatsAppLink(phone, text) ?? "#"}
               target="_blank"
               rel="noreferrer"
-              onClick={() => setOpen(false)}
+              onClick={() => {
+                logSend(text);
+                setOpen(false);
+              }}
               className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
             >
               <Send className="h-4 w-4" />
