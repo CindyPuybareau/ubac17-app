@@ -195,7 +195,7 @@ export default function TeamCard({
 
   return (
     <div
-      className={`rounded-2xl border ${theme.border} bg-white p-5 shadow-sm transition-all hover:shadow-md`}
+      className={`rounded-2xl border border-t-4 ${theme.border} border-t-ubac-yellow bg-white p-5 shadow-sm transition-all hover:shadow-md`}
     >
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="font-semibold text-zinc-900">{team.name}</h3>

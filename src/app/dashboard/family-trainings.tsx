@@ -37,7 +37,7 @@ export default function FamilyTrainings({
   return (
     <div className="flex flex-col gap-3">
       {trainings.map((e) => (
-        <div key={e.id} className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
+        <div key={e.id} className="rounded-2xl border border-t-4 border-zinc-100 border-t-ubac-yellow bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
             {childrenFor(e, rsvpPlayers)}
           </p>

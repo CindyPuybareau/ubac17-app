@@ -325,8 +325,8 @@ export default function MembersTable({
         </div>
       )}
 
-      <div className="w-full overflow-x-auto rounded-2xl border border-zinc-100">
-        <table className="w-full min-w-[950px] table-fixed border-collapse text-sm">
+      <div className="w-full overflow-x-auto rounded-2xl border border-t-4 border-zinc-100 border-t-ubac-yellow">
+        <table className="w-full min-w-[1050px] table-fixed border-collapse text-sm">
           <colgroup>
             <col className="w-8" />
             <col className="w-8" />
@@ -335,9 +335,9 @@ export default function MembersTable({
             <col className="w-32" />
             <col className="w-28" />
             <col className="w-32" />
-            <col />
+            <col className="w-56" />
             <col className="w-28" />
-            <col className="w-9" />
+            <col />
           </colgroup>
           <thead>
             <tr className="border-b border-slate-100 bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-400">

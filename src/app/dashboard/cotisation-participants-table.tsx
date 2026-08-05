@@ -427,7 +427,7 @@ export default function CotisationParticipantsTable({
         </div>
       )}
 
-      <div className="w-full overflow-x-auto rounded-2xl border border-zinc-100">
+      <div className="w-full overflow-x-auto rounded-2xl border border-t-4 border-zinc-100 border-t-ubac-yellow">
         <table className="w-full min-w-[700px] table-fixed border-collapse text-sm">
           <colgroup>
             <col className="w-10" />

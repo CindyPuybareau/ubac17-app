@@ -33,7 +33,7 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
   const reachableCoaches = card.coaches.filter((c) => c.phone);
 
   return (
-    <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-t-4 border-zinc-100 border-t-ubac-yellow bg-white p-5 shadow-sm">
       <p className="text-xs font-semibold uppercase tracking-wide text-ubac-blue">
         Équipe de {card.playerName}
       </p>
