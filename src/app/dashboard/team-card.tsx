@@ -6,9 +6,11 @@ import {
   BadgeCheck,
   CalendarDays,
   CheckCircle2,
+  Clock,
   FileText,
   Phone,
   Shirt,
+  Trash2,
   Utensils,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -430,26 +432,35 @@ export default function TeamCard({
                 </span>
                 <button
                   onClick={() => setRemoveCoachTarget(p)}
-                  className="shrink-0 text-xs font-medium text-red-600 hover:underline"
+                  title="Retirer ce coach de l'équipe"
+                  className="shrink-0 rounded-lg p-1.5 text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
                 >
-                  Retirer
+                  <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </li>
             ))}
             {team.pendingCoaches.map((p) => (
               <li
                 key={`pending-${p.id}`}
-                className="flex items-center gap-2 truncate rounded-lg bg-zinc-50 px-2 py-1 text-sm"
+                className="flex items-center gap-1.5 truncate rounded-lg bg-zinc-50 px-2 py-1 text-sm"
               >
                 <span className="truncate">{fullName(p)}</span>
+                <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-amber-200/60 bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
+                  <Clock className="h-3 w-3 shrink-0" />
+                  (en attente de compte)
+                </span>
               </li>
             ))}
             {/* Legacy free-text fallback, only shown if this team has no
                 structured pending coach (team_pending_coaches) at all —
                 keeps older, never-migrated teams from silently going blank. */}
             {team.pendingCoaches.length === 0 && team.pendingCoachNames && (
-              <li className="truncate rounded-lg bg-zinc-50 px-2 py-1 text-sm">
-                {team.pendingCoachNames}
+              <li className="flex items-center gap-1.5 truncate rounded-lg bg-zinc-50 px-2 py-1 text-sm">
+                <span className="truncate">{team.pendingCoachNames}</span>
+                <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-amber-200/60 bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
+                  <Clock className="h-3 w-3 shrink-0" />
+                  (en attente de compte)
+                </span>
               </li>
             )}
             {team.coaches.length === 0 &&
