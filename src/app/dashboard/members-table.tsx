@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Search,
   Shield,
+  User,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -325,23 +326,22 @@ export default function MembersTable({
       )}
 
       <div className="w-full overflow-x-auto rounded-2xl border border-zinc-100">
-        <table className="w-full min-w-[1050px] table-fixed border-collapse text-sm">
+        <table className="w-full min-w-[950px] table-fixed border-collapse text-sm">
           <colgroup>
-            <col className="w-9" />
-            <col className="w-9" />
-            <col className="w-36" />
-            <col className="w-24" />
-            <col className="w-28" />
-            <col className="w-28" />
-            <col className="w-24" />
-            <col className="w-36" />
-            <col />
+            <col className="w-8" />
+            <col className="w-8" />
             <col className="w-32" />
-            <col className="w-10" />
+            <col className="w-24" />
+            <col className="w-32" />
+            <col className="w-28" />
+            <col className="w-32" />
+            <col />
+            <col className="w-28" />
+            <col className="w-9" />
           </colgroup>
           <thead>
             <tr className="border-b border-slate-100 bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-400">
-              <th className="px-3 py-3">
+              <th className="px-2 py-3">
                 <input
                   type="checkbox"
                   checked={allFilteredSelected}
@@ -349,12 +349,12 @@ export default function MembersTable({
                   className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
                 />
               </th>
-              <th className="px-3 py-3">#</th>
+              <th className="px-2 py-3">#</th>
               <th
-                className="cursor-pointer select-none px-3 py-3"
+                className="cursor-pointer select-none px-2 py-3"
                 onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
               >
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-1 whitespace-nowrap">
                   Nom
                   {sortDir === "asc" ? (
                     <ChevronUp className="h-3.5 w-3.5 shrink-0" />
@@ -363,14 +363,13 @@ export default function MembersTable({
                   )}
                 </span>
               </th>
-              <th className="px-3 py-3">Prénom</th>
-              <th className="px-3 py-3">Commune</th>
-              <th className="px-3 py-3">Coach de</th>
-              <th className="px-3 py-3">Catégorie</th>
-              <th className="px-3 py-3">Statut</th>
-              <th className="px-3 py-3">Email</th>
-              <th className="px-3 py-3">Téléphone</th>
-              <th className="px-3 py-3" />
+              <th className="px-2 py-3 whitespace-nowrap">Prénom</th>
+              <th className="px-2 py-3 whitespace-nowrap">Coach de</th>
+              <th className="px-2 py-3 whitespace-nowrap">Catégorie</th>
+              <th className="px-2 py-3 whitespace-nowrap">Statut</th>
+              <th className="px-2 py-3 whitespace-nowrap">Email</th>
+              <th className="px-2 py-3 whitespace-nowrap">Téléphone</th>
+              <th className="px-2 py-3" />
             </tr>
           </thead>
           <tbody>
@@ -382,7 +381,7 @@ export default function MembersTable({
                   index % 2 === 1 ? "bg-slate-50/50" : ""
                 } ${m.archivedAt ? "opacity-50" : ""}`}
               >
-                <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
                   <input
                     type="checkbox"
                     checked={selectedIds.has(m.id)}
@@ -390,14 +389,14 @@ export default function MembersTable({
                     className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
                   />
                 </td>
-                <td className="px-3 py-3 text-xs text-zinc-400">{index + 1}</td>
+                <td className="px-2 py-3 text-xs text-zinc-400">{index + 1}</td>
                 <td
-                  className="truncate px-3 py-3 font-semibold text-zinc-900"
+                  className="truncate px-2 py-3 font-semibold text-zinc-900"
                   title={
                     m.bureauRole ? `${fullLastName(m)} — ${m.bureauRole}` : fullLastName(m)
                   }
                 >
-                  <span className="inline-flex items-center gap-1">
+                  <span className="inline-flex items-center gap-1 whitespace-nowrap">
                     {fullLastName(m)}
                     {m.bureauRole && (
                       <Shield className="h-3.5 w-3.5 shrink-0 text-ubac-yellow-dark" />
@@ -409,13 +408,10 @@ export default function MembersTable({
                     </span>
                   )}
                 </td>
-                <td className="truncate px-3 py-3 text-zinc-700" title={m.firstName ?? undefined}>
+                <td className="truncate px-2 py-3 text-zinc-700" title={m.firstName ?? undefined}>
                   {m.firstName ?? "—"}
                 </td>
-                <td className="whitespace-normal break-words px-3 py-3 text-zinc-600">
-                  {m.city ?? "—"}
-                </td>
-                <td className="px-3 py-3">
+                <td className="px-2 py-3">
                   <div className="flex flex-wrap gap-1 overflow-hidden">
                     {m.coachTeams.length === 0 && m.pendingCoachTeams.length === 0 ? (
                       <span className="text-xs text-zinc-400">—</span>
@@ -442,7 +438,7 @@ export default function MembersTable({
                     )}
                   </div>
                 </td>
-                <td className="px-3 py-3">
+                <td className="px-2 py-3">
                   <div className="flex flex-wrap items-center gap-1 overflow-hidden">
                     {m.teams.length === 0 ? (
                       <span className="text-xs text-zinc-400">—</span>
@@ -458,13 +454,13 @@ export default function MembersTable({
                     )}
                   </div>
                 </td>
-                <td className="px-3 py-3">
+                <td className="px-2 py-3">
                   <PlayerYearBadge
                     birthDate={m.birthDate}
                     category={m.teams[0]?.category ?? m.category}
                   />
                 </td>
-                <td className="truncate px-3 py-3 text-zinc-600" title={m.email ?? undefined}>
+                <td className="truncate px-2 py-3 text-zinc-600" title={m.email ?? undefined}>
                   {m.email ? (
                     <span className="truncate">{m.email}</span>
                   ) : (
@@ -472,12 +468,12 @@ export default function MembersTable({
                   )}
                 </td>
                 <td
-                  className="truncate px-3 py-3 text-zinc-600"
+                  className="truncate px-2 py-3 text-zinc-600"
                   title={m.phone ?? undefined}
                   onClick={(e) => e.stopPropagation()}
                 >
                   {m.phone ? (
-                    <span className="flex items-center gap-1.5">
+                    <span className="flex items-center gap-1 whitespace-nowrap">
                       <Phone className="h-3 w-3 shrink-0 text-zinc-400" />
                       <span className="truncate">{m.phone}</span>
                     </span>
@@ -485,7 +481,7 @@ export default function MembersTable({
                     <span className="text-zinc-300">—</span>
                   )}
                 </td>
-                <td className="relative px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                <td className="relative px-2 py-3" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center justify-end">
                     <button
                       onClick={() =>
@@ -510,6 +506,7 @@ export default function MembersTable({
                           }}
                           className={menuItemClass}
                         >
+                          <User className="h-3.5 w-3.5 text-zinc-500" />
                           Voir / Modifier le profil
                         </button>
                         {m.phone ? (
@@ -558,6 +555,7 @@ export default function MembersTable({
                             }}
                             className={menuItemClass}
                           >
+                            <RefreshCw className="h-3.5 w-3.5 text-zinc-500" />
                             Réactiver le membre
                           </button>
                         ) : (
@@ -568,6 +566,7 @@ export default function MembersTable({
                             }}
                             className={`${menuItemClass} text-red-600 hover:bg-red-50`}
                           >
+                            <Archive className="h-3.5 w-3.5" />
                             Archiver le membre
                           </button>
                         )}
@@ -579,7 +578,7 @@ export default function MembersTable({
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={11} className="px-2 py-8 text-center text-sm text-zinc-400">
+                <td colSpan={10} className="px-2 py-8 text-center text-sm text-zinc-400">
                   Aucun membre trouvé.
                 </td>
               </tr>
