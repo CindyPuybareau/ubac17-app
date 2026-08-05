@@ -10,14 +10,35 @@
 
 -- 1. Link any still-unlinked player row to its matching real account by
 --    email (case-insensitive), same reconciliation as the earlier
---    20260815000000 migration, re-run defensively.
+--    20260815000000 migration, re-run defensively. players.profile_id is
+--    unique, so this only auto-links UNAMBIGUOUS 1:1 matches: skips a
+--    profile that's already claimed by another player row, and skips any
+--    email shared by more than one still-unlinked player row (a family
+--    sharing one address, a duplicate roster entry, etc.) — those need a
+--    manual look (see the diagnostic query given alongside this migration)
+--    rather than a guess that could silently link the wrong fiche.
+with candidates as (
+  select
+    p.id as player_id,
+    pr.id as profile_id,
+    count(*) over (partition by pr.id) as dupes_per_profile,
+    count(*) over (partition by p.id) as dupes_per_player
+  from public.players p
+  join public.profiles pr
+    on p.registration_email is not null
+   and pr.email is not null
+   and lower(p.registration_email) = lower(pr.email)
+  where p.profile_id is null
+    and not exists (
+      select 1 from public.players existing where existing.profile_id = pr.id
+    )
+)
 update public.players p
-set profile_id = pr.id
-from public.profiles pr
-where p.profile_id is null
-  and p.registration_email is not null
-  and pr.email is not null
-  and lower(p.registration_email) = lower(pr.email);
+set profile_id = c.profile_id
+from candidates c
+where p.id = c.player_id
+  and c.dupes_per_profile = 1
+  and c.dupes_per_player = 1;
 
 -- 2. Now that linkage is current, promote any "pending" coach assignment
 --    for a player who turns out to already have a real account into the
