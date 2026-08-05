@@ -73,6 +73,12 @@ export default function TeamCard({
   // "+ Ajouter un joueur" shortcut here — Coach space still does, since
   // coaches have no other way to add a brand-new player to their roster.
   allowCreatePlayer = true,
+  // Same reasoning for coach assignment: the Bureau now designates coaches
+  // exclusively from the member's own fiche ("Coach de" section), so its
+  // Équipes tab drops the "+ Assigner un coach" picker — Coach space keeps
+  // it, since a coach can't reach the (Bureau-only) Membres tab to add a
+  // co-coach any other way.
+  allowAssignCoach = true,
 }: {
   team: TeamWithMembers;
   allProfiles: Person[];
@@ -82,12 +88,16 @@ export default function TeamCard({
   memberDetailsByPlayerId?: Record<string, MemberDetail>;
   taskTallyByPlayerId?: SeasonTaskTally;
   allowCreatePlayer?: boolean;
+  allowAssignCoach?: boolean;
 }) {
   const router = useRouter();
   const [detailPlayerId, setDetailPlayerId] = useState<string | null>(null);
   const [removeTarget, setRemoveTarget] = useState<RosterPlayer | null>(null);
   const [removing, setRemoving] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
+  const [removeCoachTarget, setRemoveCoachTarget] = useState<Person | null>(null);
+  const [removingCoach, setRemovingCoach] = useState(false);
+  const [removeCoachError, setRemoveCoachError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   function showToast(message: string) {
@@ -200,13 +210,28 @@ export default function TeamCard({
     router.refresh();
   }
 
-  async function removeCoach(coachId: string) {
+  async function confirmRemoveCoach() {
+    if (!removeCoachTarget) return;
+    setRemovingCoach(true);
+    setRemoveCoachError(null);
     const supabase = createClient();
-    await supabase
+    const { error } = await supabase
       .from("team_coaches")
       .delete()
       .eq("team_id", team.id)
-      .eq("coach_id", coachId);
+      .eq("coach_id", removeCoachTarget.id);
+    setRemovingCoach(false);
+    if (error) {
+      setRemoveCoachError(`Retrait impossible : ${error.message}`);
+      return;
+    }
+    // A single source of truth (team_coaches) drives both this card's own
+    // "Coachs" list and the Membres table's "Coach de" badge for this
+    // person — deleting the row here already updates both the moment the
+    // page refetches, no separate write to the member's fiche needed.
+    const name = fullName(removeCoachTarget);
+    setRemoveCoachTarget(null);
+    showToast(`${name} n'est plus coach de l'équipe ${team.name ?? ""}.`);
     router.refresh();
   }
 
@@ -404,7 +429,7 @@ export default function TeamCard({
                   </span>
                 </span>
                 <button
-                  onClick={() => removeCoach(p.id)}
+                  onClick={() => setRemoveCoachTarget(p)}
                   className="shrink-0 text-xs font-medium text-red-600 hover:underline"
                 >
                   Retirer
@@ -433,7 +458,7 @@ export default function TeamCard({
                 <li className="text-sm text-zinc-400">Aucun coach</li>
               )}
           </ul>
-          {availableCoaches.length > 0 && (
+          {allowAssignCoach && availableCoaches.length > 0 && (
             <select
               defaultValue=""
               onChange={(e) => {
@@ -579,6 +604,40 @@ export default function TeamCard({
                 className="flex-1 rounded-full bg-red-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
               >
                 {removing ? "Retrait..." : "Retirer de l'équipe"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {removeCoachTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
+            <h3 className="mb-2 font-semibold text-zinc-900">
+              Retirer le coach de cette équipe ?
+            </h3>
+            <p className="mb-4 text-sm text-zinc-600">
+              Êtes-vous sûr de vouloir retirer{" "}
+              <span className="font-semibold text-zinc-900">{fullName(removeCoachTarget)}</span>{" "}
+              du rôle de coach de l&apos;équipe{" "}
+              <span className="font-semibold text-zinc-900">{team.name}</span> ?
+            </p>
+            {removeCoachError && (
+              <p className="mb-2 text-sm text-red-600">{removeCoachError}</p>
+            )}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setRemoveCoachTarget(null)}
+                className="flex-1 rounded-full border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={confirmRemoveCoach}
+                disabled={removingCoach}
+                className="flex-1 rounded-full bg-red-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
+              >
+                {removingCoach ? "Retrait..." : "Retirer le coach"}
               </button>
             </div>
           </div>

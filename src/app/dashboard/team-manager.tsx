@@ -117,6 +117,7 @@ export default function TeamManager({
             eventsByTeamId={eventsByTeamId}
             contactPhoneByPlayerId={contactPhoneByPlayerId}
             allowCreatePlayer={false}
+            allowAssignCoach={false}
           />
         ))}
         {teams.length === 0 && (
