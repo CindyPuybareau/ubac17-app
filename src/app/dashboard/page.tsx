@@ -237,7 +237,7 @@ export default async function DashboardPage() {
     redirect("/connexion");
   }
 
-  const [profileResult, adminResult, coachResult, playerLinksResult] =
+  const [profileResult, adminResult, coachResult, playerLinksResult, ownPlayerRowResult] =
     await Promise.all([
       supabase
         .from("profiles")
@@ -259,11 +259,17 @@ export default async function DashboardPage() {
         .from("parent_player")
         .select("players(id, first_name, last_name, category, profile_id)")
         .eq("parent_id", user.id),
+      // This user's own player row, if any (players.profile_id = user.id) —
+      // reused below both to also surface teams where THEY are only a
+      // pending (not-yet-linked-account) coach, and later to merge their
+      // own player-side calendar into the Coach tab (see ownTeamIds).
+      supabase.from("players").select("id").eq("profile_id", user.id).maybeSingle(),
     ]);
 
   const profile = profileResult.data;
   const isAdmin = Boolean(adminResult.data);
   const clubFunction = adminResult.data?.club_function ?? null;
+  const ownPlayerId = ownPlayerRowResult.data?.id ?? null;
 
   type CoachedTeam = {
     id: string;
@@ -274,9 +280,36 @@ export default async function DashboardPage() {
     pending_coach_names: string | null;
   };
 
-  const coachedTeams = (coachResult.data ?? [])
+  // A coach assignment made from a member's fiche lands in team_coaches
+  // (coach_id = profiles.id) when that member's player row was already
+  // linked to a real account at the time, or in team_pending_coaches
+  // (player_id-keyed) otherwise — see member-detail-modal.tsx's handleSave.
+  // If this user's own player row wasn't linked yet when they were assigned
+  // as coach of a team, that assignment would only show up here, so it
+  // must be merged in too, or the whole Coach tab (and every team they
+  // coach) would silently stay invisible to them despite being a real,
+  // designated coach.
+  const pendingCoachResult = ownPlayerId
+    ? await supabase
+        .from("team_pending_coaches")
+        .select(
+          "teams(id, name, category, ffbb_url, sort_order, pending_coach_names)"
+        )
+        .eq("player_id", ownPlayerId)
+    : { data: [] as { teams: unknown }[] };
+
+  const seenCoachedTeamIds = new Set<string>();
+  const coachedTeams = [
+    ...(coachResult.data ?? []),
+    ...(pendingCoachResult.data ?? []),
+  ]
     .map((row) => row.teams as unknown as CoachedTeam | null)
     .filter((t): t is CoachedTeam => Boolean(t))
+    .filter((t) => {
+      if (seenCoachedTeamIds.has(t.id)) return false;
+      seenCoachedTeamIds.add(t.id);
+      return true;
+    })
     .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999));
   const isCoach = coachedTeams.length > 0;
 
@@ -541,6 +574,21 @@ export default async function DashboardPage() {
       coachesByTeam.set(tc.team_id, list);
     });
 
+    // Same source of truth as the Membres table's amber "en attente" Coach
+    // badge (team_pending_coaches), just grouped the other way round (by
+    // team instead of by player) so the Équipes tab's Coach section can
+    // show these named-but-not-yet-linked coaches too, instead of relying
+    // on the separate, no-longer-kept-in-sync teams.pending_coach_names
+    // free-text column.
+    const pendingCoachesByTeam = new Map<string, Person[]>();
+    (teamPendingCoachesRes.data ?? []).forEach((tpc) => {
+      const player = playersById.get(tpc.player_id);
+      if (!player) return;
+      const list = pendingCoachesByTeam.get(tpc.team_id) ?? [];
+      list.push(player);
+      pendingCoachesByTeam.set(tpc.team_id, list);
+    });
+
     adminTeams = (teamsRes.data ?? []).map((t) => ({
       id: t.id,
       name: t.name,
@@ -548,6 +596,7 @@ export default async function DashboardPage() {
       ffbb_url: t.ffbb_url,
       players: rosterByTeam.get(t.id) ?? [],
       coaches: coachesByTeam.get(t.id) ?? [],
+      pendingCoaches: pendingCoachesByTeam.get(t.id) ?? [],
       pendingCoachNames: t.pending_coach_names,
     }));
     allProfilesForAdmin = profilesRes.data ?? [];
@@ -808,19 +857,12 @@ export default async function DashboardPage() {
     // their own account) sees their own team's events in this same
     // calendar too — without that team appearing as one they coach in the
     // Équipe(s) tab below, which stays scoped to coachedTeamIds only.
-    const { data: ownPlayerRow } = await supabase
-      .from("players")
-      .select("id")
-      .eq("profile_id", user.id)
-      .maybeSingle();
-    const ownTeamIds = ownPlayerRow
-      ? await getPlayerTeamIds(supabase, ownPlayerRow.id)
-      : [];
+    const ownTeamIds = ownPlayerId ? await getPlayerTeamIds(supabase, ownPlayerId) : [];
     const coachCalendarTeamIds = Array.from(
       new Set([...coachedTeamIds, ...ownTeamIds])
     );
 
-    const [teamPlayersRes, teamCoachesRes, eventsRes] = await Promise.all([
+    const [teamPlayersRes, teamCoachesRes, teamPendingCoachesRes, eventsRes] = await Promise.all([
       supabase
         .from("team_players")
         .select("team_id, player_id, jersey_number, position")
@@ -828,6 +870,10 @@ export default async function DashboardPage() {
       supabase
         .from("team_coaches")
         .select("team_id, coach_id")
+        .in("team_id", coachedTeamIds),
+      supabase
+        .from("team_pending_coaches")
+        .select("team_id, player_id")
         .in("team_id", coachedTeamIds),
       supabase
         .from("events")
@@ -838,8 +884,17 @@ export default async function DashboardPage() {
         .order("start_time", { ascending: true }),
     ]);
 
+    const pendingCoachPlayerIds = Array.from(
+      new Set((teamPendingCoachesRes.data ?? []).map((r) => r.player_id))
+    );
+    // A pending co-coach's player row might not itself be on any coached
+    // team's roster, so it wouldn't already be covered by playerIds below —
+    // fetch both in one go.
     const playerIds = Array.from(
-      new Set((teamPlayersRes.data ?? []).map((r) => r.player_id))
+      new Set([
+        ...(teamPlayersRes.data ?? []).map((r) => r.player_id),
+        ...pendingCoachPlayerIds,
+      ])
     );
     const coachIds = Array.from(
       new Set((teamCoachesRes.data ?? []).map((r) => r.coach_id))
@@ -928,6 +983,15 @@ export default async function DashboardPage() {
       coachesByTeam.set(tc.team_id, list);
     });
 
+    const pendingCoachesByTeam = new Map<string, Person[]>();
+    (teamPendingCoachesRes.data ?? []).forEach((tpc) => {
+      const player = playersById.get(tpc.player_id);
+      if (!player) return;
+      const list = pendingCoachesByTeam.get(tpc.team_id) ?? [];
+      list.push(player);
+      pendingCoachesByTeam.set(tpc.team_id, list);
+    });
+
     coachTeamsWithRoster = coachedTeams.map((t) => ({
       id: t.id,
       name: t.name,
@@ -935,6 +999,7 @@ export default async function DashboardPage() {
       ffbb_url: t.ffbb_url,
       players: rosterByTeam.get(t.id) ?? [],
       coaches: coachesByTeam.get(t.id) ?? [],
+      pendingCoaches: pendingCoachesByTeam.get(t.id) ?? [],
       pendingCoachNames: t.pending_coach_names,
     }));
 
@@ -1103,20 +1168,25 @@ export default async function DashboardPage() {
     const allTeamIds = Array.from(new Set(playerTeamIdsList.flat()));
 
     if (allTeamIds.length > 0) {
-      const [teamsRes, teammateRowsRes, teamCoachesRes] = await Promise.all([
-        supabase
-          .from("teams")
-          .select("id, name, category, ffbb_url, sort_order, pending_coach_names")
-          .in("id", allTeamIds),
-        supabase
-          .from("team_players")
-          .select("team_id, players(id, first_name, last_name, birth_date, category)")
-          .in("team_id", allTeamIds),
-        supabase
-          .from("team_coaches")
-          .select("team_id, profiles(id, first_name, last_name, phone)")
-          .in("team_id", allTeamIds),
-      ]);
+      const [teamsRes, teammateRowsRes, teamCoachesRes, teamPendingCoachesRes] =
+        await Promise.all([
+          supabase
+            .from("teams")
+            .select("id, name, category, ffbb_url, sort_order, pending_coach_names")
+            .in("id", allTeamIds),
+          supabase
+            .from("team_players")
+            .select("team_id, players(id, first_name, last_name, birth_date, category)")
+            .in("team_id", allTeamIds),
+          supabase
+            .from("team_coaches")
+            .select("team_id, profiles(id, first_name, last_name, phone)")
+            .in("team_id", allTeamIds),
+          supabase
+            .from("team_pending_coaches")
+            .select("team_id, players(id, first_name, last_name)")
+            .in("team_id", allTeamIds),
+        ]);
 
       const teamsById = new Map(
         (teamsRes.data ?? []).map((t) => [t.id, t])
@@ -1169,6 +1239,19 @@ export default async function DashboardPage() {
         coachesByTeamId.set(row.team_id, list);
       });
 
+      // Same named-but-not-yet-linked coaches shown elsewhere (Membres
+      // table's amber badge, Équipes tab) — surfaced here too so a parent
+      // sees who's coaching even before that coach has signed up for a
+      // real account.
+      const pendingCoachesByTeamId = new Map<string, Person[]>();
+      (teamPendingCoachesRes.data ?? []).forEach((row) => {
+        const p = row.players as unknown as Person | null;
+        if (!p) return;
+        const list = pendingCoachesByTeamId.get(row.team_id) ?? [];
+        list.push(p);
+        pendingCoachesByTeamId.set(row.team_id, list);
+      });
+
       players.forEach((p, i) => {
         playerTeamIdsList[i].forEach((teamId) => {
           const team = teamsById.get(teamId);
@@ -1180,6 +1263,7 @@ export default async function DashboardPage() {
             teamName: team.name,
             category: team.category,
             coaches: coachesByTeamId.get(teamId) ?? [],
+            pendingCoaches: pendingCoachesByTeamId.get(teamId) ?? [],
             roster: rosterByTeamId.get(teamId) ?? [],
             ffbbUrl: team.ffbb_url,
             sortOrder: team.sort_order,

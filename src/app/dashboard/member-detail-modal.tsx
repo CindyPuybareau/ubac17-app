@@ -481,11 +481,38 @@ export default function MemberDetailModal({
     }
 
     // Coach team assignment works whether or not this member has a real
-    // login account yet: linked -> real team_coaches (grants access),
-    // unlinked -> team_pending_coaches (display-only badge, same table the
-    // "en attente de compte" pastille reads from). The players<->profiles
-    // auto-link runs silently in the background at signup — nothing here
-    // needs to know about it.
+    // login account yet: linked -> real team_coaches (grants access AND
+    // shows up in every "Coach" section app-wide), unlinked ->
+    // team_pending_coaches (display-only badge, same table the "en
+    // attente de compte" pastille reads from). The players<->profiles
+    // auto-link normally runs silently in the background at signup, but a
+    // member whose row predates that trigger (or was never re-run) can
+    // still have profileId null here despite genuinely already having an
+    // account — self-heal it right now by email match, so this save
+    // doesn't silently land in team_pending_coaches for someone who's
+    // actually already a real user (the exact bug that left a real coach
+    // invisible in their teams' "Coach" section).
+    let resolvedProfileId = profileId;
+    if (!resolvedProfileId) {
+      const emailToMatch = form.registrationEmail || member.registrationEmail;
+      if (emailToMatch) {
+        const { data: matchedProfile } = await supabase
+          .from("profiles")
+          .select("id")
+          .ilike("email", emailToMatch)
+          .maybeSingle();
+        if (matchedProfile) {
+          const { error: linkError } = await supabase
+            .from("players")
+            .update({ profile_id: matchedProfile.id })
+            .eq("id", member.id);
+          if (!linkError) {
+            resolvedProfileId = matchedProfile.id;
+          }
+        }
+      }
+    }
+
     const initialCombinedCoachIds = new Set(
       [...initialCoachTeams, ...initialPendingCoachTeams].map((t) => t.id)
     );
@@ -496,9 +523,9 @@ export default function MemberDetailModal({
     const toAdd = Array.from(desiredCoachIds).filter(
       (id) => !initialCombinedCoachIds.has(id)
     );
-    const coachTable = profileId ? "team_coaches" : "team_pending_coaches";
-    const coachIdColumn = profileId ? "coach_id" : "player_id";
-    const coachIdValue = profileId ?? member.id;
+    const coachTable = resolvedProfileId ? "team_coaches" : "team_pending_coaches";
+    const coachIdColumn = resolvedProfileId ? "coach_id" : "player_id";
+    const coachIdValue = resolvedProfileId ?? member.id;
 
     if (toRemove.length > 0) {
       const { error: removeError } = await supabase

@@ -412,16 +412,31 @@ export default function TeamCard({
                 </button>
               </li>
             ))}
-            {team.pendingCoachNames && (
+            {team.pendingCoaches.map((p) => (
+              <li
+                key={`pending-${p.id}`}
+                className="flex items-center gap-1.5 truncate rounded-lg bg-amber-50 px-2 py-1 text-sm text-amber-700"
+              >
+                <Clock className="h-3.5 w-3.5 shrink-0" />
+                {fullName(p)}
+                <span className="text-xs text-amber-500">(en attente de compte)</span>
+              </li>
+            ))}
+            {/* Legacy free-text fallback, only shown if this team has no
+                structured pending coach (team_pending_coaches) at all —
+                keeps older, never-migrated teams from silently going blank. */}
+            {team.pendingCoaches.length === 0 && team.pendingCoachNames && (
               <li className="flex items-center gap-1.5 truncate rounded-lg bg-amber-50 px-2 py-1 text-sm text-amber-700">
                 <Clock className="h-3.5 w-3.5 shrink-0" />
                 {team.pendingCoachNames}
                 <span className="text-xs text-amber-500">(en attente de compte)</span>
               </li>
             )}
-            {team.coaches.length === 0 && !team.pendingCoachNames && (
-              <li className="text-sm text-zinc-400">Aucun coach</li>
-            )}
+            {team.coaches.length === 0 &&
+              team.pendingCoaches.length === 0 &&
+              !team.pendingCoachNames && (
+                <li className="text-sm text-zinc-400">Aucun coach</li>
+              )}
           </ul>
           {availableCoaches.length > 0 && (
             <select

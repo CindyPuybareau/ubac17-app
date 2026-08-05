@@ -18,6 +18,10 @@ export type FamilyTeamCardData = {
   teamName: string | null;
   category: string | null;
   coaches: CoachContact[];
+  // Named coaches assigned via a member's fiche (team_pending_coaches)
+  // before they have a real account yet — same source as the Membres
+  // table's amber "en attente" badge.
+  pendingCoaches: Person[];
   roster: RosterMate[];
   ffbbUrl: string | null;
   sortOrder: number | null;
@@ -56,16 +60,31 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
                 {fullName(c)}
               </li>
             ))}
-            {card.pendingCoachNames && (
+            {card.pendingCoaches.map((c) => (
+              <li
+                key={`pending-${c.id}`}
+                className="flex items-center gap-1.5 truncate rounded-lg bg-amber-50 px-2 py-1 text-sm text-amber-700"
+              >
+                <Clock className="h-3.5 w-3.5 shrink-0" />
+                {fullName(c)}
+                <span className="text-xs text-amber-500">(en attente de compte)</span>
+              </li>
+            ))}
+            {/* Legacy free-text fallback, only shown if this team has no
+                structured pending coach (team_pending_coaches) at all —
+                keeps older, never-migrated teams from silently going blank. */}
+            {card.pendingCoaches.length === 0 && card.pendingCoachNames && (
               <li className="flex items-center gap-1.5 truncate rounded-lg bg-amber-50 px-2 py-1 text-sm text-amber-700">
                 <Clock className="h-3.5 w-3.5 shrink-0" />
                 {card.pendingCoachNames}
                 <span className="text-xs text-amber-500">(en attente de compte)</span>
               </li>
             )}
-            {card.coaches.length === 0 && !card.pendingCoachNames && (
-              <li className="text-sm text-zinc-400">Aucun coach assigné</li>
-            )}
+            {card.coaches.length === 0 &&
+              card.pendingCoaches.length === 0 &&
+              !card.pendingCoachNames && (
+                <li className="text-sm text-zinc-400">Aucun coach assigné</li>
+              )}
           </ul>
           {reachableCoaches.length === 1 ? (
             <WhatsAppButton

@@ -27,6 +27,11 @@ export type TeamWithMembers = {
   ffbb_url: string | null;
   players: RosterPlayer[];
   coaches: Person[];
+  // Named coaches assigned via a member's fiche (team_pending_coaches)
+  // before they have a real account yet — same source as the Membres
+  // table's amber "en attente" badge, kept in sync with it (unlike the
+  // legacy pendingCoachNames free-text field below).
+  pendingCoaches: Person[];
   pendingCoachNames: string | null;
 };
 
