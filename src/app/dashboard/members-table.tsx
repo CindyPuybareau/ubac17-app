@@ -4,6 +4,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Archive,
+  CheckCircle2,
   ChevronDown,
   ChevronUp,
   Clock,
@@ -15,11 +16,13 @@ import {
   Search,
   Shield,
   User,
+  UserPlus,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { buildGmailComposeLink } from "@/lib/email";
 import { teamLabel } from "@/lib/teams";
+import AddMemberModal from "./add-member-modal";
 import EmailTemplateModal from "./email-template-modal";
 import MemberDetailModal from "./member-detail-modal";
 import PlayerYearBadge from "./player-year-badge";
@@ -86,6 +89,13 @@ export default function MembersTable({
   const [reassignTeamId, setReassignTeamId] = useState("");
   const [reassignSaving, setReassignSaving] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [showAddMember, setShowAddMember] = useState(false);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
+
+  function handleMemberCreated(fullName: string) {
+    setSuccessToast(`Membre ${fullName} ajouté avec succès !`);
+    setTimeout(() => setSuccessToast(null), 4000);
+  }
 
   const filtered = useMemo(() => {
     let list = showArchived ? members : members.filter((m) => !m.archivedAt);
@@ -277,6 +287,13 @@ export default function MembersTable({
         <span className="text-xs font-medium text-zinc-400">
           {filtered.length} membre{filtered.length > 1 ? "s" : ""}
         </span>
+        <button
+          onClick={() => setShowAddMember(true)}
+          className="ml-auto flex items-center gap-1.5 rounded-full bg-ubac-yellow px-3.5 py-1.5 text-sm font-semibold text-navy shadow-sm transition-colors hover:bg-ubac-yellow-dark"
+        >
+          <UserPlus className="h-4 w-4" />
+          Ajouter un membre
+        </button>
       </div>
 
       {selectedIds.size > 0 && (
@@ -651,6 +668,21 @@ export default function MembersTable({
             </button>
           </div>
         </Modal>
+      )}
+
+      {showAddMember && (
+        <AddMemberModal
+          teams={teams}
+          onClose={() => setShowAddMember(false)}
+          onCreated={handleMemberCreated}
+        />
+      )}
+
+      {successToast && (
+        <div className="fixed bottom-6 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-2 rounded-full bg-navy px-4 py-2.5 text-sm font-semibold text-white shadow-lg">
+          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+          {successToast}
+        </div>
       )}
     </div>
   );

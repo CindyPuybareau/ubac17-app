@@ -210,7 +210,10 @@ function formatBirthDate(iso: string | null) {
   return d.toLocaleDateString("fr-FR");
 }
 
-function Field({
+// Exported so AddMemberModal (creation form) can reuse the exact same
+// styled input/select/textarea instead of duplicating this markup — the
+// two modals should look identical since they edit the same data model.
+export function Field({
   label,
   value,
   displayValue,
