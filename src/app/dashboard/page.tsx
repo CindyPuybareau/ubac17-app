@@ -1168,7 +1168,7 @@ export default async function DashboardPage() {
     const allTeamIds = Array.from(new Set(playerTeamIdsList.flat()));
 
     if (allTeamIds.length > 0) {
-      const [teamsRes, teammateRowsRes, teamCoachesRes, teamPendingCoachesRes] =
+      const [teamsRes, teammateRowsRes, teamCoachesRes, teamPendingCoachesRes, teamEventsRes] =
         await Promise.all([
           supabase
             .from("teams")
@@ -1186,6 +1186,11 @@ export default async function DashboardPage() {
             .from("team_pending_coaches")
             .select("team_id, players(id, first_name, last_name)")
             .in("team_id", allTeamIds),
+          supabase
+            .from("events")
+            .select("id, title, event_type, location, salle, start_time, team_id")
+            .in("team_id", allTeamIds)
+            .order("start_time", { ascending: true }),
         ]);
 
       const teamsById = new Map(
@@ -1252,6 +1257,29 @@ export default async function DashboardPage() {
         pendingCoachesByTeamId.set(row.team_id, list);
       });
 
+      // Top 3 upcoming events per team, same "Prochains événements" block
+      // as the Bureau/Coach Équipes tab (team-card.tsx) — teamEventsRes is
+      // already ordered ascending by start_time.
+      const now = Date.now();
+      const eventsByTeamId = new Map<
+        string,
+        { id: string; title: string | null; event_type: string | null; location: string | null; salle: string | null; start_time: string }[]
+      >();
+      (teamEventsRes.data ?? []).forEach((e) => {
+        if (new Date(e.start_time).getTime() < now) return;
+        const list = eventsByTeamId.get(e.team_id as string) ?? [];
+        if (list.length >= 3) return;
+        list.push({
+          id: e.id,
+          title: e.title,
+          event_type: e.event_type,
+          location: e.location,
+          salle: e.salle,
+          start_time: e.start_time,
+        });
+        eventsByTeamId.set(e.team_id as string, list);
+      });
+
       players.forEach((p, i) => {
         playerTeamIdsList[i].forEach((teamId) => {
           const team = teamsById.get(teamId);
@@ -1265,6 +1293,7 @@ export default async function DashboardPage() {
             coaches: coachesByTeamId.get(teamId) ?? [],
             pendingCoaches: pendingCoachesByTeamId.get(teamId) ?? [],
             roster: rosterByTeamId.get(teamId) ?? [],
+            events: eventsByTeamId.get(teamId) ?? [],
             ffbbUrl: team.ffbb_url,
             sortOrder: team.sort_order,
             pendingCoachNames: team.pending_coach_names,

@@ -75,7 +75,10 @@ const typeStyles: Record<
   },
 };
 
-function styleFor(eventType: string | null) {
+// Exported so team-card.tsx and family-team-card.tsx can badge each
+// event's type with the exact same palette/labels used here, instead of
+// duplicating (and inevitably drifting from) this mapping.
+export function styleFor(eventType: string | null) {
   return typeStyles[eventType ?? "OTHER"] ?? typeStyles.OTHER;
 }
 

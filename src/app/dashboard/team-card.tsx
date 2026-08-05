@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Clock,
   FileText,
+  MapPin,
   Phone,
   Shirt,
   Trash2,
@@ -15,9 +16,11 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getCurrentSeasonLabel } from "@/lib/season";
+import { styleFor } from "./calendar-view";
 import OpponentDisplay from "./opponent-display";
 import MemberDetailModal from "./member-detail-modal";
 import PlayerYearBadge from "./player-year-badge";
+import SalleBadge from "./salle-badge";
 import WhatsAppButton from "./whatsapp-button";
 import type { AdminUpcomingEvent, MemberDetail } from "./page";
 import type { RosterPlayer, TeamWithMembers } from "./team-manager";
@@ -491,38 +494,67 @@ export default function TeamCard({
         </div>
 
         <div>
-          <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-blue-700">
-            <CalendarDays className="h-3.5 w-3.5" />
-            Prochains matchs
-          </p>
+          <div className="mb-1">
+            <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-blue-700">
+              <CalendarDays className="h-3.5 w-3.5" />
+              Prochains événements
+            </p>
+            <p className="text-[11px] text-zinc-400">
+              Matchs, entraînements &amp; événements du club
+            </p>
+          </div>
           {teamEvents.length > 0 ? (
             <ul className="flex flex-col gap-1.5">
-              {teamEvents.map((e) => (
-                <li
-                  key={e.id}
-                  className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50/60 px-2.5 py-2"
-                >
-                  <CalendarDays className="h-4 w-4 shrink-0 text-blue-600" />
-                  <div className="min-w-0 flex-1">
-                    {e.event_type === "MATCH" ? (
-                      <OpponentDisplay title={e.title} size="sm" />
-                    ) : (
-                      <span className="truncate text-sm font-medium text-blue-900">
-                        {e.title ?? "Événement"}
+              {teamEvents.map((e) => {
+                const style = styleFor(e.event_type);
+                return (
+                  <li
+                    key={e.id}
+                    className="flex flex-col gap-1 rounded-xl border border-blue-200 bg-blue-50/60 px-2.5 py-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none ${style.badge}`}
+                      >
+                        {style.label}
                       </span>
-                    )}
-                  </div>
-                  <span className="shrink-0 text-xs font-semibold text-blue-700">
-                    {new Date(e.start_time).toLocaleDateString("fr-FR", {
-                      day: "numeric",
-                      month: "short",
-                    })}
-                  </span>
-                </li>
-              ))}
+                      <div className="min-w-0 flex-1">
+                        {e.event_type === "MATCH" ? (
+                          <OpponentDisplay title={e.title} size="sm" />
+                        ) : (
+                          <span className="truncate text-sm font-medium text-blue-900">
+                            {e.title ?? style.label}
+                          </span>
+                        )}
+                      </div>
+                      <span className="shrink-0 text-xs font-semibold text-blue-700">
+                        {new Date(e.start_time).toLocaleDateString("fr-FR", {
+                          day: "numeric",
+                          month: "short",
+                        })}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 pl-0.5 text-xs text-zinc-500">
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3 shrink-0" />
+                        {new Date(e.start_time).toLocaleTimeString("fr-FR", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                      {(e.salle || e.location) && (
+                        <span className="flex items-center gap-1 truncate">
+                          <MapPin className="h-3 w-3 shrink-0" />
+                          {e.salle ? <SalleBadge salle={e.salle} /> : e.location}
+                        </span>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           ) : (
-            <p className="text-sm text-zinc-400">Aucun match à venir</p>
+            <p className="text-sm text-zinc-400">Aucun événement à venir</p>
           )}
         </div>
       </div>
