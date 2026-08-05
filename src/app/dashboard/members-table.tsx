@@ -15,6 +15,7 @@ import {
   RefreshCw,
   Search,
   Shield,
+  Trash2,
   User,
   UserPlus,
   X,
@@ -90,11 +91,25 @@ export default function MembersTable({
   const [reassignSaving, setReassignSaving] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [showAddMember, setShowAddMember] = useState(false);
-  const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AdminMember | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  function showToast(message: string) {
+    setToast(message);
+    setTimeout(() => setToast(null), 4000);
+  }
 
   function handleMemberCreated(fullName: string) {
-    setSuccessToast(`Membre ${fullName} ajouté avec succès !`);
-    setTimeout(() => setSuccessToast(null), 4000);
+    showToast(`Membre ${fullName} ajouté avec succès !`);
+  }
+
+  function memberLabel(ids: string[]) {
+    if (ids.length === 1) {
+      const m = members.find((mm) => mm.id === ids[0]);
+      return m ? [m.firstName, m.lastName].filter(Boolean).join(" ") || "ce membre" : "ce membre";
+    }
+    return `${ids.length} membres`;
   }
 
   const filtered = useMemo(() => {
@@ -184,7 +199,10 @@ export default function MembersTable({
   // RLS silently returns 0 affected rows instead of an error when a policy
   // blocks a write, so a plain .error check isn't enough here — request the
   // updated rows back and compare the count to know it actually happened.
-  async function setArchived(ids: string[], archived: boolean) {
+  // Returns whether the write actually went through, so callers can
+  // decide whether to show a success toast / close a modal / etc. instead
+  // of assuming success just because no exception was thrown.
+  async function setArchived(ids: string[], archived: boolean): Promise<boolean> {
     setActionError(null);
     const supabase = createClient();
     const { data: updated, error } = await supabase
@@ -197,13 +215,13 @@ export default function MembersTable({
       setActionError(
         `${archived ? "Archivage" : "Réactivation"} impossible : ${error.message}`
       );
-      return;
+      return false;
     }
     if ((updated?.length ?? 0) < ids.length) {
       setActionError(
         "Action bloquée par les droits d'accès (RLS). Vérifie que la migration 20260731030000_members_table_support.sql a bien été exécutée dans Supabase (SQL Editor), puis réessaie."
       );
-      return;
+      return false;
     }
 
     setSelectedIds((prev) => {
@@ -212,8 +230,14 @@ export default function MembersTable({
       return next;
     });
     router.refresh();
+    return true;
   }
 
+  // Confirms once, then archives directly — used by the row ⋮ menu and the
+  // bulk-selection toolbar, neither of which is already behind a confirming
+  // modal. MemberDetailModal's own archive button confirms itself and calls
+  // setArchived directly instead (see its onArchive prop below), so a
+  // member is never asked to confirm the same action twice in a row.
   async function handleArchive(ids: string[]) {
     const label = ids.length > 1 ? `ces ${ids.length} membres` : "ce membre";
     const ok = window.confirm(
@@ -224,11 +248,54 @@ export default function MembersTable({
       } conservées et tu peux réactiver à tout moment.`
     );
     if (!ok) return;
-    await setArchived(ids, true);
+    const label2 = memberLabel(ids);
+    const ok2 = await setArchived(ids, true);
+    if (ok2) {
+      showToast(
+        ids.length > 1 ? `${label2} archivés.` : `Membre ${label2} archivé.`
+      );
+    }
   }
 
   async function handleReactivate(ids: string[]) {
-    await setArchived(ids, false);
+    const label = memberLabel(ids);
+    const ok = await setArchived(ids, false);
+    if (ok) {
+      showToast(
+        ids.length > 1 ? `${label} réactivés.` : `Membre ${label} réactivé.`
+      );
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setActionError(null);
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("players")
+      .delete()
+      .eq("id", deleteTarget.id)
+      .select("id");
+    setDeleting(false);
+    if (error) {
+      setActionError(`Suppression impossible : ${error.message}`);
+      return;
+    }
+    if ((data?.length ?? 0) === 0) {
+      setActionError(
+        "Suppression bloquée par les droits d'accès (RLS). Vérifie que la migration 20260826000000_cascade_delete_players.sql a bien été exécutée dans Supabase (SQL Editor), puis réessaie."
+      );
+      return;
+    }
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(deleteTarget.id);
+      return next;
+    });
+    setDeleteTarget(null);
+    showToast("Membre supprimé définitivement.");
+    router.refresh();
   }
 
   const selectedMembers = members.filter((m) => selectedIds.has(m.id));
@@ -552,16 +619,28 @@ export default function MembersTable({
                           </span>
                         )}
                         {m.archivedAt ? (
-                          <button
-                            onClick={() => {
-                              setOpenMenuId(null);
-                              handleReactivate([m.id]);
-                            }}
-                            className={menuItemClass}
-                          >
-                            <RefreshCw className="h-3.5 w-3.5 text-zinc-500" />
-                            Réactiver le membre
-                          </button>
+                          <>
+                            <button
+                              onClick={() => {
+                                setOpenMenuId(null);
+                                handleReactivate([m.id]);
+                              }}
+                              className={menuItemClass}
+                            >
+                              <RefreshCw className="h-3.5 w-3.5 text-zinc-500" />
+                              Réactiver le membre
+                            </button>
+                            <button
+                              onClick={() => {
+                                setOpenMenuId(null);
+                                setDeleteTarget(m);
+                              }}
+                              className={`${menuItemClass} text-red-600 hover:bg-red-50`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Supprimer définitivement
+                            </button>
+                          </>
                         ) : (
                           <button
                             onClick={() => {
@@ -600,7 +679,16 @@ export default function MembersTable({
               member={detailMember}
               readOnly={false}
               onClose={() => setDetailMemberId(null)}
-              onArchive={() => handleArchive([detailMember.id])}
+              onArchive={async () => {
+                const ok = await setArchived([detailMember.id], true);
+                if (ok) {
+                  showToast(
+                    `Membre ${[detailMember.firstName, detailMember.lastName]
+                      .filter(Boolean)
+                      .join(" ")} archivé.`
+                  );
+                }
+              }}
               archivedAt={detailMember.archivedAt}
               teams={teams}
               profileId={detailMember.profileId}
@@ -678,10 +766,41 @@ export default function MembersTable({
         />
       )}
 
-      {successToast && (
+      {deleteTarget && (
+        <Modal title="Suppression définitive" onClose={() => setDeleteTarget(null)}>
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-zinc-700">
+              Êtes-vous sûr de vouloir supprimer définitivement{" "}
+              <span className="font-semibold">
+                {[deleteTarget.firstName, deleteTarget.lastName].filter(Boolean).join(" ") ||
+                  "ce membre"}
+              </span>{" "}
+              ? Cette action est irréversible.
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="flex-1 rounded-full border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={deleting}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-red-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                {deleting ? "Suppression..." : "Supprimer définitivement"}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {toast && (
         <div className="fixed bottom-6 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-2 rounded-full bg-navy px-4 py-2.5 text-sm font-semibold text-white shadow-lg">
           <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-          {successToast}
+          {toast}
         </div>
       )}
     </div>

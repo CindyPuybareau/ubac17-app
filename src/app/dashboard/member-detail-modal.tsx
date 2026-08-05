@@ -299,7 +299,11 @@ export default function MemberDetailModal({
   member: MemberDetail;
   readOnly: boolean;
   onClose: () => void;
-  onArchive?: () => void;
+  // Already-confirmed by handleArchiveClick below — this callback performs
+  // the archive directly (no second confirm dialog of its own), unlike
+  // members-table.tsx's row-menu/bulk-toolbar handleArchive which owns its
+  // own confirmation because it isn't gated by a modal already.
+  onArchive?: () => void | Promise<void>;
   archivedAt?: string | null;
   teams?: AdminMemberTeam[];
   profileId?: string | null;
@@ -412,7 +416,7 @@ export default function MemberDetailModal({
       `Archiver la fiche de ${name} ? Elle n'apparaîtra plus dans la liste par défaut, mais ses données restent conservées et tu peux réactiver à tout moment.`
     );
     if (!ok || !onArchive) return;
-    onArchive();
+    await onArchive();
     onClose();
   }
 
