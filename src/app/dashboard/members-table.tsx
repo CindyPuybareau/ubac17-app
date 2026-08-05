@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
-  Clock,
   Mail,
   MessageCircle,
   MoreVertical,
@@ -510,9 +509,8 @@ export default function MembersTable({
                         {m.pendingCoachTeams.map((t) => (
                           <span
                             key={`pending-coach-${t.id}`}
-                            className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold leading-none text-amber-700"
+                            className="inline-flex items-center justify-center whitespace-nowrap rounded-full bg-purple-100 px-2 py-0.5 text-xs font-semibold leading-none text-purple-700"
                           >
-                            <Clock className="h-3 w-3 shrink-0" />
                             {t.category ?? t.name ?? "Équipe"}
                           </span>
                         ))}

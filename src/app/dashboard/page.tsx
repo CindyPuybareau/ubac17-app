@@ -505,7 +505,7 @@ export default async function DashboardPage() {
           | { email: string; club_function: string | null }[]
           | null
           ?? []
-      ).map((a) => [a.email.toLowerCase(), a.club_function ?? "Membre du Bureau"])
+      ).map((a) => [a.email.trim().toLowerCase(), a.club_function ?? "Membre du Bureau"])
     );
 
     const playersById = new Map(
@@ -645,7 +645,7 @@ export default async function DashboardPage() {
       const email = emailByProfileId.get(tc.coach_id);
       const team = teamsById.get(tc.team_id);
       if (!email || !team) return;
-      const key = email.toLowerCase();
+      const key = email.trim().toLowerCase();
       const list = coachTeamsByEmailLower.get(key) ?? [];
       list.push(team);
       coachTeamsByEmailLower.set(key, list);
@@ -751,10 +751,10 @@ export default async function DashboardPage() {
         archivedAt: player.archived_at,
         teams: teamsByPlayerId.get(player.id) ?? [],
         coachTeams: memberEmail
-          ? (coachTeamsByEmailLower.get(memberEmail.toLowerCase()) ?? [])
+          ? (coachTeamsByEmailLower.get(memberEmail.trim().toLowerCase()) ?? [])
           : [],
         bureauRole: memberEmail
-          ? (bureauRoleByEmailLower.get(memberEmail.toLowerCase()) ?? null)
+          ? (bureauRoleByEmailLower.get(memberEmail.trim().toLowerCase()) ?? null)
           : null,
         pendingCoachTeams: pendingCoachTeamsByPlayerId.get(player.id) ?? [],
         email: memberEmail,

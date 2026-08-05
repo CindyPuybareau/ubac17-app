@@ -494,7 +494,7 @@ export default function MemberDetailModal({
     // invisible in their teams' "Coach" section).
     let resolvedProfileId = profileId;
     if (!resolvedProfileId) {
-      const emailToMatch = form.registrationEmail || member.registrationEmail;
+      const emailToMatch = (form.registrationEmail || member.registrationEmail)?.trim();
       if (emailToMatch) {
         const { data: matchedProfile } = await supabase
           .from("profiles")

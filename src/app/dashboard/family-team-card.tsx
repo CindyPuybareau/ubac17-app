@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, ExternalLink, MessageCircle, Users } from "lucide-react";
+import { ExternalLink, MessageCircle, Users } from "lucide-react";
 import WhatsAppButton from "./whatsapp-button";
 import WhatsAppBulkModal from "./whatsapp-bulk-modal";
 import WhatsAppGroupButton from "./whatsapp-group-button";
@@ -63,21 +63,17 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
             {card.pendingCoaches.map((c) => (
               <li
                 key={`pending-${c.id}`}
-                className="flex items-center gap-1.5 truncate rounded-lg bg-amber-50 px-2 py-1 text-sm text-amber-700"
+                className="truncate rounded-lg bg-zinc-50 px-2 py-1 text-sm text-zinc-700"
               >
-                <Clock className="h-3.5 w-3.5 shrink-0" />
                 {fullName(c)}
-                <span className="text-xs text-amber-500">(en attente de compte)</span>
               </li>
             ))}
             {/* Legacy free-text fallback, only shown if this team has no
                 structured pending coach (team_pending_coaches) at all —
                 keeps older, never-migrated teams from silently going blank. */}
             {card.pendingCoaches.length === 0 && card.pendingCoachNames && (
-              <li className="flex items-center gap-1.5 truncate rounded-lg bg-amber-50 px-2 py-1 text-sm text-amber-700">
-                <Clock className="h-3.5 w-3.5 shrink-0" />
+              <li className="truncate rounded-lg bg-zinc-50 px-2 py-1 text-sm text-zinc-700">
                 {card.pendingCoachNames}
-                <span className="text-xs text-amber-500">(en attente de compte)</span>
               </li>
             )}
             {card.coaches.length === 0 &&
