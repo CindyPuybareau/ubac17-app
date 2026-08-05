@@ -320,6 +320,13 @@ export default function MembersTable({
         </div>
       )}
       <div className="flex flex-wrap items-center gap-3">
+        <button
+          onClick={() => setShowAddMember(true)}
+          className="flex shrink-0 items-center gap-1.5 rounded-full bg-ubac-yellow px-3.5 py-1.5 text-sm font-semibold text-navy shadow-sm transition-colors hover:bg-ubac-yellow-dark"
+        >
+          <UserPlus className="h-4 w-4" />
+          Ajouter un membre
+        </button>
         <div className="relative min-w-[200px] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
           <input
@@ -353,13 +360,6 @@ export default function MembersTable({
         <span className="text-xs font-medium text-zinc-400">
           {filtered.length} membre{filtered.length > 1 ? "s" : ""}
         </span>
-        <button
-          onClick={() => setShowAddMember(true)}
-          className="ml-auto flex items-center gap-1.5 rounded-full bg-ubac-yellow px-3.5 py-1.5 text-sm font-semibold text-navy shadow-sm transition-colors hover:bg-ubac-yellow-dark"
-        >
-          <UserPlus className="h-4 w-4" />
-          Ajouter un membre
-        </button>
       </div>
 
       {selectedIds.size > 0 && (
