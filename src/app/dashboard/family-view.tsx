@@ -106,7 +106,7 @@ export default function FamilyView({
     },
     {
       key: "whatsapp",
-      label: "Groupes WhatsApp",
+      label: "WhatsApp",
       icon: <MessageCircle className={iconClass} />,
       content: <WhatsAppGroupsFamily groups={whatsappGroups} />,
     },

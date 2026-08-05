@@ -106,21 +106,8 @@ export default function AdminView({
       ),
     },
     {
-      key: "ffbb",
-      label: "FFBB",
-      icon: <RefreshCw className={iconClass} />,
-      content: (
-        <div className="flex flex-col gap-4">
-          <FfbbManager teams={teams} />
-          <ImportInscriptions existingTeams={teamRefs} />
-          <ImportPlanning existingTeams={teamRefs} />
-          <ImportCoaches existingTeams={teamRefs} />
-        </div>
-      ),
-    },
-    {
       key: "whatsapp",
-      label: "Groupes WhatsApp",
+      label: "WhatsApp",
       icon: <MessageCircle className={iconClass} />,
       content: (
         <WhatsAppGroupsManager
@@ -133,6 +120,19 @@ export default function AdminView({
               lastName: m.lastName,
             }))}
         />
+      ),
+    },
+    {
+      key: "ffbb",
+      label: "FFBB",
+      icon: <RefreshCw className={iconClass} />,
+      content: (
+        <div className="flex flex-col gap-4">
+          <FfbbManager teams={teams} />
+          <ImportInscriptions existingTeams={teamRefs} />
+          <ImportPlanning existingTeams={teamRefs} />
+          <ImportCoaches existingTeams={teamRefs} />
+        </div>
       ),
     },
   ];

@@ -127,18 +127,18 @@ export default function CoachView({
       ),
     },
     {
-      key: "ffbb",
-      label: "FFBB",
-      icon: <Trophy className={iconClass} />,
-      content: <CoachFfbb teams={teams} />,
-    },
-    {
       key: "whatsapp",
-      label: "Groupes WhatsApp",
+      label: "WhatsApp",
       icon: <MessageCircle className={iconClass} />,
       content: (
         <WhatsAppGroupsManager groups={whatsappGroups} candidates={whatsappCandidates} />
       ),
+    },
+    {
+      key: "ffbb",
+      label: "FFBB",
+      icon: <Trophy className={iconClass} />,
+      content: <CoachFfbb teams={teams} />,
     },
   ];
 
