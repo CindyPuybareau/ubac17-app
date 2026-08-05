@@ -449,9 +449,19 @@ export default function MembersTable({
               <tr
                 key={m.id}
                 onClick={() => setDetailMemberId(m.id)}
+                // `opacity` (any value < 1) creates a new CSS stacking
+                // context on the element it's applied to. Applying it
+                // unconditionally to an archived row would trap that row's
+                // own z-40 dropdown menu inside it, so the menu could never
+                // paint above the *following* rows (it'd get stuck behind
+                // them, since the whole dimmed <tr> — dropdown included —
+                // is just one flattened layer relative to its siblings).
+                // Lifting the dim while this row's own menu is open avoids
+                // that entirely, with no visible side effect (the "Archivé"
+                // badge stays fully legible either way).
                 className={`cursor-pointer align-middle border-b border-slate-100 last:border-0 transition-colors duration-150 hover:bg-amber-50/40 ${
                   index % 2 === 1 ? "bg-slate-50/50" : ""
-                } ${m.archivedAt ? "opacity-50" : ""}`}
+                } ${m.archivedAt && openMenuId !== m.id ? "opacity-50" : ""}`}
               >
                 <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
                   <input
