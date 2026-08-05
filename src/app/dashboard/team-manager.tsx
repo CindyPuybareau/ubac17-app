@@ -111,6 +111,7 @@ export default function TeamManager({
             allProfiles={allProfiles}
             eventsByTeamId={eventsByTeamId}
             contactPhoneByPlayerId={contactPhoneByPlayerId}
+            allowCreatePlayer={false}
           />
         ))}
         {teams.length === 0 && (

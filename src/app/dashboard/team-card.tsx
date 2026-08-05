@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   BadgeCheck,
   CalendarDays,
+  CheckCircle2,
   Clock,
   FileText,
   Phone,
@@ -68,6 +69,11 @@ export default function TeamCard({
   createCotisationOnNewPlayer = true,
   memberDetailsByPlayerId,
   taskTallyByPlayerId,
+  // The Bureau's "Membres" tab now owns member creation + team assignment
+  // end to end (AddMemberModal), so its Équipes tab no longer needs its own
+  // "+ Ajouter un joueur" shortcut here — Coach space still does, since
+  // coaches have no other way to add a brand-new player to their roster.
+  allowCreatePlayer = true,
 }: {
   team: TeamWithMembers;
   allProfiles: Person[];
@@ -76,9 +82,19 @@ export default function TeamCard({
   createCotisationOnNewPlayer?: boolean;
   memberDetailsByPlayerId?: Record<string, MemberDetail>;
   taskTallyByPlayerId?: SeasonTaskTally;
+  allowCreatePlayer?: boolean;
 }) {
   const router = useRouter();
   const [detailPlayerId, setDetailPlayerId] = useState<string | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<RosterPlayer | null>(null);
+  const [removing, setRemoving] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  function showToast(message: string) {
+    setToast(message);
+    setTimeout(() => setToast(null), 4000);
+  }
 
   const [openPlayerForm, setOpenPlayerForm] = useState(false);
   const [newPlayerFirstName, setNewPlayerFirstName] = useState("");
@@ -155,13 +171,24 @@ export default function TeamCard({
     router.refresh();
   }
 
-  async function removePlayer(playerId: string) {
+  async function confirmRemovePlayer() {
+    if (!removeTarget) return;
+    setRemoving(true);
+    setRemoveError(null);
     const supabase = createClient();
-    await supabase
+    const { error } = await supabase
       .from("team_players")
       .delete()
       .eq("team_id", team.id)
-      .eq("player_id", playerId);
+      .eq("player_id", removeTarget.id);
+    setRemoving(false);
+    if (error) {
+      setRemoveError(`Retrait impossible : ${error.message}`);
+      return;
+    }
+    const name = fullName(removeTarget);
+    setRemoveTarget(null);
+    showToast(`${name} a été retiré de l'équipe.`);
     router.refresh();
   }
 
@@ -272,7 +299,7 @@ export default function TeamCard({
                           </button>
                         )}
                         <button
-                          onClick={() => removePlayer(p.id)}
+                          onClick={() => setRemoveTarget(p)}
                           className="shrink-0 text-xs font-medium text-red-600 hover:underline"
                         >
                           Retirer
@@ -292,7 +319,7 @@ export default function TeamCard({
             </tbody>
           </table>
         </div>
-        {openPlayerForm ? (
+        {allowCreatePlayer && (openPlayerForm ? (
           <form
             onSubmit={createPlayer}
             className="mt-2 flex flex-col gap-2 rounded-lg bg-zinc-50 p-3"
@@ -353,7 +380,7 @@ export default function TeamCard({
           >
             + Ajouter un joueur
           </button>
-        )}
+        ))}
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -515,6 +542,45 @@ export default function TeamCard({
           );
         })()}
 
+      {removeTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
+            <h3 className="mb-2 font-semibold text-zinc-900">
+              Retirer le joueur de l&apos;équipe ?
+            </h3>
+            <p className="mb-4 text-sm text-zinc-600">
+              Êtes-vous sûr de vouloir retirer{" "}
+              <span className="font-semibold text-zinc-900">{fullName(removeTarget)}</span>{" "}
+              de l&apos;équipe{" "}
+              <span className="font-semibold text-zinc-900">{team.name}</span> ? Le membre
+              existera toujours dans la liste globale du club.
+            </p>
+            {removeError && <p className="mb-2 text-sm text-red-600">{removeError}</p>}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setRemoveTarget(null)}
+                className="flex-1 rounded-full border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={confirmRemovePlayer}
+                disabled={removing}
+                className="flex-1 rounded-full bg-red-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
+              >
+                {removing ? "Retrait..." : "Retirer de l'équipe"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-2 rounded-full bg-navy px-4 py-2.5 text-sm font-semibold text-white shadow-lg">
+          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+          {toast}
+        </div>
+      )}
     </div>
   );
 }
