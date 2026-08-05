@@ -365,7 +365,7 @@ export default function MembersTable({
               <tr
                 key={m.id}
                 onClick={() => setDetailMemberId(m.id)}
-                className={`cursor-pointer border-b border-slate-100 last:border-0 transition-colors duration-150 hover:bg-amber-50/40 ${
+                className={`cursor-pointer align-middle border-b border-slate-100 last:border-0 transition-colors duration-150 hover:bg-amber-50/40 ${
                   index % 2 === 1 ? "bg-slate-50/50" : ""
                 } ${m.archivedAt ? "opacity-50" : ""}`}
               >
@@ -399,8 +399,8 @@ export default function MembersTable({
                 <td className="w-auto whitespace-nowrap px-2 py-3 text-zinc-700">
                   {m.firstName ?? "—"}
                 </td>
-                <td className="whitespace-nowrap px-2 py-3">
-                  <div className="flex flex-wrap gap-1">
+                <td className="px-2 py-3">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     {m.coachTeams.length === 0 && m.pendingCoachTeams.length === 0 ? (
                       <span className="text-xs text-zinc-400">—</span>
                     ) : (
@@ -408,7 +408,7 @@ export default function MembersTable({
                         {m.coachTeams.map((t) => (
                           <span
                             key={`coach-${t.id}`}
-                            className="inline-flex max-w-full items-center justify-center truncate whitespace-nowrap rounded-full bg-purple-100 px-2 py-0.5 text-xs font-semibold leading-none text-purple-700"
+                            className="inline-flex items-center justify-center whitespace-nowrap rounded-full bg-purple-100 px-2 py-0.5 text-xs font-semibold leading-none text-purple-700"
                           >
                             {t.category ?? t.name ?? "Équipe"}
                           </span>
@@ -416,7 +416,7 @@ export default function MembersTable({
                         {m.pendingCoachTeams.map((t) => (
                           <span
                             key={`pending-coach-${t.id}`}
-                            className="inline-flex max-w-full items-center justify-center gap-1 truncate whitespace-nowrap rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold leading-none text-amber-700"
+                            className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold leading-none text-amber-700"
                           >
                             <Clock className="h-3 w-3 shrink-0" />
                             {t.category ?? t.name ?? "Équipe"}
