@@ -326,22 +326,10 @@ export default function MembersTable({
       )}
 
       <div className="w-full overflow-x-auto rounded-2xl border border-t-4 border-zinc-100 border-t-ubac-yellow">
-        <table className="w-full min-w-[1050px] table-fixed border-collapse text-sm">
-          <colgroup>
-            <col className="w-8" />
-            <col className="w-8" />
-            <col className="w-32" />
-            <col className="w-24" />
-            <col className="w-32" />
-            <col className="w-28" />
-            <col className="w-32" />
-            <col className="w-56" />
-            <col className="w-28" />
-            <col />
-          </colgroup>
+        <table className="w-full table-auto border-collapse text-sm">
           <thead>
             <tr className="border-b border-slate-100 bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-400">
-              <th className="px-2 py-3">
+              <th className="whitespace-nowrap px-2 py-3">
                 <input
                   type="checkbox"
                   checked={allFilteredSelected}
@@ -349,9 +337,9 @@ export default function MembersTable({
                   className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
                 />
               </th>
-              <th className="px-2 py-3">#</th>
+              <th className="whitespace-nowrap px-2 py-3">#</th>
               <th
-                className="cursor-pointer select-none px-2 py-3"
+                className="w-auto cursor-pointer select-none whitespace-nowrap px-2 py-3"
                 onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
               >
                 <span className="flex items-center gap-1 whitespace-nowrap">
@@ -363,12 +351,12 @@ export default function MembersTable({
                   )}
                 </span>
               </th>
-              <th className="px-2 py-3 whitespace-nowrap">Prénom</th>
-              <th className="px-2 py-3 whitespace-nowrap">Coach de</th>
-              <th className="px-2 py-3 whitespace-nowrap">Catégorie</th>
-              <th className="px-2 py-3 whitespace-nowrap">Statut</th>
-              <th className="px-2 py-3 whitespace-nowrap">Email</th>
-              <th className="px-2 py-3 whitespace-nowrap">Téléphone</th>
+              <th className="w-auto whitespace-nowrap px-2 py-3">Prénom</th>
+              <th className="whitespace-nowrap px-2 py-3">Coach de</th>
+              <th className="whitespace-nowrap px-2 py-3">Catégorie</th>
+              <th className="whitespace-nowrap px-2 py-3">Statut</th>
+              <th className="whitespace-nowrap px-2 py-3">Email</th>
+              <th className="whitespace-nowrap px-2 py-3">Téléphone</th>
               <th className="px-2 py-3" />
             </tr>
           </thead>
@@ -391,7 +379,7 @@ export default function MembersTable({
                 </td>
                 <td className="px-2 py-3 text-xs text-zinc-400">{index + 1}</td>
                 <td
-                  className="truncate px-2 py-3 font-semibold text-zinc-900"
+                  className="w-auto whitespace-nowrap px-2 py-3 font-semibold text-zinc-900"
                   title={
                     m.bureauRole ? `${fullLastName(m)} — ${m.bureauRole}` : fullLastName(m)
                   }
@@ -408,11 +396,11 @@ export default function MembersTable({
                     </span>
                   )}
                 </td>
-                <td className="truncate px-2 py-3 text-zinc-700" title={m.firstName ?? undefined}>
+                <td className="w-auto whitespace-nowrap px-2 py-3 text-zinc-700">
                   {m.firstName ?? "—"}
                 </td>
-                <td className="px-2 py-3">
-                  <div className="flex flex-wrap gap-1 overflow-hidden">
+                <td className="whitespace-nowrap px-2 py-3">
+                  <div className="flex flex-wrap gap-1">
                     {m.coachTeams.length === 0 && m.pendingCoachTeams.length === 0 ? (
                       <span className="text-xs text-zinc-400">—</span>
                     ) : (
@@ -438,8 +426,8 @@ export default function MembersTable({
                     )}
                   </div>
                 </td>
-                <td className="px-2 py-3">
-                  <div className="flex flex-wrap items-center gap-1 overflow-hidden">
+                <td className="whitespace-nowrap px-2 py-3">
+                  <div className="flex flex-wrap items-center gap-1">
                     {m.teams.length === 0 ? (
                       <span className="text-xs text-zinc-400">—</span>
                     ) : (
@@ -454,28 +442,27 @@ export default function MembersTable({
                     )}
                   </div>
                 </td>
-                <td className="px-2 py-3">
+                <td className="whitespace-nowrap px-2 py-3">
                   <PlayerYearBadge
                     birthDate={m.birthDate}
                     category={m.teams[0]?.category ?? m.category}
                   />
                 </td>
-                <td className="truncate px-2 py-3 text-zinc-600" title={m.email ?? undefined}>
-                  {m.email ? (
-                    <span className="truncate">{m.email}</span>
-                  ) : (
-                    <span className="text-zinc-300">—</span>
-                  )}
+                <td
+                  className="max-w-[280px] truncate px-2 py-3 text-zinc-600"
+                  title={m.email ?? undefined}
+                >
+                  {m.email ?? <span className="text-zinc-300">—</span>}
                 </td>
                 <td
-                  className="truncate px-2 py-3 text-zinc-600"
+                  className="whitespace-nowrap px-2 py-3 text-zinc-600"
                   title={m.phone ?? undefined}
                   onClick={(e) => e.stopPropagation()}
                 >
                   {m.phone ? (
                     <span className="flex items-center gap-1 whitespace-nowrap">
                       <Phone className="h-3 w-3 shrink-0 text-zinc-400" />
-                      <span className="truncate">{m.phone}</span>
+                      {m.phone}
                     </span>
                   ) : (
                     <span className="text-zinc-300">—</span>

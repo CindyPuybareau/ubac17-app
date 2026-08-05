@@ -213,20 +213,13 @@ export default function TeamCard({
           Joueurs
         </p>
         <div className="w-full overflow-x-auto rounded-xl border border-zinc-100">
-          <table className="w-full min-w-[420px] table-fixed border-collapse text-sm">
-            <colgroup>
-              <col />
-              <col />
-              <col className="w-28" />
-              <col className="w-32" />
-              <col className="w-32" />
-            </colgroup>
+          <table className="w-full table-auto border-collapse text-sm">
             <thead>
               <tr className="border-b border-zinc-100 bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                <th className="px-3 py-2.5">Nom</th>
-                <th className="px-3 py-2.5">Prénom</th>
-                <th className="px-3 py-2.5">Année</th>
-                <th className="px-3 py-2.5">Présence</th>
+                <th className="w-auto whitespace-nowrap px-3 py-2.5">Nom</th>
+                <th className="w-auto whitespace-nowrap px-3 py-2.5">Prénom</th>
+                <th className="whitespace-nowrap px-3 py-2.5">Année</th>
+                <th className="whitespace-nowrap px-3 py-2.5">Présence</th>
                 <th className="px-3 py-2.5" />
               </tr>
             </thead>
@@ -236,16 +229,16 @@ export default function TeamCard({
                 const presence = presenceBadge(p.nextEventStatus);
                 return (
                   <tr key={p.id} className="border-b border-zinc-50 last:border-0">
-                    <td className="truncate px-3 py-2.5 font-medium text-zinc-900">
+                    <td className="w-auto whitespace-nowrap px-3 py-2.5 font-medium text-zinc-900">
                       {p.last_name ?? "—"}
                     </td>
-                    <td className="truncate px-3 py-2.5 text-zinc-700">
+                    <td className="w-auto whitespace-nowrap px-3 py-2.5 text-zinc-700">
                       {p.first_name ?? "—"}
                     </td>
-                    <td className="px-3 py-2.5">
+                    <td className="whitespace-nowrap px-3 py-2.5">
                       <PlayerYearBadge birthDate={p.birthDate} category={team.category} />
                     </td>
-                    <td className="px-3 py-2.5">
+                    <td className="whitespace-nowrap px-3 py-2.5">
                       <span
                         className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold leading-none ${presence.className}`}
                       >
@@ -467,18 +460,18 @@ export default function TeamCard({
             Tour de rôle — maillots &amp; goûter (saison)
           </p>
           <div className="overflow-x-auto rounded-xl border border-zinc-100">
-            <table className="w-full min-w-[380px] border-collapse text-sm">
+            <table className="w-full table-auto border-collapse text-sm">
               <thead>
                 <tr className="border-b border-zinc-100 bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                  <th className="px-2 py-2">Famille</th>
-                  <th className="px-2 py-2">
-                    <span className="flex items-center gap-1">
+                  <th className="w-auto whitespace-nowrap px-2 py-2">Famille</th>
+                  <th className="whitespace-nowrap px-2 py-2">
+                    <span className="flex items-center gap-1 whitespace-nowrap">
                       <Shirt className="h-3.5 w-3.5 text-sky-600" />
                       Maillots
                     </span>
                   </th>
-                  <th className="px-2 py-2">
-                    <span className="flex items-center gap-1">
+                  <th className="whitespace-nowrap px-2 py-2">
+                    <span className="flex items-center gap-1 whitespace-nowrap">
                       <Utensils className="h-3.5 w-3.5 text-amber-600" />
                       Goûter
                     </span>
@@ -490,7 +483,7 @@ export default function TeamCard({
                   const tally = taskTallyByPlayerId[p.id] ?? { jerseys: 0, snacks: 0 };
                   return (
                     <tr key={p.id} className="border-b border-zinc-50 last:border-0">
-                      <td className="truncate px-2 py-2 text-zinc-700">{fullName(p)}</td>
+                      <td className="w-auto whitespace-nowrap px-2 py-2 text-zinc-700">{fullName(p)}</td>
                       <td className="px-2 py-2 font-semibold text-zinc-900">{tally.jerseys}</td>
                       <td className="px-2 py-2 font-semibold text-zinc-900">{tally.snacks}</td>
                     </tr>

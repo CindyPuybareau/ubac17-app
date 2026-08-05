@@ -428,20 +428,10 @@ export default function CotisationParticipantsTable({
       )}
 
       <div className="w-full overflow-x-auto rounded-2xl border border-t-4 border-zinc-100 border-t-ubac-yellow">
-        <table className="w-full min-w-[700px] table-fixed border-collapse text-sm">
-          <colgroup>
-            <col className="w-10" />
-            <col />
-            <col className="w-24" />
-            <col className="w-24" />
-            <col className="w-24" />
-            <col className="w-28" />
-            <col className="w-28" />
-            <col className="w-10" />
-          </colgroup>
+        <table className="w-full table-auto border-collapse text-sm">
           <thead>
             <tr className="border-b border-slate-100 bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-400">
-              <th className="px-3 py-3">
+              <th className="whitespace-nowrap px-3 py-3">
                 <input
                   type="checkbox"
                   checked={allFilteredSelected}
@@ -449,12 +439,12 @@ export default function CotisationParticipantsTable({
                   className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
                 />
               </th>
-              <th className="px-3 py-3">Nom &amp; Prénom</th>
-              <th className="px-3 py-3">Tarif</th>
-              <th className="px-3 py-3">Remise</th>
-              <th className="px-3 py-3">Payé</th>
-              <th className="px-3 py-3">Mode Paiement</th>
-              <th className="px-3 py-3">Statut</th>
+              <th className="w-auto whitespace-nowrap px-3 py-3">Nom &amp; Prénom</th>
+              <th className="whitespace-nowrap px-3 py-3">Tarif</th>
+              <th className="whitespace-nowrap px-3 py-3">Remise</th>
+              <th className="whitespace-nowrap px-3 py-3">Payé</th>
+              <th className="whitespace-nowrap px-3 py-3">Mode Paiement</th>
+              <th className="whitespace-nowrap px-3 py-3">Statut</th>
               <th className="px-3 py-3" />
             </tr>
           </thead>
@@ -478,16 +468,16 @@ export default function CotisationParticipantsTable({
                       className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
                     />
                   </td>
-                  <td className="truncate px-3 py-3 font-semibold text-zinc-900" title={c.playerName}>
+                  <td className="w-auto whitespace-nowrap px-3 py-3 font-semibold text-zinc-900">
                     {c.playerName}
                   </td>
-                  <td className="px-3 py-3 text-zinc-600">{formatAmount(c.prix)}</td>
-                  <td className="px-3 py-3 text-zinc-600">{formatAmount(c.remise)}</td>
-                  <td className="px-3 py-3 text-zinc-600">{formatAmount(c.paiement)}</td>
-                  <td className="truncate px-3 py-3 text-zinc-600" title={c.mode_paiement ?? undefined}>
+                  <td className="whitespace-nowrap px-3 py-3 text-zinc-600">{formatAmount(c.prix)}</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-zinc-600">{formatAmount(c.remise)}</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-zinc-600">{formatAmount(c.paiement)}</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-zinc-600">
                     {c.mode_paiement ?? "—"}
                   </td>
-                  <td className="px-3 py-3">
+                  <td className="whitespace-nowrap px-3 py-3">
                     <span className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold leading-none ${status.className}`}>
                       {status.label}
                     </span>
