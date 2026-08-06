@@ -234,6 +234,7 @@ export default function CotisationParticipantsTable({
   const [sortKey, setSortKey] = useState<"lastName" | "firstName">("lastName");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [relanceSending, setRelanceSending] = useState(false);
@@ -573,6 +574,9 @@ export default function CotisationParticipantsTable({
     setRelancePreview(null);
   }
 
+  const menuItemClass =
+    "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-zinc-700 hover:bg-zinc-50";
+
   return (
     <div className="flex flex-col gap-4">
       {actionError && (
@@ -708,7 +712,7 @@ export default function CotisationParticipantsTable({
               return (
                 <tr
                   key={c.id}
-                  onClick={() => openPayment([c.id])}
+                  onClick={() => setOpenMenuId((cur) => (cur === c.id ? null : c.id))}
                   className={`cursor-pointer border-b border-slate-100 last:border-0 transition-colors duration-150 hover:bg-amber-50/40 ${
                     index % 2 === 1 ? "bg-slate-50/50" : ""
                   }`}
@@ -741,14 +745,73 @@ export default function CotisationParticipantsTable({
                       {status.label}
                     </span>
                   </td>
-                  <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                  <td className="relative px-3 py-3" onClick={(e) => e.stopPropagation()}>
                     <button
-                      onClick={() => openPayment([c.id])}
+                      onClick={() => setOpenMenuId((cur) => (cur === c.id ? null : c.id))}
                       className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
-                      title="Cotisation & Paiements"
                     >
                       <MoreVertical className="h-4 w-4" />
                     </button>
+                    {openMenuId === c.id && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-30"
+                          onClick={() => setOpenMenuId(null)}
+                        />
+                        <div className="absolute right-0 z-40 mt-1 w-64 rounded-xl border border-zinc-100 bg-white p-1.5 text-left shadow-lg">
+                          <button
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              openPayment([c.id]);
+                            }}
+                            className={menuItemClass}
+                          >
+                            <CreditCard className="h-3.5 w-3.5" />
+                            Enregistrer un paiement / Suivi financier
+                          </button>
+                          {contactEmail ? (
+                            <button
+                              onClick={() => {
+                                setOpenMenuId(null);
+                                openRelancePreview([c.id]);
+                              }}
+                              className={menuItemClass}
+                            >
+                              <Mail className="h-3.5 w-3.5" />
+                              Envoyer une relance / un mail
+                            </button>
+                          ) : (
+                            <span
+                              title="Aucun contact connu"
+                              className={`${menuItemClass} cursor-not-allowed text-zinc-300 hover:bg-transparent`}
+                            >
+                              <Mail className="h-3.5 w-3.5" />
+                              Envoyer une relance / un mail
+                            </span>
+                          )}
+                          <button
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              openRemise(c.id);
+                            }}
+                            className={menuItemClass}
+                          >
+                            <Percent className="h-3.5 w-3.5" />
+                            Appliquer une remise
+                          </button>
+                          <button
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              openReceiptWindow(c, contactEmail);
+                            }}
+                            className={menuItemClass}
+                          >
+                            <Receipt className="h-3.5 w-3.5" />
+                            Générer reçu / facture
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </td>
                 </tr>
               );
