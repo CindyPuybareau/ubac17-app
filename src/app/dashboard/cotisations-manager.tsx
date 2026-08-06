@@ -24,6 +24,7 @@ const collecteTypeLabels: Record<CollecteType, string> = {
 function computeKpis(list: AdminCotisation[]) {
   let payeCount = 0;
   let offertCount = 0;
+  let partielCount = 0;
   let enAttenteCount = 0;
   let totalDue = 0;
   let totalCollected = 0;
@@ -32,6 +33,7 @@ function computeKpis(list: AdminCotisation[]) {
     const status = computeStatus(c);
     if (status === "PAYE") payeCount++;
     else if (status === "OFFERT") offertCount++;
+    else if (status === "PARTIEL") partielCount++;
     else enAttenteCount++;
     // Attendu / Collecté are raw totals of Prix à payer / Paiement — not
     // netted against remise, per the club's own accounting convention.
@@ -46,6 +48,7 @@ function computeKpis(list: AdminCotisation[]) {
     total: list.length,
     payeCount,
     offertCount,
+    partielCount,
     enAttenteCount,
     totalDue,
     totalCollected,
@@ -65,6 +68,10 @@ function KpiHeader({ cotisations }: { cotisations: AdminCotisation[] }) {
         <div className="rounded-xl bg-green-50 p-3 text-center md:p-4">
           <p className="text-xl font-bold text-green-700 sm:text-2xl">{kpis.payeCount}</p>
           <p className="text-xs font-medium text-green-600 sm:text-sm">Payés</p>
+        </div>
+        <div className="rounded-xl bg-orange-50 p-3 text-center md:p-4">
+          <p className="text-xl font-bold text-orange-700 sm:text-2xl">{kpis.partielCount}</p>
+          <p className="text-xs font-medium text-orange-600 sm:text-sm">Partiels</p>
         </div>
         <div className="rounded-xl bg-amber-50 p-3 text-center md:p-4">
           <p className="text-xl font-bold text-amber-700 sm:text-2xl">{kpis.offertCount}</p>

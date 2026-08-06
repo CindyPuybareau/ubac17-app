@@ -121,6 +121,15 @@ export type AdminCollecte = {
   prix: number | null;
 };
 
+export type CotisationPayment = {
+  id: string;
+  amount: number;
+  mode: string;
+  detail: string | null;
+  expectedCashDate: string | null;
+  paidAt: string;
+};
+
 export type AdminCotisation = {
   id: string;
   saison: string;
@@ -137,6 +146,7 @@ export type AdminCotisation = {
   collecteId: string | null;
   collecteType: CollecteType | null;
   collecteName: string | null;
+  payments: CotisationPayment[];
 };
 
 export type AdminUpcomingEvent = {
@@ -460,6 +470,7 @@ export default async function DashboardPage() {
       parentPlayerRes,
       clubAdminsRes,
       teamPendingCoachesRes,
+      cotisationPaymentsRes,
     ] = await Promise.all([
       supabase
         .from("teams")
@@ -501,6 +512,10 @@ export default async function DashboardPage() {
       supabase.from("parent_player").select("parent_id, player_id"),
       supabase.from("club_administrators").select("email, club_function"),
       supabase.from("team_pending_coaches").select("team_id, player_id"),
+      supabase
+        .from("cotisation_payments")
+        .select("id, cotisation_id, amount, mode, detail, expected_cash_date, paid_at")
+        .order("paid_at", { ascending: false }),
     ]);
 
     const bureauRoleByEmailLower = new Map(
@@ -778,6 +793,23 @@ export default async function DashboardPage() {
       (upcomingEventsRes.data ?? []).map((e) => e.id)
     );
 
+    // paid_at desc order from the query above is preserved here (most
+    // recent payment first per cotisation), which is what the payment
+    // history list in the "Enregistrer un paiement" modal wants to show.
+    const paymentsByCotisationId = new Map<string, CotisationPayment[]>();
+    (cotisationPaymentsRes.data ?? []).forEach((p) => {
+      const list = paymentsByCotisationId.get(p.cotisation_id) ?? [];
+      list.push({
+        id: p.id,
+        amount: p.amount,
+        mode: p.mode,
+        detail: p.detail,
+        expectedCashDate: p.expected_cash_date,
+        paidAt: p.paid_at,
+      });
+      paymentsByCotisationId.set(p.cotisation_id, list);
+    });
+
     adminCotisations = (cotisationsRes.data ?? []).map((c) => {
       const player = c.players as unknown as {
         first_name: string | null;
@@ -800,6 +832,7 @@ export default async function DashboardPage() {
         statut: c.statut,
         mode_paiement: c.mode_paiement,
         playerId: c.player_id,
+        payments: paymentsByCotisationId.get(c.id) ?? [],
         membershipType: player?.membership_type ?? null,
         fbiStatus: player?.fbi_status ?? null,
         collecteId: c.collecte_id,

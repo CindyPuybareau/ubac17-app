@@ -4,6 +4,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import {
+  CheckCircle2,
   Contact,
   CreditCard,
   FileText,
@@ -15,19 +16,27 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { buildGmailComposeLink } from "@/lib/email";
 import MemberDetailModal from "./member-detail-modal";
 import type { AdminCotisation, AdminMember } from "./page";
 
-type StatusKey = "PAYE" | "OFFERT" | "EN_ATTENTE";
+type StatusKey = "PAYE" | "PARTIEL" | "OFFERT" | "EN_ATTENTE";
 
 const statusBadge: Record<StatusKey, { label: string; className: string }> = {
   PAYE: { label: "Payé", className: "bg-green-100 text-green-700" },
+  PARTIEL: { label: "Partiel", className: "bg-orange-100 text-orange-700" },
   OFFERT: { label: "Offert", className: "bg-amber-100 text-amber-700" },
   EN_ATTENTE: { label: "En attente", className: "bg-red-100 text-red-700" },
 };
 
-const paymentModes = ["Chèque", "Espèces", "Virement", "Pass Sport", "Carte bancaire", "Autre"];
+const paymentModes = [
+  "Chèque",
+  "Espèces",
+  "Pass Sport / ANCV",
+  "TPE / CB (SumUp)",
+  "HelloAsso",
+  "Virement",
+  "Autre",
+];
 
 export function roundCents(value: number) {
   return Math.round(value * 100) / 100;
@@ -37,18 +46,22 @@ function due(c: AdminCotisation) {
   return Math.max(0, roundCents((c.prix ?? 0) - (c.remise ?? 0)));
 }
 
-// Trust the club's own Statut Club value when it's one of the three real
-// statuses it uses (Payé/Payé (-), Offerte dirigeant/coach, En attente
-// paiement — already normalized to these codes on import). Only fall back
-// to deriving from amounts for rows with no recognized statut yet (e.g. a
-// participant just added to a stage/event collecte).
+export function balanceDue(c: AdminCotisation) {
+  return Math.max(0, roundCents(due(c) - (c.paiement ?? 0)));
+}
+
+// Always derived live from the amounts — Payé (solde <= 0), Partiel (au
+// moins un versement mais solde > 0), En attente (rien versé) — except
+// "Offert" which stays a manual override from the club's own import/
+// designation (dirigeant, coach...): that's not an amount concept, so it
+// can never be derived and always wins regardless of what's been paid.
 export function computeStatus(c: AdminCotisation): StatusKey {
-  if (c.statut === "PAYE" || c.statut === "OFFERT" || c.statut === "EN_ATTENTE") {
-    return c.statut;
-  }
+  if (c.statut === "OFFERT") return "OFFERT";
   const d = due(c);
   const paid = c.paiement ?? 0;
-  return d <= 0 || paid >= d ? "PAYE" : "EN_ATTENTE";
+  if (d <= 0 || paid >= d) return "PAYE";
+  if (paid > 0) return "PARTIEL";
+  return "EN_ATTENTE";
 }
 
 // Amounts are derived from floating-point arithmetic (prix - remise,
@@ -93,6 +106,13 @@ function openReceiptWindow(c: AdminCotisation, contactEmail: string | null) {
   const win = window.open("", "_blank");
   if (!win) return;
   const status = statusBadge[computeStatus(c)];
+  const paymentsRows = [...c.payments]
+    .sort((a, b) => new Date(a.paidAt).getTime() - new Date(b.paidAt).getTime())
+    .map(
+      (p) =>
+        `<tr><td>${new Date(p.paidAt).toLocaleDateString("fr-FR")}</td><td>${p.mode}</td><td>${p.detail ?? "—"}</td><td>${formatAmount(p.amount)}</td></tr>`
+    )
+    .join("");
   win.document.write(`<!doctype html>
 <html lang="fr">
 <head>
@@ -101,8 +121,9 @@ function openReceiptWindow(c: AdminCotisation, contactEmail: string | null) {
 <style>
   body { font-family: system-ui, sans-serif; padding: 40px; color: #18181b; }
   h1 { font-size: 20px; margin-bottom: 4px; }
+  h2 { font-size: 13px; text-transform: uppercase; color: #71717a; margin: 24px 0 4px; }
   .muted { color: #71717a; font-size: 13px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 24px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
   td, th { padding: 8px 0; border-bottom: 1px solid #e4e4e7; text-align: left; font-size: 14px; }
   th { color: #71717a; text-transform: uppercase; font-size: 11px; }
   .total { font-weight: 700; font-size: 16px; }
@@ -118,11 +139,19 @@ function openReceiptWindow(c: AdminCotisation, contactEmail: string | null) {
     ${contactEmail ? `<tr><th>Contact</th><td>${contactEmail}</td></tr>` : ""}
     <tr><th>Tarif</th><td>${formatAmount(c.prix)}</td></tr>
     <tr><th>Remise</th><td>${formatAmount(c.remise)}</td></tr>
-    <tr><th>Montant payé</th><td>${formatAmount(c.paiement)}</td></tr>
-    <tr><th>Mode de paiement</th><td>${c.mode_paiement ?? "—"}</td></tr>
+    <tr><th>Total versé</th><td>${formatAmount(c.paiement)}</td></tr>
     <tr><th>Statut</th><td>${status.label}</td></tr>
   </table>
-  <p class="total" style="margin-top:16px;">Reste dû : ${formatAmount(Math.max(0, due(c) - (c.paiement ?? 0)))}</p>
+  ${
+    paymentsRows
+      ? `<h2>Détail des règlements</h2>
+  <table>
+    <tr><th>Date</th><th>Mode</th><th>Détail</th><th>Montant</th></tr>
+    ${paymentsRows}
+  </table>`
+      : ""
+  }
+  <p class="total" style="margin-top:16px;">Solde restant dû : ${formatAmount(balanceDue(c))}</p>
 </body>
 </html>`);
   win.document.close();
@@ -149,6 +178,13 @@ export default function CotisationParticipantsTable({
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [detailPlayerId, setDetailPlayerId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [relanceSending, setRelanceSending] = useState(false);
+
+  function showToast(message: string) {
+    setToast(message);
+    setTimeout(() => setToast(null), 4000);
+  }
 
   const membersById = useMemo(
     () => new Map(members.map((m) => [m.id, m])),
@@ -158,6 +194,8 @@ export default function CotisationParticipantsTable({
   const [paymentIds, setPaymentIds] = useState<string[] | null>(null);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMode, setPaymentMode] = useState(paymentModes[0]);
+  const [paymentDetail, setPaymentDetail] = useState("");
+  const [paymentExpectedCashDate, setPaymentExpectedCashDate] = useState("");
   const [paymentSaving, setPaymentSaving] = useState(false);
 
   const [remiseId, setRemiseId] = useState<string | null>(null);
@@ -207,12 +245,13 @@ export default function CotisationParticipantsTable({
     setPaymentIds(ids);
     if (ids.length === 1) {
       const c = byId.get(ids[0]);
-      const remaining = c ? Math.max(0, due(c) - (c.paiement ?? 0)) : 0;
-      setPaymentAmount(String(remaining));
+      setPaymentAmount(c ? String(balanceDue(c)) : "");
     } else {
       setPaymentAmount("");
     }
     setPaymentMode(paymentModes[0]);
+    setPaymentDetail("");
+    setPaymentExpectedCashDate("");
   }
 
   async function confirmPayment() {
@@ -222,11 +261,28 @@ export default function CotisationParticipantsTable({
     const supabase = createClient();
 
     if (paymentIds.length === 1) {
+      // Single dossier: append one more règlement to its history instead of
+      // overwriting the total — this is what lets a member's cotisation be
+      // settled across several chèques/modes over time (Chèque 1, Chèque 2,
+      // Pass Sport...) with each one kept as its own record.
       const id = paymentIds[0];
       const c = byId.get(id);
       const amount = Number(paymentAmount);
-      if (!c || Number.isNaN(amount)) {
+      if (!c || Number.isNaN(amount) || amount <= 0) {
         setPaymentSaving(false);
+        setActionError("Montant invalide.");
+        return;
+      }
+      const { error: paymentError } = await supabase.from("cotisation_payments").insert({
+        cotisation_id: id,
+        amount,
+        mode: paymentMode,
+        detail: paymentDetail || null,
+        expected_cash_date: paymentExpectedCashDate || null,
+      });
+      if (paymentError) {
+        setPaymentSaving(false);
+        setActionError(`Paiement impossible : ${paymentError.message}`);
         return;
       }
       const newPaid = roundCents((c.paiement ?? 0) + amount);
@@ -241,13 +297,25 @@ export default function CotisationParticipantsTable({
         return;
       }
     } else {
+      // Bulk "Marquer comme payé" still settles each dossier in full with a
+      // single mode, but now also logs that settlement as a payment record
+      // so it shows up in each member's history like any other règlement.
       const results = await Promise.all(
-        paymentIds.map((id) => {
+        paymentIds.map(async (id) => {
           const c = byId.get(id);
-          const full = c ? due(c) : 0;
+          if (!c) return { error: null };
+          const remaining = balanceDue(c);
+          if (remaining > 0) {
+            const { error: paymentError } = await supabase.from("cotisation_payments").insert({
+              cotisation_id: id,
+              amount: remaining,
+              mode: paymentMode,
+            });
+            if (paymentError) return { error: paymentError };
+          }
           return supabase
             .from("cotisations")
-            .update({ paiement: full, mode_paiement: paymentMode, statut: "PAYE" })
+            .update({ paiement: due(c), mode_paiement: paymentMode, statut: "PAYE" })
             .eq("id", id);
         })
       );
@@ -261,7 +329,10 @@ export default function CotisationParticipantsTable({
 
     setPaymentSaving(false);
     setPaymentIds(null);
+    setPaymentDetail("");
+    setPaymentExpectedCashDate("");
     setSelectedIds(new Set());
+    showToast("Paiement enregistré.");
     router.refresh();
   }
 
@@ -306,6 +377,7 @@ export default function CotisationParticipantsTable({
       "Tarif",
       "Remise",
       "Payé",
+      "Solde restant",
       "Mode de Paiement",
       "Statut",
     ];
@@ -317,6 +389,7 @@ export default function CotisationParticipantsTable({
       c.prix ?? 0,
       c.remise ?? 0,
       c.paiement ?? 0,
+      balanceDue(c),
       c.mode_paiement ?? "",
       statusBadge[computeStatus(c)].label,
     ]);
@@ -326,22 +399,75 @@ export default function CotisationParticipantsTable({
     XLSX.writeFile(wb, "cotisations-export.xlsx");
   }
 
-  function relanceMailto(ids: string[]) {
-    const emails = ids
-      .map((id) => contactEmailByPlayerId[byId.get(id)?.playerId ?? ""])
-      .filter((e): e is string => Boolean(e));
-    if (emails.length === 0) return null;
-    return buildGmailComposeLink({
-      bcc: emails.join(","),
-      subject: "UBAC - Rappel de cotisation",
-      body: "Bonjour,\n\nNous vous rappelons qu'un règlement est encore attendu pour la cotisation en cours. Merci de régulariser votre situation auprès du Bureau.\n\nSportivement,\nUBAC",
-    });
+  function relanceBody(c: AdminCotisation) {
+    const lines = [
+      "Bonjour,",
+      "",
+      "Nous vous rappelons qu'un règlement est encore attendu pour la cotisation en cours :",
+      "",
+      `Membre : ${c.playerName}`,
+      `Tarif : ${formatAmount(c.prix)}`,
+      c.remise ? `Remise : ${formatAmount(c.remise)}` : null,
+      `Montant versé : ${formatAmount(c.paiement)}`,
+      `Solde restant dû : ${formatAmount(balanceDue(c))}`,
+      "",
+      "Merci de régulariser votre situation auprès du Bureau dès que possible.",
+      "",
+      "Sportivement,",
+      "UBAC",
+    ].filter((l): l is string => l !== null);
+    return lines.join("\n");
+  }
+
+  async function sendRelance(ids: string[]) {
+    const targets = ids
+      .map((id) => byId.get(id))
+      .filter((c): c is AdminCotisation => Boolean(c))
+      .map((c) => ({ c, email: contactEmailByPlayerId[c.playerId] ?? null }))
+      .filter((t): t is { c: AdminCotisation; email: string } => Boolean(t.email));
+
+    if (targets.length === 0) {
+      setActionError("Aucun contact connu pour envoyer une relance.");
+      return;
+    }
+
+    setRelanceSending(true);
+    setActionError(null);
+    const results = await Promise.all(
+      targets.map(async ({ c, email }) => {
+        try {
+          const res = await fetch("/api/send-email", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              to: email,
+              subject: "UBAC - Rappel de cotisation",
+              body: relanceBody(c),
+            }),
+          });
+          return res.ok;
+        } catch {
+          return false;
+        }
+      })
+    );
+    setRelanceSending(false);
+    const successCount = results.filter(Boolean).length;
+    if (successCount > 0) {
+      showToast(
+        `${successCount} relance${successCount > 1 ? "s" : ""} envoyée${successCount > 1 ? "s" : ""}.`
+      );
+    }
+    if (successCount < targets.length) {
+      setActionError(
+        `${targets.length - successCount} relance(s) n'ont pas pu être envoyées.`
+      );
+    }
+    setSelectedIds(new Set());
   }
 
   const menuItemClass =
     "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-zinc-700 hover:bg-zinc-50";
-
-  const selectedBulkMailto = relanceMailto(Array.from(selectedIds));
 
   return (
     <div className="flex flex-col gap-4">
@@ -397,18 +523,14 @@ export default function CotisationParticipantsTable({
               <CreditCard className="h-3.5 w-3.5" />
               Marquer comme payé
             </button>
-            <a
-              href={selectedBulkMailto ?? undefined}
-              target="_blank"
-              rel="noreferrer"
-              aria-disabled={!selectedBulkMailto}
-              className={`flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 ${
-                !selectedBulkMailto ? "cursor-not-allowed opacity-50" : "hover:bg-zinc-50"
-              }`}
+            <button
+              onClick={() => sendRelance(Array.from(selectedIds))}
+              disabled={relanceSending}
+              className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
             >
               <Mail className="h-3.5 w-3.5" />
-              Relancer la sélection
-            </a>
+              {relanceSending ? "Envoi..." : "Relancer la sélection"}
+            </button>
             <button
               onClick={() => exportSelection(Array.from(selectedIds))}
               className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
@@ -443,6 +565,7 @@ export default function CotisationParticipantsTable({
               <th className="whitespace-nowrap px-3 py-3">Tarif</th>
               <th className="whitespace-nowrap px-3 py-3">Remise</th>
               <th className="whitespace-nowrap px-3 py-3">Payé</th>
+              <th className="whitespace-nowrap px-3 py-3">Solde restant</th>
               <th className="whitespace-nowrap px-3 py-3">Mode Paiement</th>
               <th className="whitespace-nowrap px-3 py-3">Statut</th>
               <th className="px-3 py-3" />
@@ -474,6 +597,9 @@ export default function CotisationParticipantsTable({
                   <td className="whitespace-nowrap px-3 py-3 text-zinc-600">{formatAmount(c.prix)}</td>
                   <td className="whitespace-nowrap px-3 py-3 text-zinc-600">{formatAmount(c.remise)}</td>
                   <td className="whitespace-nowrap px-3 py-3 text-zinc-600">{formatAmount(c.paiement)}</td>
+                  <td className="whitespace-nowrap px-3 py-3 font-semibold text-zinc-900">
+                    {formatAmount(balanceDue(c))}
+                  </td>
                   <td className="whitespace-nowrap px-3 py-3 text-zinc-600">
                     {c.mode_paiement ?? "—"}
                   </td>
@@ -517,16 +643,17 @@ export default function CotisationParticipantsTable({
                             Enregistrer un paiement
                           </button>
                           {contactEmail ? (
-                            <a
-                              href={relanceMailto([c.id]) ?? undefined}
-                              target="_blank"
-                              rel="noreferrer"
-                              onClick={() => setOpenMenuId(null)}
-                              className={menuItemClass}
+                            <button
+                              onClick={() => {
+                                setOpenMenuId(null);
+                                sendRelance([c.id]);
+                              }}
+                              disabled={relanceSending}
+                              className={`${menuItemClass} disabled:opacity-60`}
                             >
                               <Mail className="h-3.5 w-3.5" />
                               Envoyer une relance
-                            </a>
+                            </button>
                           ) : (
                             <span
                               title="Aucun contact connu"
@@ -565,7 +692,7 @@ export default function CotisationParticipantsTable({
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-2 py-8 text-center text-sm text-zinc-400">
+                <td colSpan={9} className="px-2 py-8 text-center text-sm text-zinc-400">
                   {emptyLabel}
                 </td>
               </tr>
@@ -583,7 +710,36 @@ export default function CotisationParticipantsTable({
           }
           onClose={() => setPaymentIds(null)}
         >
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-3">
+            {paymentIds.length === 1 &&
+              (() => {
+                const c = byId.get(paymentIds[0]);
+                if (!c || c.payments.length === 0) return null;
+                const history = [...c.payments].sort(
+                  (a, b) => new Date(a.paidAt).getTime() - new Date(b.paidAt).getTime()
+                );
+                return (
+                  <div className="rounded-lg border border-zinc-100 bg-zinc-50 p-2">
+                    <p className="mb-1 text-xs font-semibold text-zinc-500">
+                      Règlements déjà enregistrés
+                    </p>
+                    <ul className="flex flex-col gap-1">
+                      {history.map((p) => (
+                        <li key={p.id} className="flex items-center justify-between text-xs text-zinc-600">
+                          <span>
+                            {new Date(p.paidAt).toLocaleDateString("fr-FR")} — {p.mode}
+                            {p.detail ? ` (${p.detail})` : ""}
+                          </span>
+                          <span className="font-semibold text-zinc-800">{formatAmount(p.amount)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-1.5 text-xs font-semibold text-zinc-700">
+                      Solde restant dû : {formatAmount(balanceDue(c))}
+                    </p>
+                  </div>
+                );
+              })()}
             {paymentIds.length === 1 && (
               <div>
                 <label className="mb-1 block text-xs font-medium text-zinc-600">
@@ -613,6 +769,33 @@ export default function CotisationParticipantsTable({
                 ))}
               </select>
             </div>
+            {paymentIds.length === 1 && (
+              <>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-zinc-600">
+                    Détail (n° chèque, banque...)
+                  </label>
+                  <input
+                    type="text"
+                    value={paymentDetail}
+                    onChange={(e) => setPaymentDetail(e.target.value)}
+                    placeholder="Optionnel"
+                    className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-zinc-600">
+                    Date d&apos;encaissement prévue
+                  </label>
+                  <input
+                    type="date"
+                    value={paymentExpectedCashDate}
+                    onChange={(e) => setPaymentExpectedCashDate(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+                  />
+                </div>
+              </>
+            )}
             {paymentIds.length > 1 && (
               <p className="text-xs text-zinc-500">
                 Le solde restant dû de chaque membre sélectionné sera réglé en
@@ -668,6 +851,13 @@ export default function CotisationParticipantsTable({
             />
           );
         })()}
+
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-2 rounded-full bg-navy px-4 py-2.5 text-sm font-semibold text-white shadow-lg">
+          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+          {toast}
+        </div>
+      )}
     </div>
   );
 }
