@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
-  Contact,
   CreditCard,
   FileText,
   Mail,
@@ -18,8 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import MemberDetailModal from "./member-detail-modal";
-import type { AdminCotisation, AdminMember } from "./page";
+import type { AdminCotisation } from "./page";
 
 type StatusKey = "PAYE" | "PARTIEL" | "OFFERT" | "EN_ATTENTE";
 
@@ -175,12 +173,10 @@ function openReceiptWindow(c: AdminCotisation, contactEmail: string | null) {
 export default function CotisationParticipantsTable({
   cotisations,
   contactEmailByPlayerId,
-  members,
   emptyLabel = "Aucune cotisation.",
 }: {
   cotisations: AdminCotisation[];
   contactEmailByPlayerId: Record<string, string>;
-  members: AdminMember[];
   emptyLabel?: string;
 }) {
   const router = useRouter();
@@ -190,9 +186,7 @@ export default function CotisationParticipantsTable({
   const [sortKey, setSortKey] = useState<"lastName" | "firstName">("lastName");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [detailPlayerId, setDetailPlayerId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [relanceSending, setRelanceSending] = useState(false);
 
@@ -200,11 +194,6 @@ export default function CotisationParticipantsTable({
     setToast(message);
     setTimeout(() => setToast(null), 4000);
   }
-
-  const membersById = useMemo(
-    () => new Map(members.map((m) => [m.id, m])),
-    [members]
-  );
 
   const [paymentIds, setPaymentIds] = useState<string[] | null>(null);
   const [paymentAmount, setPaymentAmount] = useState("");
@@ -511,9 +500,6 @@ export default function CotisationParticipantsTable({
     setSelectedIds(new Set());
   }
 
-  const menuItemClass =
-    "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-zinc-700 hover:bg-zinc-50";
-
   return (
     <div className="flex flex-col gap-4">
       {actionError && (
@@ -650,7 +636,7 @@ export default function CotisationParticipantsTable({
               return (
                 <tr
                   key={c.id}
-                  onClick={() => setDetailPlayerId(c.playerId)}
+                  onClick={() => openPayment([c.id])}
                   className={`cursor-pointer border-b border-slate-100 last:border-0 transition-colors duration-150 hover:bg-amber-50/40 ${
                     index % 2 === 1 ? "bg-slate-50/50" : ""
                   }`}
@@ -683,84 +669,14 @@ export default function CotisationParticipantsTable({
                       {status.label}
                     </span>
                   </td>
-                  <td className="relative px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                  <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                     <button
-                      onClick={() => setOpenMenuId((cur) => (cur === c.id ? null : c.id))}
+                      onClick={() => openPayment([c.id])}
                       className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+                      title="Cotisation & Paiements"
                     >
                       <MoreVertical className="h-4 w-4" />
                     </button>
-                    {openMenuId === c.id && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-30"
-                          onClick={() => setOpenMenuId(null)}
-                        />
-                        <div className="absolute right-0 z-40 mt-1 w-60 rounded-xl border border-zinc-100 bg-white p-1.5 text-left shadow-lg">
-                          <button
-                            onClick={() => {
-                              setOpenMenuId(null);
-                              setDetailPlayerId(c.playerId);
-                            }}
-                            className={menuItemClass}
-                          >
-                            <Contact className="h-3.5 w-3.5" />
-                            Voir la fiche membre
-                          </button>
-                          <button
-                            onClick={() => {
-                              setOpenMenuId(null);
-                              openPayment([c.id]);
-                            }}
-                            className={menuItemClass}
-                          >
-                            <CreditCard className="h-3.5 w-3.5" />
-                            Enregistrer un paiement
-                          </button>
-                          {contactEmail ? (
-                            <button
-                              onClick={() => {
-                                setOpenMenuId(null);
-                                sendRelance([c.id]);
-                              }}
-                              disabled={relanceSending}
-                              className={`${menuItemClass} disabled:opacity-60`}
-                            >
-                              <Mail className="h-3.5 w-3.5" />
-                              Envoyer une relance
-                            </button>
-                          ) : (
-                            <span
-                              title="Aucun contact connu"
-                              className={`${menuItemClass} cursor-not-allowed text-zinc-300 hover:bg-transparent`}
-                            >
-                              <Mail className="h-3.5 w-3.5" />
-                              Envoyer une relance
-                            </span>
-                          )}
-                          <button
-                            onClick={() => {
-                              setOpenMenuId(null);
-                              openRemise(c.id);
-                            }}
-                            className={menuItemClass}
-                          >
-                            <Percent className="h-3.5 w-3.5" />
-                            Appliquer une remise
-                          </button>
-                          <button
-                            onClick={() => {
-                              setOpenMenuId(null);
-                              openReceiptWindow(c, contactEmail);
-                            }}
-                            className={menuItemClass}
-                          >
-                            <Receipt className="h-3.5 w-3.5" />
-                            Générer reçu / facture
-                          </button>
-                        </div>
-                      </>
-                    )}
                   </td>
                 </tr>
               );
@@ -780,12 +696,70 @@ export default function CotisationParticipantsTable({
         <Modal
           title={
             paymentIds.length === 1
-              ? `Enregistrer un paiement — ${byId.get(paymentIds[0])?.playerName ?? ""}`
+              ? `Cotisation & Paiements — ${byId.get(paymentIds[0])?.playerName ?? ""}`
               : `Marquer comme payé (${paymentIds.length} membres)`
           }
           onClose={() => setPaymentIds(null)}
         >
           <div className="flex flex-col gap-3">
+            {paymentIds.length === 1 &&
+              (() => {
+                const c = byId.get(paymentIds[0]);
+                if (!c) return null;
+                const contactEmail = contactEmailByPlayerId[c.playerId] ?? null;
+                return (
+                  <div className="rounded-lg border border-zinc-100 bg-zinc-50 p-2 text-xs text-zinc-600">
+                    <div className="flex items-center justify-between">
+                      <span>Catégorie</span>
+                      <span className="font-semibold text-zinc-800">{c.category ?? "—"}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Tarif</span>
+                      <span className="font-semibold text-zinc-800">{formatAmount(c.prix)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Remise</span>
+                      <span className="flex items-center gap-1.5">
+                        <span className="font-semibold text-zinc-800">{formatAmount(c.remise)}</span>
+                        <button
+                          onClick={() => openRemise(c.id)}
+                          className="flex items-center gap-0.5 text-[11px] font-medium text-ubac-yellow-dark hover:underline"
+                        >
+                          <Percent className="h-3 w-3" />
+                          Modifier
+                        </button>
+                      </span>
+                    </div>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2 border-t border-zinc-200 pt-1.5">
+                      {contactEmail ? (
+                        <button
+                          onClick={() => sendRelance([c.id])}
+                          disabled={relanceSending}
+                          className="flex items-center gap-1 text-[11px] font-semibold text-zinc-600 hover:underline disabled:opacity-60"
+                        >
+                          <Mail className="h-3 w-3" />
+                          {relanceSending ? "Envoi..." : "Envoyer une relance"}
+                        </button>
+                      ) : (
+                        <span
+                          title="Aucun contact connu"
+                          className="flex cursor-not-allowed items-center gap-1 text-[11px] font-semibold text-zinc-300"
+                        >
+                          <Mail className="h-3 w-3" />
+                          Envoyer une relance
+                        </span>
+                      )}
+                      <button
+                        onClick={() => openReceiptWindow(c, contactEmail)}
+                        className="flex items-center gap-1 text-[11px] font-semibold text-zinc-600 hover:underline"
+                      >
+                        <Receipt className="h-3 w-3" />
+                        Générer reçu / facture
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
             {paymentIds.length === 1 &&
               (() => {
                 const c = byId.get(paymentIds[0]);
@@ -927,19 +901,6 @@ export default function CotisationParticipantsTable({
           </div>
         </Modal>
       )}
-
-      {detailPlayerId &&
-        (() => {
-          const detailMember = membersById.get(detailPlayerId);
-          if (!detailMember) return null;
-          return (
-            <MemberDetailModal
-              member={detailMember}
-              readOnly={false}
-              onClose={() => setDetailPlayerId(null)}
-            />
-          );
-        })()}
 
       {toast && (
         <div className="fixed bottom-6 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-2 rounded-full bg-navy px-4 py-2.5 text-sm font-semibold text-white shadow-lg">
