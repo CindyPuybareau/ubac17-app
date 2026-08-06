@@ -57,6 +57,52 @@ function cotisationFirstName(c: AdminCotisation) {
   return c.firstName ?? "—";
 }
 
+// Plain number for the {tarif}/{paye}/{solde} placeholders — the templates
+// already write the € sign themselves ("Montant : {tarif} €"), so this
+// deliberately doesn't use formatAmount's currency formatting (that would
+// print "160,00 € €").
+function formatPlaceholderAmount(value: number | null | undefined) {
+  const cents = Math.round((value ?? 0) * 100);
+  return (cents / 100).toLocaleString("fr-FR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+type RelanceTemplateKey = "EN_ATTENTE" | "PARTIEL" | "PAYE";
+
+const RELANCE_TEMPLATES: Record<RelanceTemplateKey, { subject: string; body: string }> = {
+  EN_ATTENTE: {
+    subject: "UBAC Basket - Rappel pour votre cotisation",
+    body: "Bonjour {prenom}, sauf erreur de notre part, nous n'avons pas encore reçu votre règlement concernant la cotisation de cette saison (Montant : {tarif} €). Merci de bien vouloir faire le nécessaire ou de contacter le bureau en cas de besoin.",
+  },
+  PARTIEL: {
+    subject: "UBAC Basket - Solde de votre cotisation",
+    body: "Bonjour {prenom}, nous vous remercions pour vos premiers versements. Nous vous rappelons qu'il reste un solde de {solde} € à régler sur votre cotisation (Cotisation globale : {tarif} €, déjà réglé : {paye} €). Merci de régulariser ce solde prochainement.",
+  },
+  PAYE: {
+    subject: "UBAC Basket - Attestation & Confirmation de cotisation à jour",
+    body: "Bonjour {prenom}, nous vous confirmons que votre cotisation pour cette saison est entièrement réglée ({tarif} €). Un grand merci pour votre engagement au sein du club ! Votre reçu/attestation reste disponible auprès du bureau si besoin.",
+  },
+};
+
+// OFFERT (waived by the club) has nothing left to chase, same as PAYE —
+// reuse the "confirmation" wording rather than inventing a 4th template
+// the ticket doesn't ask for.
+function relanceTemplateKeyFor(c: AdminCotisation): RelanceTemplateKey {
+  const status = computeStatus(c);
+  return status === "PARTIEL" || status === "EN_ATTENTE" ? status : "PAYE";
+}
+
+function renderRelanceTemplate(text: string, c: AdminCotisation) {
+  return text
+    .replace(/\{prenom\}/g, cotisationFirstName(c))
+    .replace(/\{nom\}/g, cotisationLastName(c))
+    .replace(/\{tarif\}/g, formatPlaceholderAmount(c.prix))
+    .replace(/\{paye\}/g, formatPlaceholderAmount(c.paiement))
+    .replace(/\{solde\}/g, formatPlaceholderAmount(balanceDue(c)));
+}
+
 export function balanceDue(c: AdminCotisation) {
   return Math.max(0, roundCents(due(c) - (c.paiement ?? 0)));
 }
@@ -90,14 +136,16 @@ function Modal({
   title,
   onClose,
   children,
+  wide = false,
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
+  wide?: boolean;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
+      <div className={`w-full ${wide ? "max-w-lg" : "max-w-sm"} rounded-2xl bg-white p-5 shadow-xl`}>
         <div className="mb-3 flex items-center justify-between">
           <h3 className="font-semibold text-zinc-900">{title}</h3>
           <button
@@ -189,6 +237,11 @@ export default function CotisationParticipantsTable({
   const [actionError, setActionError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [relanceSending, setRelanceSending] = useState(false);
+  const [relancePreview, setRelancePreview] = useState<{
+    ids: string[];
+    subject: string;
+    body: string;
+  } | null>(null);
 
   function showToast(message: string) {
     setToast(message);
@@ -433,27 +486,41 @@ export default function CotisationParticipantsTable({
     XLSX.writeFile(wb, "cotisations-export.xlsx");
   }
 
-  function relanceBody(c: AdminCotisation) {
-    const lines = [
-      "Bonjour,",
-      "",
-      "Nous vous rappelons qu'un règlement est encore attendu pour la cotisation en cours :",
-      "",
-      `Membre : ${c.playerName}`,
-      `Tarif : ${formatAmount(c.prix)}`,
-      c.remise ? `Remise : ${formatAmount(c.remise)}` : null,
-      `Montant versé : ${formatAmount(c.paiement)}`,
-      `Solde restant dû : ${formatAmount(balanceDue(c))}`,
-      "",
-      "Merci de régulariser votre situation auprès du Bureau dès que possible.",
-      "",
-      "Sportivement,",
-      "UBAC",
-    ].filter((l): l is string => l !== null);
-    return lines.join("\n");
+  // Opens the editable preview instead of sending straight away. Single
+  // recipient: prefill with that member's own template, fully rendered
+  // (what the Bureau sees is exactly what gets sent). Multiple recipients:
+  // prefill with the shared template if every selected cotisation has the
+  // same status, otherwise fall back to the "En attente" wording (the most
+  // common relance reason) — the {prenom}/{nom}/{tarif}/{paye}/{solde}
+  // placeholders stay literal in the textarea and are only resolved per
+  // recipient at send time, since a single rendered preview can't
+  // represent several different people's amounts at once.
+  function openRelancePreview(ids: string[]) {
+    const targets = ids
+      .map((id) => byId.get(id))
+      .filter((c): c is AdminCotisation => Boolean(c));
+    if (targets.length === 0) return;
+    setActionError(null);
+
+    if (targets.length === 1) {
+      const c = targets[0];
+      const tpl = RELANCE_TEMPLATES[relanceTemplateKeyFor(c)];
+      setRelancePreview({
+        ids,
+        subject: renderRelanceTemplate(tpl.subject, c),
+        body: renderRelanceTemplate(tpl.body, c),
+      });
+    } else {
+      const keys = new Set(targets.map(relanceTemplateKeyFor));
+      const key: RelanceTemplateKey = keys.size === 1 ? [...keys][0] : "EN_ATTENTE";
+      const tpl = RELANCE_TEMPLATES[key];
+      setRelancePreview({ ids, subject: tpl.subject, body: tpl.body });
+    }
   }
 
-  async function sendRelance(ids: string[]) {
+  async function confirmSendRelance() {
+    if (!relancePreview) return;
+    const { ids, subject, body } = relancePreview;
     const targets = ids
       .map((id) => byId.get(id))
       .filter((c): c is AdminCotisation => Boolean(c))
@@ -461,10 +528,15 @@ export default function CotisationParticipantsTable({
       .filter((t): t is { c: AdminCotisation; email: string } => Boolean(t.email));
 
     if (targets.length === 0) {
-      setActionError("Aucun contact connu pour envoyer une relance.");
+      setActionError("Aucun contact connu pour envoyer un message.");
       return;
     }
 
+    // Single recipient: the textarea already holds the final, fully
+    // rendered text (possibly hand-edited) — send it verbatim. Several
+    // recipients: the textarea holds the shared template, still with
+    // placeholders — resolve them individually for each person here.
+    const isBulk = targets.length > 1;
     setRelanceSending(true);
     setActionError(null);
     const results = await Promise.all(
@@ -475,8 +547,8 @@ export default function CotisationParticipantsTable({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               to: email,
-              subject: "UBAC - Rappel de cotisation",
-              body: relanceBody(c),
+              subject: isBulk ? renderRelanceTemplate(subject, c) : subject,
+              body: isBulk ? renderRelanceTemplate(body, c) : body,
             }),
           });
           return res.ok;
@@ -489,15 +561,16 @@ export default function CotisationParticipantsTable({
     const successCount = results.filter(Boolean).length;
     if (successCount > 0) {
       showToast(
-        `${successCount} relance${successCount > 1 ? "s" : ""} envoyée${successCount > 1 ? "s" : ""}.`
+        `${successCount} mail${successCount > 1 ? "s" : ""} envoyé${successCount > 1 ? "s" : ""} avec succès.`
       );
     }
     if (successCount < targets.length) {
       setActionError(
-        `${targets.length - successCount} relance(s) n'ont pas pu être envoyées.`
+        `${targets.length - successCount} mail(s) n'ont pas pu être envoyés.`
       );
     }
     setSelectedIds(new Set());
+    setRelancePreview(null);
   }
 
   return (
@@ -555,12 +628,11 @@ export default function CotisationParticipantsTable({
               Marquer comme payé
             </button>
             <button
-              onClick={() => sendRelance(Array.from(selectedIds))}
-              disabled={relanceSending}
-              className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
+              onClick={() => openRelancePreview(Array.from(selectedIds))}
+              className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
             >
               <Mail className="h-3.5 w-3.5" />
-              {relanceSending ? "Envoi..." : "Relancer la sélection"}
+              Relancer la sélection
             </button>
             <button
               onClick={() => exportSelection(Array.from(selectedIds))}
@@ -733,12 +805,11 @@ export default function CotisationParticipantsTable({
                     <div className="mt-1.5 flex flex-wrap items-center gap-2 border-t border-zinc-200 pt-1.5">
                       {contactEmail ? (
                         <button
-                          onClick={() => sendRelance([c.id])}
-                          disabled={relanceSending}
-                          className="flex items-center gap-1 text-[11px] font-semibold text-zinc-600 hover:underline disabled:opacity-60"
+                          onClick={() => openRelancePreview([c.id])}
+                          className="flex items-center gap-1 text-[11px] font-semibold text-zinc-600 hover:underline"
                         >
                           <Mail className="h-3 w-3" />
-                          {relanceSending ? "Envoi..." : "Envoyer une relance"}
+                          Envoyer une relance
                         </button>
                       ) : (
                         <span
@@ -898,6 +969,69 @@ export default function CotisationParticipantsTable({
             >
               {remiseSaving ? "Enregistrement..." : "Confirmer"}
             </button>
+          </div>
+        </Modal>
+      )}
+
+      {relancePreview && (
+        <Modal
+          title={
+            relancePreview.ids.length === 1
+              ? "Prévisualisation du message"
+              : `Prévisualisation du message (${relancePreview.ids.length} destinataires)`
+          }
+          onClose={() => setRelancePreview(null)}
+          wide
+        >
+          <div className="flex flex-col gap-3">
+            {relancePreview.ids.length > 1 && (
+              <p className="rounded-lg bg-zinc-50 p-2 text-xs text-zinc-500">
+                Les balises {"{prenom}"}, {"{nom}"}, {"{tarif}"}, {"{paye}"} et {"{solde}"}{" "}
+                seront remplacées individuellement pour chaque destinataire au moment de
+                l&apos;envoi.
+              </p>
+            )}
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-600">
+                Sujet du mail
+              </label>
+              <input
+                type="text"
+                value={relancePreview.subject}
+                onChange={(e) =>
+                  setRelancePreview((p) => (p ? { ...p, subject: e.target.value } : p))
+                }
+                className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-600">
+                Corps du message
+              </label>
+              <textarea
+                value={relancePreview.body}
+                onChange={(e) =>
+                  setRelancePreview((p) => (p ? { ...p, body: e.target.value } : p))
+                }
+                rows={9}
+                className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+              />
+            </div>
+            <div className="mt-1 flex items-center gap-2">
+              <button
+                onClick={confirmSendRelance}
+                disabled={relanceSending}
+                className="rounded-full bg-ubac-yellow px-3 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+              >
+                {relanceSending ? "Envoi..." : "Envoyer le mail"}
+              </button>
+              <button
+                onClick={() => setRelancePreview(null)}
+                className="rounded-full px-3 py-1.5 text-sm font-semibold text-zinc-500 hover:bg-zinc-100"
+              >
+                Annuler
+              </button>
+            </div>
           </div>
         </Modal>
       )}
