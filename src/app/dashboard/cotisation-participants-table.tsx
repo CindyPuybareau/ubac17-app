@@ -3,6 +3,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
+import { jsPDF } from "jspdf";
 import {
   CheckCircle2,
   ChevronDown,
@@ -11,6 +12,7 @@ import {
   FileText,
   Mail,
   MoreVertical,
+  Paperclip,
   Pencil,
   Percent,
   Receipt,
@@ -163,6 +165,90 @@ function Modal({
   );
 }
 
+// The line auto-appended to a relance's body when the "Joindre la
+// facture..." checkbox is on — kept as a single constant so toggling the
+// checkbox can reliably add/remove it again without leaving stray copies.
+export const RECEIPT_ATTACHMENT_MENTION =
+  "Vous trouverez votre attestation / facture de cotisation ci-jointe au format PDF.";
+
+export function withReceiptMention(body: string, attach: boolean) {
+  const hasMention = body.includes(RECEIPT_ATTACHMENT_MENTION);
+  if (attach && !hasMention) {
+    return body.trimEnd() ? `${body.trimEnd()}\n\n${RECEIPT_ATTACHMENT_MENTION}` : RECEIPT_ATTACHMENT_MENTION;
+  }
+  if (!attach && hasMention) {
+    return body
+      .replace(`\n\n${RECEIPT_ATTACHMENT_MENTION}`, "")
+      .replace(RECEIPT_ATTACHMENT_MENTION, "")
+      .trimEnd();
+  }
+  return body;
+}
+
+// Same content as openReceiptWindow's printable page, laid out as an
+// actual PDF (via jsPDF, pure client-side, no server round-trip) so it can
+// be attached to a relance/confirmation email. Title reflects the same
+// "Reçu / Facture acquittée" vs "Appel de cotisation" distinction the
+// ticket asks for, driven by whether anything is still due.
+function buildReceiptPdfBase64(c: AdminCotisation, contactEmail: string | null) {
+  const balance = balanceDue(c);
+  const isSettled = balance <= 0;
+  const title = isSettled ? "Reçu / Facture acquittée" : "Appel de cotisation";
+  const status = statusBadge[computeStatus(c)];
+
+  const doc = new jsPDF();
+  let y = 20;
+
+  doc.setFontSize(16);
+  doc.text("UBAC — Union Basket Angoulins Châtelaillon", 14, y);
+  y += 8;
+  doc.setFontSize(12);
+  doc.text(`${title} — ${c.collecteName ?? `Cotisation ${c.saison}`}`, 14, y);
+  y += 10;
+
+  doc.setFontSize(10);
+  const row = (label: string, value: string) => {
+    doc.text(`${label} :`, 14, y);
+    doc.text(value, 65, y);
+    y += 7;
+  };
+  row("Membre", c.playerName);
+  if (c.category) row("Catégorie", c.category);
+  if (c.membershipType) row("Type d'adhésion", c.membershipType);
+  if (contactEmail) row("Contact", contactEmail);
+  row("Tarif", formatAmount(c.prix));
+  row("Remise", formatAmount(c.remise));
+  row("Total versé", formatAmount(c.paiement));
+  row("Statut", status.label);
+
+  if (c.payments.length > 0) {
+    y += 3;
+    doc.setFontSize(11);
+    doc.text("Détail des règlements", 14, y);
+    y += 7;
+    doc.setFontSize(10);
+    [...c.payments]
+      .sort((a, b) => new Date(a.paidAt).getTime() - new Date(b.paidAt).getTime())
+      .forEach((p) => {
+        const label = `${new Date(p.paidAt).toLocaleDateString("fr-FR")} — ${p.mode}${p.detail ? ` (${p.detail})` : ""}`;
+        doc.text(label, 14, y);
+        doc.text(formatAmount(p.amount), 160, y);
+        y += 6;
+      });
+    y += 4;
+  }
+
+  y += 4;
+  doc.setFontSize(12);
+  doc.text(`Solde restant dû : ${formatAmount(balance)}`, 14, y);
+
+  const dataUri = doc.output("datauristring");
+  const base64 = dataUri.slice(dataUri.indexOf(",") + 1);
+  const safeName = `${cotisationLastName(c)}-${cotisationFirstName(c)}`.replace(/[^a-zA-Z0-9-]+/g, "_");
+  const filename = `${isSettled ? "recu" : "appel-cotisation"}-${safeName}.pdf`;
+  return { base64, filename };
+}
+
 function openReceiptWindow(c: AdminCotisation, contactEmail: string | null) {
   const win = window.open("", "_blank");
   if (!win) return;
@@ -244,6 +330,7 @@ export default function CotisationParticipantsTable({
     ids: string[];
     subject: string;
     body: string;
+    attachReceipt: boolean;
   } | null>(null);
 
   function showToast(message: string) {
@@ -645,19 +732,25 @@ export default function CotisationParticipantsTable({
       setRelancePreview({
         ids,
         subject: renderRelanceTemplate(tpl.subject, c),
-        body: renderRelanceTemplate(tpl.body, c),
+        body: withReceiptMention(renderRelanceTemplate(tpl.body, c), true),
+        attachReceipt: true,
       });
     } else {
       const keys = new Set(targets.map(relanceTemplateKeyFor));
       const key: RelanceTemplateKey = keys.size === 1 ? [...keys][0] : "EN_ATTENTE";
       const tpl = RELANCE_TEMPLATES[key];
-      setRelancePreview({ ids, subject: tpl.subject, body: tpl.body });
+      setRelancePreview({
+        ids,
+        subject: tpl.subject,
+        body: withReceiptMention(tpl.body, true),
+        attachReceipt: true,
+      });
     }
   }
 
   async function confirmSendRelance() {
     if (!relancePreview) return;
-    const { ids, subject, body } = relancePreview;
+    const { ids, subject, body, attachReceipt } = relancePreview;
     const targets = ids
       .map((id) => byId.get(id))
       .filter((c): c is AdminCotisation => Boolean(c))
@@ -672,13 +765,18 @@ export default function CotisationParticipantsTable({
     // Single recipient: the textarea already holds the final, fully
     // rendered text (possibly hand-edited) — send it verbatim. Several
     // recipients: the textarea holds the shared template, still with
-    // placeholders — resolve them individually for each person here.
+    // placeholders — resolve them individually for each person here. The
+    // PDF attachment is always built per recipient (each person's own
+    // reçu/appel), never a single shared file.
     const isBulk = targets.length > 1;
     setRelanceSending(true);
     setActionError(null);
     const results = await Promise.all(
       targets.map(async ({ c, email }) => {
         try {
+          const attachment = attachReceipt
+            ? buildReceiptPdfBase64(c, contactEmailByPlayerId[c.playerId] ?? null)
+            : null;
           const res = await fetch("/api/send-email", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -686,6 +784,9 @@ export default function CotisationParticipantsTable({
               to: email,
               subject: isBulk ? renderRelanceTemplate(subject, c) : subject,
               body: isBulk ? renderRelanceTemplate(body, c) : body,
+              ...(attachment
+                ? { attachmentBase64: attachment.base64, attachmentFilename: attachment.filename }
+                : {}),
             }),
           });
           return res.ok;
@@ -1319,6 +1420,28 @@ export default function CotisationParticipantsTable({
                 className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
               />
             </div>
+            <label className="flex items-center gap-2 text-sm text-zinc-700">
+              <input
+                type="checkbox"
+                checked={relancePreview.attachReceipt}
+                onChange={(e) =>
+                  setRelancePreview((p) =>
+                    p
+                      ? {
+                          ...p,
+                          attachReceipt: e.target.checked,
+                          body: withReceiptMention(p.body, e.target.checked),
+                        }
+                      : p
+                  )
+                }
+                className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
+              />
+              <span className="flex items-center gap-1.5">
+                <Paperclip className="h-3.5 w-3.5 text-zinc-500" />
+                Joindre la facture / l&apos;attestation de paiement au mail
+              </span>
+            </label>
             <div className="mt-1 flex items-center gap-2">
               <button
                 onClick={confirmSendRelance}

@@ -11,7 +11,7 @@ const GMAIL_USER = process.env.GMAIL_USER;
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
 
 export async function POST(request: Request) {
-  const { to, subject, body } = await request.json();
+  const { to, subject, body, attachmentBase64, attachmentFilename } = await request.json();
 
   if (!to || !subject || !body) {
     return NextResponse.json(
@@ -50,6 +50,16 @@ export async function POST(request: Request) {
       to,
       subject,
       text: body,
+      attachments:
+        attachmentBase64 && attachmentFilename
+          ? [
+              {
+                filename: attachmentFilename,
+                content: Buffer.from(attachmentBase64, "base64"),
+                contentType: "application/pdf",
+              },
+            ]
+          : undefined,
     });
   } catch (err) {
     return NextResponse.json(
