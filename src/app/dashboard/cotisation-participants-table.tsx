@@ -11,13 +11,15 @@ import {
   FileText,
   Mail,
   MoreVertical,
+  Pencil,
   Percent,
   Receipt,
   Search,
+  Trash2,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import type { AdminCotisation } from "./page";
+import type { AdminCotisation, CotisationPayment } from "./page";
 
 type StatusKey = "PAYE" | "PARTIEL" | "OFFERT" | "EN_ATTENTE";
 
@@ -260,6 +262,17 @@ export default function CotisationParticipantsTable({
   const [remiseAmount, setRemiseAmount] = useState("");
   const [remiseSaving, setRemiseSaving] = useState(false);
 
+  const [editPayment, setEditPayment] = useState<{
+    id: string;
+    cotisationId: string;
+    amount: string;
+    mode: string;
+    detail: string;
+    paidAt: string;
+    expectedCashDate: string;
+  } | null>(null);
+  const [editPaymentSaving, setEditPaymentSaving] = useState(false);
+
   const byId = useMemo(
     () => new Map(cotisations.map((c) => [c.id, c])),
     [cotisations]
@@ -452,6 +465,108 @@ export default function CotisationParticipantsTable({
       return;
     }
     setRemiseId(null);
+    router.refresh();
+  }
+
+  // After editing or deleting a règlement, cotisations.paiement/mode_paiement
+  // (and statut, unless it's a manual "Offert") are re-derived from the
+  // authoritative source — every remaining cotisation_payments row for this
+  // dossier — rather than incrementally patched, so a correction always
+  // lands on the exact right total regardless of which payment was touched.
+  async function recomputeCotisationTotals(cotisationId: string) {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("cotisation_payments")
+      .select("amount, mode, paid_at")
+      .eq("cotisation_id", cotisationId)
+      .order("paid_at", { ascending: false });
+    if (error) {
+      setActionError(`Recalcul du solde impossible : ${error.message}`);
+      return;
+    }
+    const rows = data ?? [];
+    const total = roundCents(rows.reduce((sum, p) => sum + (p.amount ?? 0), 0));
+    const c = byId.get(cotisationId);
+    const newDue = c ? due(c) : 0;
+    const update: { paiement: number; mode_paiement: string | null; statut?: string } = {
+      paiement: total,
+      mode_paiement: rows[0]?.mode ?? null,
+    };
+    // Never silently clear a manual "Offert" override — it isn't an amount
+    // concept, so a payment correction shouldn't be able to undo it.
+    if (c?.statut !== "OFFERT") {
+      update.statut = total >= newDue ? "PAYE" : "EN_ATTENTE";
+    }
+    const { error: updateError } = await supabase
+      .from("cotisations")
+      .update(update)
+      .eq("id", cotisationId);
+    if (updateError) {
+      setActionError(`Recalcul du solde impossible : ${updateError.message}`);
+    }
+  }
+
+  function openEditPayment(cotisationId: string, p: CotisationPayment) {
+    setActionError(null);
+    setEditPayment({
+      id: p.id,
+      cotisationId,
+      amount: String(p.amount),
+      mode: p.mode,
+      detail: p.detail ?? "",
+      paidAt: p.paidAt.slice(0, 10),
+      expectedCashDate: p.expectedCashDate ?? "",
+    });
+  }
+
+  async function confirmEditPayment() {
+    if (!editPayment) return;
+    const amount = Number(editPayment.amount);
+    if (Number.isNaN(amount) || amount <= 0) {
+      setActionError("Montant invalide.");
+      return;
+    }
+    setEditPaymentSaving(true);
+    setActionError(null);
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("cotisation_payments")
+      .update({
+        amount,
+        mode: editPayment.mode,
+        detail: editPayment.detail || null,
+        paid_at: editPayment.paidAt
+          ? new Date(`${editPayment.paidAt}T12:00:00`).toISOString()
+          : new Date().toISOString(),
+        expected_cash_date: editPayment.expectedCashDate || null,
+      })
+      .eq("id", editPayment.id);
+    if (error) {
+      setEditPaymentSaving(false);
+      setActionError(`Modification impossible : ${error.message}`);
+      return;
+    }
+    await recomputeCotisationTotals(editPayment.cotisationId);
+    setEditPaymentSaving(false);
+    setEditPayment(null);
+    showToast("Règlement modifié.");
+    router.refresh();
+  }
+
+  async function deletePayment(paymentId: string, cotisationId: string) {
+    const ok = window.confirm(
+      "Supprimer ce règlement ? Le total payé et le solde seront recalculés automatiquement."
+    );
+    if (!ok) return;
+    setActionError(null);
+    const supabase = createClient();
+    const { error } = await supabase.from("cotisation_payments").delete().eq("id", paymentId);
+    if (error) {
+      setActionError(`Suppression impossible : ${error.message}`);
+      return;
+    }
+    await recomputeCotisationTotals(cotisationId);
+    showToast("Règlement supprimé.");
     router.refresh();
   }
 
@@ -712,7 +827,7 @@ export default function CotisationParticipantsTable({
               return (
                 <tr
                   key={c.id}
-                  onClick={() => setOpenMenuId((cur) => (cur === c.id ? null : c.id))}
+                  onClick={() => openPayment([c.id])}
                   className={`cursor-pointer border-b border-slate-100 last:border-0 transition-colors duration-150 hover:bg-amber-50/40 ${
                     index % 2 === 1 ? "bg-slate-50/50" : ""
                   }`}
@@ -908,12 +1023,28 @@ export default function CotisationParticipantsTable({
                     </p>
                     <ul className="flex flex-col gap-1">
                       {history.map((p) => (
-                        <li key={p.id} className="flex items-center justify-between text-xs text-zinc-600">
+                        <li key={p.id} className="flex items-center justify-between gap-2 text-xs text-zinc-600">
                           <span>
                             {new Date(p.paidAt).toLocaleDateString("fr-FR")} — {p.mode}
                             {p.detail ? ` (${p.detail})` : ""}
                           </span>
-                          <span className="font-semibold text-zinc-800">{formatAmount(p.amount)}</span>
+                          <span className="flex shrink-0 items-center gap-1">
+                            <span className="font-semibold text-zinc-800">{formatAmount(p.amount)}</span>
+                            <button
+                              onClick={() => openEditPayment(c.id, p)}
+                              title="Modifier ce règlement"
+                              className="rounded p-0.5 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </button>
+                            <button
+                              onClick={() => deletePayment(p.id, c.id)}
+                              title="Supprimer ce règlement"
+                              className="rounded p-0.5 text-red-400 hover:bg-red-50 hover:text-red-600"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </span>
                         </li>
                       ))}
                     </ul>
@@ -1031,6 +1162,91 @@ export default function CotisationParticipantsTable({
               className="mt-1 rounded-full bg-ubac-yellow px-3 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
             >
               {remiseSaving ? "Enregistrement..." : "Confirmer"}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {editPayment && (
+        <Modal title="Modifier un règlement" onClose={() => setEditPayment(null)}>
+          <div className="flex flex-col gap-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-600">
+                Montant (€)
+              </label>
+              <input
+                type="number"
+                value={editPayment.amount}
+                onChange={(e) =>
+                  setEditPayment((p) => (p ? { ...p, amount: e.target.value } : p))
+                }
+                className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-600">
+                Mode de paiement
+              </label>
+              <select
+                value={editPayment.mode}
+                onChange={(e) =>
+                  setEditPayment((p) => (p ? { ...p, mode: e.target.value } : p))
+                }
+                className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+              >
+                {paymentModes.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-600">
+                Détail (n° chèque, banque...)
+              </label>
+              <input
+                type="text"
+                value={editPayment.detail}
+                onChange={(e) =>
+                  setEditPayment((p) => (p ? { ...p, detail: e.target.value } : p))
+                }
+                placeholder="Optionnel"
+                className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-600">
+                Date du règlement
+              </label>
+              <input
+                type="date"
+                value={editPayment.paidAt}
+                onChange={(e) =>
+                  setEditPayment((p) => (p ? { ...p, paidAt: e.target.value } : p))
+                }
+                className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-600">
+                Date d&apos;encaissement prévue
+              </label>
+              <input
+                type="date"
+                value={editPayment.expectedCashDate}
+                onChange={(e) =>
+                  setEditPayment((p) => (p ? { ...p, expectedCashDate: e.target.value } : p))
+                }
+                className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+              />
+            </div>
+            <button
+              onClick={confirmEditPayment}
+              disabled={editPaymentSaving}
+              className="mt-1 rounded-full bg-ubac-yellow px-3 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+            >
+              {editPaymentSaving ? "Enregistrement..." : "Confirmer"}
             </button>
           </div>
         </Modal>

@@ -12,6 +12,7 @@ const WATCHED_TABLES = [
   "event_tasks",
   "event_carpool_offers",
   "cotisations",
+  "cotisation_payments",
   "team_players",
   "team_coaches",
   "players",
