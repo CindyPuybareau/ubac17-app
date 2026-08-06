@@ -424,12 +424,21 @@ export default function MemberDetailModal({
     setSaving(true);
     setError(null);
     const supabase = createClient();
+    // Keep players.category in sync with whichever team is selected below —
+    // it's the single source of truth this app displays everywhere
+    // (Membres/Cotisations tables), and the DB trigger that auto-creates a
+    // cotisation for the member's tariff category only fires on category
+    // change, so this also makes "assigner un membre à une équipe" -> "il
+    // apparaît dans Cotisations" work for a member who had no team (and no
+    // category) at creation time.
+    const category = teamOptions.find((t) => t.id === teamId)?.category ?? null;
     const { error: updateError } = await supabase
       .from("players")
       .update({
         first_name: form.firstName || null,
         last_name: form.lastName || null,
         birth_date: form.birthDate || null,
+        category,
         sex: form.sex || null,
         registration_email: form.registrationEmail || null,
         registration_phone: form.registrationPhone || null,

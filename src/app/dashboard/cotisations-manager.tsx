@@ -6,12 +6,20 @@ import { Plus, Search, Tag, Target, Ticket, Wallet, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
 import GaugeChart from "./gauge-chart";
+import CategoryTariffsEditor from "./category-tariffs-editor";
 import CotisationParticipantsTable, {
   computeStatus,
   formatAmount,
   roundCents,
 } from "./cotisation-participants-table";
-import type { AdminCollecte, AdminCotisation, AdminMember, CollecteType } from "./page";
+import type {
+  AdminCategoryTariff,
+  AdminCollecte,
+  AdminCotisation,
+  AdminMember,
+  AdminMemberTeam,
+  CollecteType,
+} from "./page";
 
 const collecteTypeLabels: Record<CollecteType, string> = {
   STAGE: "Stage",
@@ -108,10 +116,14 @@ export default function CotisationsManager({
   cotisations,
   collectes,
   members,
+  categoryTariffs,
+  canonicalTeamRefs,
 }: {
   cotisations: AdminCotisation[];
   collectes: AdminCollecte[];
   members: AdminMember[];
+  categoryTariffs: AdminCategoryTariff[];
+  canonicalTeamRefs: AdminMemberTeam[];
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<"cotisations" | "collectes">("cotisations");
@@ -253,6 +265,7 @@ export default function CotisationsManager({
 
       {tab === "cotisations" && (
         <div className="flex flex-col gap-4">
+          <CategoryTariffsEditor categories={canonicalTeamRefs} tariffs={categoryTariffs} />
           <KpiHeader cotisations={seasonCotisations} />
           <CotisationParticipantsTable
             cotisations={seasonCotisations}

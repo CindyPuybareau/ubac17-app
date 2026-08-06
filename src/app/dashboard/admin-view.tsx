@@ -10,6 +10,7 @@ import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import FfbbManager from "./ffbb-manager";
 import WhatsAppGroupsManager from "./whatsapp-groups-manager";
 import type {
+  AdminCategoryTariff,
   AdminCollecte,
   AdminCotisation,
   AdminMember,
@@ -26,6 +27,7 @@ export default function AdminView({
   allProfiles,
   cotisations,
   collectes,
+  categoryTariffs,
   upcomingEvents,
   contactPhoneByPlayerId,
   members,
@@ -38,6 +40,7 @@ export default function AdminView({
   allProfiles: Person[];
   cotisations: AdminCotisation[];
   collectes: AdminCollecte[];
+  categoryTariffs: AdminCategoryTariff[];
   upcomingEvents: AdminUpcomingEvent[];
   contactPhoneByPlayerId: Record<string, string>;
   members: AdminMember[];
@@ -102,6 +105,8 @@ export default function AdminView({
           cotisations={cotisations}
           collectes={collectes}
           members={members}
+          categoryTariffs={categoryTariffs}
+          canonicalTeamRefs={canonicalTeamRefs}
         />
       ),
     },

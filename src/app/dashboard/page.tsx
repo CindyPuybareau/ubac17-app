@@ -121,6 +121,14 @@ export type AdminCollecte = {
   prix: number | null;
 };
 
+// Default season price per team category (Bureau-editable, see
+// category-tariffs-editor.tsx) — feeds the DB trigger that auto-creates a
+// cotisation row when a member is created or assigned to a team.
+export type AdminCategoryTariff = {
+  category: string;
+  prix: number;
+};
+
 export type CotisationPayment = {
   id: string;
   amount: number;
@@ -449,6 +457,7 @@ export default async function DashboardPage() {
   let allProfilesForAdmin: Person[] = [];
   let adminCotisations: AdminCotisation[] = [];
   let adminCollectes: AdminCollecte[] = [];
+  let adminCategoryTariffs: AdminCategoryTariff[] = [];
   let adminUpcomingEvents: AdminUpcomingEvent[] = [];
   let adminMembers: AdminMember[] = [];
   // The Membres table's team pickers (filter + "Modifier le profil") only
@@ -473,6 +482,7 @@ export default async function DashboardPage() {
       clubAdminsRes,
       teamPendingCoachesRes,
       cotisationPaymentsRes,
+      categoryTariffsRes,
     ] = await Promise.all([
       supabase
         .from("teams")
@@ -518,6 +528,7 @@ export default async function DashboardPage() {
         .from("cotisation_payments")
         .select("id, cotisation_id, amount, mode, detail, expected_cash_date, paid_at")
         .order("paid_at", { ascending: false }),
+      supabase.from("category_tariffs").select("category, prix").order("category"),
     ]);
 
     const bureauRoleByEmailLower = new Map(
@@ -854,6 +865,11 @@ export default async function DashboardPage() {
       name: c.name,
       type: c.type as CollecteType,
       prix: c.prix,
+    }));
+
+    adminCategoryTariffs = (categoryTariffsRes.data ?? []).map((t) => ({
+      category: t.category,
+      prix: t.prix,
     }));
 
     adminUpcomingEvents = (upcomingEventsRes.data ?? []).map((e) => {
@@ -1439,6 +1455,7 @@ export default async function DashboardPage() {
           allProfiles={allProfilesForAdmin}
           cotisations={adminCotisations}
           collectes={adminCollectes}
+          categoryTariffs={adminCategoryTariffs}
           upcomingEvents={adminUpcomingEvents}
           contactPhoneByPlayerId={adminContactPhoneByPlayerId}
           members={adminMembers}
