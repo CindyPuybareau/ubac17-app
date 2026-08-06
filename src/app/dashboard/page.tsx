@@ -139,6 +139,8 @@ export type AdminCotisation = {
   statut: string | null;
   mode_paiement: string | null;
   playerName: string;
+  firstName: string | null;
+  lastName: string | null;
   category: string | null;
   playerId: string;
   membershipType: string | null;
@@ -841,6 +843,8 @@ export default async function DashboardPage() {
         playerName:
           [player?.first_name, player?.last_name].filter(Boolean).join(" ") ||
           "Joueur",
+        firstName: player?.first_name ?? null,
+        lastName: player?.last_name ?? null,
         category: player?.category ?? null,
       };
     });

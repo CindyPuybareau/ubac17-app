@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import {
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Contact,
   CreditCard,
   FileText,
@@ -44,6 +46,17 @@ export function roundCents(value: number) {
 
 function due(c: AdminCotisation) {
   return Math.max(0, roundCents((c.prix ?? 0) - (c.remise ?? 0)));
+}
+
+// Same "NOM" convention as the Membres table: last name shown fully
+// uppercase, falling back to the free-text playerName when a cotisation's
+// player row doesn't carry split first/last name fields (older imports).
+function cotisationLastName(c: AdminCotisation) {
+  return (c.lastName ?? "").toUpperCase() || c.playerName || "—";
+}
+
+function cotisationFirstName(c: AdminCotisation) {
+  return c.firstName ?? "—";
 }
 
 export function balanceDue(c: AdminCotisation) {
@@ -174,6 +187,8 @@ export default function CotisationParticipantsTable({
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusKey | "ALL">("ALL");
+  const [sortKey, setSortKey] = useState<"lastName" | "firstName">("lastName");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -216,8 +231,21 @@ export default function CotisationParticipantsTable({
     if (q) {
       list = list.filter((c) => c.playerName.toLowerCase().includes(q));
     }
-    return [...list].sort((a, b) => a.playerName.localeCompare(b.playerName, "fr"));
-  }, [cotisations, statusFilter, search]);
+    const key = sortKey === "lastName" ? cotisationLastName : cotisationFirstName;
+    return [...list].sort((a, b) => {
+      const cmp = key(a).localeCompare(key(b), "fr");
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [cotisations, statusFilter, search, sortKey, sortDir]);
+
+  function toggleSort(key: "lastName" | "firstName") {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
 
   const allFilteredSelected =
     filtered.length > 0 && filtered.every((c) => selectedIds.has(c.id));
@@ -561,7 +589,34 @@ export default function CotisationParticipantsTable({
                   className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
                 />
               </th>
-              <th className="w-auto whitespace-nowrap px-3 py-3">Nom &amp; Prénom</th>
+              <th
+                className="w-auto cursor-pointer select-none whitespace-nowrap px-3 py-3"
+                onClick={() => toggleSort("lastName")}
+              >
+                <span className="flex items-center gap-1 whitespace-nowrap">
+                  Nom
+                  {sortKey === "lastName" &&
+                    (sortDir === "asc" ? (
+                      <ChevronUp className="h-3.5 w-3.5 shrink-0" />
+                    ) : (
+                      <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                    ))}
+                </span>
+              </th>
+              <th
+                className="w-auto cursor-pointer select-none whitespace-nowrap px-3 py-3"
+                onClick={() => toggleSort("firstName")}
+              >
+                <span className="flex items-center gap-1 whitespace-nowrap">
+                  Prénom
+                  {sortKey === "firstName" &&
+                    (sortDir === "asc" ? (
+                      <ChevronUp className="h-3.5 w-3.5 shrink-0" />
+                    ) : (
+                      <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                    ))}
+                </span>
+              </th>
               <th className="whitespace-nowrap px-3 py-3">Tarif</th>
               <th className="whitespace-nowrap px-3 py-3">Remise</th>
               <th className="whitespace-nowrap px-3 py-3">Payé</th>
@@ -592,7 +647,10 @@ export default function CotisationParticipantsTable({
                     />
                   </td>
                   <td className="w-auto whitespace-nowrap px-3 py-3 font-semibold text-zinc-900">
-                    {c.playerName}
+                    {cotisationLastName(c)}
+                  </td>
+                  <td className="w-auto whitespace-nowrap px-3 py-3 text-zinc-700">
+                    {cotisationFirstName(c)}
                   </td>
                   <td className="whitespace-nowrap px-3 py-3 text-zinc-600">{formatAmount(c.prix)}</td>
                   <td className="whitespace-nowrap px-3 py-3 text-zinc-600">{formatAmount(c.remise)}</td>
@@ -692,7 +750,7 @@ export default function CotisationParticipantsTable({
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-2 py-8 text-center text-sm text-zinc-400">
+                <td colSpan={10} className="px-2 py-8 text-center text-sm text-zinc-400">
                   {emptyLabel}
                 </td>
               </tr>
