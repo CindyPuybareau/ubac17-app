@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getCurrentSeasonLabel } from "@/lib/season";
-import { styleFor } from "./calendar-view";
+import { formatEventTime, styleFor } from "./calendar-view";
 import OpponentDisplay from "./opponent-display";
 import MemberDetailModal from "./member-detail-modal";
 import PlayerYearBadge from "./player-year-badge";
@@ -537,10 +537,7 @@ export default function TeamCard({
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 pl-0.5 text-xs text-zinc-500">
                       <span className="flex items-center gap-1">
                         <Clock className="h-3 w-3 shrink-0" />
-                        {new Date(e.start_time).toLocaleTimeString("fr-FR", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                        {formatEventTime(e.start_time, e.end_time)}
                       </span>
                       {(e.salle || e.location) && (
                         <span className="flex items-center gap-1 truncate">

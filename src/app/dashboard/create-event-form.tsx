@@ -31,11 +31,17 @@ export default function CreateEventForm({
   const [location, setLocation] = useState("");
   const [salle, setSalle] = useState("");
   const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (eventType === "TRAINING" && !endTime) {
+      setError("L'heure de fin est obligatoire pour un entraînement.");
+      return;
+    }
     setLoading(true);
     setError(null);
 
@@ -47,6 +53,8 @@ export default function CreateEventForm({
       location: location || null,
       salle: salle || null,
       start_time: new Date(startTime).toISOString(),
+      end_time: endTime ? new Date(endTime).toISOString() : null,
+      notes: notes || null,
     });
 
     setLoading(false);
@@ -60,6 +68,8 @@ export default function CreateEventForm({
     setLocation("");
     setSalle("");
     setStartTime("");
+    setEndTime("");
+    setNotes("");
     setOpen(false);
     router.refresh();
   }
@@ -139,11 +149,38 @@ export default function CreateEventForm({
         </select>
       </div>
 
-      <input
-        type="datetime-local"
-        required
-        value={startTime}
-        onChange={(e) => setStartTime(e.target.value)}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-zinc-600">
+            Début
+          </label>
+          <input
+            type="datetime-local"
+            required
+            value={startTime}
+            onChange={(e) => setStartTime(e.target.value)}
+            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-zinc-600">
+            Fin{eventType === "TRAINING" ? " *" : " (optionnel)"}
+          </label>
+          <input
+            type="datetime-local"
+            required={eventType === "TRAINING"}
+            value={endTime}
+            onChange={(e) => setEndTime(e.target.value)}
+            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+          />
+        </div>
+      </div>
+
+      <textarea
+        placeholder="Notes (optionnel)"
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        rows={2}
         className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
       />
 

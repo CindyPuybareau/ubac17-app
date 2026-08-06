@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CalendarDays, Clock, ExternalLink, MapPin, MessageCircle, Users } from "lucide-react";
-import { styleFor } from "./calendar-view";
+import { formatEventTime, styleFor } from "./calendar-view";
 import OpponentDisplay from "./opponent-display";
 import SalleBadge from "./salle-badge";
 import WhatsAppButton from "./whatsapp-button";
@@ -20,6 +20,7 @@ type TeamEvent = {
   location: string | null;
   salle: string | null;
   start_time: string;
+  end_time: string | null;
 };
 
 export type FamilyTeamCardData = {
@@ -180,10 +181,7 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 pl-0.5 text-xs text-zinc-500">
                     <span className="flex items-center gap-1">
                       <Clock className="h-3 w-3 shrink-0" />
-                      {new Date(e.start_time).toLocaleTimeString("fr-FR", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {formatEventTime(e.start_time, e.end_time)}
                     </span>
                     {(e.salle || e.location) && (
                       <span className="flex items-center gap-1 truncate">

@@ -82,6 +82,18 @@ export function styleFor(eventType: string | null) {
   return typeStyles[eventType ?? "OTHER"] ?? typeStyles.OTHER;
 }
 
+// "18h30" alone, or "18h30 – 20h00" once an end time is set — shared by
+// this file's own day list/day-detail views and every team card
+// (team-card.tsx, family-team-card.tsx) so the range format is identical
+// everywhere instead of three slightly different implementations.
+export function formatEventTime(startIso: string, endIso: string | null) {
+  const fmt = (iso: string) => {
+    const d = new Date(iso);
+    return `${d.getHours()}h${String(d.getMinutes()).padStart(2, "0")}`;
+  };
+  return endIso ? `${fmt(startIso)} – ${fmt(endIso)}` : fmt(startIso);
+}
+
 function pillLabel(event: AdminUpcomingEvent) {
   if (event.event_type === "MATCH") {
     return parseMatchTitle(event.title).opponent;
@@ -178,6 +190,8 @@ export default function CalendarView({
   const [editLocation, setEditLocation] = useState("");
   const [editSalle, setEditSalle] = useState("");
   const [editStartTime, setEditStartTime] = useState("");
+  const [editEndTime, setEditEndTime] = useState("");
+  const [editNotes, setEditNotes] = useState("");
   const [editTeamId, setEditTeamId] = useState("");
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
@@ -189,12 +203,18 @@ export default function CalendarView({
     setEditLocation(event.location ?? "");
     setEditSalle(event.salle ?? "");
     setEditStartTime(toDatetimeLocal(event.start_time));
+    setEditEndTime(event.end_time ? toDatetimeLocal(event.end_time) : "");
+    setEditNotes(event.notes ?? "");
     setEditTeamId(event.teamId ?? "");
     setEditError(null);
   }
 
   async function confirmEdit() {
     if (!editingEvent) return;
+    if (editType === "TRAINING" && !editEndTime) {
+      setEditError("L'heure de fin est obligatoire pour un entraînement.");
+      return;
+    }
     setEditSaving(true);
     setEditError(null);
     const supabase = createClient();
@@ -206,6 +226,8 @@ export default function CalendarView({
         location: editLocation || null,
         salle: editSalle || null,
         start_time: new Date(editStartTime).toISOString(),
+        end_time: editEndTime ? new Date(editEndTime).toISOString() : null,
+        notes: editNotes || null,
         ...(allowClubWide ? { team_id: editTeamId || null } : {}),
       })
       .eq("id", editingEvent.id);
@@ -235,13 +257,11 @@ export default function CalendarView({
       .map((p) => contactEmailByPlayerId[p.id])
       .filter((e): e is string => Boolean(e));
     if (emails.length === 0) return null;
-    const when = new Date(event.start_time).toLocaleString("fr-FR", {
+    const when = `${new Date(event.start_time).toLocaleString("fr-FR", {
       weekday: "long",
       day: "numeric",
       month: "long",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    })}, ${formatEventTime(event.start_time, event.end_time)}`;
     return buildGmailComposeLink({
       bcc: emails.join(","),
       subject: `UBAC - Convocation ${event.teamName}`,
@@ -529,9 +549,8 @@ export default function CalendarView({
                       weekday: "short",
                       day: "numeric",
                       month: "short",
-                      hour: "2-digit",
-                      minute: "2-digit",
                     })}
+                    , {formatEventTime(event.start_time, event.end_time)}
                   </span>
                   {event.location && (
                     <span className="flex items-center gap-1">
@@ -667,12 +686,36 @@ export default function CalendarView({
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-zinc-600">
-                  Date &amp; heure
+                  Date &amp; heure de début
                 </label>
                 <input
                   type="datetime-local"
                   value={editStartTime}
                   onChange={(e) => setEditStartTime(e.target.value)}
+                  className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-600">
+                  Heure de fin
+                  {editType === "TRAINING" ? " *" : " (optionnel)"}
+                </label>
+                <input
+                  type="datetime-local"
+                  required={editType === "TRAINING"}
+                  value={editEndTime}
+                  onChange={(e) => setEditEndTime(e.target.value)}
+                  className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-600">
+                  Notes
+                </label>
+                <textarea
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  rows={2}
                   className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
                 />
               </div>

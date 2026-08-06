@@ -146,6 +146,8 @@ export type AdminUpcomingEvent = {
   location: string | null;
   salle: string | null;
   start_time: string;
+  end_time: string | null;
+  notes: string | null;
   teamId: string | null;
   teamName: string;
   rsvpCounts: {
@@ -492,7 +494,9 @@ export default async function DashboardPage() {
         .order("created_at", { ascending: false }),
       supabase
         .from("events")
-        .select("id, title, event_type, location, salle, start_time, teams(id, name, category)")
+        .select(
+          "id, title, event_type, location, salle, start_time, end_time, notes, teams(id, name, category)"
+        )
         .order("start_time", { ascending: true }),
       supabase.from("parent_player").select("parent_id, player_id"),
       supabase.from("club_administrators").select("email, club_function"),
@@ -829,6 +833,8 @@ export default async function DashboardPage() {
         location: e.location,
         salle: e.salle,
         start_time: e.start_time,
+        end_time: e.end_time,
+        notes: e.notes,
         teamId: team?.id ?? null,
         teamName: team?.name ?? "Tous les groupes",
         rsvpCounts: buildRsvpCounts(rsvpsByEvent, e.id, rosterSize),
@@ -878,7 +884,7 @@ export default async function DashboardPage() {
       supabase
         .from("events")
         .select(
-          "id, title, event_type, location, salle, start_time, teams(id, name, category)"
+          "id, title, event_type, location, salle, start_time, end_time, notes, teams(id, name, category)"
         )
         .or(teamOrClubWideFilter(coachCalendarTeamIds))
         .order("start_time", { ascending: true }),
@@ -1141,6 +1147,8 @@ export default async function DashboardPage() {
         location: e.location,
         salle: e.salle,
         start_time: e.start_time,
+        end_time: e.end_time,
+        notes: e.notes,
         teamId: team?.id ?? null,
         teamName: team?.name ?? "Tous les groupes",
         rsvpCounts: buildRsvpCounts(rsvpsByEvent, e.id, rosterSize),
@@ -1188,7 +1196,7 @@ export default async function DashboardPage() {
             .in("team_id", allTeamIds),
           supabase
             .from("events")
-            .select("id, title, event_type, location, salle, start_time, team_id")
+            .select("id, title, event_type, location, salle, start_time, end_time, team_id")
             .in("team_id", allTeamIds)
             .order("start_time", { ascending: true }),
         ]);
@@ -1263,7 +1271,15 @@ export default async function DashboardPage() {
       const now = Date.now();
       const eventsByTeamId = new Map<
         string,
-        { id: string; title: string | null; event_type: string | null; location: string | null; salle: string | null; start_time: string }[]
+        {
+          id: string;
+          title: string | null;
+          event_type: string | null;
+          location: string | null;
+          salle: string | null;
+          start_time: string;
+          end_time: string | null;
+        }[]
       >();
       (teamEventsRes.data ?? []).forEach((e) => {
         if (new Date(e.start_time).getTime() < now) return;
@@ -1276,6 +1292,7 @@ export default async function DashboardPage() {
           location: e.location,
           salle: e.salle,
           start_time: e.start_time,
+          end_time: e.end_time,
         });
         eventsByTeamId.set(e.team_id as string, list);
       });
@@ -1308,7 +1325,7 @@ export default async function DashboardPage() {
     const { data: eventsData } = await supabase
       .from("events")
       .select(
-        "id, title, event_type, location, salle, start_time, teams(id, name, category)"
+        "id, title, event_type, location, salle, start_time, end_time, notes, teams(id, name, category)"
       )
       .or(teamOrClubWideFilter(allTeamIds))
       .order("start_time", { ascending: true });
@@ -1341,6 +1358,8 @@ export default async function DashboardPage() {
         location: e.location,
         salle: e.salle,
         start_time: e.start_time,
+        end_time: e.end_time,
+        notes: e.notes,
         teamId: team?.id ?? null,
         teamName: team?.name ?? "Tous les groupes",
         rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
