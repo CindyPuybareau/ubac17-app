@@ -789,22 +789,43 @@ export default function CotisationParticipantsTable({
                 : {}),
             }),
           });
-          return res.ok;
-        } catch {
-          return false;
+          // The API always answers with JSON — either {success:true} or
+          // {error:"..."} with the exact reason (missing env vars, Gmail
+          // auth failure, etc.). Always read it instead of trusting
+          // res.ok alone, so a real failure surfaces its real cause
+          // instead of a generic "couldn't send" with no way to diagnose it.
+          let data: { error?: string } = {};
+          try {
+            data = await res.json();
+          } catch {
+            // No JSON body — a network-level failure, handled below.
+          }
+          return { ok: res.ok, email, error: data.error };
+        } catch (err) {
+          return {
+            ok: false,
+            email,
+            error: err instanceof Error ? err.message : "Connexion au serveur impossible.",
+          };
         }
       })
     );
     setRelanceSending(false);
-    const successCount = results.filter(Boolean).length;
-    if (successCount > 0) {
+    const successes = results.filter((r) => r.ok);
+    const failures = results.filter((r) => !r.ok);
+    if (successes.length === 1 && failures.length === 0) {
+      showToast(`Email envoyé avec succès à ${successes[0].email}.`);
+    } else if (successes.length > 0) {
       showToast(
-        `${successCount} mail${successCount > 1 ? "s" : ""} envoyé${successCount > 1 ? "s" : ""} avec succès.`
+        `${successes.length} mail${successes.length > 1 ? "s" : ""} envoyé${successes.length > 1 ? "s" : ""} avec succès.`
       );
     }
-    if (successCount < targets.length) {
+    if (failures.length > 0) {
+      const firstError = failures[0].error ?? "Erreur inconnue.";
       setActionError(
-        `${targets.length - successCount} mail(s) n'ont pas pu être envoyés.`
+        failures.length === 1
+          ? `Envoi à ${failures[0].email} impossible : ${firstError}`
+          : `${failures.length} mail(s) n'ont pas pu être envoyés : ${firstError}`
       );
     }
     setSelectedIds(new Set());
