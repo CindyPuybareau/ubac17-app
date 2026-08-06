@@ -324,6 +324,23 @@ export default function CotisationParticipantsTable({
         setActionError(`Paiement impossible : ${error.message}`);
         return;
       }
+
+      // Deliberately don't close the modal here: the whole point of this
+      // dossier-level flow is to let several règlements (Chèque 1, Chèque
+      // 2, Pass Sport...) be recorded back-to-back without reopening
+      // "Enregistrer un paiement" each time. Reset the form to the
+      // just-computed remaining balance (not read from props — those won't
+      // reflect this payment until router.refresh()'s data lands) so the
+      // next entry is immediately ready.
+      const newRemaining = Math.max(0, roundCents(due(c) - newPaid));
+      setPaymentSaving(false);
+      setPaymentAmount(String(newRemaining));
+      setPaymentMode(paymentModes[0]);
+      setPaymentDetail("");
+      setPaymentExpectedCashDate("");
+      showToast("Règlement ajouté.");
+      router.refresh();
+      return;
     } else {
       // Bulk "Marquer comme payé" still settles each dossier in full with a
       // single mode, but now also logs that settlement as a payment record
@@ -860,13 +877,27 @@ export default function CotisationParticipantsTable({
                 intégralité avec ce mode de paiement.
               </p>
             )}
-            <button
-              onClick={confirmPayment}
-              disabled={paymentSaving}
-              className="mt-1 rounded-full bg-ubac-yellow px-3 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
-            >
-              {paymentSaving ? "Enregistrement..." : "Confirmer"}
-            </button>
+            <div className="mt-1 flex items-center gap-2">
+              <button
+                onClick={confirmPayment}
+                disabled={paymentSaving || (paymentIds.length === 1 && Number(paymentAmount) <= 0)}
+                className="rounded-full bg-ubac-yellow px-3 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+              >
+                {paymentSaving
+                  ? "Enregistrement..."
+                  : paymentIds.length === 1
+                    ? "Ajouter ce règlement"
+                    : "Confirmer"}
+              </button>
+              {paymentIds.length === 1 && (
+                <button
+                  onClick={() => setPaymentIds(null)}
+                  className="rounded-full px-3 py-1.5 text-sm font-semibold text-zinc-500 hover:bg-zinc-100"
+                >
+                  Terminé
+                </button>
+              )}
+            </div>
           </div>
         </Modal>
       )}
