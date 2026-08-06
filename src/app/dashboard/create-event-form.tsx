@@ -53,7 +53,10 @@ export default function CreateEventForm({
       location: location || null,
       salle: salle || null,
       start_time: new Date(startTime).toISOString(),
-      end_time: endTime ? new Date(endTime).toISOString() : null,
+      // Same calendar day as the start — this form only asks for the end
+      // hour, not a whole second date/time picker, since an event never
+      // spans past midnight for this club.
+      end_time: endTime ? new Date(`${startTime.slice(0, 10)}T${endTime}`).toISOString() : null,
       notes: notes || null,
     });
 
@@ -164,10 +167,10 @@ export default function CreateEventForm({
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-zinc-600">
-            Fin{eventType === "TRAINING" ? " *" : " (optionnel)"}
+            Heure de fin{eventType === "TRAINING" ? " *" : " (optionnel)"}
           </label>
           <input
-            type="datetime-local"
+            type="time"
             required={eventType === "TRAINING"}
             value={endTime}
             onChange={(e) => setEndTime(e.target.value)}

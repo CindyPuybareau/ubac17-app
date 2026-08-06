@@ -45,6 +45,14 @@ function toDatetimeLocal(iso: string) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// Just "HH:MM" — the end time field only ever asks for the hour, since an
+// event's end is always the same calendar day as its start for this club.
+function toTimeLocal(iso: string) {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 const typeStyles: Record<
   string,
   { pill: string; border: string; badge: string; label: string }
@@ -203,7 +211,7 @@ export default function CalendarView({
     setEditLocation(event.location ?? "");
     setEditSalle(event.salle ?? "");
     setEditStartTime(toDatetimeLocal(event.start_time));
-    setEditEndTime(event.end_time ? toDatetimeLocal(event.end_time) : "");
+    setEditEndTime(event.end_time ? toTimeLocal(event.end_time) : "");
     setEditNotes(event.notes ?? "");
     setEditTeamId(event.teamId ?? "");
     setEditError(null);
@@ -226,7 +234,9 @@ export default function CalendarView({
         location: editLocation || null,
         salle: editSalle || null,
         start_time: new Date(editStartTime).toISOString(),
-        end_time: editEndTime ? new Date(editEndTime).toISOString() : null,
+        end_time: editEndTime
+          ? new Date(`${editStartTime.slice(0, 10)}T${editEndTime}`).toISOString()
+          : null,
         notes: editNotes || null,
         ...(allowClubWide ? { team_id: editTeamId || null } : {}),
       })
@@ -701,7 +711,7 @@ export default function CalendarView({
                   {editType === "TRAINING" ? " *" : " (optionnel)"}
                 </label>
                 <input
-                  type="datetime-local"
+                  type="time"
                   required={editType === "TRAINING"}
                   value={editEndTime}
                   onChange={(e) => setEditEndTime(e.target.value)}
