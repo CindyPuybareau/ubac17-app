@@ -103,6 +103,9 @@ export default function TeamCard({
   const [removeCoachTarget, setRemoveCoachTarget] = useState<Person | null>(null);
   const [removingCoach, setRemovingCoach] = useState(false);
   const [removeCoachError, setRemoveCoachError] = useState<string | null>(null);
+  const [removePendingCoachTarget, setRemovePendingCoachTarget] = useState<Person | null>(null);
+  const [removingPendingCoach, setRemovingPendingCoach] = useState(false);
+  const [removePendingCoachError, setRemovePendingCoachError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   function showToast(message: string) {
@@ -237,6 +240,27 @@ export default function TeamCard({
     const name = fullName(removeCoachTarget);
     setRemoveCoachTarget(null);
     showToast(`${name} n'est plus coach de l'équipe ${team.name ?? ""}.`);
+    router.refresh();
+  }
+
+  async function confirmRemovePendingCoach() {
+    if (!removePendingCoachTarget) return;
+    setRemovingPendingCoach(true);
+    setRemovePendingCoachError(null);
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("team_pending_coaches")
+      .delete()
+      .eq("team_id", team.id)
+      .eq("player_id", removePendingCoachTarget.id);
+    setRemovingPendingCoach(false);
+    if (error) {
+      setRemovePendingCoachError(`Retrait impossible : ${error.message}`);
+      return;
+    }
+    const name = fullName(removePendingCoachTarget);
+    setRemovePendingCoachTarget(null);
+    showToast(`${name} n'est plus coach en attente de l'équipe ${team.name ?? ""}.`);
     router.refresh();
   }
 
@@ -445,13 +469,22 @@ export default function TeamCard({
             {team.pendingCoaches.map((p) => (
               <li
                 key={`pending-${p.id}`}
-                className="flex items-center gap-1.5 truncate rounded-lg bg-zinc-50 px-2 py-1 text-sm"
+                className="flex items-center justify-between gap-2 rounded-lg bg-zinc-50 px-2 py-1 text-sm"
               >
-                <span className="truncate">{fullName(p)}</span>
-                <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-amber-200/60 bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
-                  <Clock className="h-3 w-3 shrink-0" />
-                  (en attente de compte)
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate">{fullName(p)}</span>
+                  <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-amber-200/60 bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
+                    <Clock className="h-3 w-3 shrink-0" />
+                    (en attente de compte)
+                  </span>
                 </span>
+                <button
+                  onClick={() => setRemovePendingCoachTarget(p)}
+                  title="Retirer ce coach en attente de l'équipe"
+                  className="shrink-0 rounded-lg p-1.5 text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
               </li>
             ))}
             {/* Legacy free-text fallback, only shown if this team has no
@@ -678,6 +711,42 @@ export default function TeamCard({
                 className="flex-1 rounded-full bg-red-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
               >
                 {removingCoach ? "Retrait..." : "Retirer le coach"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {removePendingCoachTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
+            <h3 className="mb-2 font-semibold text-zinc-900">
+              Retirer ce coach en attente de cette équipe ?
+            </h3>
+            <p className="mb-4 text-sm text-zinc-600">
+              Êtes-vous sûr de vouloir retirer{" "}
+              <span className="font-semibold text-zinc-900">
+                {fullName(removePendingCoachTarget)}
+              </span>{" "}
+              de la liste des coachs en attente de compte de l&apos;équipe{" "}
+              <span className="font-semibold text-zinc-900">{team.name}</span> ?
+            </p>
+            {removePendingCoachError && (
+              <p className="mb-2 text-sm text-red-600">{removePendingCoachError}</p>
+            )}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setRemovePendingCoachTarget(null)}
+                className="flex-1 rounded-full border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={confirmRemovePendingCoach}
+                disabled={removingPendingCoach}
+                className="flex-1 rounded-full bg-red-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
+              >
+                {removingPendingCoach ? "Retrait..." : "Retirer"}
               </button>
             </div>
           </div>

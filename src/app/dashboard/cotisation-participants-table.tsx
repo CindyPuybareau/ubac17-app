@@ -468,6 +468,27 @@ export default function CotisationParticipantsTable({
     router.refresh();
   }
 
+  async function clearRemise(id: string) {
+    const ok = window.confirm("Supprimer la remise appliquée à ce membre ?");
+    if (!ok) return;
+    setActionError(null);
+    const supabase = createClient();
+    const c = byId.get(id);
+    const paid = c?.paiement ?? 0;
+    const newDue = Math.max(0, roundCents(c?.prix ?? 0));
+    const newStatut = paid >= newDue ? "PAYE" : "EN_ATTENTE";
+    const { error } = await supabase
+      .from("cotisations")
+      .update({ remise: 0, statut: newStatut })
+      .eq("id", id);
+    if (error) {
+      setActionError(`Suppression de la remise impossible : ${error.message}`);
+      return;
+    }
+    showToast("Remise supprimée.");
+    router.refresh();
+  }
+
   // After editing or deleting a règlement, cotisations.paiement/mode_paiement
   // (and statut, unless it's a manual "Offert") are re-derived from the
   // authoritative source — every remaining cotisation_payments row for this
@@ -971,13 +992,15 @@ export default function CotisationParticipantsTable({
                       <span>Remise</span>
                       <span className="flex items-center gap-1.5">
                         <span className="font-semibold text-zinc-800">{formatAmount(c.remise)}</span>
-                        <button
-                          onClick={() => openRemise(c.id)}
-                          className="flex items-center gap-0.5 text-[11px] font-medium text-ubac-yellow-dark hover:underline"
-                        >
-                          <Percent className="h-3 w-3" />
-                          Modifier
-                        </button>
+                        {(c.remise ?? 0) > 0 && (
+                          <button
+                            onClick={() => clearRemise(c.id)}
+                            title="Supprimer la remise"
+                            className="rounded p-0.5 text-red-500 hover:bg-red-50 hover:text-red-700"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                       </span>
                     </div>
                     <div className="mt-1.5 flex flex-wrap items-center gap-2 border-t border-zinc-200 pt-1.5">
