@@ -78,18 +78,55 @@ function formatPlaceholderAmount(value: number | null | undefined) {
 
 type RelanceTemplateKey = "EN_ATTENTE" | "PARTIEL" | "PAYE";
 
+// Every mail leaving the Cotisations module is signed by the club, never
+// by the individual Bureau member who happens to click "Envoyer".
+export const EMAIL_SIGNATURE = "Sportivement,\nL'équipe UBAC";
+
+// Recognised on the normalised text (curly apostrophes, casing) so a
+// hand-typed variant is never doubled by withSignature().
+const SIGNATURE_MARKER = "l'équipe ubac";
+
+function normalizeApostrophes(text: string) {
+  // 1:1 substitution — indexes stay valid against the original string.
+  return text.replace(/’/g, "'");
+}
+
+// Start offset of the signature block, including the "Sportivement," line
+// above it when present; -1 when the body isn't signed yet.
+function signatureIndex(body: string) {
+  const normalized = normalizeApostrophes(body);
+  const markerIdx = normalized.toLowerCase().lastIndexOf(SIGNATURE_MARKER);
+  if (markerIdx === -1) return -1;
+  const before = normalized.slice(0, markerIdx).trimEnd();
+  const lastBreak = before.lastIndexOf("\n");
+  const lastLine = before.slice(lastBreak + 1).trim();
+  return /^sportivement,?$/i.test(lastLine) ? lastBreak + 1 : markerIdx;
+}
+
+export function hasSignature(body: string) {
+  return signatureIndex(body) !== -1;
+}
+
+// Applied to every outgoing body right before sending, so a message the
+// Bureau rewrote by hand in the preview modal still goes out signed.
+export function withSignature(body: string) {
+  const trimmed = body.trimEnd();
+  if (hasSignature(trimmed)) return trimmed;
+  return trimmed ? `${trimmed}\n\n${EMAIL_SIGNATURE}` : EMAIL_SIGNATURE;
+}
+
 const RELANCE_TEMPLATES: Record<RelanceTemplateKey, { subject: string; body: string }> = {
   EN_ATTENTE: {
     subject: "UBAC Basket - Rappel pour votre cotisation",
-    body: "Bonjour {prenom}, sauf erreur de notre part, nous n'avons pas encore reçu votre règlement concernant la cotisation de cette saison (Montant : {tarif} €). Merci de bien vouloir faire le nécessaire ou de contacter le bureau en cas de besoin.",
+    body: `Bonjour {prenom}, sauf erreur de notre part, nous n'avons pas encore reçu votre règlement concernant la cotisation de cette saison (Montant : {tarif} €). Merci de bien vouloir faire le nécessaire ou de contacter le bureau en cas de besoin.\n\n${EMAIL_SIGNATURE}`,
   },
   PARTIEL: {
     subject: "UBAC Basket - Solde de votre cotisation",
-    body: "Bonjour {prenom}, nous vous remercions pour vos premiers versements. Nous vous rappelons qu'il reste un solde de {solde} € à régler sur votre cotisation (Cotisation globale : {tarif} €, déjà réglé : {paye} €). Merci de régulariser ce solde prochainement.",
+    body: `Bonjour {prenom}, nous vous remercions pour vos premiers versements. Nous vous rappelons qu'il reste un solde de {solde} € à régler sur votre cotisation (Cotisation globale : {tarif} €, déjà réglé : {paye} €). Merci de régulariser ce solde prochainement.\n\n${EMAIL_SIGNATURE}`,
   },
   PAYE: {
     subject: "UBAC Basket - Attestation & Confirmation de cotisation à jour",
-    body: "Bonjour {prenom}, nous vous confirmons que votre cotisation pour cette saison est entièrement réglée ({tarif} €). Un grand merci pour votre engagement au sein du club ! Votre reçu/attestation reste disponible auprès du bureau si besoin.",
+    body: `Bonjour {prenom}, nous vous confirmons que votre cotisation pour cette saison est entièrement réglée ({tarif} €). Un grand merci pour votre engagement au sein du club ! Votre reçu/attestation reste disponible auprès du bureau si besoin.\n\n${EMAIL_SIGNATURE}`,
   },
 };
 
@@ -176,16 +213,25 @@ export const RECEIPT_ATTACHMENT_MENTION =
 
 export function withReceiptMention(body: string, attach: boolean) {
   const hasMention = body.includes(RECEIPT_ATTACHMENT_MENTION);
-  if (attach && !hasMention) {
-    return body.trimEnd() ? `${body.trimEnd()}\n\n${RECEIPT_ATTACHMENT_MENTION}` : RECEIPT_ATTACHMENT_MENTION;
+  if (attach === hasMention) return withSignature(body);
+  if (!attach) {
+    return withSignature(
+      body
+        .replace(`${RECEIPT_ATTACHMENT_MENTION}\n\n`, "")
+        .replace(`\n\n${RECEIPT_ATTACHMENT_MENTION}`, "")
+        .replace(RECEIPT_ATTACHMENT_MENTION, "")
+    );
   }
-  if (!attach && hasMention) {
-    return body
-      .replace(`\n\n${RECEIPT_ATTACHMENT_MENTION}`, "")
-      .replace(RECEIPT_ATTACHMENT_MENTION, "")
-      .trimEnd();
-  }
-  return body;
+  // The mention belongs to the message, so it goes above the signature
+  // rather than after it — otherwise ticking the checkbox would push a
+  // stray line below "L'équipe UBAC".
+  const signed = withSignature(body);
+  const sigAt = signatureIndex(signed);
+  const intro = signed.slice(0, sigAt).trimEnd();
+  const signature = signed.slice(sigAt);
+  return intro
+    ? `${intro}\n\n${RECEIPT_ATTACHMENT_MENTION}\n\n${signature}`
+    : `${RECEIPT_ATTACHMENT_MENTION}\n\n${signature}`;
 }
 
 // Same content as openReceiptWindow's printable page, laid out as an
@@ -817,7 +863,10 @@ export default function CotisationParticipantsTable({
             body: JSON.stringify({
               to: email,
               subject: isBulk ? renderRelanceTemplate(subject, c) : subject,
-              body: isBulk ? renderRelanceTemplate(body, c) : body,
+              // withSignature is applied last, on the final text: a body
+              // the Bureau rewrote from scratch in the textarea still
+              // leaves signed by the club.
+              body: withSignature(isBulk ? renderRelanceTemplate(body, c) : body),
               ...(attachment
                 ? { attachmentBase64: attachment.base64, attachmentFilename: attachment.filename }
                 : {}),
@@ -1519,7 +1568,7 @@ export default function CotisationParticipantsTable({
                         href={buildGmailComposeLink({
                           to: email,
                           subject: relancePreview.subject,
-                          body: relancePreview.body,
+                          body: withSignature(relancePreview.body),
                         })}
                         target="_blank"
                         rel="noreferrer"
