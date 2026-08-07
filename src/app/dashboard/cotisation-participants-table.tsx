@@ -9,7 +9,6 @@ import {
   ChevronDown,
   ChevronUp,
   CreditCard,
-  Download,
   FileText,
   Mail,
   MoreVertical,
@@ -19,10 +18,10 @@ import {
   Receipt,
   Search,
   Trash2,
+  TriangleAlert,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { buildGmailComposeLink } from "@/lib/email";
 import type { AdminCotisation, CotisationPayment } from "./page";
 
 type StatusKey = "PAYE" | "PARTIEL" | "OFFERT" | "EN_ATTENTE";
@@ -251,17 +250,6 @@ function buildReceiptPdfBase64(c: AdminCotisation, contactEmail: string | null) 
   return { base64, filename };
 }
 
-// Gmail's compose URL can't carry an attachment, so when the Bureau falls
-// back to sending a draft by hand (no club SMTP credentials configured
-// yet), they still need the PDF as a real file to attach themselves.
-function downloadReceiptPdf(c: AdminCotisation, contactEmail: string | null) {
-  const { base64, filename } = buildReceiptPdfBase64(c, contactEmail);
-  const link = document.createElement("a");
-  link.href = `data:application/pdf;base64,${base64}`;
-  link.download = filename;
-  link.click();
-}
-
 function openReceiptWindow(c: AdminCotisation, contactEmail: string | null) {
   const win = window.open("", "_blank");
   if (!win) return;
@@ -337,7 +325,9 @@ export default function CotisationParticipantsTable({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(
+    null
+  );
   const [relanceSending, setRelanceSending] = useState(false);
   const [relancePreview, setRelancePreview] = useState<{
     ids: string[];
@@ -347,8 +337,15 @@ export default function CotisationParticipantsTable({
   } | null>(null);
 
   function showToast(message: string) {
-    setToast(message);
+    setToast({ message, variant: "success" });
     setTimeout(() => setToast(null), 4000);
+  }
+
+  // Failures carry actionable setup info ("renseigner RESEND_API_KEY"...),
+  // so they stay up noticeably longer than a success confirmation.
+  function showErrorToast(message: string) {
+    setToast({ message, variant: "error" });
+    setTimeout(() => setToast(null), 9000);
   }
 
   const [paymentIds, setPaymentIds] = useState<string[] | null>(null);
@@ -826,19 +823,20 @@ export default function CotisationParticipantsTable({
     setRelanceSending(false);
     const successes = results.filter((r) => r.ok);
     const failures = results.filter((r) => !r.ok);
+    const withAttachment = attachReceipt ? " avec la facture en pièce jointe" : "";
     if (successes.length === 1 && failures.length === 0) {
-      showToast(`Email envoyé avec succès à ${successes[0].email}.`);
+      showToast(`Email envoyé avec succès à ${successes[0].email}${withAttachment}.`);
     } else if (successes.length > 0) {
       showToast(
-        `${successes.length} mail${successes.length > 1 ? "s" : ""} envoyé${successes.length > 1 ? "s" : ""} avec succès.`
+        `${successes.length} mail${successes.length > 1 ? "s" : ""} envoyé${successes.length > 1 ? "s" : ""} avec succès${withAttachment}.`
       );
     }
     if (failures.length > 0) {
       const firstError = failures[0].error ?? "Erreur inconnue.";
-      setActionError(
+      showErrorToast(
         failures.length === 1
           ? `Envoi à ${failures[0].email} impossible : ${firstError}`
-          : `${failures.length} mail(s) n'ont pas pu être envoyés : ${firstError}`
+          : `${failures.length} mail(s) non envoyés : ${firstError}`
       );
     }
     setSelectedIds(new Set());
@@ -1492,56 +1490,22 @@ export default function CotisationParticipantsTable({
               </button>
             </div>
 
-            {/* Same manual fallback as the Membres tab's e-mail modal: as
-                long as the club's own SMTP credentials aren't configured
-                (or if automatic sending fails), the Bureau can still send
-                the exact same message by hand from their own Gmail. */}
-            {relancePreview.ids.length === 1 &&
-              (() => {
-                const c = byId.get(relancePreview.ids[0]);
-                if (!c) return null;
-                const email = contactEmailByPlayerId[c.playerId] ?? null;
-                if (!email) return null;
-                return (
-                  <div className="flex flex-col items-center gap-1.5 border-t border-zinc-100 pt-2">
-                    <a
-                      href={buildGmailComposeLink({
-                        to: email,
-                        subject: relancePreview.subject,
-                        body: relancePreview.body,
-                      })}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs font-medium text-zinc-500 underline hover:text-zinc-700"
-                    >
-                      Ou ouvrir un brouillon Gmail pré-rempli
-                    </a>
-                    {relancePreview.attachReceipt && (
-                      <button
-                        onClick={() => downloadReceiptPdf(c, email)}
-                        className="flex items-center gap-1 text-xs font-medium text-zinc-500 hover:text-zinc-700 hover:underline"
-                      >
-                        <Download className="h-3 w-3" />
-                        Télécharger le PDF à joindre au brouillon
-                      </button>
-                    )}
-                  </div>
-                );
-              })()}
-            {relancePreview.ids.length > 1 && (
-              <p className="border-t border-zinc-100 pt-2 text-center text-xs text-zinc-400">
-                Le brouillon Gmail manuel n&apos;est disponible que pour un envoi
-                individuel : les montants sont personnalisés pour chaque destinataire.
-              </p>
-            )}
           </div>
         </Modal>
       )}
 
       {toast && (
-        <div className="fixed bottom-6 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-2 rounded-full bg-navy px-4 py-2.5 text-sm font-semibold text-white shadow-lg">
-          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-          {toast}
+        <div
+          className={`fixed bottom-6 left-1/2 z-[60] flex max-w-[90vw] -translate-x-1/2 items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-white shadow-lg ${
+            toast.variant === "error" ? "bg-red-600" : "bg-navy"
+          }`}
+        >
+          {toast.variant === "error" ? (
+            <TriangleAlert className="h-4 w-4 shrink-0" />
+          ) : (
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+          )}
+          {toast.message}
         </div>
       )}
     </div>
