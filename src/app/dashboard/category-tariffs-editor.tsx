@@ -20,7 +20,11 @@ function buildValues(
 
 // Bureau-editable default price per category — feeds the DB trigger
 // (sync_category_cotisation) that auto-creates a cotisation row whenever a
-// member is created or (re)assigned to a team.
+// member is created or (re)assigned to a team. Collapsed by default so the
+// Cotisations tab opens straight onto the members table: setting tariffs is
+// a rare setup step, consulting the table is the daily one. The header
+// still shows how many are defined, so a missing tariff stays visible
+// without expanding.
 export default function CategoryTariffsEditor({
   categories,
   tariffs,
@@ -29,7 +33,7 @@ export default function CategoryTariffsEditor({
   tariffs: AdminCategoryTariff[];
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
