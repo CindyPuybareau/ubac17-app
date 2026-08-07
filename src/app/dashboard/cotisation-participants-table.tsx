@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronUp,
   CreditCard,
+  Download,
   FileText,
   Mail,
   MoreVertical,
@@ -21,6 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { buildGmailComposeLink } from "@/lib/email";
 import type { AdminCotisation, CotisationPayment } from "./page";
 
 type StatusKey = "PAYE" | "PARTIEL" | "OFFERT" | "EN_ATTENTE";
@@ -247,6 +249,17 @@ function buildReceiptPdfBase64(c: AdminCotisation, contactEmail: string | null) 
   const safeName = `${cotisationLastName(c)}-${cotisationFirstName(c)}`.replace(/[^a-zA-Z0-9-]+/g, "_");
   const filename = `${isSettled ? "recu" : "appel-cotisation"}-${safeName}.pdf`;
   return { base64, filename };
+}
+
+// Gmail's compose URL can't carry an attachment, so when the Bureau falls
+// back to sending a draft by hand (no club SMTP credentials configured
+// yet), they still need the PDF as a real file to attach themselves.
+function downloadReceiptPdf(c: AdminCotisation, contactEmail: string | null) {
+  const { base64, filename } = buildReceiptPdfBase64(c, contactEmail);
+  const link = document.createElement("a");
+  link.href = `data:application/pdf;base64,${base64}`;
+  link.download = filename;
+  link.click();
 }
 
 function openReceiptWindow(c: AdminCotisation, contactEmail: string | null) {
@@ -1478,6 +1491,49 @@ export default function CotisationParticipantsTable({
                 Annuler
               </button>
             </div>
+
+            {/* Same manual fallback as the Membres tab's e-mail modal: as
+                long as the club's own SMTP credentials aren't configured
+                (or if automatic sending fails), the Bureau can still send
+                the exact same message by hand from their own Gmail. */}
+            {relancePreview.ids.length === 1 &&
+              (() => {
+                const c = byId.get(relancePreview.ids[0]);
+                if (!c) return null;
+                const email = contactEmailByPlayerId[c.playerId] ?? null;
+                if (!email) return null;
+                return (
+                  <div className="flex flex-col items-center gap-1.5 border-t border-zinc-100 pt-2">
+                    <a
+                      href={buildGmailComposeLink({
+                        to: email,
+                        subject: relancePreview.subject,
+                        body: relancePreview.body,
+                      })}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs font-medium text-zinc-500 underline hover:text-zinc-700"
+                    >
+                      Ou ouvrir un brouillon Gmail pré-rempli
+                    </a>
+                    {relancePreview.attachReceipt && (
+                      <button
+                        onClick={() => downloadReceiptPdf(c, email)}
+                        className="flex items-center gap-1 text-xs font-medium text-zinc-500 hover:text-zinc-700 hover:underline"
+                      >
+                        <Download className="h-3 w-3" />
+                        Télécharger le PDF à joindre au brouillon
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
+            {relancePreview.ids.length > 1 && (
+              <p className="border-t border-zinc-100 pt-2 text-center text-xs text-zinc-400">
+                Le brouillon Gmail manuel n&apos;est disponible que pour un envoi
+                individuel : les montants sont personnalisés pour chaque destinataire.
+              </p>
+            )}
           </div>
         </Modal>
       )}
