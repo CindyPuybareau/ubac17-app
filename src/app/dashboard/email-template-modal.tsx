@@ -13,7 +13,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { buildGmailComposeLink } from "@/lib/email";
+import { buildGmailComposeLink, withSignature } from "@/lib/email";
 
 type Template = {
   id: string;
@@ -77,10 +77,17 @@ const BUREAU_TEMPLATES: Template[] = [
   },
 ];
 
+// Both variants go through withSignature so the club signature is
+// identical here and in the Cotisations relances — including on the blank
+// "Message classique", which used to carry none at all.
 function bodyFor(template: Template | null, recipientFirstName: string | null | undefined) {
   const greeting = `Bonjour ${recipientFirstName ?? ""},`.replace(" ,", ",");
-  if (!template) return `${greeting}\n\n`;
-  return `${greeting}\n\nMerci de consulter/compléter le document suivant :\n${template.url}\n\nSportivement,\nUBAC`;
+  // Blank line left between greeting and signature: that's where the
+  // cursor lands to type the actual message.
+  if (!template) return `${greeting}\n\n\n${withSignature("")}`;
+  return withSignature(
+    `${greeting}\n\nMerci de consulter/compléter le document suivant :\n${template.url}`
+  );
 }
 
 export default function EmailTemplateModal({
@@ -107,7 +114,10 @@ export default function EmailTemplateModal({
     setBody(bodyFor(template, recipientFirstName));
   }
 
-  const gmailComposeLink = buildGmailComposeLink({ to: toEmail, subject, body });
+  // Applied on the final text rather than only on the template, so a body
+  // rewritten (or emptied) by hand in the textarea still leaves signed.
+  const signedBody = withSignature(body);
+  const gmailComposeLink = buildGmailComposeLink({ to: toEmail, subject, body: signedBody });
 
   async function handleSend() {
     setSending(true);
@@ -116,7 +126,7 @@ export default function EmailTemplateModal({
       const res = await fetch("/api/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to: toEmail, subject, body }),
+        body: JSON.stringify({ to: toEmail, subject, body: signedBody }),
       });
       const data = await res.json();
       if (!res.ok) {

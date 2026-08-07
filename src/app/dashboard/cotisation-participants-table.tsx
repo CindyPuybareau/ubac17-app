@@ -23,7 +23,12 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { buildGmailComposeLink } from "@/lib/email";
+import {
+  EMAIL_SIGNATURE,
+  buildGmailComposeLink,
+  signatureIndex,
+  withSignature,
+} from "@/lib/email";
 import type { AdminCotisation, CotisationPayment } from "./page";
 
 type StatusKey = "PAYE" | "PARTIEL" | "OFFERT" | "EN_ATTENTE";
@@ -77,43 +82,6 @@ function formatPlaceholderAmount(value: number | null | undefined) {
 }
 
 type RelanceTemplateKey = "EN_ATTENTE" | "PARTIEL" | "PAYE";
-
-// Every mail leaving the Cotisations module is signed by the club, never
-// by the individual Bureau member who happens to click "Envoyer".
-export const EMAIL_SIGNATURE = "Sportivement,\nL'équipe UBAC";
-
-// Recognised on the normalised text (curly apostrophes, casing) so a
-// hand-typed variant is never doubled by withSignature().
-const SIGNATURE_MARKER = "l'équipe ubac";
-
-function normalizeApostrophes(text: string) {
-  // 1:1 substitution — indexes stay valid against the original string.
-  return text.replace(/’/g, "'");
-}
-
-// Start offset of the signature block, including the "Sportivement," line
-// above it when present; -1 when the body isn't signed yet.
-function signatureIndex(body: string) {
-  const normalized = normalizeApostrophes(body);
-  const markerIdx = normalized.toLowerCase().lastIndexOf(SIGNATURE_MARKER);
-  if (markerIdx === -1) return -1;
-  const before = normalized.slice(0, markerIdx).trimEnd();
-  const lastBreak = before.lastIndexOf("\n");
-  const lastLine = before.slice(lastBreak + 1).trim();
-  return /^sportivement,?$/i.test(lastLine) ? lastBreak + 1 : markerIdx;
-}
-
-export function hasSignature(body: string) {
-  return signatureIndex(body) !== -1;
-}
-
-// Applied to every outgoing body right before sending, so a message the
-// Bureau rewrote by hand in the preview modal still goes out signed.
-export function withSignature(body: string) {
-  const trimmed = body.trimEnd();
-  if (hasSignature(trimmed)) return trimmed;
-  return trimmed ? `${trimmed}\n\n${EMAIL_SIGNATURE}` : EMAIL_SIGNATURE;
-}
 
 const RELANCE_TEMPLATES: Record<RelanceTemplateKey, { subject: string; body: string }> = {
   EN_ATTENTE: {

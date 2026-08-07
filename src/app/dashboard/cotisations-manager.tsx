@@ -235,7 +235,10 @@ export default function CotisationsManager({
 
   const tabButtonClass = (active: boolean) =>
     `flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${
-      active ? "bg-navy text-white" : "text-zinc-500 hover:bg-zinc-100"
+      // Inactive keeps the club navy (icon + label) instead of grey: on a
+      // white background the grey read as a disabled control rather than
+      // a second tab one can switch to.
+      active ? "bg-navy text-white" : "text-navy hover:bg-blue-50"
     }`;
 
   return (
