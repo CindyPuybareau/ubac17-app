@@ -2,10 +2,22 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Search, Tag, Target, Ticket, Wallet, X } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  Plus,
+  Search,
+  ShieldCheck,
+  Tag,
+  Target,
+  Ticket,
+  TrendingUp,
+  Wallet,
+  X,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
-import GaugeChart from "./gauge-chart";
 import CategoryTariffsEditor from "./category-tariffs-editor";
 import CotisationParticipantsTable, {
   computeStatus,
@@ -64,50 +76,84 @@ function computeKpis(list: AdminCotisation[]) {
   };
 }
 
+// One card shape for all seven KPIs — same height, padding and radius, so
+// the row reads as a single band instead of tiles of assorted sizes.
+function KpiCard({
+  icon: Icon,
+  iconClass,
+  value,
+  label,
+  wide = false,
+}: {
+  icon: typeof Wallet;
+  iconClass: string;
+  value: string;
+  label: string;
+  wide?: boolean;
+}) {
+  return (
+    <div
+      className={`flex h-full flex-col items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm ${
+        wide ? "col-span-2 md:col-span-2 lg:col-span-1" : ""
+      }`}
+    >
+      <Icon className={`h-5 w-5 shrink-0 ${iconClass}`} />
+      <p className="text-xl font-bold text-slate-900 sm:text-2xl">{value}</p>
+      <p className="text-xs font-medium leading-tight text-slate-500">{label}</p>
+    </div>
+  );
+}
+
 function KpiHeader({ cotisations }: { cotisations: AdminCotisation[] }) {
   const kpis = useMemo(() => computeKpis(cotisations), [cotisations]);
 
+  // 7 cards over 2 / 4 / 7 columns. The last one spans two columns below
+  // lg so neither breakpoint ends on a half-empty row.
   return (
-    <div className="rounded-2xl border border-zinc-100 bg-white p-3 shadow-sm md:p-6">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="flex items-center justify-center rounded-xl bg-zinc-50 p-3 sm:col-span-2 lg:col-span-1">
-          <GaugeChart percentage={kpis.percentage} label="Collecté" color="#F4C430" />
-        </div>
-        <div className="rounded-xl bg-green-50 p-3 text-center md:p-4">
-          <p className="text-xl font-bold text-green-700 sm:text-2xl">{kpis.payeCount}</p>
-          <p className="text-xs font-medium text-green-600 sm:text-sm">Payés</p>
-        </div>
-        <div className="rounded-xl bg-orange-50 p-3 text-center md:p-4">
-          <p className="text-xl font-bold text-orange-700 sm:text-2xl">{kpis.partielCount}</p>
-          <p className="text-xs font-medium text-orange-600 sm:text-sm">Partiels</p>
-        </div>
-        <div className="rounded-xl bg-amber-50 p-3 text-center md:p-4">
-          <p className="text-xl font-bold text-amber-700 sm:text-2xl">{kpis.offertCount}</p>
-          <p className="text-xs font-medium text-amber-600 sm:text-sm">Offerts / Dispensés</p>
-        </div>
-        <div className="rounded-xl bg-red-50 p-3 text-center md:p-4">
-          <p className="text-xl font-bold text-red-700 sm:text-2xl">{kpis.enAttenteCount}</p>
-          <p className="text-xs font-medium text-red-600 sm:text-sm">En attente / Non payés</p>
-        </div>
-        <div className="flex items-center gap-2.5 rounded-xl bg-ubac-yellow/10 p-3 md:p-4">
-          <Wallet className="h-5 w-5 shrink-0 text-ubac-yellow-dark" />
-          <div>
-            <p className="text-xs font-medium text-ubac-yellow-dark sm:text-sm">Collecté</p>
-            <p className="text-base font-bold text-zinc-900 sm:text-lg">
-              {formatAmount(kpis.totalCollected)}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2.5 rounded-xl bg-navy/5 p-3 md:p-4">
-          <Target className="h-5 w-5 shrink-0 text-navy" />
-          <div>
-            <p className="text-xs font-medium text-navy sm:text-sm">Attendu</p>
-            <p className="text-base font-bold text-zinc-900 sm:text-lg">
-              {formatAmount(kpis.totalDue)}
-            </p>
-          </div>
-        </div>
-      </div>
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-7">
+      <KpiCard
+        icon={TrendingUp}
+        iconClass="text-navy"
+        value={`${kpis.percentage} %`}
+        label="Collecté"
+      />
+      <KpiCard
+        icon={CheckCircle2}
+        iconClass="text-emerald-600"
+        value={String(kpis.payeCount)}
+        label="Payés"
+      />
+      <KpiCard
+        icon={Clock}
+        iconClass="text-amber-600"
+        value={String(kpis.partielCount)}
+        label="Partiels"
+      />
+      <KpiCard
+        icon={ShieldCheck}
+        iconClass="text-blue-600"
+        value={String(kpis.offertCount)}
+        label="Offerts / Dispensés"
+      />
+      <KpiCard
+        icon={AlertTriangle}
+        iconClass="text-rose-600"
+        value={String(kpis.enAttenteCount)}
+        label="En attente / Non payés"
+      />
+      <KpiCard
+        icon={Wallet}
+        iconClass="text-amber-700"
+        value={formatAmount(kpis.totalCollected)}
+        label="Total collecté"
+      />
+      <KpiCard
+        icon={Target}
+        iconClass="text-indigo-600"
+        value={formatAmount(kpis.totalDue)}
+        label="Total attendu"
+        wide
+      />
     </div>
   );
 }
