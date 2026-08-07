@@ -18,6 +18,30 @@ const RESEND_FROM = process.env.RESEND_FROM ?? "UBAC <onboarding@resend.dev>";
 const GMAIL_USER = process.env.GMAIL_USER;
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
 
+// Lets the client know upfront whether automatic sending is available, so
+// the relance modal can offer the right button (direct 1-click send vs
+// guided manual draft) instead of only finding out after a failed POST —
+// which would also mean opening Gmail after an async gap, i.e. straight
+// into the browser's popup blocker.
+export async function GET() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  }
+
+  const provider = RESEND_API_KEY
+    ? "resend"
+    : GMAIL_USER && GMAIL_APP_PASSWORD
+      ? "gmail"
+      : null;
+
+  return NextResponse.json({ configured: provider !== null, provider });
+}
+
 export async function POST(request: Request) {
   const { to, subject, body, attachmentBase64, attachmentFilename } = await request.json();
 

@@ -10,6 +10,7 @@ import {
   ChevronUp,
   CreditCard,
   FileText,
+  Lightbulb,
   Mail,
   MoreVertical,
   Paperclip,
@@ -22,6 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { buildGmailComposeLink } from "@/lib/email";
 import type { AdminCotisation, CotisationPayment } from "./page";
 
 type StatusKey = "PAYE" | "PARTIEL" | "OFFERT" | "EN_ATTENTE";
@@ -250,6 +252,18 @@ function buildReceiptPdfBase64(c: AdminCotisation, contactEmail: string | null) 
   return { base64, filename };
 }
 
+// Manual fallback only: a web page can't slip a file into a Gmail/Outlook
+// draft (browser + provider security boundary), so when no mail service is
+// configured the PDF is dropped in the user's Downloads for them to drag
+// into the draft that opens alongside.
+function downloadReceiptPdf(c: AdminCotisation, contactEmail: string | null) {
+  const { base64, filename } = buildReceiptPdfBase64(c, contactEmail);
+  const link = document.createElement("a");
+  link.href = `data:application/pdf;base64,${base64}`;
+  link.download = filename;
+  link.click();
+}
+
 function openReceiptWindow(c: AdminCotisation, contactEmail: string | null) {
   const win = window.open("", "_blank");
   if (!win) return;
@@ -335,6 +349,10 @@ export default function CotisationParticipantsTable({
     body: string;
     attachReceipt: boolean;
   } | null>(null);
+  // null while unknown/loading — the modal optimistically shows the direct
+  // send button until the answer comes back, so nothing flickers.
+  const [mailServiceConfigured, setMailServiceConfigured] = useState<boolean | null>(null);
+  const [manualNotice, setManualNotice] = useState<string | null>(null);
 
   function showToast(message: string) {
     setToast({ message, variant: "success" });
@@ -735,6 +753,12 @@ export default function CotisationParticipantsTable({
       .filter((c): c is AdminCotisation => Boolean(c));
     if (targets.length === 0) return;
     setActionError(null);
+    setManualNotice(null);
+
+    fetch("/api/send-email")
+      .then((r) => r.json())
+      .then((d: { configured?: boolean }) => setMailServiceConfigured(Boolean(d?.configured)))
+      .catch(() => setMailServiceConfigured(false));
 
     if (targets.length === 1) {
       const c = targets[0];
@@ -1474,22 +1498,69 @@ export default function CotisationParticipantsTable({
                 Joindre la facture / l&apos;attestation de paiement au mail
               </span>
             </label>
+            {manualNotice && (
+              <p className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                <Paperclip className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                {manualNotice}
+              </p>
+            )}
+
             <div className="mt-1 flex items-center gap-2">
-              <button
-                onClick={confirmSendRelance}
-                disabled={relanceSending}
-                className="rounded-full bg-ubac-yellow px-3 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
-              >
-                {relanceSending ? "Envoi..." : "Envoyer le mail"}
-              </button>
+              {/* No mail service configured yet: a real <a> (not a
+                  window.open after an await) so the draft opens on the
+                  user's own click and never trips the popup blocker. */}
+              {mailServiceConfigured === false && relancePreview.ids.length === 1
+                ? (() => {
+                    const c = byId.get(relancePreview.ids[0]);
+                    const email = c ? contactEmailByPlayerId[c.playerId] ?? null : null;
+                    if (!c || !email) return null;
+                    return (
+                      <a
+                        href={buildGmailComposeLink({
+                          to: email,
+                          subject: relancePreview.subject,
+                          body: relancePreview.body,
+                        })}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={() => {
+                          if (relancePreview.attachReceipt) {
+                            downloadReceiptPdf(c, email);
+                            setManualNotice(
+                              "Le PDF de la facture a été téléchargé dans vos Téléchargements. Glissez-le simplement dans le mail Gmail qui vient de s'ouvrir."
+                            );
+                          }
+                        }}
+                        className="rounded-full bg-ubac-yellow px-3 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark"
+                      >
+                        Ouvrir dans Gmail
+                      </a>
+                    );
+                  })()
+                : (
+                    <button
+                      onClick={confirmSendRelance}
+                      disabled={relanceSending}
+                      className="rounded-full bg-ubac-yellow px-3 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+                    >
+                      {relanceSending ? "Envoi..." : "Envoyer le mail"}
+                    </button>
+                  )}
               <button
                 onClick={() => setRelancePreview(null)}
                 className="rounded-full px-3 py-1.5 text-sm font-semibold text-zinc-500 hover:bg-zinc-100"
               >
-                Annuler
+                {mailServiceConfigured === false ? "Fermer" : "Annuler"}
               </button>
             </div>
 
+            {mailServiceConfigured === false && (
+              <p className="flex items-start gap-2 border-t border-zinc-100 pt-2 text-xs text-zinc-500">
+                <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ubac-yellow-dark" />
+                Astuce : pour envoyer les factures en 1 clic, sans manipulation de fichier,
+                configurez la clé RESEND_API_KEY dans Vercel.
+              </p>
+            )}
           </div>
         </Modal>
       )}
