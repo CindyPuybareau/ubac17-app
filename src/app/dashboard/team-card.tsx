@@ -21,7 +21,6 @@ import { getCurrentSeasonLabel } from "@/lib/season";
 import { formatEventTime, styleFor } from "./calendar-view";
 import OpponentDisplay from "./opponent-display";
 import MemberDetailModal from "./member-detail-modal";
-import PlayerYearBadge from "./player-year-badge";
 import SalleBadge from "./salle-badge";
 import WhatsAppButton from "./whatsapp-button";
 import type { AdminUpcomingEvent, MemberDetail } from "./page";
@@ -87,17 +86,11 @@ function licenceBadge(detail: MemberDetail | undefined) {
   return { label: raw, title: raw, className: "bg-zinc-100 text-zinc-600", dotClassName: "bg-zinc-400" };
 }
 
-function presenceBadge(status: string | null) {
-  if (status === "PRESENT") {
-    return { label: "Présent", dotClassName: "bg-green-500", className: "bg-green-100 text-green-700" };
-  }
-  if (status === "ABSENT") {
-    return { label: "Absent", dotClassName: "bg-red-500", className: "bg-red-100 text-red-700" };
-  }
-  if (status) {
-    return { label: "En attente", dotClassName: "bg-amber-500", className: "bg-amber-100 text-amber-700" };
-  }
-  return { label: "—", dotClassName: "bg-zinc-300", className: "bg-zinc-100 text-zinc-400" };
+function roleBadge(role: "COACH" | "COACH_PENDING" | "JOUEUR") {
+  if (role === "COACH") return { label: "Coach", className: "bg-navy/10 text-navy" };
+  if (role === "COACH_PENDING")
+    return { label: "Coach (en attente)", className: "bg-amber-100 text-amber-700" };
+  return { label: "Joueur", className: "bg-emerald-100 text-emerald-700" };
 }
 
 export default function TeamCard({
@@ -315,12 +308,75 @@ export default function TeamCard({
   const canCreatePlayer = allowCreatePlayer && !readOnly;
   const canAssignCoach = allowAssignCoach && !readOnly;
 
+  // One list for the whole team — coachs, coachs en attente, then joueurs —
+  // so the Rôle column actually distinguishes something instead of
+  // repeating "Joueur" on every row.
+  type MemberRow = {
+    key: string;
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    role: "COACH" | "COACH_PENDING" | "JOUEUR";
+    player: RosterPlayer | null;
+  };
+  // A pending coach is itself a player row, so the same person can be on
+  // both lists — merge them into a single row carrying both badges rather
+  // than listing them twice.
+  const memberById = new Map<string, MemberRow>();
+  team.coaches.forEach((c) => {
+    memberById.set(c.id, {
+      key: c.id,
+      id: c.id,
+      firstName: c.first_name,
+      lastName: c.last_name,
+      role: "COACH",
+      player: null,
+    });
+  });
+  team.pendingCoaches.forEach((c) => {
+    if (memberById.has(c.id)) return;
+    memberById.set(c.id, {
+      key: c.id,
+      id: c.id,
+      firstName: c.first_name,
+      lastName: c.last_name,
+      role: "COACH_PENDING",
+      player: null,
+    });
+  });
+  team.players.forEach((p) => {
+    const existing = memberById.get(p.id);
+    if (existing) {
+      existing.player = p;
+      return;
+    }
+    memberById.set(p.id, {
+      key: p.id,
+      id: p.id,
+      firstName: p.first_name,
+      lastName: p.last_name,
+      role: "JOUEUR",
+      player: p,
+    });
+  });
+  const memberRows = Array.from(memberById.values());
+
   const rosterQuery = rosterSearch.trim().toLowerCase();
-  const visiblePlayers = rosterQuery
-    ? team.players.filter((p) =>
-        `${p.first_name ?? ""} ${p.last_name ?? ""}`.toLowerCase().includes(rosterQuery)
+  const visibleMembers = rosterQuery
+    ? memberRows.filter((m) =>
+        `${m.firstName ?? ""} ${m.lastName ?? ""}`.toLowerCase().includes(rosterQuery)
       )
-    : team.players;
+    : memberRows;
+
+  // Adult member: their own registration contact. Minor: the linked
+  // tutor's, which is what contactPhone/EmailByPlayerId already carry.
+  function contactsFor(id: string) {
+    const detail = memberDetailsByPlayerId?.[id];
+    return {
+      phone: contactPhoneByPlayerId[id] ?? detail?.registrationPhone ?? null,
+      email: contactEmailByPlayerId?.[id] ?? detail?.registrationEmail ?? null,
+    };
+  }
   const teamEvents = (eventsByTeamId[team.id] ?? [])
     .filter((e) => new Date(e.start_time).getTime() >= now)
     .slice(0, 3);
@@ -345,19 +401,19 @@ export default function TeamCard({
       <div className="mt-3">
         <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-            Joueurs
+            Membres
             <span className="ml-1.5 font-medium normal-case tracking-normal text-zinc-400">
-              ({visiblePlayers.length}
-              {rosterQuery ? ` / ${team.players.length}` : ""})
+              ({visibleMembers.length}
+              {rosterQuery ? ` / ${memberRows.length}` : ""})
             </span>
           </p>
-          {showRosterSearch && team.players.length > 0 && (
+          {showRosterSearch && memberRows.length > 0 && (
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
               <input
                 value={rosterSearch}
                 onChange={(e) => setRosterSearch(e.target.value)}
-                placeholder="Rechercher un joueur..."
+                placeholder="Rechercher un membre..."
                 className="w-48 rounded-full border border-zinc-200 py-1.5 pl-8 pr-3 text-sm outline-none focus:border-ubac-yellow"
               />
             </div>
@@ -367,43 +423,48 @@ export default function TeamCard({
           <table className="w-full table-auto border-collapse text-sm">
             <thead>
               <tr className="border-b border-zinc-100 bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                <th className="w-auto whitespace-nowrap px-3 py-2.5">Nom</th>
-                <th className="w-auto whitespace-nowrap px-3 py-2.5">Prénom</th>
-                <th className="whitespace-nowrap px-3 py-2.5">N°</th>
-                <th className="whitespace-nowrap px-3 py-2.5">Poste</th>
-                <th className="whitespace-nowrap px-3 py-2.5">Année</th>
-                <th className="whitespace-nowrap px-3 py-2.5">Licence</th>
-                <th className="whitespace-nowrap px-3 py-2.5">Présence</th>
+                <th className="w-auto px-3 py-2.5">Membre</th>
+                <th className="whitespace-nowrap px-3 py-2.5">Rôle</th>
+                <th className="whitespace-nowrap px-3 py-2.5">Statut</th>
+                <th className="whitespace-nowrap px-3 py-2.5">Catégorie</th>
+                <th className="whitespace-nowrap px-3 py-2.5">Téléphone</th>
+                <th className="w-auto px-3 py-2.5">E-mail</th>
                 <th className="px-3 py-2.5" />
               </tr>
             </thead>
             <tbody>
-              {visiblePlayers.map((p: RosterPlayer) => {
-                const phone = contactPhoneByPlayerId[p.id];
-                const email = contactEmailByPlayerId?.[p.id];
-                const presence = presenceBadge(p.nextEventStatus);
-                const licence = licenceBadge(memberDetailsByPlayerId?.[p.id]);
+              {visibleMembers.map((m) => {
+                const { phone, email } = contactsFor(m.id);
+                const detail = memberDetailsByPlayerId?.[m.id];
+                const licence = licenceBadge(detail);
+                const role = roleBadge(m.role);
+                const category = detail?.category ?? team.category;
                 return (
-                  <tr key={p.id} className="border-b border-zinc-50 last:border-0">
-                    <td className="w-auto whitespace-nowrap px-3 py-2.5 font-medium text-zinc-900">
+                  <tr key={m.key} className="border-b border-zinc-50 last:border-0">
+                    <td className="w-auto px-3 py-2.5 font-medium text-zinc-900">
                       <span className="flex items-center gap-2">
                         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-navy/10 text-[11px] font-bold text-navy">
-                          {initials(p)}
+                          {initials({ first_name: m.firstName, last_name: m.lastName })}
                         </span>
-                        {p.last_name ?? "—"}
+                        <span className="min-w-0 truncate">
+                          {m.lastName ?? "—"}{" "}
+                          <span className="font-normal text-zinc-600">{m.firstName ?? ""}</span>
+                        </span>
                       </span>
                     </td>
-                    <td className="w-auto whitespace-nowrap px-3 py-2.5 text-zinc-700">
-                      {p.first_name ?? "—"}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2.5 text-zinc-600">
-                      {p.jerseyNumber ?? "—"}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2.5 text-zinc-600">
-                      {p.position ?? "—"}
-                    </td>
                     <td className="whitespace-nowrap px-3 py-2.5">
-                      <PlayerYearBadge birthDate={p.birthDate} category={team.category} />
+                      <span className="flex flex-wrap items-center gap-1">
+                        <span
+                          className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold leading-none ${role.className}`}
+                        >
+                          {role.label}
+                        </span>
+                        {m.role !== "JOUEUR" && m.player && (
+                          <span className="inline-flex items-center justify-center whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold leading-none text-emerald-700">
+                            Joueur
+                          </span>
+                        )}
+                      </span>
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5">
                       <span
@@ -415,50 +476,63 @@ export default function TeamCard({
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5">
-                      <span
-                        className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold leading-none ${presence.className}`}
-                      >
-                        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${presence.dotClassName}`} />
-                        {presence.label}
-                      </span>
+                      {category ? (
+                        <span
+                          className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold leading-none ${theme.badge}`}
+                        >
+                          {category}
+                        </span>
+                      ) : (
+                        <span className="text-zinc-400">—</span>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2.5">
+                      {phone ? (
+                        <a
+                          href={`tel:${phone}`}
+                          title="Appeler"
+                          className="inline-flex items-center gap-1.5 text-zinc-600 hover:text-navy hover:underline"
+                        >
+                          <Phone className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                          {phone}
+                        </a>
+                      ) : (
+                        <span className="text-zinc-400">—</span>
+                      )}
+                    </td>
+                    <td className="w-auto px-3 py-2.5">
+                      {email ? (
+                        <a
+                          href={`mailto:${email}`}
+                          title={email}
+                          className="flex min-w-0 items-center gap-1.5 text-zinc-600 hover:text-navy hover:underline"
+                        >
+                          <Mail className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                          <span className="truncate">{email}</span>
+                        </a>
+                      ) : (
+                        <span className="text-zinc-400">—</span>
+                      )}
                     </td>
                     <td className="px-3 py-2.5">
                       <div className="flex items-center gap-1">
-                        {phone && (
-                          <a
-                            href={`tel:${phone}`}
-                            title="Appeler le parent"
-                            className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
-                          >
-                            <Phone className="h-3.5 w-3.5" />
-                          </a>
-                        )}
-                        {email && (
-                          <a
-                            href={`mailto:${email}`}
-                            title={`Écrire à ${email}`}
-                            className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
-                          >
-                            <Mail className="h-3.5 w-3.5" />
-                          </a>
-                        )}
                         <WhatsAppButton
-                          phone={phone}
+                          phone={phone ?? undefined}
                           message={`Bonjour, ici le coach de ${team.name ?? "l'équipe"}.`}
-                          playerId={p.id}
+                          playerId={m.id}
                         />
-                        {memberDetailsByPlayerId?.[p.id] && (
+                        {detail && (
                           <button
-                            onClick={() => setDetailPlayerId(p.id)}
+                            onClick={() => setDetailPlayerId(m.id)}
                             title="Voir la fiche complète"
                             className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
                           >
                             <FileText className="h-3.5 w-3.5" />
                           </button>
                         )}
-                        {!readOnly && (
+                        {!readOnly && m.player && (
                           <button
-                            onClick={() => setRemoveTarget(p)}
+                            onClick={() => setRemoveTarget(m.player)}
                             className="shrink-0 text-xs font-medium text-red-600 hover:underline"
                           >
                             Retirer
@@ -469,10 +543,10 @@ export default function TeamCard({
                   </tr>
                 );
               })}
-              {visiblePlayers.length === 0 && (
+              {visibleMembers.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-3 py-4 text-center text-sm text-zinc-400">
-                    {rosterQuery ? "Aucun joueur ne correspond à cette recherche" : "Aucun joueur"}
+                  <td colSpan={7} className="px-3 py-4 text-center text-sm text-zinc-400">
+                    {rosterQuery ? "Aucun membre ne correspond à cette recherche" : "Aucun membre"}
                   </td>
                 </tr>
               )}
