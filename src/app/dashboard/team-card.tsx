@@ -21,6 +21,7 @@ import { getCurrentSeasonLabel } from "@/lib/season";
 import { formatEventTime, styleFor } from "./calendar-view";
 import OpponentDisplay from "./opponent-display";
 import MemberDetailModal from "./member-detail-modal";
+import LicenceStatusBadge from "./licence-status-badge";
 import SalleBadge from "./salle-badge";
 import WhatsAppButton from "./whatsapp-button";
 import type { AdminUpcomingEvent, MemberDetail } from "./page";
@@ -57,33 +58,6 @@ function initials(p: { first_name: string | null; last_name: string | null }) {
   const a = p.first_name?.trim()[0] ?? "";
   const b = p.last_name?.trim()[0] ?? "";
   return (a + b).toUpperCase() || "?";
-}
-
-// The club's own FBI status is free text imported from their Excel, so it
-// is never rewritten here — only colour-coded on the words it contains,
-// and shown verbatim on hover. Falls back to the presence of a licence
-// number when the status is empty.
-function licenceBadge(detail: MemberDetail | undefined) {
-  const raw = detail?.fbiStatus?.trim() ?? "";
-  if (!raw) {
-    if (detail?.licenseNumber) {
-      return {
-        label: "Licence",
-        title: `N° ${detail.licenseNumber}`,
-        className: "bg-zinc-100 text-zinc-600",
-        dotClassName: "bg-zinc-400",
-      };
-    }
-    return { label: "—", title: "", className: "bg-zinc-100 text-zinc-400", dotClassName: "bg-zinc-300" };
-  }
-  const normalized = raw.toLowerCase();
-  if (normalized.includes("valid") || normalized.includes("actif") || normalized.includes("active")) {
-    return { label: raw, title: raw, className: "bg-green-100 text-green-700", dotClassName: "bg-green-500" };
-  }
-  if (normalized.includes("attente") || normalized.includes("cours") || normalized.includes("instance")) {
-    return { label: raw, title: raw, className: "bg-amber-100 text-amber-700", dotClassName: "bg-amber-500" };
-  }
-  return { label: raw, title: raw, className: "bg-zinc-100 text-zinc-600", dotClassName: "bg-zinc-400" };
 }
 
 function roleBadge(role: "COACH" | "COACH_PENDING" | "JOUEUR") {
@@ -436,7 +410,6 @@ export default function TeamCard({
               {visibleMembers.map((m) => {
                 const { phone, email } = contactsFor(m.id);
                 const detail = memberDetailsByPlayerId?.[m.id];
-                const licence = licenceBadge(detail);
                 const role = roleBadge(m.role);
                 const category = detail?.category ?? team.category;
                 return (
@@ -467,13 +440,7 @@ export default function TeamCard({
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5">
-                      <span
-                        title={licence.title}
-                        className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold leading-none ${licence.className}`}
-                      >
-                        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${licence.dotClassName}`} />
-                        {licence.label}
-                      </span>
+                      <LicenceStatusBadge status={detail?.fbiStatus} />
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5">
                       {category ? (
