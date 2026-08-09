@@ -17,11 +17,11 @@ import {
   Utensils,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { getCurrentSeasonLabel } from "@/lib/season";
+import { computePlayerYearStatus, getCurrentSeasonLabel } from "@/lib/season";
 import { formatEventTime, styleFor } from "./calendar-view";
 import OpponentDisplay from "./opponent-display";
 import MemberDetailModal from "./member-detail-modal";
-import LicenceStatusBadge from "./licence-status-badge";
+import PlayerYearBadge from "./player-year-badge";
 import SalleBadge from "./salle-badge";
 import WhatsAppButton from "./whatsapp-button";
 import type { AdminUpcomingEvent, MemberDetail } from "./page";
@@ -412,6 +412,12 @@ export default function TeamCard({
                 const detail = memberDetailsByPlayerId?.[m.id];
                 const role = roleBadge(m.role);
                 const category = detail?.category ?? team.category;
+                // PlayerYearBadge renders nothing when the birth date is
+                // missing (or the category can't be read), so the status is
+                // computed here too, to fall back on a neutral dash rather
+                // than an empty cell.
+                const birthDate = m.player?.birthDate ?? detail?.birthDate ?? null;
+                const yearStatus = computePlayerYearStatus(birthDate, team.category);
                 return (
                   <tr key={m.key} className="border-b border-zinc-50 last:border-0">
                     <td className="w-auto px-3 py-2.5 font-medium text-zinc-900">
@@ -440,7 +446,11 @@ export default function TeamCard({
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5">
-                      <LicenceStatusBadge status={detail?.fbiStatus} />
+                      {yearStatus ? (
+                        <PlayerYearBadge birthDate={birthDate} category={team.category} />
+                      ) : (
+                        <span className="text-zinc-300">—</span>
+                      )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5">
                       {category ? (
