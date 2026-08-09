@@ -293,8 +293,19 @@ export default function TeamCard({
   );
   const canCreatePlayer = allowCreatePlayer && !readOnly;
   const canAssignCoach = allowAssignCoach && !readOnly;
-  const switchableTeams = (clubTeams ?? []).filter((t) => t.id !== team.id);
-  const canSwitchTeam = !readOnly && switchableTeams.length > 0;
+  const canSwitchTeam = !readOnly && (clubTeams ?? []).length > 1;
+
+  // Teams this player already belongs to are dropped from the picker — the
+  // only ones known here are those the coach can see, so a duplicate can
+  // still slip through and is caught on insert (23505).
+  const switchTargetTeamIds = new Set(
+    (switchTarget ? (memberDetailsByPlayerId?.[switchTarget.id]?.teams ?? []) : []).map(
+      (t) => t.id
+    )
+  );
+  const switchableTeams = (clubTeams ?? []).filter(
+    (t) => t.id !== team.id && !switchTargetTeamIds.has(t.id)
+  );
 
   function openSwitch(p: RosterPlayer) {
     setSwitchTarget(p);
@@ -302,45 +313,42 @@ export default function TeamCard({
     setSwitchError(null);
   }
 
+  // Addition, never a move: a player lent to another team stays on his own.
+  // Removing him from his base team is a Bureau gesture, done from the
+  // member's fiche — a coach lending a player must not silently unregister
+  // him from the group he actually belongs to.
   async function confirmSwitchTeam() {
     if (!switchTarget || !switchTeamId) return;
     setSwitching(true);
     setSwitchError(null);
     const supabase = createClient();
 
-    // Insert into the destination BEFORE leaving the current team: the RLS
-    // policy that lets a coach place a player on a team they don't coach
-    // checks that the player is still on one of their own teams.
     const { error: insertError } = await supabase
       .from("team_players")
       .insert({ team_id: switchTeamId, player_id: switchTarget.id });
-    // Already on the destination team (unique violation): not a failure,
-    // the move just needs its second half.
-    if (insertError && insertError.code !== "23505") {
-      setSwitching(false);
-      setSwitchError(insertError.message);
-      return;
-    }
-
-    const { error: deleteError } = await supabase
-      .from("team_players")
-      .delete()
-      .eq("team_id", team.id)
-      .eq("player_id", switchTarget.id);
     setSwitching(false);
-    if (deleteError) {
-      setSwitchError(deleteError.message);
-      return;
-    }
 
     const destination = switchableTeams.find((t) => t.id === switchTeamId);
+    const destinationLabel = destination?.name ?? destination?.category ?? "cette équipe";
+    if (insertError) {
+      // Unique violation: he's already registered there, which is the
+      // intended end state — say so plainly instead of showing a raw
+      // Postgres error.
+      setSwitchError(
+        insertError.code === "23505"
+          ? `Ce joueur fait déjà partie de ${destinationLabel}.`
+          : insertError.message
+      );
+      return;
+    }
+
     const name = fullName({
       first_name: switchTarget.first_name,
       last_name: switchTarget.last_name,
     });
     setSwitchTarget(null);
     showToast(
-      `${name} rejoint ${destination?.name ?? destination?.category ?? "sa nouvelle équipe"}.`
+      `${name} est ajouté à ${destinationLabel} et reste dans ${team.name ?? "son équipe"}.`
     );
     router.refresh();
   }
@@ -576,7 +584,7 @@ export default function TeamCard({
                           (canSwitchTeam ? (
                             <button
                               onClick={() => openSwitch(m.player!)}
-                              title="Changer d'équipe"
+                              title="Affecter à une autre équipe"
                               className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-navy"
                             >
                               <ArrowRightLeft className="h-3.5 w-3.5" />
@@ -893,15 +901,16 @@ export default function TeamCard({
           <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
             <h3 className="mb-2 flex items-center gap-2 font-semibold text-zinc-900">
               <ArrowRightLeft className="h-4 w-4 shrink-0 text-navy" />
-              Changer l&apos;équipe de{" "}
+              Affecter{" "}
               {fullName({
                 first_name: switchTarget.first_name,
                 last_name: switchTarget.last_name,
-              })}
+              })}{" "}
+              à une autre équipe
             </h3>
             <p className="mb-3 text-sm text-zinc-500">
-              Le joueur quitte {team.name ?? "cette équipe"}
-              {" et rejoint l'équipe choisie."}
+              Il reste inscrit dans {team.name ?? "son équipe"}
+              {" et jouera aussi avec l'équipe choisie."}
             </p>
             <select
               value={switchTeamId}
@@ -928,7 +937,7 @@ export default function TeamCard({
                 disabled={switching || !switchTeamId}
                 className="rounded-full bg-navy px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-navy/90 disabled:opacity-60"
               >
-                {switching ? "Transfert..." : "Transférer"}
+                {switching ? "Affectation..." : "Affecter"}
               </button>
             </div>
           </div>
