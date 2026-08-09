@@ -1003,28 +1003,34 @@ export default async function DashboardPage() {
       new Set((teamCoachesRes.data ?? []).map((r) => r.coach_id))
     );
 
-    const [playersRes, coachProfilesRes, parentPlayerRes] = await Promise.all([
-      playerIds.length > 0
-        ? supabase
-            .from("players")
-            .select(
-              "id, first_name, last_name, birth_date, category, sex, registration_email, registration_phone, address, postal_code, city, secondary_email, mother_phone, father_phone, other_phones, secondary_address, license_type, membership_type, fbi_status, medical_notes, other_notes, image_rights, player_charter_accepted, parent_charter_accepted, license_number, archived_at"
-            )
-            .in("id", playerIds)
-        : Promise.resolve({ data: [] as Person[] }),
-      coachIds.length > 0
-        ? supabase
-            .from("profiles")
-            .select("id, first_name, last_name")
-            .in("id", coachIds)
-        : Promise.resolve({ data: [] as Person[] }),
-      playerIds.length > 0
-        ? supabase
-            .from("parent_player")
-            .select("parent_id, player_id")
-            .in("player_id", playerIds)
-        : Promise.resolve({ data: [] as { parent_id: string; player_id: string }[] }),
-    ]);
+    const playerColumns =
+      "id, profile_id, first_name, last_name, birth_date, category, sex, registration_email, registration_phone, address, postal_code, city, secondary_email, mother_phone, father_phone, other_phones, secondary_address, license_type, membership_type, fbi_status, medical_notes, other_notes, image_rights, player_charter_accepted, parent_charter_accepted, license_number, archived_at";
+
+    const [playersRes, coachProfilesRes, parentPlayerRes, coachFichesRes] =
+      await Promise.all([
+        playerIds.length > 0
+          ? supabase.from("players").select(playerColumns).in("id", playerIds)
+          : Promise.resolve({ data: [] as Person[] }),
+        coachIds.length > 0
+          ? supabase
+              .from("profiles")
+              .select("id, first_name, last_name, phone, email")
+              .in("id", coachIds)
+          : Promise.resolve({ data: [] as Person[] }),
+        playerIds.length > 0
+          ? supabase
+              .from("parent_player")
+              .select("parent_id, player_id")
+              .in("player_id", playerIds)
+          : Promise.resolve({ data: [] as { parent_id: string; player_id: string }[] }),
+        // A coach row comes from profiles, not players, so it carries no
+        // contact nor birth date on its own. Their member fiche is the one
+        // whose profile_id points at their account — same record the Bureau
+        // shows in Membres.
+        coachIds.length > 0
+          ? supabase.from("players").select(playerColumns).in("profile_id", coachIds)
+          : Promise.resolve({ data: [] as Person[] }),
+      ]);
 
     const playersById = new Map(
       (playersRes.data ?? []).map((p) => [
@@ -1035,6 +1041,18 @@ export default async function DashboardPage() {
     const coachProfilesById = new Map(
       (coachProfilesRes.data ?? []).map((p) => [p.id, p as Person])
     );
+    // Coordonnées du compte du coach, indexées sur son id de compte —
+    // c'est la clé qu'utilise sa ligne dans le tableau d'équipe.
+    (
+      (coachProfilesRes.data ?? []) as unknown as {
+        id: string;
+        phone: string | null;
+        email: string | null;
+      }[]
+    ).forEach((p) => {
+      if (p.phone) coachContactPhoneByPlayerId[p.id] = p.phone;
+      if (p.email) coachContactEmailByPlayerId[p.id] = p.email;
+    });
     coachArchivedPlayerIds = (
       (playersRes.data ?? []) as unknown as { id: string; archived_at: string | null }[]
     )
@@ -1129,9 +1147,13 @@ export default async function DashboardPage() {
 
     // Coaches have no read access to cotisations (financial/payment data
     // stays Bureau-only), so clubStatus is always null in this view.
-    (playersRes.data ?? []).forEach((row) => {
+    // Les fiches des coachs sont traitées dans la même passe, puis
+    // indexées AUSSI sous l'id de leur compte : c'est cette clé-là que le
+    // tableau d'équipe utilise pour une ligne Coach.
+    [...(playersRes.data ?? []), ...(coachFichesRes.data ?? [])].forEach((row) => {
       const player = row as {
         id: string;
+        profile_id: string | null;
         first_name: string | null;
         last_name: string | null;
         birth_date: string | null;
@@ -1186,6 +1208,13 @@ export default async function DashboardPage() {
         licenseNumber: player.license_number,
         teams: coachTeamRefsByPlayerId.get(player.id) ?? [],
       };
+      // Deuxième clé pour une fiche de coach : le tableau d'équipe
+      // identifie une ligne Coach par l'id de son compte, pas par celui de
+      // sa fiche joueur.
+      if (player.profile_id) {
+        coachMemberDetailsByPlayerId[player.profile_id] =
+          coachMemberDetailsByPlayerId[player.id];
+      }
     });
 
     const parentIds = Array.from(

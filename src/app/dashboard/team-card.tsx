@@ -412,8 +412,17 @@ export default function TeamCard({
   function contactsFor(id: string) {
     const detail = memberDetailsByPlayerId?.[id];
     return {
-      phone: contactPhoneByPlayerId[id] ?? detail?.registrationPhone ?? null,
-      email: contactEmailByPlayerId?.[id] ?? detail?.registrationEmail ?? null,
+      phone:
+        contactPhoneByPlayerId[id] ??
+        detail?.registrationPhone ??
+        detail?.motherPhone ??
+        detail?.fatherPhone ??
+        null,
+      email:
+        contactEmailByPlayerId?.[id] ??
+        detail?.registrationEmail ??
+        detail?.secondaryEmail ??
+        null,
     };
   }
   const teamEvents = (eventsByTeamId[team.id] ?? [])
@@ -488,7 +497,14 @@ export default function TeamCard({
                 // computed here too, to fall back on a neutral dash rather
                 // than an empty cell.
                 const birthDate = m.player?.birthDate ?? detail?.birthDate ?? null;
-                const yearStatus = computePlayerYearStatus(birthDate, team.category);
+                // L'ancienneté d'un joueur se lit dans la catégorie de
+                // l'équipe où il joue. Celle d'un coach, non : la catégorie
+                // de l'équipe qu'il encadre n'a aucun rapport avec son âge,
+                // c'est sa propre fiche qui fait foi (un coach Séniors né en
+                // 1986 est "Old Soldier", pas "Sparring Partner" des U13).
+                const statusCategory =
+                  m.role === "JOUEUR" ? team.category : (detail?.category ?? team.category);
+                const yearStatus = computePlayerYearStatus(birthDate, statusCategory);
                 // Belongs to another team as well: he was lent to this one,
                 // so the useful action is to send him back — a plain
                 // "Retirer" that only drops this membership. A player of
@@ -520,7 +536,7 @@ export default function TeamCard({
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5">
                       {yearStatus ? (
-                        <PlayerYearBadge birthDate={birthDate} category={team.category} />
+                        <PlayerYearBadge birthDate={birthDate} category={statusCategory} />
                       ) : (
                         <span className="text-zinc-300">—</span>
                       )}
