@@ -20,6 +20,15 @@ const WATCHED_TABLES = [
   "club_administrators",
   "whatsapp_groups",
   "whatsapp_group_members",
+  // Ajoutées après l'audit du 360° : ces tables étaient écrites par l'app
+  // sans être écoutées, donc leurs changements n'atteignaient les autres
+  // rôles qu'après un F5.
+  "teams", // création/renommage d'une équipe, lien du groupe WhatsApp
+  "parent_player", // rattachement d'un parent à son enfant (espace Famille)
+  "profiles", // nom, téléphone, email d'un compte — colonnes de contact
+  "whatsapp_messages", // historique des messages par membre
+  "collectes", // stages & événements payants
+  "category_tariffs", // tarifs par catégorie
 ] as const;
 
 // Mounted once at the dashboard root (src/app/dashboard/page.tsx) so it
