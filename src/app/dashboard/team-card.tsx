@@ -489,6 +489,13 @@ export default function TeamCard({
                 // than an empty cell.
                 const birthDate = m.player?.birthDate ?? detail?.birthDate ?? null;
                 const yearStatus = computePlayerYearStatus(birthDate, team.category);
+                // Belongs to another team as well: he was lent to this one,
+                // so the useful action is to send him back — a plain
+                // "Retirer" that only drops this membership. A player of
+                // this team only gets the "Affecter" picker instead, since
+                // removing him here would leave him with no team at all.
+                const otherTeams = (detail?.teams ?? []).filter((t) => t.id !== team.id);
+                const isLentIn = otherTeams.length > 0;
                 return (
                   <tr key={m.key} className="border-b border-zinc-50 last:border-0">
                     <td className="w-auto px-3 py-2.5 font-medium text-zinc-900">
@@ -581,7 +588,16 @@ export default function TeamCard({
                           </button>
                         )}
                         {m.player &&
-                          (canSwitchTeam ? (
+                          !readOnly &&
+                          (isLentIn ? (
+                            <button
+                              onClick={() => setRemoveTarget(m.player)}
+                              title={`Retirer de ${team.name ?? "cette équipe"}`}
+                              className="rounded-full p-1.5 text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          ) : canSwitchTeam ? (
                             <button
                               onClick={() => openSwitch(m.player!)}
                               title="Affecter à une autre équipe"
@@ -590,14 +606,12 @@ export default function TeamCard({
                               <ArrowRightLeft className="h-3.5 w-3.5" />
                             </button>
                           ) : (
-                            !readOnly && (
-                              <button
-                                onClick={() => setRemoveTarget(m.player)}
-                                className="shrink-0 text-xs font-medium text-red-600 hover:underline"
-                              >
-                                Retirer
-                              </button>
-                            )
+                            <button
+                              onClick={() => setRemoveTarget(m.player)}
+                              className="shrink-0 text-xs font-medium text-red-600 hover:underline"
+                            >
+                              Retirer
+                            </button>
                           ))}
                       </div>
                     </td>
@@ -954,8 +968,24 @@ export default function TeamCard({
               Êtes-vous sûr de vouloir retirer{" "}
               <span className="font-semibold text-zinc-900">{fullName(removeTarget)}</span>{" "}
               de l&apos;équipe{" "}
-              <span className="font-semibold text-zinc-900">{team.name}</span> ? Le membre
-              existera toujours dans la liste globale du club.
+              <span className="font-semibold text-zinc-900">{team.name}</span> ?{" "}
+              {(() => {
+                const remaining = (memberDetailsByPlayerId?.[removeTarget.id]?.teams ?? [])
+                  .filter((t) => t.id !== team.id)
+                  .map((t) => t.name ?? t.category)
+                  .filter(Boolean);
+                return remaining.length > 0 ? (
+                  <>
+                    Il reste inscrit dans{" "}
+                    <span className="font-semibold text-zinc-900">
+                      {remaining.join(", ")}
+                    </span>
+                    .
+                  </>
+                ) : (
+                  "Le membre existera toujours dans la liste globale du club."
+                );
+              })()}
             </p>
             {removeError && <p className="mb-2 text-sm text-red-600">{removeError}</p>}
             <div className="flex items-center gap-2">

@@ -1106,9 +1106,21 @@ export default async function DashboardPage() {
       pendingCoachNames: t.pending_coach_names,
     }));
 
+    // EVERY team each of these players belongs to, not just the coach's own
+    // — that's what tells a player of the team apart from one lent by
+    // another group, and it drives the roster's "Retirer" vs "Affecter"
+    // action. Readable thanks to the "coach select all teams of own
+    // players" policy.
+    const { data: allMembershipsData } =
+      playerIds.length > 0
+        ? await supabase.from("team_players").select("team_id, player_id").in("player_id", playerIds)
+        : { data: [] as { team_id: string; player_id: string }[] };
+    const clubTeamById = new Map(coachClubTeams.map((t) => [t.id, t]));
+
     const coachTeamRefsByPlayerId = new Map<string, AdminMemberTeam[]>();
-    (teamPlayersRes.data ?? []).forEach((tp) => {
-      const team = coachAllTeams.find((t) => t.id === tp.team_id);
+    (allMembershipsData ?? []).forEach((tp) => {
+      const team =
+        clubTeamById.get(tp.team_id) ?? coachAllTeams.find((t) => t.id === tp.team_id);
       if (!team) return;
       const list = coachTeamRefsByPlayerId.get(tp.player_id) ?? [];
       list.push({ id: team.id, name: team.name, category: team.category });
