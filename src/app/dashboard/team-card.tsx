@@ -8,8 +8,10 @@ import {
   CheckCircle2,
   Clock,
   FileText,
+  Mail,
   MapPin,
   Phone,
+  Search,
   Shirt,
   Trash2,
   Utensils,
@@ -52,6 +54,39 @@ function categoryTheme(category: string | null): { badge: string; border: string
   return { badge: "bg-ubac-yellow/15 text-ubac-yellow-dark", border: "border-ubac-yellow/20" };
 }
 
+function initials(p: { first_name: string | null; last_name: string | null }) {
+  const a = p.first_name?.trim()[0] ?? "";
+  const b = p.last_name?.trim()[0] ?? "";
+  return (a + b).toUpperCase() || "?";
+}
+
+// The club's own FBI status is free text imported from their Excel, so it
+// is never rewritten here — only colour-coded on the words it contains,
+// and shown verbatim on hover. Falls back to the presence of a licence
+// number when the status is empty.
+function licenceBadge(detail: MemberDetail | undefined) {
+  const raw = detail?.fbiStatus?.trim() ?? "";
+  if (!raw) {
+    if (detail?.licenseNumber) {
+      return {
+        label: "Licence",
+        title: `N° ${detail.licenseNumber}`,
+        className: "bg-zinc-100 text-zinc-600",
+        dotClassName: "bg-zinc-400",
+      };
+    }
+    return { label: "—", title: "", className: "bg-zinc-100 text-zinc-400", dotClassName: "bg-zinc-300" };
+  }
+  const normalized = raw.toLowerCase();
+  if (normalized.includes("valid") || normalized.includes("actif") || normalized.includes("active")) {
+    return { label: raw, title: raw, className: "bg-green-100 text-green-700", dotClassName: "bg-green-500" };
+  }
+  if (normalized.includes("attente") || normalized.includes("cours") || normalized.includes("instance")) {
+    return { label: raw, title: raw, className: "bg-amber-100 text-amber-700", dotClassName: "bg-amber-500" };
+  }
+  return { label: raw, title: raw, className: "bg-zinc-100 text-zinc-600", dotClassName: "bg-zinc-400" };
+}
+
 function presenceBadge(status: string | null) {
   if (status === "PRESENT") {
     return { label: "Présent", dotClassName: "bg-green-500", className: "bg-green-100 text-green-700" };
@@ -84,6 +119,12 @@ export default function TeamCard({
   // it, since a coach can't reach the (Bureau-only) Membres tab to add a
   // co-coach any other way.
   allowAssignCoach = true,
+  // Consultation only: used by the Coach space for a team the user merely
+  // plays in. Hides every write affordance (add/remove player, add/remove
+  // coach) — the RLS would reject those writes anyway.
+  readOnly = false,
+  showRosterSearch = false,
+  contactEmailByPlayerId,
 }: {
   team: TeamWithMembers;
   allProfiles: Person[];
@@ -94,6 +135,9 @@ export default function TeamCard({
   taskTallyByPlayerId?: SeasonTaskTally;
   allowCreatePlayer?: boolean;
   allowAssignCoach?: boolean;
+  readOnly?: boolean;
+  showRosterSearch?: boolean;
+  contactEmailByPlayerId?: Record<string, string>;
 }) {
   const router = useRouter();
   const [detailPlayerId, setDetailPlayerId] = useState<string | null>(null);
@@ -107,6 +151,7 @@ export default function TeamCard({
   const [removingPendingCoach, setRemovingPendingCoach] = useState(false);
   const [removePendingCoachError, setRemovePendingCoachError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [rosterSearch, setRosterSearch] = useState("");
 
   function showToast(message: string) {
     setToast(message);
@@ -267,6 +312,15 @@ export default function TeamCard({
   const availableCoaches = allProfiles.filter(
     (p) => !team.coaches.some((tc) => tc.id === p.id)
   );
+  const canCreatePlayer = allowCreatePlayer && !readOnly;
+  const canAssignCoach = allowAssignCoach && !readOnly;
+
+  const rosterQuery = rosterSearch.trim().toLowerCase();
+  const visiblePlayers = rosterQuery
+    ? team.players.filter((p) =>
+        `${p.first_name ?? ""} ${p.last_name ?? ""}`.toLowerCase().includes(rosterQuery)
+      )
+    : team.players;
   const teamEvents = (eventsByTeamId[team.id] ?? [])
     .filter((e) => new Date(e.start_time).getTime() >= now)
     .slice(0, 3);
@@ -289,34 +343,76 @@ export default function TeamCard({
       </div>
 
       <div className="mt-3">
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-          Joueurs
-        </p>
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            Joueurs
+            <span className="ml-1.5 font-medium normal-case tracking-normal text-zinc-400">
+              ({visiblePlayers.length}
+              {rosterQuery ? ` / ${team.players.length}` : ""})
+            </span>
+          </p>
+          {showRosterSearch && team.players.length > 0 && (
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
+              <input
+                value={rosterSearch}
+                onChange={(e) => setRosterSearch(e.target.value)}
+                placeholder="Rechercher un joueur..."
+                className="w-48 rounded-full border border-zinc-200 py-1.5 pl-8 pr-3 text-sm outline-none focus:border-ubac-yellow"
+              />
+            </div>
+          )}
+        </div>
         <div className="w-full overflow-x-auto rounded-xl border border-zinc-100">
           <table className="w-full table-auto border-collapse text-sm">
             <thead>
               <tr className="border-b border-zinc-100 bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-400">
                 <th className="w-auto whitespace-nowrap px-3 py-2.5">Nom</th>
                 <th className="w-auto whitespace-nowrap px-3 py-2.5">Prénom</th>
+                <th className="whitespace-nowrap px-3 py-2.5">N°</th>
+                <th className="whitespace-nowrap px-3 py-2.5">Poste</th>
                 <th className="whitespace-nowrap px-3 py-2.5">Année</th>
+                <th className="whitespace-nowrap px-3 py-2.5">Licence</th>
                 <th className="whitespace-nowrap px-3 py-2.5">Présence</th>
                 <th className="px-3 py-2.5" />
               </tr>
             </thead>
             <tbody>
-              {team.players.map((p: RosterPlayer) => {
+              {visiblePlayers.map((p: RosterPlayer) => {
                 const phone = contactPhoneByPlayerId[p.id];
+                const email = contactEmailByPlayerId?.[p.id];
                 const presence = presenceBadge(p.nextEventStatus);
+                const licence = licenceBadge(memberDetailsByPlayerId?.[p.id]);
                 return (
                   <tr key={p.id} className="border-b border-zinc-50 last:border-0">
                     <td className="w-auto whitespace-nowrap px-3 py-2.5 font-medium text-zinc-900">
-                      {p.last_name ?? "—"}
+                      <span className="flex items-center gap-2">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-navy/10 text-[11px] font-bold text-navy">
+                          {initials(p)}
+                        </span>
+                        {p.last_name ?? "—"}
+                      </span>
                     </td>
                     <td className="w-auto whitespace-nowrap px-3 py-2.5 text-zinc-700">
                       {p.first_name ?? "—"}
                     </td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-zinc-600">
+                      {p.jerseyNumber ?? "—"}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-zinc-600">
+                      {p.position ?? "—"}
+                    </td>
                     <td className="whitespace-nowrap px-3 py-2.5">
                       <PlayerYearBadge birthDate={p.birthDate} category={team.category} />
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2.5">
+                      <span
+                        title={licence.title}
+                        className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold leading-none ${licence.className}`}
+                      >
+                        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${licence.dotClassName}`} />
+                        {licence.label}
+                      </span>
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5">
                       <span
@@ -337,6 +433,15 @@ export default function TeamCard({
                             <Phone className="h-3.5 w-3.5" />
                           </a>
                         )}
+                        {email && (
+                          <a
+                            href={`mailto:${email}`}
+                            title={`Écrire à ${email}`}
+                            className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+                          >
+                            <Mail className="h-3.5 w-3.5" />
+                          </a>
+                        )}
                         <WhatsAppButton
                           phone={phone}
                           message={`Bonjour, ici le coach de ${team.name ?? "l'équipe"}.`}
@@ -351,28 +456,30 @@ export default function TeamCard({
                             <FileText className="h-3.5 w-3.5" />
                           </button>
                         )}
-                        <button
-                          onClick={() => setRemoveTarget(p)}
-                          className="shrink-0 text-xs font-medium text-red-600 hover:underline"
-                        >
-                          Retirer
-                        </button>
+                        {!readOnly && (
+                          <button
+                            onClick={() => setRemoveTarget(p)}
+                            className="shrink-0 text-xs font-medium text-red-600 hover:underline"
+                          >
+                            Retirer
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
                 );
               })}
-              {team.players.length === 0 && (
+              {visiblePlayers.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-3 py-4 text-center text-sm text-zinc-400">
-                    Aucun joueur
+                  <td colSpan={8} className="px-3 py-4 text-center text-sm text-zinc-400">
+                    {rosterQuery ? "Aucun joueur ne correspond à cette recherche" : "Aucun joueur"}
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-        {allowCreatePlayer && (openPlayerForm ? (
+        {canCreatePlayer && (openPlayerForm ? (
           <form
             onSubmit={createPlayer}
             className="mt-2 flex flex-col gap-2 rounded-lg bg-zinc-50 p-3"
@@ -457,13 +564,15 @@ export default function TeamCard({
                     Coach Officiel
                   </span>
                 </span>
-                <button
-                  onClick={() => setRemoveCoachTarget(p)}
-                  title="Retirer ce coach de l'équipe"
-                  className="shrink-0 rounded-lg p-1.5 text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                {!readOnly && (
+                  <button
+                    onClick={() => setRemoveCoachTarget(p)}
+                    title="Retirer ce coach de l'équipe"
+                    className="shrink-0 rounded-lg p-1.5 text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </li>
             ))}
             {team.pendingCoaches.map((p) => (
@@ -478,13 +587,15 @@ export default function TeamCard({
                     (en attente de compte)
                   </span>
                 </span>
-                <button
-                  onClick={() => setRemovePendingCoachTarget(p)}
-                  title="Retirer ce coach en attente de l'équipe"
-                  className="shrink-0 rounded-lg p-1.5 text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                {!readOnly && (
+                  <button
+                    onClick={() => setRemovePendingCoachTarget(p)}
+                    title="Retirer ce coach en attente de l'équipe"
+                    className="shrink-0 rounded-lg p-1.5 text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </li>
             ))}
             {/* Legacy free-text fallback, only shown if this team has no
@@ -505,7 +616,7 @@ export default function TeamCard({
                 <li className="text-sm text-zinc-400">Aucun coach</li>
               )}
           </ul>
-          {allowAssignCoach && availableCoaches.length > 0 && (
+          {canAssignCoach && availableCoaches.length > 0 && (
             <select
               defaultValue=""
               onChange={(e) => {

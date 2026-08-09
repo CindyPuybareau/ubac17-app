@@ -20,6 +20,7 @@ export default function CoachView({
   rsvpPlayers,
   rsvpStatusByKey,
   taskTallyByTeamId,
+  teamRoleByTeamId,
   birthdayMembers,
   organisationCards,
   tasksByEventId,
@@ -35,6 +36,9 @@ export default function CoachView({
   rsvpPlayers: { id: string; name: string; teamIds: string[] }[];
   rsvpStatusByKey: Record<string, string>;
   taskTallyByTeamId: Record<string, SeasonTaskTally>;
+  // "COACH" for a team they coach, "PLAYER" for one they only play in —
+  // drives both the team selector's badge and the read-only mode.
+  teamRoleByTeamId: Record<string, "COACH" | "PLAYER">;
   birthdayMembers: BirthdaySource[];
   organisationCards: CoachTeamMatchCard[];
   tasksByEventId: Record<string, EventTasksState>;
@@ -101,8 +105,10 @@ export default function CoachView({
           allProfiles={[]}
           eventsByTeamId={eventsByTeamId}
           contactPhoneByPlayerId={contactPhoneByPlayerId}
+          contactEmailByPlayerId={contactEmailByPlayerId}
           memberDetailsByPlayerId={memberDetailsByPlayerId}
           taskTallyByTeamId={taskTallyByTeamId}
+          teamRoleByTeamId={teamRoleByTeamId}
         />
       ),
     },

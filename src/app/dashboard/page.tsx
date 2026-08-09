@@ -899,6 +899,7 @@ export default async function DashboardPage() {
   let coachEvents: AdminUpcomingEvent[] = [];
   let coachRsvpPlayers: { id: string; name: string; teamIds: string[] }[] = [];
   let coachTaskTallyByTeamId: Record<string, SeasonTaskTally> = {};
+  let coachTeamRoleByTeamId: Record<string, "COACH" | "PLAYER"> = {};
   const coachContactPhoneByPlayerId: Record<string, string> = {};
   const coachContactEmailByPlayerId: Record<string, string> = {};
   const coachMemberDetailsByPlayerId: Record<string, MemberDetail> = {};
@@ -913,35 +914,58 @@ export default async function DashboardPage() {
     );
 
     // A coach who's also a registered player (players.profile_id linked to
-    // their own account) sees their own team's events in this same
-    // calendar too — without that team appearing as one they coach in the
-    // Équipe(s) tab below, which stays scoped to coachedTeamIds only.
+    // their own account) gets their own team on top of the ones they
+    // coach — in the calendar, and in the Équipe(s) tab, where it shows up
+    // as a separate "Joueur" entry (see coachTeamRoleById below).
     const ownTeamIds = ownPlayerId ? await getPlayerTeamIds(supabase, ownPlayerId) : [];
     const coachCalendarTeamIds = Array.from(
       new Set([...coachedTeamIds, ...ownTeamIds])
     );
+    const ownOnlyTeamIds = ownTeamIds.filter((id) => !coachedTeamIds.includes(id));
 
-    const [teamPlayersRes, teamCoachesRes, teamPendingCoachesRes, eventsRes] = await Promise.all([
-      supabase
-        .from("team_players")
-        .select("team_id, player_id, jersey_number, position")
-        .in("team_id", coachedTeamIds),
-      supabase
-        .from("team_coaches")
-        .select("team_id, coach_id")
-        .in("team_id", coachedTeamIds),
-      supabase
-        .from("team_pending_coaches")
-        .select("team_id, player_id")
-        .in("team_id", coachedTeamIds),
-      supabase
-        .from("events")
-        .select(
-          "id, title, event_type, location, salle, start_time, end_time, notes, teams(id, name, category)"
-        )
-        .or(teamOrClubWideFilter(coachCalendarTeamIds))
-        .order("start_time", { ascending: true }),
-    ]);
+    const [teamPlayersRes, teamCoachesRes, teamPendingCoachesRes, eventsRes, ownTeamsRes] =
+      await Promise.all([
+        supabase
+          .from("team_players")
+          .select("team_id, player_id, jersey_number, position")
+          .in("team_id", coachCalendarTeamIds),
+        supabase
+          .from("team_coaches")
+          .select("team_id, coach_id")
+          .in("team_id", coachCalendarTeamIds),
+        supabase
+          .from("team_pending_coaches")
+          .select("team_id, player_id")
+          .in("team_id", coachCalendarTeamIds),
+        supabase
+          .from("events")
+          .select(
+            "id, title, event_type, location, salle, start_time, end_time, notes, teams(id, name, category)"
+          )
+          .or(teamOrClubWideFilter(coachCalendarTeamIds))
+          .order("start_time", { ascending: true }),
+        ownOnlyTeamIds.length > 0
+          ? supabase
+              .from("teams")
+              .select("id, name, category, ffbb_url, sort_order, pending_coach_names")
+              .in("id", ownOnlyTeamIds)
+          : Promise.resolve({ data: [] as CoachedTeam[] }),
+      ]);
+
+    // Coached teams first, then the ones they only play in — each keeps
+    // the club's canonical order within its own group.
+    const coachTeamRoleById: Record<string, "COACH" | "PLAYER"> = {};
+    coachedTeams.forEach((t) => {
+      coachTeamRoleById[t.id] = "COACH";
+    });
+    const ownOnlyTeams = ((ownTeamsRes.data ?? []) as CoachedTeam[]).sort(
+      (a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999)
+    );
+    ownOnlyTeams.forEach((t) => {
+      coachTeamRoleById[t.id] = "PLAYER";
+    });
+    const coachAllTeams = [...coachedTeams, ...ownOnlyTeams];
+    coachTeamRoleByTeamId = coachTeamRoleById;
 
     const pendingCoachPlayerIds = Array.from(
       new Set((teamPendingCoachesRes.data ?? []).map((r) => r.player_id))
@@ -1051,7 +1075,7 @@ export default async function DashboardPage() {
       pendingCoachesByTeam.set(tpc.team_id, list);
     });
 
-    coachTeamsWithRoster = coachedTeams.map((t) => ({
+    coachTeamsWithRoster = coachAllTeams.map((t) => ({
       id: t.id,
       name: t.name,
       category: t.category,
@@ -1064,7 +1088,7 @@ export default async function DashboardPage() {
 
     const coachTeamRefsByPlayerId = new Map<string, AdminMemberTeam[]>();
     (teamPlayersRes.data ?? []).forEach((tp) => {
-      const team = coachedTeams.find((t) => t.id === tp.team_id);
+      const team = coachAllTeams.find((t) => t.id === tp.team_id);
       if (!team) return;
       const list = coachTeamRefsByPlayerId.get(tp.player_id) ?? [];
       list.push({ id: team.id, name: team.name, category: team.category });
@@ -1481,6 +1505,7 @@ export default async function DashboardPage() {
           rsvpPlayers={coachRsvpPlayers}
           rsvpStatusByKey={coachRsvpStatusByKey}
           taskTallyByTeamId={coachTaskTallyByTeamId}
+          teamRoleByTeamId={coachTeamRoleByTeamId}
           birthdayMembers={coachBirthdayMembers}
           organisationCards={coachCards}
           tasksByEventId={eventTasksByEventId}
