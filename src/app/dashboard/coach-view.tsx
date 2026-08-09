@@ -7,7 +7,12 @@ import CoachOrganisation, { type CoachTeamMatchCard } from "./coach-organisation
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import WhatsAppGroupsManager from "./whatsapp-groups-manager";
 import type { TeamWithMembers } from "./team-manager";
-import type { AdminUpcomingEvent, MemberDetail, WhatsAppGroup } from "./page";
+import type {
+  AdminMemberTeam,
+  AdminUpcomingEvent,
+  MemberDetail,
+  WhatsAppGroup,
+} from "./page";
 import type { CarpoolOffer, EventTasksState, SeasonTaskTally } from "./event-tasks";
 import type { BirthdaySource } from "./birthdays";
 
@@ -21,6 +26,7 @@ export default function CoachView({
   rsvpStatusByKey,
   taskTallyByTeamId,
   teamRoleByTeamId,
+  clubTeams,
   birthdayMembers,
   organisationCards,
   tasksByEventId,
@@ -39,6 +45,8 @@ export default function CoachView({
   // "COACH" for a team they coach, "PLAYER" for one they only play in —
   // drives both the team selector's badge and the read-only mode.
   teamRoleByTeamId: Record<string, "COACH" | "PLAYER">;
+  // Every club team, for the roster's "Changer d'équipe" picker.
+  clubTeams: AdminMemberTeam[];
   birthdayMembers: BirthdaySource[];
   organisationCards: CoachTeamMatchCard[];
   tasksByEventId: Record<string, EventTasksState>;
@@ -109,6 +117,7 @@ export default function CoachView({
           memberDetailsByPlayerId={memberDetailsByPlayerId}
           taskTallyByTeamId={taskTallyByTeamId}
           teamRoleByTeamId={teamRoleByTeamId}
+          clubTeams={clubTeams}
         />
       ),
     },

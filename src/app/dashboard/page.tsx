@@ -900,6 +900,7 @@ export default async function DashboardPage() {
   let coachRsvpPlayers: { id: string; name: string; teamIds: string[] }[] = [];
   let coachTaskTallyByTeamId: Record<string, SeasonTaskTally> = {};
   let coachTeamRoleByTeamId: Record<string, "COACH" | "PLAYER"> = {};
+  let coachClubTeams: AdminMemberTeam[] = [];
   const coachContactPhoneByPlayerId: Record<string, string> = {};
   const coachContactEmailByPlayerId: Record<string, string> = {};
   const coachMemberDetailsByPlayerId: Record<string, MemberDetail> = {};
@@ -923,8 +924,14 @@ export default async function DashboardPage() {
     );
     const ownOnlyTeamIds = ownTeamIds.filter((id) => !coachedTeamIds.includes(id));
 
-    const [teamPlayersRes, teamCoachesRes, teamPendingCoachesRes, eventsRes, ownTeamsRes] =
-      await Promise.all([
+    const [
+      teamPlayersRes,
+      teamCoachesRes,
+      teamPendingCoachesRes,
+      eventsRes,
+      ownTeamsRes,
+      allClubTeamsRes,
+    ] = await Promise.all([
         supabase
           .from("team_players")
           .select("team_id, player_id, jersey_number, position")
@@ -950,6 +957,14 @@ export default async function DashboardPage() {
               .select("id, name, category, ffbb_url, sort_order, pending_coach_names")
               .in("id", ownOnlyTeamIds)
           : Promise.resolve({ data: [] as CoachedTeam[] }),
+        // Every club team, for the "Changer d'équipe" picker — teams is
+        // readable by anyone (policy `using (true)`), and legacy rows
+        // without a sort_order are filtered out like everywhere else.
+        supabase
+          .from("teams")
+          .select("id, name, category, sort_order")
+          .not("sort_order", "is", null)
+          .order("sort_order"),
       ]);
 
     // Coached teams first, then the ones they only play in — each keeps
@@ -966,6 +981,11 @@ export default async function DashboardPage() {
     });
     const coachAllTeams = [...coachedTeams, ...ownOnlyTeams];
     coachTeamRoleByTeamId = coachTeamRoleById;
+    coachClubTeams = (allClubTeamsRes.data ?? []).map((t) => ({
+      id: t.id,
+      name: t.name,
+      category: t.category,
+    }));
 
     const pendingCoachPlayerIds = Array.from(
       new Set((teamPendingCoachesRes.data ?? []).map((r) => r.player_id))
@@ -1506,6 +1526,7 @@ export default async function DashboardPage() {
           rsvpStatusByKey={coachRsvpStatusByKey}
           taskTallyByTeamId={coachTaskTallyByTeamId}
           teamRoleByTeamId={coachTeamRoleByTeamId}
+          clubTeams={coachClubTeams}
           birthdayMembers={coachBirthdayMembers}
           organisationCards={coachCards}
           tasksByEventId={eventTasksByEventId}

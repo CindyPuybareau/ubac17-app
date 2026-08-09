@@ -6,7 +6,7 @@ import { teamLabel } from "@/lib/teams";
 import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
 import TeamCard from "./team-card";
 import type { TeamWithMembers } from "./team-manager";
-import type { AdminUpcomingEvent, MemberDetail } from "./page";
+import type { AdminMemberTeam, AdminUpcomingEvent, MemberDetail } from "./page";
 import type { SeasonTaskTally } from "./event-tasks";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
@@ -20,6 +20,7 @@ export default function CoachTeams({
   memberDetailsByPlayerId,
   taskTallyByTeamId,
   teamRoleByTeamId,
+  clubTeams,
 }: {
   teams: TeamWithMembers[];
   allProfiles: Person[];
@@ -29,6 +30,7 @@ export default function CoachTeams({
   memberDetailsByPlayerId: Record<string, MemberDetail>;
   taskTallyByTeamId: Record<string, SeasonTaskTally>;
   teamRoleByTeamId: Record<string, "COACH" | "PLAYER">;
+  clubTeams: AdminMemberTeam[];
 }) {
   const [activeId, setActiveId] = useState(teams[0]?.id);
   const active = teams.find((t) => t.id === activeId) ?? teams[0];
@@ -109,6 +111,8 @@ export default function CoachTeams({
         taskTallyByPlayerId={taskTallyByTeamId[active.id] ?? {}}
         readOnly={isPlayerTeam}
         showRosterSearch
+        showWhatsApp={false}
+        clubTeams={clubTeams}
       />
     </div>
   );

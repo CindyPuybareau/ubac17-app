@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
+  ArrowRightLeft,
   BadgeCheck,
   CalendarDays,
   CheckCircle2,
@@ -24,7 +25,7 @@ import MemberDetailModal from "./member-detail-modal";
 import PlayerYearBadge from "./player-year-badge";
 import SalleBadge from "./salle-badge";
 import WhatsAppButton from "./whatsapp-button";
-import type { AdminUpcomingEvent, MemberDetail } from "./page";
+import type { AdminMemberTeam, AdminUpcomingEvent, MemberDetail } from "./page";
 import type { RosterPlayer, TeamWithMembers } from "./team-manager";
 import type { SeasonTaskTally } from "./event-tasks";
 
@@ -32,7 +33,7 @@ const now = Date.now();
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 
-function fullName(p: Person) {
+function fullName(p: { first_name: string | null; last_name: string | null }) {
   return [p.first_name, p.last_name].filter(Boolean).join(" ") || "Sans nom";
 }
 
@@ -92,6 +93,11 @@ export default function TeamCard({
   readOnly = false,
   showRosterSearch = false,
   contactEmailByPlayerId,
+  showWhatsApp = true,
+  // Every club team. When provided (Coach space), the roster's action is
+  // "Changer d'équipe" instead of "Retirer" — a coach lending a player to
+  // another team is the real need; plain removal stays a Bureau gesture.
+  clubTeams,
 }: {
   team: TeamWithMembers;
   allProfiles: Person[];
@@ -105,6 +111,8 @@ export default function TeamCard({
   readOnly?: boolean;
   showRosterSearch?: boolean;
   contactEmailByPlayerId?: Record<string, string>;
+  showWhatsApp?: boolean;
+  clubTeams?: AdminMemberTeam[];
 }) {
   const router = useRouter();
   const [detailPlayerId, setDetailPlayerId] = useState<string | null>(null);
@@ -119,6 +127,10 @@ export default function TeamCard({
   const [removePendingCoachError, setRemovePendingCoachError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [rosterSearch, setRosterSearch] = useState("");
+  const [switchTarget, setSwitchTarget] = useState<RosterPlayer | null>(null);
+  const [switchTeamId, setSwitchTeamId] = useState("");
+  const [switching, setSwitching] = useState(false);
+  const [switchError, setSwitchError] = useState<string | null>(null);
 
   function showToast(message: string) {
     setToast(message);
@@ -281,6 +293,57 @@ export default function TeamCard({
   );
   const canCreatePlayer = allowCreatePlayer && !readOnly;
   const canAssignCoach = allowAssignCoach && !readOnly;
+  const switchableTeams = (clubTeams ?? []).filter((t) => t.id !== team.id);
+  const canSwitchTeam = !readOnly && switchableTeams.length > 0;
+
+  function openSwitch(p: RosterPlayer) {
+    setSwitchTarget(p);
+    setSwitchTeamId("");
+    setSwitchError(null);
+  }
+
+  async function confirmSwitchTeam() {
+    if (!switchTarget || !switchTeamId) return;
+    setSwitching(true);
+    setSwitchError(null);
+    const supabase = createClient();
+
+    // Insert into the destination BEFORE leaving the current team: the RLS
+    // policy that lets a coach place a player on a team they don't coach
+    // checks that the player is still on one of their own teams.
+    const { error: insertError } = await supabase
+      .from("team_players")
+      .insert({ team_id: switchTeamId, player_id: switchTarget.id });
+    // Already on the destination team (unique violation): not a failure,
+    // the move just needs its second half.
+    if (insertError && insertError.code !== "23505") {
+      setSwitching(false);
+      setSwitchError(insertError.message);
+      return;
+    }
+
+    const { error: deleteError } = await supabase
+      .from("team_players")
+      .delete()
+      .eq("team_id", team.id)
+      .eq("player_id", switchTarget.id);
+    setSwitching(false);
+    if (deleteError) {
+      setSwitchError(deleteError.message);
+      return;
+    }
+
+    const destination = switchableTeams.find((t) => t.id === switchTeamId);
+    const name = fullName({
+      first_name: switchTarget.first_name,
+      last_name: switchTarget.last_name,
+    });
+    setSwitchTarget(null);
+    showToast(
+      `${name} rejoint ${destination?.name ?? destination?.category ?? "sa nouvelle équipe"}.`
+    );
+    router.refresh();
+  }
 
   // One list for the whole team — coachs, coachs en attente, then joueurs —
   // so the Rôle column actually distinguishes something instead of
@@ -493,11 +556,13 @@ export default function TeamCard({
                     </td>
                     <td className="px-3 py-2.5">
                       <div className="flex items-center gap-1">
-                        <WhatsAppButton
-                          phone={phone ?? undefined}
-                          message={`Bonjour, ici le coach de ${team.name ?? "l'équipe"}.`}
-                          playerId={m.id}
-                        />
+                        {showWhatsApp && (
+                          <WhatsAppButton
+                            phone={phone ?? undefined}
+                            message={`Bonjour, ici le coach de ${team.name ?? "l'équipe"}.`}
+                            playerId={m.id}
+                          />
+                        )}
                         {detail && (
                           <button
                             onClick={() => setDetailPlayerId(m.id)}
@@ -507,14 +572,25 @@ export default function TeamCard({
                             <FileText className="h-3.5 w-3.5" />
                           </button>
                         )}
-                        {!readOnly && m.player && (
-                          <button
-                            onClick={() => setRemoveTarget(m.player)}
-                            className="shrink-0 text-xs font-medium text-red-600 hover:underline"
-                          >
-                            Retirer
-                          </button>
-                        )}
+                        {m.player &&
+                          (canSwitchTeam ? (
+                            <button
+                              onClick={() => openSwitch(m.player!)}
+                              title="Changer d'équipe"
+                              className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-navy"
+                            >
+                              <ArrowRightLeft className="h-3.5 w-3.5" />
+                            </button>
+                          ) : (
+                            !readOnly && (
+                              <button
+                                onClick={() => setRemoveTarget(m.player)}
+                                className="shrink-0 text-xs font-medium text-red-600 hover:underline"
+                              >
+                                Retirer
+                              </button>
+                            )
+                          ))}
                       </div>
                     </td>
                   </tr>
@@ -811,6 +887,53 @@ export default function TeamCard({
             />
           );
         })()}
+
+      {switchTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
+            <h3 className="mb-2 flex items-center gap-2 font-semibold text-zinc-900">
+              <ArrowRightLeft className="h-4 w-4 shrink-0 text-navy" />
+              Changer l&apos;équipe de{" "}
+              {fullName({
+                first_name: switchTarget.first_name,
+                last_name: switchTarget.last_name,
+              })}
+            </h3>
+            <p className="mb-3 text-sm text-zinc-500">
+              Le joueur quitte {team.name ?? "cette équipe"}
+              {" et rejoint l'équipe choisie."}
+            </p>
+            <select
+              value={switchTeamId}
+              onChange={(e) => setSwitchTeamId(e.target.value)}
+              className="w-full rounded-lg border border-zinc-200 px-2.5 py-2 text-sm"
+            >
+              <option value="">Choisir une équipe...</option>
+              {switchableTeams.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name ?? t.category ?? "Équipe"}
+                </option>
+              ))}
+            </select>
+            {switchError && <p className="mt-2 text-sm text-red-600">{switchError}</p>}
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setSwitchTarget(null)}
+                className="rounded-full border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={confirmSwitchTeam}
+                disabled={switching || !switchTeamId}
+                className="rounded-full bg-navy px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-navy/90 disabled:opacity-60"
+              >
+                {switching ? "Transfert..." : "Transférer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {removeTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
