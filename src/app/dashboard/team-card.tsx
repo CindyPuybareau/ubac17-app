@@ -55,12 +55,6 @@ function categoryTheme(category: string | null): { badge: string; border: string
   return { badge: "bg-ubac-yellow/15 text-ubac-yellow-dark", border: "border-ubac-yellow/20" };
 }
 
-function initials(p: { first_name: string | null; last_name: string | null }) {
-  const a = p.first_name?.trim()[0] ?? "";
-  const b = p.last_name?.trim()[0] ?? "";
-  return (a + b).toUpperCase() || "?";
-}
-
 function roleBadge(role: "COACH" | "COACH_PENDING" | "JOUEUR") {
   if (role === "COACH") return { label: "Coach", className: "bg-navy/10 text-navy" };
   if (role === "COACH_PENDING")
@@ -468,7 +462,8 @@ export default function TeamCard({
           <table className="w-full table-auto border-collapse text-sm">
             <thead>
               <tr className="border-b border-zinc-100 bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                <th className="w-auto px-3 py-2.5">Membre</th>
+                <th className="w-auto whitespace-nowrap px-3 py-2.5">Nom</th>
+                <th className="w-auto whitespace-nowrap px-3 py-2.5">Prénom</th>
                 <th className="whitespace-nowrap px-3 py-2.5">Rôle</th>
                 <th className="whitespace-nowrap px-3 py-2.5">Statut</th>
                 <th className="whitespace-nowrap px-3 py-2.5">Catégorie</th>
@@ -503,16 +498,11 @@ export default function TeamCard({
                 const isLentIn = otherTeams.length > 0;
                 return (
                   <tr key={m.key} className="border-b border-zinc-50 last:border-0">
-                    <td className="w-auto px-3 py-2.5 font-medium text-zinc-900">
-                      <span className="flex items-center gap-2">
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-navy/10 text-[11px] font-bold text-navy">
-                          {initials({ first_name: m.firstName, last_name: m.lastName })}
-                        </span>
-                        <span className="min-w-0 truncate">
-                          {m.lastName ?? "—"}{" "}
-                          <span className="font-normal text-zinc-600">{m.firstName ?? ""}</span>
-                        </span>
-                      </span>
+                    <td className="w-auto whitespace-nowrap px-3 py-2.5 font-medium text-zinc-900">
+                      {m.lastName ?? "—"}
+                    </td>
+                    <td className="w-auto whitespace-nowrap px-3 py-2.5 text-zinc-700">
+                      {m.firstName ?? "—"}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5">
                       <span className="flex flex-wrap items-center gap-1">
@@ -625,7 +615,7 @@ export default function TeamCard({
               })}
               {visibleMembers.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-3 py-4 text-center text-sm text-zinc-400">
+                  <td colSpan={8} className="px-3 py-4 text-center text-sm text-zinc-400">
                     {rosterQuery ? "Aucun membre ne correspond à cette recherche" : "Aucun membre"}
                   </td>
                 </tr>
