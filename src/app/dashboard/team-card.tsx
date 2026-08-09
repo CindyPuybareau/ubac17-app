@@ -482,7 +482,12 @@ export default function TeamCard({
                 const { phone, email } = contactsFor(m.id);
                 const detail = memberDetailsByPlayerId?.[m.id];
                 const role = roleBadge(m.role);
-                const category = detail?.category ?? team.category;
+                // La catégorie de l'équipe prime sur players.category : ce
+                // dernier vient de l'import du club et vaut parfois "U13"
+                // là où l'équipe est U13F. Dans une carte d'équipe, toutes
+                // les lignes appartiennent à cette équipe, donc c'est elle
+                // qui fait foi.
+                const category = team.category ?? detail?.category;
                 // PlayerYearBadge renders nothing when the birth date is
                 // missing (or the category can't be read), so the status is
                 // computed here too, to fall back on a neutral dash rather
