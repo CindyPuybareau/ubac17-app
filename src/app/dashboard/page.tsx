@@ -22,6 +22,7 @@ import {
   getCarpoolOffersByEventId,
   getEventTasksByEventId,
   getSeasonTaskTallyByTeamIds,
+  type EventTasksState,
   type SeasonTaskTally,
 } from "./event-tasks";
 
@@ -901,6 +902,7 @@ export default async function DashboardPage() {
   let coachTaskTallyByTeamId: Record<string, SeasonTaskTally> = {};
   let coachTeamRoleByTeamId: Record<string, "COACH" | "PLAYER"> = {};
   let coachClubTeams: AdminMemberTeam[] = [];
+  let coachOrganisationTasks: Record<string, EventTasksState> = {};
   const coachContactPhoneByPlayerId: Record<string, string> = {};
   const coachContactEmailByPlayerId: Record<string, string> = {};
   const coachMemberDetailsByPlayerId: Record<string, MemberDetail> = {};
@@ -1292,6 +1294,17 @@ export default async function DashboardPage() {
         rsvpCounts: buildRsvpCounts(rsvpsByEvent, e.id, rosterSize),
       };
     });
+
+    // Les rôles (maillots/goûter) de TOUS les événements à venir, pas
+    // seulement du prochain match : l'onglet "Planning & Rôles" les liste
+    // date par date.
+    const upcomingCoachEventIds = coachEvents
+      .filter((e) => new Date(e.start_time).getTime() >= Date.now())
+      .map((e) => e.id);
+    coachOrganisationTasks = {
+      ...eventTasksByEventId,
+      ...(await getEventTasksByEventId(supabase, upcomingCoachEventIds)),
+    };
   }
 
   // Parent/joueur: un seul calendrier lecture-seule + RSVP, tous enfants confondus.
@@ -1570,7 +1583,9 @@ export default async function DashboardPage() {
           clubTeams={coachClubTeams}
           birthdayMembers={coachBirthdayMembers}
           organisationCards={coachCards}
-          tasksByEventId={eventTasksByEventId}
+          // Couvre le prochain match de chaque équipe ET tous les
+          // événements à venir listés dans "Planning & Rôles".
+          tasksByEventId={coachOrganisationTasks}
           carpoolByEventId={carpoolOffersByEventId}
           whatsappGroups={whatsappGroups}
           archivedPlayerIds={coachArchivedPlayerIds}

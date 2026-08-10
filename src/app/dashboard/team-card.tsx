@@ -12,9 +12,7 @@ import {
   MapPin,
   Phone,
   Search,
-  Shirt,
   Trash2,
-  Utensils,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { computePlayerYearStatus, getCurrentSeasonLabel } from "@/lib/season";
@@ -26,7 +24,6 @@ import SalleBadge from "./salle-badge";
 import WhatsAppButton from "./whatsapp-button";
 import type { AdminMemberTeam, AdminUpcomingEvent, MemberDetail } from "./page";
 import type { RosterPlayer, TeamWithMembers } from "./team-manager";
-import type { SeasonTaskTally } from "./event-tasks";
 
 const now = Date.now();
 
@@ -68,7 +65,6 @@ export default function TeamCard({
   contactPhoneByPlayerId,
   createCotisationOnNewPlayer = true,
   memberDetailsByPlayerId,
-  taskTallyByPlayerId,
   // The Bureau's "Membres" tab now owns member creation + team assignment
   // end to end (AddMemberModal), so its Équipes tab no longer needs its own
   // "+ Ajouter un joueur" shortcut here — Coach space still does, since
@@ -98,7 +94,6 @@ export default function TeamCard({
   contactPhoneByPlayerId: Record<string, string>;
   createCotisationOnNewPlayer?: boolean;
   memberDetailsByPlayerId?: Record<string, MemberDetail>;
-  taskTallyByPlayerId?: SeasonTaskTally;
   allowCreatePlayer?: boolean;
   allowAssignCoach?: boolean;
   readOnly?: boolean;
@@ -855,54 +850,6 @@ export default function TeamCard({
           )}
         </div>
       </div>
-
-      {taskTallyByPlayerId && (
-        <div className="mt-4 border-t border-zinc-100 pt-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-            Tour de rôle — maillots &amp; goûter (saison)
-          </p>
-          <div className="overflow-x-auto rounded-xl border border-zinc-100">
-            <table className="w-full table-auto border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-zinc-100 bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                  <th className="w-auto whitespace-nowrap px-2 py-2">Famille</th>
-                  <th className="whitespace-nowrap px-2 py-2">
-                    <span className="flex items-center gap-1 whitespace-nowrap">
-                      <Shirt className="h-3.5 w-3.5 text-sky-600" />
-                      Maillots
-                    </span>
-                  </th>
-                  <th className="whitespace-nowrap px-2 py-2">
-                    <span className="flex items-center gap-1 whitespace-nowrap">
-                      <Utensils className="h-3.5 w-3.5 text-amber-600" />
-                      Goûter
-                    </span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {team.players.map((p) => {
-                  const tally = taskTallyByPlayerId[p.id] ?? { jerseys: 0, snacks: 0 };
-                  return (
-                    <tr key={p.id} className="border-b border-zinc-50 last:border-0">
-                      <td className="w-auto whitespace-nowrap px-2 py-2 text-zinc-700">{fullName(p)}</td>
-                      <td className="px-2 py-2 font-semibold text-zinc-900">{tally.jerseys}</td>
-                      <td className="px-2 py-2 font-semibold text-zinc-900">{tally.snacks}</td>
-                    </tr>
-                  );
-                })}
-                {team.players.length === 0 && (
-                  <tr>
-                    <td colSpan={3} className="px-2 py-4 text-center text-sm text-zinc-400">
-                      Aucun joueur
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
       {detailPlayerId &&
         memberDetailsByPlayerId?.[detailPlayerId] &&

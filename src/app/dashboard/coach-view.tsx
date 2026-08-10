@@ -120,7 +120,6 @@ export default function CoachView({
           contactPhoneByPlayerId={contactPhoneByPlayerId}
           contactEmailByPlayerId={contactEmailByPlayerId}
           memberDetailsByPlayerId={memberDetailsByPlayerId}
-          taskTallyByTeamId={taskTallyByTeamId}
           teamRoleByTeamId={teamRoleByTeamId}
           clubTeams={clubTeams}
         />
@@ -135,6 +134,8 @@ export default function CoachView({
           cards={organisationCards}
           tasksByEventId={tasksByEventId}
           carpoolByEventId={carpoolByEventId}
+          events={events}
+          taskTallyByTeamId={taskTallyByTeamId}
         />
       ),
     },

@@ -7,7 +7,6 @@ import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
 import TeamCard from "./team-card";
 import type { TeamWithMembers } from "./team-manager";
 import type { AdminMemberTeam, AdminUpcomingEvent, MemberDetail } from "./page";
-import type { SeasonTaskTally } from "./event-tasks";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 
@@ -18,7 +17,6 @@ export default function CoachTeams({
   contactPhoneByPlayerId,
   contactEmailByPlayerId,
   memberDetailsByPlayerId,
-  taskTallyByTeamId,
   teamRoleByTeamId,
   clubTeams,
 }: {
@@ -28,7 +26,6 @@ export default function CoachTeams({
   contactPhoneByPlayerId: Record<string, string>;
   contactEmailByPlayerId: Record<string, string>;
   memberDetailsByPlayerId: Record<string, MemberDetail>;
-  taskTallyByTeamId: Record<string, SeasonTaskTally>;
   teamRoleByTeamId: Record<string, "COACH" | "PLAYER">;
   clubTeams: AdminMemberTeam[];
 }) {
@@ -108,7 +105,6 @@ export default function CoachTeams({
         contactEmailByPlayerId={contactEmailByPlayerId}
         createCotisationOnNewPlayer={false}
         memberDetailsByPlayerId={memberDetailsByPlayerId}
-        taskTallyByPlayerId={taskTallyByTeamId[active.id] ?? {}}
         readOnly={isPlayerTeam}
         showRosterSearch
         showWhatsApp={false}
