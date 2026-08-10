@@ -3,6 +3,7 @@ import CalendarView, { type CalendarRsvpPlayer } from "./calendar-view";
 import FamilyTeamCard, { type FamilyTeamCardData } from "./family-team-card";
 import FamilyTrainings from "./family-trainings";
 import NextConvocationCard from "./next-convocation-card";
+import FamilyUpcomingRoles from "./family-upcoming-roles";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import WhatsAppGroupsFamily from "./whatsapp-groups-family";
 import type { AdminUpcomingEvent, WhatsAppGroup } from "./page";
@@ -101,6 +102,11 @@ export default function FamilyView({
               Aucun prochain match programmé.
             </p>
           )}
+          <FamilyUpcomingRoles
+            events={events}
+            players={rsvpPlayers}
+            tasksByEventId={tasksByEventId}
+          />
         </div>
       ),
     },

@@ -1309,6 +1309,7 @@ export default async function DashboardPage() {
 
   // Parent/joueur: un seul calendrier lecture-seule + RSVP, tous enfants confondus.
   let familyEvents: AdminUpcomingEvent[] = [];
+  let familyOrganisationTasks: Record<string, EventTasksState> = {};
   let familyRsvpPlayers: { id: string; name: string; teamIds: string[] }[] = [];
   const familyRsvpStatusByKey: Record<string, string> = {};
   const familyBirthdayMembers: BirthdaySource[] = [];
@@ -1516,6 +1517,17 @@ export default async function DashboardPage() {
         rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
       };
     });
+
+    // Les rôles de TOUS les événements à venir, pas seulement de la
+    // prochaine convocation : un parent doit pouvoir se proposer à
+    // l'avance (voir family-upcoming-roles.tsx).
+    const upcomingFamilyEventIds = familyEvents
+      .filter((e) => new Date(e.start_time).getTime() >= Date.now())
+      .map((e) => e.id);
+    familyOrganisationTasks = {
+      ...eventTasksByEventId,
+      ...(await getEventTasksByEventId(supabase, upcomingFamilyEventIds)),
+    };
   }
 
   const adminBirthdayMembers: BirthdaySource[] = isAdmin
@@ -1607,7 +1619,7 @@ export default async function DashboardPage() {
           teamCards={familyTeamCards}
           convocationCards={convocationCards}
           rosterByEventId={convocationRosterByEventId}
-          tasksByEventId={eventTasksByEventId}
+          tasksByEventId={familyOrganisationTasks}
           carpoolByEventId={carpoolOffersByEventId}
           whatsappGroups={whatsappGroups}
         />
