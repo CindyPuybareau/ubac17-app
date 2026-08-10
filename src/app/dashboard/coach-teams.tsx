@@ -113,6 +113,11 @@ export default function CoachTeams({
         showRosterSearch
         showWhatsApp={false}
         clubTeams={clubTeams}
+        // La création de membres et la gestion des coachs sont centralisées
+        // côté Bureau : un coach ne crée pas de fiche joueur et ne retire
+        // pas un collègue de l'encadrement.
+        allowCreatePlayer={false}
+        allowAssignCoach={false}
       />
     </div>
   );

@@ -58,11 +58,16 @@ export default function CoachView({
   // doesn't carry archived status itself.
   archivedPlayerIds: string[];
 }) {
-  const createTeams = teams.map((t) => ({
-    id: t.id,
-    name: t.name,
-    category: t.category,
-  }));
+  // Créer / modifier / supprimer un événement n'est permis que pour les
+  // équipes réellement entraînées : proposer celle où l'utilisateur n'est
+  // que joueur donnerait un choix que la RLS refuserait à l'enregistrement.
+  const createTeams = teams
+    .filter((t) => teamRoleByTeamId[t.id] !== "PLAYER")
+    .map((t) => ({
+      id: t.id,
+      name: t.name,
+      category: t.category,
+    }));
 
   const eventsByTeamId: Record<string, AdminUpcomingEvent[]> = {};
   events.forEach((e) => {

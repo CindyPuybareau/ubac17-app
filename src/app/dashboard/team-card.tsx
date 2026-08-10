@@ -720,7 +720,7 @@ export default function TeamCard({
                     Coach Officiel
                   </span>
                 </span>
-                {!readOnly && (
+                {canAssignCoach && (
                   <button
                     onClick={() => setRemoveCoachTarget(p)}
                     title="Retirer ce coach de l'équipe"
@@ -743,7 +743,7 @@ export default function TeamCard({
                     (en attente de compte)
                   </span>
                 </span>
-                {!readOnly && (
+                {canAssignCoach && (
                   <button
                     onClick={() => setRemovePendingCoachTarget(p)}
                     title="Retirer ce coach en attente de l'équipe"
