@@ -295,6 +295,12 @@ export default function MemberDetailModal({
   bureauRole: initialBureauRole = null,
   coachTeams: initialCoachTeams = [],
   pendingCoachTeams: initialPendingCoachTeams = [],
+  // Réaffecter une équipe, désigner un coach ou donner l'accès Bureau
+  // restent des gestes du Bureau. Un coach ouvre la même fiche, mais
+  // limitée aux informations pratiques — d'autant que la réaffectation
+  // d'équipe ci-dessous supprime TOUS les rattachements du joueur, ce qui
+  // effacerait au passage un prêt à une autre équipe.
+  canManageTeamAndRoles = true,
 }: {
   member: MemberDetail;
   readOnly: boolean;
@@ -310,6 +316,7 @@ export default function MemberDetailModal({
   bureauRole?: string | null;
   coachTeams?: AdminMemberTeam[];
   pendingCoachTeams?: AdminMemberTeam[];
+  canManageTeamAndRoles?: boolean;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>("identity");
@@ -431,7 +438,11 @@ export default function MemberDetailModal({
     // change, so this also makes "assigner un membre à une équipe" -> "il
     // apparaît dans Cotisations" work for a member who had no team (and no
     // category) at creation time.
-    const category = teamOptions.find((t) => t.id === teamId)?.category ?? null;
+    // Sans droit sur l'équipe, la catégorie n'est pas recalculée : la
+    // dériver d'un sélecteur non affiché la mettrait à null.
+    const category = canManageTeamAndRoles
+      ? (teamOptions.find((t) => t.id === teamId)?.category ?? null)
+      : member.category;
     const { error: updateError } = await supabase
       .from("players")
       .update({
@@ -467,7 +478,7 @@ export default function MemberDetailModal({
     }
 
     const currentTeamId = member.teams[0]?.id ?? "";
-    if (teamId !== currentTeamId) {
+    if (canManageTeamAndRoles && teamId !== currentTeamId) {
       const { error: deleteError } = await supabase
         .from("team_players")
         .delete()
@@ -487,6 +498,15 @@ export default function MemberDetailModal({
           return;
         }
       }
+    }
+
+    // Sans droit sur les rôles, l'enregistrement s'arrête aux informations
+    // pratiques : ni désignation de coach, ni accès Bureau.
+    if (!canManageTeamAndRoles) {
+      setSaving(false);
+      router.refresh();
+      onClose();
+      return;
     }
 
     // Coach team assignment works whether or not this member has a real
@@ -764,7 +784,7 @@ export default function MemberDetailModal({
                   {member.category ?? "—"}
                 </span>
               </ReadOnlyField>
-              {editable ? (
+              {editable && canManageTeamAndRoles ? (
                 <div className="flex flex-col gap-1">
                   <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
                     Équipe
@@ -801,7 +821,7 @@ export default function MemberDetailModal({
                 </ReadOnlyField>
               )}
 
-              {editable && (
+              {editable && canManageTeamAndRoles && (
                 <div className="flex flex-col gap-1.5 rounded-xl border border-zinc-100 bg-zinc-50 p-3 sm:col-span-2">
                   <label className="flex items-center justify-between gap-3">
                     <span className="text-sm font-medium text-zinc-700">
@@ -857,7 +877,7 @@ export default function MemberDetailModal({
                 </div>
               )}
 
-              {editable && (
+              {editable && canManageTeamAndRoles && (
                 <div className="flex flex-col gap-1.5 rounded-xl border-2 border-ubac-yellow/50 bg-gradient-to-br from-ubac-yellow/10 to-navy/5 p-3.5 sm:col-span-2">
                   <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-navy">
                     <Shield className="h-3.5 w-3.5" />

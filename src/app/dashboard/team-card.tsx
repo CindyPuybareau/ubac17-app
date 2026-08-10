@@ -8,7 +8,6 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock,
-  FileText,
   Mail,
   MapPin,
   Phone,
@@ -513,7 +512,13 @@ export default function TeamCard({
                 const otherTeams = (detail?.teams ?? []).filter((t) => t.id !== team.id);
                 const isLentIn = otherTeams.length > 0;
                 return (
-                  <tr key={m.key} className="border-b border-zinc-50 last:border-0">
+                  <tr
+                    key={m.key}
+                    onClick={detail ? () => setDetailPlayerId(m.id) : undefined}
+                    className={`border-b border-zinc-50 last:border-0 ${
+                      detail ? "cursor-pointer transition-colors hover:bg-slate-50" : ""
+                    }`}
+                  >
                     <td className="w-auto whitespace-nowrap px-3 py-2.5 font-medium text-zinc-900">
                       {m.lastName ?? "—"}
                     </td>
@@ -552,7 +557,7 @@ export default function TeamCard({
                         <span className="text-zinc-400">—</span>
                       )}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2.5">
+                    <td className="whitespace-nowrap px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
                       {phone ? (
                         <a
                           href={`tel:${phone}`}
@@ -566,7 +571,7 @@ export default function TeamCard({
                         <span className="text-zinc-400">—</span>
                       )}
                     </td>
-                    <td className="w-auto px-3 py-2.5">
+                    <td className="w-auto px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
                       {email ? (
                         <a
                           href={`mailto:${email}`}
@@ -580,7 +585,7 @@ export default function TeamCard({
                         <span className="text-zinc-400">—</span>
                       )}
                     </td>
-                    <td className="px-3 py-2.5">
+                    <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
                         {showWhatsApp && (
                           <WhatsAppButton
@@ -588,15 +593,6 @@ export default function TeamCard({
                             message={`Bonjour, ici le coach de ${team.name ?? "l'équipe"}.`}
                             playerId={m.id}
                           />
-                        )}
-                        {detail && (
-                          <button
-                            onClick={() => setDetailPlayerId(m.id)}
-                            title="Voir la fiche complète"
-                            className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
-                          >
-                            <FileText className="h-3.5 w-3.5" />
-                          </button>
                         )}
                         {m.player &&
                           !readOnly &&
@@ -915,7 +911,11 @@ export default function TeamCard({
           return (
             <MemberDetailModal
               member={detail}
-              readOnly
+              readOnly={readOnly}
+              // Un coach modifie les informations pratiques de ses joueurs,
+              // mais l'affectation d'équipe et les rôles Coach/Bureau
+              // restent la main du Bureau.
+              canManageTeamAndRoles={false}
               onClose={() => setDetailPlayerId(null)}
             />
           );
