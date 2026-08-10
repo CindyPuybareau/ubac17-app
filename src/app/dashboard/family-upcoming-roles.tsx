@@ -6,6 +6,7 @@ import { CalendarDays, Shirt, Utensils, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatEventTime, styleFor } from "./calendar-view";
 import SalleBadge from "./salle-badge";
+import TaskSourceBadge from "./task-source-badge";
 import type { EventTasksState, TaskType } from "./event-tasks";
 import type { AdminUpcomingEvent } from "./page";
 
@@ -62,7 +63,12 @@ export default function FamilyUpcomingRoles({
     const supabase = createClient();
     const { error: insertError } = await supabase
       .from("event_tasks")
-      .insert({ event_id: eventId, task_type: taskType, player_id: playerId });
+      .insert({
+        event_id: eventId,
+        task_type: taskType,
+        player_id: playerId,
+        source: "VOLUNTEER",
+      });
     setPending(null);
     if (insertError) {
       // Contrainte unique (event_id, task_type) : quelqu'un vient de le
@@ -149,8 +155,11 @@ export default function FamilyUpcomingRoles({
                           <span className="block text-xs font-medium text-zinc-700">
                             {meta.label}
                           </span>
-                          <span className="block truncate text-xs text-zinc-500">
-                            {assignment ? assignment.playerName : "Non attribué"}
+                          <span className="flex items-center gap-1.5 text-xs text-zinc-500">
+                            <span className="truncate">
+                              {assignment ? assignment.playerName : "Non attribué"}
+                            </span>
+                            {assignment && <TaskSourceBadge source={assignment.source} />}
                           </span>
                         </span>
                       </span>

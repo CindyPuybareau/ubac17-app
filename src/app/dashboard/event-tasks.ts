@@ -2,9 +2,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type TaskType = "JERSEYS" | "SNACKS";
 
+export type TaskSource = "COACH" | "VOLUNTEER";
+
 export type TaskAssignment = {
   playerId: string;
   playerName: string;
+  // null pour les attributions anterieures a la colonne source : on ne
+  // sait pas qui les a creees, donc aucun badge n'est affiche.
+  source: TaskSource | null;
 } | null;
 
 export type EventTasksState = {
@@ -33,7 +38,7 @@ export async function getEventTasksByEventId(
 
   const { data } = await supabase
     .from("event_tasks")
-    .select("event_id, task_type, player_id, players(first_name, last_name)")
+    .select("event_id, task_type, player_id, source, players(first_name, last_name)")
     .in("event_id", eventIds);
 
   (data ?? []).forEach((row) => {
@@ -44,7 +49,11 @@ export async function getEventTasksByEventId(
     const eventId = row.event_id as string;
     const state = (result[eventId] ??= { JERSEYS: null, SNACKS: null });
     const assignment: TaskAssignment = player
-      ? { playerId: row.player_id as string, playerName: fullName(player) }
+      ? {
+          playerId: row.player_id as string,
+          playerName: fullName(player),
+          source: (row.source as TaskSource | null) ?? null,
+        }
       : null;
     if (row.task_type === "JERSEYS") state.JERSEYS = assignment;
     else if (row.task_type === "SNACKS") state.SNACKS = assignment;

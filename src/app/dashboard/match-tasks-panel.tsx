@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Shirt, Utensils, Car, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import TaskSourceBadge from "./task-source-badge";
 import type { CarpoolOffer, EventTasksState, TaskType } from "./event-tasks";
 
 const TASK_META: Record<
@@ -49,7 +50,12 @@ export default function MatchTasksPanel({
     const supabase = createClient();
     const { error: insertError } = await supabase
       .from("event_tasks")
-      .insert({ event_id: eventId, task_type: taskType, player_id: playerId });
+      .insert({
+        event_id: eventId,
+        task_type: taskType,
+        player_id: playerId,
+        source: "VOLUNTEER",
+      });
     setPending(null);
     if (insertError) {
       setError("Déjà attribué à quelqu'un d'autre.");
@@ -76,13 +82,18 @@ export default function MatchTasksPanel({
     if (initialTasks[taskType]) {
       await supabase
         .from("event_tasks")
-        .update({ player_id: playerId })
+        .update({ player_id: playerId, source: "COACH" })
         .eq("event_id", eventId)
         .eq("task_type", taskType);
     } else {
       await supabase
         .from("event_tasks")
-        .insert({ event_id: eventId, task_type: taskType, player_id: playerId });
+        .insert({
+          event_id: eventId,
+          task_type: taskType,
+          player_id: playerId,
+          source: "COACH",
+        });
     }
     setPending(null);
     router.refresh();
@@ -122,8 +133,11 @@ export default function MatchTasksPanel({
               <Icon className={`h-4 w-4 shrink-0 ${meta.className}`} />
               <div className="min-w-0">
                 <p className="text-xs font-medium text-zinc-700">{meta.label}</p>
-                <p className="truncate text-xs text-zinc-500">
-                  {assignment ? assignment.playerName : "Non attribué"}
+                <p className="flex items-center gap-1.5 text-xs text-zinc-500">
+                  <span className="truncate">
+                    {assignment ? assignment.playerName : "Non attribué"}
+                  </span>
+                  {assignment && <TaskSourceBadge source={assignment.source} />}
                 </p>
               </div>
             </div>

@@ -7,7 +7,13 @@ import CoachNextMatchCard from "./coach-next-match-card";
 import { formatEventTime, styleFor } from "./calendar-view";
 import SalleBadge from "./salle-badge";
 import type { RosterPlayer, RsvpCounts, UpcomingEvent } from "./family-data";
-import type { CarpoolOffer, EventTasksState, SeasonTaskTally } from "./event-tasks";
+import TaskSourceBadge from "./task-source-badge";
+import type {
+  CarpoolOffer,
+  EventTasksState,
+  SeasonTaskTally,
+  TaskAssignment,
+} from "./event-tasks";
 import type { AdminUpcomingEvent } from "./page";
 
 const emptyEventTasks: EventTasksState = { JERSEYS: null, SNACKS: null };
@@ -36,15 +42,20 @@ function formatDay(iso: string) {
 
 // Un rôle non attribué doit se voir : c'est justement la ligne sur
 // laquelle le coach doit agir.
-function TaskCell({ name }: { name: string | null }) {
-  if (!name) {
+function TaskCell({ assignment }: { assignment: TaskAssignment }) {
+  if (!assignment) {
     return (
       <span className="inline-flex items-center whitespace-nowrap rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
         À attribuer
       </span>
     );
   }
-  return <span className="text-sm text-zinc-700">{name}</span>;
+  return (
+    <span className="flex items-center gap-1.5">
+      <span className="text-sm text-zinc-700">{assignment.playerName}</span>
+      <TaskSourceBadge source={assignment.source} />
+    </span>
+  );
 }
 
 function PlanningTab({
@@ -138,10 +149,10 @@ function PlanningTab({
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-3 py-2.5">
-                        <TaskCell name={tasks.JERSEYS?.playerName ?? null} />
+                        <TaskCell assignment={tasks.JERSEYS} />
                       </td>
                       <td className="whitespace-nowrap px-3 py-2.5">
-                        <TaskCell name={tasks.SNACKS?.playerName ?? null} />
+                        <TaskCell assignment={tasks.SNACKS} />
                       </td>
                     </tr>
                   );
