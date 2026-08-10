@@ -118,6 +118,9 @@ export default function MatchTasksPanel({
         Organisation Parents
       </p>
 
+      {/* Deux colonnes sur écran large, empilées sur mobile — même
+          disposition que la liste des événements à venir côté parent. */}
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
       {(["JERSEYS", "SNACKS"] as TaskType[]).map((taskType) => {
         const meta = TASK_META[taskType];
         const Icon = meta.icon;
@@ -127,7 +130,8 @@ export default function MatchTasksPanel({
         return (
           <div
             key={taskType}
-            className="flex flex-col gap-2 rounded-lg bg-white px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+            // Bouton collé au texte plutôt que renvoyé au bord droit.
+            className="flex flex-col gap-2 rounded-lg bg-white px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3"
           >
             <div className="flex min-w-0 items-center gap-2">
               <Icon className={`h-4 w-4 shrink-0 ${meta.className}`} />
@@ -181,6 +185,7 @@ export default function MatchTasksPanel({
           </div>
         );
       })}
+      </div>
 
       {error && <p className="text-xs text-red-600">{error}</p>}
 

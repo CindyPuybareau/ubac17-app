@@ -147,7 +147,10 @@ export default function FamilyUpcomingRoles({
                   return (
                     <div
                       key={taskType}
-                      className="flex flex-1 items-center justify-between gap-2 rounded-lg bg-white px-3 py-2"
+                      // Pas de justify-between : le bouton suit immédiatement
+                      // le texte au lieu d'être renvoyé au bord droit, ce qui
+                      // creusait un fossé visuel sur les cartes larges.
+                      className="flex flex-1 items-center gap-3 rounded-lg bg-white px-3 py-2"
                     >
                       <span className="flex min-w-0 items-center gap-1.5">
                         <Icon className={`h-3.5 w-3.5 shrink-0 ${meta.className}`} />
