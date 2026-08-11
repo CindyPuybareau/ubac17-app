@@ -22,6 +22,7 @@ export default function MatchTasksPanel({
   initialTasks,
   initialCarpool,
   roles,
+  showCarpool,
 }: {
   eventId: string;
   roster: { id: string; name: string }[];
@@ -31,6 +32,9 @@ export default function MatchTasksPanel({
   initialCarpool: CarpoolOffer[];
   // Catalogue applicable a ce type d evenement, resolu par l appelant.
   roles: EventRoleType[];
+  // Faux sur un entrainement ou un match a domicile : il n y a rien a
+  // organiser, et un bloc vide invite a une action sans objet.
+  showCarpool: boolean;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState<TaskType | "carpool" | null>(null);
@@ -180,6 +184,7 @@ export default function MatchTasksPanel({
 
       {error && <p className="text-xs text-red-600">{error}</p>}
 
+      {showCarpool && (
       <div className="rounded-lg bg-white px-3 py-2.5">
         <div className="flex items-center gap-2">
           <Car className="h-4 w-4 shrink-0 text-emerald-600" />
@@ -226,6 +231,7 @@ export default function MatchTasksPanel({
           <p className="mt-2 text-xs text-zinc-400">Aucune place proposée pour l&apos;instant.</p>
         )}
       </div>
+      )}
     </div>
   );
 }
