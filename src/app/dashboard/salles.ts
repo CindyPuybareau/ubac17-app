@@ -20,8 +20,13 @@ export function shouldOfferCarpool(event: {
   event_type: string | null;
   salle: string | null;
   location: string | null;
+  isHome?: boolean | null;
 }) {
   if (event.event_type === "TRAINING") return false;
+  // Le coach a explicitement coché domicile ou extérieur : sa réponse prime
+  // sur ce qu'on devinerait du nom de la salle.
+  if (event.isHome === true) return false;
+  if (event.isHome === false) return true;
   const venue = normalize(`${event.salle ?? ""} ${event.location ?? ""}`);
   if (!venue.trim()) return true;
   return !SALLES.some((s) => venue.includes(normalize(s)));

@@ -9,6 +9,8 @@ import {
   Cake,
   Check,
   Clock,
+  LayoutGrid,
+  List,
   Mail,
   MapPin,
   Pencil,
@@ -21,6 +23,7 @@ import { parseMatchTitle } from "@/lib/match-display";
 import { teamLabel } from "@/lib/teams";
 import OpponentDisplay from "./opponent-display";
 import CreateEventForm from "./create-event-form";
+import AppelExpressModal from "./appel-express-modal";
 import RsvpButtons from "./rsvp-buttons";
 import BirthdayWidget from "./birthday-widget";
 import type { AdminUpcomingEvent } from "./page";
@@ -32,11 +35,12 @@ import {
 import { SALLES } from "./salles";
 import SalleBadge from "./salle-badge";
 
-const eventTypeOptions: { value: string; label: string }[] = [
-  { value: "MATCH", label: "Match" },
+export const EVENT_TYPE_OPTIONS: { value: string; label: string }[] = [
   { value: "TRAINING", label: "Entraînement" },
+  { value: "MATCH", label: "Match officiel" },
+  { value: "FRIENDLY", label: "Match amical" },
+  { value: "TOURNAMENT", label: "Tournoi / Plateau" },
   { value: "OTHER", label: "Événement club" },
-  { value: "TOURNAMENT", label: "Tournoi" },
 ];
 
 function toDatetimeLocal(iso: string) {
@@ -53,26 +57,35 @@ function toTimeLocal(iso: string) {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// Un code couleur par type, repris à l'identique partout (pastilles du
+// calendrier, badges des cartes, bordure gauche) : rouge = match officiel,
+// bleu = amical, orange = tournoi, vert = entraînement.
 const typeStyles: Record<
   string,
   { pill: string; border: string; badge: string; label: string }
 > = {
   MATCH: {
+    pill: "bg-red-100 text-red-700",
+    border: "border-l-red-400",
+    badge: "bg-red-100 text-red-700",
+    label: "Match officiel",
+  },
+  FRIENDLY: {
     pill: "bg-blue-100 text-blue-700",
     border: "border-l-blue-400",
     badge: "bg-blue-100 text-blue-700",
-    label: "Match",
+    label: "Match amical",
   },
   TOURNAMENT: {
+    pill: "bg-amber-100 text-amber-800",
+    border: "border-l-amber-400",
+    badge: "bg-amber-100 text-amber-800",
+    label: "Tournoi / Plateau",
+  },
+  OTHER: {
     pill: "bg-purple-100 text-purple-700",
     border: "border-l-purple-400",
     badge: "bg-purple-100 text-purple-700",
-    label: "Tournoi",
-  },
-  OTHER: {
-    pill: "bg-orange-100 text-orange-700",
-    border: "border-l-orange-400",
-    badge: "bg-orange-100 text-orange-700",
     label: "Événement club",
   },
   TRAINING: {
@@ -82,6 +95,12 @@ const typeStyles: Record<
     label: "Entraînement",
   },
 };
+
+// Les deux types qui opposent le club à un adversaire : eux seuls
+// affichent un nom d'adversaire et la mention domicile / extérieur.
+export function isMatchType(eventType: string | null) {
+  return eventType === "MATCH" || eventType === "FRIENDLY";
+}
 
 // Exported so team-card.tsx and family-team-card.tsx can badge each
 // event's type with the exact same palette/labels used here, instead of
@@ -103,10 +122,15 @@ export function formatEventTime(startIso: string, endIso: string | null) {
 }
 
 function pillLabel(event: AdminUpcomingEvent) {
-  if (event.event_type === "MATCH") {
+  if (isMatchType(event.event_type)) {
     return parseMatchTitle(event.title).opponent;
   }
   return event.title ?? styleFor(event.event_type).label;
+}
+
+export function homeAwayLabel(isHome: boolean | null) {
+  if (isHome === null) return null;
+  return isHome ? "Domicile" : "Extérieur";
 }
 
 function toKey(d: Date) {
@@ -189,12 +213,18 @@ export default function CalendarView({
   const [viewMonth, setViewMonth] = useState<Date>(today);
   const [selectedDate, setSelectedDate] = useState<Date>(today);
   const [openBirthday, setOpenBirthday] = useState<BirthdaySource | null>(null);
+  // La liste chronologique répond à "c'est quoi la suite ?", la grille à
+  // "à quoi ressemble le mois ?" : deux questions différentes, la première
+  // est celle qu'on se pose le plus souvent, donc c'est la vue par défaut.
+  const [view, setView] = useState<"list" | "month">("list");
+  const [appelEventId, setAppelEventId] = useState<string | null>(null);
 
   const canManage = Boolean(createTeams && createTeams.length > 0);
 
   const [editingEvent, setEditingEvent] = useState<AdminUpcomingEvent | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editType, setEditType] = useState("MATCH");
+  const [editIsHome, setEditIsHome] = useState<"" | "true" | "false">("");
   const [editLocation, setEditLocation] = useState("");
   const [editSalle, setEditSalle] = useState("");
   const [editStartTime, setEditStartTime] = useState("");
@@ -208,6 +238,7 @@ export default function CalendarView({
     setEditingEvent(event);
     setEditTitle(event.title ?? "");
     setEditType(event.event_type ?? "MATCH");
+    setEditIsHome(event.isHome === null ? "" : event.isHome ? "true" : "false");
     setEditLocation(event.location ?? "");
     setEditSalle(event.salle ?? "");
     setEditStartTime(toDatetimeLocal(event.start_time));
@@ -231,6 +262,10 @@ export default function CalendarView({
       .update({
         title: editTitle || null,
         event_type: editType,
+        // Le domicile/extérieur ne veut rien dire hors d'un match : le
+        // remettre à null évite qu'un entraînement garde la mention d'un
+        // ancien type.
+        is_home: isMatchType(editType) && editIsHome !== "" ? editIsHome === "true" : null,
         location: editLocation || null,
         salle: editSalle || null,
         start_time: new Date(editStartTime).toISOString(),
@@ -325,40 +360,264 @@ export default function CalendarView({
   const detailEvents = eventsByDate.get(selectedKey) ?? [];
   const detailBirthdays = birthdaysByMonthDay.get(monthDayKey(selectedDate)) ?? [];
 
+  // Vue Liste : tout ce qui reste à venir, du plus proche au plus lointain.
+  // Le seuil est le début de la journée pour qu'un match du matin ne
+  // disparaisse pas de la liste l'après-midi même.
+  const upcomingEvents = useMemo(() => {
+    const from = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+    return events
+      .filter((e) => new Date(e.start_time).getTime() >= from)
+      .sort((a, b) => a.start_time.localeCompare(b.start_time));
+  }, [events]);
+
+  // Le club convoque par équipe : l'effectif d'un événement, ce sont les
+  // joueurs de son équipe. Un événement club (teamId null) n'a donc pas
+  // d'appel possible ici.
+  function rosterFor(event: AdminUpcomingEvent) {
+    if (!rsvp || !event.teamId) return [];
+    return rsvp.players
+      .filter((p) => p.teamIds.includes(event.teamId!))
+      .map((p) => ({ id: p.id, name: p.name }));
+  }
+
+  const appelEvent = appelEventId ? events.find((e) => e.id === appelEventId) ?? null : null;
+
+  // Une seule carte pour les deux vues : la liste et le detail du jour
+  // affichent exactement le meme evenement, avec les memes compteurs et le
+  // meme appel express.
+  function renderEventCard(event: AdminUpcomingEvent) {
+    const style = styleFor(event.event_type);
+    const rsvpCounts = event.rsvpCounts;
+    const hasRoster =
+      rsvpCounts.present + rsvpCounts.absent + rsvpCounts.late + rsvpCounts.pending > 0;
+    const respondingPlayers = rsvp
+      ? rsvp.players.filter((p) => event.teamId && p.teamIds.includes(event.teamId))
+      : [];
+    const mailto = relanceMailto(event);
+    const homeAway = isMatchType(event.event_type) ? homeAwayLabel(event.isHome) : null;
+
+    return (
+      <div
+        key={event.id}
+        className={`flex flex-col gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm border-l-4 ${style.border}`}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+              {event.teamName}
+            </span>
+            <span className="flex flex-wrap items-center gap-2">
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${style.badge}`}
+              >
+                {style.label}
+              </span>
+              {homeAway && (
+                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-600">
+                  {homeAway}
+                </span>
+              )}
+            </span>
+            {isMatchType(event.event_type) ? (
+              <OpponentDisplay title={event.title} size="sm" />
+            ) : (
+              <span className="font-semibold text-zinc-900">
+                {event.title ?? style.label}
+              </span>
+            )}
+          </div>
+          {canManage && (
+            <div className="flex shrink-0 items-center gap-1">
+              {mailto && (
+                <a
+                  href={mailto}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Relancer les convoqués"
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+                >
+                  <Mail className="h-4 w-4" />
+                </a>
+              )}
+              <button
+                onClick={() => openEdit(event)}
+                title="Modifier"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => handleDeleteEvent(event.id)}
+                title="Supprimer"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-red-400 hover:bg-red-50 hover:text-red-600"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-500">
+          <span className="flex items-center gap-1">
+            <CalendarDays className="h-4 w-4" />
+            {new Date(event.start_time).toLocaleString("fr-FR", {
+              weekday: "short",
+              day: "numeric",
+              month: "short",
+            })}
+            , {formatEventTime(event.start_time, event.end_time)}
+          </span>
+          {event.location && (
+            <span className="flex items-center gap-1">
+              <MapPin className="h-4 w-4" />
+              {event.location}
+            </span>
+          )}
+          {event.salle && <SalleBadge salle={event.salle} />}
+        </div>
+
+        {hasRoster && (
+          <div className="flex flex-wrap gap-1.5">
+            <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold leading-none text-green-700">
+              <Check className="h-3 w-3" />
+              {rsvpCounts.present} présent
+              {rsvpCounts.present > 1 ? "s" : ""}
+            </span>
+            {rsvpCounts.late > 0 && (
+              <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold leading-none text-amber-700">
+                <Clock className="h-3 w-3" />
+                {rsvpCounts.late} en retard
+              </span>
+            )}
+            <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold leading-none text-red-700">
+              <X className="h-3 w-3" />
+              {rsvpCounts.absent} absent
+              {rsvpCounts.absent > 1 ? "s" : ""}
+            </span>
+            <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold leading-none text-zinc-600">
+              <Clock className="h-3 w-3" />
+              {rsvpCounts.pending} en attente
+            </span>
+          </div>
+        )}
+
+        {/* Le coach pointe tout l'effectif d'un coup ; la famille répond
+            joueur par joueur. Empiler les deux donnerait une carte
+            interminable pour un effectif de quinze. */}
+        {canManage && rosterFor(event).length > 0 && (
+          <button
+            onClick={() => setAppelEventId(event.id)}
+            className="mt-1 w-full rounded-full bg-ubac-yellow px-4 py-2.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark"
+          >
+            Faire l&apos;appel express
+          </button>
+        )}
+
+        {!canManage && respondingPlayers.length > 0 && (
+          <div className="flex flex-col gap-2 border-t border-zinc-100 pt-2">
+            {respondingPlayers.map((p) => {
+              const playerStatus =
+                rsvp?.statusByKey[`${event.id}:${p.id}`] ?? "PENDING";
+              const badge =
+                playerStatus === "PRESENT"
+                  ? { label: "Présent", dotClassName: "bg-green-500", className: "bg-green-100 text-green-700" }
+                  : playerStatus === "ABSENT"
+                    ? { label: "Absent", dotClassName: "bg-red-500", className: "bg-red-100 text-red-700" }
+                    : { label: "En attente", dotClassName: "bg-amber-500", className: "bg-amber-100 text-amber-700" };
+              return (
+                <div key={p.id} className="flex flex-wrap items-center gap-2">
+                  {respondingPlayers.length > 1 && (
+                    <span className="min-w-0 truncate text-xs font-medium text-zinc-500">
+                      {p.name}
+                    </span>
+                  )}
+                  <span
+                    className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${badge.className}`}
+                  >
+                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${badge.dotClassName}`} />
+                    {badge.label}
+                  </span>
+                  <RsvpButtons
+                    eventId={event.id}
+                    playerId={p.id}
+                    currentStatus={playerStatus}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+
   return (
     <div className="flex w-full max-w-full min-w-0 flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => step(-1)}
-            aria-label="Précédent"
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-navy text-white transition-colors hover:bg-navy-dark"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => step(1)}
-            aria-label="Suivant"
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-navy text-white transition-colors hover:bg-navy-dark"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-          <span className="text-sm font-semibold capitalize text-zinc-900">
-            {headerLabel}
+        {view === "month" ? (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => step(-1)}
+              aria-label="Précédent"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-navy text-white transition-colors hover:bg-navy-dark"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => step(1)}
+              aria-label="Suivant"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-navy text-white transition-colors hover:bg-navy-dark"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+            <span className="text-sm font-semibold capitalize text-zinc-900">
+              {headerLabel}
+            </span>
+          </div>
+        ) : (
+          <span className="text-sm font-semibold text-zinc-900">
+            Prochains rassemblements
           </span>
+        )}
+
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-0.5 rounded-full border border-zinc-200 p-0.5">
+            <button
+              onClick={() => setView("list")}
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                view === "list" ? "bg-navy text-white" : "text-zinc-500 hover:bg-zinc-50"
+              }`}
+            >
+              <List className="h-3.5 w-3.5" />
+              Liste
+            </button>
+            <button
+              onClick={() => setView("month")}
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                view === "month" ? "bg-navy text-white" : "text-zinc-500 hover:bg-zinc-50"
+              }`}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              Mois
+            </button>
+          </div>
+          {view === "month" && (
+            <button
+              onClick={goToday}
+              className="rounded-full border border-ubac-yellow px-3 py-1 text-xs font-semibold text-ubac-yellow-dark hover:bg-ubac-yellow/10"
+            >
+              Aujourd&apos;hui
+            </button>
+          )}
         </div>
-        <button
-          onClick={goToday}
-          className="rounded-full border border-ubac-yellow px-3 py-1 text-xs font-semibold text-ubac-yellow-dark hover:bg-ubac-yellow/10"
-        >
-          Aujourd&apos;hui
-        </button>
       </div>
 
       {createTeams && createTeams.length > 0 && (
         <CreateEventForm teams={createTeams} allowClubWide={allowClubWide} />
       )}
 
+      {view === "month" && (
       <div className="w-full max-w-full overflow-hidden">
         <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
           {weekdayLabels.map((label) => (
@@ -442,11 +701,36 @@ export default function CalendarView({
           })}
         </div>
       </div>
+      )}
 
       {birthdayWidgetEntries.length > 0 && (
         <BirthdayWidget entries={birthdayWidgetEntries} />
       )}
 
+      {view === "list" && (
+        <div className="flex flex-col gap-2">
+          {upcomingEvents.length === 0 ? (
+            <p className="text-sm text-zinc-500">Aucun événement à venir.</p>
+          ) : (
+            upcomingEvents.map((event) => (
+              <div key={event.id} className="flex flex-col gap-1">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                  {toKey(new Date(event.start_time)) === todayKey
+                    ? "Aujourd'hui"
+                    : new Date(event.start_time).toLocaleDateString("fr-FR", {
+                        weekday: "long",
+                        day: "numeric",
+                        month: "long",
+                      })}
+                </p>
+                {renderEventCard(event)}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {view === "month" && (
       <div className="flex flex-col gap-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
           {selectedKey === todayKey
@@ -479,162 +763,10 @@ export default function CalendarView({
         {detailEvents.length === 0 && detailBirthdays.length === 0 ? (
           <p className="text-sm text-zinc-500">Aucun événement ce jour-là.</p>
         ) : (
-          detailEvents.map((event) => {
-            const style = styleFor(event.event_type);
-            const rsvpCounts = event.rsvpCounts;
-            const hasRoster =
-              rsvpCounts.present +
-                rsvpCounts.absent +
-                rsvpCounts.late +
-                rsvpCounts.pending >
-              0;
-            const respondingPlayers = rsvp
-              ? rsvp.players.filter(
-                  (p) => event.teamId && p.teamIds.includes(event.teamId)
-                )
-              : [];
-
-            const mailto = relanceMailto(event);
-
-            return (
-              <div
-                key={event.id}
-                className={`flex flex-col gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm border-l-4 ${style.border}`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                      {event.teamName}
-                    </span>
-                    {event.event_type === "MATCH" ? (
-                      <OpponentDisplay title={event.title} size="sm" />
-                    ) : (
-                      <span className="flex items-center gap-2">
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${style.badge}`}
-                        >
-                          {style.label}
-                        </span>
-                        <span className="font-semibold text-zinc-900">
-                          {event.title ?? style.label}
-                        </span>
-                      </span>
-                    )}
-                  </div>
-                  {canManage && (
-                    <div className="flex shrink-0 items-center gap-1">
-                      {mailto && (
-                        <a
-                          href={mailto}
-                          target="_blank"
-                          rel="noreferrer"
-                          title="Relancer les convoqués"
-                          className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
-                        >
-                          <Mail className="h-4 w-4" />
-                        </a>
-                      )}
-                      <button
-                        onClick={() => openEdit(event)}
-                        title="Modifier"
-                        className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteEvent(event.id)}
-                        title="Supprimer"
-                        className="flex h-8 w-8 items-center justify-center rounded-full text-red-400 hover:bg-red-50 hover:text-red-600"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-500">
-                  <span className="flex items-center gap-1">
-                    <CalendarDays className="h-4 w-4" />
-                    {new Date(event.start_time).toLocaleString("fr-FR", {
-                      weekday: "short",
-                      day: "numeric",
-                      month: "short",
-                    })}
-                    , {formatEventTime(event.start_time, event.end_time)}
-                  </span>
-                  {event.location && (
-                    <span className="flex items-center gap-1">
-                      <MapPin className="h-4 w-4" />
-                      {event.location}
-                    </span>
-                  )}
-                  {event.salle && <SalleBadge salle={event.salle} />}
-                </div>
-
-                {hasRoster && (
-                  <div className="flex flex-wrap gap-1.5">
-                    <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold leading-none text-green-700">
-                      <Check className="h-3 w-3" />
-                      {rsvpCounts.present} présent
-                      {rsvpCounts.present > 1 ? "s" : ""}
-                    </span>
-                    {rsvpCounts.late > 0 && (
-                      <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold leading-none text-amber-700">
-                        <Clock className="h-3 w-3" />
-                        {rsvpCounts.late} en retard
-                      </span>
-                    )}
-                    <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold leading-none text-red-700">
-                      <X className="h-3 w-3" />
-                      {rsvpCounts.absent} absent
-                      {rsvpCounts.absent > 1 ? "s" : ""}
-                    </span>
-                    <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold leading-none text-zinc-600">
-                      <Clock className="h-3 w-3" />
-                      {rsvpCounts.pending} en attente
-                    </span>
-                  </div>
-                )}
-
-                {respondingPlayers.length > 0 && (
-                  <div className="flex flex-col gap-2 border-t border-zinc-100 pt-2">
-                    {respondingPlayers.map((p) => {
-                      const playerStatus =
-                        rsvp?.statusByKey[`${event.id}:${p.id}`] ?? "PENDING";
-                      const badge =
-                        playerStatus === "PRESENT"
-                          ? { label: "Présent", dotClassName: "bg-green-500", className: "bg-green-100 text-green-700" }
-                          : playerStatus === "ABSENT"
-                            ? { label: "Absent", dotClassName: "bg-red-500", className: "bg-red-100 text-red-700" }
-                            : { label: "En attente", dotClassName: "bg-amber-500", className: "bg-amber-100 text-amber-700" };
-                      return (
-                        <div key={p.id} className="flex flex-wrap items-center gap-2">
-                          {respondingPlayers.length > 1 && (
-                            <span className="min-w-0 truncate text-xs font-medium text-zinc-500">
-                              {p.name}
-                            </span>
-                          )}
-                          <span
-                            className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${badge.className}`}
-                          >
-                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${badge.dotClassName}`} />
-                            {badge.label}
-                          </span>
-                          <RsvpButtons
-                            eventId={event.id}
-                            playerId={p.id}
-                            currentStatus={playerStatus}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })
+          detailEvents.map((event) => renderEventCard(event))
         )}
       </div>
+      )}
 
       {editingEvent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -664,13 +796,29 @@ export default function CalendarView({
                   onChange={(e) => setEditType(e.target.value)}
                   className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
                 >
-                  {eventTypeOptions.map((o) => (
+                  {EVENT_TYPE_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>
                       {o.label}
                     </option>
                   ))}
                 </select>
               </div>
+              {isMatchType(editType) && (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-zinc-600">
+                    Lieu du match
+                  </label>
+                  <select
+                    value={editIsHome}
+                    onChange={(e) => setEditIsHome(e.target.value as "" | "true" | "false")}
+                    className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+                  >
+                    <option value="">Non précisé</option>
+                    <option value="true">Domicile</option>
+                    <option value="false">Extérieur</option>
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="mb-1 block text-xs font-medium text-zinc-600">Lieu</label>
                 <input
@@ -759,6 +907,21 @@ export default function CalendarView({
             </div>
           </div>
         </div>
+      )}
+
+      {appelEvent && (
+        <AppelExpressModal
+          eventId={appelEvent.id}
+          title={appelEvent.teamName}
+          roster={rosterFor(appelEvent)}
+          statusByPlayerId={Object.fromEntries(
+            rosterFor(appelEvent).map((p) => [
+              p.id,
+              rsvp?.statusByKey[`${appelEvent.id}:${p.id}`] ?? "PENDING",
+            ])
+          )}
+          onClose={() => setAppelEventId(null)}
+        />
       )}
 
       {openBirthday && (

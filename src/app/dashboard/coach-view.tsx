@@ -1,7 +1,6 @@
-import { CalendarDays, ClipboardList, Dumbbell, MessageCircle, Trophy, Users } from "lucide-react";
+import { CalendarDays, ClipboardList, MessageCircle, Trophy, Users } from "lucide-react";
 import CalendarView from "./calendar-view";
 import CoachTeams from "./coach-teams";
-import CoachTrainings from "./coach-trainings";
 import CoachFfbb from "./coach-ffbb";
 import CoachOrganisation, { type CoachTeamMatchCard } from "./coach-organisation";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
@@ -118,7 +117,7 @@ export default function CoachView({
     },
     {
       key: "teams",
-      label: "Équipe(s)",
+      label: "Mes Équipes",
       icon: <Users className={iconClass} />,
       content: (
         <CoachTeams
@@ -135,7 +134,7 @@ export default function CoachView({
     },
     {
       key: "organisation",
-      label: "Organisation",
+      label: "Organisation & Bilan",
       icon: <ClipboardList className={iconClass} />,
       content: (
         <CoachOrganisation
@@ -146,14 +145,6 @@ export default function CoachView({
           taskTallyByTeamId={taskTallyByTeamId}
           roles={eventRoles}
         />
-      ),
-    },
-    {
-      key: "trainings",
-      label: "Entraînements",
-      icon: <Dumbbell className={iconClass} />,
-      content: (
-        <CoachTrainings teams={teams} events={events} rsvpStatusByKey={rsvpStatusByKey} />
       ),
     },
     {

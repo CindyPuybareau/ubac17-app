@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { computePlayerYearStatus, getCurrentSeasonLabel } from "@/lib/season";
-import { formatEventTime, styleFor } from "./calendar-view";
+import { formatEventTime, isMatchType, styleFor } from "./calendar-view";
 import OpponentDisplay from "./opponent-display";
 import MemberDetailModal from "./member-detail-modal";
 import PlayerYearBadge from "./player-year-badge";
@@ -864,7 +864,7 @@ export default function TeamCard({
                         {style.label}
                       </span>
                       <div className="min-w-0 flex-1">
-                        {e.event_type === "MATCH" ? (
+                        {isMatchType(e.event_type) ?  (
                           <OpponentDisplay title={e.title} size="sm" />
                         ) : (
                           <span className="truncate text-sm font-medium text-blue-900">

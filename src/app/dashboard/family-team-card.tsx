@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CalendarDays, Clock, ExternalLink, MapPin, MessageCircle, Users } from "lucide-react";
-import { formatEventTime, styleFor } from "./calendar-view";
+import { formatEventTime, isMatchType, styleFor } from "./calendar-view";
 import OpponentDisplay from "./opponent-display";
 import SalleBadge from "./salle-badge";
 import WhatsAppButton from "./whatsapp-button";
@@ -163,7 +163,7 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
                       {style.label}
                     </span>
                     <div className="min-w-0 flex-1">
-                      {e.event_type === "MATCH" ? (
+                      {isMatchType(e.event_type) ?  (
                         <OpponentDisplay title={e.title} size="sm" />
                       ) : (
                         <span className="truncate text-sm font-medium text-blue-900">

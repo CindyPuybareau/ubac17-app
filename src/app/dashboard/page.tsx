@@ -166,6 +166,9 @@ export type AdminUpcomingEvent = {
   id: string;
   title: string | null;
   event_type: string | null;
+  // true = domicile, false = extérieur, null = non précisé. Ne concerne
+  // que les matchs (MATCH, FRIENDLY).
+  isHome: boolean | null;
   location: string | null;
   salle: string | null;
   start_time: string;
@@ -525,7 +528,7 @@ export default async function DashboardPage() {
       supabase
         .from("events")
         .select(
-          "id, title, event_type, location, salle, start_time, end_time, notes, teams(id, name, category)"
+          "id, title, event_type, is_home, location, salle, start_time, end_time, notes, teams(id, name, category)"
         )
         .order("start_time", { ascending: true }),
       supabase.from("parent_player").select("parent_id, player_id"),
@@ -890,6 +893,7 @@ export default async function DashboardPage() {
         id: e.id,
         title: e.title,
         event_type: e.event_type,
+        isHome: e.is_home,
         location: e.location,
         salle: e.salle,
         start_time: e.start_time,
@@ -955,7 +959,7 @@ export default async function DashboardPage() {
         supabase
           .from("events")
           .select(
-            "id, title, event_type, location, salle, start_time, end_time, notes, teams(id, name, category)"
+            "id, title, event_type, is_home, location, salle, start_time, end_time, notes, teams(id, name, category)"
           )
           .or(teamOrClubWideFilter(coachCalendarTeamIds))
           .order("start_time", { ascending: true }),
@@ -1290,6 +1294,7 @@ export default async function DashboardPage() {
         id: e.id,
         title: e.title,
         event_type: e.event_type,
+        isHome: e.is_home,
         location: e.location,
         salle: e.salle,
         start_time: e.start_time,
@@ -1483,7 +1488,7 @@ export default async function DashboardPage() {
     const { data: eventsData } = await supabase
       .from("events")
       .select(
-        "id, title, event_type, location, salle, start_time, end_time, notes, teams(id, name, category)"
+        "id, title, event_type, is_home, location, salle, start_time, end_time, notes, teams(id, name, category)"
       )
       .or(teamOrClubWideFilter(allTeamIds))
       .order("start_time", { ascending: true });
@@ -1513,6 +1518,7 @@ export default async function DashboardPage() {
         id: e.id,
         title: e.title,
         event_type: e.event_type,
+        isHome: e.is_home,
         location: e.location,
         salle: e.salle,
         start_time: e.start_time,

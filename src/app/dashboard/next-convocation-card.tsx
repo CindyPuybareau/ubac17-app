@@ -4,6 +4,7 @@ import OpponentDisplay from "./opponent-display";
 import NextMatchActions from "./next-match-actions";
 import MatchTasksPanel from "./match-tasks-panel";
 import type { UpcomingEvent } from "./family-data";
+import { isMatchType } from "./calendar-view";
 import { rolesForEventType } from "./event-tasks";
 import { shouldOfferCarpool } from "./salles";
 import type { CarpoolOffer, EventRoleType, EventTasksState } from "./event-tasks";
@@ -43,7 +44,7 @@ export default function NextConvocationCard({
         Prochaine convocation · {playerName}
       </p>
       <div className="mt-1">
-        {event.event_type === "MATCH" ? (
+        {isMatchType(event.event_type) ?  (
           <OpponentDisplay title={event.title} />
         ) : (
           <h3 className="text-lg font-bold text-zinc-900">
