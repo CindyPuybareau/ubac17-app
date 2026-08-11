@@ -9,9 +9,9 @@ import WhatsAppGroupsFamily from "./whatsapp-groups-family";
 import type { AdminUpcomingEvent, WhatsAppGroup } from "./page";
 import type { UpcomingEvent } from "./family-data";
 import type { BirthdaySource } from "./birthdays";
-import type { CarpoolOffer, EventTasksState } from "./event-tasks";
+import type { CarpoolOffer, EventRoleType, EventTasksState } from "./event-tasks";
 
-const emptyEventTasks: EventTasksState = { JERSEYS: null, SNACKS: null };
+const emptyEventTasks: EventTasksState = {};
 
 type ConvocationCard = {
   player: { id: string; name: string; category: string | null; isSelf: boolean };
@@ -30,6 +30,7 @@ export default function FamilyView({
   tasksByEventId,
   carpoolByEventId,
   whatsappGroups,
+  eventRoles,
 }: {
   events: AdminUpcomingEvent[];
   rsvpPlayers: CalendarRsvpPlayer[];
@@ -41,6 +42,7 @@ export default function FamilyView({
   tasksByEventId: Record<string, EventTasksState>;
   carpoolByEventId: Record<string, CarpoolOffer[]>;
   whatsappGroups: WhatsAppGroup[];
+  eventRoles: EventRoleType[];
 }) {
   const iconClass = "h-4 w-4 shrink-0";
   const sections: AdminSection[] = [
@@ -95,6 +97,7 @@ export default function FamilyView({
               roster={rosterByEventId[event.id] ?? []}
               tasks={tasksByEventId[event.id] ?? emptyEventTasks}
               carpool={carpoolByEventId[event.id] ?? []}
+              roles={eventRoles}
             />
           ))}
           {convocationCards.length === 0 && (
@@ -106,6 +109,7 @@ export default function FamilyView({
             events={events}
             players={rsvpPlayers}
             tasksByEventId={tasksByEventId}
+            roles={eventRoles}
           />
         </div>
       ),

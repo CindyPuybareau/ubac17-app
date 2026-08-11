@@ -13,7 +13,12 @@ import type {
   MemberDetail,
   WhatsAppGroup,
 } from "./page";
-import type { CarpoolOffer, EventTasksState, SeasonTaskTally } from "./event-tasks";
+import type {
+  CarpoolOffer,
+  EventRoleType,
+  EventTasksState,
+  SeasonTaskTally,
+} from "./event-tasks";
 import type { BirthdaySource } from "./birthdays";
 
 export default function CoachView({
@@ -33,6 +38,7 @@ export default function CoachView({
   carpoolByEventId,
   whatsappGroups,
   archivedPlayerIds,
+  eventRoles,
 }: {
   teams: TeamWithMembers[];
   events: AdminUpcomingEvent[];
@@ -57,6 +63,8 @@ export default function CoachView({
   // done here from a plain id list since a coach's roster (RosterPlayer)
   // doesn't carry archived status itself.
   archivedPlayerIds: string[];
+  // Catalogue des roles d organisation (event_role_types).
+  eventRoles: EventRoleType[];
 }) {
   // Créer / modifier / supprimer un événement n'est permis que pour les
   // équipes réellement entraînées : proposer celle où l'utilisateur n'est
@@ -136,6 +144,7 @@ export default function CoachView({
           carpoolByEventId={carpoolByEventId}
           events={events}
           taskTallyByTeamId={taskTallyByTeamId}
+          roles={eventRoles}
         />
       ),
     },

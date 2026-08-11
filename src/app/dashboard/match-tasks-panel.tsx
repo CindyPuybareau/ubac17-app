@@ -2,28 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Shirt, Utensils, Car, X } from "lucide-react";
+import { Car, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import TaskSourceBadge from "./task-source-badge";
-import type { CarpoolOffer, EventTasksState, TaskType } from "./event-tasks";
-
-const TASK_META: Record<
+import RoleIcon from "./role-icon";
+import type {
+  CarpoolOffer,
+  EventRoleType,
+  EventTasksState,
   TaskType,
-  { label: string; icon: typeof Shirt; className: string; volunteerLabel: string }
-> = {
-  JERSEYS: {
-    label: "Lavage des maillots",
-    icon: Shirt,
-    className: "text-sky-600",
-    volunteerLabel: "Je me propose pour les maillots",
-  },
-  SNACKS: {
-    label: "Goûter d'après-match",
-    icon: Utensils,
-    className: "text-amber-600",
-    volunteerLabel: "Je m'occupe du goûter",
-  },
-};
+} from "./event-tasks";
+
 
 export default function MatchTasksPanel({
   eventId,
@@ -32,6 +21,7 @@ export default function MatchTasksPanel({
   canAssignAnyone,
   initialTasks,
   initialCarpool,
+  roles,
 }: {
   eventId: string;
   roster: { id: string; name: string }[];
@@ -39,6 +29,8 @@ export default function MatchTasksPanel({
   canAssignAnyone: boolean;
   initialTasks: EventTasksState;
   initialCarpool: CarpoolOffer[];
+  // Catalogue applicable a ce type d evenement, resolu par l appelant.
+  roles: EventRoleType[];
 }) {
   const router = useRouter();
   const [pending, setPending] = useState<TaskType | "carpool" | null>(null);
@@ -121,10 +113,9 @@ export default function MatchTasksPanel({
       {/* Deux colonnes sur écran large, empilées sur mobile — même
           disposition que la liste des événements à venir côté parent. */}
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-      {(["JERSEYS", "SNACKS"] as TaskType[]).map((taskType) => {
-        const meta = TASK_META[taskType];
-        const Icon = meta.icon;
-        const assignment = initialTasks[taskType];
+      {roles.map((role) => {
+        const taskType = role.code;
+        const assignment = initialTasks[taskType] ?? null;
         const assignedToMe = assignment ? myPlayerIds.includes(assignment.playerId) : false;
 
         return (
@@ -134,9 +125,9 @@ export default function MatchTasksPanel({
             className="flex flex-col gap-2 rounded-lg bg-white px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3"
           >
             <div className="flex min-w-0 items-center gap-2">
-              <Icon className={`h-4 w-4 shrink-0 ${meta.className}`} />
+              <RoleIcon icon={role.icon} />
               <div className="min-w-0">
-                <p className="text-xs font-medium text-zinc-700">{meta.label}</p>
+                <p className="text-xs font-medium text-zinc-700">{role.label}</p>
                 <p className="flex items-center gap-1.5 text-xs text-zinc-500">
                   <span className="truncate">
                     {assignment ? assignment.playerName : "Non attribué"}
@@ -169,7 +160,7 @@ export default function MatchTasksPanel({
                 onClick={() => volunteer(taskType, myPlayerIds[0])}
                 className="w-full rounded-full bg-navy px-3 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-navy-dark disabled:opacity-60 sm:w-auto"
               >
-                {meta.volunteerLabel}
+                Je m&apos;en occupe
               </button>
             ) : assignedToMe ? (
               <button

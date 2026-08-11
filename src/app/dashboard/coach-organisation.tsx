@@ -1,22 +1,26 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarDays, ChevronDown, ChevronUp, Shirt, Trophy, Utensils } from "lucide-react";
+import { CalendarDays, ChevronDown, ChevronUp, Trophy } from "lucide-react";
 import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
 import CoachNextMatchCard from "./coach-next-match-card";
 import { formatEventTime, styleFor } from "./calendar-view";
+import { rolesForEventType } from "./event-tasks";
 import SalleBadge from "./salle-badge";
 import type { RosterPlayer, RsvpCounts, UpcomingEvent } from "./family-data";
 import TaskSourceBadge from "./task-source-badge";
+import RoleIcon from "./role-icon";
+import EventRolesEditor from "./event-roles-editor";
 import type {
   CarpoolOffer,
   EventTasksState,
+  EventRoleType,
   SeasonTaskTally,
   TaskAssignment,
 } from "./event-tasks";
 import type { AdminUpcomingEvent } from "./page";
 
-const emptyEventTasks: EventTasksState = { JERSEYS: null, SNACKS: null };
+const emptyEventTasks: EventTasksState = {};
 
 export type CoachTeamMatchCard = {
   team: { id: string; name: string | null; category: string | null };
@@ -26,7 +30,8 @@ export type CoachTeamMatchCard = {
 };
 
 type SubTab = "planning" | "bilan";
-type SortKey = "name" | "jerseys" | "snacks";
+// "name" ou le code d un role du catalogue.
+type SortKey = string;
 
 function fullName(p: RosterPlayer) {
   return [p.first_name, p.last_name].filter(Boolean).join(" ") || "Sans nom";
@@ -63,14 +68,18 @@ function PlanningTab({
   tasksByEventId,
   carpoolByEventId,
   upcomingEvents,
+  roles,
 }: {
   cards: CoachTeamMatchCard[];
   tasksByEventId: Record<string, EventTasksState>;
   carpoolByEventId: Record<string, CarpoolOffer[]>;
   upcomingEvents: AdminUpcomingEvent[];
+  roles: EventRoleType[];
 }) {
   return (
     <div className="flex flex-col gap-4">
+      <EventRolesEditor roles={roles} />
+
       {cards.map(({ team, event, counts, roster }) => (
         <CoachNextMatchCard
           key={team.id}
@@ -82,6 +91,7 @@ function PlanningTab({
           roster={roster}
           tasks={event ? (tasksByEventId[event.id] ?? emptyEventTasks) : emptyEventTasks}
           carpool={event ? (carpoolByEventId[event.id] ?? []) : []}
+          roles={roles}
         />
       ))}
 
@@ -105,24 +115,26 @@ function PlanningTab({
                   <th className="whitespace-nowrap px-3 py-2.5">Heure</th>
                   <th className="whitespace-nowrap px-3 py-2.5">Type</th>
                   <th className="w-auto px-3 py-2.5">Équipe &amp; lieu</th>
-                  <th className="whitespace-nowrap px-3 py-2.5">
-                    <span className="flex items-center gap-1">
-                      <Shirt className="h-3.5 w-3.5 text-sky-600" />
-                      Maillots
-                    </span>
-                  </th>
-                  <th className="whitespace-nowrap px-3 py-2.5">
-                    <span className="flex items-center gap-1">
-                      <Utensils className="h-3.5 w-3.5 text-amber-600" />
-                      Goûter
-                    </span>
-                  </th>
+                  {roles.map((role) => (
+                    <th key={role.code} className="whitespace-nowrap px-3 py-2.5">
+                      <span className="flex items-center gap-1">
+                        <RoleIcon icon={role.icon} className="h-3.5 w-3.5 shrink-0" />
+                        {role.label}
+                      </span>
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {upcomingEvents.map((e) => {
                   const style = styleFor(e.event_type);
                   const tasks = tasksByEventId[e.id] ?? emptyEventTasks;
+                  // Un role restreint a certains types ne concerne pas cet
+                  // evenement : afficher "A attribuer" y appellerait a une
+                  // action impossible.
+                  const applicable = new Set(
+                    rolesForEventType(roles, e.event_type).map((r) => r.code)
+                  );
                   return (
                     <tr key={e.id} className="border-b border-zinc-50 last:border-0">
                       <td className="whitespace-nowrap px-3 py-2.5 font-medium text-zinc-900">
@@ -148,12 +160,15 @@ function PlanningTab({
                           ) : null}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2.5">
-                        <TaskCell assignment={tasks.JERSEYS} />
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2.5">
-                        <TaskCell assignment={tasks.SNACKS} />
-                      </td>
+                      {roles.map((role) => (
+                        <td key={role.code} className="whitespace-nowrap px-3 py-2.5">
+                          {applicable.has(role.code) ? (
+                            <TaskCell assignment={tasks[role.code] ?? null} />
+                          ) : (
+                            <span className="text-zinc-300">—</span>
+                          )}
+                        </td>
+                      ))}
                     </tr>
                   );
                 })}
@@ -170,14 +185,16 @@ function BilanTeamTable({
   team,
   roster,
   tally,
+  roles,
 }: {
   team: CoachTeamMatchCard["team"];
   roster: RosterPlayer[];
   tally: SeasonTaskTally;
+  roles: EventRoleType[];
 }) {
   // Par défaut : les familles qui ont le moins contribué en premier, ce
   // qui est la question que se pose un coach en ouvrant ce bilan.
-  const [sortKey, setSortKey] = useState<SortKey>("jerseys");
+  const [sortKey, setSortKey] = useState<SortKey>(roles[0]?.code ?? "name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   function toggleSort(key: SortKey) {
@@ -193,20 +210,21 @@ function BilanTeamTable({
     const list = roster.map((p) => ({
       id: p.id,
       name: fullName(p),
-      ...(tally[p.id] ?? { jerseys: 0, snacks: 0 }),
+      counts: tally[p.id] ?? {},
     }));
     const dir = sortDir === "asc" ? 1 : -1;
     return list.sort((a, b) => {
       if (sortKey === "name") return a.name.localeCompare(b.name, "fr") * dir;
-      const diff = (a[sortKey] - b[sortKey]) * dir;
+      const diff = ((a.counts[sortKey] ?? 0) - (b.counts[sortKey] ?? 0)) * dir;
       return diff !== 0 ? diff : a.name.localeCompare(b.name, "fr");
     });
   }, [roster, tally, sortKey, sortDir]);
 
-  const totals = rows.reduce(
-    (acc, r) => ({ jerseys: acc.jerseys + r.jerseys, snacks: acc.snacks + r.snacks }),
-    { jerseys: 0, snacks: 0 }
-  );
+  // Un total par rôle du catalogue, y compris les rôles créés par le club.
+  const totals = roles.map((role) => ({
+    role,
+    total: rows.reduce((sum, r) => sum + (r.counts[role.code] ?? 0), 0),
+  }));
 
   const header = (key: SortKey, label: string, icon?: React.ReactNode) => (
     <th className="whitespace-nowrap px-3 py-2.5">
@@ -237,8 +255,8 @@ function BilanTeamTable({
           )}
         </p>
         <p className="text-xs text-zinc-500">
-          {totals.jerseys} lavage{totals.jerseys > 1 ? "s" : ""} · {totals.snacks} goûter
-          {totals.snacks > 1 ? "s" : ""} sur la saison
+          {totals.map((t) => `${t.total} ${t.role.label.toLowerCase()}`).join(" · ")}
+          {totals.length > 0 ? " sur la saison" : ""}
         </p>
       </div>
 
@@ -247,33 +265,35 @@ function BilanTeamTable({
           <thead>
             <tr className="border-b border-zinc-100 bg-zinc-50 text-left text-xs font-semibold text-zinc-400">
               {header("name", "Famille / Joueur")}
-              {header("jerseys", "Maillots", <Shirt className="h-3.5 w-3.5 text-sky-600" />)}
-              {header("snacks", "Goûter", <Utensils className="h-3.5 w-3.5 text-amber-600" />)}
+              {roles.map((role) =>
+                header(role.code, role.label, <RoleIcon icon={role.icon} className="h-3.5 w-3.5 shrink-0" />)
+              )}
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} className="border-b border-zinc-50 last:border-0">
                 <td className="w-auto px-3 py-2.5 text-zinc-800">{r.name}</td>
-                <td className="whitespace-nowrap px-3 py-2.5">
-                  <span
-                    className={`font-semibold ${r.jerseys === 0 ? "text-zinc-300" : "text-zinc-900"}`}
-                  >
-                    {r.jerseys}
-                  </span>
-                </td>
-                <td className="whitespace-nowrap px-3 py-2.5">
-                  <span
-                    className={`font-semibold ${r.snacks === 0 ? "text-zinc-300" : "text-zinc-900"}`}
-                  >
-                    {r.snacks}
-                  </span>
-                </td>
+                {roles.map((role) => {
+                  const count = r.counts[role.code] ?? 0;
+                  return (
+                    <td key={role.code} className="whitespace-nowrap px-3 py-2.5">
+                      <span
+                        className={`font-semibold ${count === 0 ? "text-zinc-300" : "text-zinc-900"}`}
+                      >
+                        {count}
+                      </span>
+                    </td>
+                  );
+                })}
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={3} className="px-3 py-4 text-center text-sm text-zinc-400">
+                <td
+                  colSpan={roles.length + 1}
+                  className="px-3 py-4 text-center text-sm text-zinc-400"
+                >
                   Aucun joueur dans cette équipe
                 </td>
               </tr>
@@ -291,12 +311,14 @@ export default function CoachOrganisation({
   carpoolByEventId,
   events,
   taskTallyByTeamId,
+  roles,
 }: {
   cards: CoachTeamMatchCard[];
   tasksByEventId: Record<string, EventTasksState>;
   carpoolByEventId: Record<string, CarpoolOffer[]>;
   events: AdminUpcomingEvent[];
   taskTallyByTeamId: Record<string, SeasonTaskTally>;
+  roles: EventRoleType[];
 }) {
   const [tab, setTab] = useState<SubTab>("planning");
   useScrollTopOnChange(tab);
@@ -342,6 +364,7 @@ export default function CoachOrganisation({
           tasksByEventId={tasksByEventId}
           carpoolByEventId={carpoolByEventId}
           upcomingEvents={upcomingEvents}
+          roles={roles}
         />
       ) : (
         <div className="flex flex-col gap-4">
@@ -356,6 +379,7 @@ export default function CoachOrganisation({
               team={team}
               roster={roster}
               tally={taskTallyByTeamId[team.id] ?? {}}
+              roles={roles}
             />
           ))}
         </div>

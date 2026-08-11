@@ -7,15 +7,13 @@ import { createClient } from "@/lib/supabase/client";
 import { formatEventTime, styleFor } from "./calendar-view";
 import SalleBadge from "./salle-badge";
 import TaskSourceBadge from "./task-source-badge";
-import type { EventTasksState, TaskType } from "./event-tasks";
+import { rolesForEventType } from "./event-tasks";
+import RoleIcon from "./role-icon";
+import type { EventRoleType, EventTasksState, TaskType } from "./event-tasks";
 import type { AdminUpcomingEvent } from "./page";
 
-const emptyTasks: EventTasksState = { JERSEYS: null, SNACKS: null };
+const emptyTasks: EventTasksState = {};
 
-const TASK_META: Record<TaskType, { label: string; icon: typeof Shirt; className: string }> = {
-  JERSEYS: { label: "Maillots", icon: Shirt, className: "text-sky-600" },
-  SNACKS: { label: "Goûter", icon: Utensils, className: "text-amber-600" },
-};
 
 function formatDay(iso: string) {
   return new Date(iso).toLocaleDateString("fr-FR", {
@@ -33,10 +31,12 @@ export default function FamilyUpcomingRoles({
   events,
   players,
   tasksByEventId,
+  roles,
 }: {
   events: AdminUpcomingEvent[];
   players: { id: string; name: string; teamIds: string[] }[];
   tasksByEventId: Record<string, EventTasksState>;
+  roles: EventRoleType[];
 }) {
   const router = useRouter();
   const [pending, setPending] = useState<string | null>(null);
@@ -137,10 +137,9 @@ export default function FamilyUpcomingRoles({
               </div>
 
               <div className="flex flex-col gap-2 sm:flex-row">
-                {(["JERSEYS", "SNACKS"] as TaskType[]).map((taskType) => {
-                  const meta = TASK_META[taskType];
-                  const Icon = meta.icon;
-                  const assignment = tasks[taskType];
+                {rolesForEventType(roles, e.event_type).map((role) => {
+                  const taskType = role.code;
+                  const assignment = tasks[taskType] ?? null;
                   const isMine = assignment?.playerId === child.id;
                   const key = `${e.id}-${taskType}`;
 
@@ -153,10 +152,10 @@ export default function FamilyUpcomingRoles({
                       className="flex flex-1 items-center gap-3 rounded-lg bg-white px-3 py-2"
                     >
                       <span className="flex min-w-0 items-center gap-1.5">
-                        <Icon className={`h-3.5 w-3.5 shrink-0 ${meta.className}`} />
+                        <RoleIcon icon={role.icon} className="h-3.5 w-3.5 shrink-0" />
                         <span className="min-w-0">
                           <span className="block text-xs font-medium text-zinc-700">
-                            {meta.label}
+                            {role.label}
                           </span>
                           <span className="flex items-center gap-1.5 text-xs text-zinc-500">
                             <span className="truncate">

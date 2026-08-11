@@ -20,8 +20,10 @@ import {
 } from "./family-data";
 import {
   getCarpoolOffersByEventId,
+  getEventRoleTypes,
   getEventTasksByEventId,
   getSeasonTaskTallyByTeamIds,
+  type EventRoleType,
   type EventTasksState,
   type SeasonTaskTally,
 } from "./event-tasks";
@@ -428,6 +430,10 @@ export default async function DashboardPage() {
       ]
     )
   );
+
+  // Catalogue des roles d organisation, commun au club et lu par les trois
+  // espaces. Une seule requete, hors branche de role.
+  const eventRoleTypes: EventRoleType[] = await getEventRoleTypes(supabase);
 
   const [eventTasksByEventId, carpoolOffersByEventId] = await Promise.all([
     getEventTasksByEventId(supabase, priorityEventIds),
@@ -1601,6 +1607,7 @@ export default async function DashboardPage() {
           carpoolByEventId={carpoolOffersByEventId}
           whatsappGroups={whatsappGroups}
           archivedPlayerIds={coachArchivedPlayerIds}
+          eventRoles={eventRoleTypes}
         />
       ),
     });
@@ -1622,6 +1629,7 @@ export default async function DashboardPage() {
           tasksByEventId={familyOrganisationTasks}
           carpoolByEventId={carpoolOffersByEventId}
           whatsappGroups={whatsappGroups}
+          eventRoles={eventRoleTypes}
         />
       ),
     });

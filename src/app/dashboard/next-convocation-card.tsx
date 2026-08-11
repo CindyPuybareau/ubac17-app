@@ -4,7 +4,8 @@ import OpponentDisplay from "./opponent-display";
 import NextMatchActions from "./next-match-actions";
 import MatchTasksPanel from "./match-tasks-panel";
 import type { UpcomingEvent } from "./family-data";
-import type { CarpoolOffer, EventTasksState } from "./event-tasks";
+import { rolesForEventType } from "./event-tasks";
+import type { CarpoolOffer, EventRoleType, EventTasksState } from "./event-tasks";
 
 function formatEventDate(iso: string) {
   return new Date(iso).toLocaleString("fr-FR", {
@@ -24,6 +25,7 @@ export default function NextConvocationCard({
   roster,
   tasks,
   carpool,
+  roles,
 }: {
   playerName: string;
   playerId: string;
@@ -32,6 +34,7 @@ export default function NextConvocationCard({
   roster: { id: string; name: string }[];
   tasks: EventTasksState;
   carpool: CarpoolOffer[];
+  roles: EventRoleType[];
 }) {
   return (
     <div className="rounded-2xl border border-ubac-yellow/40 bg-ubac-yellow/5 p-5 shadow-sm">
@@ -77,6 +80,7 @@ export default function NextConvocationCard({
         canAssignAnyone={false}
         initialTasks={tasks}
         initialCarpool={carpool}
+        roles={rolesForEventType(roles, event.event_type)}
       />
     </div>
   );

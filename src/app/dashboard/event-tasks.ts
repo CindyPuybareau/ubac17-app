@@ -1,6 +1,19 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type TaskType = "JERSEYS" | "SNACKS";
+// Un rôle est désormais une donnée (table event_role_types) et non plus
+// une valeur en dur : "JERSEYS" et "SNACKS" ne sont que les deux premières
+// lignes du catalogue, à côté de "Table de marque" ou "Arbitre de touche".
+export type TaskType = string;
+
+export type EventRoleType = {
+  code: string;
+  label: string;
+  icon: string | null;
+  // Types d'événement concernés ; vide = tous (une table de marque n'a pas
+  // de sens sur un entraînement).
+  eventTypes: string[];
+  sortOrder: number;
+};
 
 export type TaskSource = "COACH" | "VOLUNTEER";
 
@@ -12,10 +25,8 @@ export type TaskAssignment = {
   source: TaskSource | null;
 } | null;
 
-export type EventTasksState = {
-  JERSEYS: TaskAssignment;
-  SNACKS: TaskAssignment;
-};
+// Clé = code du rôle. Une clé absente signifie "non attribué".
+export type EventTasksState = Record<string, TaskAssignment>;
 
 export type CarpoolOffer = {
   playerId: string;
@@ -23,10 +34,43 @@ export type CarpoolOffer = {
   seats: number;
 };
 
-export type SeasonTaskTally = Record<string, { jerseys: number; snacks: number }>;
+// playerId -> code du rôle -> nombre de fois assuré sur la saison.
+export type SeasonTaskTally = Record<string, Record<string, number>>;
 
 function fullName(p: { first_name: string | null; last_name: string | null }) {
   return [p.first_name, p.last_name].filter(Boolean).join(" ") || "Sans nom";
+}
+
+// Le catalogue de rôles du club, hors rôles archivés, dans l'ordre voulu.
+export async function getEventRoleTypes(
+  supabase: SupabaseClient
+): Promise<EventRoleType[]> {
+  const { data } = await supabase
+    .from("event_role_types")
+    .select("code, label, icon, event_types, sort_order")
+    .is("archived_at", null)
+    .order("sort_order");
+
+  return (data ?? []).map((r) => ({
+    code: r.code as string,
+    label: r.label as string,
+    icon: (r.icon as string | null) ?? null,
+    eventTypes: (r.event_types as string[] | null) ?? [],
+    sortOrder: (r.sort_order as number | null) ?? 100,
+  }));
+}
+
+// Rôles applicables à un type d'événement donné : ceux sans restriction,
+// plus ceux qui le mentionnent explicitement.
+export function rolesForEventType(
+  roles: EventRoleType[],
+  eventType: string | null
+): EventRoleType[] {
+  return roles.filter(
+    (r) =>
+      r.eventTypes.length === 0 ||
+      (eventType !== null && r.eventTypes.includes(eventType))
+  );
 }
 
 export async function getEventTasksByEventId(
@@ -47,16 +91,14 @@ export async function getEventTasksByEventId(
       last_name: string | null;
     } | null;
     const eventId = row.event_id as string;
-    const state = (result[eventId] ??= { JERSEYS: null, SNACKS: null });
-    const assignment: TaskAssignment = player
+    const state = (result[eventId] ??= {});
+    state[row.task_type as string] = player
       ? {
           playerId: row.player_id as string,
           playerName: fullName(player),
           source: (row.source as TaskSource | null) ?? null,
         }
       : null;
-    if (row.task_type === "JERSEYS") state.JERSEYS = assignment;
-    else if (row.task_type === "SNACKS") state.SNACKS = assignment;
   });
 
   return result;
@@ -109,9 +151,9 @@ export async function getSeasonTaskTallyByTeamIds(
     if (!event) return;
     const tally = (result[event.team_id] ??= {});
     const playerId = row.player_id as string;
-    const entry = (tally[playerId] ??= { jerseys: 0, snacks: 0 });
-    if (row.task_type === "JERSEYS") entry.jerseys += 1;
-    else if (row.task_type === "SNACKS") entry.snacks += 1;
+    const byRole = (tally[playerId] ??= {});
+    const code = row.task_type as string;
+    byRole[code] = (byRole[code] ?? 0) + 1;
   });
 
   return result;
