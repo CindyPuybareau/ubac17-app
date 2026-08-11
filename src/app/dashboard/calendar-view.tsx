@@ -136,11 +136,6 @@ function startOfTodayMs() {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 }
 
-function hasUpcomingEvents(events: AdminUpcomingEvent[]) {
-  const from = startOfTodayMs();
-  return events.some((e) => new Date(e.start_time).getTime() >= from);
-}
-
 export function homeAwayLabel(isHome: boolean | null) {
   if (isHome === null) return null;
   return isHome ? "Domicile" : "Extérieur";
@@ -231,14 +226,10 @@ export default function CalendarView({
   const [viewMonth, setViewMonth] = useState<Date>(today);
   const [selectedDate, setSelectedDate] = useState<Date>(today);
   const [openBirthday, setOpenBirthday] = useState<BirthdaySource | null>(null);
-  // La liste chronologique répond à "c'est quoi la suite ?", la grille à
-  // "à quoi ressemble le mois ?" : la première question est celle qu'on se
-  // pose le plus souvent. Mais hors saison il n'y a rien à venir, et une
-  // liste vide donnerait l'impression que le calendrier a disparu : dans ce
-  // cas on ouvre directement sur la grille.
-  const [view, setView] = useState<"list" | "month">(() =>
-    hasUpcomingEvents(events) ? "list" : "month"
-  );
+  // Le calendrier s'ouvre sur la grille : on veut d'abord voir le mois.
+  // La liste chronologique reste à un clic pour répondre à "c'est quoi la
+  // suite ?".
+  const [view, setView] = useState<"list" | "month">("month");
   const [appelEventId, setAppelEventId] = useState<string | null>(null);
 
   const canManage = Boolean(createTeams && createTeams.length > 0);
@@ -598,9 +589,9 @@ export default function CalendarView({
             </span>
           </div>
         ) : (
-          <span className="text-sm font-semibold text-zinc-900">
-            Prochains rassemblements
-          </span>
+          // Rien à gauche en vue Liste : le titre de la page dit déjà où on
+          // est. Le div vide garde la bascule alignée à droite.
+          <div />
         )}
 
         <div className="flex items-center gap-2">
