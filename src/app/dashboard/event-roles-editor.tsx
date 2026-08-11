@@ -45,21 +45,37 @@ export default function EventRolesEditor({ roles }: { roles: EventRoleType[] }) 
     setSaving(true);
     setError(null);
     const supabase = createClient();
-    const { error: insertError } = await supabase.from("event_role_types").insert({
+    const payload = {
       code,
       label: trimmed,
       icon,
       event_types: eventTypes,
       sort_order: (roles[roles.length - 1]?.sortOrder ?? 0) + 10,
-    });
-    setSaving(false);
+    };
+    const { error: insertError } = await supabase.from("event_role_types").insert(payload);
+
     if (insertError) {
-      setError(
-        insertError.code === "23505"
-          ? "Un rôle portant ce nom existe déjà."
-          : insertError.message
-      );
-      return;
+      // Un rôle archivé conserve son identifiant : il est invisible dans la
+      // liste mais bloque toute recréation du même nom. Le réactiver est ce
+      // que l'utilisateur veut réellement — refuser serait une impasse dont
+      // rien à l'écran n'expliquerait la cause.
+      if (insertError.code === "23505") {
+        const { error: reviveError } = await supabase
+          .from("event_role_types")
+          .update({ ...payload, archived_at: null })
+          .eq("code", code);
+        setSaving(false);
+        if (reviveError) {
+          setError(reviveError.message);
+          return;
+        }
+      } else {
+        setSaving(false);
+        setError(insertError.message);
+        return;
+      }
+    } else {
+      setSaving(false);
     }
     setLabel("");
     setEventTypes([]);
@@ -158,7 +174,12 @@ export default function EventRolesEditor({ roles }: { roles: EventRoleType[] }) 
             </span>
             <input
               value={label}
-              onChange={(e) => setLabel(e.target.value)}
+              onChange={(e) => {
+                setLabel(e.target.value);
+                // Sinon l'erreur d'une tentative précédente reste affichée
+                // pendant la saisie suivante et laisse croire à un échec.
+                if (error) setError(null);
+              }}
               placeholder="Table de marque, arbitre de touche..."
               className="rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm outline-none focus:border-ubac-yellow"
             />
