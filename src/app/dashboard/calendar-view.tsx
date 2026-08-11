@@ -15,6 +15,7 @@ import {
   MapPin,
   Pencil,
   Trash2,
+  Users,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -128,6 +129,18 @@ function pillLabel(event: AdminUpcomingEvent) {
   return event.title ?? styleFor(event.event_type).label;
 }
 
+// Fonction ordinaire et non calcul en plein rendu : la lecture de l'heure
+// courante reste hors du corps du composant.
+function startOfTodayMs() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+}
+
+function hasUpcomingEvents(events: AdminUpcomingEvent[]) {
+  const from = startOfTodayMs();
+  return events.some((e) => new Date(e.start_time).getTime() >= from);
+}
+
 export function homeAwayLabel(isHome: boolean | null) {
   if (isHome === null) return null;
   return isHome ? "Domicile" : "Extérieur";
@@ -198,6 +211,7 @@ export default function CalendarView({
   contactEmailByPlayerId,
   allowClubWide = false,
   birthdayMembers = [],
+  scopeTeams = [],
 }: {
   events: AdminUpcomingEvent[];
   createTeams?: CalendarTeamRef[];
@@ -208,15 +222,23 @@ export default function CalendarView({
   contactEmailByPlayerId?: Record<string, string>;
   allowClubWide?: boolean;
   birthdayMembers?: BirthdaySource[];
+  // Équipes dont ce calendrier montre les événements. Affiché tel quel :
+  // sans cette ligne, un calendrier vide ne dit pas s'il ne couvre rien ou
+  // s'il n'y a simplement rien de programmé.
+  scopeTeams?: { id: string; name: string | null; category: string | null }[];
 }) {
   const router = useRouter();
   const [viewMonth, setViewMonth] = useState<Date>(today);
   const [selectedDate, setSelectedDate] = useState<Date>(today);
   const [openBirthday, setOpenBirthday] = useState<BirthdaySource | null>(null);
   // La liste chronologique répond à "c'est quoi la suite ?", la grille à
-  // "à quoi ressemble le mois ?" : deux questions différentes, la première
-  // est celle qu'on se pose le plus souvent, donc c'est la vue par défaut.
-  const [view, setView] = useState<"list" | "month">("list");
+  // "à quoi ressemble le mois ?" : la première question est celle qu'on se
+  // pose le plus souvent. Mais hors saison il n'y a rien à venir, et une
+  // liste vide donnerait l'impression que le calendrier a disparu : dans ce
+  // cas on ouvre directement sur la grille.
+  const [view, setView] = useState<"list" | "month">(() =>
+    hasUpcomingEvents(events) ? "list" : "month"
+  );
   const [appelEventId, setAppelEventId] = useState<string | null>(null);
 
   const canManage = Boolean(createTeams && createTeams.length > 0);
@@ -364,7 +386,7 @@ export default function CalendarView({
   // Le seuil est le début de la journée pour qu'un match du matin ne
   // disparaisse pas de la liste l'après-midi même.
   const upcomingEvents = useMemo(() => {
-    const from = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+    const from = startOfTodayMs();
     return events
       .filter((e) => new Date(e.start_time).getTime() >= from)
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
@@ -612,6 +634,13 @@ export default function CalendarView({
           )}
         </div>
       </div>
+
+      {scopeTeams.length > 0 && (
+        <p className="flex flex-wrap items-center gap-1.5 text-xs text-zinc-500">
+          <Users className="h-3.5 w-3.5 shrink-0" />
+          Événements de {scopeTeams.map((t) => teamLabel(t)).join(", ")}
+        </p>
+      )}
 
       {createTeams && createTeams.length > 0 && (
         <CreateEventForm teams={createTeams} allowClubWide={allowClubWide} />

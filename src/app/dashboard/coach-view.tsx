@@ -112,6 +112,14 @@ export default function CoachView({
           rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
           contactEmailByPlayerId={contactEmailByPlayerId}
           birthdayMembers={birthdayMembers}
+          // Toutes ses équipes, y compris celle où il n'est que joueur :
+          // le calendrier les montre, même si créer un événement n'y est
+          // permis que pour celles qu'il entraîne.
+          scopeTeams={teams.map((t) => ({
+            id: t.id,
+            name: t.name,
+            category: t.category,
+          }))}
         />
       ),
     },
