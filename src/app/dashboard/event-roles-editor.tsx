@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronUp, Plus, Settings, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Pencil, Plus, Settings, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import RoleIcon, { ROLE_ICONS, ROLE_ICON_NAMES } from "./role-icon";
 import { styleFor } from "./calendar-view";
@@ -24,6 +24,72 @@ function toCode(label: string) {
     .slice(0, 40);
 }
 
+// Extraits pour être partagés entre le formulaire d'ajout et l'édition en
+// place : deux copies divergeraient à la première retouche.
+function IconPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (name: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-xs text-zinc-500">Icône</span>
+      <div className="flex flex-wrap gap-1.5">
+        {ROLE_ICON_NAMES.map((name) => (
+          <button
+            key={name}
+            onClick={() => onChange(name)}
+            title={ROLE_ICONS[name].label}
+            className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${
+              value === name ? "border-navy bg-navy/10" : "border-zinc-200 hover:bg-zinc-50"
+            }`}
+          >
+            <RoleIcon icon={name} />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function EventTypePicker({
+  value,
+  onChange,
+}: {
+  value: string[];
+  onChange: (t: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-xs text-zinc-500">
+        Types d&apos;événement (aucun coché = tous)
+      </span>
+      <div className="flex flex-wrap gap-1.5">
+        {EVENT_TYPES.map((t) => (
+          <label
+            key={t}
+            className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+              value.includes(t)
+                ? "border-navy bg-navy/10 text-navy"
+                : "border-zinc-200 text-zinc-600"
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={value.includes(t)}
+              onChange={() => onChange(t)}
+              className="h-3.5 w-3.5 rounded border-zinc-300"
+            />
+            {styleFor(t).label}
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function EventRolesEditor({ roles }: { roles: EventRoleType[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -33,6 +99,42 @@ export default function EventRolesEditor({ roles }: { roles: EventRoleType[] }) 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [removeTarget, setRemoveTarget] = useState<EventRoleType | null>(null);
+  const [editCode, setEditCode] = useState<string | null>(null);
+  const [editLabel, setEditLabel] = useState("");
+  const [editIcon, setEditIcon] = useState<string>("ClipboardList");
+  const [editEventTypes, setEditEventTypes] = useState<string[]>([]);
+
+  function startEdit(role: EventRoleType) {
+    setEditCode(role.code);
+    setEditLabel(role.label);
+    setEditIcon(role.icon ?? "ClipboardList");
+    setEditEventTypes(role.eventTypes);
+    setError(null);
+  }
+
+  // Le code n'est jamais réécrit : c'est lui que référencent les attributions
+  // déjà enregistrées (event_tasks.task_type). Renommer « Buvette » en
+  // « Buvette & goûter » change donc l'affichage sans perdre une seule ligne
+  // du bilan de la saison.
+  async function saveRole() {
+    if (!editCode) return;
+    const trimmed = editLabel.trim();
+    if (!trimmed) return;
+    setSaving(true);
+    setError(null);
+    const supabase = createClient();
+    const { error: updateError } = await supabase
+      .from("event_role_types")
+      .update({ label: trimmed, icon: editIcon, event_types: editEventTypes })
+      .eq("code", editCode);
+    setSaving(false);
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+    setEditCode(null);
+    router.refresh();
+  }
 
   async function addRole() {
     const trimmed = label.trim();
@@ -139,33 +241,82 @@ export default function EventRolesEditor({ roles }: { roles: EventRoleType[] }) 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
           <ul className="flex flex-col gap-1.5">
-            {roles.map((role) => (
-              <li
-                key={role.code}
-                className="flex items-center justify-between gap-2 rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2"
-              >
-                <span className="flex min-w-0 items-center gap-2">
-                  <RoleIcon icon={role.icon} />
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-medium text-zinc-800">
-                      {role.label}
-                    </span>
-                    <span className="block text-xs text-zinc-500">
-                      {role.eventTypes.length === 0
-                        ? "Tous les événements"
-                        : role.eventTypes.map((t) => styleFor(t).label).join(", ")}
+            {roles.map((role) =>
+              editCode === role.code ? (
+                <li
+                  key={role.code}
+                  className="flex flex-col gap-2 rounded-lg border border-navy/30 bg-white p-3"
+                >
+                  <input
+                    value={editLabel}
+                    onChange={(e) => {
+                      setEditLabel(e.target.value);
+                      if (error) setError(null);
+                    }}
+                    className="rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm outline-none focus:border-ubac-yellow"
+                  />
+                  <IconPicker value={editIcon} onChange={setEditIcon} />
+                  <EventTypePicker
+                    value={editEventTypes}
+                    onChange={(t) =>
+                      setEditEventTypes((cur) =>
+                        cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t]
+                      )
+                    }
+                  />
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setEditCode(null)}
+                      className="rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      onClick={saveRole}
+                      disabled={saving || !editLabel.trim()}
+                      className="rounded-full bg-navy px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-navy/90 disabled:opacity-60"
+                    >
+                      {saving ? "Enregistrement..." : "Enregistrer"}
+                    </button>
+                  </div>
+                </li>
+              ) : (
+                <li
+                  key={role.code}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2"
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <RoleIcon icon={role.icon} />
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-medium text-zinc-800">
+                        {role.label}
+                      </span>
+                      <span className="block text-xs text-zinc-500">
+                        {role.eventTypes.length === 0
+                          ? "Tous les événements"
+                          : role.eventTypes.map((t) => styleFor(t).label).join(", ")}
+                      </span>
                     </span>
                   </span>
-                </span>
-                <button
-                  onClick={() => setRemoveTarget(role)}
-                  title="Archiver ce rôle"
-                  className="shrink-0 rounded-lg p-1.5 text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </li>
-            ))}
+                  <span className="flex shrink-0 items-center gap-1">
+                    <button
+                      onClick={() => startEdit(role)}
+                      title="Modifier ce rôle"
+                      className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-navy"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setRemoveTarget(role)}
+                      title="Archiver ce rôle"
+                      className="rounded-lg p-1.5 text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </span>
+                </li>
+              )
+            )}
           </ul>
 
           <div className="flex flex-col gap-2 rounded-lg border border-dashed border-zinc-200 p-3">
@@ -184,47 +335,8 @@ export default function EventRolesEditor({ roles }: { roles: EventRoleType[] }) 
               className="rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm outline-none focus:border-ubac-yellow"
             />
 
-            <span className="text-xs text-zinc-500">Icône</span>
-            <div className="flex flex-wrap gap-1.5">
-              {ROLE_ICON_NAMES.map((name) => (
-                <button
-                  key={name}
-                  onClick={() => setIcon(name)}
-                  title={ROLE_ICONS[name].label}
-                  className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${
-                    icon === name
-                      ? "border-navy bg-navy/10"
-                      : "border-zinc-200 hover:bg-zinc-50"
-                  }`}
-                >
-                  <RoleIcon icon={name} />
-                </button>
-              ))}
-            </div>
-
-            <span className="text-xs text-zinc-500">
-              Types d&apos;événement (aucun coché = tous)
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {EVENT_TYPES.map((t) => (
-                <label
-                  key={t}
-                  className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
-                    eventTypes.includes(t)
-                      ? "border-navy bg-navy/10 text-navy"
-                      : "border-zinc-200 text-zinc-600"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={eventTypes.includes(t)}
-                    onChange={() => toggleEventType(t)}
-                    className="h-3.5 w-3.5 rounded border-zinc-300"
-                  />
-                  {styleFor(t).label}
-                </label>
-              ))}
-            </div>
+            <IconPicker value={icon} onChange={setIcon} />
+            <EventTypePicker value={eventTypes} onChange={toggleEventType} />
 
             <button
               onClick={addRole}
