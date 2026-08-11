@@ -67,6 +67,7 @@ export default function CoachNextMatchCard({
           <NextMatchActions
             location={event.location}
             context={event.title ?? "match"}
+            showCarpool={shouldOfferCarpool(event)}
           />
           <MatchTasksPanel
             eventId={event.id}

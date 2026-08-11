@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, Shirt, Utensils, X } from "lucide-react";
+import { CalendarDays, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatEventTime, styleFor } from "./calendar-view";
 import SalleBadge from "./salle-badge";
@@ -46,8 +46,11 @@ export default function FamilyUpcomingRoles({
     const nowMs = Date.now();
     return events
       .filter((e) => new Date(e.start_time).getTime() >= nowMs)
+      // Un entraînement n'a plus aucun rôle applicable : l'afficher
+      // laisserait une carte de date sans rien à quoi se proposer.
+      .filter((e) => rolesForEventType(roles, e.event_type).length > 0)
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
-  }, [events]);
+  }, [events, roles]);
 
   // L'enfant concerné par cet événement : celui dont l'équipe correspond.
   // Un événement club (teamId null) concerne le premier enfant.

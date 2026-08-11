@@ -108,6 +108,10 @@ export default function MatchTasksPanel({
 
   const myOffer = initialCarpool.find((o) => myPlayerIds.includes(o.playerId));
 
+  // Sur un entraînement il ne reste ni rôle applicable ni covoiturage : le
+  // titre seul au-dessus d'un cadre vide ressemblerait à un bug.
+  if (roles.length === 0 && !showCarpool) return null;
+
   return (
     <div className="mt-3 flex flex-col gap-2.5 rounded-xl border border-zinc-100 bg-zinc-50/60 p-3">
       <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">

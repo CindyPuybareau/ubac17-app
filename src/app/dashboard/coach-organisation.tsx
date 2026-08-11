@@ -226,8 +226,10 @@ function BilanTeamTable({
     total: rows.reduce((sum, r) => sum + (r.counts[role.code] ?? 0), 0),
   }));
 
+  // La key vit ici : les colonnes de rôle sont produites par un .map, et
+  // sans elle React réutilise mal les <th> quand le catalogue change.
   const header = (key: SortKey, label: string, icon?: React.ReactNode) => (
-    <th className="whitespace-nowrap px-3 py-2.5">
+    <th key={key} className="whitespace-nowrap px-3 py-2.5">
       <button
         onClick={() => toggleSort(key)}
         className="flex items-center gap-1 uppercase tracking-wide transition-colors hover:text-navy"

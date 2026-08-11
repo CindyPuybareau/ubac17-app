@@ -73,6 +73,7 @@ export default function NextConvocationCard({
       <NextMatchActions
         location={event.location}
         context={event.title ?? "match"}
+        showCarpool={shouldOfferCarpool(event)}
       />
       <MatchTasksPanel
         eventId={event.id}
@@ -82,7 +83,7 @@ export default function NextConvocationCard({
         initialTasks={tasks}
         initialCarpool={carpool}
         roles={rolesForEventType(roles, event.event_type)}
-            showCarpool={shouldOfferCarpool(event)}
+        showCarpool={shouldOfferCarpool(event)}
       />
     </div>
   );

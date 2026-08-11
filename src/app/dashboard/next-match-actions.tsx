@@ -17,11 +17,19 @@ function carpoolMailto(kind: "offer" | "request", context: string) {
 export default function NextMatchActions({
   location,
   context,
+  showCarpool,
 }: {
   location: string | null;
   context: string;
+  // Même règle que le bloc Covoiturage du panneau Organisation : sans quoi
+  // le bouton continuerait de s'afficher sur un entraînement alors que le
+  // reste du covoiturage y a disparu.
+  showCarpool: boolean;
 }) {
   const [openCarpool, setOpenCarpool] = useState(false);
+
+  // Plus rien à proposer : une barre d'actions vide laisserait un blanc.
+  if (!location && !showCarpool) return null;
 
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2">
