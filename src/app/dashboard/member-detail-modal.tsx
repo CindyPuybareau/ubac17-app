@@ -543,7 +543,17 @@ export default function MemberDetailModal({
             .neq("id", member.id)
             .maybeSingle();
 
-          if (!alreadyLinked) {
+          // Et même si ce compte n'est encore lié à aucune fiche : une fiche
+          // déclarée comme l'enfant de ce compte n'est pas la fiche de son
+          // titulaire.
+          const { data: declaredAsChild } = await supabase
+            .from("parent_player")
+            .select("player_id")
+            .eq("player_id", member.id)
+            .eq("parent_id", matchedProfile.id)
+            .maybeSingle();
+
+          if (!alreadyLinked && !declaredAsChild) {
             const { error: linkError } = await supabase
               .from("players")
               .update({ profile_id: matchedProfile.id })
