@@ -1,10 +1,12 @@
 "use client";
 
-import { CalendarDays, MapPin, Navigation } from "lucide-react";
+import { CalendarDays, MapPin } from "lucide-react";
 import { formatEventTime, homeAwayLabel, isMatchType, styleFor } from "./calendar-view";
+import ItineraryButton from "./itinerary-button";
 import OpponentDisplay from "./opponent-display";
 import RsvpControl from "./rsvp-control";
 import SalleBadge from "./salle-badge";
+import { venueQuery } from "./salles";
 import type { AdminUpcomingEvent } from "./page";
 import type { CalendarRsvpPlayer } from "./calendar-view";
 
@@ -15,13 +17,6 @@ function upcomingSorted(events: AdminUpcomingEvent[]) {
   return events
     .filter((e) => new Date(e.start_time).getTime() >= now)
     .sort((a, b) => a.start_time.localeCompare(b.start_time));
-}
-
-// Le lieu tel qu'il servira à l'itinéraire : la salle nomme un gymnase du
-// club, le lieu une adresse libre. Les deux valent une recherche Maps.
-function mapsQuery(event: AdminUpcomingEvent) {
-  const parts = [event.salle, event.location].filter(Boolean);
-  return parts.length > 0 ? parts.join(", ") : null;
 }
 
 export default function FamilyEventFeed({
@@ -51,7 +46,7 @@ export default function FamilyEventFeed({
           ? players.filter((p) => p.teamIds.includes(e.teamId as string))
           : players;
         const homeAway = isMatchType(e.event_type) ? homeAwayLabel(e.isHome) : null;
-        const query = mapsQuery(e);
+        const query = venueQuery(e);
 
         return (
           <div
@@ -100,17 +95,7 @@ export default function FamilyEventFeed({
               {e.salle && <SalleBadge salle={e.salle} />}
             </div>
 
-            {query && (
-              <a
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`}
-                target="_blank"
-                rel="noreferrer"
-                className="flex w-fit items-center gap-1.5 rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50"
-              >
-                <Navigation className="h-3.5 w-3.5 shrink-0" />
-                Itinéraire
-              </a>
-            )}
+            <ItineraryButton query={query} />
 
             {concerned.length > 0 ? (
               <div className="flex flex-col gap-3 border-t border-zinc-100 pt-3">

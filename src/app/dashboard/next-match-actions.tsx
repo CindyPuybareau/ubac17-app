@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Navigation, Car } from "lucide-react";
+import { Car } from "lucide-react";
+import ItineraryButton from "./itinerary-button";
 import { buildGmailComposeLink } from "@/lib/email";
 
 function carpoolMailto(kind: "offer" | "request", context: string) {
@@ -15,11 +16,13 @@ function carpoolMailto(kind: "offer" | "request", context: string) {
 }
 
 export default function NextMatchActions({
-  location,
+  venue,
   context,
   showCarpool,
 }: {
-  location: string | null;
+  // Adresse déjà résolue par venueQuery : une salle du club vaut son
+  // adresse postale, un déplacement le lieu saisi par le coach.
+  venue: string | null;
   context: string;
   // Même règle que le bloc Covoiturage du panneau Organisation : sans quoi
   // le bouton continuerait de s'afficher sur un entraînement alors que le
@@ -29,21 +32,14 @@ export default function NextMatchActions({
   const [openCarpool, setOpenCarpool] = useState(false);
 
   // Plus rien à proposer : une barre d'actions vide laisserait un blanc.
-  if (!location && !showCarpool) return null;
+  if (!venue && !showCarpool) return null;
 
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2">
-      {location && (
-        <a
-          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`}
-          target="_blank"
-          rel="noreferrer"
-          className="flex items-center gap-1.5 rounded-full bg-navy px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-navy-dark"
-        >
-          <Navigation className="h-3.5 w-3.5" />
-          Y aller (GPS)
-        </a>
-      )}
+      <ItineraryButton
+        query={venue}
+        className="flex items-center gap-1.5 rounded-full bg-navy px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-navy-dark"
+      />
 
       <div className="relative">
         <button

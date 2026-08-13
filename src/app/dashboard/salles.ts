@@ -32,6 +32,29 @@ export function shouldOfferCarpool(event: {
   return !SALLES.some((s) => venue.includes(normalize(s)));
 }
 
+// Adresses postales des trois gymnases du club. "Angoulins" seul envoie
+// un GPS au centre du village ; l'adresse complète le pose devant la
+// bonne porte, ce qui est tout l'intérêt d'un itinéraire un samedi matin.
+export const SALLE_ADDRESS: Record<Salle, string> = {
+  Angoulins: "Chemin des Marais, 17690 Angoulins",
+  Châtelaillon: "Allée du Stade, 17340 Châtelaillon-Plage",
+  "Saint-Vivien": "Complexe sportif, 17220 Saint-Vivien",
+};
+
+// Ce qu'on donne au GPS. Une salle du club vaut son adresse postale ; un
+// déplacement garde le lieu tel que le coach l'a saisi, faute de mieux.
+export function venueQuery(event: {
+  salle: string | null;
+  location: string | null;
+}): string | null {
+  if (event.salle) {
+    const known = SALLES.find((s) => normalize(s) === normalize(event.salle as string));
+    if (known) return SALLE_ADDRESS[known];
+  }
+  const parts = [event.salle, event.location].filter(Boolean);
+  return parts.length > 0 ? parts.join(", ") : null;
+}
+
 export const SALLE_META: Record<Salle, { dot: string; badge: string }> = {
   Angoulins: { dot: "#1E4FA8", badge: "bg-[#1E4FA8]/10 text-[#1E4FA8]" },
   Châtelaillon: { dot: "#2E8B57", badge: "bg-[#2E8B57]/10 text-[#2E8B57]" },

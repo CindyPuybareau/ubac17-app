@@ -6,7 +6,7 @@ import MatchTasksPanel from "./match-tasks-panel";
 import type { UpcomingEvent } from "./family-data";
 import { isMatchType } from "./event-style";
 import { rolesForEventType } from "./event-tasks";
-import { shouldOfferCarpool } from "./salles";
+import { shouldOfferCarpool, venueQuery } from "./salles";
 import type { CarpoolOffer, EventRoleType, EventTasksState } from "./event-tasks";
 
 function formatEventDate(iso: string) {
@@ -72,7 +72,7 @@ export default function NextConvocationCard({
         />
       </div>
       <NextMatchActions
-        location={event.location}
+        venue={venueQuery(event)}
         context={event.title ?? "match"}
         showCarpool={shouldOfferCarpool(event)}
       />
