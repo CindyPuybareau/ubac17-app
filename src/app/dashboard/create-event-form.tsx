@@ -30,12 +30,18 @@ const typeChoices: { value: EventType; label: string; active: string }[] = [
 export default function CreateEventForm({
   teams,
   allowClubWide = false,
+  open,
+  onClose,
 }: {
   teams: Team[];
   allowClubWide?: boolean;
+  // Ouverture pilotee par l appelant : le bouton "+ Creer un evenement"
+  // vit dans l en-tete du calendrier, a cote de la navigation de date,
+  // pas au-dessus du formulaire.
+  open: boolean;
+  onClose: () => void;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
   const [teamId, setTeamId] = useState(teams[0]?.id ?? "");
   const [title, setTitle] = useState("");
   const [eventType, setEventType] = useState<EventType>("TRAINING");
@@ -89,20 +95,11 @@ export default function CreateEventForm({
     setStartTime("");
     setEndTime("");
     setNotes("");
-    setOpen(false);
+    onClose();
     router.refresh();
   }
 
-  if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        className="w-fit rounded-full border border-ubac-blue px-4 py-2 text-sm font-semibold text-ubac-blue transition-colors hover:bg-ubac-blue/10"
-      >
-        + Créer un événement
-      </button>
-    );
-  }
+  if (!open) return null;
 
   return (
     <form
@@ -248,7 +245,7 @@ export default function CreateEventForm({
         </button>
         <button
           type="button"
-          onClick={() => setOpen(false)}
+          onClick={onClose}
           className="rounded-full border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
         >
           Annuler
