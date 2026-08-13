@@ -3,7 +3,7 @@ import OpponentDisplay from "./opponent-display";
 import NextMatchActions from "./next-match-actions";
 import MatchTasksPanel from "./match-tasks-panel";
 import AttendanceBadges from "./attendance-badges";
-import AppelExpressButton from "./appel-express-button";
+import RequestAttendanceButton from "./request-attendance-button";
 import SalleBadge from "./salle-badge";
 import { isMatchType, styleFor } from "./event-style";
 import type { RosterPlayer, RsvpCounts, UpcomingEvent } from "./family-data";
@@ -69,11 +69,13 @@ export default function CoachNextMatchCard({
                 </h3>
               )}
             </div>
-            <AppelExpressButton
+            {/* Le coach ne pointe plus à la place des familles : il leur
+                demande de répondre, et un bandeau s'affiche dans leur
+                espace tant que la réponse manque. */}
+            <RequestAttendanceButton
               eventId={event.id}
-              title={teamName}
-              roster={roster}
-              statusByKey={rsvpStatusByKey}
+              requestedAt={event.attendance_requested_at ?? null}
+              pendingCount={counts?.pending ?? 0}
             />
           </div>
 

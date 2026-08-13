@@ -5,6 +5,7 @@ import { CalendarDays, ClipboardList, MessageCircle, Users } from "lucide-react"
 import { sortTeamsByGroup } from "@/lib/teams";
 import CalendarView, { type CalendarRsvpPlayer } from "./calendar-view";
 import FamilyTeamCard, { type FamilyTeamCardData } from "./family-team-card";
+import FamilyAttendanceRequests from "./family-attendance-requests";
 import FamilyEventFeed from "./family-event-feed";
 import FamilyOrganisationTable from "./family-organisation-table";
 import FamilyUpcomingRoles from "./family-upcoming-roles";
@@ -183,6 +184,14 @@ export default function FamilyView({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* En tête de page et hors des onglets : une demande du coach doit
+          se voir en ouvrant l'app, pas se découvrir en fouillant. */}
+      <FamilyAttendanceRequests
+        events={visibleEvents}
+        players={visiblePlayers}
+        statusByKey={rsvpStatusByKey}
+      />
+
       {hasSeveralChildren && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">

@@ -26,7 +26,6 @@ import { parseMatchTitle } from "@/lib/match-display";
 import { teamLabel } from "@/lib/teams";
 import OpponentDisplay from "./opponent-display";
 import CreateEventForm from "./create-event-form";
-import AppelExpressModal from "./appel-express-modal";
 import RsvpButtons from "./rsvp-buttons";
 import BirthdayWidget from "./birthday-widget";
 import type { AdminUpcomingEvent } from "./page";
@@ -166,7 +165,6 @@ export default function CalendarView({
   // La liste chronologique reste à un clic pour répondre à "c'est quoi la
   // suite ?".
   const [view, setView] = useState<"list" | "month">("month");
-  const [appelEventId, setAppelEventId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
 
   const canManage = Boolean(createTeams && createTeams.length > 0);
@@ -320,21 +318,8 @@ export default function CalendarView({
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
   }, [events]);
 
-  // Le club convoque par équipe : l'effectif d'un événement, ce sont les
-  // joueurs de son équipe. Un événement club (teamId null) n'a donc pas
-  // d'appel possible ici.
-  function rosterFor(event: AdminUpcomingEvent) {
-    if (!rsvp || !event.teamId) return [];
-    return rsvp.players
-      .filter((p) => p.teamIds.includes(event.teamId!))
-      .map((p) => ({ id: p.id, name: p.name }));
-  }
-
-  const appelEvent = appelEventId ? events.find((e) => e.id === appelEventId) ?? null : null;
-
   // Une seule carte pour les deux vues : la liste et le detail du jour
-  // affichent exactement le meme evenement, avec les memes compteurs et le
-  // meme appel express.
+  // affichent exactement le meme evenement, avec les memes compteurs.
   function renderEventCard(event: AdminUpcomingEvent) {
     const style = styleFor(event.event_type);
     const rsvpCounts = event.rsvpCounts;
@@ -451,18 +436,9 @@ export default function CalendarView({
           </div>
         )}
 
-        {/* Le coach pointe tout l'effectif d'un coup ; la famille répond
-            joueur par joueur. Empiler les deux donnerait une carte
-            interminable pour un effectif de quinze. */}
-        {canManage && rosterFor(event).length > 0 && (
-          <button
-            onClick={() => setAppelEventId(event.id)}
-            className="mt-1 w-full rounded-full bg-ubac-yellow px-4 py-2.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark"
-          >
-            Faire l&apos;appel express
-          </button>
-        )}
-
+        {/* Plus d'appel express ici : le coach ne répond pas à la place des
+            familles, il leur demande de le faire depuis sa carte
+            d'événement (Organisation & Bilan). */}
         {!canManage && respondingPlayers.length > 0 && (
           <div className="flex flex-col gap-2 border-t border-zinc-100 pt-2">
             {respondingPlayers.map((p) => {
@@ -885,21 +861,6 @@ export default function CalendarView({
             </div>
           </div>
         </div>
-      )}
-
-      {appelEvent && (
-        <AppelExpressModal
-          eventId={appelEvent.id}
-          title={appelEvent.teamName}
-          roster={rosterFor(appelEvent)}
-          statusByPlayerId={Object.fromEntries(
-            rosterFor(appelEvent).map((p) => [
-              p.id,
-              rsvp?.statusByKey[`${appelEvent.id}:${p.id}`] ?? "PENDING",
-            ])
-          )}
-          onClose={() => setAppelEventId(null)}
-        />
       )}
 
       {openBirthday && (
