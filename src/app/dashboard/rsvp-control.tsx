@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Clock, X } from "lucide-react";
+import { Check, Clock, Undo2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
   SEGMENT_ABSENT_ON,
@@ -83,6 +83,29 @@ export default function RsvpControl({
     router.refresh();
   }
 
+  // Revenir à "en attente", c'est supprimer la ligne : l'app lit déjà
+  // l'absence de réponse ainsi. Utile quand la famille a répondu trop vite
+  // et ne sait finalement plus.
+  async function clearAnswer() {
+    setSaving(true);
+    setError(null);
+    const supabase = createClient();
+    const { error: deleteError } = await supabase
+      .from("rsvps")
+      .delete()
+      .eq("event_id", eventId)
+      .eq("player_id", playerId);
+    setSaving(false);
+    if (deleteError) {
+      setError("Annulation impossible, réessaie.");
+      return;
+    }
+    setStatus("PENDING");
+    setReason("");
+    setAskReason(false);
+    router.refresh();
+  }
+
   const badge = badgeFor(status);
 
   return (
@@ -124,6 +147,21 @@ export default function RsvpControl({
           <X className="h-3.5 w-3.5 shrink-0" />
           Absent
         </button>
+
+        {/* Ne s'affiche qu'une fois une réponse donnée : il n'y a rien à
+            annuler tant qu'on n'a pas répondu. */}
+        {status !== "PENDING" && (
+          <button
+            type="button"
+            disabled={saving}
+            onClick={clearAnswer}
+            title="Revenir à « en attente »"
+            className={`${SEGMENT_BUTTON} ${SEGMENT_OFF}`}
+          >
+            <Undo2 className="h-3.5 w-3.5 shrink-0" />
+            Annuler
+          </button>
+        )}
       </div>
 
       {askReason && (
