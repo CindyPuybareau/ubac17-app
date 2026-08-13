@@ -451,6 +451,13 @@ export default function TeamCard({
       )
     : memberRows;
 
+  // L'encadrement passe devant : c'est la première chose qu'on cherche en
+  // ouvrant une équipe, et le mélanger aux joueurs le noyait dans la liste.
+  // Un coach qui joue aussi reste dans l'encadrement — sa ligne porte déjà
+  // les deux badges, la dupliquer en bas fausserait le compte des joueurs.
+  const staffMembers = visibleMembers.filter((m) => m.role !== "JOUEUR");
+  const playerMembers = visibleMembers.filter((m) => m.role === "JOUEUR");
+
   // Adult member: their own registration contact. Minor: the linked
   // tutor's, which is what contactPhone/EmailByPlayerId already carry.
   function contactsFor(id: string) {
@@ -474,6 +481,160 @@ export default function TeamCard({
     .slice(0, 3);
 
   const theme = categoryTheme(team.category);
+
+  // Une seule definition de ligne pour les deux sections : Encadrement et
+  // Joueurs affichent les memes colonnes, seul le fond change.
+  function renderMemberRow(m: MemberRow, isStaff: boolean) {
+          const { phone, email } = contactsFor(m.id);
+          const detail = memberDetailsByPlayerId?.[m.id];
+          const role = roleBadge(m.role);
+          // La catégorie de l'équipe prime sur players.category : ce
+          // dernier vient de l'import du club et vaut parfois "U13"
+          // là où l'équipe est U13F. Dans une carte d'équipe, toutes
+          // les lignes appartiennent à cette équipe, donc c'est elle
+          // qui fait foi.
+          const category = team.category ?? detail?.category;
+          // PlayerYearBadge renders nothing when the birth date is
+          // missing (or the category can't be read), so the status is
+          // computed here too, to fall back on a neutral dash rather
+          // than an empty cell.
+          const birthDate = m.player?.birthDate ?? detail?.birthDate ?? null;
+          // L'ancienneté d'un joueur se lit dans la catégorie de
+          // l'équipe où il joue. Celle d'un coach, non : la catégorie
+          // de l'équipe qu'il encadre n'a aucun rapport avec son âge,
+          // c'est sa propre fiche qui fait foi (un coach Séniors né en
+          // 1986 est "Old Soldier", pas "Sparring Partner" des U13).
+          const statusCategory =
+            m.role === "JOUEUR" ? team.category : (detail?.category ?? team.category);
+          const yearStatus = computePlayerYearStatus(birthDate, statusCategory);
+          // Belongs to another team as well: he was lent to this one,
+          // so the useful action is to send him back — a plain
+          // "Retirer" that only drops this membership. A player of
+          // this team only gets the "Affecter" picker instead, since
+          // removing him here would leave him with no team at all.
+          const otherTeams = (detail?.teams ?? []).filter((t) => t.id !== team.id);
+          const isLentIn = otherTeams.length > 0;
+    return (
+            <tr
+              key={m.key}
+              onClick={detail ? () => setDetailPlayerId(m.id) : undefined}
+              className={`border-b border-zinc-50 last:border-0 ${
+                isStaff ? "bg-navy/[0.04]" : ""
+              } ${detail ? "cursor-pointer transition-colors hover:bg-slate-50" : ""}`}
+            >
+              {/* La bordure vit sur la première cellule : sur un <tr> en
+                  border-collapse, un bord gauche ne s'affiche pas. */}
+              <td
+                className={`w-auto whitespace-nowrap px-3 py-2.5 font-medium text-zinc-900 ${
+                  isStaff ? "border-l-4 border-l-navy" : ""
+                }`}
+              >
+                {m.lastName ?? "—"}
+              </td>
+              <td className="w-auto whitespace-nowrap px-3 py-2.5 text-zinc-700">
+                {m.firstName ?? "—"}
+              </td>
+              <td className="whitespace-nowrap px-3 py-2.5">
+                <span className="flex flex-wrap items-center gap-1">
+                  <span
+                    className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold leading-none ${role.className}`}
+                  >
+                    {role.label}
+                  </span>
+                  {m.role !== "JOUEUR" && m.player && (
+                    <span className="inline-flex items-center justify-center whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold leading-none text-emerald-700">
+                      Joueur
+                    </span>
+                  )}
+                </span>
+              </td>
+              <td className="whitespace-nowrap px-3 py-2.5">
+                {yearStatus ? (
+                  <PlayerYearBadge birthDate={birthDate} category={statusCategory} />
+                ) : (
+                  <span className="text-zinc-300">—</span>
+                )}
+              </td>
+              <td className="whitespace-nowrap px-3 py-2.5">
+                {category ? (
+                  <span
+                    className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold leading-none ${theme.badge}`}
+                  >
+                    {category}
+                  </span>
+                ) : (
+                  <span className="text-zinc-400">—</span>
+                )}
+              </td>
+              <td className="whitespace-nowrap px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                {phone ? (
+                  <a
+                    href={`tel:${phone}`}
+                    title="Appeler"
+                    className="inline-flex items-center gap-1.5 text-zinc-600 hover:text-navy hover:underline"
+                  >
+                    <Phone className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                    {phone}
+                  </a>
+                ) : (
+                  <span className="text-zinc-400">—</span>
+                )}
+              </td>
+              <td className="w-auto px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                {email ? (
+                  <a
+                    href={`mailto:${email}`}
+                    title={email}
+                    className="flex min-w-0 items-center gap-1.5 text-zinc-600 hover:text-navy hover:underline"
+                  >
+                    <Mail className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                    <span className="truncate">{email}</span>
+                  </a>
+                ) : (
+                  <span className="text-zinc-400">—</span>
+                )}
+              </td>
+              <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center gap-1">
+                  {showWhatsApp && (
+                    <WhatsAppButton
+                      phone={phone ?? undefined}
+                      message={`Bonjour, ici le coach de ${team.name ?? "l'équipe"}.`}
+                      playerId={m.id}
+                    />
+                  )}
+                  {m.player &&
+                    !readOnly &&
+                    (isLentIn ? (
+                      <button
+                        onClick={() => setRemoveTarget(m.player)}
+                        title={`Retirer de ${team.name ?? "cette équipe"}`}
+                        className="rounded-full p-1.5 text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    ) : canSwitchTeam ? (
+                      <button
+                        onClick={() => openSwitch(m.player!)}
+                        title="Affecter à une autre équipe"
+                        className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-navy"
+                      >
+                        <ArrowRightLeft className="h-3.5 w-3.5" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setRemoveTarget(m.player)}
+                        className="shrink-0 text-xs font-medium text-red-600 hover:underline"
+                      >
+                        Retirer
+                      </button>
+                    ))}
+                </div>
+              </td>
+            </tr>
+    );
+  }
+
 
   return (
     <div
@@ -526,150 +687,39 @@ export default function TeamCard({
               </tr>
             </thead>
             <tbody>
-              {visibleMembers.map((m) => {
-                const { phone, email } = contactsFor(m.id);
-                const detail = memberDetailsByPlayerId?.[m.id];
-                const role = roleBadge(m.role);
-                // La catégorie de l'équipe prime sur players.category : ce
-                // dernier vient de l'import du club et vaut parfois "U13"
-                // là où l'équipe est U13F. Dans une carte d'équipe, toutes
-                // les lignes appartiennent à cette équipe, donc c'est elle
-                // qui fait foi.
-                const category = team.category ?? detail?.category;
-                // PlayerYearBadge renders nothing when the birth date is
-                // missing (or the category can't be read), so the status is
-                // computed here too, to fall back on a neutral dash rather
-                // than an empty cell.
-                const birthDate = m.player?.birthDate ?? detail?.birthDate ?? null;
-                // L'ancienneté d'un joueur se lit dans la catégorie de
-                // l'équipe où il joue. Celle d'un coach, non : la catégorie
-                // de l'équipe qu'il encadre n'a aucun rapport avec son âge,
-                // c'est sa propre fiche qui fait foi (un coach Séniors né en
-                // 1986 est "Old Soldier", pas "Sparring Partner" des U13).
-                const statusCategory =
-                  m.role === "JOUEUR" ? team.category : (detail?.category ?? team.category);
-                const yearStatus = computePlayerYearStatus(birthDate, statusCategory);
-                // Belongs to another team as well: he was lent to this one,
-                // so the useful action is to send him back — a plain
-                // "Retirer" that only drops this membership. A player of
-                // this team only gets the "Affecter" picker instead, since
-                // removing him here would leave him with no team at all.
-                const otherTeams = (detail?.teams ?? []).filter((t) => t.id !== team.id);
-                const isLentIn = otherTeams.length > 0;
-                return (
-                  <tr
-                    key={m.key}
-                    onClick={detail ? () => setDetailPlayerId(m.id) : undefined}
-                    className={`border-b border-zinc-50 last:border-0 ${
-                      detail ? "cursor-pointer transition-colors hover:bg-slate-50" : ""
-                    }`}
-                  >
-                    <td className="w-auto whitespace-nowrap px-3 py-2.5 font-medium text-zinc-900">
-                      {m.lastName ?? "—"}
-                    </td>
-                    <td className="w-auto whitespace-nowrap px-3 py-2.5 text-zinc-700">
-                      {m.firstName ?? "—"}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2.5">
-                      <span className="flex flex-wrap items-center gap-1">
-                        <span
-                          className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold leading-none ${role.className}`}
-                        >
-                          {role.label}
-                        </span>
-                        {m.role !== "JOUEUR" && m.player && (
-                          <span className="inline-flex items-center justify-center whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold leading-none text-emerald-700">
-                            Joueur
-                          </span>
-                        )}
+              {staffMembers.length > 0 && (
+                <>
+                  <tr>
+                    <td
+                      colSpan={8}
+                      className="border-b border-navy/10 bg-navy/[0.07] px-3 py-2 text-xs font-bold uppercase tracking-wide text-navy"
+                    >
+                      Encadrement
+                      <span className="ml-1.5 font-semibold normal-case tracking-normal text-navy/60">
+                        ({staffMembers.length})
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2.5">
-                      {yearStatus ? (
-                        <PlayerYearBadge birthDate={birthDate} category={statusCategory} />
-                      ) : (
-                        <span className="text-zinc-300">—</span>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2.5">
-                      {category ? (
-                        <span
-                          className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold leading-none ${theme.badge}`}
-                        >
-                          {category}
-                        </span>
-                      ) : (
-                        <span className="text-zinc-400">—</span>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
-                      {phone ? (
-                        <a
-                          href={`tel:${phone}`}
-                          title="Appeler"
-                          className="inline-flex items-center gap-1.5 text-zinc-600 hover:text-navy hover:underline"
-                        >
-                          <Phone className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-                          {phone}
-                        </a>
-                      ) : (
-                        <span className="text-zinc-400">—</span>
-                      )}
-                    </td>
-                    <td className="w-auto px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
-                      {email ? (
-                        <a
-                          href={`mailto:${email}`}
-                          title={email}
-                          className="flex min-w-0 items-center gap-1.5 text-zinc-600 hover:text-navy hover:underline"
-                        >
-                          <Mail className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-                          <span className="truncate">{email}</span>
-                        </a>
-                      ) : (
-                        <span className="text-zinc-400">—</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center gap-1">
-                        {showWhatsApp && (
-                          <WhatsAppButton
-                            phone={phone ?? undefined}
-                            message={`Bonjour, ici le coach de ${team.name ?? "l'équipe"}.`}
-                            playerId={m.id}
-                          />
-                        )}
-                        {m.player &&
-                          !readOnly &&
-                          (isLentIn ? (
-                            <button
-                              onClick={() => setRemoveTarget(m.player)}
-                              title={`Retirer de ${team.name ?? "cette équipe"}`}
-                              className="rounded-full p-1.5 text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          ) : canSwitchTeam ? (
-                            <button
-                              onClick={() => openSwitch(m.player!)}
-                              title="Affecter à une autre équipe"
-                              className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-navy"
-                            >
-                              <ArrowRightLeft className="h-3.5 w-3.5" />
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => setRemoveTarget(m.player)}
-                              className="shrink-0 text-xs font-medium text-red-600 hover:underline"
-                            >
-                              Retirer
-                            </button>
-                          ))}
-                      </div>
+                  </tr>
+                  {staffMembers.map((m) => renderMemberRow(m, true))}
+                </>
+              )}
+
+              {playerMembers.length > 0 && (
+                <>
+                  <tr>
+                    <td
+                      colSpan={8}
+                      className="border-b border-zinc-100 bg-zinc-50 px-3 py-2 text-xs font-bold uppercase tracking-wide text-zinc-500"
+                    >
+                      Joueurs
+                      <span className="ml-1.5 font-semibold normal-case tracking-normal text-zinc-400">
+                        ({playerMembers.length})
+                      </span>
                     </td>
                   </tr>
-                );
-              })}
+                  {playerMembers.map((m) => renderMemberRow(m, false))}
+                </>
+              )}
               {visibleMembers.length === 0 && (
                 <tr>
                   <td colSpan={8} className="px-3 py-4 text-center text-sm text-zinc-400">
