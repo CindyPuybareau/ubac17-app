@@ -37,14 +37,17 @@ import {
 } from "./birthdays";
 import { SALLES } from "./salles";
 import SalleBadge from "./salle-badge";
+import {
+  EVENT_TYPE_OPTIONS,
+  formatEventTime,
+  homeAwayLabel,
+  isMatchType,
+  styleFor,
+} from "./event-style";
 
-export const EVENT_TYPE_OPTIONS: { value: string; label: string }[] = [
-  { value: "TRAINING", label: "Entraînement" },
-  { value: "MATCH", label: "Match officiel" },
-  { value: "FRIENDLY", label: "Match amical" },
-  { value: "TOURNAMENT", label: "Tournoi / Plateau" },
-  { value: "OTHER", label: "Événement club" },
-];
+// Ré-exportés : beaucoup d'écrans les importent historiquement d'ici, et
+// ce fichier reste le point d'entrée naturel du calendrier.
+export { EVENT_TYPE_OPTIONS, formatEventTime, homeAwayLabel, isMatchType, styleFor };
 
 function toDatetimeLocal(iso: string) {
   const d = new Date(iso);
@@ -60,70 +63,6 @@ function toTimeLocal(iso: string) {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-// Un code couleur par type, repris à l'identique partout (pastilles du
-// calendrier, badges des cartes, bordure gauche) : rouge = match officiel,
-// bleu = amical, orange = tournoi, vert = entraînement.
-const typeStyles: Record<
-  string,
-  { pill: string; border: string; badge: string; label: string }
-> = {
-  MATCH: {
-    pill: "bg-red-100 text-red-700",
-    border: "border-l-red-400",
-    badge: "bg-red-100 text-red-700",
-    label: "Match officiel",
-  },
-  FRIENDLY: {
-    pill: "bg-blue-100 text-blue-700",
-    border: "border-l-blue-400",
-    badge: "bg-blue-100 text-blue-700",
-    label: "Match amical",
-  },
-  TOURNAMENT: {
-    pill: "bg-amber-100 text-amber-800",
-    border: "border-l-amber-400",
-    badge: "bg-amber-100 text-amber-800",
-    label: "Tournoi / Plateau",
-  },
-  OTHER: {
-    pill: "bg-purple-100 text-purple-700",
-    border: "border-l-purple-400",
-    badge: "bg-purple-100 text-purple-700",
-    label: "Événement club",
-  },
-  TRAINING: {
-    pill: "bg-green-100 text-green-700",
-    border: "border-l-green-400",
-    badge: "bg-green-100 text-green-700",
-    label: "Entraînement",
-  },
-};
-
-// Les deux types qui opposent le club à un adversaire : eux seuls
-// affichent un nom d'adversaire et la mention domicile / extérieur.
-export function isMatchType(eventType: string | null) {
-  return eventType === "MATCH" || eventType === "FRIENDLY";
-}
-
-// Exported so team-card.tsx and family-team-card.tsx can badge each
-// event's type with the exact same palette/labels used here, instead of
-// duplicating (and inevitably drifting from) this mapping.
-export function styleFor(eventType: string | null) {
-  return typeStyles[eventType ?? "OTHER"] ?? typeStyles.OTHER;
-}
-
-// "18h30" alone, or "18h30 – 20h00" once an end time is set — shared by
-// this file's own day list/day-detail views and every team card
-// (team-card.tsx, family-team-card.tsx) so the range format is identical
-// everywhere instead of three slightly different implementations.
-export function formatEventTime(startIso: string, endIso: string | null) {
-  const fmt = (iso: string) => {
-    const d = new Date(iso);
-    return `${d.getHours()}h${String(d.getMinutes()).padStart(2, "0")}`;
-  };
-  return endIso ? `${fmt(startIso)} – ${fmt(endIso)}` : fmt(startIso);
-}
-
 function pillLabel(event: AdminUpcomingEvent) {
   if (isMatchType(event.event_type)) {
     return parseMatchTitle(event.title).opponent;
@@ -136,11 +75,6 @@ function pillLabel(event: AdminUpcomingEvent) {
 function startOfTodayMs() {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-}
-
-export function homeAwayLabel(isHome: boolean | null) {
-  if (isHome === null) return null;
-  return isHome ? "Domicile" : "Extérieur";
 }
 
 function toKey(d: Date) {

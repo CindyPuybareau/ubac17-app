@@ -28,6 +28,7 @@ export default function CoachView({
   memberDetailsByPlayerId,
   rsvpPlayers,
   rsvpStatusByKey,
+  rsvpReasonByKey,
   taskTallyByTeamId,
   teamRoleByTeamId,
   clubTeams,
@@ -46,6 +47,8 @@ export default function CoachView({
   memberDetailsByPlayerId: Record<string, MemberDetail>;
   rsvpPlayers: { id: string; name: string; teamIds: string[] }[];
   rsvpStatusByKey: Record<string, string>;
+  // Motif d'absence saisi par la famille, affiché sur les cartes.
+  rsvpReasonByKey: Record<string, string | null>;
   taskTallyByTeamId: Record<string, SeasonTaskTally>;
   // "COACH" for a team they coach, "PLAYER" for one they only play in —
   // drives both the team selector's badge and the read-only mode.
@@ -151,6 +154,8 @@ export default function CoachView({
           carpoolByEventId={carpoolByEventId}
           events={events}
           taskTallyByTeamId={taskTallyByTeamId}
+          rsvpStatusByKey={rsvpStatusByKey}
+          rsvpReasonByKey={rsvpReasonByKey}
           roles={eventRoles}
         />
       ),

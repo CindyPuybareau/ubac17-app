@@ -69,12 +69,16 @@ function PlanningTab({
   tasksByEventId,
   carpoolByEventId,
   upcomingEvents,
+  rsvpStatusByKey,
+  rsvpReasonByKey,
   roles,
 }: {
   cards: CoachTeamMatchCard[];
   tasksByEventId: Record<string, EventTasksState>;
   carpoolByEventId: Record<string, CarpoolOffer[]>;
   upcomingEvents: AdminUpcomingEvent[];
+  rsvpStatusByKey: Record<string, string>;
+  rsvpReasonByKey: Record<string, string | null>;
   roles: EventRoleType[];
 }) {
   return (
@@ -92,6 +96,8 @@ function PlanningTab({
           roster={roster}
           tasks={event ? (tasksByEventId[event.id] ?? emptyEventTasks) : emptyEventTasks}
           carpool={event ? (carpoolByEventId[event.id] ?? []) : []}
+          rsvpStatusByKey={rsvpStatusByKey}
+          rsvpReasonByKey={rsvpReasonByKey}
           roles={roles}
         />
       ))}
@@ -314,6 +320,8 @@ export default function CoachOrganisation({
   carpoolByEventId,
   events,
   taskTallyByTeamId,
+  rsvpStatusByKey,
+  rsvpReasonByKey,
   roles,
 }: {
   cards: CoachTeamMatchCard[];
@@ -321,6 +329,8 @@ export default function CoachOrganisation({
   carpoolByEventId: Record<string, CarpoolOffer[]>;
   events: AdminUpcomingEvent[];
   taskTallyByTeamId: Record<string, SeasonTaskTally>;
+  rsvpStatusByKey: Record<string, string>;
+  rsvpReasonByKey: Record<string, string | null>;
   roles: EventRoleType[];
 }) {
   const [tab, setTab] = useState<SubTab>("planning");
@@ -367,6 +377,8 @@ export default function CoachOrganisation({
           tasksByEventId={tasksByEventId}
           carpoolByEventId={carpoolByEventId}
           upcomingEvents={upcomingEvents}
+          rsvpStatusByKey={rsvpStatusByKey}
+          rsvpReasonByKey={rsvpReasonByKey}
           roles={roles}
         />
       ) : (

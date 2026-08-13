@@ -4,7 +4,7 @@ import OpponentDisplay from "./opponent-display";
 import NextMatchActions from "./next-match-actions";
 import MatchTasksPanel from "./match-tasks-panel";
 import type { UpcomingEvent } from "./family-data";
-import { isMatchType } from "./calendar-view";
+import { isMatchType } from "./event-style";
 import { rolesForEventType } from "./event-tasks";
 import { shouldOfferCarpool } from "./salles";
 import type { CarpoolOffer, EventRoleType, EventTasksState } from "./event-tasks";

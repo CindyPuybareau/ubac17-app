@@ -916,6 +916,8 @@ export default async function DashboardPage() {
   const coachContactEmailByPlayerId: Record<string, string> = {};
   const coachMemberDetailsByPlayerId: Record<string, MemberDetail> = {};
   const coachRsvpStatusByKey: Record<string, string> = {};
+  // Motif d'absence saisi par la famille, affiché sur la carte du coach.
+  const coachRsvpReasonByKey: Record<string, string | null> = {};
   let coachArchivedPlayerIds: string[] = [];
 
   if (isCoach) {
@@ -1260,11 +1262,19 @@ export default async function DashboardPage() {
       coachEventIds.length > 0
         ? await supabase
             .from("rsvps")
-            .select("event_id, player_id, status")
+            .select("event_id, player_id, status, reason")
             .in("event_id", coachEventIds)
-        : { data: [] as { event_id: string; player_id: string; status: string }[] };
+        : {
+            data: [] as {
+              event_id: string;
+              player_id: string;
+              status: string;
+              reason: string | null;
+            }[],
+          };
     (coachRsvpRows ?? []).forEach((r) => {
       coachRsvpStatusByKey[`${r.event_id}:${r.player_id}`] = r.status;
+      coachRsvpReasonByKey[`${r.event_id}:${r.player_id}`] = r.reason ?? null;
     });
 
     const coachRosterPlayerIds = Array.from(
@@ -1604,6 +1614,7 @@ export default async function DashboardPage() {
           memberDetailsByPlayerId={coachMemberDetailsByPlayerId}
           rsvpPlayers={coachRsvpPlayers}
           rsvpStatusByKey={coachRsvpStatusByKey}
+          rsvpReasonByKey={coachRsvpReasonByKey}
           taskTallyByTeamId={coachTaskTallyByTeamId}
           teamRoleByTeamId={coachTeamRoleByTeamId}
           clubTeams={coachClubTeams}
