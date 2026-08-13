@@ -12,11 +12,16 @@ export default function RequestAttendanceButton({
   eventId,
   requestedAt,
   pendingCount,
+  teamName,
+  startTime,
 }: {
   eventId: string;
   requestedAt: string | null;
   // Réponses encore manquantes : sans elles, la demande n'a pas d'objet.
   pendingCount: number;
+  // Servent au texte de la notification poussée sur le téléphone.
+  teamName: string;
+  startTime: string;
 }) {
   const router = useRouter();
   const [sentAt, setSentAt] = useState<string | null>(requestedAt);
@@ -38,6 +43,32 @@ export default function RequestAttendanceButton({
       return;
     }
     setSentAt(now);
+
+    // La notification est un bonus : le bandeau dans l'app, lui, est déjà
+    // en place grâce à la date enregistrée ci-dessus. Un échec d'envoi ne
+    // doit donc pas se présenter comme un échec de la demande.
+    const when = new Date(startTime).toLocaleString("fr-FR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    try {
+      await fetch("/api/send-push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventId,
+          title: `UBAC — ${teamName}`,
+          body: `Le coach attend ta réponse pour ${when}.`,
+          url: "/dashboard",
+        }),
+      });
+    } catch {
+      // Silencieux volontairement : voir ci-dessus.
+    }
+
     router.refresh();
   }
 

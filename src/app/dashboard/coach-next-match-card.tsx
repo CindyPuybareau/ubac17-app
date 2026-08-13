@@ -76,6 +76,8 @@ export default function CoachNextMatchCard({
               eventId={event.id}
               requestedAt={event.attendance_requested_at ?? null}
               pendingCount={counts?.pending ?? 0}
+              teamName={teamName}
+              startTime={event.start_time}
             />
           </div>
 
