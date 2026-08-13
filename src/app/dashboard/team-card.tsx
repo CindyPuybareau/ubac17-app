@@ -707,12 +707,15 @@ export default function TeamCard({
               {playerMembers.length > 0 && (
                 <>
                   <tr>
+                    {/* Même bandeau que l'Encadrement, en vert : c'est la
+                        couleur que porte déjà le badge "Joueur" sur chaque
+                        ligne, comme le navy porte celui de "Coach". */}
                     <td
                       colSpan={8}
-                      className="border-b border-zinc-100 bg-zinc-50 px-3 py-2 text-xs font-bold uppercase tracking-wide text-zinc-500"
+                      className="border-b border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-bold uppercase tracking-wide text-emerald-700"
                     >
                       Joueurs
-                      <span className="ml-1.5 font-semibold normal-case tracking-normal text-zinc-400">
+                      <span className="ml-1.5 font-semibold normal-case tracking-normal text-emerald-600/70">
                         ({playerMembers.length})
                       </span>
                     </td>
