@@ -598,6 +598,30 @@ export default function CalendarView({
         )}
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Action principale de l'écran : elle mérite un fond plein, sur
+              la même ligne que la navigation de date plutôt qu'un bouton
+              de plus empilé au-dessus de la grille. */}
+          {canManage && (
+            <button
+              onClick={() => setCreateOpen((v) => !v)}
+              className="flex items-center gap-1.5 rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-110"
+            >
+              <Plus className="h-4 w-4 shrink-0" />
+              Créer un événement
+            </button>
+          )}
+
+          {view === "month" && (
+            <button
+              onClick={goToday}
+              className="rounded-full border border-ubac-yellow px-3 py-1 text-xs font-semibold text-ubac-yellow-dark hover:bg-ubac-yellow/10"
+            >
+              Aujourd&apos;hui
+            </button>
+          )}
+
+          {/* Tout à droite : c'est un réglage d'affichage, pas une action
+              sur les données — il vient après ce qu'on fait, pas avant. */}
           <div className="flex items-center gap-0.5 rounded-full border border-zinc-200 p-0.5">
             <button
               onClick={() => setView("list")}
@@ -618,27 +642,6 @@ export default function CalendarView({
               Mois
             </button>
           </div>
-          {view === "month" && (
-            <button
-              onClick={goToday}
-              className="rounded-full border border-ubac-yellow px-3 py-1 text-xs font-semibold text-ubac-yellow-dark hover:bg-ubac-yellow/10"
-            >
-              Aujourd&apos;hui
-            </button>
-          )}
-
-          {/* Action principale de l'écran : elle mérite un fond plein, sur
-              la même ligne que la navigation de date plutôt qu'un bouton
-              de plus empilé au-dessus de la grille. */}
-          {canManage && (
-            <button
-              onClick={() => setCreateOpen((v) => !v)}
-              className="flex items-center gap-1.5 rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-110"
-            >
-              <Plus className="h-4 w-4 shrink-0" />
-              Créer un événement
-            </button>
-          )}
         </div>
       </div>
 
