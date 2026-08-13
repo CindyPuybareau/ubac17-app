@@ -682,19 +682,18 @@ export default async function DashboardPage() {
       ])
     );
 
-    // Display-only: teams coached by whoever shares this email, so a member
-    // who's both a player and a coach (e.g. Basile) shows both badges in the
-    // Membres table. Doesn't grant access — actual coach rights are still
-    // only ever set via team_coaches (Équipes tab).
-    const coachTeamsByEmailLower = new Map<string, AdminMemberTeam[]>();
+    // Équipes coachées, rattachées au COMPTE de la fiche et non à son
+    // e-mail. Une famille partage une seule adresse : rapprocher par
+    // e-mail faisait hériter l'enfant des équipes de son parent coach —
+    // Léonie affichait les badges de Basile, et le bouton "enregistrer"
+    // ne pouvait rien retirer puisqu'elle n'a jamais eu ce rôle.
+    const coachTeamsByProfileId = new Map<string, AdminMemberTeam[]>();
     (teamCoachesRes.data ?? []).forEach((tc) => {
-      const email = emailByProfileId.get(tc.coach_id);
       const team = teamsById.get(tc.team_id);
-      if (!email || !team) return;
-      const key = email.trim().toLowerCase();
-      const list = coachTeamsByEmailLower.get(key) ?? [];
+      if (!team) return;
+      const list = coachTeamsByProfileId.get(tc.coach_id) ?? [];
       list.push(team);
-      coachTeamsByEmailLower.set(key, list);
+      coachTeamsByProfileId.set(tc.coach_id, list);
     });
 
     // Display-only: named coaches without a real account yet, designated
@@ -796,8 +795,8 @@ export default async function DashboardPage() {
         licenseNumber: player.license_number,
         archivedAt: player.archived_at,
         teams: teamsByPlayerId.get(player.id) ?? [],
-        coachTeams: memberEmail
-          ? (coachTeamsByEmailLower.get(memberEmail.trim().toLowerCase()) ?? [])
+        coachTeams: player.profile_id
+          ? (coachTeamsByProfileId.get(player.profile_id) ?? [])
           : [],
         bureauRole: memberEmail
           ? (bureauRoleByEmailLower.get(memberEmail.trim().toLowerCase()) ?? null)

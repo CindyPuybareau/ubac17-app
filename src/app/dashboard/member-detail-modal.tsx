@@ -532,12 +532,25 @@ export default function MemberDetailModal({
           .ilike("email", emailToMatch)
           .maybeSingle();
         if (matchedProfile) {
-          const { error: linkError } = await supabase
+          // Une famille partage une seule adresse : ce compte est peut-être
+          // celui du parent, déjà rattaché à SA fiche. Le réutiliser ici
+          // attacherait la fiche de l'enfant au compte du père, et le
+          // retrait d'un rôle de coach viserait alors les équipes du père.
+          const { data: alreadyLinked } = await supabase
             .from("players")
-            .update({ profile_id: matchedProfile.id })
-            .eq("id", member.id);
-          if (!linkError) {
-            resolvedProfileId = matchedProfile.id;
+            .select("id")
+            .eq("profile_id", matchedProfile.id)
+            .neq("id", member.id)
+            .maybeSingle();
+
+          if (!alreadyLinked) {
+            const { error: linkError } = await supabase
+              .from("players")
+              .update({ profile_id: matchedProfile.id })
+              .eq("id", member.id);
+            if (!linkError) {
+              resolvedProfileId = matchedProfile.id;
+            }
           }
         }
       }
