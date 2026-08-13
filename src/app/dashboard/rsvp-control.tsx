@@ -4,14 +4,21 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Clock, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import {
+  SEGMENT_ABSENT_ON,
+  SEGMENT_BUTTON,
+  SEGMENT_GROUP,
+  SEGMENT_OFF,
+  SEGMENT_PRESENT_ON,
+} from "./rsvp-segment";
 
 type Status = "PRESENT" | "ABSENT" | "LATE" | "PENDING";
 
 function badgeFor(status: Status) {
   if (status === "PRESENT")
-    return { label: "Confirmé présent", className: "bg-green-100 text-green-700", Icon: Check };
+    return { label: "Confirmé présent", className: "bg-emerald-100 text-emerald-800", Icon: Check };
   if (status === "ABSENT")
-    return { label: "Noté absent", className: "bg-red-100 text-red-700", Icon: X };
+    return { label: "Noté absent", className: "bg-rose-100 text-rose-800", Icon: X };
   if (status === "LATE")
     return { label: "Retard annoncé", className: "bg-amber-100 text-amber-700", Icon: Clock };
   return { label: "Réponse attendue", className: "bg-zinc-100 text-zinc-500", Icon: Clock };
@@ -92,31 +99,29 @@ export default function RsvpControl({
         </span>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Segmented control : les deux réponses sont un même choix, pas deux
+          actions indépendantes — les enfermer dans un seul cadre le dit. */}
+      <div className={SEGMENT_GROUP}>
         <button
           type="button"
           disabled={saving}
           onClick={() => save("PRESENT", null)}
-          className={`flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold transition-colors disabled:opacity-60 ${
-            status === "PRESENT"
-              ? "bg-green-600 text-white"
-              : "border border-green-600 text-green-700 hover:bg-green-50"
+          className={`${SEGMENT_BUTTON} ${
+            status === "PRESENT" ? SEGMENT_PRESENT_ON : SEGMENT_OFF
           }`}
         >
-          <Check className="h-4 w-4 shrink-0" />
+          <Check className="h-3.5 w-3.5 shrink-0" />
           Présent
         </button>
         <button
           type="button"
           disabled={saving}
           onClick={() => setAskReason((v) => !v)}
-          className={`flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold transition-colors disabled:opacity-60 ${
-            status === "ABSENT"
-              ? "bg-red-600 text-white"
-              : "border border-red-600 text-red-700 hover:bg-red-50"
+          className={`${SEGMENT_BUTTON} ${
+            status === "ABSENT" ? SEGMENT_ABSENT_ON : SEGMENT_OFF
           }`}
         >
-          <X className="h-4 w-4 shrink-0" />
+          <X className="h-3.5 w-3.5 shrink-0" />
           Absent
         </button>
       </div>

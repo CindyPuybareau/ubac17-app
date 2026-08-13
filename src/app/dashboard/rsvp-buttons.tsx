@@ -4,6 +4,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import {
+  SEGMENT_ABSENT_ON,
+  SEGMENT_BUTTON,
+  SEGMENT_GROUP,
+  SEGMENT_OFF,
+  SEGMENT_PRESENT_ON,
+} from "./rsvp-segment";
 
 export default function RsvpButtons({
   eventId,
@@ -46,29 +53,25 @@ export default function RsvpButtons({
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className={SEGMENT_GROUP}>
       <button
         disabled={loading}
         onClick={() => respond("PRESENT")}
-        className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-60 ${
-          status === "PRESENT"
-            ? "bg-ubac-yellow text-navy"
-            : "border border-ubac-yellow text-ubac-yellow-dark hover:bg-ubac-yellow/10"
+        className={`${SEGMENT_BUTTON} ${
+          status === "PRESENT" ? SEGMENT_PRESENT_ON : SEGMENT_OFF
         }`}
       >
-        <Check className="h-4 w-4" />
+        <Check className="h-3.5 w-3.5 shrink-0" />
         Présent
       </button>
       <button
         disabled={loading}
         onClick={() => respond("ABSENT")}
-        className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-60 ${
-          status === "ABSENT"
-            ? "bg-red-600 text-white"
-            : "border border-red-600 text-red-700 hover:bg-red-50"
+        className={`${SEGMENT_BUTTON} ${
+          status === "ABSENT" ? SEGMENT_ABSENT_ON : SEGMENT_OFF
         }`}
       >
-        <X className="h-4 w-4" />
+        <X className="h-3.5 w-3.5 shrink-0" />
         Absent
       </button>
     </div>
