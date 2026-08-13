@@ -1,4 +1,5 @@
 import { CalendarDays, ClipboardList, Dumbbell, MessageCircle, Users } from "lucide-react";
+import { sortTeamsByGroup } from "@/lib/teams";
 import CalendarView, { type CalendarRsvpPlayer } from "./calendar-view";
 import FamilyTeamCard, { type FamilyTeamCardData } from "./family-team-card";
 import FamilyTrainings from "./family-trainings";
@@ -45,6 +46,12 @@ export default function FamilyView({
   eventRoles: EventRoleType[];
 }) {
   const iconClass = "h-4 w-4 shrink-0";
+  // Même ordre que côté coach : l'équipe mère avant ses déclinaisons.
+  // L'espace Parent empile des cartes au lieu d'onglets, mais la question
+  // posée est la même — retrouver U13M avant U13M-1.
+  const sortedTeamCards = sortTeamsByGroup(
+    teamCards.map((c) => ({ ...c, name: c.teamName }))
+  );
   const sections: AdminSection[] = [
     {
       key: "calendar",
@@ -64,7 +71,7 @@ export default function FamilyView({
       icon: <Users className={iconClass} />,
       content: (
         <div className="flex flex-col gap-4">
-          {teamCards.map((c) => (
+          {sortedTeamCards.map((c) => (
             <FamilyTeamCard key={`${c.playerId}-${c.teamId}`} card={c} />
           ))}
           {teamCards.length === 0 && (

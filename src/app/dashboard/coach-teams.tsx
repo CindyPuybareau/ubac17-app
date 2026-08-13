@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ClipboardList, Shirt } from "lucide-react";
-import { teamLabel } from "@/lib/teams";
+import { sortTeamsByGroup, teamLabel } from "@/lib/teams";
 import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
 import TeamCard from "./team-card";
 import type { TeamWithMembers } from "./team-manager";
@@ -29,8 +29,10 @@ export default function CoachTeams({
   teamRoleByTeamId: Record<string, "COACH" | "PLAYER">;
   clubTeams: AdminMemberTeam[];
 }) {
-  const [activeId, setActiveId] = useState(teams[0]?.id);
-  const active = teams.find((t) => t.id === activeId) ?? teams[0];
+  // L'équipe mère passe avant ses déclinaisons : U13M, puis U13M-1, U13M-2.
+  const sortedTeams = useMemo(() => sortTeamsByGroup(teams), [teams]);
+  const [activeId, setActiveId] = useState(sortedTeams[0]?.id);
+  const active = sortedTeams.find((t) => t.id === activeId) ?? sortedTeams[0];
 
   useScrollTopOnChange(activeId);
 
@@ -50,9 +52,9 @@ export default function CoachTeams({
 
   return (
     <div className="flex flex-col gap-4">
-      {teams.length > 1 && (
+      {sortedTeams.length > 1 && (
         <div className="flex flex-wrap gap-2">
-          {teams.map((t) => {
+          {sortedTeams.map((t) => {
             const role = teamRoleByTeamId[t.id] ?? "COACH";
             const isActive = active.id === t.id;
             return (
