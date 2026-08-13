@@ -23,6 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { formatLastName } from "@/lib/names";
 import {
   EMAIL_SIGNATURE,
   buildGmailComposeLink,
@@ -62,7 +63,7 @@ function due(c: AdminCotisation) {
 // uppercase, falling back to the free-text playerName when a cotisation's
 // player row doesn't carry split first/last name fields (older imports).
 function cotisationLastName(c: AdminCotisation) {
-  return (c.lastName ?? "").toUpperCase() || c.playerName || "—";
+  return formatLastName(c.lastName) || c.playerName || "—";
 }
 
 function cotisationFirstName(c: AdminCotisation) {

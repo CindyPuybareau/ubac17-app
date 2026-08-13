@@ -27,10 +27,11 @@ import EmailTemplateModal from "./email-template-modal";
 import MemberDetailModal from "./member-detail-modal";
 import PlayerYearBadge from "./player-year-badge";
 import WhatsAppButton from "./whatsapp-button";
+import { formatLastName, formatPersonName } from "@/lib/names";
 import type { AdminMember, AdminMemberTeam } from "./page";
 
 function fullLastName(m: AdminMember) {
-  return (m.lastName ?? "").toUpperCase() || "—";
+  return formatLastName(m.lastName) || "—";
 }
 
 function Modal({
@@ -106,7 +107,7 @@ export default function MembersTable({
   function memberLabel(ids: string[]) {
     if (ids.length === 1) {
       const m = members.find((mm) => mm.id === ids[0]);
-      return m ? [m.firstName, m.lastName].filter(Boolean).join(" ") || "ce membre" : "ce membre";
+      return m ? formatPersonName(m.firstName, m.lastName, "ce membre") : "ce membre";
     }
     return `${ids.length} membres`;
   }
@@ -780,8 +781,7 @@ export default function MembersTable({
             <p className="text-sm text-zinc-700">
               Êtes-vous sûr de vouloir supprimer définitivement{" "}
               <span className="font-semibold">
-                {[deleteTarget.firstName, deleteTarget.lastName].filter(Boolean).join(" ") ||
-                  "ce membre"}
+                {formatPersonName(deleteTarget.firstName, deleteTarget.lastName, "ce membre")}
               </span>{" "}
               ? Cette action est irréversible.
             </p>

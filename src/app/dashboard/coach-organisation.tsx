@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { CalendarDays, ChevronDown, ChevronUp, Trophy } from "lucide-react";
 import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
+import { formatPersonName } from "@/lib/names";
 import CoachNextMatchCard from "./coach-next-match-card";
 import { formatEventTime, styleFor } from "./calendar-view";
 import { rolesForEventType } from "./event-tasks";
@@ -34,7 +35,7 @@ type SubTab = "planning" | "bilan";
 type SortKey = string;
 
 function fullName(p: RosterPlayer) {
-  return [p.first_name, p.last_name].filter(Boolean).join(" ") || "Sans nom";
+  return formatPersonName(p.first_name, p.last_name);
 }
 
 function formatDay(iso: string) {
@@ -275,7 +276,7 @@ function BilanTeamTable({
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} className="border-b border-zinc-50 last:border-0">
-                <td className="w-auto px-3 py-2.5 text-zinc-800">{r.name}</td>
+                <td className="w-auto px-3 py-2.5 font-semibold text-zinc-800">{r.name}</td>
                 {roles.map((role) => {
                   const count = r.counts[role.code] ?? 0;
                   return (

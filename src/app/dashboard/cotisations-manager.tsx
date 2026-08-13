@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
+import { formatPersonName } from "@/lib/names";
 import CategoryTariffsEditor from "./category-tariffs-editor";
 import CotisationParticipantsTable, {
   computeStatus,
@@ -427,7 +428,7 @@ export default function CotisationsManager({
                               onChange={() => toggleNewParticipant(m.id)}
                               className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
                             />
-                            {m.firstName} {(m.lastName ?? "").toUpperCase()}
+                            {formatPersonName(m.firstName, m.lastName)}
                             {m.category ? (
                               <span className="text-xs text-zinc-400">· {m.category}</span>
                             ) : null}

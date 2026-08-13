@@ -113,7 +113,7 @@ export default function AppelExpressModal({
                     onClick={() => cycleStatus(p.id)}
                     className="flex w-full items-center justify-between gap-2 rounded-xl border border-zinc-100 px-4 py-3.5 text-left transition-colors hover:border-ubac-yellow/50"
                   >
-                    <span className="min-w-0 truncate font-medium text-zinc-900">{p.name}</span>
+                    <span className="min-w-0 truncate font-semibold text-zinc-900">{p.name}</span>
                     <span
                       className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${style.className}`}
                     >

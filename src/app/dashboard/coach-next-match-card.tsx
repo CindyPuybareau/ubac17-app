@@ -3,12 +3,13 @@ import OpponentDisplay from "./opponent-display";
 import NextMatchActions from "./next-match-actions";
 import MatchTasksPanel from "./match-tasks-panel";
 import type { RosterPlayer, RsvpCounts, UpcomingEvent } from "./family-data";
+import { formatPersonName } from "@/lib/names";
 import { rolesForEventType } from "./event-tasks";
 import { shouldOfferCarpool } from "./salles";
 import type { CarpoolOffer, EventRoleType, EventTasksState } from "./event-tasks";
 
 function fullName(p: RosterPlayer) {
-  return [p.first_name, p.last_name].filter(Boolean).join(" ") || "Sans nom";
+  return formatPersonName(p.first_name, p.last_name);
 }
 
 export default function CoachNextMatchCard({

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CalendarDays, Clock, ExternalLink, MapPin, MessageCircle, Users } from "lucide-react";
+import { formatPersonName } from "@/lib/names";
 import { formatEventTime, isMatchType, styleFor } from "./calendar-view";
 import OpponentDisplay from "./opponent-display";
 import SalleBadge from "./salle-badge";
@@ -42,7 +43,7 @@ export type FamilyTeamCardData = {
 };
 
 function fullName(p: Person) {
-  return [p.first_name, p.last_name].filter(Boolean).join(" ") || "Sans nom";
+  return formatPersonName(p.first_name, p.last_name);
 }
 
 export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {

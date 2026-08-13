@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
+import { formatPersonName } from "@/lib/names";
 import SignOutButton from "./sign-out-button";
 import RealtimeSync from "./realtime-sync";
 import DashboardTabs, { type DashboardTab } from "./dashboard-tabs";
@@ -458,7 +459,7 @@ export default async function DashboardPage() {
       const roster = await getTeamRoster(supabase, c.event.team_id);
       convocationRosterByEventId[c.event.id] = roster.map((p) => ({
         id: p.id,
-        name: [p.first_name, p.last_name].filter(Boolean).join(" ") || "Sans nom",
+        name: formatPersonName(p.first_name, p.last_name),
       }));
     })
   );
@@ -861,9 +862,7 @@ export default async function DashboardPage() {
         collecteId: c.collecte_id,
         collecteType: collecte?.type ?? null,
         collecteName: collecte?.name ?? null,
-        playerName:
-          [player?.first_name, player?.last_name].filter(Boolean).join(" ") ||
-          "Joueur",
+        playerName: formatPersonName(player?.first_name, player?.last_name, "Joueur"),
         firstName: player?.first_name ?? null,
         lastName: player?.last_name ?? null,
         category: player?.category ?? null,
@@ -1277,7 +1276,7 @@ export default async function DashboardPage() {
         if (!player) return null;
         return {
           id: playerId,
-          name: [player.first_name, player.last_name].filter(Boolean).join(" ") || "Joueur",
+          name: formatPersonName(player.first_name, player.last_name, "Joueur"),
           teamIds: (coachTeamRefsByPlayerId.get(playerId) ?? []).map((t) => t.id),
         };
       })

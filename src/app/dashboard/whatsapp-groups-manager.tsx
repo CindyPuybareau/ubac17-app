@@ -12,13 +12,14 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { formatPersonName } from "@/lib/names";
 import { buildAppDeepLink } from "@/lib/whatsapp";
 import type { WhatsAppGroup } from "./page";
 
 type Candidate = { id: string; firstName: string | null; lastName: string | null };
 
 function fullName(p: Candidate) {
-  return [p.firstName, p.lastName].filter(Boolean).join(" ") || "Sans nom";
+  return formatPersonName(p.firstName, p.lastName);
 }
 
 function GroupRow({

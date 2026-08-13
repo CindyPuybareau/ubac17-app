@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { formatPersonName } from "@/lib/names";
 
 // Un rôle est désormais une donnée (table event_role_types) et non plus
 // une valeur en dur : "JERSEYS" et "SNACKS" ne sont que les deux premières
@@ -38,7 +39,7 @@ export type CarpoolOffer = {
 export type SeasonTaskTally = Record<string, Record<string, number>>;
 
 function fullName(p: { first_name: string | null; last_name: string | null }) {
-  return [p.first_name, p.last_name].filter(Boolean).join(" ") || "Sans nom";
+  return formatPersonName(p.first_name, p.last_name);
 }
 
 // Le catalogue de rôles du club, hors rôles archivés, dans l'ordre voulu.

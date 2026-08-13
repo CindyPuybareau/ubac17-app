@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { buildGmailComposeLink } from "@/lib/email";
+import { formatPersonName } from "@/lib/names";
 import { parseMatchTitle } from "@/lib/match-display";
 import { teamLabel } from "@/lib/teams";
 import OpponentDisplay from "./opponent-display";
@@ -792,7 +793,7 @@ export default function CalendarView({
               >
                 <Cake className="h-4 w-4 shrink-0 text-purple-600" />
                 <span className="text-sm font-medium text-zinc-900">
-                  Anniversaire : {[m.firstName, m.lastName].filter(Boolean).join(" ")}
+                  Anniversaire : {formatPersonName(m.firstName, m.lastName, "Membre")}
                   {m.category ? ` · ${m.category}` : ""}
                 </span>
               </button>
@@ -991,7 +992,7 @@ export default function CalendarView({
                 : `Le ${selectedDate.toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}`}
               , c&apos;est l&apos;anniversaire de{" "}
               <span className="font-semibold">
-                {[openBirthday.firstName, openBirthday.lastName].filter(Boolean).join(" ")}
+                {formatPersonName(openBirthday.firstName, openBirthday.lastName, "Membre")}
               </span>
               {openBirthday.category ? ` - ${openBirthday.category}` : ""} !
             </p>

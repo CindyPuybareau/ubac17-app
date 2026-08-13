@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { formatPersonName } from "@/lib/names";
 import { teamLabel } from "@/lib/teams";
 import { buildAppDeepLink, buildWhatsAppLink } from "@/lib/whatsapp";
 import type { AdminMemberTeam, MemberDetail } from "./page";
@@ -418,7 +419,7 @@ export default function MemberDetailModal({
   }
 
   async function handleArchiveClick() {
-    const name = [member.firstName, member.lastName].filter(Boolean).join(" ") || "ce membre";
+    const name = formatPersonName(member.firstName, member.lastName, "ce membre");
     const ok = window.confirm(
       `Archiver la fiche de ${name} ? Elle n'apparaîtra plus dans la liste par défaut, mais ses données restent conservées et tu peux réactiver à tout moment.`
     );
@@ -626,8 +627,7 @@ export default function MemberDetailModal({
         <div className="flex items-center justify-between border-b border-zinc-100 px-5 py-4">
           <div>
             <h3 className="font-semibold text-zinc-900">
-              {[member.firstName, member.lastName].filter(Boolean).join(" ") ||
-                "Membre"}
+              {formatPersonName(member.firstName, member.lastName, "Membre")}
             </h3>
             {member.category && (
               <p className="text-xs text-zinc-500">{member.category}</p>

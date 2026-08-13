@@ -15,6 +15,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { formatLastName, formatPersonName } from "@/lib/names";
 import { computePlayerYearStatus, getCurrentSeasonLabel } from "@/lib/season";
 import { formatEventTime, isMatchType, styleFor } from "./calendar-view";
 import OpponentDisplay from "./opponent-display";
@@ -30,7 +31,7 @@ const now = Date.now();
 type Person = { id: string; first_name: string | null; last_name: string | null };
 
 function fullName(p: { first_name: string | null; last_name: string | null }) {
-  return [p.first_name, p.last_name].filter(Boolean).join(" ") || "Sans nom";
+  return formatPersonName(p.first_name, p.last_name);
 }
 
 // Gives each category its own soft pastel identity (badge + card border)
@@ -525,11 +526,11 @@ export default function TeamCard({
               {/* La bordure vit sur la première cellule : sur un <tr> en
                   border-collapse, un bord gauche ne s'affiche pas. */}
               <td
-                className={`w-auto whitespace-nowrap px-3 py-2.5 font-medium text-zinc-900 ${
+                className={`w-auto whitespace-nowrap px-3 py-2.5 font-semibold text-zinc-900 ${
                   isStaff ? "border-l-4 border-l-navy" : ""
                 }`}
               >
-                {m.lastName ?? "—"}
+                {formatLastName(m.lastName) || "—"}
               </td>
               <td className="w-auto whitespace-nowrap px-3 py-2.5 text-zinc-700">
                 {m.firstName ?? "—"}
