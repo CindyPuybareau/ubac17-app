@@ -8,6 +8,7 @@ import WhatsAppGroupButton from "./whatsapp-group-button";
 import PlayerYearBadge from "./player-year-badge";
 import { categoryTheme } from "./team-card";
 import type { AdminUpcomingEvent } from "./page";
+import type { CarpoolOffer, EventRoleType, EventTasksState } from "./event-tasks";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 type CoachContact = Person & { phone: string | null };
@@ -44,6 +45,9 @@ export default function FamilyTeamCard({
   card,
   events,
   rsvpStatusByKey,
+  tasksByEventId = {},
+  carpoolByEventId = {},
+  eventRoles = [],
 }: {
   card: FamilyTeamCardData;
   // Événements de cette équipe uniquement — déjà filtrés par FamilyView à
@@ -51,6 +55,9 @@ export default function FamilyTeamCard({
   // les deux vues lisent exactement le même statut RSVP.
   events: AdminUpcomingEvent[];
   rsvpStatusByKey: Record<string, string>;
+  tasksByEventId?: Record<string, EventTasksState>;
+  carpoolByEventId?: Record<string, CarpoolOffer[]>;
+  eventRoles?: EventRoleType[];
 }) {
   const theme = categoryTheme(card.category ?? card.teamName);
   const categoryLabel = card.category ?? card.teamName;
@@ -156,6 +163,9 @@ export default function FamilyTeamCard({
                 event={e}
                 concerned={concerned}
                 rsvpStatusByKey={rsvpStatusByKey}
+                tasksByEventId={tasksByEventId}
+                carpoolByEventId={carpoolByEventId}
+                eventRoles={eventRoles}
               />
             ))}
           </div>

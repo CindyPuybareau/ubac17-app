@@ -133,6 +133,9 @@ export default function FamilyView({
               card={c}
               events={eventsByTeamId.get(c.teamId) ?? []}
               rsvpStatusByKey={rsvpStatusByKey}
+              tasksByEventId={tasksByEventId}
+              carpoolByEventId={carpoolByEventId}
+              eventRoles={eventRoles}
             />
           ))}
           {visibleTeamCards.length === 0 && (
@@ -161,6 +164,9 @@ export default function FamilyView({
           events={visibleEvents}
           players={visiblePlayers}
           rsvpStatusByKey={rsvpStatusByKey}
+          tasksByEventId={tasksByEventId}
+          carpoolByEventId={carpoolByEventId}
+          eventRoles={eventRoles}
         />
       ),
     },

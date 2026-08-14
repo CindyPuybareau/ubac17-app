@@ -3,6 +3,7 @@
 import FamilyEventCard from "./family-event-card";
 import type { AdminUpcomingEvent } from "./page";
 import type { CalendarRsvpPlayer } from "./calendar-view";
+import type { CarpoolOffer, EventRoleType, EventTasksState } from "./event-tasks";
 
 // Fonction ordinaire : la lecture de l'heure courante reste hors du corps
 // du composant (règle react-hooks/purity, même motif que family-data.ts).
@@ -19,11 +20,17 @@ export default function FamilyEventFeed({
   events,
   players,
   rsvpStatusByKey,
+  tasksByEventId = {},
+  carpoolByEventId = {},
+  eventRoles = [],
 }: {
   events: AdminUpcomingEvent[];
   // Enfants concernés : déjà filtrés par le sélecteur d'enfant en amont.
   players: CalendarRsvpPlayer[];
   rsvpStatusByKey: Record<string, string>;
+  tasksByEventId?: Record<string, EventTasksState>;
+  carpoolByEventId?: Record<string, CarpoolOffer[]>;
+  eventRoles?: EventRoleType[];
 }) {
   const upcoming = upcomingSorted(events);
 
@@ -44,6 +51,9 @@ export default function FamilyEventFeed({
             event={e}
             concerned={concerned}
             rsvpStatusByKey={rsvpStatusByKey}
+            tasksByEventId={tasksByEventId}
+            carpoolByEventId={carpoolByEventId}
+            eventRoles={eventRoles}
           />
         );
       })}

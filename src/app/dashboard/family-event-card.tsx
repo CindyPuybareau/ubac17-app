@@ -3,25 +3,38 @@
 import { CalendarDays, MapPin } from "lucide-react";
 import { formatEventTime, homeAwayLabel, isMatchType, styleFor } from "./calendar-view";
 import ItineraryButton from "./itinerary-button";
+import MatchTasksPanel from "./match-tasks-panel";
 import OpponentDisplay from "./opponent-display";
 import RsvpControl from "./rsvp-control";
 import SalleBadge from "./salle-badge";
-import { venueQuery } from "./salles";
+import { shouldOfferCarpool, venueQuery } from "./salles";
+import { rolesForEventType } from "./event-tasks";
+import type { CarpoolOffer, EventRoleType, EventTasksState } from "./event-tasks";
 import type { AdminUpcomingEvent } from "./page";
 
+const emptyEventTasks: EventTasksState = {};
+
 // Carte d'événement interactive partagée entre l'onglet "Prochains
-// Événements" (family-event-feed.tsx, tous enfants confondus) et l'onglet
-// "Mon Équipe" (family-team-card.tsx, un enfant à la fois) : même source
-// d'événements, même statut RSVP, donc même carte plutôt que deux rendus
-// qui pourraient diverger.
+// Événements" (family-event-feed.tsx, tous enfants confondus), l'onglet
+// "Mon Équipe" (family-team-card.tsx, un enfant à la fois) et le
+// Calendrier (calendar-view.tsx) : même source d'événements, même statut
+// RSVP, mêmes rôles/covoiturage — pas une version allégée par écran, pour
+// qu'une famille n'ait jamais à aller chercher l'organisation dans un
+// autre onglet que celui où elle se trouve déjà.
 export default function FamilyEventCard({
   event: e,
   concerned,
   rsvpStatusByKey,
+  tasksByEventId = {},
+  carpoolByEventId = {},
+  eventRoles = [],
 }: {
   event: AdminUpcomingEvent;
   concerned: { id: string; name: string }[];
   rsvpStatusByKey: Record<string, string>;
+  tasksByEventId?: Record<string, EventTasksState>;
+  carpoolByEventId?: Record<string, CarpoolOffer[]>;
+  eventRoles?: EventRoleType[];
 }) {
   const style = styleFor(e.event_type);
   const homeAway = isMatchType(e.event_type) ? homeAwayLabel(e.isHome) : null;
@@ -94,6 +107,18 @@ export default function FamilyEventCard({
           Aucun de tes enfants n&apos;est convoqué sur ce rassemblement.
         </p>
       )}
+
+      <MatchTasksPanel
+        eventId={e.id}
+        eventDate={e.start_time}
+        roster={[]}
+        myPlayerIds={concerned.map((p) => p.id)}
+        canAssignAnyone={false}
+        initialTasks={tasksByEventId[e.id] ?? emptyEventTasks}
+        initialCarpool={carpoolByEventId[e.id] ?? []}
+        roles={rolesForEventType(eventRoles, e.event_type)}
+        showCarpool={shouldOfferCarpool(e)}
+      />
     </div>
   );
 }

@@ -54,12 +54,6 @@ import {
 
 const emptyEventTasks: EventTasksState = {};
 
-// Rôles attribuables et covoiturage n'ont de sens que pour ce qui suppose
-// un déplacement — un entraînement n'en a jamais besoin.
-function isOrganisableEvent(eventType: string | null) {
-  return eventType === "MATCH" || eventType === "FRIENDLY" || eventType === "TOURNAMENT";
-}
-
 // Ré-exportés : beaucoup d'écrans les importent historiquement d'ici, et
 // ce fichier reste le point d'entrée naturel du calendrier.
 export { EVENT_TYPE_OPTIONS, formatEventTime, homeAwayLabel, isMatchType, styleFor };
@@ -506,8 +500,12 @@ export default function CalendarView({
             onglets Organisation / Prochains Événements — pas une version
             allégée propre au calendrier, pour ne jamais afficher deux
             vérités différentes du même trajet. Seulement côté famille :
-            Bureau et Coach ont déjà leur onglet Organisation dédié. */}
-        {!canManage && isOrganisableEvent(event.event_type) && (
+            Bureau et Coach ont déjà leur onglet Organisation dédié.
+            MatchTasksPanel se masque déjà tout seul s'il n'y a ni rôle ni
+            covoiturage applicable (ex. un entraînement) : pas besoin d'un
+            filtre par type d'événement en plus, qui ferait justement
+            disparaître ce bloc sur un "Événement club" pourtant organisé. */}
+        {!canManage && (
           <MatchTasksPanel
             eventId={event.id}
             eventDate={event.start_time}
