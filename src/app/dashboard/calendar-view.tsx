@@ -28,13 +28,15 @@ import OpponentDisplay from "./opponent-display";
 import CreateEventForm from "./create-event-form";
 import RsvpButtons from "./rsvp-buttons";
 import BirthdayWidget from "./birthday-widget";
+import ItineraryButton from "./itinerary-button";
+import MatchTasksPanel from "./match-tasks-panel";
 import type { AdminUpcomingEvent } from "./page";
 import {
   groupBirthdaysByMonthDay,
   upcomingBirthdays,
   type BirthdaySource,
 } from "./birthdays";
-import { SALLES } from "./salles";
+import { SALLES, shouldOfferCarpool, venueQuery } from "./salles";
 import SalleBadge from "./salle-badge";
 import {
   EVENT_TYPE_OPTIONS,
@@ -43,6 +45,20 @@ import {
   isMatchType,
   styleFor,
 } from "./event-style";
+import {
+  rolesForEventType,
+  type CarpoolOffer,
+  type EventRoleType,
+  type EventTasksState,
+} from "./event-tasks";
+
+const emptyEventTasks: EventTasksState = {};
+
+// Rôles attribuables et covoiturage n'ont de sens que pour ce qui suppose
+// un déplacement — un entraînement n'en a jamais besoin.
+function isOrganisableEvent(eventType: string | null) {
+  return eventType === "MATCH" || eventType === "FRIENDLY" || eventType === "TOURNAMENT";
+}
 
 // Ré-exportés : beaucoup d'écrans les importent historiquement d'ici, et
 // ce fichier reste le point d'entrée naturel du calendrier.
@@ -142,6 +158,9 @@ export default function CalendarView({
   allowClubWide = false,
   birthdayMembers = [],
   scopeTeams = [],
+  tasksByEventId = {},
+  carpoolByEventId = {},
+  eventRoles = [],
 }: {
   events: AdminUpcomingEvent[];
   createTeams?: CalendarTeamRef[];
@@ -156,6 +175,13 @@ export default function CalendarView({
   // sans cette ligne, un calendrier vide ne dit pas s'il ne couvre rien ou
   // s'il n'y a simplement rien de programmé.
   scopeTeams?: { id: string; name: string | null; category: string | null }[];
+  // Rôles attribués (voiture, maillots, goûter...) et places de covoiturage,
+  // affichés dans la carte d'un match/tournoi côté famille — seulement là où
+  // ils sont fournis : ni Bureau ni Coach n'en ont besoin sur leur propre
+  // calendrier, ils ont déjà leur onglet Organisation dédié pour ça.
+  tasksByEventId?: Record<string, EventTasksState>;
+  carpoolByEventId?: Record<string, CarpoolOffer[]>;
+  eventRoles?: EventRoleType[];
 }) {
   const router = useRouter();
   const [viewMonth, setViewMonth] = useState<Date>(today);
@@ -411,6 +437,8 @@ export default function CalendarView({
           {event.salle && <SalleBadge salle={event.salle} />}
         </div>
 
+        <ItineraryButton query={venueQuery(event)} />
+
         {hasRoster && (
           <div className="flex flex-wrap gap-1.5">
             <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold leading-none text-green-700">
@@ -472,6 +500,25 @@ export default function CalendarView({
               );
             })}
           </div>
+        )}
+
+        {/* Rôles et covoiturage : mêmes données, même composant que les
+            onglets Organisation / Prochains Événements — pas une version
+            allégée propre au calendrier, pour ne jamais afficher deux
+            vérités différentes du même trajet. Seulement côté famille :
+            Bureau et Coach ont déjà leur onglet Organisation dédié. */}
+        {!canManage && isOrganisableEvent(event.event_type) && (
+          <MatchTasksPanel
+            eventId={event.id}
+            eventDate={event.start_time}
+            roster={[]}
+            myPlayerIds={respondingPlayers.map((p) => p.id)}
+            canAssignAnyone={false}
+            initialTasks={tasksByEventId[event.id] ?? emptyEventTasks}
+            initialCarpool={carpoolByEventId[event.id] ?? []}
+            roles={rolesForEventType(eventRoles, event.event_type)}
+            showCarpool={shouldOfferCarpool(event)}
+          />
         )}
       </div>
     );

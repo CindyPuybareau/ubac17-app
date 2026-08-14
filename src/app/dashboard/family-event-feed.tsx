@@ -19,13 +19,11 @@ export default function FamilyEventFeed({
   events,
   players,
   rsvpStatusByKey,
-  rsvpReasonByKey = {},
 }: {
   events: AdminUpcomingEvent[];
   // Enfants concernés : déjà filtrés par le sélecteur d'enfant en amont.
   players: CalendarRsvpPlayer[];
   rsvpStatusByKey: Record<string, string>;
-  rsvpReasonByKey?: Record<string, string | null>;
 }) {
   const upcoming = upcomingSorted(events);
 
@@ -46,7 +44,6 @@ export default function FamilyEventFeed({
             event={e}
             concerned={concerned}
             rsvpStatusByKey={rsvpStatusByKey}
-            rsvpReasonByKey={rsvpReasonByKey}
           />
         );
       })}

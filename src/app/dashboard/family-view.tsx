@@ -30,7 +30,6 @@ export default function FamilyView({
   events,
   rsvpPlayers,
   rsvpStatusByKey,
-  rsvpReasonByKey,
   birthdayMembers,
   teamCards,
   convocationCards,
@@ -43,7 +42,6 @@ export default function FamilyView({
   events: AdminUpcomingEvent[];
   rsvpPlayers: CalendarRsvpPlayer[];
   rsvpStatusByKey: Record<string, string>;
-  rsvpReasonByKey: Record<string, string | null>;
   birthdayMembers: BirthdaySource[];
   teamCards: FamilyTeamCardData[];
   convocationCards: ConvocationCard[];
@@ -117,6 +115,9 @@ export default function FamilyView({
           events={visibleEvents}
           rsvp={{ players: visiblePlayers, statusByKey: rsvpStatusByKey }}
           birthdayMembers={birthdayMembers}
+          tasksByEventId={tasksByEventId}
+          carpoolByEventId={carpoolByEventId}
+          eventRoles={eventRoles}
         />
       ),
     },
@@ -132,7 +133,6 @@ export default function FamilyView({
               card={c}
               events={eventsByTeamId.get(c.teamId) ?? []}
               rsvpStatusByKey={rsvpStatusByKey}
-              rsvpReasonByKey={rsvpReasonByKey}
             />
           ))}
           {visibleTeamCards.length === 0 && (
@@ -161,7 +161,6 @@ export default function FamilyView({
           events={visibleEvents}
           players={visiblePlayers}
           rsvpStatusByKey={rsvpStatusByKey}
-          rsvpReasonByKey={rsvpReasonByKey}
         />
       ),
     },

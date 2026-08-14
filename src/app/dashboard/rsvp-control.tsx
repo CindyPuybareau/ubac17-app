@@ -32,14 +32,12 @@ export default function RsvpControl({
   playerId,
   playerName,
   currentStatus,
-  currentReason,
 }: {
   eventId: string;
   playerId: string;
   // Affiché seulement quand la famille suit plusieurs enfants.
   playerName?: string;
   currentStatus: string;
-  currentReason?: string | null;
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<Status>(
@@ -47,12 +45,10 @@ export default function RsvpControl({
       ? currentStatus
       : "PENDING"
   );
-  const [reason, setReason] = useState(currentReason ?? "");
-  const [askReason, setAskReason] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function save(next: Status, nextReason: string | null) {
+  async function save(next: Status) {
     setSaving(true);
     setError(null);
     const supabase = createClient();
@@ -66,7 +62,7 @@ export default function RsvpControl({
       .eq("player_id", playerId)
       .maybeSingle();
 
-    const payload = { status: next, reason: nextReason };
+    const payload = { status: next };
     const { error: writeError } = existing
       ? await supabase.from("rsvps").update(payload).eq("id", existing.id)
       : await supabase
@@ -79,13 +75,11 @@ export default function RsvpControl({
       return;
     }
     setStatus(next);
-    setAskReason(false);
     router.refresh();
   }
 
   // Revenir à "en attente", c'est supprimer la ligne : l'app lit déjà
-  // l'absence de réponse ainsi. Utile quand la famille a répondu trop vite
-  // et ne sait finalement plus.
+  // l'absence de réponse ainsi. Utile en cas de faute de frappe.
   async function clearAnswer() {
     setSaving(true);
     setError(null);
@@ -101,8 +95,6 @@ export default function RsvpControl({
       return;
     }
     setStatus("PENDING");
-    setReason("");
-    setAskReason(false);
     router.refresh();
   }
 
@@ -128,7 +120,7 @@ export default function RsvpControl({
         <button
           type="button"
           disabled={saving}
-          onClick={() => save("PRESENT", null)}
+          onClick={() => save("PRESENT")}
           className={`${SEGMENT_BUTTON} ${
             status === "PRESENT" ? SEGMENT_PRESENT_ON : SEGMENT_OFF
           }`}
@@ -139,7 +131,7 @@ export default function RsvpControl({
         <button
           type="button"
           disabled={saving}
-          onClick={() => setAskReason((v) => !v)}
+          onClick={() => save("ABSENT")}
           className={`${SEGMENT_BUTTON} ${
             status === "ABSENT" ? SEGMENT_ABSENT_ON : SEGMENT_OFF
           }`}
@@ -149,7 +141,8 @@ export default function RsvpControl({
         </button>
 
         {/* Ne s'affiche qu'une fois une réponse donnée : il n'y a rien à
-            annuler tant qu'on n'a pas répondu. */}
+            annuler tant qu'on n'a pas répondu — utile en cas de faute de
+            frappe plutôt qu'une vraie absence. */}
         {status !== "PENDING" && (
           <button
             type="button"
@@ -164,43 +157,6 @@ export default function RsvpControl({
         )}
       </div>
 
-      {askReason && (
-        // Le motif reste facultatif : "Valider l'absence" fonctionne avec
-        // un champ vide, on ne bloque pas une réponse pour un commentaire.
-        <div className="flex flex-col gap-2 rounded-xl border border-red-100 bg-red-50/60 p-3">
-          <label className="text-xs font-medium text-zinc-600" htmlFor={`reason-${eventId}-${playerId}`}>
-            Motif de l&apos;absence (facultatif)
-          </label>
-          <input
-            id={`reason-${eventId}-${playerId}`}
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="Blessure, vacances, examen..."
-            className="rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm outline-none focus:border-red-300"
-          />
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setAskReason(false)}
-              className="rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-white"
-            >
-              Annuler
-            </button>
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => save("ABSENT", reason.trim() || null)}
-              className="rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
-            >
-              {saving ? "Enregistrement..." : "Valider l'absence"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {status === "ABSENT" && !askReason && reason && (
-        <p className="text-xs text-zinc-500">Motif : {reason}</p>
-      )}
       {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   );

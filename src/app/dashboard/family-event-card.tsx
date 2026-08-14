@@ -18,12 +18,10 @@ export default function FamilyEventCard({
   event: e,
   concerned,
   rsvpStatusByKey,
-  rsvpReasonByKey = {},
 }: {
   event: AdminUpcomingEvent;
   concerned: { id: string; name: string }[];
   rsvpStatusByKey: Record<string, string>;
-  rsvpReasonByKey?: Record<string, string | null>;
 }) {
   const style = styleFor(e.event_type);
   const homeAway = isMatchType(e.event_type) ? homeAwayLabel(e.isHome) : null;
@@ -88,7 +86,6 @@ export default function FamilyEventCard({
               // concernés par le même rassemblement.
               playerName={concerned.length > 1 ? p.name : undefined}
               currentStatus={rsvpStatusByKey[`${e.id}:${p.id}`] ?? "PENDING"}
-              currentReason={rsvpReasonByKey[`${e.id}:${p.id}`] ?? null}
             />
           ))}
         </div>

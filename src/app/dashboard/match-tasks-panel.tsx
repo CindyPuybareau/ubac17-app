@@ -225,8 +225,14 @@ export default function MatchTasksPanel({
         return (
           <div
             key={taskType}
-            // Bouton collé au texte plutôt que renvoyé au bord droit.
-            className="flex flex-col gap-2 rounded-lg bg-white px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3"
+            // Bouton collé au texte plutôt que renvoyé au bord droit. Un
+            // rôle qui te concerne se distingue au premier coup d'œil,
+            // sans devoir relire chaque ligne pour retrouver le sien.
+            className={`flex flex-col gap-2 rounded-lg px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3 ${
+              assignedToMe
+                ? "bg-ubac-yellow/10 ring-1 ring-inset ring-ubac-yellow/50"
+                : "bg-white"
+            }`}
           >
             <div className="flex min-w-0 items-center gap-2">
               <RoleIcon icon={role.icon} />

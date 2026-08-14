@@ -44,7 +44,6 @@ export default function FamilyTeamCard({
   card,
   events,
   rsvpStatusByKey,
-  rsvpReasonByKey = {},
 }: {
   card: FamilyTeamCardData;
   // Événements de cette équipe uniquement — déjà filtrés par FamilyView à
@@ -52,7 +51,6 @@ export default function FamilyTeamCard({
   // les deux vues lisent exactement le même statut RSVP.
   events: AdminUpcomingEvent[];
   rsvpStatusByKey: Record<string, string>;
-  rsvpReasonByKey?: Record<string, string | null>;
 }) {
   const theme = categoryTheme(card.category ?? card.teamName);
   const categoryLabel = card.category ?? card.teamName;
@@ -158,7 +156,6 @@ export default function FamilyTeamCard({
                 event={e}
                 concerned={concerned}
                 rsvpStatusByKey={rsvpStatusByKey}
-                rsvpReasonByKey={rsvpReasonByKey}
               />
             ))}
           </div>

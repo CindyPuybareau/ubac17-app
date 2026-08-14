@@ -1336,8 +1336,6 @@ export default async function DashboardPage() {
   let familyOrganisationTasks: Record<string, EventTasksState> = {};
   let familyRsvpPlayers: { id: string; name: string; teamIds: string[] }[] = [];
   const familyRsvpStatusByKey: Record<string, string> = {};
-  // Motif d'absence saisi par la famille, affiché sous sa réponse.
-  const familyRsvpReasonByKey: Record<string, string | null> = {};
   const familyBirthdayMembers: BirthdaySource[] = [];
   const familyTeamCards: FamilyTeamCardData[] = [];
 
@@ -1481,13 +1479,12 @@ export default async function DashboardPage() {
     if (eventIds.length > 0 && familyPlayerIds.length > 0) {
       const { data: rsvpRows } = await supabase
         .from("rsvps")
-        .select("event_id, player_id, status, reason")
+        .select("event_id, player_id, status")
         .in("event_id", eventIds)
         .in("player_id", familyPlayerIds);
 
       (rsvpRows ?? []).forEach((r) => {
         familyRsvpStatusByKey[`${r.event_id}:${r.player_id}`] = r.status;
-        familyRsvpReasonByKey[`${r.event_id}:${r.player_id}`] = r.reason ?? null;
       });
     }
 
@@ -1613,7 +1610,6 @@ export default async function DashboardPage() {
           events={familyEvents}
           rsvpPlayers={familyRsvpPlayers}
           rsvpStatusByKey={familyRsvpStatusByKey}
-          rsvpReasonByKey={familyRsvpReasonByKey}
           birthdayMembers={familyBirthdayMembers}
           teamCards={familyTeamCards}
           convocationCards={convocationCards}
