@@ -347,24 +347,15 @@ export default async function DashboardPage() {
         .eq("parent_id", user.id),
       // This user's own player row, if any (players.profile_id = user.id) —
       // reused below both to also surface teams where THEY are only a
-      // pending (not-yet-linked-account) coach, later to merge their own
-      // player-side calendar into the Coach tab (see ownTeamIds), and to
-      // give a player with no children of their own a Famille tab too
-      // (see `players` below).
-      supabase
-        .from("players")
-        .select("id, first_name, category")
-        .eq("profile_id", user.id)
-        .maybeSingle(),
+      // pending (not-yet-linked-account) coach, and later to merge their
+      // own player-side calendar into the Coach tab (see ownTeamIds).
+      supabase.from("players").select("id").eq("profile_id", user.id).maybeSingle(),
     ]);
 
   const profile = profileResult.data;
   const isAdmin = Boolean(adminResult.data);
   const clubFunction = adminResult.data?.club_function ?? null;
-  const ownPlayerRow = ownPlayerRowResult.data as
-    | { id: string; first_name: string | null; category: string | null }
-    | null;
-  const ownPlayerId = ownPlayerRow?.id ?? null;
+  const ownPlayerId = ownPlayerRowResult.data?.id ?? null;
 
   type CoachedTeam = {
     id: string;
@@ -408,7 +399,7 @@ export default async function DashboardPage() {
     .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999));
   const isCoach = coachedTeams.length > 0;
 
-  const linkedPlayers = (playerLinksResult.data ?? [])
+  const players = (playerLinksResult.data ?? [])
     .map((link) => link.players as unknown as PlayerRow | null)
     .filter((p): p is PlayerRow => Boolean(p))
     .map((p) => ({
@@ -417,26 +408,6 @@ export default async function DashboardPage() {
       category: p.category,
       isSelf: p.profile_id === user.id,
     }));
-
-  // Un joueur qui crée son propre compte (fiche liée via players.profile_id,
-  // cf. handle_new_user()) n'apparaît dans aucune ligne parent_player —
-  // cette table ne relie que des ENFANTS à leur parent. Sans ce complément,
-  // il se retrouvait avec `players` vide, donc aucun onglet du tout à sa
-  // toute première connexion, malgré une fiche bel et bien reliée (RLS
-  // ouverte en parallèle sur events/rsvps/cotisations/etc., voir
-  // 20260925000000_own_player_first_class.sql).
-  const players =
-    ownPlayerId && !linkedPlayers.some((p) => p.id === ownPlayerId)
-      ? [
-          ...linkedPlayers,
-          {
-            id: ownPlayerId,
-            name: ownPlayerRow?.first_name ?? "Toi",
-            category: ownPlayerRow?.category ?? null,
-            isSelf: true,
-          },
-        ]
-      : linkedPlayers;
 
   const coachedTeamIds = new Set(coachedTeams.map((t) => t.id));
 
