@@ -7,6 +7,7 @@ import CalendarView, { type CalendarRsvpPlayer } from "./calendar-view";
 import FamilyTeamCard, { type FamilyTeamCardData } from "./family-team-card";
 import FamilyAttendanceRequests from "./family-attendance-requests";
 import PushSubscribe from "./push-subscribe";
+import CalendarSubscribe from "./calendar-subscribe";
 import FamilyEventFeed from "./family-event-feed";
 import FamilyOrganisationTable from "./family-organisation-table";
 import FamilyUpcomingRoles from "./family-upcoming-roles";
@@ -111,14 +112,17 @@ export default function FamilyView({
       label: "Calendrier",
       icon: <CalendarDays className={iconClass} />,
       content: (
-        <CalendarView
-          events={visibleEvents}
-          rsvp={{ players: visiblePlayers, statusByKey: rsvpStatusByKey }}
-          birthdayMembers={birthdayMembers}
-          tasksByEventId={tasksByEventId}
-          carpoolByEventId={carpoolByEventId}
-          eventRoles={eventRoles}
-        />
+        <div className="flex flex-col gap-4">
+          <CalendarView
+            events={visibleEvents}
+            rsvp={{ players: visiblePlayers, statusByKey: rsvpStatusByKey }}
+            birthdayMembers={birthdayMembers}
+            tasksByEventId={tasksByEventId}
+            carpoolByEventId={carpoolByEventId}
+            eventRoles={eventRoles}
+          />
+          <CalendarSubscribe />
+        </div>
       ),
     },
     {
