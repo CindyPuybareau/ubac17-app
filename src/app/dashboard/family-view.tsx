@@ -1,16 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarDays, ClipboardList, MessageCircle, Users } from "lucide-react";
+import { CalendarDays, MessageCircle, Users } from "lucide-react";
 import { sortTeamsByGroup } from "@/lib/teams";
 import CalendarView, { type CalendarRsvpPlayer } from "./calendar-view";
 import FamilyTeamCard, { type FamilyTeamCardData } from "./family-team-card";
 import FamilyAttendanceRequests from "./family-attendance-requests";
+import FamilyAttendanceSummary from "./family-attendance-summary";
 import PushSubscribe from "./push-subscribe";
 import CalendarSubscribe from "./calendar-subscribe";
-import FamilyEventFeed from "./family-event-feed";
-import FamilyOrganisationTable from "./family-organisation-table";
-import FamilyUpcomingRoles from "./family-upcoming-roles";
 import FamilyCotisationCard from "./family-cotisation-card";
 import NextConvocationCard from "./next-convocation-card";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
@@ -28,6 +26,12 @@ type ConvocationCard = {
   status: string;
 };
 
+// Navigation à 2 onglets, zéro redondance : "Planning & Matchs" concentre
+// tout ce qui est chronologique (prochain rendez-vous en tête, puis tous
+// les événements à venir avec la même carte interactive partout), "Mon
+// Équipe" concentre tout ce qui est identitaire (qui coache, qui joue,
+// où en est la cotisation). Plus aucune donnée n'apparaît sous deux formes
+// différentes selon l'onglet où on se trouve.
 export default function FamilyView({
   events,
   rsvpPlayers,
@@ -85,21 +89,6 @@ export default function FamilyView({
     return sortTeamsByGroup(cards.map((c) => ({ ...c, name: c.teamName })));
   }, [teamCards, selectedPlayerId]);
 
-  // Même liste d'événements et même statut RSVP que "Prochains Événements",
-  // simplement répartis par équipe : les deux onglets lisent la même
-  // source, donc une réponse donnée dans l'un se voit immédiatement dans
-  // l'autre en changeant d'onglet.
-  const eventsByTeamId = useMemo(() => {
-    const map = new Map<string, AdminUpcomingEvent[]>();
-    visibleEvents.forEach((e) => {
-      if (!e.teamId) return;
-      const list = map.get(e.teamId) ?? [];
-      list.push(e);
-      map.set(e.teamId, list);
-    });
-    return map;
-  }, [visibleEvents]);
-
   const visiblePlayerIds = useMemo(() => visiblePlayers.map((p) => p.id), [visiblePlayers]);
   const visibleCotisations = useMemo(
     () => cotisations.filter((c) => visiblePlayerIds.includes(c.playerId)),
@@ -115,11 +104,31 @@ export default function FamilyView({
 
   const sections: AdminSection[] = [
     {
-      key: "calendar",
-      label: "Calendrier",
+      key: "planning",
+      label: "Planning & Matchs",
       icon: <CalendarDays className={iconClass} />,
       content: (
         <div className="flex flex-col gap-4">
+          {/* Le prochain rassemblement en tête : présences, itinéraire et
+              rôles/covoiturage accessibles sans le moindre clic de plus. */}
+          {visibleConvocations.map(({ player, event, status }) => (
+            <NextConvocationCard
+              key={player.id}
+              playerName={player.isSelf ? "toi" : player.name}
+              playerId={player.id}
+              event={event}
+              status={status}
+              roster={rosterByEventId[event.id] ?? []}
+              tasks={tasksByEventId[event.id] ?? emptyEventTasks}
+              carpool={carpoolByEventId[event.id] ?? []}
+              roles={eventRoles}
+            />
+          ))}
+
+          {/* Tout le reste du calendrier : bascule liste/mois, même carte
+              interactive (présences, itinéraire, rôles) sur chaque
+              événement, qu'il s'agisse d'un match, d'un entraînement ou
+              d'un stage. */}
           <CalendarView
             events={visibleEvents}
             rsvp={{ players: visiblePlayers, statusByKey: rsvpStatusByKey }}
@@ -139,15 +148,7 @@ export default function FamilyView({
       content: (
         <div className="flex flex-col gap-4">
           {visibleTeamCards.map((c) => (
-            <FamilyTeamCard
-              key={`${c.playerId}-${c.teamId}`}
-              card={c}
-              events={eventsByTeamId.get(c.teamId) ?? []}
-              rsvpStatusByKey={rsvpStatusByKey}
-              tasksByEventId={tasksByEventId}
-              carpoolByEventId={carpoolByEventId}
-              eventRoles={eventRoles}
-            />
+            <FamilyTeamCard key={`${c.playerId}-${c.teamId}`} card={c} />
           ))}
           {visibleTeamCards.length === 0 && (
             <p className="text-sm text-zinc-500">Aucune équipe rattachée pour le moment.</p>
@@ -163,59 +164,18 @@ export default function FamilyView({
             </p>
             <WhatsAppGroupsFamily groups={whatsappGroups} />
           </div>
-        </div>
-      ),
-    },
-    {
-      key: "events",
-      label: "Prochains Événements",
-      icon: <CalendarDays className={iconClass} />,
-      content: (
-        <FamilyEventFeed
-          events={visibleEvents}
-          players={visiblePlayers}
-          rsvpStatusByKey={rsvpStatusByKey}
-          tasksByEventId={tasksByEventId}
-          carpoolByEventId={carpoolByEventId}
-          eventRoles={eventRoles}
-        />
-      ),
-    },
-    {
-      key: "organisation",
-      label: "Organisation",
-      icon: <ClipboardList className={iconClass} />,
-      content: (
-        <div className="flex flex-col gap-4">
-          <FamilyCotisationCard cotisations={visibleCotisations} />
-          <FamilyOrganisationTable
-            events={visibleEvents}
-            tasksByEventId={tasksByEventId}
-            roles={eventRoles}
-            myPlayerIds={visiblePlayerIds}
-          />
-          {/* Le prochain rassemblement garde sa carte détaillée : c'est
-              d'elle que dépend le covoiturage (proposer des places), que ni
-              le récapitulatif ni la liste des rôles ne couvrent. */}
-          {visibleConvocations.map(({ player, event, status }) => (
-            <NextConvocationCard
-              key={player.id}
-              playerName={player.isSelf ? "toi" : player.name}
-              playerId={player.id}
-              event={event}
-              status={status}
-              roster={rosterByEventId[event.id] ?? []}
-              tasks={tasksByEventId[event.id] ?? emptyEventTasks}
-              carpool={carpoolByEventId[event.id] ?? []}
-              roles={eventRoles}
+
+          {/* Deux encarts discrets, en pied de page : la situation
+              administrative n'a rien à faire mêlée au planning, mais
+              reste à portée d'un scroll depuis l'écran "identité". */}
+          <div className="grid grid-cols-1 gap-4 border-t border-zinc-100 pt-4 sm:grid-cols-2">
+            <FamilyCotisationCard cotisations={visibleCotisations} />
+            <FamilyAttendanceSummary
+              events={visibleEvents}
+              players={visiblePlayers}
+              rsvpStatusByKey={rsvpStatusByKey}
             />
-          ))}
-          <FamilyUpcomingRoles
-            events={visibleEvents}
-            players={visiblePlayers}
-            tasksByEventId={tasksByEventId}
-            roles={eventRoles}
-          />
+          </div>
         </div>
       ),
     },

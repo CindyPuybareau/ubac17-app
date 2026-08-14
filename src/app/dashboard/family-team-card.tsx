@@ -1,14 +1,10 @@
 "use client";
 
-import { CalendarDays, ClipboardList, ExternalLink, Users } from "lucide-react";
+import { ClipboardList, ExternalLink, Users } from "lucide-react";
 import { formatFirstName, formatLastName } from "@/lib/names";
-import FamilyEventCard from "./family-event-card";
-import { upcomingSorted } from "./family-event-feed";
 import WhatsAppGroupButton from "./whatsapp-group-button";
 import PlayerYearBadge from "./player-year-badge";
 import { categoryTheme } from "./team-card";
-import type { AdminUpcomingEvent } from "./page";
-import type { CarpoolOffer, EventRoleType, EventTasksState } from "./event-tasks";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 type CoachContact = Person & { phone: string | null };
@@ -41,31 +37,13 @@ function PersonNameInline({ p }: { p: Person }) {
   );
 }
 
-export default function FamilyTeamCard({
-  card,
-  events,
-  rsvpStatusByKey,
-  tasksByEventId = {},
-  carpoolByEventId = {},
-  eventRoles = [],
-}: {
-  card: FamilyTeamCardData;
-  // Événements de cette équipe uniquement — déjà filtrés par FamilyView à
-  // partir de la même liste que l'onglet "Prochains Événements", pour que
-  // les deux vues lisent exactement le même statut RSVP.
-  events: AdminUpcomingEvent[];
-  rsvpStatusByKey: Record<string, string>;
-  tasksByEventId?: Record<string, EventTasksState>;
-  carpoolByEventId?: Record<string, CarpoolOffer[]>;
-  eventRoles?: EventRoleType[];
-}) {
+// Carte d'identité de l'équipe : qui l'entraîne, qui la compose. Les
+// événements de l'équipe ne sont plus dupliqués ici — l'onglet "Planning &
+// Matchs" est désormais l'unique endroit où les consulter, pour ne jamais
+// avoir à comparer deux listes qui pourraient diverger.
+export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
   const theme = categoryTheme(card.category ?? card.teamName);
   const categoryLabel = card.category ?? card.teamName;
-  // Même plafond que l'ancien affichage statique : les 3 prochains
-  // rassemblements suffisent ici, la liste complète reste dans l'onglet
-  // "Prochains Événements".
-  const upcomingEvents = upcomingSorted(events).slice(0, 3);
-  const concerned = [{ id: card.playerId, name: card.playerName }];
 
   return (
     <div className="rounded-2xl border border-t-4 border-zinc-100 border-t-ubac-yellow bg-white p-5 shadow-sm">
@@ -146,35 +124,6 @@ export default function FamilyTeamCard({
       </div>
 
       <div className="mt-4">
-        <div className="mb-1">
-          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-blue-700">
-            <CalendarDays className="h-3.5 w-3.5" />
-            Prochains événements
-          </p>
-          <p className="text-[11px] text-zinc-400">
-            Matchs, entraînements &amp; événements du club
-          </p>
-        </div>
-        {upcomingEvents.length > 0 ? (
-          <div className="flex flex-col gap-3">
-            {upcomingEvents.map((e) => (
-              <FamilyEventCard
-                key={e.id}
-                event={e}
-                concerned={concerned}
-                rsvpStatusByKey={rsvpStatusByKey}
-                tasksByEventId={tasksByEventId}
-                carpoolByEventId={carpoolByEventId}
-                eventRoles={eventRoles}
-              />
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-zinc-400">Aucun événement à venir</p>
-        )}
-      </div>
-
-      <div className="mt-3">
         <WhatsAppGroupButton
           teamName={card.teamName ?? "l'équipe"}
           defaultMessage={`Bonjour à tous, je suis un parent de l'équipe ${card.teamName ?? ""}.`}

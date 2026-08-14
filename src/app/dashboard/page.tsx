@@ -1589,8 +1589,9 @@ export default async function DashboardPage() {
     });
 
     // Les rôles de TOUS les événements à venir, pas seulement de la
-    // prochaine convocation : un parent doit pouvoir se proposer à
-    // l'avance (voir family-upcoming-roles.tsx).
+    // prochaine convocation : chaque carte du Planning porte son propre
+    // panneau rôles/covoiturage (MatchTasksPanel), pas seulement celle du
+    // prochain rendez-vous.
     const upcomingFamilyEventIds = familyEvents
       .filter((e) => new Date(e.start_time).getTime() >= Date.now())
       .map((e) => e.id);
