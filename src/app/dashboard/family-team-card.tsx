@@ -1,15 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarDays, Clock, ExternalLink, MapPin, MessageCircle, Users } from "lucide-react";
-import { formatPersonName } from "@/lib/names";
+import {
+  CalendarDays,
+  ClipboardList,
+  Clock,
+  ExternalLink,
+  MapPin,
+  MessageCircle,
+  Users,
+} from "lucide-react";
+import { formatFirstName, formatLastName } from "@/lib/names";
 import { formatEventTime, isMatchType, styleFor } from "./calendar-view";
 import OpponentDisplay from "./opponent-display";
 import SalleBadge from "./salle-badge";
 import WhatsAppButton from "./whatsapp-button";
 import WhatsAppBulkModal from "./whatsapp-bulk-modal";
-import WhatsAppGroupButton from "./whatsapp-group-button";
 import PlayerYearBadge from "./player-year-badge";
+import { categoryTheme } from "./team-card";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 type CoachContact = Person & { phone: string | null };
@@ -43,50 +51,69 @@ export type FamilyTeamCardData = {
 };
 
 function fullName(p: Person) {
-  return formatPersonName(p.first_name, p.last_name);
+  return [formatFirstName(p.first_name), formatLastName(p.last_name)].filter(Boolean).join(" ");
+}
+
+// Rendu inline harmonisé avec le reste de l'app : prénom en casse normale,
+// nom de famille en gras et majuscules (calendar-view.tsx, team-card.tsx).
+function PersonNameInline({ p }: { p: Person }) {
+  return (
+    <>
+      {formatFirstName(p.first_name)} <span className="font-bold uppercase">{formatLastName(p.last_name)}</span>
+    </>
+  );
 }
 
 export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
   const [contactCoachesOpen, setContactCoachesOpen] = useState(false);
   const reachableCoaches = card.coaches.filter((c) => c.phone);
 
+  const theme = categoryTheme(card.category ?? card.teamName);
+  const categoryLabel = card.category ?? card.teamName;
+
   return (
     <div className="rounded-2xl border border-t-4 border-zinc-100 border-t-ubac-yellow bg-white p-5 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-wide text-ubac-blue">
-        Équipe de {card.playerName}
-      </p>
-      <h3 className="mt-1 font-semibold text-zinc-900">
-        {card.teamName ?? "Équipe"}
-        {card.category && card.category !== card.teamName ? ` · ${card.category}` : ""}
-      </h3>
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-ubac-blue">
+          Équipe de {card.playerName}
+        </p>
+        {categoryLabel && (
+          <span
+            className={`inline-flex w-fit items-center justify-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold leading-none ${theme.badge}`}
+          >
+            {categoryLabel}
+          </span>
+        )}
+      </div>
 
       <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-blue-700">
+            <ClipboardList className="h-3.5 w-3.5" />
             Coachs
           </p>
           <ul className="mt-1 flex flex-col gap-1">
             {card.coaches.map((c) => (
               <li
                 key={c.id}
-                className="truncate rounded-lg bg-zinc-50 px-2 py-1 text-sm text-zinc-700"
+                className="truncate rounded-lg border border-blue-200/80 bg-blue-50/70 p-2.5 text-sm text-blue-950 shadow-sm"
               >
-                {fullName(c)}
+                <PersonNameInline p={c} />
               </li>
             ))}
             {card.pendingCoaches.map((c) => (
               <li
                 key={`pending-${c.id}`}
-                className="truncate rounded-lg bg-zinc-50 px-2 py-1 text-sm text-zinc-700"
+                className="truncate rounded-lg border border-blue-200/80 bg-blue-50/70 p-2.5 text-sm text-blue-950 shadow-sm"
               >
-                {fullName(c)}
+                <PersonNameInline p={c} />
               </li>
             ))}
             {/* Legacy free-text fallback, only shown if this team has no
                 structured pending coach (team_pending_coaches) at all —
                 keeps older, never-migrated teams from silently going blank. */}
             {card.pendingCoaches.length === 0 && card.pendingCoachNames && (
-              <li className="truncate rounded-lg bg-zinc-50 px-2 py-1 text-sm text-zinc-700">
+              <li className="truncate rounded-lg border border-blue-200/80 bg-blue-50/70 p-2.5 text-sm text-blue-950 shadow-sm">
                 {card.pendingCoachNames}
               </li>
             )}
@@ -117,7 +144,7 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
         </div>
 
         <div>
-          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-blue-700">
             <Users className="h-3.5 w-3.5" />
             Joueurs
           </p>
@@ -127,7 +154,9 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
                 key={p.id}
                 className="flex items-center justify-between gap-2 rounded-lg bg-zinc-50 px-2 py-1 text-sm text-zinc-700"
               >
-                <span className="truncate">{fullName(p)}</span>
+                <span className="truncate">
+                  <PersonNameInline p={p} />
+                </span>
                 <PlayerYearBadge birthDate={p.birthDate} category={card.category} />
               </li>
             ))}
@@ -198,14 +227,6 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
         ) : (
           <p className="text-sm text-zinc-400">Aucun événement à venir</p>
         )}
-      </div>
-
-      <div className="mt-3">
-        <WhatsAppGroupButton
-          teamName={card.teamName ?? "l'équipe"}
-          defaultMessage={`Bonjour à tous, je suis un parent de l'équipe ${card.teamName ?? ""}.`}
-          className="flex items-center gap-1.5 rounded-full border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
-        />
       </div>
 
       {card.ffbbUrl && (

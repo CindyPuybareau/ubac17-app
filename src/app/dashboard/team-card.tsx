@@ -38,7 +38,7 @@ function fullName(p: { first_name: string | null; last_name: string | null }) {
 // so the Équipes list reads at a glance instead of as a wall of identical
 // white cards — same "quiet color, not loud" palette used for presence
 // badges elsewhere in the app.
-function categoryTheme(category: string | null): { badge: string; border: string } {
+export function categoryTheme(category: string | null): { badge: string; border: string } {
   const c = (category ?? "").toLowerCase();
   if (c.startsWith("séniors") || c.startsWith("seniors"))
     return { badge: "bg-navy/10 text-navy", border: "border-navy/10" };
