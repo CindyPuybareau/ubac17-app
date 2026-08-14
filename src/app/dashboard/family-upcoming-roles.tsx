@@ -59,7 +59,12 @@ export default function FamilyUpcomingRoles({
     return players.find((p) => p.teamIds.includes(event.teamId!)) ?? null;
   }
 
-  async function volunteer(eventId: string, taskType: TaskType, playerId: string) {
+  // Même confirmation que dans match-tasks-panel.tsx : un clic exploratoire
+  // sur "Se proposer sur les prochains événements" ne doit pas engager
+  // quelqu'un sans qu'il l'ait vraiment voulu.
+  async function volunteer(eventId: string, taskType: TaskType, playerId: string, roleLabel: string) {
+    const ok = window.confirm(`Confirmer : tu t'occupes de « ${roleLabel} » pour cet événement ?`);
+    if (!ok) return;
     const key = `${eventId}-${taskType}`;
     setPending(key);
     setError(null);
@@ -173,7 +178,7 @@ export default function FamilyUpcomingRoles({
                         <button
                           type="button"
                           disabled={pending === key}
-                          onClick={() => volunteer(e.id, taskType, child.id)}
+                          onClick={() => volunteer(e.id, taskType, child.id, role.label)}
                           className="shrink-0 rounded-full bg-navy px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-navy/90 disabled:opacity-60"
                         >
                           Je m&apos;en occupe

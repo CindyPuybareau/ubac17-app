@@ -69,7 +69,13 @@ export default function MatchTasksPanel({
   const [meetingPointInput, setMeetingPointInput] = useState("");
   const [reserveSeatsInput, setReserveSeatsInput] = useState<Record<string, string>>({});
 
-  async function volunteer(taskType: TaskType, playerId: string) {
+  // Engage réellement quelqu'un (soi ou son enfant) sur une tâche du jour
+  // J : une confirmation évite qu'un clic exploratoire — le bouton est
+  // juste sous Présent/Absent — s'engage sans le vouloir. Même principe
+  // que la suppression d'un événement (handleDeleteEvent).
+  async function volunteer(taskType: TaskType, playerId: string, roleLabel: string) {
+    const ok = window.confirm(`Confirmer : tu t'occupes de « ${roleLabel} » pour cet événement ?`);
+    if (!ok) return;
     setPending(taskType);
     setError(null);
     const supabase = createClient();
@@ -267,7 +273,7 @@ export default function MatchTasksPanel({
               <button
                 type="button"
                 disabled={pending === taskType}
-                onClick={() => volunteer(taskType, myPlayerIds[0])}
+                onClick={() => volunteer(taskType, myPlayerIds[0], role.label)}
                 className="w-full rounded-full bg-navy px-3 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-navy-dark disabled:opacity-60 sm:w-auto"
               >
                 Je m&apos;en occupe
