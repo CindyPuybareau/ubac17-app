@@ -55,7 +55,7 @@ export function roundCents(value: number) {
   return Math.round(value * 100) / 100;
 }
 
-function due(c: AdminCotisation) {
+export function due(c: AdminCotisation) {
   return Math.max(0, roundCents((c.prix ?? 0) - (c.remise ?? 0)));
 }
 

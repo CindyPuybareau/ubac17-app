@@ -11,10 +11,11 @@ import CalendarSubscribe from "./calendar-subscribe";
 import FamilyEventFeed from "./family-event-feed";
 import FamilyOrganisationTable from "./family-organisation-table";
 import FamilyUpcomingRoles from "./family-upcoming-roles";
+import FamilyCotisationCard from "./family-cotisation-card";
 import NextConvocationCard from "./next-convocation-card";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import WhatsAppGroupsFamily from "./whatsapp-groups-family";
-import type { AdminUpcomingEvent, WhatsAppGroup } from "./page";
+import type { AdminCotisation, AdminUpcomingEvent, WhatsAppGroup } from "./page";
 import type { UpcomingEvent } from "./family-data";
 import type { BirthdaySource } from "./birthdays";
 import type { CarpoolOffer, EventRoleType, EventTasksState } from "./event-tasks";
@@ -39,6 +40,7 @@ export default function FamilyView({
   carpoolByEventId,
   whatsappGroups,
   eventRoles,
+  cotisations,
 }: {
   events: AdminUpcomingEvent[];
   rsvpPlayers: CalendarRsvpPlayer[];
@@ -51,6 +53,7 @@ export default function FamilyView({
   carpoolByEventId: Record<string, CarpoolOffer[]>;
   whatsappGroups: WhatsAppGroup[];
   eventRoles: EventRoleType[];
+  cotisations: AdminCotisation[];
 }) {
   const iconClass = "h-4 w-4 shrink-0";
 
@@ -98,6 +101,10 @@ export default function FamilyView({
   }, [visibleEvents]);
 
   const visiblePlayerIds = useMemo(() => visiblePlayers.map((p) => p.id), [visiblePlayers]);
+  const visibleCotisations = useMemo(
+    () => cotisations.filter((c) => visiblePlayerIds.includes(c.playerId)),
+    [cotisations, visiblePlayerIds]
+  );
   const visibleConvocations = useMemo(
     () =>
       selectedPlayerId
@@ -180,6 +187,7 @@ export default function FamilyView({
       icon: <ClipboardList className={iconClass} />,
       content: (
         <div className="flex flex-col gap-4">
+          <FamilyCotisationCard cotisations={visibleCotisations} />
           <FamilyOrganisationTable
             events={visibleEvents}
             tasksByEventId={tasksByEventId}

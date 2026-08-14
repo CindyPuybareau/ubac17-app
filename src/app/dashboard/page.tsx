@@ -163,6 +163,60 @@ export type AdminCotisation = {
   payments: CotisationPayment[];
 };
 
+// Transforme une ligne brute de "cotisations" (avec ses jointures players/
+// collectes) en AdminCotisation — utilisé aussi bien pour la vue Bureau que
+// pour la carte "Ma cotisation" côté parent, qui lisent la même table avec
+// la même forme de requête.
+function mapCotisationRow(
+  c: {
+    id: string;
+    saison: string;
+    prix: number | null;
+    remise: number | null;
+    paiement: number | null;
+    statut: string | null;
+    mode_paiement: string | null;
+    player_id: string;
+    collecte_id: string | null;
+    players: unknown;
+    collectes: unknown;
+  },
+  paymentsByCotisationId: Map<string, CotisationPayment[]>
+): AdminCotisation {
+  const player = c.players as unknown as {
+    first_name: string | null;
+    last_name: string | null;
+    category: string | null;
+    membership_type: string | null;
+    fbi_status: string | null;
+  } | null;
+  const collecte = c.collectes as unknown as {
+    id: string;
+    name: string;
+    type: CollecteType;
+  } | null;
+  return {
+    id: c.id,
+    saison: c.saison,
+    prix: c.prix,
+    remise: c.remise,
+    paiement: c.paiement,
+    statut: c.statut,
+    mode_paiement: c.mode_paiement,
+    playerId: c.player_id,
+    payments: paymentsByCotisationId.get(c.id) ?? [],
+    membershipType: player?.membership_type ?? null,
+    fbiStatus: player?.fbi_status ?? null,
+    collecteId: c.collecte_id,
+    collecteType: collecte?.type ?? null,
+    collecteName: collecte?.name ?? null,
+    playerName: formatPersonName(player?.first_name, player?.last_name, "Joueur"),
+    firstName: player?.first_name ?? null,
+    lastName: player?.last_name ?? null,
+    category: player?.category ?? null,
+  };
+}
+
 export type AdminUpcomingEvent = {
   id: string;
   title: string | null;
@@ -836,40 +890,9 @@ export default async function DashboardPage() {
       paymentsByCotisationId.set(p.cotisation_id, list);
     });
 
-    adminCotisations = (cotisationsRes.data ?? []).map((c) => {
-      const player = c.players as unknown as {
-        first_name: string | null;
-        last_name: string | null;
-        category: string | null;
-        membership_type: string | null;
-        fbi_status: string | null;
-      } | null;
-      const collecte = c.collectes as unknown as {
-        id: string;
-        name: string;
-        type: CollecteType;
-      } | null;
-      return {
-        id: c.id,
-        saison: c.saison,
-        prix: c.prix,
-        remise: c.remise,
-        paiement: c.paiement,
-        statut: c.statut,
-        mode_paiement: c.mode_paiement,
-        playerId: c.player_id,
-        payments: paymentsByCotisationId.get(c.id) ?? [],
-        membershipType: player?.membership_type ?? null,
-        fbiStatus: player?.fbi_status ?? null,
-        collecteId: c.collecte_id,
-        collecteType: collecte?.type ?? null,
-        collecteName: collecte?.name ?? null,
-        playerName: formatPersonName(player?.first_name, player?.last_name, "Joueur"),
-        firstName: player?.first_name ?? null,
-        lastName: player?.last_name ?? null,
-        category: player?.category ?? null,
-      };
-    });
+    adminCotisations = (cotisationsRes.data ?? []).map((c) =>
+      mapCotisationRow(c, paymentsByCotisationId)
+    );
 
     adminCollectes = (collectesRes.data ?? []).map((c) => ({
       id: c.id,
@@ -1338,6 +1361,7 @@ export default async function DashboardPage() {
   const familyRsvpStatusByKey: Record<string, string> = {};
   const familyBirthdayMembers: BirthdaySource[] = [];
   const familyTeamCards: FamilyTeamCardData[] = [];
+  let familyCotisations: AdminCotisation[] = [];
 
   if (players.length > 0) {
     const playerTeamIdsList = await Promise.all(
@@ -1488,6 +1512,47 @@ export default async function DashboardPage() {
       });
     }
 
+    // Filtre explicite par player_id plutôt que de compter sur la seule
+    // RLS : Cindy elle-même est Bureau ET parente, et la policy admin sur
+    // cotisations laisserait passer TOUTES les lignes du club pour son
+    // compte si cette requête-ci ne filtrait pas elle-même.
+    if (familyPlayerIds.length > 0) {
+      const { data: familyCotisationRows } = await supabase
+        .from("cotisations")
+        .select(
+          "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, collecte_id, players(first_name, last_name, category, membership_type, fbi_status), collectes(id, name, type)"
+        )
+        .in("player_id", familyPlayerIds)
+        .order("saison", { ascending: false });
+
+      const familyCotisationIds = (familyCotisationRows ?? []).map((c) => c.id);
+      const familyPaymentsByCotisationId = new Map<string, CotisationPayment[]>();
+      if (familyCotisationIds.length > 0) {
+        const { data: familyPaymentRows } = await supabase
+          .from("cotisation_payments")
+          .select("id, cotisation_id, amount, mode, detail, expected_cash_date, paid_at")
+          .in("cotisation_id", familyCotisationIds)
+          .order("paid_at", { ascending: false });
+
+        (familyPaymentRows ?? []).forEach((p) => {
+          const list = familyPaymentsByCotisationId.get(p.cotisation_id) ?? [];
+          list.push({
+            id: p.id,
+            amount: p.amount,
+            mode: p.mode,
+            detail: p.detail,
+            expectedCashDate: p.expected_cash_date,
+            paidAt: p.paid_at,
+          });
+          familyPaymentsByCotisationId.set(p.cotisation_id, list);
+        });
+      }
+
+      familyCotisations = (familyCotisationRows ?? []).map((c) =>
+        mapCotisationRow(c, familyPaymentsByCotisationId)
+      );
+    }
+
     familyEvents = (eventsData ?? []).map((e) => {
       const team = e.teams as unknown as {
         id: string;
@@ -1618,6 +1683,7 @@ export default async function DashboardPage() {
           carpoolByEventId={carpoolOffersByEventId}
           whatsappGroups={whatsappGroups}
           eventRoles={eventRoleTypes}
+          cotisations={familyCotisations}
         />
       ),
     });
