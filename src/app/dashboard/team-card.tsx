@@ -10,6 +10,7 @@ import {
   Clock,
   Mail,
   MapPin,
+  MessageCircle,
   Phone,
   Search,
   Trash2,
@@ -132,6 +133,12 @@ export default function TeamCard({
   // "Changer d'équipe" instead of "Retirer" — a coach lending a player to
   // another team is the real need; plain removal stays a Bureau gesture.
   clubTeams,
+  // Lien d'invitation du groupe WhatsApp de CETTE équipe (whatsapp_groups),
+  // pas un message pré-rempli à choisir une destination comme côté parent :
+  // le coach est déjà dans ce groupe au quotidien, un simple raccourci
+  // "ouvrir le groupe" suffit. Absent si aucun lien n'a été enregistré —
+  // le bouton ne s'affiche alors pas du tout, plutôt qu'un lien mort.
+  whatsappInviteLink,
 }: {
   team: TeamWithMembers;
   allProfiles: Person[];
@@ -146,6 +153,7 @@ export default function TeamCard({
   contactEmailByPlayerId?: Record<string, string>;
   showWhatsApp?: boolean;
   clubTeams?: AdminMemberTeam[];
+  whatsappInviteLink?: string | null;
 }) {
   const router = useRouter();
   const [detailPlayerId, setDetailPlayerId] = useState<string | null>(null);
@@ -954,6 +962,18 @@ export default function TeamCard({
           )}
         </div>
       </div>
+
+      {whatsappInviteLink && (
+        <a
+          href={whatsappInviteLink}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-3 flex w-fit items-center gap-1.5 rounded-full border border-emerald-200 px-3 py-1.5 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
+        >
+          <MessageCircle className="h-4 w-4" />
+          Ouvrir le groupe WhatsApp {team.name ?? "de l'équipe"}
+        </a>
+      )}
 
       {detailPlayerId &&
         memberDetailsByPlayerId?.[detailPlayerId] &&

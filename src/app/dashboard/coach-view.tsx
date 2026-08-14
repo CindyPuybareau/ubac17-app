@@ -148,6 +148,7 @@ export default function CoachView({
           memberDetailsByPlayerId={memberDetailsByPlayerId}
           teamRoleByTeamId={teamRoleByTeamId}
           clubTeams={clubTeams}
+          whatsappGroups={whatsappGroups}
         />
       ),
     },

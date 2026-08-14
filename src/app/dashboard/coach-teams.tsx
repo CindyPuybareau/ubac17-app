@@ -6,7 +6,7 @@ import { sortTeamsByGroup, teamLabel } from "@/lib/teams";
 import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
 import TeamCard from "./team-card";
 import type { TeamWithMembers } from "./team-manager";
-import type { AdminMemberTeam, AdminUpcomingEvent, MemberDetail } from "./page";
+import type { AdminMemberTeam, AdminUpcomingEvent, MemberDetail, WhatsAppGroup } from "./page";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 
@@ -19,6 +19,7 @@ export default function CoachTeams({
   memberDetailsByPlayerId,
   teamRoleByTeamId,
   clubTeams,
+  whatsappGroups,
 }: {
   teams: TeamWithMembers[];
   allProfiles: Person[];
@@ -28,6 +29,7 @@ export default function CoachTeams({
   memberDetailsByPlayerId: Record<string, MemberDetail>;
   teamRoleByTeamId: Record<string, "COACH" | "PLAYER">;
   clubTeams: AdminMemberTeam[];
+  whatsappGroups: WhatsAppGroup[];
 }) {
   // L'équipe mère passe avant ses déclinaisons : U13M, puis U13M-1, U13M-2.
   const sortedTeams = useMemo(() => sortTeamsByGroup(teams), [teams]);
@@ -49,6 +51,8 @@ export default function CoachTeams({
   // Bureau (the RLS wouldn't accept the write either).
   const activeRole = teamRoleByTeamId[active.id] ?? "COACH";
   const isPlayerTeam = activeRole === "PLAYER";
+  const activeWhatsappLink =
+    whatsappGroups.find((g) => g.teamId === active.id)?.inviteLink ?? null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -116,6 +120,7 @@ export default function CoachTeams({
         // pas un collègue de l'encadrement.
         allowCreatePlayer={false}
         allowAssignCoach={false}
+        whatsappInviteLink={activeWhatsappLink}
       />
     </div>
   );
