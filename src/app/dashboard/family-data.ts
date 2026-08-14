@@ -10,6 +10,9 @@ export type UpcomingEvent = {
   team_id: string | null;
   // Date de la demande de presences faite par le coach, null si aucune.
   attendance_requested_at: string | null;
+  // Ecrite par le coach/Bureau a la creation ou la modification de
+  // l'evenement — affichee sur la carte "prochain rendez-vous".
+  notes: string | null;
 };
 
 export type RosterPlayer = {
@@ -40,7 +43,7 @@ export async function getNextEventForTeams(
 ): Promise<UpcomingEvent | null> {
   const { data } = await supabase
     .from("events")
-    .select("id, title, event_type, location, salle, start_time, team_id, attendance_requested_at")
+    .select("id, title, event_type, location, salle, start_time, team_id, attendance_requested_at, notes")
     .or(teamOrClubWideFilter(teamIds))
     .gte("start_time", new Date().toISOString())
     .order("start_time", { ascending: true })
@@ -57,7 +60,7 @@ export async function getUpcomingEventsForTeam(
 ): Promise<UpcomingEvent[]> {
   const { data } = await supabase
     .from("events")
-    .select("id, title, event_type, location, salle, start_time, team_id, attendance_requested_at")
+    .select("id, title, event_type, location, salle, start_time, team_id, attendance_requested_at, notes")
     .eq("team_id", teamId)
     .gte("start_time", new Date().toISOString())
     .order("start_time", { ascending: true })

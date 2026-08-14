@@ -1,4 +1,4 @@
-import { CalendarDays, Check, Clock, MapPin, X } from "lucide-react";
+import { CalendarDays, Check, Clock, MapPin, StickyNote, X } from "lucide-react";
 import OpponentDisplay from "./opponent-display";
 import NextMatchActions from "./next-match-actions";
 import MatchTasksPanel from "./match-tasks-panel";
@@ -100,6 +100,13 @@ export default function CoachNextMatchCard({
             )}
             {event.salle && <SalleBadge salle={event.salle} />}
           </div>
+
+          {event.notes && (
+            <p className="mt-2.5 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2.5 py-2 text-xs text-amber-900">
+              <StickyNote className="h-3.5 w-3.5 shrink-0 translate-y-0.5" />
+              {event.notes}
+            </p>
+          )}
 
           {counts && (
             <div className="mt-2.5 flex flex-wrap gap-1.5">

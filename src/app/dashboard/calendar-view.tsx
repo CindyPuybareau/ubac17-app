@@ -15,6 +15,7 @@ import {
   MapPin,
   Pencil,
   Plus,
+  StickyNote,
   Trash2,
   Users,
   X,
@@ -493,6 +494,16 @@ export default function CalendarView({
           )}
           {event.salle && <SalleBadge salle={event.salle} />}
         </div>
+
+        {/* Écrite par le coach/Bureau à la création ou la modification,
+            mais jusqu'ici jamais réaffichée nulle part — une note comme
+            "RDV 45 min avant, tenue blanche" partait dans le vide. */}
+        {event.notes && (
+          <p className="flex items-start gap-1.5 rounded-lg bg-amber-50 px-2.5 py-2 text-xs text-amber-900">
+            <StickyNote className="h-3.5 w-3.5 shrink-0 translate-y-0.5" />
+            {event.notes}
+          </p>
+        )}
 
         <ItineraryButton query={venueQuery(event)} />
 

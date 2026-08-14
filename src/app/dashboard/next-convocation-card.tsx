@@ -1,4 +1,4 @@
-import { CalendarDays, MapPin } from "lucide-react";
+import { CalendarDays, MapPin, StickyNote } from "lucide-react";
 import RsvpButtons from "./rsvp-buttons";
 import OpponentDisplay from "./opponent-display";
 import NextMatchActions from "./next-match-actions";
@@ -64,6 +64,12 @@ export default function NextConvocationCard({
           </span>
         )}
       </div>
+      {event.notes && (
+        <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2.5 py-2 text-xs text-amber-900">
+          <StickyNote className="h-3.5 w-3.5 shrink-0 translate-y-0.5" />
+          {event.notes}
+        </p>
+      )}
       <div className="mt-3">
         <RsvpButtons
           eventId={event.id}
