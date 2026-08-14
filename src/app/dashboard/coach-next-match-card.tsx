@@ -124,11 +124,7 @@ export default function CoachNextMatchCard({
             </div>
           )}
 
-          <NextMatchActions
-            venue={venueQuery(event)}
-            context={event.title ?? "match"}
-            showCarpool={shouldOfferCarpool(event)}
-          />
+          <NextMatchActions venue={venueQuery(event)} />
 
           {/* Le détail des réponses remplace la liste de prénoms séparés
               par des virgules : elle ne disait pas qui avait répondu quoi. */}
@@ -143,6 +139,7 @@ export default function CoachNextMatchCard({
 
           <MatchTasksPanel
             eventId={event.id}
+            eventDate={event.start_time}
             roster={roster.map((p) => ({ id: p.id, name: fullName(p) }))}
             myPlayerIds={[]}
             canAssignAnyone

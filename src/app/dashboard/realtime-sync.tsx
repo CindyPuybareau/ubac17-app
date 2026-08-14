@@ -11,6 +11,7 @@ const WATCHED_TABLES = [
   "rsvps",
   "event_tasks",
   "event_carpool_offers",
+  "event_carpool_reservations",
   "cotisations",
   "cotisation_payments",
   "team_players",

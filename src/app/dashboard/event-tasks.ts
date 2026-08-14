@@ -29,10 +29,20 @@ export type TaskAssignment = {
 // Clé = code du rôle. Une clé absente signifie "non attribué".
 export type EventTasksState = Record<string, TaskAssignment>;
 
-export type CarpoolOffer = {
+export type CarpoolReservation = {
   playerId: string;
   playerName: string;
   seats: number;
+};
+
+export type CarpoolOffer = {
+  id: string;
+  playerId: string;
+  playerName: string;
+  seats: number;
+  departureTime: string | null;
+  meetingPoint: string | null;
+  reservations: CarpoolReservation[];
 };
 
 // playerId -> code du rôle -> nombre de fois assuré sur la saison.
@@ -112,23 +122,58 @@ export async function getCarpoolOffersByEventId(
   const result: Record<string, CarpoolOffer[]> = {};
   if (eventIds.length === 0) return result;
 
-  const { data } = await supabase
+  const { data: offerRows } = await supabase
     .from("event_carpool_offers")
-    .select("event_id, player_id, seats, players(first_name, last_name)")
+    .select(
+      "id, event_id, player_id, seats, departure_time, meeting_point, players(first_name, last_name)"
+    )
     .in("event_id", eventIds)
     .gt("seats", 0);
 
-  (data ?? []).forEach((row) => {
+  const offerIds = (offerRows ?? []).map((row) => row.id as string);
+
+  // Requête séparée plutôt qu'une jointure imbriquée à deux niveaux
+  // (offres -> réservations -> fiches) : plus simple à relire, et cohérent
+  // avec le reste du fichier (team_players -> players fait déjà pareil).
+  const reservationsByOfferId = new Map<string, CarpoolReservation[]>();
+  if (offerIds.length > 0) {
+    const { data: reservationRows } = await supabase
+      .from("event_carpool_reservations")
+      .select("offer_id, player_id, seats, players(first_name, last_name)")
+      .in("offer_id", offerIds);
+
+    (reservationRows ?? []).forEach((row) => {
+      const player = row.players as unknown as {
+        first_name: string | null;
+        last_name: string | null;
+      } | null;
+      const offerId = row.offer_id as string;
+      const list = reservationsByOfferId.get(offerId) ?? [];
+      list.push({
+        playerId: row.player_id as string,
+        playerName: player ? fullName(player) : "Famille",
+        seats: row.seats as number,
+      });
+      reservationsByOfferId.set(offerId, list);
+    });
+  }
+
+  (offerRows ?? []).forEach((row) => {
     const player = row.players as unknown as {
       first_name: string | null;
       last_name: string | null;
     } | null;
     const eventId = row.event_id as string;
+    const offerId = row.id as string;
     const list = (result[eventId] ??= []);
     list.push({
+      id: offerId,
       playerId: row.player_id as string,
       playerName: player ? fullName(player) : "Famille",
       seats: row.seats as number,
+      departureTime: (row.departure_time as string | null) ?? null,
+      meetingPoint: (row.meeting_point as string | null) ?? null,
+      reservations: reservationsByOfferId.get(offerId) ?? [],
     });
   });
 

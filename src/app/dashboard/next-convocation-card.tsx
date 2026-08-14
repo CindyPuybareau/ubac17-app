@@ -71,13 +71,10 @@ export default function NextConvocationCard({
           currentStatus={status}
         />
       </div>
-      <NextMatchActions
-        venue={venueQuery(event)}
-        context={event.title ?? "match"}
-        showCarpool={shouldOfferCarpool(event)}
-      />
+      <NextMatchActions venue={venueQuery(event)} />
       <MatchTasksPanel
         eventId={event.id}
+        eventDate={event.start_time}
         roster={roster}
         myPlayerIds={[playerId]}
         canAssignAnyone={false}
