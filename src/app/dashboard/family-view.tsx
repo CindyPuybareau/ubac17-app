@@ -83,6 +83,21 @@ export default function FamilyView({
     return sortTeamsByGroup(cards.map((c) => ({ ...c, name: c.teamName })));
   }, [teamCards, selectedPlayerId]);
 
+  // Même liste d'événements et même statut RSVP que "Prochains Événements",
+  // simplement répartis par équipe : les deux onglets lisent la même
+  // source, donc une réponse donnée dans l'un se voit immédiatement dans
+  // l'autre en changeant d'onglet.
+  const eventsByTeamId = useMemo(() => {
+    const map = new Map<string, AdminUpcomingEvent[]>();
+    visibleEvents.forEach((e) => {
+      if (!e.teamId) return;
+      const list = map.get(e.teamId) ?? [];
+      list.push(e);
+      map.set(e.teamId, list);
+    });
+    return map;
+  }, [visibleEvents]);
+
   const visiblePlayerIds = useMemo(() => visiblePlayers.map((p) => p.id), [visiblePlayers]);
   const visibleConvocations = useMemo(
     () =>
@@ -112,7 +127,13 @@ export default function FamilyView({
       content: (
         <div className="flex flex-col gap-4">
           {visibleTeamCards.map((c) => (
-            <FamilyTeamCard key={`${c.playerId}-${c.teamId}`} card={c} />
+            <FamilyTeamCard
+              key={`${c.playerId}-${c.teamId}`}
+              card={c}
+              events={eventsByTeamId.get(c.teamId) ?? []}
+              rsvpStatusByKey={rsvpStatusByKey}
+              rsvpReasonByKey={rsvpReasonByKey}
+            />
           ))}
           {visibleTeamCards.length === 0 && (
             <p className="text-sm text-zinc-500">Aucune équipe rattachée pour le moment.</p>

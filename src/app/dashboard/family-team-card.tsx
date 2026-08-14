@@ -1,33 +1,17 @@
 "use client";
 
-import {
-  CalendarDays,
-  ClipboardList,
-  Clock,
-  ExternalLink,
-  MapPin,
-  Users,
-} from "lucide-react";
+import { CalendarDays, ClipboardList, ExternalLink, Users } from "lucide-react";
 import { formatFirstName, formatLastName } from "@/lib/names";
-import { formatEventTime, isMatchType, styleFor } from "./calendar-view";
-import OpponentDisplay from "./opponent-display";
-import SalleBadge from "./salle-badge";
+import FamilyEventCard from "./family-event-card";
+import { upcomingSorted } from "./family-event-feed";
 import WhatsAppGroupButton from "./whatsapp-group-button";
 import PlayerYearBadge from "./player-year-badge";
 import { categoryTheme } from "./team-card";
+import type { AdminUpcomingEvent } from "./page";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 type CoachContact = Person & { phone: string | null };
 type RosterMate = Person & { birthDate: string | null };
-type TeamEvent = {
-  id: string;
-  title: string | null;
-  event_type: string | null;
-  location: string | null;
-  salle: string | null;
-  start_time: string;
-  end_time: string | null;
-};
 
 export type FamilyTeamCardData = {
   playerId: string;
@@ -41,7 +25,6 @@ export type FamilyTeamCardData = {
   // table's amber "en attente" badge.
   pendingCoaches: Person[];
   roster: RosterMate[];
-  events: TeamEvent[];
   ffbbUrl: string | null;
   sortOrder: number | null;
   pendingCoachNames: string | null;
@@ -57,9 +40,27 @@ function PersonNameInline({ p }: { p: Person }) {
   );
 }
 
-export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
+export default function FamilyTeamCard({
+  card,
+  events,
+  rsvpStatusByKey,
+  rsvpReasonByKey = {},
+}: {
+  card: FamilyTeamCardData;
+  // Événements de cette équipe uniquement — déjà filtrés par FamilyView à
+  // partir de la même liste que l'onglet "Prochains Événements", pour que
+  // les deux vues lisent exactement le même statut RSVP.
+  events: AdminUpcomingEvent[];
+  rsvpStatusByKey: Record<string, string>;
+  rsvpReasonByKey?: Record<string, string | null>;
+}) {
   const theme = categoryTheme(card.category ?? card.teamName);
   const categoryLabel = card.category ?? card.teamName;
+  // Même plafond que l'ancien affichage statique : les 3 prochains
+  // rassemblements suffisent ici, la liste complète reste dans l'onglet
+  // "Prochains Événements".
+  const upcomingEvents = upcomingSorted(events).slice(0, 3);
+  const concerned = [{ id: card.playerId, name: card.playerName }];
 
   return (
     <div className="rounded-2xl border border-t-4 border-zinc-100 border-t-ubac-yellow bg-white p-5 shadow-sm">
@@ -149,53 +150,18 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
             Matchs, entraînements &amp; événements du club
           </p>
         </div>
-        {card.events.length > 0 ? (
-          <ul className="flex flex-col gap-1.5">
-            {card.events.map((e) => {
-              const style = styleFor(e.event_type);
-              return (
-                <li
-                  key={e.id}
-                  className="flex flex-col gap-1 rounded-xl border border-blue-200 bg-blue-50/60 px-2.5 py-2"
-                >
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none ${style.badge}`}
-                    >
-                      {style.label}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      {isMatchType(e.event_type) ?  (
-                        <OpponentDisplay title={e.title} size="sm" />
-                      ) : (
-                        <span className="truncate text-sm font-medium text-blue-900">
-                          {e.title ?? style.label}
-                        </span>
-                      )}
-                    </div>
-                    <span className="shrink-0 text-xs font-semibold text-blue-700">
-                      {new Date(e.start_time).toLocaleDateString("fr-FR", {
-                        day: "numeric",
-                        month: "short",
-                      })}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 pl-0.5 text-xs text-zinc-500">
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3 shrink-0" />
-                      {formatEventTime(e.start_time, e.end_time)}
-                    </span>
-                    {(e.salle || e.location) && (
-                      <span className="flex items-center gap-1 truncate">
-                        <MapPin className="h-3 w-3 shrink-0" />
-                        {e.salle ? <SalleBadge salle={e.salle} /> : e.location}
-                      </span>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+        {upcomingEvents.length > 0 ? (
+          <div className="flex flex-col gap-3">
+            {upcomingEvents.map((e) => (
+              <FamilyEventCard
+                key={e.id}
+                event={e}
+                concerned={concerned}
+                rsvpStatusByKey={rsvpStatusByKey}
+                rsvpReasonByKey={rsvpReasonByKey}
+              />
+            ))}
+          </div>
         ) : (
           <p className="text-sm text-zinc-400">Aucun événement à venir</p>
         )}
