@@ -181,7 +181,7 @@ export default function CoachView({
       key: "ffbb",
       label: "FFBB",
       icon: <Trophy className={iconClass} />,
-      content: <CoachFfbb teams={teams} />,
+      content: <CoachFfbb teams={teams} teamRoleByTeamId={teamRoleByTeamId} />,
     },
   ];
 

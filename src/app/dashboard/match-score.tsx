@@ -27,12 +27,14 @@ export default function MatchScore({
   const [team, setTeam] = useState("");
   const [opponent, setOpponent] = useState("");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const hasScore = teamScore !== null && opponentScore !== null;
 
   function openEdit() {
     setTeam(teamScore !== null ? String(teamScore) : "");
     setOpponent(opponentScore !== null ? String(opponentScore) : "");
+    setError(null);
     setEditing(true);
   }
 
@@ -41,57 +43,73 @@ export default function MatchScore({
     const o = Number(opponent);
     if (!Number.isInteger(t) || !Number.isInteger(o) || t < 0 || o < 0) return;
     setSaving(true);
+    setError(null);
     const supabase = createClient();
-    await supabase
+    // .select().single() plutôt qu'un simple .update() : une policy RLS en
+    // UPDATE qui ne matche pas ne renvoie normalement AUCUNE erreur, elle
+    // filtre juste la ligne — sans .single() ici, un enregistrement refusé
+    // (ex. match d'une équipe qu'on ne coache pas) semblait réussir alors
+    // que rien n'était sauvegardé. .single() force une erreur explicite
+    // (PGRST116) quand aucune ligne n'a réellement été modifiée.
+    const { error: updateError } = await supabase
       .from("events")
       .update({ team_score: t, opponent_score: o })
-      .eq("id", eventId);
+      .eq("id", eventId)
+      .select("id")
+      .single();
     setSaving(false);
+    if (updateError) {
+      setError("Enregistrement impossible — vérifie que tu coaches bien cette équipe.");
+      return;
+    }
     setEditing(false);
     router.refresh();
   }
 
   if (editing) {
     return (
-      <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-        <input
-          type="number"
-          inputMode="numeric"
-          min={0}
-          value={team}
-          onChange={(e) => setTeam(e.target.value)}
-          placeholder="UBAC"
-          aria-label="Score UBAC"
-          className="h-7 w-12 rounded-md border border-zinc-200 text-center text-sm font-semibold tabular-nums"
-        />
-        <span className="text-xs text-zinc-400">–</span>
-        <input
-          type="number"
-          inputMode="numeric"
-          min={0}
-          value={opponent}
-          onChange={(e) => setOpponent(e.target.value)}
-          placeholder="Adv."
-          aria-label="Score adverse"
-          className="h-7 w-12 rounded-md border border-zinc-200 text-center text-sm font-semibold tabular-nums"
-        />
-        <button
-          type="button"
-          onClick={save}
-          disabled={saving || team === "" || opponent === ""}
-          title="Valider"
-          className="flex h-7 w-7 items-center justify-center rounded-full bg-navy text-white disabled:opacity-50"
-        >
-          <Check className="h-3.5 w-3.5" />
-        </button>
-        <button
-          type="button"
-          onClick={() => setEditing(false)}
-          title="Annuler"
-          className="flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
+      <div className="flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-1.5">
+          <input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            value={team}
+            onChange={(e) => setTeam(e.target.value)}
+            placeholder="UBAC"
+            aria-label="Score UBAC"
+            className="h-7 w-12 rounded-md border border-zinc-200 text-center text-sm font-semibold tabular-nums"
+          />
+          <span className="text-xs text-zinc-400">–</span>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            value={opponent}
+            onChange={(e) => setOpponent(e.target.value)}
+            placeholder="Adv."
+            aria-label="Score adverse"
+            className="h-7 w-12 rounded-md border border-zinc-200 text-center text-sm font-semibold tabular-nums"
+          />
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving || team === "" || opponent === ""}
+            title="Valider"
+            className="flex h-7 w-7 items-center justify-center rounded-full bg-navy text-white disabled:opacity-50"
+          >
+            <Check className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditing(false)}
+            title="Annuler"
+            className="flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        {error && <p className="text-[11px] text-red-600">{error}</p>}
       </div>
     );
   }

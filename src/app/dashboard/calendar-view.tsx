@@ -406,6 +406,19 @@ export default function CalendarView({
       : [];
     const mailto = relanceMailto(event);
     const homeAway = isMatchType(event.event_type) ? homeAwayLabel(event.isHome) : null;
+    // canManage dit "cet utilisateur gère AU MOINS une équipe" — un coach
+    // qui coache l'U13F et joue en Séniors 1 voit les deux dans la même
+    // liste, mais la policy RLS "coach update own team events" ne matche
+    // que l'équipe réellement coachée. Sans ce calcul par carte, les
+    // crayons Modifier/Supprimer/Ajouter le score apparaissaient aussi sur
+    // les matchs Séniors — un clic dessus échouait sans le moindre message
+    // (une policy RLS en UPDATE filtre la ligne au lieu de rejeter, donc
+    // Supabase ne remonte aucune erreur).
+    const canManageEvent =
+      canManage &&
+      (event.teamId
+        ? Boolean(createTeams?.some((t) => t.id === event.teamId))
+        : allowClubWide);
 
     return (
       <div
@@ -436,7 +449,7 @@ export default function CalendarView({
                   eventId={event.id}
                   teamScore={event.teamScore}
                   opponentScore={event.opponentScore}
-                  canEdit={canManage}
+                  canEdit={canManageEvent}
                 />
               </>
             ) : (
@@ -445,7 +458,7 @@ export default function CalendarView({
               </span>
             )}
           </div>
-          {canManage && (
+          {canManageEvent && (
             <div className="flex shrink-0 items-center gap-1">
               {mailto && (
                 <a
