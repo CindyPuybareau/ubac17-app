@@ -227,6 +227,12 @@ export type AdminUpcomingEvent = {
   // Date de la demande de présences faite par le coach, null si aucune.
   // Déclenche le bandeau "le coach attend ta réponse" côté famille.
   attendanceRequestedAt: string | null;
+  // Score saisi par le coach après coup — null tant qu'il ne l'a pas
+  // renseigné (jamais pour un entraînement). Deux colonnes distinctes
+  // plutôt qu'un texte libre : is_home dit déjà domicile/extérieur, ces
+  // deux-là disent qui a gagné.
+  teamScore: number | null;
+  opponentScore: number | null;
   location: string | null;
   salle: string | null;
   start_time: string;
@@ -586,7 +592,7 @@ export default async function DashboardPage() {
       supabase
         .from("events")
         .select(
-          "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, teams(id, name, category)"
+          "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, teams(id, name, category)"
         )
         .order("start_time", { ascending: true }),
       supabase.from("parent_player").select("parent_id, player_id"),
@@ -919,6 +925,8 @@ export default async function DashboardPage() {
         event_type: e.event_type,
         isHome: e.is_home,
         attendanceRequestedAt: e.attendance_requested_at ?? null,
+        teamScore: e.team_score ?? null,
+        opponentScore: e.opponent_score ?? null,
         location: e.location,
         salle: e.salle,
         start_time: e.start_time,
@@ -986,7 +994,7 @@ export default async function DashboardPage() {
         supabase
           .from("events")
           .select(
-            "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, teams(id, name, category)"
+            "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, teams(id, name, category)"
           )
           .or(teamOrClubWideFilter(coachCalendarTeamIds))
           .order("start_time", { ascending: true }),
@@ -1331,6 +1339,8 @@ export default async function DashboardPage() {
         event_type: e.event_type,
         isHome: e.is_home,
         attendanceRequestedAt: e.attendance_requested_at ?? null,
+        teamScore: e.team_score ?? null,
+        opponentScore: e.opponent_score ?? null,
         location: e.location,
         salle: e.salle,
         start_time: e.start_time,
@@ -1492,7 +1502,7 @@ export default async function DashboardPage() {
     const { data: eventsData } = await supabase
       .from("events")
       .select(
-        "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, teams(id, name, category)"
+        "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, teams(id, name, category)"
       )
       .or(teamOrClubWideFilter(allTeamIds))
       .order("start_time", { ascending: true });
@@ -1565,6 +1575,8 @@ export default async function DashboardPage() {
         event_type: e.event_type,
         isHome: e.is_home,
         attendanceRequestedAt: e.attendance_requested_at ?? null,
+        teamScore: e.team_score ?? null,
+        opponentScore: e.opponent_score ?? null,
         location: e.location,
         salle: e.salle,
         start_time: e.start_time,

@@ -30,6 +30,7 @@ import RsvpButtons from "./rsvp-buttons";
 import BirthdayWidget from "./birthday-widget";
 import ItineraryButton from "./itinerary-button";
 import MatchTasksPanel from "./match-tasks-panel";
+import MatchScore from "./match-score";
 import { sendEventPush } from "./event-push";
 import type { AdminUpcomingEvent } from "./page";
 import {
@@ -428,7 +429,15 @@ export default function CalendarView({
               )}
             </span>
             {isMatchType(event.event_type) ? (
-              <OpponentDisplay title={event.title} size="sm" />
+              <>
+                <OpponentDisplay title={event.title} size="sm" />
+                <MatchScore
+                  eventId={event.id}
+                  teamScore={event.teamScore}
+                  opponentScore={event.opponentScore}
+                  canEdit={canManage}
+                />
+              </>
             ) : (
               <span className="font-semibold text-zinc-900">
                 {event.title ?? style.label}

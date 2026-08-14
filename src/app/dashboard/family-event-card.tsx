@@ -3,6 +3,7 @@
 import { CalendarDays, MapPin } from "lucide-react";
 import { formatEventTime, homeAwayLabel, isMatchType, styleFor } from "./calendar-view";
 import ItineraryButton from "./itinerary-button";
+import MatchScore from "./match-score";
 import MatchTasksPanel from "./match-tasks-panel";
 import OpponentDisplay from "./opponent-display";
 import RsvpControl from "./rsvp-control";
@@ -61,7 +62,15 @@ export default function FamilyEventCard({
           </span>
         </span>
         {isMatchType(e.event_type) ? (
-          <OpponentDisplay title={e.title} size="sm" />
+          <>
+            <OpponentDisplay title={e.title} size="sm" />
+            <MatchScore
+              eventId={e.id}
+              teamScore={e.teamScore}
+              opponentScore={e.opponentScore}
+              canEdit={false}
+            />
+          </>
         ) : (
           <h3 className="font-semibold text-zinc-900">{e.title ?? style.label}</h3>
         )}
