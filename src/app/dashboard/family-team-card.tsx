@@ -96,7 +96,7 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
             {card.coaches.map((c) => (
               <li
                 key={c.id}
-                className="truncate rounded-lg border border-blue-200/80 bg-blue-50/70 p-2.5 text-sm text-blue-950 shadow-sm"
+                className="truncate rounded-lg bg-blue-50/70 p-2.5 text-sm text-blue-950"
               >
                 <PersonNameInline p={c} />
               </li>
@@ -104,7 +104,7 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
             {card.pendingCoaches.map((c) => (
               <li
                 key={`pending-${c.id}`}
-                className="truncate rounded-lg border border-blue-200/80 bg-blue-50/70 p-2.5 text-sm text-blue-950 shadow-sm"
+                className="truncate rounded-lg bg-blue-50/70 p-2.5 text-sm text-blue-950"
               >
                 <PersonNameInline p={c} />
               </li>
@@ -113,7 +113,7 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
                 structured pending coach (team_pending_coaches) at all —
                 keeps older, never-migrated teams from silently going blank. */}
             {card.pendingCoaches.length === 0 && card.pendingCoachNames && (
-              <li className="truncate rounded-lg border border-blue-200/80 bg-blue-50/70 p-2.5 text-sm text-blue-950 shadow-sm">
+              <li className="truncate rounded-lg bg-blue-50/70 p-2.5 text-sm text-blue-950">
                 {card.pendingCoachNames}
               </li>
             )}
