@@ -18,6 +18,25 @@ const defaultTitles: Record<EventType, string> = {
   TOURNAMENT: "Tournoi",
 };
 
+// Garde-fou plutôt qu'une vraie limite métier : une saison complète
+// hebdomadaire tient largement dedans (~43 semaines), au-delà c'est plus
+// probablement une erreur de date de fin qu'une vraie intention.
+const MAX_OCCURRENCES = 52;
+
+// Ajoute N semaines à un "YYYY-MM-DDTHH:MM" (valeur d'un <input
+// datetime-local>) en ne touchant qu'à la date, jamais à l'heure — et en
+// restant en local tout du long, contrairement à un aller-retour par
+// toISOString() qui peut faire glisser la date d'un jour selon l'heure et
+// le fuseau.
+function addWeeksToLocalDatetime(datetimeLocal: string, weeks: number): string {
+  const [datePart, timePart] = datetimeLocal.split("T");
+  const [y, m, d] = datePart.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  date.setDate(date.getDate() + weeks * 7);
+  const newDatePart = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  return `${newDatePart}T${timePart}`;
+}
+
 // Le choix du type se fait en un geste, avec la couleur qu'aura ensuite
 // l'événement dans le calendrier : on voit ce qu'on crée.
 const typeChoices: { value: EventType; label: string; active: string }[] = [
@@ -52,6 +71,8 @@ export default function CreateEventForm({
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [notes, setNotes] = useState("");
+  const [repeatWeekly, setRepeatWeekly] = useState(false);
+  const [repeatUntil, setRepeatUntil] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -63,29 +84,54 @@ export default function CreateEventForm({
       setError("L'heure de fin est obligatoire pour un entraînement.");
       return;
     }
+    if (repeatWeekly && !repeatUntil) {
+      setError("Choisis une date de fin pour la répétition.");
+      return;
+    }
+
+    // Une occurrence par semaine, même jour même heure, jusqu'à la date de
+    // fin incluse — pas un moteur de récurrence : chaque ligne est un
+    // événement normal comme un autre une fois créée, modifiable ou
+    // supprimable seule sans toucher aux autres.
+    const occurrences = [startTime];
+    if (repeatWeekly && repeatUntil) {
+      for (let i = 1; i <= MAX_OCCURRENCES; i += 1) {
+        const candidate = addWeeksToLocalDatetime(startTime, i);
+        if (candidate.slice(0, 10) > repeatUntil) break;
+        occurrences.push(candidate);
+      }
+      if (occurrences.length > MAX_OCCURRENCES) {
+        setError(
+          `Trop de séances (${occurrences.length}) pour une seule création — choisis une date de fin plus proche (${MAX_OCCURRENCES} maximum).`
+        );
+        return;
+      }
+    }
+
     setLoading(true);
     setError(null);
 
     const supabase = createClient();
-    const startIso = new Date(startTime).toISOString();
+    const rows = occurrences.map((dt) => ({
+      team_id: teamId || null,
+      title: title || defaultTitles[eventType],
+      event_type: eventType,
+      is_home: isMatch && isHome !== "" ? isHome === "true" : null,
+      location: location || null,
+      salle: salle || null,
+      start_time: new Date(dt).toISOString(),
+      // Même jour que le début de CETTE occurrence — pas celui de la
+      // première : sinon toute la série hériterait de la date du premier
+      // entraînement pour son heure de fin.
+      end_time: endTime ? new Date(`${dt.slice(0, 10)}T${endTime}`).toISOString() : null,
+      notes: notes || null,
+    }));
+
     const { data: inserted, error } = await supabase
       .from("events")
-      .insert({
-        team_id: teamId || null,
-        title: title || defaultTitles[eventType],
-        event_type: eventType,
-        is_home: isMatch && isHome !== "" ? isHome === "true" : null,
-        location: location || null,
-        salle: salle || null,
-        start_time: startIso,
-        // Same calendar day as the start — this form only asks for the end
-        // hour, not a whole second date/time picker, since an event never
-        // spans past midnight for this club.
-        end_time: endTime ? new Date(`${startTime.slice(0, 10)}T${endTime}`).toISOString() : null,
-        notes: notes || null,
-      })
-      .select("id")
-      .single();
+      .insert(rows)
+      .select("id, start_time")
+      .order("start_time", { ascending: true });
 
     setLoading(false);
 
@@ -96,24 +142,28 @@ export default function CreateEventForm({
 
     // Bonus, pas bloquant : voir event-push.ts. La famille apprend le
     // nouveau rendez-vous sans avoir à ouvrir l'appli ni passer par
-    // WhatsApp.
-    if (inserted) {
+    // WhatsApp. Une seule notification même pour une série entière : dix
+    // pushs d'affilée pour dix entraînements identiques serait du bruit,
+    // pas un service.
+    const first = inserted?.[0];
+    if (first) {
       const team = teams.find((t) => t.id === teamId);
-      const when = new Date(startIso).toLocaleDateString("fr-FR", {
+      const when = new Date(first.start_time).toLocaleDateString("fr-FR", {
         weekday: "long",
         day: "numeric",
         month: "long",
       });
-      const heure = new Date(startIso).toLocaleTimeString("fr-FR", {
+      const heure = new Date(first.start_time).toLocaleTimeString("fr-FR", {
         hour: "2-digit",
         minute: "2-digit",
       });
       const lieu = salle || location;
-      sendEventPush(
-        inserted.id,
-        `UBAC — ${team ? teamLabel(team) : "Tous les groupes"}`,
-        `Nouveau : ${typeChoices.find((c) => c.value === eventType)?.label ?? "Événement"}, ${when} à ${heure}${lieu ? ` · ${lieu}` : ""}.`
-      );
+      const label = typeChoices.find((c) => c.value === eventType)?.label ?? "Événement";
+      const body =
+        inserted.length > 1
+          ? `Nouveau : ${label} chaque semaine (${inserted.length} séances), à partir du ${when} à ${heure}${lieu ? ` · ${lieu}` : ""}.`
+          : `Nouveau : ${label}, ${when} à ${heure}${lieu ? ` · ${lieu}` : ""}.`;
+      sendEventPush(first.id, `UBAC — ${team ? teamLabel(team) : "Tous les groupes"}`, body);
     }
 
     setTitle("");
@@ -123,6 +173,8 @@ export default function CreateEventForm({
     setStartTime("");
     setEndTime("");
     setNotes("");
+    setRepeatWeekly(false);
+    setRepeatUntil("");
     onClose();
     router.refresh();
   }
@@ -261,6 +313,38 @@ export default function CreateEventForm({
             className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
           />
         </div>
+      </div>
+
+      <div className="flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3">
+        <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
+          <input
+            type="checkbox"
+            checked={repeatWeekly}
+            onChange={(e) => setRepeatWeekly(e.target.checked)}
+            className="h-4 w-4 rounded border-zinc-300 text-navy focus:ring-navy"
+          />
+          Répéter chaque semaine
+        </label>
+        {repeatWeekly && (
+          <div>
+            <label className="mb-1 block text-xs font-medium text-zinc-600">
+              Jusqu&apos;au (inclus)
+            </label>
+            <input
+              type="date"
+              required={repeatWeekly}
+              min={startTime ? startTime.slice(0, 10) : undefined}
+              value={repeatUntil}
+              onChange={(e) => setRepeatUntil(e.target.value)}
+              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+            />
+            <p className="mt-1 text-[11px] text-zinc-400">
+              Une séance créée chaque semaine, même jour et même heure, jusqu&apos;à
+              cette date incluse ({MAX_OCCURRENCES} séances maximum en une fois).
+              Chacune reste ensuite modifiable ou supprimable indépendamment.
+            </p>
+          </div>
+        )}
       </div>
 
       <textarea
