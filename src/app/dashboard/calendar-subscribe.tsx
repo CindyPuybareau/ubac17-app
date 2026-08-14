@@ -61,6 +61,11 @@ export default function CalendarSubscribe() {
   if (token === undefined) return null;
 
   const url = token ? `${window.location.origin}/api/calendar/${token}` : null;
+  // iPhone/iPad reconnaissent ce protocole et proposent directement l'écran
+  // d'abonnement — un seul tap, sans passer par les Réglages. Android n'a
+  // pas d'équivalent fiable : Google n'accepte ce type de lien que depuis
+  // le site complet de Google Agenda, jamais depuis l'appli mobile.
+  const webcalUrl = url ? url.replace(/^https?:/, "webcal:") : null;
 
   return (
     <div className="flex flex-col gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
@@ -69,33 +74,49 @@ export default function CalendarSubscribe() {
         Recevoir le calendrier dans ton agenda
       </p>
       <p className="text-xs text-zinc-500">
-        Les matchs et entraînements de tes enfants apparaissent directement dans Google
-        Agenda ou Calendrier (iPhone), mis à jour automatiquement.
+        Les matchs et entraînements de tes enfants apparaissent directement dans ton agenda,
+        mis à jour automatiquement.
       </p>
 
-      {url ? (
-        <div className="mt-1 flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <input
-              readOnly
-              value={url}
-              onFocus={(e) => e.target.select()}
-              className="w-full min-w-0 flex-1 rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs text-zinc-600"
-            />
-            <button
-              type="button"
-              onClick={() => copy(url)}
-              className="flex shrink-0 items-center gap-1.5 rounded-full bg-navy px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-navy-dark"
-            >
-              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-              {copied ? "Copié" : "Copier"}
-            </button>
+      {url && webcalUrl ? (
+        <div className="mt-1 flex flex-col gap-3">
+          <a
+            href={webcalUrl}
+            className="flex w-fit items-center gap-1.5 rounded-full bg-navy px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-navy-dark"
+          >
+            <CalendarPlus className="h-3.5 w-3.5" />
+            Ajouter à mon calendrier (iPhone/iPad)
+          </a>
+
+          <div className="flex flex-col gap-1.5 rounded-xl bg-zinc-50 p-3">
+            <p className="text-[11px] font-medium text-zinc-600">
+              Sur Android, Google n&apos;autorise cet ajout que depuis un ordinateur (ou le
+              navigateur du téléphone en version ordinateur) — l&apos;appli mobile ne le
+              permet pas, ce n&apos;est pas nous qui le limitons.
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                readOnly
+                value={url}
+                onFocus={(e) => e.target.select()}
+                className="w-full min-w-0 flex-1 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs text-zinc-600"
+              />
+              <button
+                type="button"
+                onClick={() => copy(url)}
+                className="flex shrink-0 items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-100"
+              >
+                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                {copied ? "Copié" : "Copier"}
+              </button>
+            </div>
           </div>
+
           <p className="text-[11px] text-zinc-400">
-            Google Agenda : « Ajouter un agenda » → « À partir de l&apos;URL ». iPhone/iPad :
-            Réglages → Calendrier → Comptes → Ajouter un compte → Autre → Calendrier avec
-            abonnement.
+            Plus simple sur Android : active plutôt les notifications ci-dessus — tu es
+            prévenu directement, sans rien configurer.
           </p>
+
           <button
             type="button"
             onClick={generate}
