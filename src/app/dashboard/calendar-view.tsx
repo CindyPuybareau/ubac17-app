@@ -30,6 +30,7 @@ import RsvpButtons from "./rsvp-buttons";
 import BirthdayWidget from "./birthday-widget";
 import ItineraryButton from "./itinerary-button";
 import MatchTasksPanel from "./match-tasks-panel";
+import { sendEventPush } from "./event-push";
 import type { AdminUpcomingEvent } from "./page";
 import {
   groupBirthdaysByMonthDay,
@@ -249,6 +250,36 @@ export default function CalendarView({
       setEditError(error.message);
       return;
     }
+
+    // Bonus, pas bloquant : voir event-push.ts. Seul un vrai changement
+    // d'horaire ou de lieu justifie de déranger les familles — pas une
+    // note ou un titre corrigé. Tolérance d'une minute sur l'heure pour
+    // ignorer un arrondi de saisie sans rapport avec un vrai déplacement.
+    const newStartIso = new Date(editStartTime).toISOString();
+    const timeMoved =
+      Math.abs(new Date(newStartIso).getTime() - new Date(editingEvent.start_time).getTime()) >
+      60000;
+    const placeMoved =
+      (editLocation || "") !== (editingEvent.location ?? "") ||
+      (editSalle || "") !== (editingEvent.salle ?? "");
+    if (timeMoved || placeMoved) {
+      const when = new Date(newStartIso).toLocaleDateString("fr-FR", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+      });
+      const heure = new Date(newStartIso).toLocaleTimeString("fr-FR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      const lieu = editSalle || editLocation;
+      sendEventPush(
+        editingEvent.id,
+        `UBAC — ${editingEvent.teamName}`,
+        `Changement : ${when} à ${heure}${lieu ? ` · ${lieu}` : ""}.`
+      );
+    }
+
     setEditingEvent(null);
     router.refresh();
   }

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { teamLabel } from "@/lib/teams";
 import { SALLES } from "./salles";
+import { sendEventPush } from "./event-push";
 
 type Team = { id: string; name: string | null; category: string | null };
 type EventType = "MATCH" | "FRIENDLY" | "TRAINING" | "OTHER" | "TOURNAMENT";
@@ -66,26 +67,53 @@ export default function CreateEventForm({
     setError(null);
 
     const supabase = createClient();
-    const { error } = await supabase.from("events").insert({
-      team_id: teamId || null,
-      title: title || defaultTitles[eventType],
-      event_type: eventType,
-      is_home: isMatch && isHome !== "" ? isHome === "true" : null,
-      location: location || null,
-      salle: salle || null,
-      start_time: new Date(startTime).toISOString(),
-      // Same calendar day as the start — this form only asks for the end
-      // hour, not a whole second date/time picker, since an event never
-      // spans past midnight for this club.
-      end_time: endTime ? new Date(`${startTime.slice(0, 10)}T${endTime}`).toISOString() : null,
-      notes: notes || null,
-    });
+    const startIso = new Date(startTime).toISOString();
+    const { data: inserted, error } = await supabase
+      .from("events")
+      .insert({
+        team_id: teamId || null,
+        title: title || defaultTitles[eventType],
+        event_type: eventType,
+        is_home: isMatch && isHome !== "" ? isHome === "true" : null,
+        location: location || null,
+        salle: salle || null,
+        start_time: startIso,
+        // Same calendar day as the start — this form only asks for the end
+        // hour, not a whole second date/time picker, since an event never
+        // spans past midnight for this club.
+        end_time: endTime ? new Date(`${startTime.slice(0, 10)}T${endTime}`).toISOString() : null,
+        notes: notes || null,
+      })
+      .select("id")
+      .single();
 
     setLoading(false);
 
     if (error) {
       setError(error.message);
       return;
+    }
+
+    // Bonus, pas bloquant : voir event-push.ts. La famille apprend le
+    // nouveau rendez-vous sans avoir à ouvrir l'appli ni passer par
+    // WhatsApp.
+    if (inserted) {
+      const team = teams.find((t) => t.id === teamId);
+      const when = new Date(startIso).toLocaleDateString("fr-FR", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+      });
+      const heure = new Date(startIso).toLocaleTimeString("fr-FR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      const lieu = salle || location;
+      sendEventPush(
+        inserted.id,
+        `UBAC — ${team ? teamLabel(team) : "Tous les groupes"}`,
+        `Nouveau : ${typeChoices.find((c) => c.value === eventType)?.label ?? "Événement"}, ${when} à ${heure}${lieu ? ` · ${lieu}` : ""}.`
+      );
     }
 
     setTitle("");
