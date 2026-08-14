@@ -21,13 +21,19 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "UBAC",
   },
+  // Safari iOS met en cache l'icône "Sur l'écran d'accueil" de façon très
+  // agressive et ne la revérifie quasiment jamais tant que l'URL ne change
+  // pas — un logo mis à jour côté serveur reste invisible indéfiniment sur
+  // les téléphones qui l'ont déjà ajoutée. Le suffixe ?v= force iOS à voir
+  // une URL différente, donc à retélécharger, la prochaine fois que ce
+  // fichier changera vraiment (à incrémenter à ce moment-là).
   icons: {
     icon: [
-      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
-      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+      { url: "/favicon-32.png?v=2", sizes: "32x32", type: "image/png" },
+      { url: "/icon-192.png?v=2", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png?v=2", sizes: "512x512", type: "image/png" },
     ],
-    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    apple: [{ url: "/apple-touch-icon.png?v=2", sizes: "180x180", type: "image/png" }],
   },
 };
 
