@@ -158,6 +158,7 @@ export default function CalendarView({
   tasksByEventId = {},
   carpoolByEventId = {},
   eventRoles = [],
+  selfPlayerId = null,
 }: {
   events: AdminUpcomingEvent[];
   createTeams?: CalendarTeamRef[];
@@ -179,6 +180,12 @@ export default function CalendarView({
   tasksByEventId?: Record<string, EventTasksState>;
   carpoolByEventId?: Record<string, CarpoolOffer[]>;
   eventRoles?: EventRoleType[];
+  // La propre fiche joueur de qui consulte ce calendrier (coach qui joue
+  // aussi dans une autre équipe) — jamais fourni côté Bureau/Famille.
+  // Permet à un coach de répondre présent/absent pour LUI-MÊME sur un
+  // événement d'une équipe qu'il ne coache pas, sans jamais lui montrer
+  // le bouton de ses coéquipiers (voir rsvpVisiblePlayers plus bas).
+  selfPlayerId?: string | null;
 }) {
   const router = useRouter();
   const [viewMonth, setViewMonth] = useState<Date>(today);
@@ -419,6 +426,15 @@ export default function CalendarView({
       (event.teamId
         ? Boolean(createTeams?.some((t) => t.id === event.teamId))
         : allowClubWide);
+    // Une famille voit tous ses enfants concernés (respondingPlayers peut
+    // en contenir plusieurs). Un coach, lui, ne doit jamais voir le bouton
+    // de ses coéquipiers — seulement le sien, quand il en a un sur cette
+    // équipe précise : coachRsvpPlayers (page.tsx) porte tout l'effectif
+    // des équipes coachées, pas seulement sa propre fiche. canManage sert
+    // ici à distinguer les deux contextes (toujours faux côté famille).
+    const rsvpVisiblePlayers = canManage
+      ? respondingPlayers.filter((p) => p.id === selfPlayerId)
+      : respondingPlayers;
 
     return (
       <div
@@ -545,12 +561,15 @@ export default function CalendarView({
           </div>
         )}
 
-        {/* Plus d'appel express ici : le coach ne répond pas à la place des
-            familles, il leur demande de le faire depuis sa carte
-            d'événement (Organisation & Bilan). */}
-        {!canManage && respondingPlayers.length > 0 && (
+        {/* Plus d'appel express ici pour une équipe gérée : le coach ne
+            répond pas à la place des familles, il leur demande de le
+            faire depuis sa carte d'événement (Organisation & Bilan).
+            Mais sur une équipe qu'il ne gère pas (ex. sa propre équipe de
+            joueur), personne d'autre ne répond pour lui : il doit voir
+            son propre bouton, comme n'importe quel joueur. */}
+        {!canManageEvent && rsvpVisiblePlayers.length > 0 && (
           <div className="flex flex-col gap-2 border-t border-zinc-100 pt-2">
-            {respondingPlayers.map((p) => {
+            {rsvpVisiblePlayers.map((p) => {
               const playerStatus =
                 rsvp?.statusByKey[`${event.id}:${p.id}`] ?? "PENDING";
               const badge =
@@ -561,7 +580,7 @@ export default function CalendarView({
                     : { label: "En attente", dotClassName: "bg-amber-500", className: "bg-amber-100 text-amber-700" };
               return (
                 <div key={p.id} className="flex flex-wrap items-center gap-2">
-                  {respondingPlayers.length > 1 && (
+                  {rsvpVisiblePlayers.length > 1 && (
                     <span className="min-w-0 truncate text-xs font-medium text-zinc-500">
                       {p.name}
                     </span>

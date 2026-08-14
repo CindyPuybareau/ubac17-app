@@ -1,4 +1,4 @@
-import { CalendarDays, ClipboardList, MessageCircle, Trophy, Users } from "lucide-react";
+import { CalendarDays, ClipboardList, Trophy, Users } from "lucide-react";
 import CalendarView from "./calendar-view";
 import CalendarSubscribe from "./calendar-subscribe";
 import PushSubscribe from "./push-subscribe";
@@ -6,7 +6,6 @@ import CoachTeams from "./coach-teams";
 import CoachFfbb from "./coach-ffbb";
 import CoachOrganisation, { type CoachTeamMatchCard } from "./coach-organisation";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
-import WhatsAppGroupsManager from "./whatsapp-groups-manager";
 import type { TeamWithMembers } from "./team-manager";
 import type {
   AdminMemberTeam,
@@ -39,8 +38,8 @@ export default function CoachView({
   tasksByEventId,
   carpoolByEventId,
   whatsappGroups,
-  archivedPlayerIds,
   eventRoles,
+  ownPlayerId,
 }: {
   teams: TeamWithMembers[];
   events: AdminUpcomingEvent[];
@@ -62,13 +61,12 @@ export default function CoachView({
   tasksByEventId: Record<string, EventTasksState>;
   carpoolByEventId: Record<string, CarpoolOffer[]>;
   whatsappGroups: WhatsAppGroup[];
-  // Archived members shouldn't be offered in "Ajouter un membre" on the
-  // Groupes WhatsApp screen — see admin-view.tsx's equivalent filter,
-  // done here from a plain id list since a coach's roster (RosterPlayer)
-  // doesn't carry archived status itself.
-  archivedPlayerIds: string[];
   // Catalogue des roles d organisation (event_role_types).
   eventRoles: EventRoleType[];
+  // Sa propre fiche joueur (players.profile_id = son compte), si elle
+  // existe — un coach qui joue aussi dans une autre équipe doit pouvoir
+  // répondre présent/absent pour LUI-MÊME sur ses propres matchs.
+  ownPlayerId: string | null;
 }) {
   // Créer / modifier / supprimer un événement n'est permis que pour les
   // équipes réellement entraînées : proposer celle où l'utilisateur n'est
@@ -86,23 +84,6 @@ export default function CoachView({
     if (!e.teamId) return;
     (eventsByTeamId[e.teamId] ??= []).push(e);
   });
-
-  const archivedPlayerIdSet = new Set(archivedPlayerIds);
-  const whatsappCandidatesById = new Map<
-    string,
-    { id: string; firstName: string | null; lastName: string | null }
-  >();
-  teams.forEach((t) => {
-    t.players.forEach((p) => {
-      if (archivedPlayerIdSet.has(p.id)) return;
-      whatsappCandidatesById.set(p.id, {
-        id: p.id,
-        firstName: p.first_name,
-        lastName: p.last_name,
-      });
-    });
-  });
-  const whatsappCandidates = Array.from(whatsappCandidatesById.values());
 
   const iconClass = "h-4 w-4 shrink-0";
   const sections: AdminSection[] = [
@@ -126,6 +107,7 @@ export default function CoachView({
               name: t.name,
               category: t.category,
             }))}
+            selfPlayerId={ownPlayerId}
           />
           {/* Même bloc que l'espace parent : un coach a lui aussi son
               propre agenda, et être coach ne devrait pas le priver de cet
@@ -167,14 +149,6 @@ export default function CoachView({
           rsvpReasonByKey={rsvpReasonByKey}
           roles={eventRoles}
         />
-      ),
-    },
-    {
-      key: "whatsapp",
-      label: "WhatsApp",
-      icon: <MessageCircle className={iconClass} />,
-      content: (
-        <WhatsAppGroupsManager groups={whatsappGroups} candidates={whatsappCandidates} />
       ),
     },
     {

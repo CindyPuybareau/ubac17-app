@@ -51,8 +51,7 @@ export default function CoachTeams({
   // Bureau (the RLS wouldn't accept the write either).
   const activeRole = teamRoleByTeamId[active.id] ?? "COACH";
   const isPlayerTeam = activeRole === "PLAYER";
-  const activeWhatsappLink =
-    whatsappGroups.find((g) => g.teamId === active.id)?.inviteLink ?? null;
+  const activeWhatsappGroup = whatsappGroups.find((g) => g.teamId === active.id) ?? null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -120,7 +119,7 @@ export default function CoachTeams({
         // pas un collègue de l'encadrement.
         allowCreatePlayer={false}
         allowAssignCoach={false}
-        whatsappInviteLink={activeWhatsappLink}
+        whatsappGroup={activeWhatsappGroup}
       />
     </div>
   );

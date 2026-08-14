@@ -952,7 +952,6 @@ export default async function DashboardPage() {
   const coachRsvpStatusByKey: Record<string, string> = {};
   // Motif d'absence saisi par la famille, affiché sur la carte du coach.
   const coachRsvpReasonByKey: Record<string, string | null> = {};
-  let coachArchivedPlayerIds: string[] = [];
 
   if (isCoach) {
     const coachedTeamIds = coachedTeams.map((t) => t.id);
@@ -1100,12 +1099,6 @@ export default async function DashboardPage() {
       if (p.phone) coachContactPhoneByPlayerId[p.id] = p.phone;
       if (p.email) coachContactEmailByPlayerId[p.id] = p.email;
     });
-    coachArchivedPlayerIds = (
-      (playersRes.data ?? []) as unknown as { id: string; archived_at: string | null }[]
-    )
-      .filter((p) => p.archived_at)
-      .map((p) => p.id);
-
     const rosterByTeam = new Map<string, RosterPlayer[]>();
     (teamPlayersRes.data ?? []).forEach((tp) => {
       const player = playersById.get(tp.player_id);
@@ -1672,8 +1665,8 @@ export default async function DashboardPage() {
           tasksByEventId={coachOrganisationTasks}
           carpoolByEventId={carpoolOffersByEventId}
           whatsappGroups={whatsappGroups}
-          archivedPlayerIds={coachArchivedPlayerIds}
           eventRoles={eventRoleTypes}
+          ownPlayerId={ownPlayerId}
         />
       ),
     });

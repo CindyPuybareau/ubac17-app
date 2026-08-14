@@ -10,7 +10,6 @@ import {
   Clock,
   Mail,
   MapPin,
-  MessageCircle,
   Phone,
   Search,
   Trash2,
@@ -24,7 +23,9 @@ import MemberDetailModal from "./member-detail-modal";
 import PlayerYearBadge from "./player-year-badge";
 import SalleBadge from "./salle-badge";
 import WhatsAppButton from "./whatsapp-button";
-import type { AdminMemberTeam, AdminUpcomingEvent, MemberDetail } from "./page";
+import WhatsAppGroupButton from "./whatsapp-group-button";
+import TeamWhatsAppSettings from "./team-whatsapp-settings";
+import type { AdminMemberTeam, AdminUpcomingEvent, MemberDetail, WhatsAppGroup } from "./page";
 import type { RosterPlayer, TeamWithMembers } from "./team-manager";
 
 const now = Date.now();
@@ -133,12 +134,12 @@ export default function TeamCard({
   // "Changer d'équipe" instead of "Retirer" — a coach lending a player to
   // another team is the real need; plain removal stays a Bureau gesture.
   clubTeams,
-  // Lien d'invitation du groupe WhatsApp de CETTE équipe (whatsapp_groups),
-  // pas un message pré-rempli à choisir une destination comme côté parent :
-  // le coach est déjà dans ce groupe au quotidien, un simple raccourci
-  // "ouvrir le groupe" suffit. Absent si aucun lien n'a été enregistré —
-  // le bouton ne s'affiche alors pas du tout, plutôt qu'un lien mort.
-  whatsappInviteLink,
+  // Groupe WhatsApp de CETTE équipe (whatsapp_groups). En coach (readOnly
+  // false), un bouton "Configurer WhatsApp" ouvre le lien d'invitation et
+  // les membres — plus besoin d'un onglet séparé pour ça. En joueur
+  // (readOnly true), un simple bouton d'envoi comme côté parent : pas
+  // besoin de tout gérer, juste écrire au groupe.
+  whatsappGroup,
 }: {
   team: TeamWithMembers;
   allProfiles: Person[];
@@ -153,7 +154,7 @@ export default function TeamCard({
   contactEmailByPlayerId?: Record<string, string>;
   showWhatsApp?: boolean;
   clubTeams?: AdminMemberTeam[];
-  whatsappInviteLink?: string | null;
+  whatsappGroup?: WhatsAppGroup | null;
 }) {
   const router = useRouter();
   const [detailPlayerId, setDetailPlayerId] = useState<string | null>(null);
@@ -649,14 +650,37 @@ export default function TeamCard({
     <div
       className={`rounded-2xl border border-t-4 ${theme.border} border-t-ubac-yellow bg-white p-5 shadow-sm transition-all hover:shadow-md`}
     >
-      <div className="flex flex-wrap items-center gap-2">
-        <h3 className="font-semibold text-zinc-900">{team.name}</h3>
-        {team.category && team.category !== team.name && (
-          <span
-            className={`inline-flex w-fit items-center justify-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold leading-none ${theme.badge}`}
-          >
-            {team.category}
-          </span>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="font-semibold text-zinc-900">{team.name}</h3>
+          {team.category && team.category !== team.name && (
+            <span
+              className={`inline-flex w-fit items-center justify-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold leading-none ${theme.badge}`}
+            >
+              {team.category}
+            </span>
+          )}
+        </div>
+        {/* Coach de cette équipe : un raccourci discret dans l'en-tête
+            plutôt qu'un onglet séparé pour ça — un seul endroit où gérer
+            son équipe. En lecture seule (joueur), le bouton d'envoi plus
+            bas suffit, pas besoin de ce réglage. */}
+        {!readOnly && whatsappGroup && (
+          <TeamWhatsAppSettings
+            groupId={whatsappGroup.id}
+            groupName={team.name ?? "de l'équipe"}
+            inviteLink={whatsappGroup.inviteLink}
+            members={whatsappGroup.members.map((m) => ({
+              id: m.id,
+              firstName: m.firstName,
+              lastName: m.lastName,
+            }))}
+            candidates={team.players.map((p) => ({
+              id: p.id,
+              firstName: p.first_name,
+              lastName: p.last_name,
+            }))}
+          />
         )}
       </div>
 
@@ -963,16 +987,16 @@ export default function TeamCard({
         </div>
       </div>
 
-      {whatsappInviteLink && (
-        <a
-          href={whatsappInviteLink}
-          target="_blank"
-          rel="noreferrer"
+      {/* Lecture seule (joueur) : même bouton d'envoi que côté parent —
+          message pré-rempli, choix du groupe à la main. Un coach gère déjà
+          ce groupe via "Configurer WhatsApp" dans l'en-tête, pas besoin des
+          deux à la fois. */}
+      {readOnly && (
+        <WhatsAppGroupButton
+          teamName={team.name ?? "l'équipe"}
+          defaultMessage={`Bonjour à tous, je suis un joueur de l'équipe ${team.name ?? ""}.`}
           className="mt-3 flex w-fit items-center gap-1.5 rounded-full border border-emerald-200 px-3 py-1.5 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
-        >
-          <MessageCircle className="h-4 w-4" />
-          Ouvrir le groupe WhatsApp {team.name ?? "de l'équipe"}
-        </a>
+        />
       )}
 
       {detailPlayerId &&
