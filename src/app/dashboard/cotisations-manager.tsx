@@ -346,7 +346,7 @@ export default function CotisationsManager({
             ))}
             <button
               onClick={() => setCreatingCollecte((v) => !v)}
-              className="flex items-center gap-1.5 rounded-full border border-dashed border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-600 hover:border-ubac-yellow hover:text-ubac-yellow-dark"
+              className="flex items-center gap-1.5 rounded-full bg-ubac-yellow px-3 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark"
             >
               <Plus className="h-3.5 w-3.5" />
               Nouvelle collecte
@@ -402,7 +402,7 @@ export default function CotisationsManager({
               <div className="flex flex-col gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
                 <button
                   onClick={() => setAddingParticipants((v) => !v)}
-                  className="flex w-fit items-center gap-1.5 rounded-full border border-dashed border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-600 hover:border-ubac-yellow hover:text-ubac-yellow-dark"
+                  className="flex w-fit items-center gap-1.5 rounded-full bg-ubac-yellow px-3 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   Ajouter des participants

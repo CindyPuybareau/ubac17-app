@@ -791,7 +791,7 @@ export default function TeamCard({
         ) : (
           <button
             onClick={() => setOpenPlayerForm(true)}
-            className="mt-2 w-full rounded-lg border border-dashed border-zinc-300 px-2 py-1.5 text-sm font-medium text-zinc-600 hover:border-ubac-yellow hover:text-ubac-yellow-dark"
+            className="mt-2 w-full rounded-lg bg-ubac-yellow px-2 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark"
           >
             + Ajouter un joueur
           </button>

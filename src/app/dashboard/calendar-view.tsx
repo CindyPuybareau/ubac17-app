@@ -514,7 +514,7 @@ export default function CalendarView({
           {canManage && (
             <button
               onClick={() => setCreateOpen((v) => !v)}
-              className="flex items-center gap-1.5 rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-110"
+              className="flex items-center gap-1.5 rounded-full bg-ubac-yellow px-4 py-2 text-sm font-semibold text-navy shadow-sm transition-colors hover:bg-ubac-yellow-dark"
             >
               <Plus className="h-4 w-4 shrink-0" />
               Créer un événement
