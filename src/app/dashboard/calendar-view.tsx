@@ -284,13 +284,36 @@ export default function CalendarView({
     router.refresh();
   }
 
-  async function handleDeleteEvent(eventId: string) {
+  async function handleDeleteEvent(event: AdminUpcomingEvent) {
     const ok = window.confirm(
       "Supprimer définitivement cet événement ? Cette action est irréversible."
     );
     if (!ok) return;
+
+    // Bonus, pas bloquant : voir event-push.ts. Envoyé avant la
+    // suppression — push_targets_for_event a besoin de retrouver
+    // l'événement pour savoir à qui l'envoyer, ce qui ne serait plus
+    // possible une fois la ligne effacée.
+    const when = new Date(event.start_time).toLocaleDateString("fr-FR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    });
+    const heure = new Date(event.start_time).toLocaleTimeString("fr-FR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    const lieu = event.salle || event.location;
+    // Attendu, cette fois : la ligne doit encore exister côté serveur au
+    // moment où push_targets_for_event la cherche.
+    await sendEventPush(
+      event.id,
+      `UBAC — ${event.teamName}`,
+      `Annulé : ${when} à ${heure}${lieu ? ` · ${lieu}` : ""}.`
+    );
+
     const supabase = createClient();
-    await supabase.from("events").delete().eq("id", eventId);
+    await supabase.from("events").delete().eq("id", event.id);
     router.refresh();
   }
 
@@ -433,7 +456,7 @@ export default function CalendarView({
                 <Pencil className="h-4 w-4" />
               </button>
               <button
-                onClick={() => handleDeleteEvent(event.id)}
+                onClick={() => handleDeleteEvent(event)}
                 title="Supprimer"
                 className="flex h-8 w-8 items-center justify-center rounded-full text-red-400 hover:bg-red-50 hover:text-red-600"
               >
