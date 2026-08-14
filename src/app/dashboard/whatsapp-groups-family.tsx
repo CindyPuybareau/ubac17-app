@@ -1,27 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
-import { Copy, ExternalLink, MessageCircle } from "lucide-react";
-import { buildAppDeepLink } from "@/lib/whatsapp";
+import { ExternalLink, MessageCircle } from "lucide-react";
 import type { WhatsAppGroup } from "./page";
 
 function GroupCard({ group, highlighted }: { group: WhatsAppGroup; highlighted: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (highlighted) ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [highlighted]);
-
-  function copyAppLink() {
-    navigator.clipboard
-      .writeText(buildAppDeepLink("whatsapp", { openGroup: group.id }))
-      .then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      });
-  }
 
   return (
     <div
@@ -49,15 +38,6 @@ function GroupCard({ group, highlighted }: { group: WhatsAppGroup; highlighted: 
           Lien non disponible pour le moment.
         </span>
       )}
-      <button
-        type="button"
-        onClick={copyAppLink}
-        title="Copier un lien à partager (ex: dans WhatsApp) pour revenir directement sur ce groupe dans UBAC"
-        className="flex w-fit items-center gap-1.5 rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50"
-      >
-        <Copy className="h-3.5 w-3.5" />
-        {copied ? "Lien copié !" : "Copier le lien (UBAC)"}
-      </button>
     </div>
   );
 }
