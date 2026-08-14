@@ -90,9 +90,9 @@ export default function CalendarSubscribe() {
 
           <div className="flex flex-col gap-1.5 rounded-xl bg-zinc-50 p-3">
             <p className="text-[11px] font-medium text-zinc-600">
-              Sur Android, Google n&apos;autorise cet ajout que depuis un ordinateur (ou le
-              navigateur du téléphone en version ordinateur) — l&apos;appli mobile ne le
-              permet pas, ce n&apos;est pas nous qui le limitons.
+              Sur Android : ouvre l&apos;appli <b>Google Agenda</b> → menu ☰ en haut à gauche
+              → <b>« Autres agendas »</b> → appuie sur le <b>+</b> juste à côté → <b>« À
+              partir de l&apos;URL »</b> → colle le lien ci-dessous.
             </p>
             <div className="flex items-center gap-2">
               <input

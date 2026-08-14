@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BellOff, BellRing } from "lucide-react";
+import { BellOff, BellRing, Share } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 // La clé publique voyage jusqu'au navigateur, mais l'API Push la veut en
@@ -13,7 +13,21 @@ function urlBase64ToUint8Array(base64: string) {
   return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
 }
 
-type State = "checking" | "unsupported" | "denied" | "off" | "on";
+// Safari sur iOS n'expose l'API Push que si l'app a été ajoutée à l'écran
+// d'accueil — une contrainte d'Apple, pas un choix du club. Sans cette
+// détection, un parent sur iPhone dans un onglet Safari classique ne
+// voyait ni bouton ni explication : rien ne lui disait qu'il lui manquait
+// une étape.
+function isIosNotInstalled() {
+  if (typeof window === "undefined" || typeof navigator === "undefined") return false;
+  const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isStandalone =
+    (window.navigator as unknown as { standalone?: boolean }).standalone === true ||
+    window.matchMedia("(display-mode: standalone)").matches;
+  return isIos && !isStandalone;
+}
+
+type State = "checking" | "unsupported" | "ios-not-installed" | "denied" | "off" | "on";
 
 export default function PushSubscribe() {
   const [state, setState] = useState<State>("checking");
@@ -21,16 +35,13 @@ export default function PushSubscribe() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Safari sur iOS n'expose l'API Push que si l'app a été ajoutée à
-    // l'écran d'accueil : dans un onglet classique, il n'y a rien à
-    // proposer, et un bouton qui échoue vaut moins que pas de bouton.
     if (
       typeof window === "undefined" ||
       !("serviceWorker" in navigator) ||
       !("PushManager" in window) ||
       !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
     ) {
-      setState("unsupported");
+      setState(isIosNotInstalled() ? "ios-not-installed" : "unsupported");
       return;
     }
     if (Notification.permission === "denied") {
@@ -41,7 +52,7 @@ export default function PushSubscribe() {
       .register("/sw.js")
       .then((reg) => reg.pushManager.getSubscription())
       .then((sub) => setState(sub ? "on" : "off"))
-      .catch(() => setState("unsupported"));
+      .catch(() => setState(isIosNotInstalled() ? "ios-not-installed" : "unsupported"));
   }, []);
 
   async function enable() {
@@ -108,6 +119,23 @@ export default function PushSubscribe() {
   }
 
   if (state === "checking" || state === "unsupported") return null;
+
+  if (state === "ios-not-installed") {
+    return (
+      <div className="flex flex-col gap-1 rounded-xl border border-ubac-yellow/40 bg-ubac-yellow/10 px-3 py-2.5">
+        <p className="flex items-center gap-1.5 text-xs font-semibold text-navy">
+          <BellRing className="h-3.5 w-3.5 shrink-0" />
+          Reçois les notifications sur iPhone
+        </p>
+        <p className="flex flex-wrap items-center gap-1 text-xs text-zinc-600">
+          Ajoute UBAC à ton écran d&apos;accueil : appuie sur{" "}
+          <Share className="h-3.5 w-3.5 shrink-0" aria-label="Partager" /> en bas de Safari, puis
+          « Sur l&apos;écran d&apos;accueil ». Ouvre ensuite l&apos;appli depuis cette icône pour
+          activer les notifications.
+        </p>
+      </div>
+    );
+  }
 
   if (state === "denied") {
     return (
