@@ -774,12 +774,21 @@ export default function CalendarView({
                 </div>
               )}
               <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-600">Lieu</label>
+                <label className="mb-1 block text-xs font-medium text-zinc-600">
+                  Adresse ou lieu
+                </label>
                 <input
                   value={editLocation}
                   onChange={(e) => setEditLocation(e.target.value)}
                   className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
                 />
+                {/* Même rappel qu'à la création : sans salle du club
+                    reconnue, c'est ce texte qui part vers l'itinéraire et
+                    le covoiturage — une adresse précise vaut mieux qu'un
+                    nom de ville. */}
+                <p className="mt-1 text-[11px] text-zinc-400">
+                  Utilisée pour l&apos;itinéraire et le covoiturage.
+                </p>
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-zinc-600">Salle</label>

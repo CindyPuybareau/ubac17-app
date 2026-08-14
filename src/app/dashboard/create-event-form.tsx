@@ -178,16 +178,26 @@ export default function CreateEventForm({
       />
 
       <div className="grid grid-cols-2 gap-3">
-        <input
-          placeholder="Lieu"
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
-          className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-        />
+        <div>
+          <input
+            placeholder="Adresse ou lieu"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+          />
+          {/* Une des trois salles du club a déjà son adresse complète : ce
+              champ ne sert que pour un lieu hors club (déplacement), d'où
+              le rappel — sinon l'itinéraire pointerait juste sur le centre
+              de la ville tapée, pas sur le gymnase. */}
+          <p className="mt-1 text-[11px] text-zinc-400">
+            Utilisée pour l&apos;itinéraire (Waze/Maps) et le covoiturage — une
+            adresse précise vaut mieux qu&apos;un nom de ville.
+          </p>
+        </div>
         <select
           value={salle}
           onChange={(e) => setSalle(e.target.value)}
-          className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+          className="h-fit rounded-lg border border-zinc-200 px-3 py-2 text-sm"
         >
           <option value="">Salle (optionnel)</option>
           {SALLES.map((s) => (
