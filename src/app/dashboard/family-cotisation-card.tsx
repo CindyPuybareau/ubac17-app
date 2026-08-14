@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronUp, CreditCard, Receipt } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronUp, CreditCard, Receipt } from "lucide-react";
 import {
   balanceDue,
   computeStatus,
@@ -105,11 +105,18 @@ function Row({ c }: { c: AdminCotisation }) {
 
 // Lecture seule, volontairement : une famille consulte où elle en est,
 // elle ne corrige rien depuis ici — toute correction reste au Bureau.
+//
+// Une fois réglée, une cotisation n'a plus rien à signaler : l'onglet
+// Organisation sert à repérer ce qui reste à faire, pas à archiver ce qui
+// est déjà bouclé. Elle disparaît donc d'ici une fois "Payé" — sans
+// jamais toucher à la donnée elle-même, seulement à ce qui s'affiche.
 export default function FamilyCotisationCard({
   cotisations,
 }: {
   cotisations: AdminCotisation[];
 }) {
+  const pending = cotisations.filter((c) => computeStatus(c) !== "PAYE");
+
   if (cotisations.length === 0) {
     return (
       <div className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm sm:p-5">
@@ -124,6 +131,21 @@ export default function FamilyCotisationCard({
     );
   }
 
+  if (pending.length === 0) {
+    return (
+      <div className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm sm:p-5">
+        <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          <CreditCard className="h-3.5 w-3.5 text-blue-700" />
+          Ma cotisation
+        </p>
+        <p className="mt-2 flex items-center gap-1.5 text-sm text-green-700">
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          Tout est réglé, rien à signaler.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm sm:p-5">
       <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
@@ -131,7 +153,7 @@ export default function FamilyCotisationCard({
         Ma cotisation
       </p>
       <div className="flex flex-col gap-2">
-        {cotisations.map((c) => (
+        {pending.map((c) => (
           <Row key={c.id} c={c} />
         ))}
       </div>
