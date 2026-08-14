@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarDays, ChevronDown, ChevronUp, Trophy } from "lucide-react";
+import { CalendarCheck2, CalendarDays, ChevronDown, ChevronUp, Trophy } from "lucide-react";
 import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
 import { formatPersonName } from "@/lib/names";
 import CoachNextMatchCard from "./coach-next-match-card";
@@ -193,15 +193,23 @@ function BilanTeamTable({
   roster,
   tally,
   roles,
+  events,
+  rsvpStatusByKey,
 }: {
   team: CoachTeamMatchCard["team"];
   roster: RosterPlayer[];
   tally: SeasonTaskTally;
   roles: EventRoleType[];
+  // Pour calculer l'assiduité : les rassemblements passés de cette équipe
+  // et qui a répondu quoi. Même source que le reste de l'appli — pas une
+  // requête séparée qui pourrait diverger.
+  events: AdminUpcomingEvent[];
+  rsvpStatusByKey: Record<string, string>;
 }) {
-  // Par défaut : les familles qui ont le moins contribué en premier, ce
-  // qui est la question que se pose un coach en ouvrant ce bilan.
-  const [sortKey, setSortKey] = useState<SortKey>(roles[0]?.code ?? "name");
+  // Par défaut : l'assiduité la plus faible en premier — la vraie question
+  // que se pose un coach en ouvrant ce bilan, avant même de savoir qui a
+  // lavé les maillots.
+  const [sortKey, setSortKey] = useState<SortKey>("attendance");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   function toggleSort(key: SortKey) {
@@ -213,19 +221,50 @@ function BilanTeamTable({
     setSortDir(key === "name" ? "asc" : "asc");
   }
 
+  // Une réponse "en attente" (jamais répondu) ne compte ni pour ni contre :
+  // seule une réponse donnée dit quelque chose sur l'assiduité réelle.
+  const pastEvents = useMemo(() => {
+    const nowMs = Date.now();
+    return events.filter(
+      (e) => e.teamId === team.id && new Date(e.start_time).getTime() < nowMs
+    );
+  }, [events, team.id]);
+
   const rows = useMemo(() => {
-    const list = roster.map((p) => ({
-      id: p.id,
-      name: fullName(p),
-      counts: tally[p.id] ?? {},
-    }));
+    const list = roster.map((p) => {
+      let present = 0;
+      let total = 0;
+      pastEvents.forEach((e) => {
+        const status = rsvpStatusByKey[`${e.id}:${p.id}`];
+        if (!status || status === "PENDING") return;
+        total += 1;
+        if (status === "PRESENT" || status === "LATE") present += 1;
+      });
+      return {
+        id: p.id,
+        name: fullName(p),
+        counts: tally[p.id] ?? {},
+        attendance: { present, total },
+      };
+    });
     const dir = sortDir === "asc" ? 1 : -1;
     return list.sort((a, b) => {
       if (sortKey === "name") return a.name.localeCompare(b.name, "fr") * dir;
+      if (sortKey === "attendance") {
+        const rateA = a.attendance.total > 0 ? a.attendance.present / a.attendance.total : null;
+        const rateB = b.attendance.total > 0 ? b.attendance.present / b.attendance.total : null;
+        // Sans historique : ni bon ni mauvais élève, toujours en dernier
+        // plutôt que de fausser un classement par manque de données.
+        if (rateA === null && rateB === null) return a.name.localeCompare(b.name, "fr");
+        if (rateA === null) return 1;
+        if (rateB === null) return -1;
+        const diff = (rateA - rateB) * dir;
+        return diff !== 0 ? diff : a.name.localeCompare(b.name, "fr");
+      }
       const diff = ((a.counts[sortKey] ?? 0) - (b.counts[sortKey] ?? 0)) * dir;
       return diff !== 0 ? diff : a.name.localeCompare(b.name, "fr");
     });
-  }, [roster, tally, sortKey, sortDir]);
+  }, [roster, tally, pastEvents, rsvpStatusByKey, sortKey, sortDir]);
 
   // Un total par rôle du catalogue, y compris les rôles créés par le club.
   const totals = roles.map((role) => ({
@@ -274,15 +313,35 @@ function BilanTeamTable({
           <thead>
             <tr className="border-b border-zinc-100 bg-zinc-50 text-left text-xs font-semibold text-zinc-400">
               {header("name", "Famille / Joueur")}
+              {header("attendance", "Assiduité", <CalendarCheck2 className="h-3.5 w-3.5 shrink-0" />)}
               {roles.map((role) =>
                 header(role.code, role.label, <RoleIcon icon={role.icon} className="h-3.5 w-3.5 shrink-0" />)
               )}
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
+            {rows.map((r) => {
+              const rate = r.attendance.total > 0 ? r.attendance.present / r.attendance.total : null;
+              const rateClass =
+                rate === null
+                  ? "text-zinc-300"
+                  : rate < 0.5
+                    ? "text-red-600"
+                    : rate < 0.8
+                      ? "text-amber-600"
+                      : "text-emerald-700";
+              return (
               <tr key={r.id} className="border-b border-zinc-50 last:border-0">
                 <td className="w-auto px-3 py-2.5 font-semibold text-zinc-800">{r.name}</td>
+                <td className="whitespace-nowrap px-3 py-2.5">
+                  {rate === null ? (
+                    <span className="text-zinc-300">—</span>
+                  ) : (
+                    <span className={`font-semibold tabular-nums ${rateClass}`}>
+                      {r.attendance.present}/{r.attendance.total}
+                    </span>
+                  )}
+                </td>
                 {roles.map((role) => {
                   const count = r.counts[role.code] ?? 0;
                   return (
@@ -296,11 +355,12 @@ function BilanTeamTable({
                   );
                 })}
               </tr>
-            ))}
+              );
+            })}
             {rows.length === 0 && (
               <tr>
                 <td
-                  colSpan={roles.length + 1}
+                  colSpan={roles.length + 2}
                   className="px-3 py-4 text-center text-sm text-zinc-400"
                 >
                   Aucun joueur dans cette équipe
@@ -384,8 +444,8 @@ export default function CoachOrganisation({
       ) : (
         <div className="flex flex-col gap-4">
           <p className="text-xs text-zinc-500">
-            Cumul des rôles depuis le début de la saison. Cliquez sur une colonne pour
-            trier — par défaut, les familles qui ont le moins contribué apparaissent en
+            Assiduité et rôles cumulés depuis le début de la saison. Cliquez sur une
+            colonne pour trier — par défaut, l&apos;assiduité la plus faible apparaît en
             premier.
           </p>
           {cards.map(({ team, roster }) => (
@@ -395,6 +455,8 @@ export default function CoachOrganisation({
               roster={roster}
               tally={taskTallyByTeamId[team.id] ?? {}}
               roles={roles}
+              events={events}
+              rsvpStatusByKey={rsvpStatusByKey}
             />
           ))}
         </div>
