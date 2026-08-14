@@ -169,9 +169,14 @@ export default function PushSubscribe() {
             ? "Désactiver les notifications"
             : "Activer les notifications"}
       </button>
+      {/* Formulation volontairement neutre : le même composant est monté
+          côté Famille (demande de présence, changement d'horaire) et
+          côté Coach (changement fait par un co-coach ou le Bureau sur sa
+          propre équipe) — jamais "le coach attend ta réponse", qui n'a
+          de sens que pour la moitié des lecteurs. */}
       {state === "on" && (
         <span className="text-xs text-zinc-400">
-          Tu seras prévenu quand le coach attend une réponse.
+          Tu seras prévenu des changements sur tes événements.
         </span>
       )}
       {error && <span className="text-xs text-red-600">{error}</span>}
