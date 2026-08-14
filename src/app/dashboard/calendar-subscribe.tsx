@@ -18,15 +18,25 @@ export default function CalendarSubscribe() {
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      const supabase = createClient();
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) return;
-      const { data } = await supabase
-        .from("profiles")
-        .select("calendar_token")
-        .eq("id", userData.user.id)
-        .maybeSingle();
-      if (!cancelled) setToken((data?.calendar_token as string | null) ?? null);
+      try {
+        const supabase = createClient();
+        const { data: userData } = await supabase.auth.getUser();
+        if (!userData.user) {
+          if (!cancelled) setToken(null);
+          return;
+        }
+        const { data } = await supabase
+          .from("profiles")
+          .select("calendar_token")
+          .eq("id", userData.user.id)
+          .maybeSingle();
+        if (!cancelled) setToken((data?.calendar_token as string | null) ?? null);
+      } catch {
+        // Un raté réseau ne doit jamais laisser le bloc bloqué en
+        // "chargement" pour toujours : mieux vaut proposer de générer le
+        // lien, quitte à réessayer, que de rester invisible sans un mot.
+        if (!cancelled) setToken(null);
+      }
     }
     load();
     return () => {

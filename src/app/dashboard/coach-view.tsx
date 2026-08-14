@@ -1,5 +1,6 @@
 import { CalendarDays, ClipboardList, MessageCircle, Trophy, Users } from "lucide-react";
 import CalendarView from "./calendar-view";
+import CalendarSubscribe from "./calendar-subscribe";
 import CoachTeams from "./coach-teams";
 import CoachFfbb from "./coach-ffbb";
 import CoachOrganisation, { type CoachTeamMatchCard } from "./coach-organisation";
@@ -109,21 +110,27 @@ export default function CoachView({
       label: "Calendrier",
       icon: <CalendarDays className={iconClass} />,
       content: (
-        <CalendarView
-          events={events}
-          createTeams={createTeams}
-          rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
-          contactEmailByPlayerId={contactEmailByPlayerId}
-          birthdayMembers={birthdayMembers}
-          // Toutes ses équipes, y compris celle où il n'est que joueur :
-          // le calendrier les montre, même si créer un événement n'y est
-          // permis que pour celles qu'il entraîne.
-          scopeTeams={teams.map((t) => ({
-            id: t.id,
-            name: t.name,
-            category: t.category,
-          }))}
-        />
+        <div className="flex flex-col gap-4">
+          <CalendarView
+            events={events}
+            createTeams={createTeams}
+            rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
+            contactEmailByPlayerId={contactEmailByPlayerId}
+            birthdayMembers={birthdayMembers}
+            // Toutes ses équipes, y compris celle où il n'est que joueur :
+            // le calendrier les montre, même si créer un événement n'y est
+            // permis que pour celles qu'il entraîne.
+            scopeTeams={teams.map((t) => ({
+              id: t.id,
+              name: t.name,
+              category: t.category,
+            }))}
+          />
+          {/* Même bloc que l'espace parent : un coach a lui aussi son
+              propre agenda, et être coach ne devrait pas le priver de cet
+              outil — il fallait juste l'y ajouter aussi. */}
+          <CalendarSubscribe />
+        </div>
       ),
     },
     {
