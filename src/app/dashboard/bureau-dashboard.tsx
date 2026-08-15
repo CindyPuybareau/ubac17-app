@@ -1,11 +1,27 @@
-import { CalendarDays, MapPin, ShieldAlert, Users, Wallet } from "lucide-react";
+import { CalendarDays, FileWarning, MapPin, ShieldAlert, Users, Wallet } from "lucide-react";
 import { teamLabel } from "@/lib/teams";
+import { formatPersonName } from "@/lib/names";
 import { balanceDue, computeStatus, formatAmount } from "./cotisation-participants-table";
 import { formatEventTime, isMatchType, styleFor } from "./event-style";
 import OpponentDisplay from "./opponent-display";
 import SalleBadge from "./salle-badge";
 import type { AdminCotisation, AdminMember, AdminUpcomingEvent } from "./page";
 import type { TeamWithMembers } from "./team-manager";
+
+// Fenêtre "à surveiller" — même horizon que /api/cron/expiry-alerts (30
+// jours), pour que le tableau de bord et le rappel automatique par email
+// parlent toujours des mêmes personnes.
+const EXPIRY_WINDOW_DAYS = 30;
+
+function isExpiringSoon(dateStr: string | null) {
+  if (!dateStr) return false;
+  const windowEnd = new Date();
+  windowEnd.setDate(windowEnd.getDate() + EXPIRY_WINDOW_DAYS);
+  windowEnd.setHours(23, 59, 59, 999);
+  // Pas de borne basse : une échéance déjà dépassée reste à traiter, pas
+  // seulement celles encore à venir.
+  return new Date(dateStr).getTime() <= windowEnd.getTime();
+}
 
 function KpiCard({
   icon: Icon,
@@ -60,6 +76,12 @@ export default function BureauDashboard({
     (t) => t.coaches.length === 0 && t.pendingCoaches.length === 0
   );
 
+  const membersWithExpiringDocs = members.filter(
+    (m) =>
+      !m.archivedAt &&
+      (isExpiringSoon(m.licenseExpiresAt) || isExpiringSoon(m.medicalCertificateExpiresAt))
+  );
+
   // Seuil "aujourd'hui à minuit", même logique que calendar-view.tsx : un
   // match du matin ne doit pas disparaître du tableau de bord l'après-midi
   // même.
@@ -76,7 +98,7 @@ export default function BureauDashboard({
         <p className="text-sm text-zinc-500">Vue d&apos;ensemble du club, en un coup d&apos;œil.</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <KpiCard
           icon={Wallet}
           iconClass="text-rose-600"
@@ -94,6 +116,12 @@ export default function BureauDashboard({
           iconClass="text-amber-600"
           value={String(teamsWithoutCoach.length)}
           label="Équipes sans coach"
+        />
+        <KpiCard
+          icon={FileWarning}
+          iconClass="text-orange-600"
+          value={String(membersWithExpiringDocs.length)}
+          label="Documents à renouveler"
         />
         <KpiCard
           icon={Users}
@@ -166,6 +194,28 @@ export default function BureauDashboard({
                 className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-amber-800 shadow-sm"
               >
                 {teamLabel(t)}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Un rappel automatique par email part déjà tout seul (voir
+          /api/cron/expiry-alerts) — ce bloc n'est qu'un aperçu Bureau,
+          pratique pour relancer soi-même sans attendre. */}
+      {membersWithExpiringDocs.length > 0 && (
+        <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4">
+          <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-orange-800">
+            <FileWarning className="h-3.5 w-3.5 shrink-0" />
+            Licences / certificats médicaux à renouveler (30 jours)
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {membersWithExpiringDocs.map((m) => (
+              <span
+                key={m.id}
+                className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-orange-800 shadow-sm"
+              >
+                {formatPersonName(m.firstName, m.lastName, "Membre")}
               </span>
             ))}
           </div>

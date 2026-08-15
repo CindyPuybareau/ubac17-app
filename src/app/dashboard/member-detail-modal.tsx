@@ -401,6 +401,8 @@ export default function MemberDetailModal({
     otherNotes: member.otherNotes ?? "",
     imageRights: member.imageRights ?? "",
     licenseNumber: member.licenseNumber ?? "",
+    licenseExpiresAt: member.licenseExpiresAt ?? "",
+    medicalCertificateExpiresAt: member.medicalCertificateExpiresAt ?? "",
   });
 
   const editable = !readOnly;
@@ -444,6 +446,14 @@ export default function MemberDetailModal({
     const category = canManageTeamAndRoles
       ? (teamOptions.find((t) => t.id === teamId)?.category ?? null)
       : member.category;
+    // Une date d'échéance modifiée (renouvellement, ou simple correction)
+    // remet à zéro le repère "déjà alerté" correspondant — sinon un
+    // document renouvelé resterait silencieusement marqué comme relancé
+    // pour sa nouvelle échéance, qui ne recevrait donc jamais son propre
+    // rappel (voir /api/cron/expiry-alerts).
+    const licenseExpiryChanged = form.licenseExpiresAt !== (member.licenseExpiresAt ?? "");
+    const medicalExpiryChanged =
+      form.medicalCertificateExpiresAt !== (member.medicalCertificateExpiresAt ?? "");
     const { error: updateError } = await supabase
       .from("players")
       .update({
@@ -469,6 +479,10 @@ export default function MemberDetailModal({
         other_notes: form.otherNotes || null,
         image_rights: form.imageRights || null,
         license_number: form.licenseNumber || null,
+        license_expires_at: form.licenseExpiresAt || null,
+        medical_certificate_expires_at: form.medicalCertificateExpiresAt || null,
+        ...(licenseExpiryChanged ? { license_expiry_alert_sent_at: null } : {}),
+        ...(medicalExpiryChanged ? { medical_expiry_alert_sent_at: null } : {}),
       })
       .eq("id", member.id);
 
@@ -963,6 +977,14 @@ export default function MemberDetailModal({
                 editable={editable}
                 onChange={(v) => set("licenseNumber", v)}
               />
+              <Field
+                label="Licence valable jusqu'au"
+                type="date"
+                value={form.licenseExpiresAt}
+                displayValue={formatBirthDate(member.licenseExpiresAt)}
+                editable={editable}
+                onChange={(v) => set("licenseExpiresAt", v)}
+              />
             </div>
           )}
 
@@ -974,6 +996,14 @@ export default function MemberDetailModal({
                 value={form.medicalNotes}
                 editable={editable}
                 onChange={(v) => set("medicalNotes", v)}
+              />
+              <Field
+                label="Certificat médical valable jusqu'au"
+                type="date"
+                value={form.medicalCertificateExpiresAt}
+                displayValue={formatBirthDate(member.medicalCertificateExpiresAt)}
+                editable={editable}
+                onChange={(v) => set("medicalCertificateExpiresAt", v)}
               />
               <Field
                 label="Autres informations utiles"

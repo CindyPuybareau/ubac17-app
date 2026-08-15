@@ -47,6 +47,8 @@ const EMPTY_FORM = {
   otherNotes: "",
   imageRights: "",
   licenseNumber: "",
+  licenseExpiresAt: "",
+  medicalCertificateExpiresAt: "",
 };
 
 // Creation form, structured to look and behave exactly like the existing
@@ -139,6 +141,8 @@ export default function AddMemberModal({
         other_notes: form.otherNotes || null,
         image_rights: form.imageRights || null,
         license_number: form.licenseNumber || null,
+        license_expires_at: form.licenseExpiresAt || null,
+        medical_certificate_expires_at: form.medicalCertificateExpiresAt || null,
       })
       .select("id")
       .single();
@@ -414,6 +418,13 @@ export default function AddMemberModal({
                 editable
                 onChange={(v) => set("licenseNumber", v)}
               />
+              <Field
+                label="Licence valable jusqu'au"
+                type="date"
+                value={form.licenseExpiresAt}
+                editable
+                onChange={(v) => set("licenseExpiresAt", v)}
+              />
             </div>
           )}
 
@@ -481,6 +492,13 @@ export default function AddMemberModal({
                 value={form.medicalNotes}
                 editable
                 onChange={(v) => set("medicalNotes", v)}
+              />
+              <Field
+                label="Certificat médical valable jusqu'au"
+                type="date"
+                value={form.medicalCertificateExpiresAt}
+                editable
+                onChange={(v) => set("medicalCertificateExpiresAt", v)}
               />
               <Field
                 label="Autres informations utiles"

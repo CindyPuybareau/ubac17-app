@@ -89,6 +89,11 @@ export type MemberDetail = {
   playerCharterAccepted: string | null;
   parentCharterAccepted: string | null;
   licenseNumber: string | null;
+  // Alertes d'expiration (voir /api/cron/expiry-alerts) : dates saisies à
+  // la main par le Bureau, absentes de tout import existant — le club n'a
+  // jamais suivi ces échéances de façon structurée jusqu'ici.
+  licenseExpiresAt: string | null;
+  medicalCertificateExpiresAt: string | null;
   teams: AdminMemberTeam[];
 };
 
@@ -590,7 +595,7 @@ export default async function DashboardPage() {
       supabase
         .from("players")
         .select(
-          "id, first_name, last_name, profile_id, pending_parent_email, birth_date, category, sex, registration_email, registration_phone, address, postal_code, city, secondary_email, mother_phone, father_phone, other_phones, secondary_address, license_type, membership_type, fbi_status, medical_notes, other_notes, image_rights, player_charter_accepted, parent_charter_accepted, license_number, archived_at"
+          "id, first_name, last_name, profile_id, pending_parent_email, birth_date, category, sex, registration_email, registration_phone, address, postal_code, city, secondary_email, mother_phone, father_phone, other_phones, secondary_address, license_type, membership_type, fbi_status, medical_notes, other_notes, image_rights, player_charter_accepted, parent_charter_accepted, license_number, license_expires_at, medical_certificate_expires_at, archived_at"
         )
         .order("first_name"),
       supabase
@@ -831,6 +836,8 @@ export default async function DashboardPage() {
         player_charter_accepted: string | null;
         parent_charter_accepted: string | null;
         license_number: string | null;
+        license_expires_at: string | null;
+        medical_certificate_expires_at: string | null;
         archived_at: string | null;
       };
       // Exclude self-link rows: a self-registered adult player is linked to
@@ -876,6 +883,8 @@ export default async function DashboardPage() {
         playerCharterAccepted: player.player_charter_accepted,
         parentCharterAccepted: player.parent_charter_accepted,
         licenseNumber: player.license_number,
+        licenseExpiresAt: player.license_expires_at,
+        medicalCertificateExpiresAt: player.medical_certificate_expires_at,
         archivedAt: player.archived_at,
         teams: teamsByPlayerId.get(player.id) ?? [],
         coachTeams: player.profile_id
@@ -1074,7 +1083,7 @@ export default async function DashboardPage() {
     );
 
     const playerColumns =
-      "id, profile_id, first_name, last_name, birth_date, category, sex, registration_email, registration_phone, address, postal_code, city, secondary_email, mother_phone, father_phone, other_phones, secondary_address, license_type, membership_type, fbi_status, medical_notes, other_notes, image_rights, player_charter_accepted, parent_charter_accepted, license_number, archived_at";
+      "id, profile_id, first_name, last_name, birth_date, category, sex, registration_email, registration_phone, address, postal_code, city, secondary_email, mother_phone, father_phone, other_phones, secondary_address, license_type, membership_type, fbi_status, medical_notes, other_notes, image_rights, player_charter_accepted, parent_charter_accepted, license_number, license_expires_at, medical_certificate_expires_at, archived_at";
 
     const [playersRes, coachProfilesRes, parentPlayerRes, coachFichesRes] =
       await Promise.all([
@@ -1242,6 +1251,8 @@ export default async function DashboardPage() {
         player_charter_accepted: string | null;
         parent_charter_accepted: string | null;
         license_number: string | null;
+        license_expires_at: string | null;
+        medical_certificate_expires_at: string | null;
       };
       coachMemberDetailsByPlayerId[player.id] = {
         id: player.id,
@@ -1270,6 +1281,8 @@ export default async function DashboardPage() {
         playerCharterAccepted: player.player_charter_accepted,
         parentCharterAccepted: player.parent_charter_accepted,
         licenseNumber: player.license_number,
+        licenseExpiresAt: player.license_expires_at,
+        medicalCertificateExpiresAt: player.medical_certificate_expires_at,
         teams: coachTeamRefsByPlayerId.get(player.id) ?? [],
       };
       // Deuxième clé pour une fiche de coach : le tableau d'équipe
