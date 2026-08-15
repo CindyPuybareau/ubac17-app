@@ -417,17 +417,59 @@ export default async function DashboardPage() {
 
   const coachedTeamIds = new Set(coachedTeams.map((t) => t.id));
 
-  // A single query, unconditional on role: RLS already narrows the result
-  // to exactly what this user may see (everything for Bureau, their own
-  // team's + own memberships for a Coach, only their own family's
-  // memberships for everyone else) — see is_whatsapp_group_member() /
-  // is_whatsapp_group_team_coach() in the whatsapp_groups migration.
-  const whatsappGroupsRes = await supabase
-    .from("whatsapp_groups")
-    .select(
-      "id, name, category, team_id, invite_link, sort_order, whatsapp_group_members(player_id, players(id, first_name, last_name))"
-    )
-    .order("sort_order", { ascending: true });
+  // Ces quatre requêtes ne dépendent que de valeurs déjà connues à ce stade
+  // (players, coachedTeams, isAdmin/coachedTeamIds) — jamais les unes des
+  // autres — donc parties en même temps plutôt qu'à la queue leu leu.
+  // C'est cette chaîne de petites requêtes séquentielles, répétée à chaque
+  // clic (voir router.refresh() dans toute l'appli), qui rendait chaque
+  // action perceptiblement lente.
+  const [
+    whatsappGroupsRes,
+    convocationCardsRaw,
+    coachCards,
+    eventRoleTypes,
+  ] = await Promise.all([
+    // A single query, unconditional on role: RLS already narrows the
+    // result to exactly what this user may see (everything for Bureau,
+    // their own team's + own memberships for a Coach, only their own
+    // family's memberships for everyone else) — see
+    // is_whatsapp_group_member() / is_whatsapp_group_team_coach() in the
+    // whatsapp_groups migration.
+    supabase
+      .from("whatsapp_groups")
+      .select(
+        "id, name, category, team_id, invite_link, sort_order, whatsapp_group_members(player_id, players(id, first_name, last_name))"
+      )
+      .order("sort_order", { ascending: true }),
+    // Priority zone: next convocation per linked player.
+    Promise.all(
+      players.map(async (p) => {
+        const teamIds = await getPlayerTeamIds(supabase, p.id);
+        const event = await getNextEventForTeams(supabase, teamIds);
+        if (!event) return null;
+        const status = await getPlayerRsvpStatus(supabase, event.id, p.id);
+        return { player: p, event, status };
+      })
+    ),
+    // Priority zone: next match status per coached team.
+    Promise.all(
+      coachedTeams.map(async (team) => {
+        const event = await getNextEventForTeams(supabase, [team.id]);
+        const roster = await getTeamRoster(supabase, team.id);
+        const counts = event
+          ? await getRsvpCounts(supabase, event.id, roster.length)
+          : null;
+        return { team, event, counts, roster };
+      })
+    ),
+    // Catalogue des roles d organisation, commun au club et lu par les
+    // trois espaces. Une seule requete, hors branche de role.
+    getEventRoleTypes(supabase),
+  ]);
+
+  const convocationCards = convocationCardsRaw.filter(
+    (c): c is NonNullable<typeof c> => Boolean(c)
+  );
 
   type WhatsAppGroupRow = {
     id: string;
@@ -460,31 +502,6 @@ export default async function DashboardPage() {
       .map((p) => ({ id: p.id, firstName: p.first_name, lastName: p.last_name })),
   }));
 
-  // Priority zone: next convocation per linked player.
-  const convocationCards = (
-    await Promise.all(
-      players.map(async (p) => {
-        const teamIds = await getPlayerTeamIds(supabase, p.id);
-        const event = await getNextEventForTeams(supabase, teamIds);
-        if (!event) return null;
-        const status = await getPlayerRsvpStatus(supabase, event.id, p.id);
-        return { player: p, event, status };
-      })
-    )
-  ).filter((c): c is NonNullable<typeof c> => Boolean(c));
-
-  // Priority zone: next match status per coached team.
-  const coachCards = await Promise.all(
-    coachedTeams.map(async (team) => {
-      const event = await getNextEventForTeams(supabase, [team.id]);
-      const roster = await getTeamRoster(supabase, team.id);
-      const counts = event
-        ? await getRsvpCounts(supabase, event.id, roster.length)
-        : null;
-      return { team, event, counts, roster };
-    })
-  );
-
   // Match-day parent tasks (jerseys/snacks/carpool) for every event shown
   // in the priority zone above.
   const priorityEventIds = Array.from(
@@ -498,34 +515,32 @@ export default async function DashboardPage() {
     )
   );
 
-  // Catalogue des roles d organisation, commun au club et lu par les trois
-  // espaces. Une seule requete, hors branche de role.
-  const eventRoleTypes: EventRoleType[] = await getEventRoleTypes(supabase);
-
-  const [eventTasksByEventId, carpoolOffersByEventId] = await Promise.all([
-    getEventTasksByEventId(supabase, priorityEventIds),
-    getCarpoolOffersByEventId(supabase, priorityEventIds),
-  ]);
-
   // Convocation cards need the convened-players list of their own event's
   // team, for the task-assignment picker's context.
   const convocationRosterByEventId: Record<
     string,
     { id: string; name: string }[]
   > = {};
-  await Promise.all(
-    convocationCards.map(async (c) => {
-      if (!c.event.team_id) {
-        convocationRosterByEventId[c.event.id] = [];
-        return;
-      }
-      const roster = await getTeamRoster(supabase, c.event.team_id);
-      convocationRosterByEventId[c.event.id] = roster.map((p) => ({
-        id: p.id,
-        name: formatPersonName(p.first_name, p.last_name),
-      }));
-    })
-  );
+
+  // Les trois ne dépendent que de priorityEventIds/convocationCards, déjà
+  // résolus juste au-dessus — encore un groupe qui tournait en file avant.
+  const [eventTasksByEventId, carpoolOffersByEventId] = await Promise.all([
+    getEventTasksByEventId(supabase, priorityEventIds),
+    getCarpoolOffersByEventId(supabase, priorityEventIds),
+    Promise.all(
+      convocationCards.map(async (c) => {
+        if (!c.event.team_id) {
+          convocationRosterByEventId[c.event.id] = [];
+          return;
+        }
+        const roster = await getTeamRoster(supabase, c.event.team_id);
+        convocationRosterByEventId[c.event.id] = roster.map((p) => ({
+          id: p.id,
+          name: formatPersonName(p.first_name, p.last_name),
+        }));
+      })
+    ),
+  ]);
 
   let adminTeams: TeamWithMembers[] = [];
   let allProfilesForAdmin: Person[] = [];
@@ -955,16 +970,17 @@ export default async function DashboardPage() {
 
   if (isCoach) {
     const coachedTeamIds = coachedTeams.map((t) => t.id);
-    coachTaskTallyByTeamId = await getSeasonTaskTallyByTeamIds(
-      supabase,
-      coachedTeamIds
-    );
-
-    // A coach who's also a registered player (players.profile_id linked to
-    // their own account) gets their own team on top of the ones they
-    // coach — in the calendar, and in the Équipe(s) tab, where it shows up
-    // as a separate "Joueur" entry (see coachTeamRoleById below).
-    const ownTeamIds = ownPlayerId ? await getPlayerTeamIds(supabase, ownPlayerId) : [];
+    // Les deux ne dépendent pas l'une de l'autre — parties ensemble
+    // plutôt qu'à la queue leu leu.
+    const [taskTally, ownTeamIds] = await Promise.all([
+      getSeasonTaskTallyByTeamIds(supabase, coachedTeamIds),
+      // A coach who's also a registered player (players.profile_id linked
+      // to their own account) gets their own team on top of the ones they
+      // coach — in the calendar, and in the Équipe(s) tab, where it shows
+      // up as a separate "Joueur" entry (see coachTeamRoleById below).
+      ownPlayerId ? getPlayerTeamIds(supabase, ownPlayerId) : Promise.resolve([]),
+    ]);
+    coachTaskTallyByTeamId = taskTally;
     const coachCalendarTeamIds = Array.from(
       new Set([...coachedTeamIds, ...ownTeamIds])
     );
@@ -1277,28 +1293,26 @@ export default async function DashboardPage() {
       if (email) coachContactEmailByPlayerId[pp.player_id] = email;
     });
 
-    const rsvpsByEvent = await fetchRsvpsByEvent(
-      supabase,
-      (eventsRes.data ?? []).map((e) => e.id)
-    );
-
-    // Full per-player attendance map (not just aggregate counts), for the
-    // Calendrier convocation list and the Entraînements "appel express".
+    // Aucune ne dépend de l'autre — parties ensemble plutôt qu'à la queue
+    // leu leu.
     const coachEventIds = (eventsRes.data ?? []).map((e) => e.id);
-    const { data: coachRsvpRows } =
+    const [rsvpsByEvent, coachRsvpRowsRes] = await Promise.all([
+      fetchRsvpsByEvent(supabase, coachEventIds),
       coachEventIds.length > 0
-        ? await supabase
+        ? supabase
             .from("rsvps")
             .select("event_id, player_id, status, reason")
             .in("event_id", coachEventIds)
-        : {
+        : Promise.resolve({
             data: [] as {
               event_id: string;
               player_id: string;
               status: string;
               reason: string | null;
             }[],
-          };
+          }),
+    ]);
+    const coachRsvpRows = coachRsvpRowsRes.data;
     (coachRsvpRows ?? []).forEach((r) => {
       coachRsvpStatusByKey[`${r.event_id}:${r.player_id}`] = r.status;
       coachRsvpReasonByKey[`${r.event_id}:${r.player_id}`] = r.reason ?? null;
@@ -1377,27 +1391,59 @@ export default async function DashboardPage() {
     }));
 
     const allTeamIds = Array.from(new Set(playerTeamIdsList.flat()));
+    // Levée plus haut qu'avant (ne dépend que de `players`, déjà connu) :
+    // sert désormais aussi de garde pour la requête cotisations ci-dessous.
+    const familyPlayerIds = players.map((p) => p.id);
 
-    if (allTeamIds.length > 0) {
+    // Ces trois groupes de requêtes ne dépendent que de allTeamIds /
+    // familyPlayerIds, déjà connus ci-dessus — jamais les uns des autres —
+    // donc partis ensemble plutôt qu'à la queue leu leu.
+    const [teamsQueryResults, eventsRes, familyCotisationRes] = await Promise.all([
+      allTeamIds.length > 0
+        ? Promise.all([
+            supabase
+              .from("teams")
+              .select("id, name, category, ffbb_url, sort_order, pending_coach_names")
+              .in("id", allTeamIds),
+            supabase
+              .from("team_players")
+              .select("team_id, players(id, first_name, last_name, birth_date, category)")
+              .in("team_id", allTeamIds),
+            supabase
+              .from("team_coaches")
+              .select("team_id, profiles(id, first_name, last_name, phone)")
+              .in("team_id", allTeamIds),
+            supabase
+              .from("team_pending_coaches")
+              .select("team_id, players(id, first_name, last_name)")
+              .in("team_id", allTeamIds),
+          ])
+        : null,
+      supabase
+        .from("events")
+        .select(
+          "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, teams(id, name, category)"
+        )
+        .or(teamOrClubWideFilter(allTeamIds))
+        .order("start_time", { ascending: true }),
+      // Filtre explicite par player_id plutôt que de compter sur la seule
+      // RLS : Cindy elle-même est Bureau ET parente, et la policy admin sur
+      // cotisations laisserait passer TOUTES les lignes du club pour son
+      // compte si cette requête-ci ne filtrait pas elle-même.
+      familyPlayerIds.length > 0
+        ? supabase
+            .from("cotisations")
+            .select(
+              "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, collecte_id, players(first_name, last_name, category, membership_type, fbi_status), collectes(id, name, type)"
+            )
+            .in("player_id", familyPlayerIds)
+            .order("saison", { ascending: false })
+        : null,
+    ]);
+
+    if (teamsQueryResults) {
       const [teamsRes, teammateRowsRes, teamCoachesRes, teamPendingCoachesRes] =
-        await Promise.all([
-          supabase
-            .from("teams")
-            .select("id, name, category, ffbb_url, sort_order, pending_coach_names")
-            .in("id", allTeamIds),
-          supabase
-            .from("team_players")
-            .select("team_id, players(id, first_name, last_name, birth_date, category)")
-            .in("team_id", allTeamIds),
-          supabase
-            .from("team_coaches")
-            .select("team_id, profiles(id, first_name, last_name, phone)")
-            .in("team_id", allTeamIds),
-          supabase
-            .from("team_pending_coaches")
-            .select("team_id, players(id, first_name, last_name)")
-            .in("team_id", allTeamIds),
-        ]);
+        teamsQueryResults;
 
       const teamsById = new Map(
         (teamsRes.data ?? []).map((t) => [t.id, t])
@@ -1492,69 +1538,9 @@ export default async function DashboardPage() {
       );
     }
 
-    const { data: eventsData } = await supabase
-      .from("events")
-      .select(
-        "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, teams(id, name, category)"
-      )
-      .or(teamOrClubWideFilter(allTeamIds))
-      .order("start_time", { ascending: true });
-
+    const eventsData = eventsRes.data;
     const eventIds = (eventsData ?? []).map((e) => e.id);
-    const familyPlayerIds = players.map((p) => p.id);
-
-    if (eventIds.length > 0 && familyPlayerIds.length > 0) {
-      const { data: rsvpRows } = await supabase
-        .from("rsvps")
-        .select("event_id, player_id, status")
-        .in("event_id", eventIds)
-        .in("player_id", familyPlayerIds);
-
-      (rsvpRows ?? []).forEach((r) => {
-        familyRsvpStatusByKey[`${r.event_id}:${r.player_id}`] = r.status;
-      });
-    }
-
-    // Filtre explicite par player_id plutôt que de compter sur la seule
-    // RLS : Cindy elle-même est Bureau ET parente, et la policy admin sur
-    // cotisations laisserait passer TOUTES les lignes du club pour son
-    // compte si cette requête-ci ne filtrait pas elle-même.
-    if (familyPlayerIds.length > 0) {
-      const { data: familyCotisationRows } = await supabase
-        .from("cotisations")
-        .select(
-          "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, collecte_id, players(first_name, last_name, category, membership_type, fbi_status), collectes(id, name, type)"
-        )
-        .in("player_id", familyPlayerIds)
-        .order("saison", { ascending: false });
-
-      const familyCotisationIds = (familyCotisationRows ?? []).map((c) => c.id);
-      const familyPaymentsByCotisationId = new Map<string, CotisationPayment[]>();
-      if (familyCotisationIds.length > 0) {
-        const { data: familyPaymentRows } = await supabase
-          .from("cotisation_payments")
-          .select("id, cotisation_id, amount, mode, detail, expected_cash_date, paid_at")
-          .in("cotisation_id", familyCotisationIds)
-          .order("paid_at", { ascending: false });
-
-        (familyPaymentRows ?? []).forEach((p) => {
-          const list = familyPaymentsByCotisationId.get(p.cotisation_id) ?? [];
-          list.push({
-            id: p.id,
-            amount: p.amount,
-            mode: p.mode,
-            detail: p.detail,
-            expectedCashDate: p.expected_cash_date,
-            paidAt: p.paid_at,
-          });
-          familyPaymentsByCotisationId.set(p.cotisation_id, list);
-        });
-      }
-
-      familyCotisations = (familyCotisationRows ?? []).map((c) =>
-        mapCotisationRow(c, familyPaymentsByCotisationId)
-      );
-    }
+    const familyCotisationRows = familyCotisationRes?.data ?? null;
 
     familyEvents = (eventsData ?? []).map((e) => {
       const team = e.teams as unknown as {
@@ -1588,9 +1574,55 @@ export default async function DashboardPage() {
     const upcomingFamilyEventIds = familyEvents
       .filter((e) => new Date(e.start_time).getTime() >= Date.now())
       .map((e) => e.id);
+    const familyCotisationIds = (familyCotisationRows ?? []).map((c) => c.id);
+
+    // Ces trois-là ne dépendent que de ce qui est déjà résolu ci-dessus,
+    // mais pas les uns des autres — dernier groupe parallélisable de ce
+    // bloc plutôt qu'à la queue leu leu.
+    const [rsvpRowsRes, familyPaymentRes, extraFamilyTasks] = await Promise.all([
+      eventIds.length > 0 && familyPlayerIds.length > 0
+        ? supabase
+            .from("rsvps")
+            .select("event_id, player_id, status")
+            .in("event_id", eventIds)
+            .in("player_id", familyPlayerIds)
+        : null,
+      familyCotisationIds.length > 0
+        ? supabase
+            .from("cotisation_payments")
+            .select("id, cotisation_id, amount, mode, detail, expected_cash_date, paid_at")
+            .in("cotisation_id", familyCotisationIds)
+            .order("paid_at", { ascending: false })
+        : null,
+      getEventTasksByEventId(supabase, upcomingFamilyEventIds),
+    ]);
+
+    (rsvpRowsRes?.data ?? []).forEach((r) => {
+      familyRsvpStatusByKey[`${r.event_id}:${r.player_id}`] = r.status;
+    });
+
+    if (familyCotisationRows) {
+      const familyPaymentsByCotisationId = new Map<string, CotisationPayment[]>();
+      (familyPaymentRes?.data ?? []).forEach((p) => {
+        const list = familyPaymentsByCotisationId.get(p.cotisation_id) ?? [];
+        list.push({
+          id: p.id,
+          amount: p.amount,
+          mode: p.mode,
+          detail: p.detail,
+          expectedCashDate: p.expected_cash_date,
+          paidAt: p.paid_at,
+        });
+        familyPaymentsByCotisationId.set(p.cotisation_id, list);
+      });
+      familyCotisations = familyCotisationRows.map((c) =>
+        mapCotisationRow(c, familyPaymentsByCotisationId)
+      );
+    }
+
     familyOrganisationTasks = {
       ...eventTasksByEventId,
-      ...(await getEventTasksByEventId(supabase, upcomingFamilyEventIds)),
+      ...extraFamilyTasks,
     };
   }
 
