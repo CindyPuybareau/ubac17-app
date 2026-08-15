@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { teamLabel } from "@/lib/teams";
 import { SALLES } from "./salles";
 import { sendEventPush } from "./event-push";
+import DateTimePicker from "./date-time-picker";
 
 type Team = { id: string; name: string | null; category: string | null };
 type EventType = "MATCH" | "FRIENDLY" | "TRAINING" | "OTHER" | "TOURNAMENT";
@@ -80,6 +81,13 @@ export default function CreateEventForm({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    // Plus de <input required> natif depuis le passage au DateTimePicker
+    // (ce n'est plus un vrai champ de formulaire) — la validation devient
+    // explicite ici, au même endroit que celle de l'heure de fin.
+    if (!startTime) {
+      setError("La date et l'heure de début sont requises.");
+      return;
+    }
     if (eventType === "TRAINING" && !endTime) {
       setError("L'heure de fin est obligatoire pour un entraînement.");
       return;
@@ -293,13 +301,7 @@ export default function CreateEventForm({
           <label className="mb-1 block text-xs font-medium text-zinc-600">
             Début
           </label>
-          <input
-            type="datetime-local"
-            required
-            value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
-            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-          />
+          <DateTimePicker value={startTime} onChange={setStartTime} />
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-zinc-600">

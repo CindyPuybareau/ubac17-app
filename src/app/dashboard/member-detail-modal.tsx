@@ -18,6 +18,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatPersonName } from "@/lib/names";
 import { teamLabel } from "@/lib/teams";
 import { buildAppDeepLink, buildWhatsAppLink } from "@/lib/whatsapp";
+import DateTimePicker from "./date-time-picker";
 import type { AdminMemberTeam, MemberDetail } from "./page";
 
 const BUREAU_ROLE_OPTIONS = [
@@ -128,12 +129,9 @@ function WhatsAppHistoryTab({ playerId, phone }: { playerId: string; phone: stri
             <option value="RECU">Reçu du membre</option>
             <option value="ENVOYE">Envoyé au membre</option>
           </select>
-          <input
-            type="datetime-local"
-            value={sentAt}
-            onChange={(e) => setSentAt(e.target.value)}
-            className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-sm"
-          />
+          <div className="w-48">
+            <DateTimePicker value={sentAt} onChange={setSentAt} />
+          </div>
         </div>
         <textarea
           value={content}

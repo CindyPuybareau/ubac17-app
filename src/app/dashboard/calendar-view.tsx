@@ -30,6 +30,7 @@ import { parseMatchTitle } from "@/lib/match-display";
 import { teamLabel } from "@/lib/teams";
 import OpponentDisplay from "./opponent-display";
 import CreateEventForm from "./create-event-form";
+import DateTimePicker from "./date-time-picker";
 import RsvpButtons from "./rsvp-buttons";
 import ItineraryButton from "./itinerary-button";
 import MatchTasksPanel from "./match-tasks-panel";
@@ -278,6 +279,10 @@ export default function CalendarView({
 
   async function confirmEdit() {
     if (!editingEvent) return;
+    if (!editStartTime) {
+      setEditError("La date et l'heure de début sont requises.");
+      return;
+    }
     if (editType === "TRAINING" && !editEndTime) {
       setEditError("L'heure de fin est obligatoire pour un entraînement.");
       return;
@@ -1052,12 +1057,7 @@ export default function CalendarView({
                 <label className="mb-1 block text-xs font-medium text-zinc-600">
                   Date &amp; heure de début
                 </label>
-                <input
-                  type="datetime-local"
-                  value={editStartTime}
-                  onChange={(e) => setEditStartTime(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
-                />
+                <DateTimePicker value={editStartTime} onChange={setEditStartTime} />
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-zinc-600">
