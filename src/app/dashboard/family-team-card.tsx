@@ -2,7 +2,6 @@
 
 import { ClipboardList, ExternalLink, Users } from "lucide-react";
 import { formatFirstName, formatLastName } from "@/lib/names";
-import WhatsAppGroupButton from "./whatsapp-group-button";
 import PlayerYearBadge from "./player-year-badge";
 import { categoryTheme } from "./team-card";
 
@@ -121,14 +120,6 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
             )}
           </ul>
         </div>
-      </div>
-
-      <div className="mt-4">
-        <WhatsAppGroupButton
-          teamName={card.teamName ?? "l'équipe"}
-          defaultMessage={`Bonjour à tous, je suis un parent de l'équipe ${card.teamName ?? ""}.`}
-          className="flex items-center gap-1.5 rounded-full border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
-        />
       </div>
 
       {card.ffbbUrl && (

@@ -102,6 +102,20 @@ export default function FamilyView({
     [convocationCards, selectedPlayerId]
   );
 
+  // Un groupe "Équipe" ne concerne qu'une seule équipe : il ne s'affiche
+  // que si cette équipe fait partie de l'enfant/des enfants actuellement
+  // sélectionnés. Les groupes "Commission" (Buvette...) ne sont rattachés
+  // à aucune équipe — ils restent visibles quel que soit l'enfant choisi,
+  // sans quoi sélectionner un enfant en particulier ferait perdre l'accès
+  // à un groupe où le parent est membre pour une tout autre raison.
+  const visibleWhatsappGroups = useMemo(
+    () =>
+      whatsappGroups.filter(
+        (g) => g.category === "COMMISSION" || (g.teamId !== null && visibleTeamIds.has(g.teamId))
+      ),
+    [whatsappGroups, visibleTeamIds]
+  );
+
   const sections: AdminSection[] = [
     {
       key: "planning",
@@ -162,7 +176,7 @@ export default function FamilyView({
               <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
               Discussions WhatsApp
             </p>
-            <WhatsAppGroupsFamily groups={whatsappGroups} />
+            <WhatsAppGroupsFamily groups={visibleWhatsappGroups} />
           </div>
 
           {/* Deux encarts discrets, en pied de page : la situation
