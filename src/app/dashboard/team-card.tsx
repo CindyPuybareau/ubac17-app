@@ -16,7 +16,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { formatLastName, formatPersonName } from "@/lib/names";
+import { formatFirstName, formatLastName, formatPersonName } from "@/lib/names";
 import { computePlayerYearStatus, getCurrentSeasonLabel } from "@/lib/season";
 import { formatEventTime, isMatchType, styleFor } from "./calendar-view";
 import OpponentDisplay from "./opponent-display";
@@ -543,7 +543,7 @@ export default function TeamCard({
                 {formatLastName(m.lastName) || "—"}
               </td>
               <td className="w-auto whitespace-nowrap px-3 py-2.5 text-zinc-700">
-                {m.firstName ?? "—"}
+                {m.firstName ? formatFirstName(m.firstName) : "—"}
               </td>
               <td className="whitespace-nowrap px-3 py-2.5">
                 <span className="flex flex-wrap items-center gap-1">

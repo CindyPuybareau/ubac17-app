@@ -903,7 +903,7 @@ export default function CalendarView({
                       <span className="inline-flex items-center justify-center gap-0.5 truncate whitespace-nowrap rounded bg-purple-100 px-1 py-0.5 text-[10px] font-semibold leading-none text-purple-700">
                         <Cake className="h-2.5 w-2.5 shrink-0" />
                         {dayBirthdays.length === 1
-                          ? dayBirthdays[0].firstName
+                          ? formatFirstName(dayBirthdays[0].firstName)
                           : `${dayBirthdays.length} anniv.`}
                       </span>
                     )}

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import { createClient } from "@/lib/supabase/client";
 import { getCurrentSeasonLabel } from "@/lib/season";
+import { formatFirstName } from "@/lib/names";
 
 type ParsedRow = {
   firstName: string;
@@ -561,7 +562,7 @@ export default function ImportInscriptions() {
                   <ul className="mt-1.5 flex max-h-40 flex-col gap-0.5 overflow-y-auto text-xs text-zinc-500">
                     {preview.toInsert.map((r, i) => (
                       <li key={i}>
-                        {r.firstName} {r.lastName} · {r.category}
+                        {formatFirstName(r.firstName)} {r.lastName} · {r.category}
                       </li>
                     ))}
                   </ul>

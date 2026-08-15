@@ -6,7 +6,7 @@
 // même principe que event-style.ts, hors de calendar-view.tsx pour la
 // même raison.
 import { EMAIL_SIGNATURE } from "@/lib/email";
-import { formatLastName } from "@/lib/names";
+import { formatFirstName, formatLastName } from "@/lib/names";
 import type { AdminCotisation } from "./page";
 
 export type StatusKey = "PAYE" | "PARTIEL" | "OFFERT" | "EN_ATTENTE";
@@ -56,7 +56,7 @@ export function cotisationLastName(c: AdminCotisation) {
 }
 
 export function cotisationFirstName(c: AdminCotisation) {
-  return c.firstName ?? "—";
+  return c.firstName ? formatFirstName(c.firstName) : "—";
 }
 
 // Plain number for the {tarif}/{paye}/{solde} placeholders — the templates

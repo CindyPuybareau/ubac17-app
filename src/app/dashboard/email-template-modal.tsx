@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { buildGmailComposeLink, withSignature } from "@/lib/email";
+import { formatFirstName } from "@/lib/names";
 
 type Template = {
   id: string;
@@ -81,7 +82,7 @@ const BUREAU_TEMPLATES: Template[] = [
 // identical here and in the Cotisations relances — including on the blank
 // "Message classique", which used to carry none at all.
 function bodyFor(template: Template | null, recipientFirstName: string | null | undefined) {
-  const greeting = `Bonjour ${recipientFirstName ?? ""},`.replace(" ,", ",");
+  const greeting = `Bonjour ${recipientFirstName ? formatFirstName(recipientFirstName) : ""},`.replace(" ,", ",");
   // Blank line left between greeting and signature: that's where the
   // cursor lands to type the actual message.
   if (!template) return `${greeting}\n\n\n${withSignature("")}`;

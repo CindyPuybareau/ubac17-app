@@ -29,7 +29,7 @@ import EmailTemplateModal from "./email-template-modal";
 import MemberDetailModal from "./member-detail-modal";
 import PlayerYearBadge from "./player-year-badge";
 import WhatsAppButton from "./whatsapp-button";
-import { formatLastName, formatPersonName } from "@/lib/names";
+import { formatFirstName, formatLastName, formatPersonName } from "@/lib/names";
 import type { AdminMember, AdminMemberTeam } from "./page";
 
 function fullLastName(m: AdminMember) {
@@ -557,7 +557,7 @@ export default function MembersTable({
                   )}
                 </td>
                 <td className="w-auto whitespace-nowrap px-2 py-3 text-zinc-700">
-                  {m.firstName ?? "—"}
+                  {m.firstName ? formatFirstName(m.firstName) : "—"}
                 </td>
                 <td className="px-2 py-3">
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -658,7 +658,7 @@ export default function MembersTable({
                         {m.phone ? (
                           <WhatsAppButton
                             phone={m.phone}
-                            message={`Bonjour ${m.firstName ?? ""}, ici l'UBAC.`}
+                            message={`Bonjour ${m.firstName ? formatFirstName(m.firstName) : ""}, ici l'UBAC.`}
                             label="Contacter sur WhatsApp"
                             playerId={m.id}
                             onTriggerClick={() => setOpenMenuId(null)}
@@ -758,9 +758,7 @@ export default function MembersTable({
                 const ok = await setArchived([detailMember.id], true);
                 if (ok) {
                   showToast(
-                    `Membre ${[detailMember.firstName, detailMember.lastName]
-                      .filter(Boolean)
-                      .join(" ")} archivé.`
+                    `Membre ${formatPersonName(detailMember.firstName, detailMember.lastName, "")} archivé.`
                   );
                 }
               }}
