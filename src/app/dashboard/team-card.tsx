@@ -8,6 +8,7 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock,
+  ExternalLink,
   Mail,
   MapPin,
   Phone,
@@ -987,16 +988,32 @@ export default function TeamCard({
         </div>
       </div>
 
-      {/* Lecture seule (joueur) : même bouton d'envoi que côté parent —
-          message pré-rempli, choix du groupe à la main. Un coach gère déjà
-          ce groupe via "Configurer WhatsApp" dans l'en-tête, pas besoin des
-          deux à la fois. */}
-      {readOnly && (
-        <WhatsAppGroupButton
-          teamName={team.name ?? "l'équipe"}
-          defaultMessage={`Bonjour à tous, je suis un joueur de l'équipe ${team.name ?? ""}.`}
-          className="mt-3 flex w-fit items-center gap-1.5 rounded-full border border-emerald-200 px-3 py-1.5 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
-        />
+      {/* Un lien direct dès qu'il existe — coach ou joueur, même bouton :
+          "Configurer WhatsApp" (en-tête, coach uniquement) sert à SAISIR
+          le lien, pas à l'ouvrir. Sans ce bouton-ci, un coach n'avait plus
+          aucun moyen de rejoindre le groupe de sa propre équipe en un
+          clic — régression introduite en retirant l'onglet WhatsApp dédié
+          au profit de la roue crantée. Le bouton "compose un message"
+          (générique, sans vrai lien) ne reste qu'en dernier recours pour
+          un joueur, tant qu'aucun lien n'a encore été renseigné. */}
+      {whatsappGroup?.inviteLink ? (
+        <a
+          href={whatsappGroup.inviteLink}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-3 flex w-fit items-center gap-1.5 rounded-full bg-emerald-500 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
+        >
+          <ExternalLink className="h-4 w-4" />
+          Rejoindre le groupe WhatsApp
+        </a>
+      ) : (
+        readOnly && (
+          <WhatsAppGroupButton
+            teamName={team.name ?? "l'équipe"}
+            defaultMessage={`Bonjour à tous, je suis un joueur de l'équipe ${team.name ?? ""}.`}
+            className="mt-3 flex w-fit items-center gap-1.5 rounded-full border border-emerald-200 px-3 py-1.5 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
+          />
+        )
       )}
 
       {detailPlayerId &&
