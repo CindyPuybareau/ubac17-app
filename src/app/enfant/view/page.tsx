@@ -31,11 +31,15 @@ export default async function ChildViewPage() {
 
   const supabase = createServiceClient();
 
-  const { data: player } = await supabase
+  const { data: player, error: playerError } = await supabase
     .from("players")
     .select("id, first_name")
     .eq("id", playerId)
     .maybeSingle();
+
+  if (playerError) {
+    console.error("enfant/view — erreur requête players:", playerError);
+  }
 
   if (!player) {
     return (
@@ -43,6 +47,13 @@ export default async function ChildViewPage() {
         <p className="text-sm text-zinc-500">
           Profil introuvable. Redemande le lien à un parent et réessaie.
         </p>
+        {/* Diagnostic temporaire — à retirer une fois la cause du bug
+            identifiée avec Cindy. */}
+        {playerError && (
+          <p className="mt-3 max-w-xs text-xs text-red-400">
+            (diagnostic : {playerError.message})
+          </p>
+        )}
       </div>
     );
   }
