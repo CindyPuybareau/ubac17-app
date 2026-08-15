@@ -83,9 +83,21 @@ function nameBirthKey(
   return `${firstName.trim().toLowerCase()}|${lastName.trim().toLowerCase()}|${birthDate ?? ""}`;
 }
 
+type MatchedRow = ParsedRow & { id: string };
+
+// Calculé dès l'analyse du fichier (pas seulement au clic "Confirmer") pour
+// que le Bureau voie exactement qui sera créé vs mis à jour *avant*
+// d'écrire quoi que ce soit — l'aperçu demandé après l'incident du
+// 15/08/2026 (une importation ne doit plus jamais surprendre).
+type ImportPreview = {
+  toInsert: MatchedRow[];
+  toUpdate: MatchedRow[];
+};
+
 export default function ImportInscriptions() {
   const router = useRouter();
   const [rows, setRows] = useState<ParsedRow[] | null>(null);
+  const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [duplicateCount, setDuplicateCount] = useState(0);
   const [season, setSeason] = useState(() => getCurrentSeasonLabel());
   const [error, setError] = useState<string | null>(null);
@@ -251,24 +263,21 @@ export default function ImportInscriptions() {
 
     setDuplicateCount(parsed.length - deduped.length);
     setRows(deduped);
-  }
-
-  async function handleImport() {
-    if (!rows) return;
-    setLoading(true);
+    setResult(null);
+    setPreview(null);
     setError(null);
-
-    const supabase = createClient();
 
     // Match every row against players already in the club (upsert, never
     // duplicate): prefer the license number when the file has one, else
-    // fall back to nom + prénom + date de naissance.
+    // fall back to nom + prénom + date de naissance. Fait ici, dès
+    // l'analyse, pour pouvoir montrer "X nouveaux / Y mis à jour" avant
+    // que le Bureau ne clique sur "Confirmer l'import".
+    const supabase = createClient();
     const { data: existingPlayers, error: existingError } = await supabase
       .from("players")
       .select("id, first_name, last_name, birth_date, license_number");
 
     if (existingError) {
-      setLoading(false);
       setError(existingError.message);
       return;
     }
@@ -291,9 +300,9 @@ export default function ImportInscriptions() {
       return existingByNameBirth.get(key) ?? null;
     }
 
-    const toInsert: (ParsedRow & { id: string })[] = [];
-    const toUpdate: (ParsedRow & { id: string })[] = [];
-    for (const r of rows) {
+    const toInsert: MatchedRow[] = [];
+    const toUpdate: MatchedRow[] = [];
+    for (const r of deduped) {
       const existingId = resolveExistingId(r);
       if (existingId) {
         toUpdate.push({ ...r, id: existingId });
@@ -301,6 +310,16 @@ export default function ImportInscriptions() {
         toInsert.push({ ...r, id: crypto.randomUUID() });
       }
     }
+    setPreview({ toInsert, toUpdate });
+  }
+
+  async function handleImport() {
+    if (!rows || !preview) return;
+    setLoading(true);
+    setError(null);
+
+    const supabase = createClient();
+    const { toInsert, toUpdate } = preview;
 
     const playerFields = (r: ParsedRow) => ({
       first_name: r.firstName,
@@ -448,6 +467,7 @@ export default function ImportInscriptions() {
       `${toInsert.length} nouveau${toInsert.length > 1 ? "x" : ""} membre${toInsert.length > 1 ? "s" : ""}, ${toUpdate.length} mis à jour, pour la saison ${season}.`
     );
     setRows(null);
+    setPreview(null);
     router.refresh();
   }
 
@@ -517,9 +537,44 @@ export default function ImportInscriptions() {
               </li>
             ))}
           </ul>
+
+          {preview ? (
+            <div className="mt-3 rounded-lg border border-zinc-200 bg-white p-3">
+              <p className="text-sm text-zinc-700">
+                <span className="font-semibold text-emerald-700">
+                  {preview.toInsert.length} nouveau
+                  {preview.toInsert.length > 1 ? "x" : ""} membre
+                  {preview.toInsert.length > 1 ? "s" : ""}
+                </span>{" "}
+                seront créés,{" "}
+                <span className="font-semibold text-amber-700">
+                  {preview.toUpdate.length} fiche{preview.toUpdate.length > 1 ? "s" : ""} existante
+                  {preview.toUpdate.length > 1 ? "s" : ""}
+                </span>{" "}
+                seront mises à jour. Aucune équipe ne sera modifiée.
+              </p>
+              {preview.toInsert.length > 0 && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-xs font-medium text-zinc-500 hover:text-zinc-700">
+                    Voir les {preview.toInsert.length} nouveaux membres
+                  </summary>
+                  <ul className="mt-1.5 flex max-h-40 flex-col gap-0.5 overflow-y-auto text-xs text-zinc-500">
+                    {preview.toInsert.map((r, i) => (
+                      <li key={i}>
+                        {r.firstName} {r.lastName} · {r.category}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
+          ) : (
+            !error && <p className="mt-3 text-xs text-zinc-400">Vérification des membres existants...</p>
+          )}
+
           <button
             onClick={handleImport}
-            disabled={loading}
+            disabled={loading || !preview}
             className="mt-3 rounded-full bg-ubac-yellow px-4 py-2 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
           >
             {loading ? "Import en cours..." : "Confirmer l'import"}
