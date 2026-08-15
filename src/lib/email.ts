@@ -3,6 +3,13 @@
 // of truth shared by the Cotisations relances and the Membres mail modal.
 export const EMAIL_SIGNATURE = "Sportivement,\nL'équipe UBAC";
 
+// L'expéditeur technique (Resend) n'est jamais une boîte que quelqu'un
+// relève — c'est cette adresse qui doit recevoir les réponses. Posée en
+// Reply-To sur chaque envoi (voir send-email.ts) plutôt qu'en From : le
+// From reste le domaine technique/vérifié par Resend, mais "Répondre"
+// dans n'importe quel client mail atterrit directement ici.
+export const EMAIL_REPLY_TO = "ubac17.basket@gmail.com";
+
 // Recognised on the normalised text (curly apostrophes, casing) so a
 // hand-typed variant is never doubled by withSignature().
 const SIGNATURE_MARKER = "l'équipe ubac";

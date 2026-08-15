@@ -47,5 +47,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: result.error }, { status });
   }
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, simulated: result.simulated ?? false });
 }

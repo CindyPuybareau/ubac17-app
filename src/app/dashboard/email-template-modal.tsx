@@ -132,8 +132,13 @@ export default function EmailTemplateModal({
       const data = await res.json();
       if (!res.ok) {
         setResult({ ok: false, message: data.error ?? "Envoi impossible." });
+      } else if (data.simulated) {
+        setResult({
+          ok: true,
+          message: "Envoi simulé (aucun service d'email configuré en local) — voir la console du serveur.",
+        });
       } else {
-        setResult({ ok: true, message: "E-mail envoyé depuis ubac17.basket@gmail.com." });
+        setResult({ ok: true, message: "E-mail envoyé — les réponses arrivent sur ubac17.basket@gmail.com." });
       }
     } catch {
       setResult({ ok: false, message: "Envoi impossible (problème de connexion)." });

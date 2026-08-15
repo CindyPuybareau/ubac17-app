@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import { Resend } from "resend";
+import { EMAIL_REPLY_TO } from "@/lib/email";
 
 // Deux fournisseurs supportés, par ordre de priorité — voir la logique
 // originale dans /api/send-email/route.ts, extraite ici pour être
@@ -17,6 +18,10 @@ export function emailProviderConfigured(): "resend" | "gmail" | null {
   return null;
 }
 
+type SendResult =
+  | { ok: true; simulated?: true }
+  | { ok: false; error: string };
+
 export async function sendEmail({
   to,
   subject,
@@ -29,7 +34,7 @@ export async function sendEmail({
   body: string;
   attachmentBase64?: string;
   attachmentFilename?: string;
-}): Promise<{ ok: true } | { ok: false; error: string }> {
+}): Promise<SendResult> {
   const hasAttachment = Boolean(attachmentBase64 && attachmentFilename);
 
   if (RESEND_API_KEY) {
@@ -40,6 +45,11 @@ export async function sendEmail({
         to,
         subject,
         text: body,
+        // Le From reste le domaine technique vérifié par Resend — c'est le
+        // Reply-To qui fait qu'un "Répondre" dans n'importe quelle boîte
+        // mail atterrit directement sur l'adresse du club, jamais sur
+        // onboarding@resend.dev.
+        replyTo: EMAIL_REPLY_TO,
         attachments: hasAttachment
           ? [
               {
@@ -77,6 +87,7 @@ export async function sendEmail({
         to,
         subject,
         text: body,
+        replyTo: EMAIL_REPLY_TO,
         attachments: hasAttachment
           ? [
               {
@@ -96,9 +107,14 @@ export async function sendEmail({
     }
   }
 
-  return {
-    ok: false,
-    error:
-      "Service d'envoi d'emails non configuré. Veuillez renseigner RESEND_API_KEY dans les variables d'environnement Vercel.",
-  };
+  // Aucun fournisseur configuré — typiquement en local, où RESEND_API_KEY
+  // n'est pas forcément renseignée dans .env.local. On simule plutôt que
+  // d'échouer : la page qui a déclenché l'envoi continue de fonctionner
+  // normalement (pas de 500, pas de blocage), et le contenu de l'email
+  // "envoyé" reste inspectable dans les logs du serveur de dev. Les
+  // appelants qui font aussi foi d'un envoi réel (ex. le cron des
+  // relances, qui marque une cotisation comme relancée) doivent traiter
+  // `simulated: true` comme "rien n'est réellement parti".
+  console.info("Email simulé pour :", to, "| Objet :", subject);
+  return { ok: true, simulated: true };
 }

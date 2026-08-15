@@ -148,7 +148,10 @@ async function runExpiryAlerts(supabase: ReturnType<typeof createServiceClient>)
     const body = `Bonjour,\n\nUn document arrive à échéance pour ${fullName} :\n${lines.join("\n")}\n\nMerci de vous rapprocher du Bureau pour le renouvellement.\n\nSportivement,\nL'UBAC`;
 
     const result = await sendEmail({ to: email, subject, body });
-    if (result.ok) {
+    // "simulated" (pas de fournisseur configuré, cas local) ne compte
+    // jamais comme envoyé : sinon un prochain vrai passage en production
+    // croirait l'alerte déjà partie alors qu'elle n'a jamais existé.
+    if (result.ok && !result.simulated) {
       sent += 1;
       const update: Record<string, string> = {};
       if (dueLicense) update.license_expiry_alert_sent_at = new Date().toISOString();
@@ -241,7 +244,9 @@ async function runCotisationRelances(supabase: ReturnType<typeof createServiceCl
     const body = renderRelanceTemplate(tpl.body, cotisation);
 
     const result = await sendEmail({ to: email, subject, body });
-    if (result.ok) {
+    // Même garde-fou que runExpiryAlerts : un envoi simulé (pas de
+    // fournisseur configuré) ne doit jamais poser last_auto_relance_sent_at.
+    if (result.ok && !result.simulated) {
       sent += 1;
       await supabase
         .from("cotisations")
