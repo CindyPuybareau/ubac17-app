@@ -4,12 +4,14 @@ import { useEffect, useState } from "react";
 import { CalendarPlus, Check, ChevronDown, ChevronUp, Copy, RefreshCw } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
-// Repli mémorisé sur CET appareil : rien depuis l'appli ne peut détecter
-// qu'un parent a fini de coller le lien dans Google/Apple Calendar, ça se
-// passe entièrement dans l'agenda externe — impossible à automatiser côté
-// serveur. Un repli manuel (et le bouton "C'est fait" plus bas) valent
-// donc mieux qu'un bloc qui reste grand ouvert indéfiniment une fois
-// l'intégration terminée, ou pour qui ne veut simplement pas s'en servir.
+// Replié par défaut : la quasi-totalité des familles ne s'en sert qu'une
+// fois (récupérer le lien), pas à chaque visite du tableau de bord — le
+// garder ouvert en permanence ne faisait qu'allonger la page pour rien.
+// Toujours accessible en un clic sur la flèche pour qui veut y revenir.
+// Mémorisé sur CET appareil pour respecter un choix explicite de rouvrir
+// et garder ouvert (aucune détection possible côté serveur d'une
+// intégration terminée dans Google/Apple Calendar) — seule l'absence de
+// préférence stockée retombe sur replié.
 const COLLAPSE_STORAGE_KEY = "ubac-calendar-subscribe-collapsed";
 
 // Abonnement à sens unique : une fois le lien collé dans Google/Apple
@@ -23,8 +25,9 @@ export default function CalendarSubscribe() {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.localStorage.getItem(COLLAPSE_STORAGE_KEY) === "1";
+    if (typeof window === "undefined") return true;
+    const stored = window.localStorage.getItem(COLLAPSE_STORAGE_KEY);
+    return stored === null ? true : stored === "1";
   });
 
   useEffect(() => {
@@ -131,10 +134,6 @@ export default function CalendarSubscribe() {
           <ChevronUp className="h-4 w-4" />
         </button>
       </div>
-      <p className="text-xs text-zinc-500">
-        Les matchs et entraînements de tes enfants apparaissent directement dans ton agenda,
-        mis à jour automatiquement.
-      </p>
 
       {url && webcalUrl ? (
         <div className="mt-1 flex flex-col gap-3">
@@ -168,23 +167,6 @@ export default function CalendarSubscribe() {
               </button>
             </div>
           </div>
-
-          <p className="text-[11px] text-zinc-400">
-            Plus simple sur Android : active plutôt les notifications ci-dessus — tu es
-            prévenu directement, sans rien configurer.
-          </p>
-
-          {/* Rien ici ne peut savoir si le lien a vraiment été collé dans
-              l'agenda — seule la personne le sait. Ce bouton lui laisse le
-              dire elle-même, plutôt que de deviner. */}
-          <button
-            type="button"
-            onClick={() => setCollapsedPersisted(true)}
-            className="flex w-fit items-center gap-1.5 text-[11px] font-semibold text-emerald-600 hover:text-emerald-700"
-          >
-            <Check className="h-3 w-3" />
-            C&apos;est fait, ajouté à mon agenda — masquer ce bloc
-          </button>
 
           <button
             type="button"
