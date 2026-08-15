@@ -40,8 +40,6 @@ type ParsedRow = {
   horodatage: number;
 };
 
-type Team = { id: string; name: string | null; category: string | null };
-
 function excelSerialToISODate(serial: number): string {
   const utcDays = Math.floor(serial - 25569);
   return new Date(utcDays * 86400 * 1000).toISOString().slice(0, 10);
@@ -85,11 +83,7 @@ function nameBirthKey(
   return `${firstName.trim().toLowerCase()}|${lastName.trim().toLowerCase()}|${birthDate ?? ""}`;
 }
 
-export default function ImportInscriptions({
-  existingTeams,
-}: {
-  existingTeams: Team[];
-}) {
+export default function ImportInscriptions() {
   const router = useRouter();
   const [rows, setRows] = useState<ParsedRow[] | null>(null);
   const [duplicateCount, setDuplicateCount] = useState(0);
@@ -266,31 +260,6 @@ export default function ImportInscriptions({
 
     const supabase = createClient();
 
-    const categories = Array.from(new Set(rows.map((r) => r.category)));
-    const teamIdByCategory = new Map<string, string>();
-    existingTeams.forEach((t) => {
-      if (t.category) teamIdByCategory.set(t.category, t.id);
-    });
-
-    const missingCategories = categories.filter(
-      (c) => !teamIdByCategory.has(c)
-    );
-    if (missingCategories.length > 0) {
-      const { data: newTeams, error: teamsError } = await supabase
-        .from("teams")
-        .insert(missingCategories.map((c) => ({ name: c, category: c })))
-        .select("id, category");
-
-      if (teamsError) {
-        setLoading(false);
-        setError(teamsError.message);
-        return;
-      }
-      (newTeams ?? []).forEach((t) => {
-        if (t.category) teamIdByCategory.set(t.category, t.id);
-      });
-    }
-
     // Match every row against players already in the club (upsert, never
     // duplicate): prefer the license number when the file has one, else
     // fall back to nom + prénom + date de naissance.
@@ -392,35 +361,15 @@ export default function ImportInscriptions({
     const allRows = [...toInsert, ...toUpdate];
     const allIds = allRows.map((r) => r.id);
 
-    if (allIds.length > 0) {
-      const { error: clearTeamPlayersError } = await supabase
-        .from("team_players")
-        .delete()
-        .in("player_id", allIds);
-      if (clearTeamPlayersError) {
-        setLoading(false);
-        setError(clearTeamPlayersError.message);
-        return;
-      }
-
-      const teamPlayersRows = allRows
-        .map((r) => {
-          const teamId = teamIdByCategory.get(r.category);
-          return teamId ? { team_id: teamId, player_id: r.id } : null;
-        })
-        .filter((r): r is { team_id: string; player_id: string } => Boolean(r));
-
-      if (teamPlayersRows.length > 0) {
-        const { error: teamPlayersError } = await supabase
-          .from("team_players")
-          .insert(teamPlayersRows);
-        if (teamPlayersError) {
-          setLoading(false);
-          setError(teamPlayersError.message);
-          return;
-        }
-      }
-    }
+    // L'affectation aux équipes n'est plus touchée par cet import : la
+    // "Catégorie" du fichier n'est qu'une tranche d'âge large (U13, U18,
+    // z.Sénior...), pas le numéro d'équipe précis (U13F/U13M-1/U13M-2,
+    // Séniors 1/2/M...). La réappliquer en masse écrasait silencieusement
+    // la répartition fine déjà faite à la main, et créait des équipes en
+    // double dès que le libellé du fichier ne collait pas mot pour mot à
+    // l'existant (incident du 15/08/2026). L'affectation reste du ressort
+    // exclusif de l'onglet Équipes / "Affecter à une équipe" côté Membres,
+    // volontairement additive et jamais automatique.
 
     // Cotisations: one row per player per season. Update this season's row
     // if it already exists (re-import correcting the same season) instead
@@ -496,7 +445,7 @@ export default function ImportInscriptions({
     }
 
     setResult(
-      `${toInsert.length} nouveau${toInsert.length > 1 ? "x" : ""} membre${toInsert.length > 1 ? "s" : ""}, ${toUpdate.length} mis à jour, dans ${teamIdByCategory.size} équipes pour la saison ${season}.`
+      `${toInsert.length} nouveau${toInsert.length > 1 ? "x" : ""} membre${toInsert.length > 1 ? "s" : ""}, ${toUpdate.length} mis à jour, pour la saison ${season}.`
     );
     setRows(null);
     router.refresh();
@@ -520,7 +469,9 @@ export default function ImportInscriptions({
         Fichier Excel &quot;Suivi des inscriptions&quot;, feuille &quot;Suivi
         Inscriptions&quot;. Un membre déjà présent (même n° de licence, ou
         même nom + prénom + date de naissance) est mis à jour, jamais
-        dupliqué.
+        dupliqué. Met à jour la fiche membre et la cotisation de la saison
+        uniquement — n&apos;affecte plus les joueurs à une équipe (à faire
+        depuis l&apos;onglet Équipes ou Membres).
       </p>
 
       <div className="flex flex-wrap items-end gap-3">

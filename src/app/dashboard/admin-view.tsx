@@ -152,7 +152,7 @@ export default function AdminView({
       content: (
         <div className="flex flex-col gap-4">
           <FfbbManager teams={teams} />
-          <ImportInscriptions existingTeams={teamRefs} />
+          <ImportInscriptions />
           <ImportPlanning existingTeams={teamRefs} />
           <ImportCoaches existingTeams={teamRefs} />
         </div>
