@@ -3,9 +3,9 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import PasswordInput from "@/components/password-input";
+import AuthTabs from "@/components/auth-tabs";
 
 export default function InscriptionPage() {
   const router = useRouter();
@@ -67,6 +67,8 @@ export default function InscriptionPage() {
             Rejoins l&apos;espace UBAC
           </p>
         </div>
+
+        <AuthTabs active="inscription" />
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-3">
@@ -142,13 +144,6 @@ export default function InscriptionPage() {
             {loading ? "Création..." : "Créer mon compte"}
           </button>
         </form>
-
-        <p className="mt-5 text-center text-sm text-zinc-500">
-          Déjà un compte ?{" "}
-          <Link href="/connexion" className="font-semibold text-ubac-blue">
-            Connecte-toi
-          </Link>
-        </p>
       </div>
     </div>
   );
