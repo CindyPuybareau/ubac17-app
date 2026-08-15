@@ -10,6 +10,7 @@ import FamilyAttendanceSummary from "./family-attendance-summary";
 import PushSubscribe from "./push-subscribe";
 import CalendarSubscribe from "./calendar-subscribe";
 import FamilyCotisationCard from "./family-cotisation-card";
+import ChildAccessManager from "./child-access-manager";
 import NextConvocationCard from "./next-convocation-card";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import WhatsAppGroupsFamily from "./whatsapp-groups-family";
@@ -200,6 +201,10 @@ export default function FamilyView({
               players={visiblePlayers}
               rsvpStatusByKey={rsvpStatusByKey}
             />
+          </div>
+
+          <div className="border-t border-zinc-100 pt-4">
+            <ChildAccessManager />
           </div>
         </div>
       ),
