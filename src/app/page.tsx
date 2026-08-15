@@ -4,6 +4,7 @@ import {
   Building2,
   ClipboardList,
   HeartHandshake,
+  KeyRound,
   CheckCircle2,
   ShieldCheck,
   MapPin,
@@ -15,24 +16,33 @@ const roles = [
     icon: Building2,
     title: "Pour le Bureau",
     points: [
-      "Vision globale à 360° sur tout le club",
-      "Centralisation des entraînements, des gymnases et des membres",
+      "Vision globale à 360° sur le club",
+      "Membres, cotisations, synchronisation FFBB et hub WhatsApp",
     ],
   },
   {
     icon: ClipboardList,
     title: "Pour les Coachs",
     points: [
-      "Gestion de leur équipe et suivi des présences",
-      "Envoi simple des convocations pour matchs et entraînements",
+      "Gestion des équipes, mères et sous-équipes",
+      "Suivi des présences, convocations et retours de match",
     ],
   },
   {
     icon: HeartHandshake,
-    title: "Pour les Parents & Joueurs",
+    title: "Pour les Parents",
     points: [
-      "Réponse instantanée aux convocations (Présent / Absent)",
-      "Organisation ultra simple de l'équipe : covoiturage, goûter, maillots",
+      "Gestion des profils enfants et réponses aux convocations",
+      "Organisation simplifiée : covoiturage, goûter, maillots",
+    ],
+  },
+  {
+    icon: KeyRound,
+    title: "Pour les Enfants",
+    badge: "Nouveau",
+    points: [
+      "Connexion autonome avec un simple code PIN à 4 chiffres, sans email ni téléphone",
+      "Planning, équipe, résultats et consignes du coach en lecture seule",
     ],
   },
 ];
@@ -44,12 +54,18 @@ const clubStats = [
 ];
 
 const gyms = [
-  { commune: "Angoulins", lieu: "Salle polyvalente, Chemin des Marais" },
+  {
+    commune: "Angoulins-sur-Mer",
+    lieu: "Salle polyvalente, Chemin des Marais, 17690 Angoulins",
+  },
   {
     commune: "Châtelaillon-Plage",
-    lieu: "Complexe sportif, Allée du Stade",
+    lieu: "Complexe sportif, Allée du Stade, 17340 Châtelaillon-Plage",
   },
-  { commune: "Saint-Vivien", lieu: "Salle polyvalente, 26 Grande Rue" },
+  {
+    commune: "Saint-Vivien",
+    lieu: "Salle polyvalente, 26 Grande Rue, 17220 Saint-Vivien",
+  },
 ];
 
 export default function Home() {
@@ -86,13 +102,20 @@ export default function Home() {
                 href="/connexion"
                 className="w-full rounded-full bg-ubac-yellow px-6 py-3 text-center text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark sm:w-auto"
               >
-                Se connecter
+                Se connecter / S&apos;inscrire
               </Link>
-              <span className="flex items-center gap-1.5 text-xs text-white/70">
-                <ShieldCheck className="h-4 w-4" />
-                Accès réservé aux membres du club
-              </span>
+              <Link
+                href="/enfant"
+                className="flex w-full items-center justify-center gap-1.5 rounded-full border border-white/30 px-5 py-3 text-center text-sm font-medium text-white/90 transition-colors hover:bg-white/10 sm:w-auto"
+              >
+                <KeyRound className="h-4 w-4" />
+                Accès Espace Enfant (Code PIN)
+              </Link>
             </div>
+            <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-white/70">
+              <ShieldCheck className="h-4 w-4" />
+              Accès réservé aux membres du club
+            </p>
           </div>
         </section>
 
@@ -112,19 +135,26 @@ export default function Home() {
             Une application pensée pour chaque membre du club
           </h2>
           <p className="mx-auto mt-2 max-w-xl text-center text-sm text-zinc-500">
-            Bureau, coachs, parents et joueurs : à chacun son espace, simple
+            Bureau, coachs, parents et enfants : à chacun son espace, simple
             et clair.
           </p>
 
-          <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-3">
-            {roles.map(({ icon: Icon, title, points }) => (
+          <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {roles.map(({ icon: Icon, title, points, badge }) => (
               <div
                 key={title}
                 className="flex flex-col gap-4 rounded-2xl border border-zinc-100 bg-white p-6 shadow-sm"
               >
-                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-ubac-blue/10 text-ubac-blue">
-                  <Icon className="h-6 w-6" />
-                </span>
+                <div className="flex items-center justify-between">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-ubac-blue/10 text-ubac-blue">
+                    <Icon className="h-6 w-6" />
+                  </span>
+                  {badge && (
+                    <span className="rounded-full bg-ubac-yellow/20 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-ubac-yellow-dark">
+                      {badge}
+                    </span>
+                  )}
+                </div>
                 <h3 className="font-semibold text-zinc-900">{title}</h3>
                 <ul className="flex flex-col gap-2.5">
                   {points.map((point) => (
