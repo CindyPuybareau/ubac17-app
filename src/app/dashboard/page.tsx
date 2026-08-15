@@ -568,6 +568,10 @@ export default async function DashboardPage() {
   // way z.Sénior/U18/U13 became Séniors M/U18M/U13M.
   let canonicalTeamRefs: AdminMemberTeam[] = [];
   const adminContactPhoneByPlayerId: Record<string, string> = {};
+  // Défaut prudent : tant que le Bureau n'a pas explicitement activé la
+  // relance automatique (ou tant que la migration club_settings n'est pas
+  // encore posée), le cron reste inactif — voir /api/cron/bureau-alerts.
+  let adminCotisationRelanceEnabled = false;
 
   if (isAdmin) {
     const [
@@ -584,6 +588,7 @@ export default async function DashboardPage() {
       teamPendingCoachesRes,
       cotisationPaymentsRes,
       categoryTariffsRes,
+      clubSettingsRes,
     ] = await Promise.all([
       supabase
         .from("teams")
@@ -630,7 +635,13 @@ export default async function DashboardPage() {
         .select("id, cotisation_id, amount, mode, detail, expected_cash_date, paid_at")
         .order("paid_at", { ascending: false }),
       supabase.from("category_tariffs").select("category, prix").order("category"),
+      supabase.from("club_settings").select("cotisation_relance_enabled").eq("id", true).maybeSingle(),
     ]);
+
+    adminCotisationRelanceEnabled = Boolean(
+      (clubSettingsRes.data as { cotisation_relance_enabled: boolean } | null)
+        ?.cotisation_relance_enabled
+    );
 
     const bureauRoleByEmailLower = new Map(
       (
@@ -1758,6 +1769,7 @@ export default async function DashboardPage() {
           birthdayMembers={adminBirthdayMembers}
           canonicalTeamRefs={canonicalTeamRefs}
           whatsappGroups={whatsappGroups}
+          cotisationRelanceEnabled={adminCotisationRelanceEnabled}
         />
       ),
     });

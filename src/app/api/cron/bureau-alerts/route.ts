@@ -149,6 +149,18 @@ async function runExpiryAlerts(supabase: ReturnType<typeof createServiceClient>)
 }
 
 async function runCotisationRelances(supabase: ReturnType<typeof createServiceClient>) {
+  // Interrupteur Bureau (onglet Cotisations & Licences) — désactivé par
+  // défaut : personne ne doit recevoir de relance automatique tant que le
+  // Bureau n'a pas explicitement choisi d'activer le mécanisme.
+  const { data: settings } = await supabase
+    .from("club_settings")
+    .select("cotisation_relance_enabled")
+    .eq("id", true)
+    .maybeSingle();
+  if (!settings?.cotisation_relance_enabled) {
+    return { sent: 0, skippedNoEmail: 0, checked: 0, paused: true };
+  }
+
   const cooldownStart = new Date();
   cooldownStart.setDate(cooldownStart.getDate() - COTISATION_RELANCE_COOLDOWN_DAYS);
   const cooldownStartIso = cooldownStart.toISOString();

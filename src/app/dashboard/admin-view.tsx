@@ -43,6 +43,7 @@ export default function AdminView({
   birthdayMembers,
   canonicalTeamRefs,
   whatsappGroups,
+  cotisationRelanceEnabled,
 }: {
   clubFunction?: string | null;
   teams: TeamWithMembers[];
@@ -56,6 +57,7 @@ export default function AdminView({
   birthdayMembers: BirthdaySource[];
   canonicalTeamRefs: { id: string; name: string | null; category: string | null }[];
   whatsappGroups: WhatsAppGroup[];
+  cotisationRelanceEnabled: boolean;
 }) {
   const teamRefs = teams.map((t) => ({
     id: t.id,
@@ -132,6 +134,7 @@ export default function AdminView({
           members={members}
           categoryTariffs={categoryTariffs}
           canonicalTeamRefs={canonicalTeamRefs}
+          relanceEnabled={cotisationRelanceEnabled}
         />
       ),
     },
