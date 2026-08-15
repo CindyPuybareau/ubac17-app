@@ -114,18 +114,7 @@ export default function AdminView({
       key: "whatsapp",
       label: "WhatsApp",
       icon: <MessageCircle className={iconClass} />,
-      content: (
-        <WhatsAppGroupsManager
-          groups={whatsappGroups}
-          candidates={members
-            .filter((m) => !m.archivedAt)
-            .map((m) => ({
-              id: m.id,
-              firstName: m.firstName,
-              lastName: m.lastName,
-            }))}
-        />
-      ),
+      content: <WhatsAppGroupsManager groups={whatsappGroups} teams={canonicalTeamRefs} />,
     },
     {
       key: "ffbb",
