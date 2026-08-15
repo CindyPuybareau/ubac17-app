@@ -4,6 +4,11 @@ export type BirthdaySource = {
   lastName: string | null;
   birthDate: string | null;
   category?: string | null;
+  // Équipe(s) auxquelles ce membre appartient — seulement renseigné côté
+  // Famille, pour filtrer "Anniversaires de la semaine" et les puces du
+  // calendrier par enfant sélectionné (family-view.tsx). Absent ailleurs
+  // (Bureau, Coach), qui n'ont pas ce filtre à appliquer.
+  teamIds?: string[];
 };
 
 // Groups members by their birthday's month/day (e.g. "05-12"), ignoring

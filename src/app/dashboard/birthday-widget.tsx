@@ -1,5 +1,5 @@
 import { PartyPopper, Gift } from "lucide-react";
-import { formatPersonName } from "@/lib/names";
+import { formatFirstName, formatLastName } from "@/lib/names";
 import type { BirthdayEntry, BirthdaySource } from "./birthdays";
 
 function dayLabel(daysUntil: number) {
@@ -27,7 +27,8 @@ export default function BirthdayWidget({
         {entries.map((e) => (
           <li key={e.id} className="flex items-center justify-between gap-2 text-sm">
             <span className="truncate font-medium text-zinc-800">
-              {formatPersonName(e.firstName, e.lastName, "Membre")}
+              {formatFirstName(e.firstName) || "Membre"}{" "}
+              <span className="font-bold uppercase">{formatLastName(e.lastName)}</span>
             </span>
             <span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-pink-600">
               <Gift className="h-3.5 w-3.5" />

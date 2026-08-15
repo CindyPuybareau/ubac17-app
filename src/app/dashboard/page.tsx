@@ -1465,6 +1465,12 @@ export default async function DashboardPage() {
         (teamsRes.data ?? []).map((t) => [t.id, t])
       );
       const seenTeammateIds = new Set<string>();
+      // Un même joueur peut apparaître dans plusieurs lignes (une par
+      // équipe) : accumulé à part plutôt que de ne garder que la première
+      // équipe croisée, pour que le filtrage par enfant sélectionné
+      // (family-view.tsx) sache qu'un joueur d'une équipe donnée reste
+      // rattaché à TOUTES ses équipes, pas juste la première rencontrée.
+      const teamIdsByPlayerId = new Map<string, string[]>();
       (teammateRowsRes.data ?? []).forEach((row) => {
         const p = row.players as unknown as {
           id: string;
@@ -1483,6 +1489,10 @@ export default async function DashboardPage() {
         });
         rosterByTeamId.set(row.team_id, list);
 
+        const teamIdsForPlayer = teamIdsByPlayerId.get(p.id) ?? [];
+        teamIdsForPlayer.push(row.team_id);
+        teamIdsByPlayerId.set(p.id, teamIdsForPlayer);
+
         if (seenTeammateIds.has(p.id)) return;
         seenTeammateIds.add(p.id);
         familyBirthdayMembers.push({
@@ -1491,7 +1501,15 @@ export default async function DashboardPage() {
           lastName: p.last_name,
           birthDate: p.birth_date,
           category: p.category,
+          teamIds: [],
         });
+      });
+      // teamIdsByPlayerId n'est complète qu'une fois TOUTES les lignes
+      // parcourues (une deuxième équipe peut apparaître après la première
+      // poussée dans familyBirthdayMembers) — renseigné dans une passe à
+      // part plutôt qu'en cours de boucle.
+      familyBirthdayMembers.forEach((m) => {
+        m.teamIds = teamIdsByPlayerId.get(m.id) ?? [];
       });
 
       const coachesByTeamId = new Map<

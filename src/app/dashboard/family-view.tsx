@@ -116,6 +116,17 @@ export default function FamilyView({
     [whatsappGroups, visibleTeamIds]
   );
 
+  // Même logique que les groupes WhatsApp ci-dessus : un anniversaire ne
+  // reste affiché (puce du calendrier ET bloc "Anniversaires de la
+  // semaine", tous deux dérivés de ce même tableau à l'intérieur de
+  // CalendarView) que s'il appartient à une équipe de l'enfant/des enfants
+  // actuellement sélectionnés — sinon, sélectionner Raphaël montrerait
+  // quand même l'anniversaire d'une coéquipière de Léonie.
+  const visibleBirthdayMembers = useMemo(
+    () => birthdayMembers.filter((m) => m.teamIds?.some((id) => visibleTeamIds.has(id))),
+    [birthdayMembers, visibleTeamIds]
+  );
+
   const sections: AdminSection[] = [
     {
       key: "planning",
@@ -146,7 +157,7 @@ export default function FamilyView({
           <CalendarView
             events={visibleEvents}
             rsvp={{ players: visiblePlayers, statusByKey: rsvpStatusByKey }}
-            birthdayMembers={birthdayMembers}
+            birthdayMembers={visibleBirthdayMembers}
             tasksByEventId={tasksByEventId}
             carpoolByEventId={carpoolByEventId}
             eventRoles={eventRoles}
