@@ -183,7 +183,7 @@ export default function DateTimePicker({
             onClick={() => setOpen(false)}
           />
           <div
-            className="fixed inset-x-0 bottom-0 z-50 max-h-[80vh] overflow-y-auto rounded-t-2xl border border-zinc-200 bg-white p-4 shadow-xl sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:top-full sm:mt-2 sm:max-h-none sm:w-80 sm:overflow-visible sm:rounded-2xl"
+            className="fixed inset-x-0 bottom-0 z-50 max-h-[80vh] overflow-y-auto rounded-t-2xl border border-zinc-200 bg-white p-4 shadow-xl sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:top-full sm:mt-2 sm:max-h-[420px] sm:w-80 sm:overflow-y-auto sm:rounded-2xl"
             style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
           >
             <div className="mx-auto mb-3 h-1 w-10 shrink-0 rounded-full bg-zinc-200 sm:hidden" />
