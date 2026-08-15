@@ -1,8 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CalendarPlus, Check, Copy, RefreshCw } from "lucide-react";
+import { CalendarPlus, Check, ChevronDown, ChevronUp, Copy, RefreshCw } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+
+// Repli mémorisé sur CET appareil : rien depuis l'appli ne peut détecter
+// qu'un parent a fini de coller le lien dans Google/Apple Calendar, ça se
+// passe entièrement dans l'agenda externe — impossible à automatiser côté
+// serveur. Un repli manuel (et le bouton "C'est fait" plus bas) valent
+// donc mieux qu'un bloc qui reste grand ouvert indéfiniment une fois
+// l'intégration terminée, ou pour qui ne veut simplement pas s'en servir.
+const COLLAPSE_STORAGE_KEY = "ubac-calendar-subscribe-collapsed";
 
 // Abonnement à sens unique : une fois le lien collé dans Google/Apple
 // Calendar, les matchs et entraînements de l'équipe de l'enfant
@@ -14,6 +22,10 @@ export default function CalendarSubscribe() {
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(COLLAPSE_STORAGE_KEY) === "1";
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -68,7 +80,33 @@ export default function CalendarSubscribe() {
     }
   }
 
+  function setCollapsedPersisted(next: boolean) {
+    setCollapsed(next);
+    try {
+      window.localStorage.setItem(COLLAPSE_STORAGE_KEY, next ? "1" : "0");
+    } catch {
+      // Stockage indisponible (navigation privée...) : le repli reste
+      // actif pour cette visite, simplement pas mémorisé pour la suivante.
+    }
+  }
+
   if (token === undefined) return null;
+
+  if (collapsed) {
+    return (
+      <button
+        type="button"
+        onClick={() => setCollapsedPersisted(false)}
+        className="flex w-full items-center justify-between gap-2 rounded-2xl border border-zinc-100 bg-white px-4 py-2.5 text-left shadow-sm transition-colors hover:bg-zinc-50"
+      >
+        <span className="flex items-center gap-1.5 text-sm font-medium text-zinc-600">
+          <CalendarPlus className="h-4 w-4 shrink-0 text-ubac-blue" />
+          Recevoir le calendrier dans ton agenda
+        </span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-zinc-400" />
+      </button>
+    );
+  }
 
   const url = token ? `${window.location.origin}/api/calendar/${token}` : null;
   // iPhone/iPad reconnaissent ce protocole et proposent directement l'écran
@@ -79,10 +117,20 @@ export default function CalendarSubscribe() {
 
   return (
     <div className="flex flex-col gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
-      <p className="flex items-center gap-1.5 text-sm font-semibold text-zinc-900">
-        <CalendarPlus className="h-4 w-4 shrink-0 text-ubac-blue" />
-        Recevoir le calendrier dans ton agenda
-      </p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="flex items-center gap-1.5 text-sm font-semibold text-zinc-900">
+          <CalendarPlus className="h-4 w-4 shrink-0 text-ubac-blue" />
+          Recevoir le calendrier dans ton agenda
+        </p>
+        <button
+          type="button"
+          onClick={() => setCollapsedPersisted(true)}
+          title="Réduire"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
+        >
+          <ChevronUp className="h-4 w-4" />
+        </button>
+      </div>
       <p className="text-xs text-zinc-500">
         Les matchs et entraînements de tes enfants apparaissent directement dans ton agenda,
         mis à jour automatiquement.
@@ -125,6 +173,18 @@ export default function CalendarSubscribe() {
             Plus simple sur Android : active plutôt les notifications ci-dessus — tu es
             prévenu directement, sans rien configurer.
           </p>
+
+          {/* Rien ici ne peut savoir si le lien a vraiment été collé dans
+              l'agenda — seule la personne le sait. Ce bouton lui laisse le
+              dire elle-même, plutôt que de deviner. */}
+          <button
+            type="button"
+            onClick={() => setCollapsedPersisted(true)}
+            className="flex w-fit items-center gap-1.5 text-[11px] font-semibold text-emerald-600 hover:text-emerald-700"
+          >
+            <Check className="h-3 w-3" />
+            C&apos;est fait, ajouté à mon agenda — masquer ce bloc
+          </button>
 
           <button
             type="button"
