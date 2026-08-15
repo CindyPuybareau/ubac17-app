@@ -7,6 +7,12 @@ import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
 export type AdminSection = {
   key: string;
   label: string;
+  // Barre du bas (mobile) seulement : un intitulé plus long ("Organisation
+  // & Bilan") tient très bien dans la sidebar desktop (toute la largeur
+  // pour lui), mais se fait tronquer en "Organisation ..." une fois
+  // serré entre 3 autres onglets sur un écran de téléphone. Repli sur
+  // label si absent — la plupart des intitulés courts n'en ont pas besoin.
+  shortLabel?: string;
   icon: ReactNode;
   content: ReactNode;
 };
@@ -86,7 +92,9 @@ export default function AdminSidebar({
               }`}
             >
               {section.icon}
-              <span className="w-full truncate text-center">{section.label}</span>
+              <span className="w-full truncate text-center leading-tight">
+                {section.shortLabel ?? section.label}
+              </span>
             </button>
           );
         })}

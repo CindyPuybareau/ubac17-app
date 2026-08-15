@@ -137,6 +137,10 @@ export default function CoachView({
     {
       key: "organisation",
       label: "Organisation & Bilan",
+      // "Organisation & Bilan" se fait tronquer en "Organisation ..." dans
+      // la barre du bas sur mobile, serrée entre 3 autres onglets — un
+      // seul mot y tient sans coupure.
+      shortLabel: "Organisation",
       icon: <ClipboardList className={iconClass} />,
       content: (
         <CoachOrganisation
