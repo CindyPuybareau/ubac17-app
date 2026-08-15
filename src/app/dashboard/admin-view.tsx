@@ -1,4 +1,12 @@
-import { CalendarDays, Contact, MessageCircle, Users, Wallet, RefreshCw } from "lucide-react";
+import {
+  CalendarDays,
+  Contact,
+  LayoutDashboard,
+  MessageCircle,
+  Users,
+  Wallet,
+  RefreshCw,
+} from "lucide-react";
 import TeamManager, { type TeamWithMembers } from "./team-manager";
 import ImportInscriptions from "./import-inscriptions";
 import ImportPlanning from "./import-planning";
@@ -9,6 +17,7 @@ import MembersTable from "./members-table";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import FfbbManager from "./ffbb-manager";
 import WhatsAppGroupsManager from "./whatsapp-groups-manager";
+import BureauDashboard from "./bureau-dashboard";
 import type {
   AdminCategoryTariff,
   AdminCollecte,
@@ -62,6 +71,22 @@ export default function AdminView({
 
   const iconClass = "h-4 w-4 shrink-0";
   const sections: AdminSection[] = [
+    {
+      // Premier onglet, avant Calendrier : le Bureau atterrissait jusqu'ici
+      // directement dans le détail (grille du mois), sans jamais voir de
+      // résumé "où est-ce que ça coince" avant d'ouvrir un onglet précis.
+      key: "home",
+      label: "Accueil",
+      icon: <LayoutDashboard className={iconClass} />,
+      content: (
+        <BureauDashboard
+          cotisations={cotisations}
+          members={members}
+          teams={teams}
+          events={upcomingEvents}
+        />
+      ),
+    },
     {
       key: "calendar",
       label: "Calendrier",
