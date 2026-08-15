@@ -5,6 +5,7 @@ import { balanceDue, computeStatus, formatAmount } from "./cotisation-shared";
 import { formatEventTime, isMatchType, styleFor } from "./event-style";
 import OpponentDisplay from "./opponent-display";
 import SalleBadge from "./salle-badge";
+import AutomationSettings, { type AutomationKey } from "./automation-settings";
 import type { AdminCotisation, AdminMember, AdminUpcomingEvent } from "./page";
 import type { TeamWithMembers } from "./team-manager";
 
@@ -54,11 +55,13 @@ export default function BureauDashboard({
   members,
   teams,
   events,
+  automationSettings,
 }: {
   cotisations: AdminCotisation[];
   members: AdminMember[];
   teams: TeamWithMembers[];
   events: AdminUpcomingEvent[];
+  automationSettings: Record<AutomationKey, boolean>;
 }) {
   // Même périmètre que l'onglet Cotisations & Licences (KpiHeader) : les
   // stages/événements/boutique (collecteId non nul) ont leur propre suivi
@@ -97,6 +100,8 @@ export default function BureauDashboard({
         <h2 className="text-lg font-semibold text-zinc-900">Bienvenue</h2>
         <p className="text-sm text-zinc-500">Vue d&apos;ensemble du club, en un coup d&apos;œil.</p>
       </div>
+
+      <AutomationSettings settings={automationSettings} />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <KpiCard
@@ -200,9 +205,10 @@ export default function BureauDashboard({
         </div>
       )}
 
-      {/* Un rappel automatique par email part déjà tout seul (voir
-          /api/cron/expiry-alerts) — ce bloc n'est qu'un aperçu Bureau,
-          pratique pour relancer soi-même sans attendre. */}
+      {/* Rappel par email envoyé automatiquement seulement si l'interrupteur
+          "Alertes licence & certificat médical" ci-dessus est activé (voir
+          /api/cron/bureau-alerts) — ce bloc reste un aperçu Bureau utile
+          même désactivé, pour relancer soi-même sans attendre. */}
       {membersWithExpiringDocs.length > 0 && (
         <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4">
           <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-orange-800">

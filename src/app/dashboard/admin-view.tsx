@@ -18,6 +18,7 @@ import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import FfbbManager from "./ffbb-manager";
 import WhatsAppGroupsManager from "./whatsapp-groups-manager";
 import BureauDashboard from "./bureau-dashboard";
+import type { AutomationKey } from "./automation-settings";
 import type {
   AdminCategoryTariff,
   AdminCollecte,
@@ -43,7 +44,7 @@ export default function AdminView({
   birthdayMembers,
   canonicalTeamRefs,
   whatsappGroups,
-  cotisationRelanceEnabled,
+  automationSettings,
 }: {
   clubFunction?: string | null;
   teams: TeamWithMembers[];
@@ -57,7 +58,7 @@ export default function AdminView({
   birthdayMembers: BirthdaySource[];
   canonicalTeamRefs: { id: string; name: string | null; category: string | null }[];
   whatsappGroups: WhatsAppGroup[];
-  cotisationRelanceEnabled: boolean;
+  automationSettings: Record<AutomationKey, boolean>;
 }) {
   const teamRefs = teams.map((t) => ({
     id: t.id,
@@ -86,6 +87,7 @@ export default function AdminView({
           members={members}
           teams={teams}
           events={upcomingEvents}
+          automationSettings={automationSettings}
         />
       ),
     },
@@ -134,7 +136,6 @@ export default function AdminView({
           members={members}
           categoryTariffs={categoryTariffs}
           canonicalTeamRefs={canonicalTeamRefs}
-          relanceEnabled={cotisationRelanceEnabled}
         />
       ),
     },

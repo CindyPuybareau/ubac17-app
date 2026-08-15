@@ -4,8 +4,6 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
-  Bell,
-  BellOff,
   CheckCircle2,
   Clock,
   Plus,
@@ -161,82 +159,18 @@ function KpiHeader({ cotisations }: { cotisations: AdminCotisation[] }) {
   );
 }
 
-// Interrupteur "Relances automatiques" — voir club_settings.
-// cotisation_relance_enabled. Désactivé par défaut : le Bureau doit
-// explicitement l'allumer, jamais un démarrage silencieux.
-function RelanceToggle({ relanceEnabled }: { relanceEnabled: boolean }) {
-  const router = useRouter();
-  const [enabled, setEnabled] = useState(relanceEnabled);
-  const [saving, setSaving] = useState(false);
-  const [toggleError, setToggleError] = useState<string | null>(null);
-
-  async function toggle() {
-    const next = !enabled;
-    setSaving(true);
-    setToggleError(null);
-    const supabase = createClient();
-    const { error: updateError } = await supabase
-      .from("club_settings")
-      .update({ cotisation_relance_enabled: next, updated_at: new Date().toISOString() })
-      .eq("id", true);
-    setSaving(false);
-    if (updateError) {
-      setToggleError(updateError.message);
-      return;
-    }
-    setEnabled(next);
-    router.refresh();
-  }
-
-  return (
-    <div className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-start gap-3">
-          {enabled ? (
-            <Bell className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
-          ) : (
-            <BellOff className="mt-0.5 h-5 w-5 shrink-0 text-zinc-400" />
-          )}
-          <div>
-            <p className="text-sm font-semibold text-zinc-900">Relances automatiques par email</p>
-            <p className="max-w-xl text-xs text-zinc-500">
-              {enabled
-                ? "Un email de rappel part tout seul tous les 14 jours pour chaque cotisation encore en attente ou partielle, tant qu'elle n'est pas réglée."
-                : "Désactivées : aucune relance n'est envoyée automatiquement. Les relances manuelles ci-dessous restent disponibles."}
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={toggle}
-          disabled={saving}
-          className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold transition-colors disabled:opacity-60 ${
-            enabled
-              ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
-              : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
-          }`}
-        >
-          {saving ? "..." : enabled ? "Activées" : "Désactivées"}
-        </button>
-      </div>
-      {toggleError && <p className="mt-2 text-xs text-red-600">{toggleError}</p>}
-    </div>
-  );
-}
-
 export default function CotisationsManager({
   cotisations,
   collectes,
   members,
   categoryTariffs,
   canonicalTeamRefs,
-  relanceEnabled,
 }: {
   cotisations: AdminCotisation[];
   collectes: AdminCollecte[];
   members: AdminMember[];
   categoryTariffs: AdminCategoryTariff[];
   canonicalTeamRefs: AdminMemberTeam[];
-  relanceEnabled: boolean;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<"cotisations" | "collectes">("cotisations");
@@ -381,7 +315,9 @@ export default function CotisationsManager({
 
       {tab === "cotisations" && (
         <div className="flex flex-col gap-4">
-          <RelanceToggle relanceEnabled={relanceEnabled} />
+          {/* L'interrupteur des relances automatiques vit désormais dans
+              l'onglet Accueil, avec les autres envois automatiques du
+              club — un seul panneau de contrôle plutôt qu'un par onglet. */}
           <CategoryTariffsEditor categories={canonicalTeamRefs} tariffs={categoryTariffs} />
           <KpiHeader cotisations={seasonCotisations} />
           <CotisationParticipantsTable

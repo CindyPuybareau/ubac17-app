@@ -35,6 +35,17 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
 
+  // Interrupteur Bureau (onglet Accueil) — désactivé par défaut : aucun
+  // rappel ne part tant que le Bureau ne l'a pas explicitement activé.
+  const { data: settings } = await supabase
+    .from("club_settings")
+    .select("match_reminder_enabled")
+    .eq("id", true)
+    .maybeSingle();
+  if (!settings?.match_reminder_enabled) {
+    return NextResponse.json({ sent: 0, matches: 0, paused: true });
+  }
+
   // "Demain" en heure de Paris, pas UTC : un match à 19h ne doit pas
   // glisser dans le lot de la veille juste parce que le serveur (Vercel,
   // toujours en UTC) considère qu'on est encore le jour d'avant.

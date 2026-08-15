@@ -11,6 +11,7 @@ import CoachView from "./coach-view";
 import FamilyView from "./family-view";
 import type { FamilyTeamCardData } from "./family-team-card";
 import type { BirthdaySource } from "./birthdays";
+import type { AutomationKey } from "./automation-settings";
 import {
   getNextEventForTeams,
   getPlayerRsvpStatus,
@@ -568,10 +569,15 @@ export default async function DashboardPage() {
   // way z.Sénior/U18/U13 became Séniors M/U18M/U13M.
   let canonicalTeamRefs: AdminMemberTeam[] = [];
   const adminContactPhoneByPlayerId: Record<string, string> = {};
-  // Défaut prudent : tant que le Bureau n'a pas explicitement activé la
-  // relance automatique (ou tant que la migration club_settings n'est pas
-  // encore posée), le cron reste inactif — voir /api/cron/bureau-alerts.
-  let adminCotisationRelanceEnabled = false;
+  // Défaut prudent : tant que le Bureau n'a pas explicitement activé un
+  // envoi automatique (ou tant que la migration club_settings n'est pas
+  // encore posée), les crons restent inactifs — voir /api/cron/bureau-
+  // alerts et /api/cron/match-reminders.
+  let adminAutomationSettings: Record<AutomationKey, boolean> = {
+    match_reminder_enabled: false,
+    expiry_alert_enabled: false,
+    cotisation_relance_enabled: false,
+  };
 
   if (isAdmin) {
     const [
@@ -635,13 +641,19 @@ export default async function DashboardPage() {
         .select("id, cotisation_id, amount, mode, detail, expected_cash_date, paid_at")
         .order("paid_at", { ascending: false }),
       supabase.from("category_tariffs").select("category, prix").order("category"),
-      supabase.from("club_settings").select("cotisation_relance_enabled").eq("id", true).maybeSingle(),
+      supabase
+        .from("club_settings")
+        .select("match_reminder_enabled, expiry_alert_enabled, cotisation_relance_enabled")
+        .eq("id", true)
+        .maybeSingle(),
     ]);
 
-    adminCotisationRelanceEnabled = Boolean(
-      (clubSettingsRes.data as { cotisation_relance_enabled: boolean } | null)
-        ?.cotisation_relance_enabled
-    );
+    const clubSettingsRow = clubSettingsRes.data as Record<AutomationKey, boolean> | null;
+    adminAutomationSettings = {
+      match_reminder_enabled: Boolean(clubSettingsRow?.match_reminder_enabled),
+      expiry_alert_enabled: Boolean(clubSettingsRow?.expiry_alert_enabled),
+      cotisation_relance_enabled: Boolean(clubSettingsRow?.cotisation_relance_enabled),
+    };
 
     const bureauRoleByEmailLower = new Map(
       (
@@ -1769,7 +1781,7 @@ export default async function DashboardPage() {
           birthdayMembers={adminBirthdayMembers}
           canonicalTeamRefs={canonicalTeamRefs}
           whatsappGroups={whatsappGroups}
-          cotisationRelanceEnabled={adminCotisationRelanceEnabled}
+          automationSettings={adminAutomationSettings}
         />
       ),
     });

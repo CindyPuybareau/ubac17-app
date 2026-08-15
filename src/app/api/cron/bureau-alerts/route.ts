@@ -80,6 +80,18 @@ async function resolveContactEmail(
 }
 
 async function runExpiryAlerts(supabase: ReturnType<typeof createServiceClient>) {
+  // Interrupteur Bureau (onglet Accueil) — désactivé par défaut : aucune
+  // alerte n'est envoyée tant que le Bureau ne l'a pas explicitement
+  // activée depuis l'appli.
+  const { data: settings } = await supabase
+    .from("club_settings")
+    .select("expiry_alert_enabled")
+    .eq("id", true)
+    .maybeSingle();
+  if (!settings?.expiry_alert_enabled) {
+    return { sent: 0, skippedNoEmail: 0, checked: 0, paused: true };
+  }
+
   // Fenêtre large (30 jours), bornée seulement en haut : une échéance déjà
   // dépassée mérite tout autant un rappel qu'une échéance à venir — pas de
   // borne basse.
