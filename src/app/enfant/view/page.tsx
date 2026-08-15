@@ -40,7 +40,9 @@ export default async function ChildViewPage() {
   if (!player) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center bg-zinc-50 px-4 py-16 text-center">
-        <p className="text-sm text-zinc-500">Profil introuvable.</p>
+        <p className="text-sm text-zinc-500">
+          Profil introuvable. Redemande le lien à un parent et réessaie.
+        </p>
       </div>
     );
   }

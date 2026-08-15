@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Delete } from "lucide-react";
 
 type Child = { id: string; first_name: string | null };
@@ -13,7 +12,6 @@ const KEYPAD = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "back"] as
 // vient jamais recouvrir l'écran (même esprit que le sélecteur bottom-sheet
 // du DateTimePicker).
 export default function ChildLoginForm({ code, children }: { code: string; children: Child[] }) {
-  const router = useRouter();
   const [selected, setSelected] = useState<Child | null>(null);
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +37,7 @@ export default function ChildLoginForm({ code, children }: { code: string; child
 
     const res = await fetch("/api/child-login", {
       method: "POST",
+      credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code, playerId: selected.id, pin: fullPin }),
     });
@@ -51,8 +50,12 @@ export default function ChildLoginForm({ code, children }: { code: string; child
       return;
     }
 
-    router.push("/enfant/view");
-    router.refresh();
+    // Navigation complète plutôt que router.push : certains navigateurs
+    // intégrés (WhatsApp, Instagram...) ne relisent pas de façon fiable un
+    // cookie tout juste posé lors d'une transition "douce" côté client —
+    // un vrai rechargement de page repart toujours du cookie réellement
+    // stocké par le navigateur.
+    window.location.href = "/enfant/view";
   }
 
   // Sélection du prénom : grille de puces, pas de saisie.

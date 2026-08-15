@@ -6,7 +6,7 @@ import { KeyRound } from "lucide-react";
 // sur une page sans authentification serait une fuite de vie privée. Cette
 // route sert seulement de point d'atterrissage au bouton "Accès Espace
 // Enfant" de la page d'accueil — le vrai lien reste celui, privé et propre
-// à chaque famille, généré depuis Mon espace → Accès enfant.
+// à chaque famille, généré depuis Mon espace → Mon Équipe → Accès enfant.
 export default function EnfantLandingPage() {
   return (
     <div className="flex flex-1 flex-col items-center justify-center bg-zinc-50 px-4 py-16 text-center">
@@ -25,9 +25,9 @@ export default function EnfantLandingPage() {
         <h1 className="mt-3 text-xl font-bold text-zinc-900">Espace enfant</h1>
         <p className="mt-3 text-sm text-zinc-500">
           Ton accès se fait via un lien privé, propre à ta famille — pas
-          depuis cette page. Demande-le à un parent : il le trouve dans son
-          espace UBAC, onglet <strong>Mon espace</strong>, carte{" "}
-          <strong>Accès enfant</strong>.
+          depuis cette page. Demande-le à un parent : dans son espace UBAC,
+          onglet <strong>Mon espace</strong>, puis <strong>Mon Équipe</strong>{" "}
+          (tout en bas de la page), carte <strong>Accès enfant</strong>.
         </p>
         <p className="mt-3 text-xs text-zinc-400">
           Une fois ce lien ouvert sur ton appareil, tu n&apos;auras plus qu&apos;à
