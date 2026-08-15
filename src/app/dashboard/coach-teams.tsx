@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ClipboardList, Shirt } from "lucide-react";
+import { ClipboardList, MessageCircle, Shirt } from "lucide-react";
 import { sortTeamsByGroup, teamLabel } from "@/lib/teams";
 import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
 import TeamCard from "./team-card";
+import WhatsAppGroupButton from "./whatsapp-group-button";
 import type { TeamWithMembers } from "./team-manager";
 import type { AdminMemberTeam, AdminUpcomingEvent, MemberDetail, WhatsAppGroup } from "./page";
 
@@ -52,6 +53,12 @@ export default function CoachTeams({
   const activeRole = teamRoleByTeamId[active.id] ?? "COACH";
   const isPlayerTeam = activeRole === "PLAYER";
   const activeWhatsappGroup = whatsappGroups.find((g) => g.teamId === active.id) ?? null;
+  // Groupes "Commission" (Bureau, Coachs UBAC, Buvette...) : jamais liés à
+  // une équipe, donc jamais gérables par un coach (seul le Bureau le
+  // peut), mais toujours affichés si RLS les a renvoyés — c'est-à-dire
+  // seulement ceux dont il est déjà membre. Regroupés ici plutôt que
+  // répétés sur chaque équipe : ça n'a rien à voir avec l'équipe active.
+  const commissionGroups = whatsappGroups.filter((g) => g.category === "COMMISSION");
 
   return (
     <div className="flex flex-col gap-4">
@@ -121,6 +128,30 @@ export default function CoachTeams({
         allowAssignCoach={false}
         whatsappGroup={activeWhatsappGroup}
       />
+
+      {/* Pas liés à une équipe, donc hors de la carte ci-dessus : les
+          commissions dont le coach est déjà membre (Bureau, Coachs
+          UBAC...), avec le même bouton d'envoi que côté équipe jouée —
+          il ne peut de toute façon jamais les gérer, seul le Bureau le
+          peut. */}
+      {commissionGroups.length > 0 && (
+        <div className="flex flex-col gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
+          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
+            Commissions &amp; Admin
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {commissionGroups.map((g) => (
+              <WhatsAppGroupButton
+                key={g.id}
+                teamName={g.name}
+                defaultMessage="Bonjour à tous,"
+                className="flex items-center gap-1.5 rounded-full border border-emerald-200 px-3 py-1.5 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
