@@ -1,0 +1,231 @@
+"use client";
+
+import Image from "next/image";
+import { CalendarDays, Cake, Home, Trophy, Users } from "lucide-react";
+import AdminSidebar, { type AdminSection } from "@/app/dashboard/admin-sidebar";
+import { formatFirstName } from "@/lib/names";
+import { styleFor, isMatchType, homeAwayLabel, formatEventTime } from "@/app/dashboard/event-style";
+import { parseMatchTitle } from "@/lib/match-display";
+import ChildLogoutButton from "./child-logout-button";
+import ChildCalendarTab from "./child-calendar-tab";
+import ChildTeamTab from "./child-team-tab";
+import ChildBadgesTab from "./child-badges-tab";
+
+export type ChildEvent = {
+  id: string;
+  title: string | null;
+  eventType: string | null;
+  isHome: boolean | null;
+  location: string | null;
+  salle: string | null;
+  startTime: string;
+  endTime: string | null;
+  teamName: string | null;
+};
+
+export type ChildTeammate = {
+  id: string;
+  firstName: string | null;
+  birthDate: string | null;
+  jerseyNumber: number | null;
+  position: string | null;
+  isSelf: boolean;
+};
+
+export type ChildCoach = { id: string; firstName: string | null; lastName: string | null };
+
+export type ChildBadge = {
+  key: string;
+  label: string;
+  description: string;
+  unlocked: boolean;
+  progress?: number;
+  target?: number;
+  isPercent?: boolean;
+};
+
+// Un seul composant, jamais un import de createClient() nulle part dans
+// cet arbre : chaque onglet ne fait que présenter les props reçues de
+// page.tsx (déjà lues en service_role côté serveur). Aucune écriture
+// n'est donc possible même en théorie — pas de bouton RSVP, pas de champ
+// éditable, pas de lien WhatsApp.
+export default function ChildDashboard({
+  firstName,
+  category,
+  teams,
+  ownJersey,
+  events,
+  teammates,
+  coaches,
+  badges,
+  nextEventAttendance,
+}: {
+  firstName: string | null;
+  category: string | null;
+  teams: { id: string; name: string | null; category: string | null }[];
+  ownJersey: { jersey: number | null; position: string | null } | null;
+  events: ChildEvent[];
+  teammates: ChildTeammate[];
+  coaches: ChildCoach[];
+  badges: ChildBadge[];
+  nextEventAttendance: { name: string | null; status: string }[];
+}) {
+  const now = Date.now();
+  const nextEvent = events.find((e) => new Date(e.startTime).getTime() >= now) ?? null;
+  const teammatesOnly = teammates.filter((t) => !t.isSelf);
+
+  const thisMonth = new Date().getMonth();
+  const birthdaysThisMonth = teammatesOnly
+    .filter((t) => t.birthDate && new Date(t.birthDate).getMonth() === thisMonth)
+    .sort((a, b) => new Date(a.birthDate!).getDate() - new Date(b.birthDate!).getDate());
+
+  const iconClass = "h-4 w-4 shrink-0";
+  const sections: AdminSection[] = [
+    {
+      key: "home",
+      label: "Accueil",
+      icon: <Home className={iconClass} />,
+      content: (
+        <div className="flex flex-col gap-4">
+          <div className="rounded-2xl bg-gradient-to-br from-navy to-ubac-blue p-5 text-white shadow-sm">
+            <p className="text-lg font-bold">Salut {formatFirstName(firstName) || "champion"} !</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {teams.map((t) => (
+                <span
+                  key={t.id}
+                  className="rounded-full bg-ubac-yellow px-3 py-1 text-xs font-bold uppercase tracking-wide text-navy"
+                >
+                  {t.category ?? t.name}
+                </span>
+              ))}
+              {ownJersey?.jersey != null && (
+                <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold">
+                  N° {ownJersey.jersey}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {nextEvent ? <NextEventCard event={nextEvent} /> : (
+            <div className="rounded-2xl border border-zinc-100 bg-white p-4 text-sm text-zinc-500 shadow-sm">
+              Rien de prévu pour le moment.
+            </div>
+          )}
+
+          {birthdaysThisMonth.length > 0 && (
+            <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-4 shadow-sm">
+              <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-amber-800">
+                <Cake className="h-3.5 w-3.5 shrink-0 animate-pulse" />
+                Anniversaires du mois
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {birthdaysThisMonth.map((t) => (
+                  <span
+                    key={t.id}
+                    className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-amber-800 shadow-sm"
+                  >
+                    {formatFirstName(t.firstName)} · {new Date(t.birthDate!).getDate()}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "calendar",
+      label: "Calendrier",
+      icon: <CalendarDays className={iconClass} />,
+      content: <ChildCalendarTab events={events} />,
+    },
+    {
+      key: "team",
+      label: "Mon Équipe",
+      icon: <Users className={iconClass} />,
+      content: (
+        <ChildTeamTab
+          teammates={teammatesOnly}
+          coaches={coaches}
+          nextEvent={nextEvent}
+          nextEventAttendance={nextEventAttendance}
+        />
+      ),
+    },
+    {
+      key: "profile",
+      label: "Mon Profil",
+      shortLabel: "Défis",
+      icon: <Trophy className={iconClass} />,
+      content: <ChildBadgesTab firstName={firstName} category={category} badges={badges} />,
+    },
+  ];
+
+  return (
+    <div className="flex flex-1 flex-col">
+      <header className="sticky top-0 z-10 bg-navy px-4 py-3 sm:px-6">
+        <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Image src="/logo.png" alt="UBAC" width={32} height={32} className="h-8 w-8 object-contain" priority />
+            <span className="text-sm font-semibold text-white">UBAC</span>
+          </div>
+          <ChildLogoutButton />
+        </div>
+      </header>
+
+      <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-6 px-4 pt-6 pb-24 sm:px-6 sm:py-10">
+        <AdminSidebar sections={sections} />
+      </div>
+    </div>
+  );
+}
+
+// Compte à rebours simple ("Aujourd'hui" / "Demain" / "Dans N jours"),
+// calculé à l'ouverture de la page — pas besoin d'un vrai minuteur pour
+// une granularité à la journée.
+function daysUntilLabel(startIso: string): string {
+  const start = new Date(startIso);
+  const startOfDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const days = Math.round((startOfDay.getTime() - startOfToday.getTime()) / 86400000);
+  if (days <= 0) return "Aujourd'hui !";
+  if (days === 1) return "Demain !";
+  return `Dans ${days} jours`;
+}
+
+function NextEventCard({ event }: { event: ChildEvent }) {
+  const style = styleFor(event.eventType);
+  const parsed = parseMatchTitle(event.title);
+  const home = event.isHome ?? parsed.isHome;
+  const lieu = event.salle || event.location;
+
+  return (
+    <div className={`rounded-2xl border-2 bg-white p-4 shadow-sm ${style.border.replace("border-l-", "border-")}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${style.badge}`}>
+          {style.label}
+        </span>
+        <span className="rounded-full bg-navy px-3 py-1 text-xs font-bold text-ubac-yellow">
+          {daysUntilLabel(event.startTime)}
+        </span>
+      </div>
+      <p className="mt-2 text-lg font-bold text-zinc-900">
+        {isMatchType(event.eventType)
+          ? [homeAwayLabel(home), parsed.opponent ? `vs ${parsed.opponent}` : null].filter(Boolean).join(" · ")
+          : event.title ?? style.label}
+      </p>
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500">
+        <span>
+          {new Date(event.startTime).toLocaleDateString("fr-FR", {
+            weekday: "long",
+            day: "numeric",
+            month: "long",
+          })}
+          , {formatEventTime(event.startTime, event.endTime)}
+        </span>
+        {lieu && <span>· {lieu}</span>}
+      </div>
+    </div>
+  );
+}
