@@ -16,6 +16,7 @@ import {
   Mail,
   MapPin,
   Pencil,
+  PartyPopper,
   Plus,
   StickyNote,
   Trash2,
@@ -24,13 +25,12 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { buildGmailComposeLink } from "@/lib/email";
-import { formatFirstName, formatLastName, formatPersonName } from "@/lib/names";
+import { formatFirstName, formatLastName } from "@/lib/names";
 import { parseMatchTitle } from "@/lib/match-display";
 import { teamLabel } from "@/lib/teams";
 import OpponentDisplay from "./opponent-display";
 import CreateEventForm from "./create-event-form";
 import RsvpButtons from "./rsvp-buttons";
-import BirthdayWidget from "./birthday-widget";
 import ItineraryButton from "./itinerary-button";
 import MatchTasksPanel from "./match-tasks-panel";
 import MatchScore from "./match-score";
@@ -241,7 +241,6 @@ export default function CalendarView({
   const router = useRouter();
   const [viewMonth, setViewMonth] = useState<Date>(today);
   const [selectedDate, setSelectedDate] = useState<Date>(today);
-  const [openBirthday, setOpenBirthday] = useState<BirthdaySource | null>(null);
   // Le calendrier s'ouvre sur la grille : on veut d'abord voir le mois.
   // La liste chronologique reste à un clic pour répondre à "c'est quoi la
   // suite ?".
@@ -412,10 +411,11 @@ export default function CalendarView({
     [birthdayMembers]
   );
 
-  const birthdayWidgetEntries = useMemo(
-    () => upcomingBirthdays(birthdayMembers),
-    [birthdayMembers]
-  );
+  // Anniversaires à moins de 7 jours : ex-encart "Anniversaires de la
+  // semaine" (supprimé), désormais réinjectés à leur date exacte dans le
+  // fil chronologique de la vue Liste — même donnée, même fenêtre de 7
+  // jours, juste plus d'encart séparé qui doublonnait l'info.
+  const nearBirthdays = useMemo(() => upcomingBirthdays(birthdayMembers), [birthdayMembers]);
 
   function goToday() {
     const now = new Date();
@@ -451,6 +451,28 @@ export default function CalendarView({
       .filter((e) => new Date(e.start_time).getTime() >= from)
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
   }, [events]);
+
+  // Anniversaires + événements mélangés dans un seul fil chronologique,
+  // triés ensemble : un anniversaire vaut minuit ce jour-là (avant tout
+  // événement du même jour, qui a lui une vraie heure), donc il ouvre
+  // naturellement la journée plutôt que de s'intercaler au hasard.
+  const upcomingListItems = useMemo(() => {
+    type ListItem =
+      | { kind: "event"; date: Date; event: AdminUpcomingEvent }
+      | { kind: "birthday"; date: Date; member: BirthdaySource };
+    const items: ListItem[] = upcomingEvents.map((event) => ({
+      kind: "event",
+      date: new Date(event.start_time),
+      event,
+    }));
+    nearBirthdays.forEach((member) => {
+      const date = new Date();
+      date.setHours(0, 0, 0, 0);
+      date.setDate(date.getDate() + member.daysUntil);
+      items.push({ kind: "birthday", date, member });
+    });
+    return items.sort((a, b) => a.date.getTime() - b.date.getTime());
+  }, [upcomingEvents, nearBirthdays]);
 
   // Une seule carte pour les deux vues : la liste et le detail du jour
   // affichent exactement le meme evenement, avec les memes compteurs.
@@ -685,6 +707,35 @@ export default function CalendarView({
     );
   }
 
+  // Une carte à part, pas une simple ligne : un anniversaire est traité
+  // comme un événement à part entière du fil chronologique du jour
+  // (ex-encart "Anniversaires de la semaine", supprimé — voir
+  // nearBirthdays). Même gabarit que renderEventCard (arrondi, bordure de
+  // couleur à gauche, ombre légère) pour s'intégrer au même fil sans
+  // détonner, coloré rose/festif pour rester identifiable au premier coup
+  // d'œil.
+  function renderBirthdayCard(member: BirthdaySource) {
+    return (
+      <div
+        key={`bday-${member.id}`}
+        className="flex items-center gap-3 rounded-2xl border border-pink-100 bg-pink-50/60 p-4 shadow-sm border-l-4 border-l-pink-400"
+      >
+        <PartyPopper className="h-5 w-5 shrink-0 text-pink-500" />
+        <div className="flex flex-col gap-1">
+          <span className="w-fit rounded-full bg-pink-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-pink-700">
+            Anniversaire
+          </span>
+          <span className="font-semibold text-zinc-900">
+            {formatFirstName(member.firstName)}{" "}
+            <span className="font-bold uppercase">{formatLastName(member.lastName)}</span>
+            {member.category ? (
+              <span className="font-normal text-zinc-500"> · {member.category}</span>
+            ) : null}
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex w-full max-w-full min-w-0 flex-col gap-4">
@@ -865,27 +916,26 @@ export default function CalendarView({
       </div>
       )}
 
-      {birthdayWidgetEntries.length > 0 && (
-        <BirthdayWidget entries={birthdayWidgetEntries} />
-      )}
-
       {view === "list" && (
         <div className="flex flex-col gap-2">
-          {upcomingEvents.length === 0 ? (
+          {upcomingListItems.length === 0 ? (
             <p className="text-sm text-zinc-500">Aucun événement à venir.</p>
           ) : (
-            upcomingEvents.map((event) => (
-              <div key={event.id} className="flex flex-col gap-1">
+            upcomingListItems.map((item) => (
+              <div
+                key={item.kind === "event" ? item.event.id : `bday-${item.member.id}`}
+                className="flex flex-col gap-1"
+              >
                 <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                  {toKey(new Date(event.start_time)) === todayKey
+                  {toKey(item.date) === todayKey
                     ? "Aujourd'hui"
-                    : new Date(event.start_time).toLocaleDateString("fr-FR", {
+                    : item.date.toLocaleDateString("fr-FR", {
                         weekday: "long",
                         day: "numeric",
                         month: "long",
                       })}
                 </p>
-                {renderEventCard(event)}
+                {item.kind === "event" ? renderEventCard(item.event) : renderBirthdayCard(item.member)}
               </div>
             ))
           )}
@@ -904,28 +954,13 @@ export default function CalendarView({
               })}
         </p>
 
-        {detailBirthdays.length > 0 && (
-          <div className="flex flex-col gap-2">
-            {detailBirthdays.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => setOpenBirthday(m)}
-                className="flex items-center gap-2 rounded-xl border border-purple-100 bg-purple-50/60 px-3 py-2.5 text-left transition-colors hover:border-purple-200"
-              >
-                <Cake className="h-4 w-4 shrink-0 text-purple-600" />
-                <span className="text-sm font-medium text-zinc-900">
-                  Anniversaire : {formatPersonName(m.firstName, m.lastName, "Membre")}
-                  {m.category ? ` · ${m.category}` : ""}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-
         {detailEvents.length === 0 && detailBirthdays.length === 0 ? (
           <p className="text-sm text-zinc-500">Aucun événement ce jour-là.</p>
         ) : (
-          detailEvents.map((event) => renderEventCard(event))
+          <>
+            {detailBirthdays.map((m) => renderBirthdayCard(m))}
+            {detailEvents.map((event) => renderEventCard(event))}
+          </>
         )}
       </div>
       )}
@@ -1076,41 +1111,6 @@ export default function CalendarView({
                 {editSaving ? "Enregistrement..." : "Enregistrer"}
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {openBirthday && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setOpenBirthday(null)}
-        >
-          <div
-            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Cake className="h-5 w-5 text-purple-600" />
-                <h3 className="font-semibold text-zinc-900">Anniversaire</h3>
-              </div>
-              <button
-                onClick={() => setOpenBirthday(null)}
-                className="rounded-full p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <p className="text-sm text-zinc-700">
-              {selectedKey === todayKey
-                ? "Aujourd'hui"
-                : `Le ${selectedDate.toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}`}
-              , c&apos;est l&apos;anniversaire de{" "}
-              <span className="font-semibold">
-                {formatPersonName(openBirthday.firstName, openBirthday.lastName, "Membre")}
-              </span>
-              {openBirthday.category ? ` - ${openBirthday.category}` : ""} !
-            </p>
           </div>
         </div>
       )}
