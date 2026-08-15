@@ -5,7 +5,7 @@
       "schedule": "0 17 * * *"
     },
     {
-      "path": "/api/cron/expiry-alerts",
+      "path": "/api/cron/bureau-alerts",
       "schedule": "0 7 * * *"
     }
   ]

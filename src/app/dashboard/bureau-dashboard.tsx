@@ -1,7 +1,7 @@
 import { CalendarDays, FileWarning, MapPin, ShieldAlert, Users, Wallet } from "lucide-react";
 import { teamLabel } from "@/lib/teams";
 import { formatPersonName } from "@/lib/names";
-import { balanceDue, computeStatus, formatAmount } from "./cotisation-participants-table";
+import { balanceDue, computeStatus, formatAmount } from "./cotisation-shared";
 import { formatEventTime, isMatchType, styleFor } from "./event-style";
 import OpponentDisplay from "./opponent-display";
 import SalleBadge from "./salle-badge";
