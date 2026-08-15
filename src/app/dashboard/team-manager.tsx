@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import TeamCard from "./team-card";
@@ -25,6 +25,11 @@ export type TeamWithMembers = {
   name: string | null;
   category: string | null;
   ffbb_url: string | null;
+  // Posé par /api/sync-ffbb juste après une synchro réussie — alimente la
+  // vue d'ensemble de l'onglet FFBB (ffbb-manager.tsx). Optionnel : les
+  // objets construits ailleurs (ex. le calendrier Coach) n'ont pas besoin
+  // de le porter.
+  ffbb_last_synced_at?: string | null;
   players: RosterPlayer[];
   coaches: Person[];
   // Named coaches assigned via a member's fiche (team_pending_coaches)
@@ -47,10 +52,24 @@ export default function TeamManager({
   contactPhoneByPlayerId: Record<string, string>;
 }) {
   const router = useRouter();
+  const categoryListId = useId();
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Suggestions plutôt qu'une liste fermée : un texte libre reste possible
+  // (toute nouvelle catégorie doit pouvoir exister), mais la faute de
+  // frappe qui casse un tri ou un matching FFBB (vécu plusieurs fois
+  // cette saison — U13G vs U13M-1, Séniors 2 orthographiée autrement...)
+  // devient un choix explicite plutôt qu'un accident.
+  const existingCategories = useMemo(
+    () =>
+      Array.from(
+        new Set(teams.map((t) => t.category).filter((c): c is string => Boolean(c)))
+      ).sort((a, b) => a.localeCompare(b, "fr")),
+    [teams]
+  );
 
   const [selectedTeamIds, setSelectedTeamIds] = useState<Set<string>>(
     () => new Set(teams.map((t) => t.id))
@@ -150,11 +169,17 @@ export default function TeamManager({
             Catégorie
           </label>
           <input
+            list={categoryListId}
             placeholder="U11, U13, Seniors..."
             value={category}
             onChange={(e) => setCategory(e.target.value)}
             className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-ubac-blue focus:outline-none focus:ring-1 focus:ring-ubac-blue"
           />
+          <datalist id={categoryListId}>
+            {existingCategories.map((c) => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
         </div>
         <button
           type="submit"

@@ -41,6 +41,15 @@ export async function POST(request: Request) {
     );
   }
 
+  // Posé dès qu'on a réussi à parler à la FFBB pour cette équipe — pas
+  // seulement quand des matchs ont réellement changé — pour que la vue
+  // d'ensemble (ffbb-manager.tsx) distingue "synchronisé, rien de neuf"
+  // d'"jamais synchronisé".
+  await supabase
+    .from("teams")
+    .update({ ffbb_last_synced_at: new Date().toISOString() })
+    .eq("id", teamId);
+
   if (matches.length === 0) {
     return NextResponse.json({
       imported: 0,

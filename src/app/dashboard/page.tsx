@@ -583,7 +583,7 @@ export default async function DashboardPage() {
       supabase
         .from("teams")
         .select(
-          "id, name, category, ffbb_url, pending_coach_names, sort_order"
+          "id, name, category, ffbb_url, ffbb_last_synced_at, pending_coach_names, sort_order"
         )
         .order("sort_order", { ascending: true, nullsFirst: false })
         .order("category"),
@@ -722,6 +722,7 @@ export default async function DashboardPage() {
       name: t.name,
       category: t.category,
       ffbb_url: t.ffbb_url,
+      ffbb_last_synced_at: t.ffbb_last_synced_at,
       players: rosterByTeam.get(t.id) ?? [],
       coaches: coachesByTeam.get(t.id) ?? [],
       pendingCoaches: pendingCoachesByTeam.get(t.id) ?? [],

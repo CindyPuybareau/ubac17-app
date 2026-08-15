@@ -2,11 +2,13 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import * as XLSX from "xlsx";
 import {
   Archive,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  FileText,
   Mail,
   MessageCircle,
   MoreVertical,
@@ -88,6 +90,13 @@ export default function MembersTable({
 
   const [reassignIds, setReassignIds] = useState<string[] | null>(null);
   const [reassignTeamId, setReassignTeamId] = useState("");
+  // Par défaut, additif (ajoute à l'équipe choisie sans toucher aux
+  // équipes actuelles) : un membre présent sur 2 équipes (joueur qui
+  // "surclasse", coach qui joue aussi ailleurs...) ne doit pas en perdre
+  // une silencieusement. Le retrait des équipes actuelles reste possible,
+  // mais devient un choix explicite (case cochée) plutôt que le
+  // comportement par défaut.
+  const [reassignReplace, setReassignReplace] = useState(false);
   const [reassignSaving, setReassignSaving] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [showAddMember, setShowAddMember] = useState(false);
@@ -102,6 +111,38 @@ export default function MembersTable({
 
   function handleMemberCreated(fullName: string) {
     showToast(`Membre ${fullName} ajouté avec succès !`);
+  }
+
+  // Exporte la liste actuellement affichée (recherche/filtre/archivés déjà
+  // appliqués) — pas besoin de tout sélectionner à la main d'abord, à la
+  // différence de l'export de l'onglet Cotisations qui part d'une
+  // sélection. Utile en fin de saison pour la compta, une déclaration
+  // FFBB/assurance, ou tout usage hors de l'appli.
+  function exportMembers() {
+    const header = [
+      "Nom",
+      "Prénom",
+      "Catégorie",
+      "Équipe(s)",
+      "Coach de",
+      "Email",
+      "Téléphone",
+      "Statut",
+    ];
+    const rows = filtered.map((m) => [
+      fullLastName(m),
+      m.firstName ?? "",
+      m.category ?? "",
+      m.teams.map((t) => t.category ?? t.name ?? "").join(", "),
+      [...m.coachTeams, ...m.pendingCoachTeams].map((t) => t.category ?? t.name ?? "").join(", "),
+      m.email ?? "",
+      m.phone ?? "",
+      m.archivedAt ? "Archivé" : "Actif",
+    ]);
+    const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Membres");
+    XLSX.writeFile(wb, "membres-export.xlsx");
   }
 
   function memberLabel(ids: string[]) {
@@ -163,6 +204,7 @@ export default function MembersTable({
   function openReassign(ids: string[]) {
     setReassignIds(ids);
     setReassignTeamId("");
+    setReassignReplace(false);
   }
 
   async function confirmReassign() {
@@ -170,23 +212,39 @@ export default function MembersTable({
     setReassignSaving(true);
     setActionError(null);
     const supabase = createClient();
-    const { error: deleteError } = await supabase
-      .from("team_players")
-      .delete()
-      .in("player_id", reassignIds);
-    if (deleteError) {
-      setReassignSaving(false);
-      setActionError(`Changement d'équipe impossible : ${deleteError.message}`);
-      return;
+
+    if (reassignReplace) {
+      const { error: deleteError } = await supabase
+        .from("team_players")
+        .delete()
+        .in("player_id", reassignIds);
+      if (deleteError) {
+        setReassignSaving(false);
+        setActionError(`Changement d'équipe impossible : ${deleteError.message}`);
+        return;
+      }
     }
-    const { error: insertError } = await supabase
-      .from("team_players")
-      .insert(reassignIds.map((pid) => ({ team_id: reassignTeamId, player_id: pid })));
+
+    // N'ajoute que les membres pas déjà dans cette équipe — évite un
+    // conflit de clé (team_id, player_id) sur team_players côté additif,
+    // sans avoir à interroger la base : `members` porte déjà chaque
+    // équipe actuelle de chacun.
+    const alreadyInTeam = new Set(
+      members.filter((m) => m.teams.some((t) => t.id === reassignTeamId)).map((m) => m.id)
+    );
+    const idsToInsert = reassignIds.filter((id) => !alreadyInTeam.has(id));
+
+    if (idsToInsert.length > 0) {
+      const { error: insertError } = await supabase
+        .from("team_players")
+        .insert(idsToInsert.map((pid) => ({ team_id: reassignTeamId, player_id: pid })));
+      if (insertError) {
+        setReassignSaving(false);
+        setActionError(`Affectation impossible : ${insertError.message}`);
+        return;
+      }
+    }
     setReassignSaving(false);
-    if (insertError) {
-      setActionError(`Changement d'équipe impossible : ${insertError.message}`);
-      return;
-    }
     setReassignIds(null);
     setSelectedIds(new Set());
     router.refresh();
@@ -328,6 +386,14 @@ export default function MembersTable({
           <UserPlus className="h-4 w-4" />
           Ajouter un membre
         </button>
+        <button
+          onClick={exportMembers}
+          title="Exporte la liste actuellement affichée (recherche et filtres compris)"
+          className="flex shrink-0 items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3.5 py-1.5 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-50"
+        >
+          <FileText className="h-4 w-4" />
+          Exporter (Excel)
+        </button>
         <div className="relative min-w-[200px] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
           <input
@@ -389,7 +455,7 @@ export default function MembersTable({
               className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
             >
               <RefreshCw className="h-3.5 w-3.5" />
-              Changer d&apos;équipe
+              Affecter à une équipe
             </button>
             <button
               onClick={() => handleArchive(Array.from(selectedIds))}
@@ -731,7 +797,7 @@ export default function MembersTable({
 
       {reassignIds && (
         <Modal
-          title={`Changer d'équipe (${reassignIds.length} membre${
+          title={`Affecter à une équipe (${reassignIds.length} membre${
             reassignIds.length > 1 ? "s" : ""
           })`}
           onClose={() => setReassignIds(null)}
@@ -751,11 +817,25 @@ export default function MembersTable({
                 </option>
               ))}
             </select>
-            <p className="text-xs text-zinc-500">
-              Remplace l&apos;équipe actuelle de{" "}
-              {reassignIds.length > 1 ? "ces membres" : "ce membre"}{" "}
-              par l&apos;équipe choisie.
-            </p>
+            <label className="flex items-start gap-2 rounded-lg border border-zinc-100 bg-zinc-50 p-2.5 text-xs text-zinc-600">
+              <input
+                type="checkbox"
+                checked={reassignReplace}
+                onChange={(e) => setReassignReplace(e.target.checked)}
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
+              />
+              <span>
+                <span className="font-semibold text-zinc-800">
+                  Retirer aussi de leur(s) équipe(s) actuelle(s)
+                </span>
+                <br />
+                {reassignIds.length > 1
+                  ? "Décoché (par défaut) : ces membres gardent leurs équipes actuelles en plus de la nouvelle"
+                  : "Décoché (par défaut) : ce membre garde son équipe actuelle en plus de la nouvelle"}{" "}
+                — utile pour un joueur présent sur 2 équipes. Coché : remplace complètement
+                l&apos;affectation actuelle par la nouvelle équipe.
+              </span>
+            </label>
             <button
               onClick={confirmReassign}
               disabled={!reassignTeamId || reassignSaving}
