@@ -246,6 +246,13 @@ export type AdminUpcomingEvent = {
     late: number;
     pending: number;
   };
+  // Coéquipiers ayant répondu Présent, avec leur nom — pour le module "Qui
+  // sera là ?" de la carte d'événement. Seul le bloc Famille (le seul
+  // endroit où "vue Parent/Joueur" a du sens) le renseigne : undefined
+  // ailleurs (Bureau, Coach) plutôt qu'un tableau vide, pour que la carte
+  // sache distinguer "personne n'a encore répondu" de "pas concerné par
+  // ce module".
+  presentPlayers?: { id: string; firstName: string | null; lastName: string | null }[];
 };
 
 // Plain (non-component) helper so the "now" read doesn't happen inside the
@@ -1394,6 +1401,15 @@ export default async function DashboardPage() {
     // Levée plus haut qu'avant (ne dépend que de `players`, déjà connu) :
     // sert désormais aussi de garde pour la requête cotisations ci-dessous.
     const familyPlayerIds = players.map((p) => p.id);
+    // Hissé hors du bloc teamsQueryResults ci-dessous (au lieu d'y être
+    // déclaré en `const`) : la liste des présents par événement, plus bas,
+    // a besoin de l'effectif complet de chaque équipe pour savoir à qui
+    // rattacher un statut RSVP — pas seulement au moment où on construit
+    // les cartes "Mon Équipe".
+    const rosterByTeamId = new Map<
+      string,
+      (Person & { birthDate: string | null })[]
+    >();
 
     // Ces trois groupes de requêtes ne dépendent que de allTeamIds /
     // familyPlayerIds, déjà connus ci-dessus — jamais les uns des autres —
@@ -1448,10 +1464,6 @@ export default async function DashboardPage() {
       const teamsById = new Map(
         (teamsRes.data ?? []).map((t) => [t.id, t])
       );
-      const rosterByTeamId = new Map<
-        string,
-        (Person & { birthDate: string | null })[]
-      >();
       const seenTeammateIds = new Set<string>();
       (teammateRowsRes.data ?? []).forEach((row) => {
         const p = row.players as unknown as {
@@ -1575,17 +1587,27 @@ export default async function DashboardPage() {
       .filter((e) => new Date(e.start_time).getTime() >= Date.now())
       .map((e) => e.id);
     const familyCotisationIds = (familyCotisationRows ?? []).map((c) => c.id);
+    // Effectif complet de toutes les équipes de la fratrie, pas seulement
+    // ses propres enfants : "Qui sera là ?" doit pouvoir afficher les
+    // coéquipiers ayant répondu Présent, pas juste Raphaël/Léonie. La RLS
+    // (migration teammates_rsvp_visibility) ne laisse de toute façon
+    // remonter que les lignes d'un coéquipier réel — ce filtre explicite
+    // est une garde en plus, dans le même esprit que familyPlayerIds
+    // ci-dessus pour les cotisations.
+    const allRosterPlayerIds = Array.from(
+      new Set(Array.from(rosterByTeamId.values()).flatMap((list) => list.map((p) => p.id)))
+    );
 
     // Ces trois-là ne dépendent que de ce qui est déjà résolu ci-dessus,
     // mais pas les uns des autres — dernier groupe parallélisable de ce
     // bloc plutôt qu'à la queue leu leu.
     const [rsvpRowsRes, familyPaymentRes, extraFamilyTasks] = await Promise.all([
-      eventIds.length > 0 && familyPlayerIds.length > 0
+      eventIds.length > 0 && allRosterPlayerIds.length > 0
         ? supabase
             .from("rsvps")
             .select("event_id, player_id, status")
             .in("event_id", eventIds)
-            .in("player_id", familyPlayerIds)
+            .in("player_id", allRosterPlayerIds)
         : null,
       familyCotisationIds.length > 0
         ? supabase
@@ -1597,8 +1619,44 @@ export default async function DashboardPage() {
       getEventTasksByEventId(supabase, upcomingFamilyEventIds),
     ]);
 
+    // Statuts par équipe/événement, pour construire à la fois
+    // familyRsvpStatusByKey (boutons Présent/Absent de ses propres
+    // enfants — inchangé) et, juste après, le nombre et le nom des
+    // coéquipiers présents sur chaque carte.
+    const teammateStatusByEvent = new Map<string, Map<string, string>>();
     (rsvpRowsRes?.data ?? []).forEach((r) => {
       familyRsvpStatusByKey[`${r.event_id}:${r.player_id}`] = r.status;
+      const byPlayer = teammateStatusByEvent.get(r.event_id) ?? new Map<string, string>();
+      byPlayer.set(r.player_id, r.status);
+      teammateStatusByEvent.set(r.event_id, byPlayer);
+    });
+
+    // Compteurs (déjà affichés en pastilles) ET liste nominative des
+    // présents (nouveau) : les deux se lisent dans la même donnée, pas la
+    // peine de les calculer séparément. Un événement club-wide (teamId
+    // null, ex. stage d'été) n'a pas d'effectif d'équipe : ni pastille ni
+    // liste, comme avant ce correctif.
+    familyEvents.forEach((e) => {
+      const roster = e.teamId ? (rosterByTeamId.get(e.teamId) ?? []) : [];
+      const statuses = teammateStatusByEvent.get(e.id);
+      let present = 0;
+      let absent = 0;
+      let late = 0;
+      let answered = 0;
+      const presentPlayers: { id: string; firstName: string | null; lastName: string | null }[] =
+        [];
+      roster.forEach((p) => {
+        const status = statuses?.get(p.id);
+        if (!status) return;
+        answered += 1;
+        if (status === "PRESENT") {
+          present += 1;
+          presentPlayers.push({ id: p.id, firstName: p.first_name, lastName: p.last_name });
+        } else if (status === "ABSENT") absent += 1;
+        else if (status === "LATE") late += 1;
+      });
+      e.rsvpCounts = { present, absent, late, pending: Math.max(0, roster.length - answered) };
+      e.presentPlayers = presentPlayers;
     });
 
     if (familyCotisationRows) {

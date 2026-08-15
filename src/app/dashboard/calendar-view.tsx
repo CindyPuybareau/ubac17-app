@@ -3,8 +3,10 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   CalendarDays,
   Cake,
   Check,
@@ -22,7 +24,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { buildGmailComposeLink } from "@/lib/email";
-import { formatPersonName } from "@/lib/names";
+import { formatFirstName, formatLastName, formatPersonName } from "@/lib/names";
 import { parseMatchTitle } from "@/lib/match-display";
 import { teamLabel } from "@/lib/teams";
 import OpponentDisplay from "./opponent-display";
@@ -146,6 +148,55 @@ export type CalendarRsvpPlayer = {
   name: string;
   teamIds: string[];
 };
+
+// Module "Qui sera là ?" : repliée par défaut pour garder la carte
+// compacte (une famille avec plusieurs enfants voit vite s'empiler
+// beaucoup de cartes), un tap dévoile la liste nominative. Le nombre reste
+// visible même repliée — c'est justement ce qui donne envie ou non de
+// déplier. Composant à part (et non une fonction interne à
+// renderEventCard) : lui seul a besoin d'un état local d'ouverture, et un
+// Hook ne peut pas vivre dans une fonction appelée comme un simple
+// callback de rendu.
+function PresentPlayersList({
+  players,
+}: {
+  players: { id: string; firstName: string | null; lastName: string | null }[];
+}) {
+  const [open, setOpen] = useState(false);
+
+  if (players.length === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-1.5 border-t border-zinc-100 pt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:text-zinc-900"
+      >
+        <Users className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+        {players.length} {players.length > 1 ? "joueurs/joueuses présent(e)s" : "joueur/joueuse présent(e)"}
+        {open ? (
+          <ChevronUp className="h-3.5 w-3.5 shrink-0" />
+        ) : (
+          <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+        )}
+      </button>
+      {open && (
+        <div className="flex flex-wrap gap-1.5">
+          {players.map((p) => (
+            <span
+              key={p.id}
+              className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700"
+            >
+              {formatFirstName(p.firstName)}{" "}
+              <span className="font-bold uppercase">{formatLastName(p.lastName)}</span>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function CalendarView({
   events,
@@ -560,6 +611,12 @@ export default function CalendarView({
             </span>
           </div>
         )}
+
+        {/* "Qui sera là ?" : uniquement renseigné côté Famille (voir
+            presentPlayers sur AdminUpcomingEvent) — ne rend donc jamais
+            rien côté Bureau/Coach, qui ont déjà leur propre vue de
+            l'effectif ailleurs. */}
+        <PresentPlayersList players={event.presentPlayers ?? []} />
 
         {/* Plus d'appel express ici pour une équipe gérée : le coach ne
             répond pas à la place des familles, il leur demande de le
