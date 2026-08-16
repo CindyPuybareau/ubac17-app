@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { BarChart3, Cake, CalendarDays, Users } from "lucide-react";
+import { BarChart3, Cake, CalendarDays, Trophy, Users } from "lucide-react";
 import AdminSidebar, { type AdminSection } from "@/app/dashboard/admin-sidebar";
 import { formatFirstName } from "@/lib/names";
 import { styleFor, isMatchType, homeAwayLabel, formatEventTime } from "@/app/dashboard/event-style";
@@ -10,6 +10,7 @@ import { localDateFromParts } from "@/lib/local-date";
 import ChildLogoutButton from "./child-logout-button";
 import ChildCalendarTab from "./child-calendar-tab";
 import ChildTeamTab from "./child-team-tab";
+import ChildResultsTab from "./child-results-tab";
 import ChildPresenceTab from "./child-presence-tab";
 import ChildNotificationBell, { type ChildNotification } from "./child-notification-bell";
 
@@ -88,12 +89,14 @@ export default function ChildDashboard({
     .sort((a, b) => a.birth.getDate() - b.birth.getDate());
 
   const iconClass = "h-4 w-4 shrink-0";
-  // 3 onglets seulement : "Accueil" a été retiré (redondant avec ce que
-  // Calendrier montre maintenant en tête de page) et "Défis" a laissé la
-  // place à "Mes Présences", un vrai bilan d'assiduité plutôt qu'un
-  // système de badges. Calendrier est délibérément en premier :
-  // AdminSidebar ouvre toujours sur sections[0], c'est donc lui la page
-  // d'accueil désormais.
+  // "Accueil" a été retiré (redondant avec ce que Calendrier montre
+  // maintenant en tête de page) et "Défis" a laissé la place à "Mes
+  // Présences", un vrai bilan d'assiduité plutôt qu'un système de badges.
+  // "Résultats" a rejoint le lot en onglet séparé (repris pendant un
+  // temps dans Mon Équipe, mais Cindy voulait un onglet à part entière,
+  // comme côté Bureau/Coach/Parents). Calendrier est délibérément en
+  // premier : AdminSidebar ouvre toujours sur sections[0], c'est donc lui
+  // la page d'accueil désormais.
   const sections: AdminSection[] = [
     {
       key: "calendar",
@@ -140,9 +143,14 @@ export default function ChildDashboard({
           coaches={coaches}
           nextEvent={nextEvent}
           nextEventAttendance={nextEventAttendance}
-          pastMatches={pastMatches}
         />
       ),
+    },
+    {
+      key: "results",
+      label: "Résultats",
+      icon: <Trophy className={iconClass} />,
+      content: <ChildResultsTab pastMatches={pastMatches} />,
     },
     {
       key: "presence",
