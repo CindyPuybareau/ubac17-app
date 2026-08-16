@@ -49,14 +49,19 @@ function Modal({
   title,
   onClose,
   children,
+  widthClassName = "max-w-sm",
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
+  // Les modales de confirmation à deux boutons ("Annuler" / action) ont
+  // besoin d'un peu plus de largeur que max-w-sm pour que le bouton
+  // d'action tienne sur une seule ligne sans se tasser.
+  widthClassName?: string;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
+      <div className={`w-full ${widthClassName} rounded-2xl bg-white p-5 shadow-xl`}>
         <div className="mb-3 flex items-center justify-between">
           <h3 className="font-semibold text-zinc-900">{title}</h3>
           <button
@@ -875,7 +880,11 @@ export default function MembersTable({
       )}
 
       {deleteTarget && (
-        <Modal title="Suppression définitive" onClose={() => setDeleteTarget(null)}>
+        <Modal
+          title="Suppression définitive"
+          onClose={() => setDeleteTarget(null)}
+          widthClassName="max-w-md"
+        >
           <div className="flex flex-col gap-3">
             <p className="text-sm text-zinc-700">
               Êtes-vous sûr de vouloir supprimer définitivement{" "}
@@ -884,19 +893,19 @@ export default function MembersTable({
               </span>{" "}
               ? Cette action est irréversible.
             </p>
-            <div className="flex items-center gap-2">
+            <div className="flex items-stretch gap-2">
               <button
                 onClick={() => setDeleteTarget(null)}
-                className="flex-1 rounded-full border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+                className="flex-1 whitespace-nowrap rounded-full border border-zinc-200 px-3 py-2 text-[14px] font-medium text-zinc-600 hover:bg-zinc-50"
               >
                 Annuler
               </button>
               <button
                 onClick={confirmDelete}
                 disabled={deleting}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-red-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
+                className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-red-600 px-3 py-2 text-[14px] font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
               >
-                <Trash2 className="h-3.5 w-3.5" />
+                <Trash2 className="h-3.5 w-3.5 shrink-0" />
                 {deleting ? "Suppression..." : "Supprimer définitivement"}
               </button>
             </div>
