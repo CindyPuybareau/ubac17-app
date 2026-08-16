@@ -302,12 +302,25 @@ export default function ImportInscriptions() {
 
     const existingByLicense = new Map<string, string>();
     const existingByNameBirth = new Map<string, string>();
+    // Repli de dernier recours (voir resolveExistingId ci-dessous) : liste
+    // des id par nom+prénom seuls, pour retrouver un membre même si sa
+    // date de naissance stockée diffère de celle fraîchement relue du
+    // fichier — incident du 16/08/2026, où une correction du parsing des
+    // dates a changé la valeur calculée et fait perdre la correspondance
+    // exacte nom+prénom+date pour tout membre sans n° de licence, créant
+    // des doublons en masse. Un tableau (pas juste le dernier id) pour
+    // détecter l'ambiguïté : deux homonymes ne doivent jamais fusionner.
+    const existingByNameOnly = new Map<string, string[]>();
     (existingPlayers ?? []).forEach((p) => {
       if (p.license_number) existingByLicense.set(p.license_number, p.id);
       existingByNameBirth.set(
         nameBirthKey(p.first_name ?? "", p.last_name ?? "", p.birth_date),
         p.id
       );
+      const nameKey = `${(p.first_name ?? "").trim().toLowerCase()}|${(p.last_name ?? "").trim().toLowerCase()}`;
+      const list = existingByNameOnly.get(nameKey) ?? [];
+      list.push(p.id);
+      existingByNameOnly.set(nameKey, list);
     });
 
     function resolveExistingId(r: ParsedRow): string | null {
@@ -315,7 +328,18 @@ export default function ImportInscriptions() {
         return existingByLicense.get(r.licenseNumber) ?? null;
       }
       const key = nameBirthKey(r.firstName, r.lastName, r.birthDate);
-      return existingByNameBirth.get(key) ?? null;
+      const exact = existingByNameBirth.get(key);
+      if (exact) return exact;
+      // La date de naissance seule a changé (import précédent buggé,
+      // correction manuelle...) : si un seul membre existant porte ce
+      // nom+prénom, c'est très probablement lui — mieux vaut le mettre à
+      // jour (et corriger sa date au passage) que le dupliquer. En cas
+      // d'homonymie (plusieurs membres, ex. jumeaux), on refuse de
+      // deviner : mieux vaut rater une mise à jour qu'en fusionner deux.
+      const nameKey = `${r.firstName.trim().toLowerCase()}|${r.lastName.trim().toLowerCase()}`;
+      const candidates = existingByNameOnly.get(nameKey);
+      if (candidates && candidates.length === 1) return candidates[0];
+      return null;
     }
 
     const toInsert: MatchedRow[] = [];
