@@ -41,9 +41,26 @@ type ParsedRow = {
   horodatage: number;
 };
 
+// Arrondi au jour le plus proche plutôt qu'un floor : le fichier "Suivi
+// des Inscriptions" (export Google Forms -> Google Sheets -> Excel) encode
+// systématiquement chaque date de naissance avec un résidu de quelques
+// dizaines de secondes avant minuit heure de Paris (23:59:39, sur les 92
+// lignes vérifiées) au lieu d'un minuit propre — un artefact de la chaîne
+// d'export, pas une vraie heure. Un floor prenait alors le jour précédent
+// à chaque fois ; arrondir absorbe ce résidu sans jamais dépendre du
+// fuseau d'exécution (le calcul reste en UTC de bout en bout).
 function excelSerialToISODate(serial: number): string {
-  const utcDays = Math.floor(serial - 25569);
+  const utcDays = Math.round(serial - 25569);
   return new Date(utcDays * 86400 * 1000).toISOString().slice(0, 10);
+}
+
+// Même correction pour les cellules déjà converties en Date par la lib
+// xlsx (cellDates: true) — c'est en réalité le chemin emprunté pour la
+// quasi-totalité des lignes de ce fichier.
+function dateCellToISODate(d: Date): string {
+  const dayMs = 86400000;
+  const roundedMs = Math.round(d.getTime() / dayMs) * dayMs;
+  return new Date(roundedMs).toISOString().slice(0, 10);
 }
 
 function normalizeStatut(raw: string | null): string | null {
@@ -192,7 +209,7 @@ export default function ImportInscriptions() {
       const birthRaw = idx.naissance >= 0 ? r[idx.naissance] : null;
       let birthDate: string | null = null;
       if (birthRaw instanceof Date) {
-        birthDate = birthRaw.toISOString().slice(0, 10);
+        birthDate = dateCellToISODate(birthRaw);
       } else if (typeof birthRaw === "number") {
         birthDate = excelSerialToISODate(birthRaw);
       }

@@ -24,9 +24,21 @@ function normalize(s: string): string {
     .toUpperCase();
 }
 
+// Même correction que import-inscriptions.tsx (voir son commentaire pour
+// le détail) : certains exports Google Sheets encodent une date "pure"
+// avec un résidu de quelques dizaines de secondes avant minuit plutôt
+// qu'un minuit propre. Arrondir au jour le plus proche absorbe ce résidu.
 function excelSerialToDate(serial: number): Date {
-  const utcDays = Math.floor(serial - 25569);
+  const utcDays = Math.round(serial - 25569);
   return new Date(utcDays * 86400 * 1000);
+}
+
+// Même arrondi pour une cellule déjà convertie en Date par la lib xlsx —
+// seul le jour calendaire nous intéresse ici, l'heure vient de la colonne
+// "Heure" séparée (voir combineDateTime ci-dessous).
+function roundDateToDay(d: Date): Date {
+  const dayMs = 86400000;
+  return new Date(Math.round(d.getTime() / dayMs) * dayMs);
 }
 
 function parseHeure(value: unknown): { h: number; m: number } {
@@ -38,7 +50,7 @@ function parseHeure(value: unknown): { h: number; m: number } {
 
 function combineDateTime(dateValue: unknown, heureValue: unknown): string | null {
   let base: Date | null = null;
-  if (dateValue instanceof Date) base = dateValue;
+  if (dateValue instanceof Date) base = roundDateToDay(dateValue);
   else if (typeof dateValue === "number") base = excelSerialToDate(dateValue);
   else if (typeof dateValue === "string" && dateValue.trim()) {
     const parsed = new Date(dateValue);
