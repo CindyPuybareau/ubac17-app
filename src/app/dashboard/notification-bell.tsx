@@ -89,7 +89,14 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-30 mt-2 w-80 max-w-[90vw] overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-xl">
+        // Sous le point de rupture sm, un dropdown "absolute right-0"
+        // ancré au bouton (pas au viewport) dépassait de l'écran : la
+        // cloche n'est pas collée au bord droit de l'écran (le bouton
+        // Déconnexion la suit), donc le popover partait plus à gauche
+        // qu'il n'y avait de place. En fixed + marges fixes sur mobile, il
+        // est ancré au viewport lui-même, jamais au bouton — plus aucun
+        // dépassement possible quelle que soit la position de la cloche.
+        <div className="fixed inset-x-4 top-16 z-30 overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-80">
           <div className="flex items-center justify-between gap-2 border-b border-zinc-100 px-4 py-3">
             <p className="text-sm font-semibold text-zinc-900">Notifications</p>
             {marking && <span className="text-[11px] text-zinc-400">Mise à jour...</span>}

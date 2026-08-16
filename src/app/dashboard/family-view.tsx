@@ -7,7 +7,6 @@ import CalendarView, { type CalendarRsvpPlayer } from "./calendar-view";
 import FamilyTeamCard, { type FamilyTeamCardData } from "./family-team-card";
 import FamilyAttendanceRequests from "./family-attendance-requests";
 import FamilyAttendanceSummary from "./family-attendance-summary";
-import PushSubscribe from "./push-subscribe";
 import CalendarSubscribe from "./calendar-subscribe";
 import FamilyCotisationCard from "./family-cotisation-card";
 import ChildAccessManager from "./child-access-manager";
@@ -217,10 +216,6 @@ export default function FamilyView({
         players={visiblePlayers}
         statusByKey={rsvpStatusByKey}
       />
-
-      {/* Ne s'affiche que là où le navigateur sait recevoir un push : sur
-          iPhone, seulement si l'app est installée sur l'écran d'accueil. */}
-      <PushSubscribe />
 
       {hasSeveralChildren && (
         <div className="flex flex-wrap items-center gap-2">

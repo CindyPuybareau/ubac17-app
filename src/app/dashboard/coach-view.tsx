@@ -1,7 +1,6 @@
 import { CalendarDays, ClipboardList, Trophy, Users } from "lucide-react";
 import CalendarView from "./calendar-view";
 import CalendarSubscribe from "./calendar-subscribe";
-import PushSubscribe from "./push-subscribe";
 import CoachTeams from "./coach-teams";
 import CoachFfbb from "./coach-ffbb";
 import CoachOrganisation, { type CoachTeamMatchCard } from "./coach-organisation";
@@ -165,12 +164,6 @@ export default function CoachView({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Même emplacement que côté Famille, hors des onglets : un coach
-          doit pouvoir l'activer sans avoir à deviner dans quel onglet elle
-          se cache. Ne s'affiche que là où le navigateur sait recevoir un
-          push (sur iPhone, seulement si l'app est installée à l'écran
-          d'accueil). */}
-      <PushSubscribe />
       <AdminSidebar sections={sections} />
     </div>
   );
