@@ -1,3 +1,5 @@
+import { localDateFromParts } from "@/lib/local-date";
+
 export type BirthdaySource = {
   id: string;
   firstName: string | null;
@@ -49,8 +51,8 @@ export function upcomingBirthdays<T extends BirthdaySource>(
 
   members.forEach((m) => {
     if (!m.birthDate) return;
-    const birth = new Date(m.birthDate);
-    if (Number.isNaN(birth.getTime())) return;
+    const birth = localDateFromParts(m.birthDate);
+    if (!birth) return;
 
     const thisYear = new Date(today.getFullYear(), birth.getMonth(), birth.getDate());
     let daysUntil = Math.round((thisYear.getTime() - today.getTime()) / msPerDay);

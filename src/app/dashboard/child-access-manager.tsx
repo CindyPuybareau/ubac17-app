@@ -8,12 +8,6 @@ import { isValidPinFormat } from "@/lib/pin";
 
 type Child = { id: string; name: string; hasPin: boolean };
 
-// Même repli par défaut et même mémorisation par appareil que
-// CalendarSubscribe (voir calendar-subscribe.tsx) : une famille configure
-// ça une fois, pas à chaque visite — mais reste à un clic pour qui veut
-// copier le lien à nouveau ou changer un code.
-const COLLAPSE_STORAGE_KEY = "ubac-child-access-collapsed";
-
 // Gestion de l'accès enfant (lien privé par famille + PIN par enfant) —
 // entièrement autonome : ne dépend d'aucune donnée déjà chargée par
 // page.tsx, tout est relu ici via les fonctions SQL dédiées
@@ -30,21 +24,12 @@ export default function ChildAccessManager() {
   const [pinDraft, setPinDraft] = useState("");
   const [pinError, setPinError] = useState<string | null>(null);
   const [savingPin, setSavingPin] = useState(false);
-  const [collapsed, setCollapsed] = useState(() => {
-    if (typeof window === "undefined") return true;
-    const stored = window.localStorage.getItem(COLLAPSE_STORAGE_KEY);
-    return stored === null ? true : stored === "1";
-  });
-
-  function setCollapsedPersisted(next: boolean) {
-    setCollapsed(next);
-    try {
-      window.localStorage.setItem(COLLAPSE_STORAGE_KEY, next ? "1" : "0");
-    } catch {
-      // Stockage indisponible (navigation privée...) : le repli reste
-      // actif pour cette visite, simplement pas mémorisé pour la suivante.
-    }
-  }
+  // Replié par défaut à chaque ouverture de page, sans mémorisation par
+  // appareil (voir calendar-subscribe.tsx pour l'explication complète du
+  // même choix) : une préférence "resté ouvert" stockée en localStorage
+  // laissait ce bloc bloqué ouvert indéfiniment dès qu'on l'avait déplié
+  // une fois.
+  const [collapsed, setCollapsed] = useState(true);
 
   async function load() {
     const supabase = createClient();
@@ -130,7 +115,7 @@ export default function ChildAccessManager() {
     return (
       <button
         type="button"
-        onClick={() => setCollapsedPersisted(false)}
+        onClick={() => setCollapsed(false)}
         className="flex w-full items-center justify-between gap-2 rounded-2xl border border-zinc-100 bg-white px-4 py-2.5 text-left shadow-sm transition-colors hover:bg-zinc-50"
       >
         <span className="flex items-center gap-1.5 text-sm font-medium text-zinc-600">
@@ -153,7 +138,7 @@ export default function ChildAccessManager() {
         </p>
         <button
           type="button"
-          onClick={() => setCollapsedPersisted(true)}
+          onClick={() => setCollapsed(true)}
           title="Réduire"
           className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
         >

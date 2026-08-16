@@ -6,6 +6,7 @@ import AdminSidebar, { type AdminSection } from "@/app/dashboard/admin-sidebar";
 import { formatFirstName } from "@/lib/names";
 import { styleFor, isMatchType, homeAwayLabel, formatEventTime } from "@/app/dashboard/event-style";
 import { parseMatchTitle } from "@/lib/match-display";
+import { localDateFromParts } from "@/lib/local-date";
 import ChildLogoutButton from "./child-logout-button";
 import ChildCalendarTab from "./child-calendar-tab";
 import ChildTeamTab from "./child-team-tab";
@@ -73,8 +74,9 @@ export default function ChildDashboard({
 
   const thisMonth = new Date().getMonth();
   const birthdaysThisMonth = teammatesOnly
-    .filter((t) => t.birthDate && new Date(t.birthDate).getMonth() === thisMonth)
-    .sort((a, b) => new Date(a.birthDate!).getDate() - new Date(b.birthDate!).getDate());
+    .map((t) => ({ teammate: t, birth: t.birthDate ? localDateFromParts(t.birthDate) : null }))
+    .filter((x): x is { teammate: ChildTeammate; birth: Date } => x.birth !== null && x.birth.getMonth() === thisMonth)
+    .sort((a, b) => a.birth.getDate() - b.birth.getDate());
 
   const iconClass = "h-4 w-4 shrink-0";
   // 3 onglets seulement : "Accueil" a été retiré (redondant avec ce que
@@ -103,12 +105,12 @@ export default function ChildDashboard({
                 Anniversaires du mois
               </p>
               <div className="mt-2 flex flex-wrap gap-1.5">
-                {birthdaysThisMonth.map((t) => (
+                {birthdaysThisMonth.map(({ teammate, birth }) => (
                   <span
-                    key={t.id}
+                    key={teammate.id}
                     className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-amber-800 shadow-sm"
                   >
-                    {formatFirstName(t.firstName)} · {new Date(t.birthDate!).getDate()}
+                    {formatFirstName(teammate.firstName)} · {birth.getDate()}
                   </span>
                 ))}
               </div>

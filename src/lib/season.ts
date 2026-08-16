@@ -6,6 +6,8 @@
 // extra "année" for everyone, etc.) need zero manual intervention: the
 // same code just returns different numbers the day after June 30th.
 
+import { parseDateParts } from "./local-date";
+
 // French basketball seasons run September-to-June but the club treats
 // July 1st as the hard cutover point (registrations for the new season
 // open then), so "the season" for any given date is:
@@ -54,8 +56,9 @@ export function computePlayerYearStatus(
   referenceDate: Date = new Date()
 ): PlayerYearStatus | null {
   if (!birthDate || !category) return null;
-  const birthYear = new Date(birthDate).getFullYear();
-  if (Number.isNaN(birthYear)) return null;
+  const parts = parseDateParts(birthDate);
+  if (!parts) return null;
+  const birthYear = parts.year;
 
   const seasonStart = getCurrentSeasonStartYear(referenceDate);
   const age = seasonStart - birthYear;

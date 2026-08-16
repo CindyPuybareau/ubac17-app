@@ -4,16 +4,15 @@ import { useEffect, useState } from "react";
 import { CalendarPlus, Check, ChevronDown, ChevronUp, Copy, RefreshCw } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
-// Replié par défaut : la quasi-totalité des familles ne s'en sert qu'une
-// fois (récupérer le lien), pas à chaque visite du tableau de bord — le
-// garder ouvert en permanence ne faisait qu'allonger la page pour rien.
-// Toujours accessible en un clic sur la flèche pour qui veut y revenir.
-// Mémorisé sur CET appareil pour respecter un choix explicite de rouvrir
-// et garder ouvert (aucune détection possible côté serveur d'une
-// intégration terminée dans Google/Apple Calendar) — seule l'absence de
-// préférence stockée retombe sur replié.
-const COLLAPSE_STORAGE_KEY = "ubac-calendar-subscribe-collapsed";
-
+// Replié par défaut à CHAQUE ouverture de page, sans exception : la
+// quasi-totalité des familles ne s'en sert qu'une fois (récupérer le
+// lien), pas à chaque visite du tableau de bord — le garder ouvert en
+// permanence ne faisait qu'allonger la page pour rien. Toujours accessible
+// en un clic sur la flèche pour qui veut y revenir. Une précédente version
+// mémorisait "resté ouvert" par appareil (localStorage) — retiré : ça
+// laissait le bloc bloqué ouvert indéfiniment dès qu'on l'avait dépliĕ une
+// fois, ce qui ressemblait à un bug plutôt qu'à un choix.
+//
 // Abonnement à sens unique : une fois le lien collé dans Google/Apple
 // Calendar, les matchs et entraînements de l'équipe de l'enfant
 // apparaissent tout seuls dans l'agenda que le parent regarde déjà — mis à
@@ -24,11 +23,7 @@ export default function CalendarSubscribe() {
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [collapsed, setCollapsed] = useState(() => {
-    if (typeof window === "undefined") return true;
-    const stored = window.localStorage.getItem(COLLAPSE_STORAGE_KEY);
-    return stored === null ? true : stored === "1";
-  });
+  const [collapsed, setCollapsed] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -83,23 +78,13 @@ export default function CalendarSubscribe() {
     }
   }
 
-  function setCollapsedPersisted(next: boolean) {
-    setCollapsed(next);
-    try {
-      window.localStorage.setItem(COLLAPSE_STORAGE_KEY, next ? "1" : "0");
-    } catch {
-      // Stockage indisponible (navigation privée...) : le repli reste
-      // actif pour cette visite, simplement pas mémorisé pour la suivante.
-    }
-  }
-
   if (token === undefined) return null;
 
   if (collapsed) {
     return (
       <button
         type="button"
-        onClick={() => setCollapsedPersisted(false)}
+        onClick={() => setCollapsed(false)}
         className="flex w-full items-center justify-between gap-2 rounded-2xl border border-zinc-100 bg-white px-4 py-2.5 text-left shadow-sm transition-colors hover:bg-zinc-50"
       >
         <span className="flex items-center gap-1.5 text-sm font-medium text-zinc-600">
@@ -127,7 +112,7 @@ export default function CalendarSubscribe() {
         </p>
         <button
           type="button"
-          onClick={() => setCollapsedPersisted(true)}
+          onClick={() => setCollapsed(true)}
           title="Réduire"
           className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
         >

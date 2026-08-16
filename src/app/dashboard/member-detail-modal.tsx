@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatPersonName } from "@/lib/names";
+import { formatLocalDateFr } from "@/lib/local-date";
 import { teamLabel } from "@/lib/teams";
 import { buildAppDeepLink, buildWhatsAppLink } from "@/lib/whatsapp";
 import DateTimePicker from "./date-time-picker";
@@ -204,9 +205,7 @@ type TabKey = (typeof TABS)[number]["key"];
 
 function formatBirthDate(iso: string | null) {
   if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("fr-FR");
+  return formatLocalDateFr(iso) ?? iso;
 }
 
 // Exported so AddMemberModal (creation form) can reuse the exact same
