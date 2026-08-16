@@ -41,6 +41,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
+  // Historique en base pour la cloche in-app : indépendant du succès de
+  // l'envoi push (best-effort, jamais bloquant) — un parent qui ouvre son
+  // espace plus tard doit retrouver l'alerte même s'il n'était abonné à
+  // rien au moment de l'envoi.
+  try {
+    const { data: eventRow } = await supabase.from("events").select("team_id").eq("id", eventId).maybeSingle();
+    await supabase.from("notifications").insert({
+      team_id: eventRow?.team_id ?? null,
+      event_id: eventId,
+      title: title ?? "UBAC",
+      body: body ?? "Le coach attend ta réponse.",
+      url: url ?? "/dashboard",
+    });
+  } catch {
+    // Silencieux : voir la note plus haut sur les échecs non bloquants.
+  }
+
   const subscriptions = (targets ?? []) as {
     endpoint: string;
     p256dh: string;

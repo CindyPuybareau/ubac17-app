@@ -3,6 +3,7 @@ import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { formatFirstName, formatPersonName } from "@/lib/names";
 import SignOutButton from "./sign-out-button";
+import NotificationBell from "./notification-bell";
 import RealtimeSync from "./realtime-sync";
 import DashboardTabs, { type DashboardTab } from "./dashboard-tabs";
 import AdminView from "./admin-view";
@@ -1850,7 +1851,10 @@ export default async function DashboardPage() {
             <Image src="/logo.png" alt="UBAC" width={32} height={32} className="h-8 w-8 object-contain" priority />
             <span className="text-sm font-semibold text-white">UBAC</span>
           </div>
-          <SignOutButton />
+          <div className="flex items-center gap-1">
+            <NotificationBell />
+            <SignOutButton />
+          </div>
         </div>
       </header>
 

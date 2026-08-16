@@ -10,6 +10,7 @@ import ChildLogoutButton from "./child-logout-button";
 import ChildCalendarTab from "./child-calendar-tab";
 import ChildTeamTab from "./child-team-tab";
 import ChildPresenceTab from "./child-presence-tab";
+import ChildNotificationBell, { type ChildNotification } from "./child-notification-bell";
 
 export type ChildEvent = {
   id: string;
@@ -51,6 +52,8 @@ export default function ChildDashboard({
   coaches,
   presence,
   nextEventAttendance,
+  notifications,
+  notificationsEnabled,
 }: {
   firstName: string | null;
   category: string | null;
@@ -61,6 +64,8 @@ export default function ChildDashboard({
   coaches: ChildCoach[];
   presence: { trainings: ChildAttendanceStats; matches: ChildAttendanceStats };
   nextEventAttendance: { name: string | null; status: string }[];
+  notifications: ChildNotification[];
+  notificationsEnabled: boolean;
 }) {
   const now = Date.now();
   const nextEvent = events.find((e) => new Date(e.startTime).getTime() >= now) ?? null;
@@ -143,7 +148,10 @@ export default function ChildDashboard({
             <Image src="/logo.png" alt="UBAC" width={32} height={32} className="h-8 w-8 object-contain" priority />
             <span className="text-sm font-semibold text-white">UBAC</span>
           </div>
-          <ChildLogoutButton />
+          <div className="flex items-center gap-1">
+            <ChildNotificationBell initialNotifications={notifications} initialEnabled={notificationsEnabled} />
+            <ChildLogoutButton />
+          </div>
         </div>
       </header>
 

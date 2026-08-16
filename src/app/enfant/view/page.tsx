@@ -33,7 +33,7 @@ export default async function ChildViewPage() {
 
   const { data: player } = await supabase
     .from("players")
-    .select("id, first_name, category")
+    .select("id, first_name, category, notifications_enabled")
     .eq("id", playerId)
     .maybeSingle();
 
@@ -189,6 +189,52 @@ export default async function ChildViewPage() {
       }))
     : [];
 
+  // Cloche de notifications : mêmes alertes que Parent/Coach (voir la
+  // migration 20260817000000_notifications.sql), lues ici en service_role
+  // et filtrées à la main sur les équipes de l'enfant — pas de fonction
+  // SQL notifications_for_me() côté enfant, elle repose sur auth.uid() qui
+  // n'existe pas pour lui.
+  const notificationsEnabled = player.notifications_enabled ?? true;
+  let notifications: {
+    id: string;
+    teamName: string | null;
+    title: string;
+    body: string;
+    createdAt: string;
+    readAt: string | null;
+  }[] = [];
+  if (notificationsEnabled) {
+    const notifQuery = supabase
+      .from("notifications")
+      .select("id, team_id, title, body, created_at, teams(name)")
+      .order("created_at", { ascending: false })
+      .limit(30);
+    const { data: notifRows } =
+      teamIds.length > 0
+        ? await notifQuery.or(`team_id.is.null,team_id.in.(${teamIds.join(",")})`)
+        : await notifQuery.is("team_id", null);
+
+    const notifIds = (notifRows ?? []).map((n) => n.id);
+    const { data: readRows } =
+      notifIds.length > 0
+        ? await supabase
+            .from("notification_reads")
+            .select("notification_id, read_at")
+            .eq("player_id", playerId)
+            .in("notification_id", notifIds)
+        : { data: [] as { notification_id: string; read_at: string }[] };
+    const readAtByNotifId = new Map((readRows ?? []).map((r) => [r.notification_id, r.read_at]));
+
+    notifications = (notifRows ?? []).map((n) => ({
+      id: n.id,
+      teamName: (n.teams as unknown as { name: string | null } | null)?.name ?? null,
+      title: n.title,
+      body: n.body,
+      createdAt: n.created_at,
+      readAt: readAtByNotifId.get(n.id) ?? null,
+    }));
+  }
+
   return (
     <ChildDashboard
       firstName={player.first_name}
@@ -200,6 +246,8 @@ export default async function ChildViewPage() {
       coaches={coaches}
       presence={presence}
       nextEventAttendance={nextEventAttendance}
+      notifications={notifications}
+      notificationsEnabled={notificationsEnabled}
     />
   );
 }

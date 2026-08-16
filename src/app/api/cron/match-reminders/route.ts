@@ -104,6 +104,17 @@ export async function GET(request: Request) {
       .filter(Boolean)
       .join(" · ");
 
+    // Historique en base pour la cloche in-app, comme dans /api/send-push
+    // — indépendant de subs.length : un rappel reste consultable dans
+    // l'historique même sans personne d'abonné au push ce jour-là.
+    await supabase.from("notifications").insert({
+      team_id: event.team_id,
+      event_id: event.id,
+      title,
+      body,
+      url: "/dashboard",
+    });
+
     const subs = await pushSubscriptionsForTeam(supabase, event.team_id);
     if (subs.length > 0) {
       const payload = JSON.stringify({
