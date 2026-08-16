@@ -89,6 +89,21 @@ export default function FamilyView({
     return sortTeamsByGroup(cards.map((c) => ({ ...c, name: c.teamName })));
   }, [teamCards, selectedPlayerId]);
 
+  // Sélecteur d'équipe de la vue Résultats (voir calendar-view.tsx) : une
+  // famille à plusieurs enfants sur des équipes différentes a exactement
+  // le même besoin qu'un coach sur "Mes Équipes" — dédoublonné par
+  // équipe, un enfant sur 2 équipes ou 2 enfants sur la même n'y
+  // apparaissant qu'une fois.
+  const visibleResultsTeams = useMemo(() => {
+    const byTeamId = new Map<string, { id: string; name: string | null; category: string | null }>();
+    visibleTeamCards.forEach((c) => {
+      if (!byTeamId.has(c.teamId)) {
+        byTeamId.set(c.teamId, { id: c.teamId, name: c.teamName, category: c.category });
+      }
+    });
+    return Array.from(byTeamId.values());
+  }, [visibleTeamCards]);
+
   const visiblePlayerIds = useMemo(() => visiblePlayers.map((p) => p.id), [visiblePlayers]);
   const visibleCotisations = useMemo(
     () => cotisations.filter((c) => visiblePlayerIds.includes(c.playerId)),
@@ -209,7 +224,13 @@ export default function FamilyView({
       key: "results",
       label: "Résultats",
       icon: <Trophy className={iconClass} />,
-      content: <CalendarView events={visibleEvents} forcedView="results" />,
+      content: (
+        <CalendarView
+          events={visibleEvents}
+          forcedView="results"
+          resultsTeams={visibleResultsTeams.map((t) => ({ ...t, role: "PLAYER" as const }))}
+        />
+      ),
     },
   ];
 

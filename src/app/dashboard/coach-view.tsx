@@ -168,6 +168,16 @@ export default function CoachView({
             category: t.category,
           }))}
           forcedView="results"
+          // Un coach qui encadre plusieurs équipes (et joue parfois dans
+          // une autre) doit pouvoir choisir laquelle regarder, comme dans
+          // "Mes Équipes" — sinon tous les matchs de toutes ses équipes
+          // se mélangent dans un seul fil.
+          resultsTeams={teams.map((t) => ({
+            id: t.id,
+            name: t.name,
+            category: t.category,
+            role: teamRoleByTeamId[t.id] ?? "COACH",
+          }))}
         />
       ),
     },

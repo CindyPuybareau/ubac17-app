@@ -15,9 +15,11 @@ import {
   List,
   Mail,
   MapPin,
+  ClipboardList,
   Pencil,
   PartyPopper,
   Plus,
+  Shirt,
   StickyNote,
   Trash2,
   Trophy,
@@ -28,7 +30,7 @@ import { createClient } from "@/lib/supabase/client";
 import { buildGmailComposeLink } from "@/lib/email";
 import { formatFirstName, formatLastName, sortByLastName } from "@/lib/names";
 import { parseMatchTitle } from "@/lib/match-display";
-import { teamLabel } from "@/lib/teams";
+import { sortTeamsByGroup, teamLabel } from "@/lib/teams";
 import OpponentDisplay from "./opponent-display";
 import CreateEventForm from "./create-event-form";
 import DateTimePicker from "./date-time-picker";
@@ -213,6 +215,7 @@ export default function CalendarView({
   eventRoles = [],
   selfPlayerId = null,
   forcedView,
+  resultsTeams,
 }: {
   events: AdminUpcomingEvent[];
   createTeams?: CalendarTeamRef[];
@@ -241,11 +244,20 @@ export default function CalendarView({
   // le bouton de ses coéquipiers (voir rsvpVisiblePlayers plus bas).
   selfPlayerId?: string | null;
   // Utilisé par l'onglet "Résultats" dédié (sidebar Bureau/Coach/Parent) :
-  // verrouille la vue sur les résultats et masque la bascule Liste/Mois/
-  // Résultats, qui n'aurait plus de sens sur une page qui ne s'appelle
-  // que "Résultats". Omis (undefined) partout ailleurs, où les trois
-  // vues restent librement accessibles depuis l'onglet Calendrier.
+  // verrouille la vue sur les résultats, cette page n'ayant plus besoin
+  // de bascule Liste/Mois — celle-ci reste dans l'onglet Calendrier.
   forcedView?: "results";
+  // Sélecteur d'équipe façon "Mes Équipes" (voir coach-teams.tsx), pour un
+  // coach qui encadre plusieurs équipes : sans lui, la vue Résultats
+  // mélangeait les matchs de toutes ses équipes dans un seul fil, sans
+  // aucun moyen de s'y retrouver. Omis (undefined) là où une seule équipe
+  // est en jeu, ou côté Bureau qui veut au contraire tout voir d'un coup.
+  resultsTeams?: {
+    id: string;
+    name: string | null;
+    category: string | null;
+    role?: "COACH" | "PLAYER";
+  }[];
 }) {
   const router = useRouter();
   const [viewMonth, setViewMonth] = useState<Date>(today);
@@ -255,6 +267,16 @@ export default function CalendarView({
   // suite ?".
   const [view, setView] = useState<"list" | "month" | "results">(forcedView ?? "month");
   const [createOpen, setCreateOpen] = useState(false);
+
+  // Même ordre que "Mes Équipes" : l'équipe mère avant ses déclinaisons.
+  const sortedResultsTeams = useMemo(
+    () => (resultsTeams ? sortTeamsByGroup(resultsTeams) : []),
+    [resultsTeams]
+  );
+  const [activeResultsTeamId, setActiveResultsTeamId] = useState<string | undefined>(
+    sortedResultsTeams[0]?.id
+  );
+  const activeResultsTeamIdResolved = activeResultsTeamId ?? sortedResultsTeams[0]?.id;
 
   const canManage = Boolean(createTeams && createTeams.length > 0);
 
@@ -473,9 +495,16 @@ export default function CalendarView({
   // ait réellement eu lieu).
   const seasonMatches = useMemo(() => {
     return events
-      .filter((e) => isMatchType(e.event_type))
+      .filter(
+        (e) =>
+          isMatchType(e.event_type) &&
+          // Filtré sur l'équipe active du sélecteur seulement quand il y en
+          // a un (plusieurs équipes en jeu) — sinon (Bureau, ou une seule
+          // équipe) on garde tout, comme avant.
+          (!resultsTeams || resultsTeams.length <= 1 || e.teamId === activeResultsTeamIdResolved)
+      )
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
-  }, [events]);
+  }, [events, resultsTeams, activeResultsTeamIdResolved]);
 
   // Anniversaires + événements mélangés dans un seul fil chronologique,
   // triés ensemble : un anniversaire vaut minuit ce jour-là (avant tout
@@ -916,15 +945,6 @@ export default function CalendarView({
                 <LayoutGrid className="h-3.5 w-3.5" />
                 Mois
               </button>
-              <button
-                onClick={() => setView("results")}
-                className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
-                  view === "results" ? "bg-navy text-white" : "text-zinc-500 hover:bg-zinc-50"
-                }`}
-              >
-                <Trophy className="h-3.5 w-3.5" />
-                Résultats
-              </button>
             </div>
           )}
         </div>
@@ -1059,7 +1079,48 @@ export default function CalendarView({
       )}
 
       {view === "results" && (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
+          {/* Même sélecteur que "Mes Équipes" : indispensable dès qu'on
+              encadre ou joue dans plusieurs équipes, sans quoi les
+              résultats de toutes se mélangeaient dans un seul fil illisible. */}
+          {sortedResultsTeams.length > 1 && (
+            <div className="flex flex-wrap gap-2">
+              {sortedResultsTeams.map((t) => {
+                const isActive = activeResultsTeamIdResolved === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => setActiveResultsTeamId(t.id)}
+                    className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                      isActive
+                        ? "border-navy bg-navy text-white"
+                        : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+                    }`}
+                  >
+                    {t.role === "PLAYER" ? (
+                      <Shirt className="h-3.5 w-3.5 shrink-0" />
+                    ) : (
+                      <ClipboardList className="h-3.5 w-3.5 shrink-0" />
+                    )}
+                    {teamLabel(t)}
+                    {t.role && (
+                      <span
+                        className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none ${
+                          isActive
+                            ? "bg-white/20 text-white"
+                            : t.role === "PLAYER"
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-navy/10 text-navy"
+                        }`}
+                      >
+                        {t.role === "PLAYER" ? "Joueur" : "Coach"}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {seasonMatches.length === 0 ? (
             <p className="text-sm text-zinc-500">
               Aucun match programmé pour le moment — le calendrier de la saison apparaîtra ici.
