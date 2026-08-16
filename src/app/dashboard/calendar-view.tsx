@@ -16,6 +16,7 @@ import {
   Mail,
   MapPin,
   ClipboardList,
+  ListOrdered,
   Pencil,
   PartyPopper,
   Plus,
@@ -1129,6 +1130,29 @@ export default function CalendarView({
                   </button>
                 );
               })}
+            </div>
+          )}
+          {/* Emplacement réservé du classement officiel FFBB, propre à
+              l'équipe sélectionnée ci-dessus (chaque équipe joue dans sa
+              propre poule). Pas encore de données à afficher : la FFBB ne
+              publie le classement qu'une fois les premiers résultats de
+              la saison tombés. Cette carte disparaît d'elle-même le jour
+              où le classement réel prend sa place ici — même
+              emplacement, pas de nouvel onglet à chercher. */}
+          {sortedResultsTeams.length > 0 && (
+            <div className="flex items-start gap-2 rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/60 px-4 py-3">
+              <ListOrdered className="h-4 w-4 shrink-0 text-zinc-400" />
+              <p className="text-sm text-zinc-500">
+                <span className="font-semibold text-zinc-600">Classement</span>
+                {(() => {
+                  const activeTeam = sortedResultsTeams.find(
+                    (t) => t.id === activeResultsTeamIdResolved
+                  );
+                  return activeTeam ? ` — ${teamLabel(activeTeam)}` : "";
+                })()}{" "}
+                : pas encore publié par la FFBB — apparaîtra ici automatiquement dès les
+                premiers résultats de la saison.
+              </p>
             </div>
           )}
           {seasonMatches.length === 0 ? (
