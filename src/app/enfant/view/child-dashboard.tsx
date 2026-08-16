@@ -85,25 +85,6 @@ export default function ChildDashboard({
       icon: <CalendarDays className={iconClass} />,
       content: (
         <div className="flex flex-col gap-4">
-          <div className="rounded-2xl bg-gradient-to-br from-navy to-ubac-blue p-5 text-white shadow-sm">
-            <p className="text-lg font-bold">Salut {formatFirstName(firstName) || "champion"} !</p>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              {teams.map((t) => (
-                <span
-                  key={t.id}
-                  className="rounded-full bg-ubac-yellow px-3 py-1 text-xs font-bold uppercase tracking-wide text-navy"
-                >
-                  {t.category ?? t.name}
-                </span>
-              ))}
-              {ownJersey?.jersey != null && (
-                <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold">
-                  N° {ownJersey.jersey}
-                </span>
-              )}
-            </div>
-          </div>
-
           {nextEvent ? <NextEventCard event={nextEvent} /> : (
             <div className="rounded-2xl border border-zinc-100 bg-white p-4 text-sm text-zinc-500 shadow-sm">
               Rien de prévu pour le moment.
@@ -167,6 +148,33 @@ export default function ChildDashboard({
       </header>
 
       <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-6 px-4 pt-6 pb-24 sm:px-6 sm:py-10">
+        {/* Même gabarit que l'en-tête de l'Espace Parent (dashboard/page.tsx)
+            — sobre, sur fond blanc, sans carte pleine couleur — pour que les
+            deux espaces se ressemblent au premier coup d'œil. */}
+        <div>
+          <h1 className="text-2xl font-bold text-zinc-900">
+            <span className="font-medium text-zinc-500">Bienvenue</span>{" "}
+            <span className="text-navy">{formatFirstName(firstName) || "champion"}</span>
+          </h1>
+          {(teams.length > 0 || ownJersey?.jersey != null) && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              {teams.map((t) => (
+                <span
+                  key={t.id}
+                  className="rounded-full bg-ubac-yellow/15 px-2.5 py-0.5 text-xs font-semibold text-ubac-yellow-dark"
+                >
+                  {t.category ?? t.name}
+                </span>
+              ))}
+              {ownJersey?.jersey != null && (
+                <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-500">
+                  N° {ownJersey.jersey}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
         <AdminSidebar sections={sections} />
       </div>
     </div>

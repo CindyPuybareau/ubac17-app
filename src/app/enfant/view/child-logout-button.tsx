@@ -12,13 +12,16 @@ export default function ChildLogoutButton() {
     router.refresh();
   }
 
+  // Même bouton (texte, icône, style) que SignOutButton côté Espace Parent
+  // — l'enfant clique sur le même geste, présenté de la même façon.
   return (
     <button
       onClick={handleLogout}
-      className="flex items-center gap-1.5 rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-500 transition-colors hover:bg-zinc-50"
+      aria-label="Se déconnecter"
+      className="flex items-center gap-1.5 rounded-lg p-2 text-sm font-medium text-white transition-colors hover:bg-white/10"
     >
-      <LogOut className="h-3.5 w-3.5" />
-      Quitter
+      <LogOut className="h-5 w-5 shrink-0" />
+      <span className="hidden sm:inline">Déconnexion</span>
     </button>
   );
 }
