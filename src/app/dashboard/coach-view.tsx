@@ -134,17 +134,23 @@ export default function CoachView({
       label: "Mes Équipes",
       icon: <Users className={iconClass} />,
       content: (
-        <CoachTeams
-          teams={teams}
-          allProfiles={[]}
-          eventsByTeamId={eventsByTeamId}
-          contactPhoneByPlayerId={contactPhoneByPlayerId}
-          contactEmailByPlayerId={contactEmailByPlayerId}
-          memberDetailsByPlayerId={memberDetailsByPlayerId}
-          teamRoleByTeamId={teamRoleByTeamId}
-          clubTeams={clubTeams}
-          whatsappGroups={whatsappGroups}
-        />
+        <div className="flex flex-col gap-4">
+          <CoachTeams
+            teams={teams}
+            allProfiles={[]}
+            eventsByTeamId={eventsByTeamId}
+            contactPhoneByPlayerId={contactPhoneByPlayerId}
+            contactEmailByPlayerId={contactEmailByPlayerId}
+            memberDetailsByPlayerId={memberDetailsByPlayerId}
+            teamRoleByTeamId={teamRoleByTeamId}
+            clubTeams={clubTeams}
+            whatsappGroups={whatsappGroups}
+          />
+          {/* Même emplacement que côté Parent (family-view.tsx, onglet
+              "Mon Équipe") : la cotisation vit avec l'identité de
+              l'équipe, pas en haut de page. */}
+          {showOwnPlayerSummary && <FamilyCotisationCard cotisations={ownCotisations} />}
+        </div>
       ),
     },
     {
@@ -207,17 +213,15 @@ export default function CoachView({
     <div className="flex flex-col gap-4">
       {/* Repris de l'espace Parent (voir family-view.tsx) pour un coach
           sans enfant, dont "Mon espace" a été retiré : sa propre relance
-          de présence et sa propre cotisation restent visibles quelque
-          part, plutôt que de disparaître avec l'onglet. */}
+          de présence doit se voir en ouvrant l'app, comme côté Parent —
+          la cotisation, elle, vit dans "Mes Équipes" (voir plus bas),
+          même emplacement que côté Parent. */}
       {showOwnPlayerSummary && ownPlayerId && (
-        <>
-          <FamilyAttendanceRequests
-            events={events}
-            players={rsvpPlayers.filter((p) => p.id === ownPlayerId)}
-            statusByKey={rsvpStatusByKey}
-          />
-          <FamilyCotisationCard cotisations={ownCotisations} />
-        </>
+        <FamilyAttendanceRequests
+          events={events}
+          players={rsvpPlayers.filter((p) => p.id === ownPlayerId)}
+          statusByKey={rsvpStatusByKey}
+        />
       )}
       <AdminSidebar sections={sections} />
     </div>
