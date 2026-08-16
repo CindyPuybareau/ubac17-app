@@ -465,16 +465,16 @@ export default function CalendarView({
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
   }, [events]);
 
-  // Vue Résultats : matchs et amicaux déjà joués, du plus récent au plus
-  // ancien — c'est "qu'est-ce qu'on a fait" plutôt que "qu'est-ce qui
-  // vient", donc l'ordre s'inverse par rapport à la vue Liste. Un match
-  // passé sans score saisi apparaît quand même (MatchScore affiche alors
-  // "Ajouter le score" côté coach/Bureau, et rien côté famille).
-  const pastMatches = useMemo(() => {
-    const from = startOfTodayMs();
+  // Vue Résultats : tout le calendrier de matchs/amicaux de la saison,
+  // joués ou non, dans l'ordre chronologique — même principe que la page
+  // FFBB (J1, J2, J3...) plutôt qu'un historique séparé du planning. Un
+  // match à venir apparaît donc aussi, sans score (renderResultCard gère
+  // l'affichage "à venir" et empêche d'en saisir un avant que le match
+  // ait réellement eu lieu).
+  const seasonMatches = useMemo(() => {
     return events
-      .filter((e) => isMatchType(e.event_type) && new Date(e.start_time).getTime() < from)
-      .sort((a, b) => b.start_time.localeCompare(a.start_time));
+      .filter((e) => isMatchType(e.event_type))
+      .sort((a, b) => a.start_time.localeCompare(b.start_time));
   }, [events]);
 
   // Anniversaires + événements mélangés dans un seul fil chronologique,
@@ -746,6 +746,10 @@ export default function CalendarView({
       (event.teamId
         ? Boolean(createTeams?.some((t) => t.id === event.teamId))
         : allowClubWide);
+    // La vue Résultats montre désormais toute la saison, match à venir
+    // compris (voir seasonMatches) : le bouton "Ajouter le score" ne doit
+    // s'afficher qu'une fois le match réellement joué, jamais avant.
+    const alreadyPlayed = new Date(event.start_time).getTime() < Date.now();
 
     return (
       <div
@@ -770,12 +774,18 @@ export default function CalendarView({
             {event.salle && <SalleBadge salle={event.salle} />}
           </span>
           <OpponentDisplay title={event.title} size="sm" />
-          <MatchScore
-            eventId={event.id}
-            teamScore={event.teamScore}
-            opponentScore={event.opponentScore}
-            canEdit={canManageEvent}
-          />
+          {alreadyPlayed ? (
+            <MatchScore
+              eventId={event.id}
+              teamScore={event.teamScore}
+              opponentScore={event.opponentScore}
+              canEdit={canManageEvent}
+            />
+          ) : (
+            <span className="w-fit rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-semibold text-zinc-400">
+              À venir
+            </span>
+          )}
         </div>
         {canManageEvent && (
           <div className="flex shrink-0 items-center gap-1">
@@ -1050,13 +1060,12 @@ export default function CalendarView({
 
       {view === "results" && (
         <div className="flex flex-col gap-2">
-          {pastMatches.length === 0 ? (
+          {seasonMatches.length === 0 ? (
             <p className="text-sm text-zinc-500">
-              Aucun match joué pour le moment — les résultats apparaîtront ici au fur et à
-              mesure de la saison.
+              Aucun match programmé pour le moment — le calendrier de la saison apparaîtra ici.
             </p>
           ) : (
-            pastMatches.map((event) => (
+            seasonMatches.map((event) => (
               <div key={event.id} className="flex flex-col gap-1">
                 <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
                   {new Date(event.start_time).toLocaleDateString("fr-FR", {

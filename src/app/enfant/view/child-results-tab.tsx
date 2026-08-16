@@ -5,10 +5,14 @@ import type { ChildEvent } from "./child-dashboard";
 
 // Même code couleur que MatchScore côté Bureau/Coach (victoire/défaite/nul)
 // mais en lecture seule : aucun enfant ne peut jamais modifier un score.
+// Un match pas encore joué affiche "À venir" plutôt qu'un tiret ou un
+// 0-0 — jamais laisser croire qu'un résultat existe avant que le match
+// ait réellement eu lieu.
 function ResultRow({ event }: { event: ChildEvent }) {
   const { opponent } = parseMatchTitle(event.title);
   const home = homeAwayLabel(event.isHome);
   const hasScore = event.teamScore !== null && event.opponentScore !== null;
+  const alreadyPlayed = new Date(event.startTime).getTime() < Date.now();
   const diff = hasScore ? (event.teamScore as number) - (event.opponentScore as number) : 0;
   const resultClass = !hasScore
     ? "bg-zinc-100 text-zinc-400"
@@ -27,14 +31,20 @@ function ResultRow({ event }: { event: ChildEvent }) {
           {home ? ` · ${home}` : ""}
         </span>
       </div>
-      <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-sm font-bold tabular-nums ${resultClass}`}>
-        {hasScore ? `${event.teamScore} – ${event.opponentScore}` : "—"}
-      </span>
+      {alreadyPlayed ? (
+        <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-sm font-bold tabular-nums ${resultClass}`}>
+          {hasScore ? `${event.teamScore} – ${event.opponentScore}` : "—"}
+        </span>
+      ) : (
+        <span className="shrink-0 rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-semibold text-zinc-400">
+          À venir
+        </span>
+      )}
     </div>
   );
 }
 
-export default function ChildResultsTab({ pastMatches }: { pastMatches: ChildEvent[] }) {
+export default function ChildResultsTab({ seasonMatches }: { seasonMatches: ChildEvent[] }) {
   return (
     <div className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
       <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
@@ -42,10 +52,10 @@ export default function ChildResultsTab({ pastMatches }: { pastMatches: ChildEve
         Résultats
       </p>
       <div className="flex flex-col gap-1.5">
-        {pastMatches.length === 0 ? (
-          <p className="text-sm text-zinc-500">Aucun match joué pour le moment.</p>
+        {seasonMatches.length === 0 ? (
+          <p className="text-sm text-zinc-500">Aucun match programmé pour le moment.</p>
         ) : (
-          pastMatches.map((e) => <ResultRow key={e.id} event={e} />)
+          seasonMatches.map((e) => <ResultRow key={e.id} event={e} />)
         )}
       </div>
     </div>

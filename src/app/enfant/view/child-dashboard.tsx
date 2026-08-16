@@ -73,13 +73,14 @@ export default function ChildDashboard({
 }) {
   const now = Date.now();
   const nextEvent = events.find((e) => new Date(e.startTime).getTime() >= now) ?? null;
-  // "Résultats" dans l'onglet Mon Équipe : les matchs et amicaux déjà
-  // joués, du plus récent au plus ancien — mêmes règles que la vue
-  // Résultats du calendrier Bureau/Coach/Parent (calendar-view.tsx), en
-  // lecture seule ici comme tout le reste de l'espace Enfant.
-  const pastMatches = events
-    .filter((e) => isMatchType(e.eventType) && new Date(e.startTime).getTime() < now)
-    .sort((a, b) => b.startTime.localeCompare(a.startTime));
+  // Onglet "Résultats" : tout le calendrier de matchs/amicaux de la
+  // saison, joués ou non, dans l'ordre chronologique — mêmes règles que
+  // la vue Résultats du calendrier Bureau/Coach/Parent (calendar-view.tsx,
+  // seasonMatches), en lecture seule ici comme tout le reste de l'espace
+  // Enfant.
+  const seasonMatches = events
+    .filter((e) => isMatchType(e.eventType))
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
   const teammatesOnly = teammates.filter((t) => !t.isSelf);
 
   const thisMonth = new Date().getMonth();
@@ -156,7 +157,7 @@ export default function ChildDashboard({
       key: "results",
       label: "Résultats",
       icon: <Trophy className={iconClass} />,
-      content: <ChildResultsTab pastMatches={pastMatches} />,
+      content: <ChildResultsTab seasonMatches={seasonMatches} />,
     },
   ];
 
