@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import Image from "next/image";
+import { Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { formatFirstName, formatPersonName } from "@/lib/names";
+import { EMAIL_REPLY_TO } from "@/lib/email";
 import SignOutButton from "./sign-out-button";
 import NotificationBell from "./notification-bell";
 import RealtimeSync from "./realtime-sync";
@@ -367,9 +369,17 @@ export default async function DashboardPage() {
         .eq("parent_id", user.id),
       // This user's own player row, if any (players.profile_id = user.id) —
       // reused below both to also surface teams where THEY are only a
-      // pending (not-yet-linked-account) coach, and later to merge their
-      // own player-side calendar into the Coach tab (see ownTeamIds).
-      supabase.from("players").select("id").eq("profile_id", user.id).maybeSingle(),
+      // pending (not-yet-linked-account) coach, to merge their own
+      // player-side calendar into the Coach tab (see ownTeamIds), AND to
+      // give them a "Mon espace" tab even with zero children (an adult
+      // player registered under their own account — Séniors, Loisirs...
+      // — was previously invisible to every branch below and landed on
+      // the empty "Aucun espace" message despite being validly linked).
+      supabase
+        .from("players")
+        .select("id, first_name, last_name, category, profile_id")
+        .eq("profile_id", user.id)
+        .maybeSingle(),
     ]);
 
   const profile = profileResult.data;
@@ -419,15 +429,24 @@ export default async function DashboardPage() {
     .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999));
   const isCoach = coachedTeams.length > 0;
 
-  const players = (playerLinksResult.data ?? [])
+  const childPlayerRows = (playerLinksResult.data ?? [])
     .map((link) => link.players as unknown as PlayerRow | null)
-    .filter((p): p is PlayerRow => Boolean(p))
-    .map((p) => ({
-      id: p.id,
-      name: p.first_name ? formatFirstName(p.first_name) : "Joueur",
-      category: p.category,
-      isSelf: p.profile_id === user.id,
-    }));
+    .filter((p): p is PlayerRow => Boolean(p));
+  // Un adulte inscrit lui-même (Séniors, Loisirs...) n'apparaît dans
+  // aucune ligne parent_player : sans ce merge, il n'a ni enfant ni
+  // équipe coachée ni accès Bureau, donc zéro onglet — voir le
+  // commentaire sur ownPlayerRowResult plus haut.
+  const ownPlayerRow = ownPlayerRowResult.data as PlayerRow | null;
+  const playerRows =
+    ownPlayerRow && !childPlayerRows.some((p) => p.id === ownPlayerRow.id)
+      ? [...childPlayerRows, ownPlayerRow]
+      : childPlayerRows;
+  const players = playerRows.map((p) => ({
+    id: p.id,
+    name: p.first_name ? formatFirstName(p.first_name) : "Joueur",
+    category: p.category,
+    isSelf: p.profile_id === user.id,
+  }));
 
   const coachedTeamIds = new Set(coachedTeams.map((t) => t.id));
 
@@ -1869,11 +1888,37 @@ export default async function DashboardPage() {
 
       <DashboardTabs tabs={tabs} />
 
+      {/* Cas normalement rare depuis que "Mon espace" couvre aussi un
+          adulte inscrit sans enfant (voir le merge de playerRows plus
+          haut) — reste un vrai cas possible : l'adresse utilisée à la
+          connexion diffère de celle donnée à l'inscription. Message
+          bienveillant, pas un mur : explique la cause la plus probable et
+          donne un contact direct plutôt qu'un simple "demande au Bureau"
+          sans piste ni lien. */}
       {tabs.length === 0 && (
-        <p className="text-sm text-zinc-500">
-          Aucun espace n&apos;est encore rattaché à ton compte. Contacte le
-          Bureau pour qu&apos;il associe ton enfant à ton adresse email.
-        </p>
+        <div className="rounded-2xl border border-zinc-100 bg-white p-5 text-sm text-zinc-600 shadow-sm">
+          <p className="font-semibold text-zinc-900">
+            Ton espace n&apos;est pas encore relié à ton compte.
+          </p>
+          <p className="mt-2">
+            C&apos;est généralement parce que l&apos;adresse email utilisée ici (
+            <span className="font-medium text-zinc-800">{user.email}</span>)
+            diffère de celle donnée lors de l&apos;inscription au club. Rien
+            d&apos;inquiétant : le Bureau peut relier ton compte en quelques
+            secondes depuis sa fiche.
+          </p>
+          <a
+            href={`mailto:${EMAIL_REPLY_TO}?subject=${encodeURIComponent(
+              "Mon espace UBAC n'est pas relié"
+            )}&body=${encodeURIComponent(
+              `Bonjour,\n\nMon compte (${user.email}) n'affiche aucun espace après connexion. Merci de le relier à ma fiche.\n\nMerci !`
+            )}`}
+            className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-navy px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-navy-dark"
+          >
+            <Mail className="h-3.5 w-3.5 shrink-0" />
+            Contacter le Bureau
+          </a>
+        </div>
       )}
       </div>
     </div>

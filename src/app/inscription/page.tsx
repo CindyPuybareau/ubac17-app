@@ -3,9 +3,20 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import PasswordInput from "@/components/password-input";
 import AuthTabs from "@/components/auth-tabs";
+
+// Selon la configuration Supabase du projet, un email déjà inscrit
+// déclenche soit une vraie erreur ("User already registered"), soit une
+// réponse "réussie" mais avec identities: [] (comportement anti-énumération
+// volontaire de Supabase) — les deux doivent aboutir au même message
+// bienveillant plutôt qu'un texte d'erreur brut ou un faux "vérifie tes
+// emails" qui n'enverra jamais rien.
+function isAlreadyRegistered(message: string) {
+  return /already registered|already exists|user already/i.test(message);
+}
 
 export default function InscriptionPage() {
   const router = useRouter();
@@ -16,6 +27,7 @@ export default function InscriptionPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [alreadyRegistered, setAlreadyRegistered] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
@@ -23,6 +35,7 @@ export default function InscriptionPage() {
     setLoading(true);
     setError(null);
     setMessage(null);
+    setAlreadyRegistered(false);
 
     const supabase = createClient();
     const { data, error } = await supabase.auth.signUp({
@@ -40,7 +53,19 @@ export default function InscriptionPage() {
     setLoading(false);
 
     if (error) {
+      if (isAlreadyRegistered(error.message)) {
+        setAlreadyRegistered(true);
+        return;
+      }
       setError(error.message);
+      return;
+    }
+
+    // Comportement anti-énumération de Supabase : un email déjà utilisé
+    // renvoie un "succès" sans erreur, mais data.user.identities est un
+    // tableau vide — aucun email de confirmation ne part réellement.
+    if (data.user && data.user.identities?.length === 0) {
+      setAlreadyRegistered(true);
       return;
     }
 
@@ -133,6 +158,19 @@ export default function InscriptionPage() {
             />
           </div>
 
+          {alreadyRegistered && (
+            <p className="text-sm text-zinc-600">
+              Un compte existe déjà avec cet email.{" "}
+              <Link href="/connexion" className="font-semibold text-ubac-blue">
+                Se connecter
+              </Link>{" "}
+              ou{" "}
+              <Link href="/mot-de-passe-oublie" className="font-semibold text-ubac-blue">
+                mot de passe oublié
+              </Link>
+              .
+            </p>
+          )}
           {error && <p className="text-sm text-red-600">{error}</p>}
           {message && <p className="text-sm text-green-600">{message}</p>}
 

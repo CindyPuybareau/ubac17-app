@@ -55,7 +55,7 @@ export default function ConnexionPage() {
       email,
       options: {
         shouldCreateUser: false,
-        emailRedirectTo: `${window.location.origin}/dashboard`,
+        emailRedirectTo: `${window.location.origin}/lien-de-connexion`,
       },
     });
 
