@@ -473,20 +473,23 @@ export default function TeamCard({
   const staffMembers = visibleMembers.filter((m) => m.role !== "JOUEUR");
   const playerMembers = visibleMembers.filter((m) => m.role === "JOUEUR");
 
-  // Adult member: their own registration contact. Minor: the linked
-  // tutor's, which is what contactPhone/EmailByPlayerId already carry.
+  // La fiche est la source de vérité : dès que le Bureau modifie le
+  // téléphone/email d'inscription, cette valeur doit primer partout,
+  // y compris sur le compte du tuteur lié (contactPhone/EmailByPlayerId)
+  // qui peut être obsolète (ancien compte de test, ancienne adresse...).
+  // Le compte lié ne sert donc que de repli quand la fiche n'a rien.
   function contactsFor(id: string) {
     const detail = memberDetailsByPlayerId?.[id];
     return {
       phone:
-        contactPhoneByPlayerId[id] ??
         detail?.registrationPhone ??
+        contactPhoneByPlayerId[id] ??
         detail?.motherPhone ??
         detail?.fatherPhone ??
         null,
       email:
-        contactEmailByPlayerId?.[id] ??
         detail?.registrationEmail ??
+        contactEmailByPlayerId?.[id] ??
         detail?.secondaryEmail ??
         null,
     };
