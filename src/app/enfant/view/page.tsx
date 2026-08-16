@@ -72,7 +72,9 @@ export default async function ChildViewPage() {
     teamIds.length > 0
       ? supabase
           .from("events")
-          .select("id, title, event_type, is_home, location, salle, start_time, end_time, team_id, teams(name)")
+          .select(
+            "id, title, event_type, is_home, location, salle, start_time, end_time, team_id, team_score, opponent_score, teams(name)"
+          )
           .in("team_id", teamIds)
           .order("start_time", { ascending: true })
       : Promise.resolve({ data: [] as never[] }),
@@ -129,6 +131,8 @@ export default async function ChildViewPage() {
     start_time: string;
     end_time: string | null;
     team_id: string | null;
+    team_score: number | null;
+    opponent_score: number | null;
     teams: { name: string | null } | null;
   }[];
   const events: ChildEvent[] = eventRows.map((e) => ({
@@ -141,6 +145,8 @@ export default async function ChildViewPage() {
     startTime: e.start_time,
     endTime: e.end_time,
     teamName: e.teams?.name ?? null,
+    teamScore: e.team_score,
+    opponentScore: e.opponent_score,
   }));
 
   // RSVPs : nécessaires à la fois pour "qui vient au prochain rendez-vous"

@@ -20,6 +20,7 @@ import {
   Plus,
   StickyNote,
   Trash2,
+  Trophy,
   Users,
   X,
 } from "lucide-react";
@@ -245,7 +246,7 @@ export default function CalendarView({
   // Le calendrier s'ouvre sur la grille : on veut d'abord voir le mois.
   // La liste chronologique reste à un clic pour répondre à "c'est quoi la
   // suite ?".
-  const [view, setView] = useState<"list" | "month">("month");
+  const [view, setView] = useState<"list" | "month" | "results">("month");
   const [createOpen, setCreateOpen] = useState(false);
 
   const canManage = Boolean(createTeams && createTeams.length > 0);
@@ -455,6 +456,18 @@ export default function CalendarView({
     return events
       .filter((e) => new Date(e.start_time).getTime() >= from)
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
+  }, [events]);
+
+  // Vue Résultats : matchs et amicaux déjà joués, du plus récent au plus
+  // ancien — c'est "qu'est-ce qu'on a fait" plutôt que "qu'est-ce qui
+  // vient", donc l'ordre s'inverse par rapport à la vue Liste. Un match
+  // passé sans score saisi apparaît quand même (MatchScore affiche alors
+  // "Ajouter le score" côté coach/Bureau, et rien côté famille).
+  const pastMatches = useMemo(() => {
+    const from = startOfTodayMs();
+    return events
+      .filter((e) => isMatchType(e.event_type) && new Date(e.start_time).getTime() < from)
+      .sort((a, b) => b.start_time.localeCompare(a.start_time));
   }, [events]);
 
   // Anniversaires + événements mélangés dans un seul fil chronologique,
@@ -712,6 +725,73 @@ export default function CalendarView({
     );
   }
 
+  // Carte dédiée à un match déjà joué, volontairement plus légère que
+  // renderEventCard : pas de compteurs de présence, pas de bouton
+  // Présent/Absent, pas de répartition covoiturage/goûter — tout ça n'a
+  // plus de sens une fois le match passé. Seuls restent l'essentiel (contre
+  // qui, le score) et, pour qui gère l'équipe, de quoi corriger une
+  // erreur de saisie après coup.
+  function renderResultCard(event: AdminUpcomingEvent) {
+    const style = styleFor(event.event_type);
+    const homeAway = homeAwayLabel(event.isHome);
+    const canManageEvent =
+      canManage &&
+      (event.teamId
+        ? Boolean(createTeams?.some((t) => t.id === event.teamId))
+        : allowClubWide);
+
+    return (
+      <div
+        key={event.id}
+        className={`flex items-start justify-between gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm border-l-4 ${style.border}`}
+      >
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+            {event.teamName}
+          </span>
+          <span className="flex flex-wrap items-center gap-2">
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${style.badge}`}
+            >
+              {style.label}
+            </span>
+            {homeAway && (
+              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-600">
+                {homeAway}
+              </span>
+            )}
+            {event.salle && <SalleBadge salle={event.salle} />}
+          </span>
+          <OpponentDisplay title={event.title} size="sm" />
+          <MatchScore
+            eventId={event.id}
+            teamScore={event.teamScore}
+            opponentScore={event.opponentScore}
+            canEdit={canManageEvent}
+          />
+        </div>
+        {canManageEvent && (
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              onClick={() => openEdit(event)}
+              title="Modifier"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => handleDeleteEvent(event)}
+              title="Supprimer"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-red-400 hover:bg-red-50 hover:text-red-600"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   // Une carte à part, pas une simple ligne : un anniversaire est traité
   // comme un événement à part entière du fil chronologique du jour
   // (ex-encart "Anniversaires de la semaine", supprimé — voir
@@ -814,6 +894,15 @@ export default function CalendarView({
             >
               <LayoutGrid className="h-3.5 w-3.5" />
               Mois
+            </button>
+            <button
+              onClick={() => setView("results")}
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                view === "results" ? "bg-navy text-white" : "text-zinc-500 hover:bg-zinc-50"
+              }`}
+            >
+              <Trophy className="h-3.5 w-3.5" />
+              Résultats
             </button>
           </div>
         </div>
@@ -941,6 +1030,30 @@ export default function CalendarView({
                       })}
                 </p>
                 {item.kind === "event" ? renderEventCard(item.event) : renderBirthdayCard(item.member)}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {view === "results" && (
+        <div className="flex flex-col gap-2">
+          {pastMatches.length === 0 ? (
+            <p className="text-sm text-zinc-500">
+              Aucun match joué pour le moment — les résultats apparaîtront ici au fur et à
+              mesure de la saison.
+            </p>
+          ) : (
+            pastMatches.map((event) => (
+              <div key={event.id} className="flex flex-col gap-1">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                  {new Date(event.start_time).toLocaleDateString("fr-FR", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                  })}
+                </p>
+                {renderResultCard(event)}
               </div>
             ))
           )}

@@ -23,6 +23,8 @@ export type ChildEvent = {
   startTime: string;
   endTime: string | null;
   teamName: string | null;
+  teamScore: number | null;
+  opponentScore: number | null;
 };
 
 export type ChildTeammate = {
@@ -70,6 +72,13 @@ export default function ChildDashboard({
 }) {
   const now = Date.now();
   const nextEvent = events.find((e) => new Date(e.startTime).getTime() >= now) ?? null;
+  // "Résultats" dans l'onglet Mon Équipe : les matchs et amicaux déjà
+  // joués, du plus récent au plus ancien — mêmes règles que la vue
+  // Résultats du calendrier Bureau/Coach/Parent (calendar-view.tsx), en
+  // lecture seule ici comme tout le reste de l'espace Enfant.
+  const pastMatches = events
+    .filter((e) => isMatchType(e.eventType) && new Date(e.startTime).getTime() < now)
+    .sort((a, b) => b.startTime.localeCompare(a.startTime));
   const teammatesOnly = teammates.filter((t) => !t.isSelf);
 
   const thisMonth = new Date().getMonth();
@@ -131,6 +140,7 @@ export default function ChildDashboard({
           coaches={coaches}
           nextEvent={nextEvent}
           nextEventAttendance={nextEventAttendance}
+          pastMatches={pastMatches}
         />
       ),
     },
