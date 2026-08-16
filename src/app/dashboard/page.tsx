@@ -631,7 +631,7 @@ export default async function DashboardPage() {
       supabase
         .from("players")
         .select(
-          "id, first_name, last_name, profile_id, pending_parent_email, birth_date, category, sex, registration_email, registration_phone, address, postal_code, city, secondary_email, mother_phone, father_phone, other_phones, secondary_address, license_type, membership_type, fbi_status, medical_notes, other_notes, image_rights, player_charter_accepted, parent_charter_accepted, license_number, license_expires_at, medical_certificate_expires_at, archived_at"
+          "id, first_name, last_name, profile_id, pending_parent_email, birth_date, category, sex, registration_email, registration_phone, address, postal_code, city, secondary_email, mother_phone, father_phone, other_phones, secondary_address, license_type, membership_type, fbi_status, medical_notes, other_notes, image_rights, player_charter_accepted, parent_charter_accepted, license_number, license_expires_at, medical_certificate_expires_at, archived_at, last_child_login_at"
         )
         .order("first_name"),
       supabase
@@ -897,6 +897,7 @@ export default async function DashboardPage() {
         license_expires_at: string | null;
         medical_certificate_expires_at: string | null;
         archived_at: string | null;
+        last_child_login_at: string | null;
       };
       // Exclude self-link rows: a self-registered adult player is linked to
       // their own parent_player row, which isn't a "parent" for display.
@@ -961,9 +962,17 @@ export default async function DashboardPage() {
         hasParent: parentIds.length > 0,
         pendingParentEmail: player.pending_parent_email,
         profileId: player.profile_id,
-        lastLoginAt: player.profile_id
-          ? (lastLoginByProfileId.get(player.profile_id) ?? null)
-          : null,
+        // La plus récente des deux connexions possibles : compte
+        // Supabase Auth classique (Parent/Coach/Bureau) OU code PIN
+        // enfant (Espace Enfant) — mécanismes distincts, aucun des deux
+        // n'exclut l'autre pour une même fiche.
+        lastLoginAt: [
+          player.profile_id ? lastLoginByProfileId.get(player.profile_id) : null,
+          player.last_child_login_at,
+        ]
+          .filter((d): d is string => Boolean(d))
+          .sort()
+          .at(-1) ?? null,
       };
     });
 
