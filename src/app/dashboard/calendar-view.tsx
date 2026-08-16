@@ -738,13 +738,18 @@ export default function CalendarView({
         {/* Rôles et covoiturage : mêmes données, même composant que les
             onglets Organisation / Prochains Événements — pas une version
             allégée propre au calendrier, pour ne jamais afficher deux
-            vérités différentes du même trajet. Seulement côté famille :
-            Bureau et Coach ont déjà leur onglet Organisation dédié.
-            MatchTasksPanel se masque déjà tout seul s'il n'y a ni rôle ni
-            covoiturage applicable (ex. un entraînement) : pas besoin d'un
-            filtre par type d'événement en plus, qui ferait justement
-            disparaître ce bloc sur un "Événement club" pourtant organisé. */}
-        {!canManage && (
+            vérités différentes du même trajet. Condition par ÉVÉNEMENT
+            (canManageEvent), pas par instance entière (canManage) : un
+            coach qui gère au moins une équipe voyait ce bloc disparaître
+            partout, y compris sur les matchs d'une équipe où il n'est que
+            joueur — alors que Bureau/Coach n'ont un onglet Organisation
+            dédié que pour les équipes qu'ils gèrent réellement, jamais
+            pour celles où ils ne sont que joueur. MatchTasksPanel se
+            masque déjà tout seul s'il n'y a ni rôle ni covoiturage
+            applicable (ex. un entraînement) : pas besoin d'un filtre par
+            type d'événement en plus, qui ferait justement disparaître ce
+            bloc sur un "Événement club" pourtant organisé. */}
+        {!canManageEvent && (
           <MatchTasksPanel
             eventId={event.id}
             eventDate={event.start_time}
