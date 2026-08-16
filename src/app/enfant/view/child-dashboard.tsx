@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { CalendarDays, Cake, Home, Trophy, Users } from "lucide-react";
+import { BarChart3, Cake, CalendarDays, Users } from "lucide-react";
 import AdminSidebar, { type AdminSection } from "@/app/dashboard/admin-sidebar";
 import { formatFirstName } from "@/lib/names";
 import { styleFor, isMatchType, homeAwayLabel, formatEventTime } from "@/app/dashboard/event-style";
@@ -9,7 +9,7 @@ import { parseMatchTitle } from "@/lib/match-display";
 import ChildLogoutButton from "./child-logout-button";
 import ChildCalendarTab from "./child-calendar-tab";
 import ChildTeamTab from "./child-team-tab";
-import ChildBadgesTab from "./child-badges-tab";
+import ChildPresenceTab from "./child-presence-tab";
 
 export type ChildEvent = {
   id: string;
@@ -34,15 +34,7 @@ export type ChildTeammate = {
 
 export type ChildCoach = { id: string; firstName: string | null; lastName: string | null };
 
-export type ChildBadge = {
-  key: string;
-  label: string;
-  description: string;
-  unlocked: boolean;
-  progress?: number;
-  target?: number;
-  isPercent?: boolean;
-};
+export type ChildAttendanceStats = { present: number; total: number };
 
 // Un seul composant, jamais un import de createClient() nulle part dans
 // cet arbre : chaque onglet ne fait que présenter les props reçues de
@@ -57,7 +49,7 @@ export default function ChildDashboard({
   events,
   teammates,
   coaches,
-  badges,
+  presence,
   nextEventAttendance,
 }: {
   firstName: string | null;
@@ -67,7 +59,7 @@ export default function ChildDashboard({
   events: ChildEvent[];
   teammates: ChildTeammate[];
   coaches: ChildCoach[];
-  badges: ChildBadge[];
+  presence: { trainings: ChildAttendanceStats; matches: ChildAttendanceStats };
   nextEventAttendance: { name: string | null; status: string }[];
 }) {
   const now = Date.now();
@@ -80,11 +72,17 @@ export default function ChildDashboard({
     .sort((a, b) => new Date(a.birthDate!).getDate() - new Date(b.birthDate!).getDate());
 
   const iconClass = "h-4 w-4 shrink-0";
+  // 3 onglets seulement : "Accueil" a été retiré (redondant avec ce que
+  // Calendrier montre maintenant en tête de page) et "Défis" a laissé la
+  // place à "Mes Présences", un vrai bilan d'assiduité plutôt qu'un
+  // système de badges. Calendrier est délibérément en premier :
+  // AdminSidebar ouvre toujours sur sections[0], c'est donc lui la page
+  // d'accueil désormais.
   const sections: AdminSection[] = [
     {
-      key: "home",
-      label: "Accueil",
-      icon: <Home className={iconClass} />,
+      key: "calendar",
+      label: "Calendrier",
+      icon: <CalendarDays className={iconClass} />,
       content: (
         <div className="flex flex-col gap-4">
           <div className="rounded-2xl bg-gradient-to-br from-navy to-ubac-blue p-5 text-white shadow-sm">
@@ -130,14 +128,10 @@ export default function ChildDashboard({
               </div>
             </div>
           )}
+
+          <ChildCalendarTab events={events} teammates={teammates} />
         </div>
       ),
-    },
-    {
-      key: "calendar",
-      label: "Calendrier",
-      icon: <CalendarDays className={iconClass} />,
-      content: <ChildCalendarTab events={events} teammates={teammates} />,
     },
     {
       key: "team",
@@ -153,11 +147,10 @@ export default function ChildDashboard({
       ),
     },
     {
-      key: "profile",
-      label: "Mon Profil",
-      shortLabel: "Défis",
-      icon: <Trophy className={iconClass} />,
-      content: <ChildBadgesTab firstName={firstName} category={category} badges={badges} />,
+      key: "presence",
+      label: "Mes Présences",
+      icon: <BarChart3 className={iconClass} />,
+      content: <ChildPresenceTab trainings={presence.trainings} matches={presence.matches} />,
     },
   ];
 

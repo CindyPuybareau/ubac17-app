@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { createServiceClient } from "@/lib/supabase/service";
 import { CHILD_SESSION_COOKIE, verifyChildSession } from "@/lib/child-session";
 import ChildDashboard, {
-  type ChildBadge,
+  type ChildAttendanceStats,
   type ChildCoach,
   type ChildEvent,
   type ChildTeammate,
@@ -155,55 +155,28 @@ export default async function ChildViewPage() {
     (rsvpRows ?? []).map((r) => [`${r.event_id}:${r.player_id}`, r.status])
   );
 
-  // Badge "Assidu" : plus longue série en cours de présences consécutives
-  // (Présent/En retard) sur les rendez-vous passés de l'enfant, la plus
-  // récente d'abord — un rendez-vous manqué ou jamais répondu casse la
-  // série, honnêtement.
+  // "Mes Présences" : un vrai bilan d'assiduité, pas un badge à débloquer
+  // — pour chaque famille de types (entraînements / matchs-tournois), le
+  // nombre de rendez-vous passés où l'enfant était Présent/En retard sur
+  // le total de rendez-vous passés (répondu ou non : un rendez-vous
+  // manqué sans réponse compte quand même contre le total, honnêtement).
   const now = Date.now();
-  const ownPastEvents = events
-    .filter((e) => new Date(e.startTime).getTime() < now)
-    .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
-  let streak = 0;
-  for (const e of ownPastEvents) {
-    const status = rsvpStatusByKey.get(`${e.id}:${playerId}`);
-    if (status === "PRESENT" || status === "LATE") streak += 1;
-    else break;
-  }
-  let answered = 0;
-  let present = 0;
-  for (const e of ownPastEvents) {
-    const status = rsvpStatusByKey.get(`${e.id}:${playerId}`);
-    if (!status || status === "PENDING") continue;
-    answered += 1;
-    if (status === "PRESENT" || status === "LATE") present += 1;
-  }
-  const attendanceRate = answered > 0 ? Math.round((present / answered) * 100) : null;
+  const ownPastEvents = events.filter((e) => new Date(e.startTime).getTime() < now);
 
-  const badges: ChildBadge[] = [
-    {
-      key: "welcome",
-      label: teams[0] ? `Membre ${teams[0].category ?? teams[0].name ?? ""}` : "Membre de l'équipe",
-      description: "Fait partie de l'équipe UBAC.",
-      unlocked: true,
-    },
-    {
-      key: "assidu",
-      label: "Assidu",
-      description: "5 présences d'affilée aux entraînements et matchs.",
-      unlocked: streak >= 5,
-      progress: Math.min(streak, 5),
-      target: 5,
-    },
-    {
-      key: "toujours-partant",
-      label: "Toujours partant",
-      description: "80% de présence ou plus (sur au moins 3 réponses).",
-      unlocked: attendanceRate !== null && answered >= 3 && attendanceRate >= 80,
-      progress: attendanceRate ?? 0,
-      target: 80,
-      isPercent: true,
-    },
-  ];
+  function attendanceFor(predicate: (eventType: string | null) => boolean): ChildAttendanceStats {
+    const relevant = ownPastEvents.filter((e) => predicate(e.eventType));
+    let present = 0;
+    for (const e of relevant) {
+      const status = rsvpStatusByKey.get(`${e.id}:${playerId}`);
+      if (status === "PRESENT" || status === "LATE") present += 1;
+    }
+    return { present, total: relevant.length };
+  }
+
+  const presence = {
+    trainings: attendanceFor((t) => t === "TRAINING"),
+    matches: attendanceFor((t) => t === "MATCH" || t === "FRIENDLY" || t === "TOURNAMENT"),
+  };
 
   // Prochain rendez-vous : qui de l'équipe a déjà répondu, pour l'onglet
   // Mon Équipe — jamais une action, juste une lecture de ce que les
@@ -225,7 +198,7 @@ export default async function ChildViewPage() {
       events={events}
       teammates={teammates}
       coaches={coaches}
-      badges={badges}
+      presence={presence}
       nextEventAttendance={nextEventAttendance}
     />
   );

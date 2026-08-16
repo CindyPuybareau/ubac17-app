@@ -1,6 +1,9 @@
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import Image from "next/image";
 import ChildLoginForm from "./child-login-form";
+import { CHILD_SESSION_COOKIE, verifyChildSession } from "@/lib/child-session";
 
 // Route délibérément anonyme, même famille de solution que
 // /api/calendar/[token] : c'est family_access_children() qui fait office
@@ -11,6 +14,15 @@ export default async function ChildLoginPage({
 }: {
   params: Promise<{ code: string }>;
 }) {
+  // Un enfant qui a ajouté ce lien à son écran d'accueil (PWA) le
+  // rouvrira ici à chaque fois, jamais directement sur /enfant/view — le
+  // cookie de session (30 jours, voir child-session.ts) doit donc être
+  // revérifié à cette entrée-là aussi, pas seulement sur /enfant/view.
+  const cookieStore = await cookies();
+  if (verifyChildSession(cookieStore.get(CHILD_SESSION_COOKIE)?.value)) {
+    redirect("/enfant/view");
+  }
+
   const { code } = await params;
 
   const supabase = createClient(

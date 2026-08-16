@@ -1,5 +1,8 @@
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import Image from "next/image";
 import { KeyRound } from "lucide-react";
+import { CHILD_SESSION_COOKIE, verifyChildSession } from "@/lib/child-session";
 
 // Pas de sélecteur public ici par choix délibéré (voir la migration
 // 20261008000000_child_pin_access.sql) : exposer tous les enfants du club
@@ -7,7 +10,15 @@ import { KeyRound } from "lucide-react";
 // route sert seulement de point d'atterrissage au bouton "Accès Espace
 // Enfant" de la page d'accueil — le vrai lien reste celui, privé et propre
 // à chaque famille, généré depuis Mon espace → Mon Équipe → Accès enfant.
-export default function EnfantLandingPage() {
+export default async function EnfantLandingPage() {
+  // Même logique qu'à la connexion : un cookie de session encore valide
+  // saute directement à l'espace, plutôt que de réafficher ce texte
+  // d'accueil à chaque réouverture depuis l'écran d'accueil (PWA).
+  const cookieStore = await cookies();
+  if (verifyChildSession(cookieStore.get(CHILD_SESSION_COOKIE)?.value)) {
+    redirect("/enfant/view");
+  }
+
   return (
     <div className="flex flex-1 flex-col items-center justify-center bg-zinc-50 px-4 py-16 text-center">
       <div className="w-full max-w-sm rounded-2xl border border-zinc-100 bg-white p-6 shadow-sm">
