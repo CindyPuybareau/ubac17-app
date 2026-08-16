@@ -125,6 +125,13 @@ export default function AddMemberModal({
         category,
         sex: form.sex || null,
         registration_email: form.registrationEmail.trim() || null,
+        // Même valeur que registration_email : c'est exactement ce que fait
+        // l'import Excel (les deux viennent de la même colonne "email" du
+        // formulaire d'inscription). Sans ça, un membre mineur créé ici
+        // n'obtenait jamais le lien parent/enfant à l'inscription du
+        // parent — sa fiche pouvait même se retrouver rattachée au compte
+        // du parent lui-même à la place de l'enfant.
+        pending_parent_email: form.registrationEmail.trim() || null,
         registration_phone: form.registrationPhone.trim() || null,
         address: form.address || null,
         postal_code: form.postalCode || null,
@@ -177,10 +184,16 @@ export default function AddMemberModal({
     }
 
     if (bureauRole && form.registrationEmail.trim()) {
+      // En minuscules, comme le reste des accès Bureau : voir le
+      // commentaire équivalent dans member-detail-modal.tsx.
       const { error: bureauError } = await supabase
         .from("club_administrators")
         .upsert(
-          { email: form.registrationEmail.trim(), role: "ADMIN", club_function: bureauRole },
+          {
+            email: form.registrationEmail.trim().toLowerCase(),
+            role: "ADMIN",
+            club_function: bureauRole,
+          },
           { onConflict: "email" }
         );
       if (bureauError) {

@@ -619,7 +619,13 @@ export default function MemberDetailModal({
     // holds the specific role for display today, ahead of the
     // finer-grained permissions it'll eventually drive.
     if (bureauRole !== (initialBureauRole ?? "")) {
-      const email = form.registrationEmail || member.registrationEmail;
+      // En minuscules : is_club_admin() compare cet email à celui du JWT
+      // au moment de la connexion — une casse différente entre les deux
+      // (ex. "Cindy@..." ici, "cindy@..." tapé à l'inscription) ferait
+      // échouer l'accès Bureau sans aucun message d'erreur visible.
+      const email = (form.registrationEmail || member.registrationEmail || "")
+        .trim()
+        .toLowerCase();
       if (!email) {
         // Échouait silencieusement avant ce correctif : la modale se
         // fermait comme si tout avait été enregistré, alors que l'accès

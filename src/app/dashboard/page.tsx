@@ -357,10 +357,15 @@ export default async function DashboardPage() {
         .select("first_name, last_name")
         .eq("id", user.id)
         .single(),
+      // En minuscules : club_administrators.email est désormais toujours
+      // stocké en minuscules (voir 20260918010000), mais user.email
+      // reflète la casse tapée à l'inscription — un .eq() strict aurait pu
+      // ne jamais trouver la ligne pour quelqu'un qui s'est inscrit avec
+      // une majuscule, et le rendre invisible au Bureau sans aucune erreur.
       supabase
         .from("club_administrators")
         .select("role, club_function")
-        .eq("email", user.email ?? "")
+        .eq("email", (user.email ?? "").toLowerCase())
         .maybeSingle(),
       supabase
         .from("team_coaches")
