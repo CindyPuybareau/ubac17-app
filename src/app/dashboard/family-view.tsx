@@ -168,12 +168,6 @@ export default function FamilyView({
       ),
     },
     {
-      key: "results",
-      label: "Résultats",
-      icon: <Trophy className={iconClass} />,
-      content: <CalendarView events={visibleEvents} forcedView="results" />,
-    },
-    {
       key: "teams",
       label: "Mon Équipe",
       icon: <Users className={iconClass} />,
@@ -210,6 +204,12 @@ export default function FamilyView({
           </div>
         </div>
       ),
+    },
+    {
+      key: "results",
+      label: "Résultats",
+      icon: <Trophy className={iconClass} />,
+      content: <CalendarView events={visibleEvents} forcedView="results" />,
     },
   ];
 

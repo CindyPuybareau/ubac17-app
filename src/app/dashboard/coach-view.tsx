@@ -116,23 +116,6 @@ export default function CoachView({
       ),
     },
     {
-      key: "results",
-      label: "Résultats",
-      icon: <Trophy className={iconClass} />,
-      content: (
-        <CalendarView
-          events={events}
-          createTeams={createTeams}
-          scopeTeams={teams.map((t) => ({
-            id: t.id,
-            name: t.name,
-            category: t.category,
-          }))}
-          forcedView="results"
-        />
-      ),
-    },
-    {
       key: "teams",
       label: "Mes Équipes",
       icon: <Users className={iconClass} />,
@@ -154,8 +137,8 @@ export default function CoachView({
       key: "organisation",
       label: "Organisation & Bilan",
       // "Organisation & Bilan" se fait tronquer en "Organisation ..." dans
-      // la barre du bas sur mobile, serrée entre 3 autres onglets — un
-      // seul mot y tient sans coupure.
+      // la barre du bas sur mobile, serrée entre plusieurs autres onglets —
+      // un seul mot y tient sans coupure.
       shortLabel: "Organisation",
       icon: <ClipboardList className={iconClass} />,
       content: (
@@ -168,6 +151,23 @@ export default function CoachView({
           rsvpStatusByKey={rsvpStatusByKey}
           rsvpReasonByKey={rsvpReasonByKey}
           roles={eventRoles}
+        />
+      ),
+    },
+    {
+      key: "results",
+      label: "Résultats",
+      icon: <Trophy className={iconClass} />,
+      content: (
+        <CalendarView
+          events={events}
+          createTeams={createTeams}
+          scopeTeams={teams.map((t) => ({
+            id: t.id,
+            name: t.name,
+            category: t.category,
+          }))}
+          forcedView="results"
         />
       ),
     },

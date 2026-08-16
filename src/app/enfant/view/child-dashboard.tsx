@@ -147,16 +147,16 @@ export default function ChildDashboard({
       ),
     },
     {
-      key: "results",
-      label: "Résultats",
-      icon: <Trophy className={iconClass} />,
-      content: <ChildResultsTab pastMatches={pastMatches} />,
-    },
-    {
       key: "presence",
       label: "Mes Présences",
       icon: <BarChart3 className={iconClass} />,
       content: <ChildPresenceTab trainings={presence.trainings} matches={presence.matches} />,
+    },
+    {
+      key: "results",
+      label: "Résultats",
+      icon: <Trophy className={iconClass} />,
+      content: <ChildResultsTab pastMatches={pastMatches} />,
     },
   ];
 

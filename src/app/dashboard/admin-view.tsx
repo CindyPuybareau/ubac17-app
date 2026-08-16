@@ -106,19 +106,6 @@ export default function AdminView({
       ),
     },
     {
-      key: "results",
-      label: "Résultats",
-      icon: <Trophy className={iconClass} />,
-      content: (
-        <CalendarView
-          events={upcomingEvents}
-          createTeams={teamRefs}
-          allowClubWide
-          forcedView="results"
-        />
-      ),
-    },
-    {
       key: "members",
       label: "Membres",
       icon: <Contact className={iconClass} />,
@@ -150,6 +137,19 @@ export default function AdminView({
           members={members}
           categoryTariffs={categoryTariffs}
           canonicalTeamRefs={canonicalTeamRefs}
+        />
+      ),
+    },
+    {
+      key: "results",
+      label: "Résultats",
+      icon: <Trophy className={iconClass} />,
+      content: (
+        <CalendarView
+          events={upcomingEvents}
+          createTeams={teamRefs}
+          allowClubWide
+          forcedView="results"
         />
       ),
     },
