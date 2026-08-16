@@ -150,6 +150,10 @@ export default function AdminView({
           createTeams={teamRefs}
           allowClubWide
           forcedView="results"
+          // Sans ça, toutes les équipes du club défilaient dans un seul
+          // fil de ~200 matchs sur la saison — même sélecteur que côté
+          // Coach/Parents (voir calendar-view.tsx), une équipe à la fois.
+          resultsTeams={teamRefs}
         />
       ),
     },

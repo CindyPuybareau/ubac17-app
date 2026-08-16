@@ -1099,8 +1099,13 @@ export default function CalendarView({
                   >
                     {t.role === "PLAYER" ? (
                       <Shirt className="h-3.5 w-3.5 shrink-0" />
-                    ) : (
+                    ) : t.role === "COACH" ? (
                       <ClipboardList className="h-3.5 w-3.5 shrink-0" />
+                    ) : (
+                      // Bureau : ni coach ni joueur de l'équipe, juste
+                      // gestionnaire — une icône neutre plutôt qu'un badge
+                      // Coach/Joueur qui ne le concerne pas personnellement.
+                      <Users className="h-3.5 w-3.5 shrink-0" />
                     )}
                     {teamLabel(t)}
                     {t.role && (
