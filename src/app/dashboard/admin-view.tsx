@@ -3,6 +3,7 @@ import {
   Contact,
   LayoutDashboard,
   MessageCircle,
+  Trophy,
   Users,
   Wallet,
   RefreshCw,
@@ -101,6 +102,19 @@ export default function AdminView({
           createTeams={teamRefs}
           allowClubWide
           birthdayMembers={birthdayMembers}
+        />
+      ),
+    },
+    {
+      key: "results",
+      label: "Résultats",
+      icon: <Trophy className={iconClass} />,
+      content: (
+        <CalendarView
+          events={upcomingEvents}
+          createTeams={teamRefs}
+          allowClubWide
+          forcedView="results"
         />
       ),
     },

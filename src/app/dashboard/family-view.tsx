@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarDays, MessageCircle, Users } from "lucide-react";
+import { CalendarDays, MessageCircle, Trophy, Users } from "lucide-react";
 import { sortTeamsByGroup } from "@/lib/teams";
 import CalendarView, { type CalendarRsvpPlayer } from "./calendar-view";
 import FamilyTeamCard, { type FamilyTeamCardData } from "./family-team-card";
@@ -166,6 +166,12 @@ export default function FamilyView({
           <ChildAccessManager />
         </div>
       ),
+    },
+    {
+      key: "results",
+      label: "Résultats",
+      icon: <Trophy className={iconClass} />,
+      content: <CalendarView events={visibleEvents} forcedView="results" />,
     },
     {
       key: "teams",

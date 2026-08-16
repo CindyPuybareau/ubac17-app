@@ -1,4 +1,4 @@
-import { CalendarDays, ClipboardList, Trophy, Users } from "lucide-react";
+import { CalendarDays, ClipboardList, RefreshCw, Trophy, Users } from "lucide-react";
 import CalendarView from "./calendar-view";
 import CalendarSubscribe from "./calendar-subscribe";
 import CoachTeams from "./coach-teams";
@@ -116,6 +116,23 @@ export default function CoachView({
       ),
     },
     {
+      key: "results",
+      label: "Résultats",
+      icon: <Trophy className={iconClass} />,
+      content: (
+        <CalendarView
+          events={events}
+          createTeams={createTeams}
+          scopeTeams={teams.map((t) => ({
+            id: t.id,
+            name: t.name,
+            category: t.category,
+          }))}
+          forcedView="results"
+        />
+      ),
+    },
+    {
       key: "teams",
       label: "Mes Équipes",
       icon: <Users className={iconClass} />,
@@ -157,7 +174,7 @@ export default function CoachView({
     {
       key: "ffbb",
       label: "FFBB",
-      icon: <Trophy className={iconClass} />,
+      icon: <RefreshCw className={iconClass} />,
       content: <CoachFfbb teams={teams} teamRoleByTeamId={teamRoleByTeamId} />,
     },
   ];

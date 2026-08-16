@@ -212,6 +212,7 @@ export default function CalendarView({
   carpoolByEventId = {},
   eventRoles = [],
   selfPlayerId = null,
+  forcedView,
 }: {
   events: AdminUpcomingEvent[];
   createTeams?: CalendarTeamRef[];
@@ -239,6 +240,12 @@ export default function CalendarView({
   // événement d'une équipe qu'il ne coache pas, sans jamais lui montrer
   // le bouton de ses coéquipiers (voir rsvpVisiblePlayers plus bas).
   selfPlayerId?: string | null;
+  // Utilisé par l'onglet "Résultats" dédié (sidebar Bureau/Coach/Parent) :
+  // verrouille la vue sur les résultats et masque la bascule Liste/Mois/
+  // Résultats, qui n'aurait plus de sens sur une page qui ne s'appelle
+  // que "Résultats". Omis (undefined) partout ailleurs, où les trois
+  // vues restent librement accessibles depuis l'onglet Calendrier.
+  forcedView?: "results";
 }) {
   const router = useRouter();
   const [viewMonth, setViewMonth] = useState<Date>(today);
@@ -246,7 +253,7 @@ export default function CalendarView({
   // Le calendrier s'ouvre sur la grille : on veut d'abord voir le mois.
   // La liste chronologique reste à un clic pour répondre à "c'est quoi la
   // suite ?".
-  const [view, setView] = useState<"list" | "month" | "results">("month");
+  const [view, setView] = useState<"list" | "month" | "results">(forcedView ?? "month");
   const [createOpen, setCreateOpen] = useState(false);
 
   const canManage = Boolean(createTeams && createTeams.length > 0);
@@ -875,36 +882,41 @@ export default function CalendarView({
           )}
 
           {/* Tout à droite : c'est un réglage d'affichage, pas une action
-              sur les données — il vient après ce qu'on fait, pas avant. */}
-          <div className="flex items-center gap-0.5 rounded-full border border-zinc-200 p-0.5">
-            <button
-              onClick={() => setView("list")}
-              className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
-                view === "list" ? "bg-navy text-white" : "text-zinc-500 hover:bg-zinc-50"
-              }`}
-            >
-              <List className="h-3.5 w-3.5" />
-              Liste
-            </button>
-            <button
-              onClick={() => setView("month")}
-              className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
-                view === "month" ? "bg-navy text-white" : "text-zinc-500 hover:bg-zinc-50"
-              }`}
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-              Mois
-            </button>
-            <button
-              onClick={() => setView("results")}
-              className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
-                view === "results" ? "bg-navy text-white" : "text-zinc-500 hover:bg-zinc-50"
-              }`}
-            >
-              <Trophy className="h-3.5 w-3.5" />
-              Résultats
-            </button>
-          </div>
+              sur les données — il vient après ce qu'on fait, pas avant.
+              Masqué sur la page "Résultats" dédiée (forcedView) : basculer
+              vers Mois n'y aurait pas de sens, l'onglet Calendrier existe
+              déjà pour ça. */}
+          {!forcedView && (
+            <div className="flex items-center gap-0.5 rounded-full border border-zinc-200 p-0.5">
+              <button
+                onClick={() => setView("list")}
+                className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                  view === "list" ? "bg-navy text-white" : "text-zinc-500 hover:bg-zinc-50"
+                }`}
+              >
+                <List className="h-3.5 w-3.5" />
+                Liste
+              </button>
+              <button
+                onClick={() => setView("month")}
+                className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                  view === "month" ? "bg-navy text-white" : "text-zinc-500 hover:bg-zinc-50"
+                }`}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                Mois
+              </button>
+              <button
+                onClick={() => setView("results")}
+                className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                  view === "results" ? "bg-navy text-white" : "text-zinc-500 hover:bg-zinc-50"
+                }`}
+              >
+                <Trophy className="h-3.5 w-3.5" />
+                Résultats
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
