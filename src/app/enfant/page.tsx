@@ -9,7 +9,7 @@ import { CHILD_SESSION_COOKIE, verifyChildSession } from "@/lib/child-session";
 // sur une page sans authentification serait une fuite de vie privée. Cette
 // route sert seulement de point d'atterrissage au bouton "Accès Espace
 // Enfant" de la page d'accueil — le vrai lien reste celui, privé et propre
-// à chaque famille, généré depuis Mon espace → Mon Équipe → Accès enfant.
+// à chaque famille, généré depuis Planning & Matchs → Accès enfant.
 export default async function EnfantLandingPage() {
   // Même logique qu'à la connexion : un cookie de session encore valide
   // saute directement à l'espace, plutôt que de réafficher ce texte
@@ -37,8 +37,8 @@ export default async function EnfantLandingPage() {
         <p className="mt-3 text-sm text-zinc-500">
           Ton accès se fait via un lien privé, propre à ta famille — pas
           depuis cette page. Demande-le à un parent : dans son espace UBAC,
-          onglet <strong>Mon espace</strong>, puis <strong>Mon Équipe</strong>{" "}
-          (tout en bas de la page), carte <strong>Accès enfant</strong>.
+          onglet <strong>Planning &amp; Matchs</strong> (tout en bas de la
+          page), carte <strong>Accès enfant</strong>.
         </p>
         <p className="mt-3 text-xs text-zinc-400">
           Une fois ce lien ouvert sur ton appareil, tu n&apos;auras plus qu&apos;à
