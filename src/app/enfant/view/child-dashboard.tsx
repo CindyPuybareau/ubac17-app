@@ -137,7 +137,7 @@ export default function ChildDashboard({
       key: "calendar",
       label: "Calendrier",
       icon: <CalendarDays className={iconClass} />,
-      content: <ChildCalendarTab events={events} />,
+      content: <ChildCalendarTab events={events} teammates={teammates} />,
     },
     {
       key: "team",
