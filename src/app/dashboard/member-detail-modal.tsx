@@ -620,23 +620,32 @@ export default function MemberDetailModal({
     // finer-grained permissions it'll eventually drive.
     if (bureauRole !== (initialBureauRole ?? "")) {
       const email = form.registrationEmail || member.registrationEmail;
-      if (email) {
-        const { error: bureauError } = bureauRole
-          ? await supabase
-              .from("club_administrators")
-              .upsert(
-                { email, role: "ADMIN", club_function: bureauRole },
-                { onConflict: "email" }
-              )
-          : await supabase
-              .from("club_administrators")
-              .delete()
-              .eq("email", email);
-        if (bureauError) {
-          setSaving(false);
-          setError(`Accès Bureau non mis à jour : ${bureauError.message}`);
-          return;
-        }
+      if (!email) {
+        // Échouait silencieusement avant ce correctif : la modale se
+        // fermait comme si tout avait été enregistré, alors que l'accès
+        // Bureau n'avait jamais été écrit faute d'email à quoi le
+        // rattacher. Un message clair plutôt qu'un faux succès.
+        setSaving(false);
+        setError(
+          "Impossible d'attribuer un rôle Bureau : cette fiche n'a aucune adresse email d'inscription renseignée."
+        );
+        return;
+      }
+      const { error: bureauError } = bureauRole
+        ? await supabase
+            .from("club_administrators")
+            .upsert(
+              { email, role: "ADMIN", club_function: bureauRole },
+              { onConflict: "email" }
+            )
+        : await supabase
+            .from("club_administrators")
+            .delete()
+            .eq("email", email);
+      if (bureauError) {
+        setSaving(false);
+        setError(`Accès Bureau non mis à jour : ${bureauError.message}`);
+        return;
       }
     }
 
