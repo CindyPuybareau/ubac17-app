@@ -104,7 +104,7 @@ export default function CalendarSubscribe() {
       >
         <span className="flex items-center gap-1.5 text-sm font-medium text-zinc-600">
           <CalendarPlus className="h-4 w-4 shrink-0 text-ubac-blue" />
-          Recevoir le calendrier dans ton agenda
+          Calendrier UBAC dans ton agenda
         </span>
         <ChevronDown className="h-4 w-4 shrink-0 text-zinc-400" />
       </button>
@@ -123,7 +123,7 @@ export default function CalendarSubscribe() {
       <div className="flex items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-sm font-semibold text-zinc-900">
           <CalendarPlus className="h-4 w-4 shrink-0 text-ubac-blue" />
-          Recevoir le calendrier dans ton agenda
+          Calendrier UBAC dans ton agenda
         </p>
         <button
           type="button"

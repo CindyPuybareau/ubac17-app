@@ -1,12 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { KeyRound, Link2, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronUp, KeyRound, Link2, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatFirstName } from "@/lib/names";
 import { isValidPinFormat } from "@/lib/pin";
 
 type Child = { id: string; name: string; hasPin: boolean };
+
+// Même repli par défaut et même mémorisation par appareil que
+// CalendarSubscribe (voir calendar-subscribe.tsx) : une famille configure
+// ça une fois, pas à chaque visite — mais reste à un clic pour qui veut
+// copier le lien à nouveau ou changer un code.
+const COLLAPSE_STORAGE_KEY = "ubac-child-access-collapsed";
 
 // Gestion de l'accès enfant (lien privé par famille + PIN par enfant) —
 // entièrement autonome : ne dépend d'aucune donnée déjà chargée par
@@ -24,6 +30,21 @@ export default function ChildAccessManager() {
   const [pinDraft, setPinDraft] = useState("");
   const [pinError, setPinError] = useState<string | null>(null);
   const [savingPin, setSavingPin] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === "undefined") return true;
+    const stored = window.localStorage.getItem(COLLAPSE_STORAGE_KEY);
+    return stored === null ? true : stored === "1";
+  });
+
+  function setCollapsedPersisted(next: boolean) {
+    setCollapsed(next);
+    try {
+      window.localStorage.setItem(COLLAPSE_STORAGE_KEY, next ? "1" : "0");
+    } catch {
+      // Stockage indisponible (navigation privée...) : le repli reste
+      // actif pour cette visite, simplement pas mémorisé pour la suivante.
+    }
+  }
 
   async function load() {
     const supabase = createClient();
@@ -105,14 +126,40 @@ export default function ChildAccessManager() {
   if (loading) return null;
   if (!children || children.length === 0) return null;
 
+  if (collapsed) {
+    return (
+      <button
+        type="button"
+        onClick={() => setCollapsedPersisted(false)}
+        className="flex w-full items-center justify-between gap-2 rounded-2xl border border-zinc-100 bg-white px-4 py-2.5 text-left shadow-sm transition-colors hover:bg-zinc-50"
+      >
+        <span className="flex items-center gap-1.5 text-sm font-medium text-zinc-600">
+          <KeyRound className="h-4 w-4 shrink-0 text-navy" />
+          Accès enfant (sans email)
+        </span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-zinc-400" />
+      </button>
+    );
+  }
+
   const link = code && typeof window !== "undefined" ? `${window.location.origin}/enfant/${code}` : null;
 
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
-      <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-        <KeyRound className="h-3.5 w-3.5 text-navy" />
-        Accès enfant (sans email)
-      </p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          <KeyRound className="h-3.5 w-3.5 text-navy" />
+          Accès enfant (sans email)
+        </p>
+        <button
+          type="button"
+          onClick={() => setCollapsedPersisted(true)}
+          title="Réduire"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
+        >
+          <ChevronUp className="h-4 w-4" />
+        </button>
+      </div>
       <p className="text-xs text-zinc-500">
         Un lien privé pour votre foyer, à garder sur l&apos;appareil familial —
         chaque enfant s&apos;y connecte ensuite seul avec son code à 4 chiffres,

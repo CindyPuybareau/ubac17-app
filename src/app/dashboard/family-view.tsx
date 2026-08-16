@@ -164,6 +164,7 @@ export default function FamilyView({
             eventRoles={eventRoles}
           />
           <CalendarSubscribe />
+          <ChildAccessManager />
         </div>
       ),
     },
@@ -201,10 +202,6 @@ export default function FamilyView({
               players={visiblePlayers}
               rsvpStatusByKey={rsvpStatusByKey}
             />
-          </div>
-
-          <div className="border-t border-zinc-100 pt-4">
-            <ChildAccessManager />
           </div>
         </div>
       ),
