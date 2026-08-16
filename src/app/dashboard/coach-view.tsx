@@ -4,9 +4,12 @@ import CalendarSubscribe from "./calendar-subscribe";
 import CoachTeams from "./coach-teams";
 import CoachFfbb from "./coach-ffbb";
 import CoachOrganisation, { type CoachTeamMatchCard } from "./coach-organisation";
+import FamilyAttendanceRequests from "./family-attendance-requests";
+import FamilyCotisationCard from "./family-cotisation-card";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import type { TeamWithMembers } from "./team-manager";
 import type {
+  AdminCotisation,
   AdminMemberTeam,
   AdminUpcomingEvent,
   MemberDetail,
@@ -39,6 +42,8 @@ export default function CoachView({
   whatsappGroups,
   eventRoles,
   ownPlayerId,
+  showOwnPlayerSummary = false,
+  ownCotisations = [],
 }: {
   teams: TeamWithMembers[];
   events: AdminUpcomingEvent[];
@@ -66,6 +71,15 @@ export default function CoachView({
   // existe — un coach qui joue aussi dans une autre équipe doit pouvoir
   // répondre présent/absent pour LUI-MÊME sur ses propres matchs.
   ownPlayerId: string | null;
+  // true seulement quand ce coach n'a aucun enfant rattaché (juste sa
+  // propre fiche joueur) : l'onglet "Mon espace" est alors retiré et cet
+  // espace reprend ses deux derniers morceaux (relance de présence,
+  // cotisation) pour rester le seul endroit à consulter. Un coach qui a
+  // aussi des enfants garde les deux onglets séparés — page.tsx ne
+  // fournit ces informations qu'à ce moment-là (ownCotisations reste
+  // vide sinon), pour ne jamais les faire apparaître en double.
+  showOwnPlayerSummary?: boolean;
+  ownCotisations?: AdminCotisation[];
 }) {
   // Créer / modifier / supprimer un événement n'est permis que pour les
   // équipes réellement entraînées : proposer celle où l'utilisateur n'est
@@ -191,6 +205,20 @@ export default function CoachView({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Repris de l'espace Parent (voir family-view.tsx) pour un coach
+          sans enfant, dont "Mon espace" a été retiré : sa propre relance
+          de présence et sa propre cotisation restent visibles quelque
+          part, plutôt que de disparaître avec l'onglet. */}
+      {showOwnPlayerSummary && ownPlayerId && (
+        <>
+          <FamilyAttendanceRequests
+            events={events}
+            players={rsvpPlayers.filter((p) => p.id === ownPlayerId)}
+            statusByKey={rsvpStatusByKey}
+          />
+          <FamilyCotisationCard cotisations={ownCotisations} />
+        </>
+      )}
       <AdminSidebar sections={sections} />
     </div>
   );

@@ -1815,6 +1815,14 @@ export default async function DashboardPage() {
 
   const tabs: DashboardTab[] = [];
 
+  // Un coach dont le SEUL "joueur" rattaché est lui-même (aucun enfant) a
+  // désormais tout ce qu'il lui faut dans "Équipe" (calendrier, effectif,
+  // résultats — voir le sélecteur d'équipe de CalendarView) : "Mon
+  // espace" devient un doublon pur qui prête à confusion. Un coach qui a
+  // aussi des enfants garde les deux onglets séparés (gérer SES enfants
+  // n'a rien à voir avec ses propres équipes).
+  const foldFamilyIntoCoach = isCoach && players.length > 0 && players.every((p) => p.isSelf);
+
   if (isAdmin) {
     tabs.push({
       key: "admin",
@@ -1865,12 +1873,18 @@ export default async function DashboardPage() {
           whatsappGroups={whatsappGroups}
           eventRoles={eventRoleTypes}
           ownPlayerId={ownPlayerId}
+          showOwnPlayerSummary={foldFamilyIntoCoach}
+          ownCotisations={
+            foldFamilyIntoCoach
+              ? familyCotisations.filter((c) => c.playerId === ownPlayerId)
+              : []
+          }
         />
       ),
     });
   }
 
-  if (players.length > 0) {
+  if (players.length > 0 && !foldFamilyIntoCoach) {
     tabs.push({
       key: "family",
       label: "Mon espace",
