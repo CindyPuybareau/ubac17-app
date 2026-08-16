@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { buildGmailComposeLink } from "@/lib/email";
-import { formatFirstName, formatLastName } from "@/lib/names";
+import { formatFirstName, formatLastName, sortByLastName } from "@/lib/names";
 import { parseMatchTitle } from "@/lib/match-display";
 import { teamLabel } from "@/lib/teams";
 import OpponentDisplay from "./opponent-display";
@@ -184,7 +184,7 @@ function PresentPlayersList({
       </button>
       {open && (
         <div className="flex flex-wrap gap-1.5">
-          {players.map((p) => (
+          {sortByLastName(players, (p) => p.lastName).map((p) => (
             <span
               key={p.id}
               className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700"

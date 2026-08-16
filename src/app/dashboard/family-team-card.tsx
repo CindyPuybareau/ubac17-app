@@ -1,7 +1,7 @@
 "use client";
 
 import { ClipboardList, ExternalLink, Users } from "lucide-react";
-import { formatFirstName, formatLastName } from "@/lib/names";
+import { formatFirstName, formatLastName, sortByLastName } from "@/lib/names";
 import PlayerYearBadge from "./player-year-badge";
 import { categoryTheme } from "./team-card";
 
@@ -66,7 +66,7 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
             Coachs
           </p>
           <ul className="mt-1 flex flex-col gap-1">
-            {card.coaches.map((c) => (
+            {sortByLastName(card.coaches, (c) => c.last_name).map((c) => (
               <li
                 key={c.id}
                 className="truncate rounded-lg bg-blue-50/70 p-2.5 text-sm text-blue-950"
@@ -74,7 +74,7 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
                 <PersonNameInline p={c} />
               </li>
             ))}
-            {card.pendingCoaches.map((c) => (
+            {sortByLastName(card.pendingCoaches, (c) => c.last_name).map((c) => (
               <li
                 key={`pending-${c.id}`}
                 className="truncate rounded-lg bg-blue-50/70 p-2.5 text-sm text-blue-950"
@@ -104,7 +104,7 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
             Joueurs
           </p>
           <ul className="mt-1 flex flex-col gap-1">
-            {card.roster.map((p) => (
+            {sortByLastName(card.roster, (p) => p.last_name).map((p) => (
               <li
                 key={p.id}
                 className="flex items-center justify-between gap-2 rounded-lg bg-zinc-50 px-2 py-1 text-sm text-zinc-700"

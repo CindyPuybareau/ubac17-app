@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { sortByLastName } from "@/lib/names";
 
 export type UpcomingEvent = {
   id: string;
@@ -105,9 +106,14 @@ export async function getTeamRoster(
     .select("players(id, first_name, last_name)")
     .eq("team_id", teamId);
 
-  return (data ?? [])
+  const roster = (data ?? [])
     .map((row) => row.players as unknown as RosterPlayer | null)
     .filter((p): p is RosterPlayer => Boolean(p));
+  // Trié une bonne fois ici : tous les écrans qui affichent un effectif
+  // d'équipe (Organisation, cartes de match, badges de présence...) lisent
+  // ce même helper, donc trier à la source évite de le refaire (ou de
+  // l'oublier) dans chacun d'eux.
+  return sortByLastName(roster, (p) => p.last_name);
 }
 
 export async function getRsvpCounts(

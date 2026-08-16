@@ -16,7 +16,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { formatFirstName, formatLastName, formatPersonName } from "@/lib/names";
+import { formatFirstName, formatLastName, formatPersonName, sortByLastName } from "@/lib/names";
 import { computePlayerYearStatus, getCurrentSeasonLabel } from "@/lib/season";
 import { formatEventTime, isMatchType, styleFor } from "./calendar-view";
 import OpponentDisplay from "./opponent-display";
@@ -331,8 +331,9 @@ export default function TeamCard({
     router.refresh();
   }
 
-  const availableCoaches = allProfiles.filter(
-    (p) => !team.coaches.some((tc) => tc.id === p.id)
+  const availableCoaches = sortByLastName(
+    allProfiles.filter((p) => !team.coaches.some((tc) => tc.id === p.id)),
+    (p) => p.last_name
   );
   const canCreatePlayer = allowCreatePlayer && !readOnly;
   const canAssignCoach = allowAssignCoach && !readOnly;
@@ -453,7 +454,10 @@ export default function TeamCard({
       player: p,
     });
   });
-  const memberRows = Array.from(memberById.values());
+  // Trié par nom de famille : la liste se construisait jusqu'ici dans
+  // l'ordre d'arrivée des données (coachs, coachs en attente, joueurs),
+  // pas alphabétique.
+  const memberRows = sortByLastName(Array.from(memberById.values()), (m) => m.lastName);
 
   const rosterQuery = rosterSearch.trim().toLowerCase();
   const visibleMembers = rosterQuery
@@ -671,16 +675,14 @@ export default function TeamCard({
             groupId={whatsappGroup.id}
             groupName={team.name ?? "de l'équipe"}
             inviteLink={whatsappGroup.inviteLink}
-            members={whatsappGroup.members.map((m) => ({
-              id: m.id,
-              firstName: m.firstName,
-              lastName: m.lastName,
-            }))}
-            candidates={team.players.map((p) => ({
-              id: p.id,
-              firstName: p.first_name,
-              lastName: p.last_name,
-            }))}
+            members={sortByLastName(
+              whatsappGroup.members.map((m) => ({ id: m.id, firstName: m.firstName, lastName: m.lastName })),
+              (m) => m.lastName
+            )}
+            candidates={sortByLastName(
+              team.players.map((p) => ({ id: p.id, firstName: p.first_name, lastName: p.last_name })),
+              (p) => p.lastName
+            )}
           />
         )}
       </div>
@@ -837,7 +839,7 @@ export default function TeamCard({
             Coachs
           </p>
           <ul className="mt-1 flex flex-col gap-1">
-            {team.coaches.map((p) => (
+            {sortByLastName(team.coaches, (p) => p.last_name).map((p) => (
               <li
                 key={p.id}
                 className="flex items-center justify-between gap-2 rounded-lg bg-zinc-50 px-2 py-1 text-sm"
@@ -863,7 +865,7 @@ export default function TeamCard({
                 )}
               </li>
             ))}
-            {team.pendingCoaches.map((p) => (
+            {sortByLastName(team.pendingCoaches, (p) => p.last_name).map((p) => (
               <li
                 key={`pending-${p.id}`}
                 className="flex items-center justify-between gap-2 rounded-lg bg-zinc-50 px-2 py-1 text-sm"

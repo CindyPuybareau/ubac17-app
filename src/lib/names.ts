@@ -41,3 +41,17 @@ export function formatPersonName(
 ) {
   return [formatFirstName(first), formatLastName(last)].filter(Boolean).join(" ") || fallback;
 }
+
+// Tri par nom de famille, appliqué de la même façon partout dans l'appli
+// (tableau Membres, listes d'équipe, trombinoscope, groupes WhatsApp...) —
+// un seul point pour cette règle plutôt qu'un localeCompare("fr")
+// réinventé (ou oublié) dans chaque écran qui liste des personnes. Ne
+// mute jamais le tableau reçu.
+export function sortByLastName<T>(
+  items: T[],
+  getLastName: (item: T) => string | null | undefined
+): T[] {
+  return [...items].sort((a, b) =>
+    formatLastName(getLastName(a)).localeCompare(formatLastName(getLastName(b)), "fr")
+  );
+}

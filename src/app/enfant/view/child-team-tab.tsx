@@ -1,6 +1,16 @@
 import { ShieldCheck, Users } from "lucide-react";
-import { formatFirstName, formatPersonName } from "@/lib/names";
+import { formatFirstName, formatPersonName, sortByLastName } from "@/lib/names";
 import type { ChildCoach, ChildEvent, ChildTeammate } from "./child-dashboard";
+
+// Trombinoscope et présences : jamais de nom de famille exposé à l'enfant
+// (choix de confidentialité délibéré, voir child-dashboard.tsx), donc le
+// tri se fait sur le prénom plutôt que sur le nom comme partout ailleurs
+// dans l'appli — c'est la seule identité affichée ici.
+function sortByFirstName<T>(items: T[], getFirstName: (item: T) => string | null | undefined): T[] {
+  return [...items].sort((a, b) =>
+    formatFirstName(getFirstName(a)).localeCompare(formatFirstName(getFirstName(b)), "fr")
+  );
+}
 
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   PRESENT: { label: "Présent", className: "bg-emerald-100 text-emerald-700" },
@@ -49,7 +59,7 @@ export default function ChildTeamTab({
             Coachs
           </p>
           <div className="flex flex-wrap gap-3">
-            {coaches.map((c) => (
+            {sortByLastName(coaches, (c) => c.lastName).map((c) => (
               <div key={c.id} className="flex items-center gap-2">
                 <span
                   className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-white ${avatarColor(c.id)}`}
@@ -75,7 +85,7 @@ export default function ChildTeamTab({
             {presentCount > 1 ? "s" : ""} sur {nextEventAttendance.length}
           </p>
           <div className="flex flex-col gap-1.5">
-            {nextEventAttendance.map((a, i) => {
+            {sortByFirstName(nextEventAttendance, (a) => a.name).map((a, i) => {
               const status = STATUS_LABELS[a.status] ?? STATUS_LABELS.PENDING;
               return (
                 <div key={i} className="flex items-center justify-between gap-2 text-sm">
@@ -96,7 +106,7 @@ export default function ChildTeamTab({
           L&apos;équipe ({teammates.length})
         </p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {teammates.map((t) => (
+          {sortByFirstName(teammates, (t) => t.firstName).map((t) => (
             <div key={t.id} className="flex flex-col items-center gap-1.5 rounded-xl bg-zinc-50 p-3 text-center">
               <span
                 className={`flex h-12 w-12 items-center justify-center rounded-full text-lg font-bold text-white ${avatarColor(t.id)}`}
