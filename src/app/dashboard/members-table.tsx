@@ -32,6 +32,15 @@ import WhatsAppButton from "./whatsapp-button";
 import { formatFirstName, formatLastName, formatPersonName } from "@/lib/names";
 import type { AdminMember, AdminMemberTeam } from "./page";
 
+// "12 août 2026 à 09:36" — utilisé uniquement dans l'infobulle de
+// l'indicateur de connexion, jamais affiché en clair dans le tableau.
+function formatLastLogin(iso: string) {
+  const d = new Date(iso);
+  const date = d.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  const time = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  return `${date} à ${time}`;
+}
+
 function fullLastName(m: AdminMember) {
   return formatLastName(m.lastName) || "—";
 }
@@ -545,6 +554,18 @@ export default function MembersTable({
                   }
                 >
                   <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                    <span
+                      title={
+                        m.lastLoginAt
+                          ? `Déjà connecté(e) — dernière connexion le ${formatLastLogin(m.lastLoginAt)}`
+                          : "Jamais connecté(e) à l'application"
+                      }
+                      className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center ${
+                        m.lastLoginAt ? "text-emerald-500" : "text-zinc-300"
+                      }`}
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                    </span>
                     {fullLastName(m)}
                     {m.bureauRole && (
                       <Shield className="h-3.5 w-3.5 shrink-0 text-ubac-yellow-dark" />

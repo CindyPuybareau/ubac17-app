@@ -123,6 +123,11 @@ export type AdminMember = MemberDetail & {
   // have a real account (team_pending_coaches) — display-only, mirrors
   // the free-text pending_coach_names shown on team cards.
   pendingCoachTeams: AdminMemberTeam[];
+  // Dernière connexion réelle de CETTE fiche (son propre compte Supabase
+  // Auth, jamais celui d'un parent) — null si elle n'a pas de compte lié
+  // ou ne s'est jamais connectée. Alimenté par un trigger sur
+  // auth.users.last_sign_in_at (voir la migration 20260817010000).
+  lastLoginAt: string | null;
 };
 
 export type CollecteType = "STAGE" | "EVENEMENT" | "BOUTIQUE";
@@ -631,7 +636,7 @@ export default async function DashboardPage() {
         .order("first_name"),
       supabase
         .from("profiles")
-        .select("id, first_name, last_name, phone, email")
+        .select("id, first_name, last_name, phone, email, last_login_at")
         .order("first_name"),
       supabase
         .from("team_players")
@@ -812,6 +817,16 @@ export default async function DashboardPage() {
         (p as { email: string | null }).email,
       ])
     );
+    // Dernière connexion réelle (compte Supabase Auth) de CETTE fiche —
+    // jamais celle d'un parent : un enfant sans compte propre (géré par PIN,
+    // un mécanisme totalement séparé) n'a donc jamais de valeur ici, ce qui
+    // est le comportement honnête attendu.
+    const lastLoginByProfileId = new Map(
+      (profilesRes.data ?? []).map((p) => [
+        p.id,
+        (p as { last_login_at: string | null }).last_login_at,
+      ])
+    );
 
     // Équipes coachées, rattachées au COMPTE de la fiche et non à son
     // e-mail. Une famille partage une seule adresse : rapprocher par
@@ -946,6 +961,9 @@ export default async function DashboardPage() {
         hasParent: parentIds.length > 0,
         pendingParentEmail: player.pending_parent_email,
         profileId: player.profile_id,
+        lastLoginAt: player.profile_id
+          ? (lastLoginByProfileId.get(player.profile_id) ?? null)
+          : null,
       };
     });
 

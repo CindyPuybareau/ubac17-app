@@ -31,7 +31,7 @@ function GroupCard({ group, highlighted }: { group: WhatsAppGroup; highlighted: 
           className="flex w-fit items-center gap-1.5 rounded-full bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-600"
         >
           <ExternalLink className="h-3.5 w-3.5" />
-          Rejoindre le groupe WhatsApp
+          Ouvrir sur WhatsApp
         </a>
       ) : (
         <span className="text-xs text-zinc-400">

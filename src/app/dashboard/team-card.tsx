@@ -1006,7 +1006,7 @@ export default function TeamCard({
           className="mt-3 flex w-fit items-center gap-1.5 rounded-full bg-emerald-500 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
         >
           <ExternalLink className="h-4 w-4" />
-          Rejoindre le groupe WhatsApp
+          Ouvrir sur WhatsApp
         </a>
       ) : (
         readOnly && (
