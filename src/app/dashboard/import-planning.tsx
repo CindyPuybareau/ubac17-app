@@ -42,10 +42,13 @@ function roundDateToDay(d: Date): Date {
   return new Date(Math.round(d.getTime() / dayMs) * dayMs);
 }
 
-function parseHeure(value: unknown): { h: number; m: number } {
+// null quand la cellule ne contient rien d'exploitable comme heure — un
+// import ne doit jamais fabriquer un "00h00" qui n'existe dans aucune
+// donnée source, ça se lirait comme un vrai match de minuit.
+function parseHeure(value: unknown): { h: number; m: number } | null {
   const text = String(value ?? "").trim();
   const match = text.match(/(\d{1,2})\s*[h:]\s*(\d{0,2})/i);
-  if (!match) return { h: 0, m: 0 };
+  if (!match) return null;
   return { h: Number(match[1]), m: match[2] ? Number(match[2]) : 0 };
 }
 
@@ -59,7 +62,9 @@ function combineDateTime(dateValue: unknown, heureValue: unknown): string | null
   }
   if (!base) return null;
 
-  const { h, m } = parseHeure(heureValue);
+  const parsedHeure = parseHeure(heureValue);
+  if (!parsedHeure) return null;
+  const { h, m } = parsedHeure;
   const combined = new Date(
     Date.UTC(
       base.getUTCFullYear(),
@@ -182,12 +187,21 @@ export default function ImportPlanning({
 
     const supabase = createClient();
     const unmatched: string[] = [];
+    // Une ligne sans heure valide (startTime null) n'est jamais importée
+    // avec un minuit fabriqué — elle est ignorée et comptée à part, plutôt
+    // que d'écrire une fausse heure indistinguable d'un vrai match de
+    // minuit.
+    let unknownTime = 0;
 
     const eventsRows = rows
       .map((r) => {
         const team = findTeamForDivision(r.division, existingTeams);
         if (!team) {
           unmatched.push(r.division);
+          return null;
+        }
+        if (!r.startTime) {
+          unknownTime += 1;
           return null;
         }
         const opponent = r.isHome ? r.equipe2 : r.equipe1;
@@ -219,6 +233,9 @@ export default function ImportPlanning({
           ? ` ${unmatched.length} ligne(s) ignorée(s) (division non reconnue: ${Array.from(
               new Set(unmatched)
             ).join(", ")}).`
+          : "") +
+        (unknownTime > 0
+          ? ` ${unknownTime} ligne(s) ignorée(s) (heure introuvable dans le fichier) — à ajouter à la main si besoin.`
           : "")
     );
     setRows(null);

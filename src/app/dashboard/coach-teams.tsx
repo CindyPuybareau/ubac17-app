@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ClipboardList, MessageCircle, Shirt } from "lucide-react";
-import { sortTeamsByGroup, teamLabel } from "@/lib/teams";
+import { MessageCircle } from "lucide-react";
+import { sortTeamsByGroup } from "@/lib/teams";
 import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
 import TeamCard from "./team-card";
+import TeamSelectorPills from "./team-selector-pills";
 import WhatsAppGroupButton from "./whatsapp-group-button";
 import type { TeamWithMembers } from "./team-manager";
 import type { AdminMemberTeam, AdminUpcomingEvent, MemberDetail, WhatsAppGroup } from "./page";
@@ -62,43 +63,16 @@ export default function CoachTeams({
 
   return (
     <div className="flex flex-col gap-4">
-      {sortedTeams.length > 1 && (
-        <div className="flex flex-wrap gap-2">
-          {sortedTeams.map((t) => {
-            const role = teamRoleByTeamId[t.id] ?? "COACH";
-            const isActive = active.id === t.id;
-            return (
-              <button
-                key={t.id}
-                onClick={() => setActiveId(t.id)}
-                className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
-                  isActive
-                    ? "border-navy bg-navy text-white"
-                    : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
-                }`}
-              >
-                {role === "COACH" ? (
-                  <ClipboardList className="h-3.5 w-3.5 shrink-0" />
-                ) : (
-                  <Shirt className="h-3.5 w-3.5 shrink-0" />
-                )}
-                {teamLabel(t)}
-                <span
-                  className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none ${
-                    isActive
-                      ? "bg-white/20 text-white"
-                      : role === "COACH"
-                        ? "bg-navy/10 text-navy"
-                        : "bg-emerald-100 text-emerald-700"
-                  }`}
-                >
-                  {role === "COACH" ? "Coach" : "Joueur"}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
+      <TeamSelectorPills
+        teams={sortedTeams.map((t) => ({
+          id: t.id,
+          name: t.name,
+          category: t.category,
+          role: teamRoleByTeamId[t.id] ?? "COACH",
+        }))}
+        activeId={active.id}
+        onSelect={setActiveId}
+      />
       {isPlayerTeam && (
         <p className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
           Tu figures dans cette équipe en tant que joueur : l&apos;effectif est

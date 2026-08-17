@@ -15,12 +15,10 @@ import {
   List,
   Mail,
   MapPin,
-  ClipboardList,
   ListOrdered,
   Pencil,
   PartyPopper,
   Plus,
-  Shirt,
   StickyNote,
   Trash2,
   Users,
@@ -38,6 +36,7 @@ import RsvpButtons from "./rsvp-buttons";
 import ItineraryButton from "./itinerary-button";
 import MatchTasksPanel from "./match-tasks-panel";
 import MatchScore from "./match-score";
+import TeamSelectorPills from "./team-selector-pills";
 import { sendEventPush } from "./event-push";
 import type { AdminUpcomingEvent } from "./page";
 import {
@@ -1113,52 +1112,15 @@ export default function CalendarView({
 
       {view === "results" && (
         <div className="flex flex-col gap-3">
-          {/* Même sélecteur que "Mes Équipes" : indispensable dès qu'on
-              encadre ou joue dans plusieurs équipes, sans quoi les
-              résultats de toutes se mélangeaient dans un seul fil illisible. */}
-          {sortedResultsTeams.length > 1 && (
-            <div className="flex flex-wrap gap-2">
-              {sortedResultsTeams.map((t) => {
-                const isActive = activeResultsTeamIdResolved === t.id;
-                return (
-                  <button
-                    key={t.id}
-                    onClick={() => setActiveResultsTeamId(t.id)}
-                    className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
-                      isActive
-                        ? "border-navy bg-navy text-white"
-                        : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
-                    }`}
-                  >
-                    {t.role === "PLAYER" ? (
-                      <Shirt className="h-3.5 w-3.5 shrink-0" />
-                    ) : t.role === "COACH" ? (
-                      <ClipboardList className="h-3.5 w-3.5 shrink-0" />
-                    ) : (
-                      // Bureau : ni coach ni joueur de l'équipe, juste
-                      // gestionnaire — une icône neutre plutôt qu'un badge
-                      // Coach/Joueur qui ne le concerne pas personnellement.
-                      <Users className="h-3.5 w-3.5 shrink-0" />
-                    )}
-                    {teamLabel(t)}
-                    {t.role && (
-                      <span
-                        className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none ${
-                          isActive
-                            ? "bg-white/20 text-white"
-                            : t.role === "PLAYER"
-                              ? "bg-emerald-100 text-emerald-700"
-                              : "bg-navy/10 text-navy"
-                        }`}
-                      >
-                        {t.role === "PLAYER" ? "Joueur" : "Coach"}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          {/* Même sélecteur que "Mes Équipes" (team-selector-pills.tsx) :
+              indispensable dès qu'on encadre ou joue dans plusieurs
+              équipes, sans quoi les résultats de toutes se mélangeaient
+              dans un seul fil illisible. */}
+          <TeamSelectorPills
+            teams={sortedResultsTeams}
+            activeId={activeResultsTeamIdResolved}
+            onSelect={setActiveResultsTeamId}
+          />
           {/* Emplacement réservé du classement officiel FFBB, propre à
               l'équipe sélectionnée ci-dessus (chaque équipe joue dans sa
               propre poule). Pas encore de données à afficher : la FFBB ne

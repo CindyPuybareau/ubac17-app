@@ -187,19 +187,47 @@ export async function getSeasonTaskTallyByTeamIds(
   const result: Record<string, SeasonTaskTally> = {};
   if (teamIds.length === 0) return result;
 
-  const { data } = await supabase
-    .from("event_tasks")
-    .select("task_type, player_id, events!inner(team_id)")
-    .in("events.team_id", teamIds);
+  function addToTally(teamId: string, playerId: string, code: string) {
+    const tally = (result[teamId] ??= {});
+    const byRole = (tally[playerId] ??= {});
+    byRole[code] = (byRole[code] ?? 0) + 1;
+  }
 
-  (data ?? []).forEach((row) => {
+  const [{ data: teamScoped }, { data: clubWide }, { data: rosterRows }] = await Promise.all([
+    supabase
+      .from("event_tasks")
+      .select("task_type, player_id, events!inner(team_id)")
+      .in("events.team_id", teamIds),
+    // Un rôle pris sur un événement club (events.team_id null) n'est
+    // rattaché à aucune équipe par l'événement lui-même — seulement par
+    // l'équipe du joueur qui l'a pris. "Prochains événements" l'affiche
+    // déjà (pas filtré par équipe), mais le Bilan de saison, lui, l'a
+    // toujours ignoré : les deux écrans se contredisaient pour le même
+    // rôle sur le même événement.
+    supabase
+      .from("event_tasks")
+      .select("task_type, player_id, events!inner(team_id)")
+      .is("events.team_id", null),
+    supabase.from("team_players").select("team_id, player_id").in("team_id", teamIds),
+  ]);
+
+  (teamScoped ?? []).forEach((row) => {
     const event = row.events as unknown as { team_id: string } | null;
     if (!event) return;
-    const tally = (result[event.team_id] ??= {});
+    addToTally(event.team_id, row.player_id as string, row.task_type as string);
+  });
+
+  const teamIdsByPlayerId = new Map<string, string[]>();
+  (rosterRows ?? []).forEach((r) => {
+    const list = teamIdsByPlayerId.get(r.player_id) ?? [];
+    list.push(r.team_id);
+    teamIdsByPlayerId.set(r.player_id, list);
+  });
+
+  (clubWide ?? []).forEach((row) => {
     const playerId = row.player_id as string;
-    const byRole = (tally[playerId] ??= {});
     const code = row.task_type as string;
-    byRole[code] = (byRole[code] ?? 0) + 1;
+    (teamIdsByPlayerId.get(playerId) ?? []).forEach((teamId) => addToTally(teamId, playerId, code));
   });
 
   return result;
