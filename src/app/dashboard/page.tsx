@@ -4,6 +4,7 @@ import { Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { formatFirstName, formatPersonName } from "@/lib/names";
 import { EMAIL_REPLY_TO } from "@/lib/email";
+import { localDateFromParts } from "@/lib/local-date";
 import SignOutButton from "./sign-out-button";
 import NotificationBell from "./notification-bell";
 import RealtimeSync from "./realtime-sync";
@@ -268,6 +269,25 @@ export type AdminUpcomingEvent = {
   // ce module".
   presentPlayers?: { id: string; firstName: string | null; lastName: string | null }[];
 };
+
+// Un mineur ne peut jamais afficher le badge Bureau (voir bureauRole
+// plus bas) : seul critère fiable, contrairement à pending_parent_email
+// que l'import remplit pour tout le monde. Date de naissance absente ->
+// on ne peut pas prouver qu'il s'agit d'un mineur, donc pas d'exclusion
+// par défaut plutôt qu'un faux positif qui masquerait le badge de
+// quelqu'un dont la fiche est juste incomplète.
+function isMinor(birthDate: string | null): boolean {
+  if (!birthDate) return false;
+  const birth = localDateFromParts(birthDate);
+  if (!birth) return false;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const hadBirthdayThisYear =
+    today.getMonth() > birth.getMonth() ||
+    (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate());
+  if (!hadBirthdayThisYear) age -= 1;
+  return age < 18;
+}
 
 // Plain (non-component) helper so the "now" read doesn't happen inside the
 // page component's own render body — matches the existing family-data.ts
@@ -954,16 +974,16 @@ export default async function DashboardPage() {
         coachTeams: player.profile_id
           ? (coachTeamsByProfileId.get(player.profile_id) ?? [])
           : [],
-        // pending_parent_email exclu volontairement : cette fiche déclare
-        // alors un email de PARENT (souvent le même que registration_email
-        // pour un mineur inscrit par sa mère/son père), pas le sien
-        // propre. Sans cette exclusion, le fils d'une secrétaire du
-        // Bureau partageant l'adresse mail de sa mère héritait à tort du
-        // badge Bureau lui-même — même principe que le garde-fou
-        // "fiche déclarée comme l'enfant de quelqu'un n'est jamais la
-        // fiche de son titulaire" du trigger d'inscription.
+        // Un mineur ne peut jamais afficher le badge Bureau, même s'il
+        // partage l'email d'un parent qui, lui, en a un (cas remonté : le
+        // fils d'une secrétaire du Bureau, inscrit avec l'email de sa
+        // mère, héritait à tort du badge). pending_parent_email ne
+        // suffisait pas comme critère : l'import le remplit pour TOUT le
+        // monde, adultes compris, depuis la même colonne "email" du
+        // fichier — ça excluait aussi la secrétaire de son propre badge.
+        // L'âge réel (date de naissance) est le seul signal fiable ici.
         bureauRole:
-          memberEmail && !player.pending_parent_email
+          memberEmail && !isMinor(player.birth_date)
             ? (bureauRoleByEmailLower.get(memberEmail.trim().toLowerCase()) ?? null)
             : null,
         pendingCoachTeams: pendingCoachTeamsByPlayerId.get(player.id) ?? [],
