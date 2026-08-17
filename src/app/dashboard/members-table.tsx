@@ -296,6 +296,33 @@ export default function MembersTable({
       return false;
     }
 
+    // Archiver quelqu'un dans Membres doit le retirer de partout où il
+    // était actif — pas seulement de cette liste. Sans ça, une fiche
+    // archivée pouvait rester coach de plusieurs équipes indéfiniment (cas
+    // remonté par Cindy : un vieux compte de démo toujours coach de 3
+    // équipes des mois après avoir "disparu" de Membres). Uniquement à
+    // l'archivage, jamais à la réactivation : on ne sait pas dans quelle(s)
+    // équipe(s) remettre quelqu'un, ça reste un geste manuel du Bureau.
+    if (archived) {
+      const profileIds = ids
+        .map((id) => members.find((m) => m.id === id)?.profileId)
+        .filter((pid): pid is string => Boolean(pid));
+      const emails = ids
+        .map((id) => members.find((m) => m.id === id)?.email?.trim().toLowerCase())
+        .filter((e): e is string => Boolean(e));
+
+      await Promise.all([
+        supabase.from("team_players").delete().in("player_id", ids),
+        supabase.from("team_pending_coaches").delete().in("player_id", ids),
+        profileIds.length > 0
+          ? supabase.from("team_coaches").delete().in("coach_id", profileIds)
+          : Promise.resolve(),
+        emails.length > 0
+          ? supabase.from("club_administrators").delete().in("email", emails)
+          : Promise.resolve(),
+      ]);
+    }
+
     setSelectedIds((prev) => {
       const next = new Set(prev);
       ids.forEach((id) => next.delete(id));
