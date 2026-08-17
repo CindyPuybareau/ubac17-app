@@ -142,8 +142,7 @@ export default function ImportCoaches({
         Importer les emails des coachs (fichier officiel)
       </h3>
       <p className="text-sm text-zinc-500">
-        Fichier Excel &quot;Mails des coachs&quot;. Une équipe est créée par
-        ligne (sauf si elle existe déjà sous un nom équivalent).
+        Fichier Excel &quot;Mails des coachs&quot;
       </p>
 
       <div>

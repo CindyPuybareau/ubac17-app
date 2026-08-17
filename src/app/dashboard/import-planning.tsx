@@ -219,8 +219,7 @@ export default function ImportPlanning({
         Importer le planning (fichier officiel)
       </h3>
       <p className="text-sm text-zinc-500">
-        Fichier Excel &quot;Planning complet&quot;, feuille &quot;Planning
-        complet&quot;.
+        Fichier Excel &quot;Planning complet&quot;
       </p>
 
       <div>

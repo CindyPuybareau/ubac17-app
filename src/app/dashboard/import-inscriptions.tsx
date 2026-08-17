@@ -533,12 +533,7 @@ export default function ImportInscriptions() {
         Importer les inscriptions (fichier officiel)
       </h3>
       <p className="text-sm text-zinc-500">
-        Fichier Excel &quot;Suivi des inscriptions&quot;, feuille &quot;Suivi
-        Inscriptions&quot;. Un membre déjà présent (même n° de licence, ou
-        même nom + prénom + date de naissance) est mis à jour, jamais
-        dupliqué. Met à jour la fiche membre et la cotisation de la saison
-        uniquement — n&apos;affecte plus les joueurs à une équipe (à faire
-        depuis l&apos;onglet Équipes ou Membres).
+        Fichier Excel &quot;Suivi des inscriptions&quot;
       </p>
 
       <div>
