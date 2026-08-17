@@ -551,14 +551,13 @@ export default function ImportInscriptions() {
           />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-zinc-700">
-            Fichier
-          </label>
-          {/* Input natif invisible mais toujours présent/cliquable (pas
-              display:none, qui empêcherait le clic) : le <label> fait
-              office de bouton visible, stylé comme les autres actions de
-              l'appli — l'ancien input brut ne ressemblait à rien de
-              cliquable et se confondait avec du texte. */}
+          {/* Pas de label "Fichier" au-dessus : redondant, le bouton dit
+              déjà "Choisir un fichier". Input natif invisible mais
+              toujours présent/cliquable (pas display:none, qui
+              empêcherait le clic) : le <label> ci-dessous fait office de
+              bouton visible, stylé comme les autres actions de l'appli —
+              l'ancien input brut ne ressemblait à rien de cliquable et se
+              confondait avec du texte. */}
           <label
             htmlFor="import-inscriptions-file"
             className="flex w-fit cursor-pointer items-center gap-1.5 rounded-full bg-ubac-yellow px-4 py-2 text-sm font-semibold text-navy shadow-sm transition-colors hover:bg-ubac-yellow-dark"

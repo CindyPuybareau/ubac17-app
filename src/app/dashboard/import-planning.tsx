@@ -233,9 +233,8 @@ export default function ImportPlanning({
           />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-zinc-700">
-            Fichier
-          </label>
+          {/* Pas de label "Fichier" au-dessus : redondant, le bouton dit
+              déjà "Choisir un fichier". */}
           <label
             htmlFor="import-planning-file"
             className="flex w-fit cursor-pointer items-center gap-1.5 rounded-full bg-ubac-yellow px-4 py-2 text-sm font-semibold text-navy shadow-sm transition-colors hover:bg-ubac-yellow-dark"
