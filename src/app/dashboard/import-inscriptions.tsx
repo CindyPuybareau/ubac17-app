@@ -118,7 +118,9 @@ export default function ImportInscriptions() {
   const [rows, setRows] = useState<ParsedRow[] | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [duplicateCount, setDuplicateCount] = useState(0);
-  const [season, setSeason] = useState(() => getCurrentSeasonLabel());
+  // Plus de champ éditable : personne ne change jamais cette valeur à la
+  // main, elle suit simplement la saison en cours.
+  const season = getCurrentSeasonLabel();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -539,43 +541,32 @@ export default function ImportInscriptions() {
         depuis l&apos;onglet Équipes ou Membres).
       </p>
 
-      <div className="flex flex-wrap items-end gap-3">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-zinc-700">
-            Saison
-          </label>
-          <input
-            value={season}
-            onChange={(e) => setSeason(e.target.value)}
-            className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-          />
-        </div>
-        <div>
-          {/* Pas de label "Fichier" au-dessus : redondant, le bouton dit
-              déjà "Choisir un fichier". Input natif invisible mais
-              toujours présent/cliquable (pas display:none, qui
-              empêcherait le clic) : le <label> ci-dessous fait office de
-              bouton visible, stylé comme les autres actions de l'appli —
-              l'ancien input brut ne ressemblait à rien de cliquable et se
-              confondait avec du texte. */}
-          <label
-            htmlFor="import-inscriptions-file"
-            className="flex w-fit cursor-pointer items-center gap-1.5 rounded-full bg-ubac-yellow px-4 py-2 text-sm font-semibold text-navy shadow-sm transition-colors hover:bg-ubac-yellow-dark"
-          >
-            <Upload className="h-4 w-4 shrink-0" />
-            Choisir un fichier
-          </label>
-          <input
-            id="import-inscriptions-file"
-            type="file"
-            accept=".xlsx"
-            onChange={handleFile}
-            className="sr-only"
-          />
-          {fileName && (
-            <p className="mt-1.5 truncate text-xs text-zinc-500">{fileName}</p>
-          )}
-        </div>
+      <div>
+        {/* Pas de label "Fichier" ni de champ Saison visible : la saison
+            suit automatiquement la date du jour (voir season plus haut),
+            personne ne la change à la main — même minimalisme que
+            l'import Coachs, juste la description et le bouton. Input
+            natif invisible mais toujours présent/cliquable (pas
+            display:none, qui empêcherait le clic) : le <label>
+            ci-dessous fait office de bouton visible, stylé comme les
+            autres actions de l'appli. */}
+        <label
+          htmlFor="import-inscriptions-file"
+          className="flex w-fit cursor-pointer items-center gap-1.5 rounded-full bg-ubac-yellow px-4 py-2 text-sm font-semibold text-navy shadow-sm transition-colors hover:bg-ubac-yellow-dark"
+        >
+          <Upload className="h-4 w-4 shrink-0" />
+          Choisir un fichier
+        </label>
+        <input
+          id="import-inscriptions-file"
+          type="file"
+          accept=".xlsx"
+          onChange={handleFile}
+          className="sr-only"
+        />
+        {fileName && (
+          <p className="mt-1.5 truncate text-xs text-zinc-500">{fileName}</p>
+        )}
       </div>
 
       {rows && (

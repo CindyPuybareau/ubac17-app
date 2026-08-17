@@ -87,7 +87,9 @@ export default function ImportPlanning({
 }) {
   const router = useRouter();
   const [rows, setRows] = useState<ParsedRow[] | null>(null);
-  const [clubKeyword, setClubKeyword] = useState("UBAC");
+  // Plus de champ éditable : c'est toujours le planning de ce club-ci qu'on
+  // importe, personne ne change jamais cette valeur à la main.
+  const clubKeyword = "UBAC";
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -221,38 +223,28 @@ export default function ImportPlanning({
         complet&quot;.
       </p>
 
-      <div className="flex flex-wrap items-end gap-3">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-zinc-700">
-            Mot-clé du club
-          </label>
-          <input
-            value={clubKeyword}
-            onChange={(e) => setClubKeyword(e.target.value)}
-            className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-          />
-        </div>
-        <div>
-          {/* Pas de label "Fichier" au-dessus : redondant, le bouton dit
-              déjà "Choisir un fichier". */}
-          <label
-            htmlFor="import-planning-file"
-            className="flex w-fit cursor-pointer items-center gap-1.5 rounded-full bg-ubac-yellow px-4 py-2 text-sm font-semibold text-navy shadow-sm transition-colors hover:bg-ubac-yellow-dark"
-          >
-            <Upload className="h-4 w-4 shrink-0" />
-            Choisir un fichier
-          </label>
-          <input
-            id="import-planning-file"
-            type="file"
-            accept=".xlsx"
-            onChange={handleFile}
-            className="sr-only"
-          />
-          {fileName && (
-            <p className="mt-1.5 truncate text-xs text-zinc-500">{fileName}</p>
-          )}
-        </div>
+      <div>
+        {/* Pas de label "Fichier" ni de champ "Mot-clé du club" visible :
+            c'est toujours "UBAC" (voir clubKeyword plus haut), personne
+            ne le change à la main — même minimalisme que l'import
+            Coachs, juste la description et le bouton. */}
+        <label
+          htmlFor="import-planning-file"
+          className="flex w-fit cursor-pointer items-center gap-1.5 rounded-full bg-ubac-yellow px-4 py-2 text-sm font-semibold text-navy shadow-sm transition-colors hover:bg-ubac-yellow-dark"
+        >
+          <Upload className="h-4 w-4 shrink-0" />
+          Choisir un fichier
+        </label>
+        <input
+          id="import-planning-file"
+          type="file"
+          accept=".xlsx"
+          onChange={handleFile}
+          className="sr-only"
+        />
+        {fileName && (
+          <p className="mt-1.5 truncate text-xs text-zinc-500">{fileName}</p>
+        )}
       </div>
 
       {rows && (
