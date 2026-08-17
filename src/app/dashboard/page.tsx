@@ -1896,6 +1896,34 @@ export default async function DashboardPage() {
   // aussi des enfants garde les deux onglets séparés (gérer SES enfants
   // n'a rien à voir avec ses propres équipes).
   const foldFamilyIntoCoach = isCoach && players.length > 0 && players.every((p) => p.isSelf);
+  // Même principe que pour Basile (coach sans enfant, voir plus haut),
+  // dans l'autre sens : quelqu'un du Bureau qui a aussi des enfants (ou sa
+  // propre fiche joueur) n'a pas besoin d'un onglet "Mon espace" séparé et
+  // de même poids que "Bureau" — c'est justement la juxtaposition de deux
+  // onglets qui prêtait à confusion (voir l'échange avec Cindy). Sa vie de
+  // parent devient une section DANS "Bureau", pas une deuxième identité
+  // à côté. Contrairement à foldFamilyIntoCoach, on ne restreint pas aux
+  // "isSelf uniquement" : le Bureau reste l'identité principale même avec
+  // de vrais enfants.
+  const foldFamilyIntoAdmin = isAdmin && players.length > 0;
+
+  const familyViewElement =
+    players.length > 0 ? (
+      <FamilyView
+        events={familyEvents}
+        rsvpPlayers={familyRsvpPlayers}
+        rsvpStatusByKey={familyRsvpStatusByKey}
+        birthdayMembers={familyBirthdayMembers}
+        teamCards={familyTeamCards}
+        convocationCards={convocationCards}
+        rosterByEventId={convocationRosterByEventId}
+        tasksByEventId={familyOrganisationTasks}
+        carpoolByEventId={carpoolOffersByEventId}
+        whatsappGroups={whatsappGroups}
+        eventRoles={eventRoleTypes}
+        cotisations={familyCotisations}
+      />
+    ) : null;
 
   if (isAdmin) {
     tabs.push({
@@ -1916,6 +1944,7 @@ export default async function DashboardPage() {
           canonicalTeamRefs={canonicalTeamRefs}
           whatsappGroups={whatsappGroups}
           automationSettings={adminAutomationSettings}
+          familySection={foldFamilyIntoAdmin ? familyViewElement : null}
         />
       ),
     });
@@ -1958,26 +1987,11 @@ export default async function DashboardPage() {
     });
   }
 
-  if (players.length > 0 && !foldFamilyIntoCoach) {
+  if (players.length > 0 && !foldFamilyIntoCoach && !foldFamilyIntoAdmin) {
     tabs.push({
       key: "family",
       label: "Mon espace",
-      content: (
-        <FamilyView
-          events={familyEvents}
-          rsvpPlayers={familyRsvpPlayers}
-          rsvpStatusByKey={familyRsvpStatusByKey}
-          birthdayMembers={familyBirthdayMembers}
-          teamCards={familyTeamCards}
-          convocationCards={convocationCards}
-          rosterByEventId={convocationRosterByEventId}
-          tasksByEventId={familyOrganisationTasks}
-          carpoolByEventId={carpoolOffersByEventId}
-          whatsappGroups={whatsappGroups}
-          eventRoles={eventRoleTypes}
-          cotisations={familyCotisations}
-        />
-      ),
+      content: familyViewElement,
     });
   }
 

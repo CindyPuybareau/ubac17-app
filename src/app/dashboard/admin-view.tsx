@@ -1,6 +1,7 @@
 import {
   CalendarDays,
   Contact,
+  Heart,
   LayoutDashboard,
   MessageCircle,
   Trophy,
@@ -46,6 +47,7 @@ export default function AdminView({
   canonicalTeamRefs,
   whatsappGroups,
   automationSettings,
+  familySection = null,
 }: {
   clubFunction?: string | null;
   teams: TeamWithMembers[];
@@ -60,6 +62,12 @@ export default function AdminView({
   canonicalTeamRefs: { id: string; name: string | null; category: string | null }[];
   whatsappGroups: WhatsAppGroup[];
   automationSettings: Record<AutomationKey, boolean>;
+  // Repris de l'espace Parent (family-view.tsx) : un membre du Bureau qui
+  // a aussi des enfants (ou sa propre fiche joueur) n'a plus un onglet
+  // "Mon espace" séparé, du même poids que "Bureau" — sa vie de parent
+  // devient une section ici, comme l'a été "Mes Équipes" pour un coach
+  // sans enfant (voir page.tsx, foldFamilyIntoCoach/foldFamilyIntoAdmin).
+  familySection?: React.ReactNode;
 }) {
   const teamRefs = teams.map((t) => ({
     id: t.id,
@@ -92,6 +100,18 @@ export default function AdminView({
         />
       ),
     },
+    ...(familySection
+      ? [
+          {
+            // Juste après "Accueil" : c'est la partie personnelle, avant
+            // les outils de gestion du club qui suivent.
+            key: "family",
+            label: "Ma famille",
+            icon: <Heart className={iconClass} />,
+            content: familySection,
+          },
+        ]
+      : []),
     {
       key: "calendar",
       label: "Calendrier",
