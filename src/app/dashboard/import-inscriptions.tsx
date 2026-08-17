@@ -2,6 +2,7 @@
 
 import { useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
+import { Upload } from "lucide-react";
 import * as XLSX from "xlsx";
 import { createClient } from "@/lib/supabase/client";
 import { getCurrentSeasonLabel } from "@/lib/season";
@@ -121,10 +122,12 @@ export default function ImportInscriptions() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
 
   async function handleFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setFileName(file.name);
     setError(null);
     setResult(null);
 
@@ -551,12 +554,28 @@ export default function ImportInscriptions() {
           <label className="mb-1 block text-sm font-medium text-zinc-700">
             Fichier
           </label>
+          {/* Input natif invisible mais toujours présent/cliquable (pas
+              display:none, qui empêcherait le clic) : le <label> fait
+              office de bouton visible, stylé comme les autres actions de
+              l'appli — l'ancien input brut ne ressemblait à rien de
+              cliquable et se confondait avec du texte. */}
+          <label
+            htmlFor="import-inscriptions-file"
+            className="flex w-fit cursor-pointer items-center gap-1.5 rounded-full bg-ubac-yellow px-4 py-2 text-sm font-semibold text-navy shadow-sm transition-colors hover:bg-ubac-yellow-dark"
+          >
+            <Upload className="h-4 w-4 shrink-0" />
+            Choisir un fichier
+          </label>
           <input
+            id="import-inscriptions-file"
             type="file"
             accept=".xlsx"
             onChange={handleFile}
-            className="text-sm"
+            className="sr-only"
           />
+          {fileName && (
+            <p className="mt-1.5 truncate text-xs text-zinc-500">{fileName}</p>
+          )}
         </div>
       </div>
 

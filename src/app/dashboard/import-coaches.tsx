@@ -2,6 +2,7 @@
 
 import { useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
+import { Upload } from "lucide-react";
 import * as XLSX from "xlsx";
 import { createClient } from "@/lib/supabase/client";
 
@@ -32,10 +33,12 @@ export default function ImportCoaches({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
 
   async function handleFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setFileName(file.name);
     setError(null);
     setResult(null);
 
@@ -143,7 +146,25 @@ export default function ImportCoaches({
         ligne (sauf si elle existe déjà sous un nom équivalent).
       </p>
 
-      <input type="file" accept=".xlsx" onChange={handleFile} className="text-sm" />
+      <div>
+        <label
+          htmlFor="import-coaches-file"
+          className="flex w-fit cursor-pointer items-center gap-1.5 rounded-full bg-ubac-yellow px-4 py-2 text-sm font-semibold text-navy shadow-sm transition-colors hover:bg-ubac-yellow-dark"
+        >
+          <Upload className="h-4 w-4 shrink-0" />
+          Choisir un fichier
+        </label>
+        <input
+          id="import-coaches-file"
+          type="file"
+          accept=".xlsx"
+          onChange={handleFile}
+          className="sr-only"
+        />
+        {fileName && (
+          <p className="mt-1.5 truncate text-xs text-zinc-500">{fileName}</p>
+        )}
+      </div>
 
       {rows && (
         <div className="rounded-xl bg-zinc-50 p-4">
