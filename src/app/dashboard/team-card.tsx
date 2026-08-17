@@ -4,7 +4,6 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowRightLeft,
-  BadgeCheck,
   CalendarDays,
   CheckCircle2,
   Clock,
@@ -483,6 +482,27 @@ export default function TeamCard({
   const staffMembers = visibleMembers.filter((m) => m.role !== "JOUEUR");
   const playerMembers = visibleMembers.filter((m) => m.role === "JOUEUR");
 
+  // Repli texte libre (team_pending_coaches n'existait pas encore quand ce
+  // nom a été saisi) : ce n'est pas une vraie fiche, donc jamais dans
+  // memberById/staffMembers — sans cette ligne de secours, un coach encore
+  // sur l'ancien format disparaissait purement et simplement du tableau au
+  // lieu de juste perdre ses actions (retirer/affecter, impossibles sans
+  // fiche réelle).
+  const legacyPendingCoachRow =
+    team.pendingCoaches.length === 0 && team.pendingCoachNames ? (
+      <tr key="legacy-pending-coach" className="border-b border-zinc-50 last:border-0 bg-navy/[0.04]">
+        <td colSpan={2} className="whitespace-nowrap px-3 py-2.5 border-l-4 border-l-navy font-semibold text-zinc-900">
+          {team.pendingCoachNames}
+        </td>
+        <td className="whitespace-nowrap px-3 py-2.5">
+          <span className="inline-flex items-center justify-center whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold leading-none text-amber-700">
+            Coach (en attente)
+          </span>
+        </td>
+        <td colSpan={5} />
+      </tr>
+    ) : null;
+
   // La fiche est la source de vérité : dès que le Bureau modifie le
   // téléphone/email d'inscription, cette valeur doit primer partout,
   // y compris sur le compte du tuteur lié (contactPhone/EmailByPlayerId)
@@ -631,6 +651,26 @@ export default function TeamCard({
                       playerId={m.id}
                     />
                   )}
+                  {/* Retirer comme coach : jusqu'ici seulement possible
+                      depuis le bloc "Coachs" séparé sous le tableau — la
+                      seule action que ce tableau ne couvrait pas encore
+                      pour une fiche sans joueur associé (m.player null).
+                      Distincte de l'action joueur juste en dessous : un
+                      coach qui joue aussi dans l'équipe peut avoir les
+                      deux, l'une ne remplace pas l'autre. */}
+                  {(m.role === "COACH" || m.role === "COACH_PENDING") && canAssignCoach && (
+                    <button
+                      onClick={() =>
+                        m.role === "COACH"
+                          ? setRemoveCoachTarget({ id: m.id, first_name: m.firstName, last_name: m.lastName })
+                          : setRemovePendingCoachTarget({ id: m.id, first_name: m.firstName, last_name: m.lastName })
+                      }
+                      title={`Retirer comme coach de ${team.name ?? "cette équipe"}`}
+                      className="rounded-full p-1.5 text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                   {m.player &&
                     !readOnly &&
                     (isLentIn ? (
@@ -705,8 +745,8 @@ export default function TeamCard({
           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
             Membres
             <span className="ml-1.5 font-medium normal-case tracking-normal text-zinc-400">
-              ({visibleMembers.length}
-              {rosterQuery ? ` / ${memberRows.length}` : ""})
+              ({visibleMembers.length + (legacyPendingCoachRow ? 1 : 0)}
+              {rosterQuery ? ` / ${memberRows.length + (legacyPendingCoachRow ? 1 : 0)}` : ""})
             </span>
           </p>
           {showRosterSearch && memberRows.length > 0 && (
@@ -743,13 +783,30 @@ export default function TeamCard({
                       colSpan={8}
                       className="border-b border-navy/10 bg-navy/[0.07] px-3 py-2 text-xs font-bold uppercase tracking-wide text-navy"
                     >
-                      Encadrement
+                      Coachs
                       <span className="ml-1.5 font-semibold normal-case tracking-normal text-navy/60">
-                        ({staffMembers.length})
+                        ({staffMembers.length + (legacyPendingCoachRow ? 1 : 0)})
                       </span>
                     </td>
                   </tr>
                   {staffMembers.map((m) => renderMemberRow(m, true))}
+                  {legacyPendingCoachRow}
+                </>
+              )}
+              {staffMembers.length === 0 && legacyPendingCoachRow && (
+                <>
+                  <tr>
+                    <td
+                      colSpan={8}
+                      className="border-b border-navy/10 bg-navy/[0.07] px-3 py-2 text-xs font-bold uppercase tracking-wide text-navy"
+                    >
+                      Coachs
+                      <span className="ml-1.5 font-semibold normal-case tracking-normal text-navy/60">
+                        (1)
+                      </span>
+                    </td>
+                  </tr>
+                  {legacyPendingCoachRow}
                 </>
               )}
 
@@ -772,7 +829,7 @@ export default function TeamCard({
                   {playerMembers.map((m) => renderMemberRow(m, false))}
                 </>
               )}
-              {visibleMembers.length === 0 && (
+              {visibleMembers.length === 0 && !legacyPendingCoachRow && (
                 <tr>
                   <td colSpan={8} className="px-3 py-4 text-center text-sm text-zinc-400">
                     {rosterQuery ? "Aucun membre ne correspond à cette recherche" : "Aucun membre"}
@@ -847,86 +904,21 @@ export default function TeamCard({
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-            Coachs
-          </p>
-          <ul className="mt-1 flex flex-col gap-1">
-            {sortByLastName(team.coaches, (p) => p.last_name).map((p) => (
-              <li
-                key={p.id}
-                className="flex items-center justify-between gap-2 rounded-lg bg-zinc-50 px-2 py-1 text-sm"
-              >
-                <span className="flex min-w-0 items-center gap-1.5">
-                  <span className="truncate">{fullName(p)}</span>
-                  <span
-                    title="Coach avec un compte UBAC actif"
-                    className="inline-flex shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold leading-none text-emerald-700"
-                  >
-                    <BadgeCheck className="h-3 w-3" />
-                    Coach Officiel
-                  </span>
-                </span>
-                {canAssignCoach && (
-                  <button
-                    onClick={() => setRemoveCoachTarget(p)}
-                    title="Retirer ce coach de l'équipe"
-                    className="shrink-0 rounded-lg p-1.5 text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </li>
-            ))}
-            {sortByLastName(team.pendingCoaches, (p) => p.last_name).map((p) => (
-              <li
-                key={`pending-${p.id}`}
-                className="flex items-center justify-between gap-2 rounded-lg bg-zinc-50 px-2 py-1 text-sm"
-              >
-                <span className="flex min-w-0 items-center gap-1.5">
-                  <span className="truncate">{fullName(p)}</span>
-                  <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-amber-200/60 bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
-                    <Clock className="h-3 w-3 shrink-0" />
-                    (en attente de compte)
-                  </span>
-                </span>
-                {canAssignCoach && (
-                  <button
-                    onClick={() => setRemovePendingCoachTarget(p)}
-                    title="Retirer ce coach en attente de l'équipe"
-                    className="shrink-0 rounded-lg p-1.5 text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </li>
-            ))}
-            {/* Legacy free-text fallback, only shown if this team has no
-                structured pending coach (team_pending_coaches) at all —
-                keeps older, never-migrated teams from silently going blank. */}
-            {team.pendingCoaches.length === 0 && team.pendingCoachNames && (
-              <li className="flex items-center gap-1.5 truncate rounded-lg bg-zinc-50 px-2 py-1 text-sm">
-                <span className="truncate">{team.pendingCoachNames}</span>
-                <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-amber-200/60 bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
-                  <Clock className="h-3 w-3 shrink-0" />
-                  (en attente de compte)
-                </span>
-              </li>
-            )}
-            {team.coaches.length === 0 &&
-              team.pendingCoaches.length === 0 &&
-              !team.pendingCoachNames && (
-                <li className="text-sm text-zinc-400">Aucun coach</li>
-              )}
-          </ul>
-          {canAssignCoach && availableCoaches.length > 0 && (
+        {/* La liste des coachs (noms + badge Officiel/en attente) vivait en
+            double ici ET dans le tableau juste au-dessus, avec la même
+            info affichée deux fois sous deux formes différentes — le
+            tableau ("Coachs" + colonne Rôle) est maintenant la seule
+            source de vérité, ce bloc ne garde que l'action qui n'existe
+            nulle part ailleurs : assigner un nouveau coach. */}
+        {canAssignCoach && availableCoaches.length > 0 && (
+          <div>
             <select
               defaultValue=""
               onChange={(e) => {
                 addCoach(e.target.value);
                 e.target.value = "";
               }}
-              className="mt-2 w-full rounded-lg border border-zinc-200 px-2 py-1.5 text-sm"
+              className="w-full rounded-lg border border-zinc-200 px-2 py-1.5 text-sm"
             >
               <option value="" disabled>
                 + Assigner un coach
@@ -937,8 +929,8 @@ export default function TeamCard({
                 </option>
               ))}
             </select>
-          )}
-        </div>
+          </div>
+        )}
 
         <div>
           <div className="mb-1">
