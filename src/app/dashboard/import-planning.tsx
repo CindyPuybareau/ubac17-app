@@ -2,9 +2,9 @@
 
 import { useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Upload } from "lucide-react";
 import * as XLSX from "xlsx";
 import { createClient } from "@/lib/supabase/client";
+import FilePickerButton from "./file-picker-button";
 
 type Team = { id: string; name: string | null; category: string | null };
 
@@ -222,29 +222,10 @@ export default function ImportPlanning({
         Fichier Excel &quot;Planning complet&quot;
       </p>
 
-      <div>
-        {/* Pas de label "Fichier" ni de champ "Mot-clé du club" visible :
-            c'est toujours "UBAC" (voir clubKeyword plus haut), personne
-            ne le change à la main — même minimalisme que l'import
-            Coachs, juste la description et le bouton. */}
-        <label
-          htmlFor="import-planning-file"
-          className="flex w-fit cursor-pointer items-center gap-1.5 rounded-full bg-ubac-yellow px-4 py-2 text-sm font-semibold text-navy shadow-sm transition-colors hover:bg-ubac-yellow-dark"
-        >
-          <Upload className="h-4 w-4 shrink-0" />
-          Choisir un fichier
-        </label>
-        <input
-          id="import-planning-file"
-          type="file"
-          accept=".xlsx"
-          onChange={handleFile}
-          className="sr-only"
-        />
-        {fileName && (
-          <p className="mt-1.5 truncate text-xs text-zinc-500">{fileName}</p>
-        )}
-      </div>
+      {/* Pas de champ "Mot-clé du club" visible : c'est toujours "UBAC"
+          (voir clubKeyword plus haut), personne ne le change à la main —
+          même minimalisme que l'import Coachs. */}
+      <FilePickerButton id="import-planning-file" fileName={fileName} onChange={handleFile} />
 
       {rows && (
         <div className="rounded-xl bg-zinc-50 p-4">

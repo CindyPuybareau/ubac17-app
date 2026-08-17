@@ -2,11 +2,11 @@
 
 import { useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Upload } from "lucide-react";
 import * as XLSX from "xlsx";
 import { createClient } from "@/lib/supabase/client";
 import { getCurrentSeasonLabel } from "@/lib/season";
 import { formatFirstName } from "@/lib/names";
+import FilePickerButton from "./file-picker-button";
 
 type ParsedRow = {
   firstName: string;
@@ -536,33 +536,10 @@ export default function ImportInscriptions() {
         Fichier Excel &quot;Suivi des inscriptions&quot;
       </p>
 
-      <div>
-        {/* Pas de label "Fichier" ni de champ Saison visible : la saison
-            suit automatiquement la date du jour (voir season plus haut),
-            personne ne la change à la main — même minimalisme que
-            l'import Coachs, juste la description et le bouton. Input
-            natif invisible mais toujours présent/cliquable (pas
-            display:none, qui empêcherait le clic) : le <label>
-            ci-dessous fait office de bouton visible, stylé comme les
-            autres actions de l'appli. */}
-        <label
-          htmlFor="import-inscriptions-file"
-          className="flex w-fit cursor-pointer items-center gap-1.5 rounded-full bg-ubac-yellow px-4 py-2 text-sm font-semibold text-navy shadow-sm transition-colors hover:bg-ubac-yellow-dark"
-        >
-          <Upload className="h-4 w-4 shrink-0" />
-          Choisir un fichier
-        </label>
-        <input
-          id="import-inscriptions-file"
-          type="file"
-          accept=".xlsx"
-          onChange={handleFile}
-          className="sr-only"
-        />
-        {fileName && (
-          <p className="mt-1.5 truncate text-xs text-zinc-500">{fileName}</p>
-        )}
-      </div>
+      {/* Pas de label "Fichier" ni de champ Saison visible : la saison suit
+          automatiquement la date du jour (voir season plus haut), personne
+          ne la change à la main — même minimalisme que l'import Coachs. */}
+      <FilePickerButton id="import-inscriptions-file" fileName={fileName} onChange={handleFile} />
 
       {rows && (
         <div className="rounded-xl bg-zinc-50 p-4">

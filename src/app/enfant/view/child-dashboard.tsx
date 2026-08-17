@@ -23,6 +23,7 @@ export type ChildEvent = {
   salle: string | null;
   startTime: string;
   endTime: string | null;
+  teamId: string | null;
   teamName: string | null;
   teamScore: number | null;
   opponentScore: number | null;
@@ -157,7 +158,7 @@ export default function ChildDashboard({
       key: "results",
       label: "Résultats",
       icon: <Trophy className={iconClass} />,
-      content: <ChildResultsTab seasonMatches={seasonMatches} />,
+      content: <ChildResultsTab seasonMatches={seasonMatches} teams={teams} />,
     },
   ];
 

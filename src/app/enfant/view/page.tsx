@@ -144,6 +144,7 @@ export default async function ChildViewPage() {
     salle: e.salle,
     startTime: e.start_time,
     endTime: e.end_time,
+    teamId: e.team_id,
     teamName: e.teams?.name ?? null,
     teamScore: e.team_score,
     opponentScore: e.opponent_score,

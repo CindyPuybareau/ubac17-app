@@ -23,7 +23,6 @@ import {
   Shirt,
   StickyNote,
   Trash2,
-  Trophy,
   Users,
   X,
 } from "lucide-react";
@@ -248,11 +247,13 @@ export default function CalendarView({
   // verrouille la vue sur les résultats, cette page n'ayant plus besoin
   // de bascule Liste/Mois — celle-ci reste dans l'onglet Calendrier.
   forcedView?: "results";
-  // Sélecteur d'équipe façon "Mes Équipes" (voir coach-teams.tsx), pour un
-  // coach qui encadre plusieurs équipes : sans lui, la vue Résultats
-  // mélangeait les matchs de toutes ses équipes dans un seul fil, sans
-  // aucun moyen de s'y retrouver. Omis (undefined) là où une seule équipe
-  // est en jeu, ou côté Bureau qui veut au contraire tout voir d'un coup.
+  // Sélecteur d'équipe façon "Mes Équipes" (voir coach-teams.tsx) : sans
+  // lui, la vue Résultats mélangeait les matchs de toutes les équipes dans
+  // un seul fil, sans aucun moyen de s'y retrouver — vrai pour un coach
+  // multi-équipes comme pour le Bureau qui voit tout le club. Omis
+  // (undefined) là où une seule équipe est en jeu (le sélecteur ne
+  // s'affiche de toute façon qu'à partir de deux équipes, voir
+  // sortedResultsTeams.length > 1 plus bas).
   resultsTeams?: {
     id: string;
     name: string | null;
@@ -277,7 +278,18 @@ export default function CalendarView({
   const [activeResultsTeamId, setActiveResultsTeamId] = useState<string | undefined>(
     sortedResultsTeams[0]?.id
   );
-  const activeResultsTeamIdResolved = activeResultsTeamId ?? sortedResultsTeams[0]?.id;
+  // Ne fait pas juste confiance à l'état : si resultsTeams change de forme
+  // après le montage (enfant sélectionné différent côté Famille, effectif
+  // d'un coach modifié en direct via useRealtimeRefresh) et que l'équipe
+  // choisie n'existe plus dans la nouvelle liste, l'id retenu deviendrait
+  // orphelin et seasonMatches ne matcherait plus rien — un fil Résultats
+  // vide sans raison apparente. On retombe alors sur la première équipe
+  // disponible plutôt que de garder un id qui ne correspond plus à rien.
+  const activeResultsTeamIdResolved = sortedResultsTeams.some(
+    (t) => t.id === activeResultsTeamId
+  )
+    ? activeResultsTeamId
+    : sortedResultsTeams[0]?.id;
 
   const canManage = Boolean(createTeams && createTeams.length > 0);
 
@@ -755,7 +767,15 @@ export default function CalendarView({
             eventId={event.id}
             eventDate={event.start_time}
             roster={[]}
-            myPlayerIds={respondingPlayers.map((p) => p.id)}
+            // rsvpVisiblePlayers, pas respondingPlayers : un coach qui gère
+            // au moins une équipe (canManage) mais pas celle-ci
+            // (!canManageEvent) ne doit voir que SA propre fiche ici, pas
+            // tout l'effectif de l'équipe. respondingPlayers contient tout
+            // le roster côté Coach (coachRsvpPlayers, page.tsx) — l'utiliser
+            // tel quel ferait écrire volunteer()/reserve() sur
+            // myPlayerIds[0], c'est-à-dire un coéquipier arbitraire, pas le
+            // coach lui-même.
+            myPlayerIds={rsvpVisiblePlayers.map((p) => p.id)}
             canAssignAnyone={false}
             initialTasks={tasksByEventId[event.id] ?? emptyEventTasks}
             initialCarpool={carpoolByEventId[event.id] ?? []}

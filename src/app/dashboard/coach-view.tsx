@@ -5,6 +5,7 @@ import CoachTeams from "./coach-teams";
 import CoachFfbb from "./coach-ffbb";
 import CoachOrganisation, { type CoachTeamMatchCard } from "./coach-organisation";
 import FamilyAttendanceRequests from "./family-attendance-requests";
+import FamilyAttendanceSummary from "./family-attendance-summary";
 import FamilyCotisationCard from "./family-cotisation-card";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import type { TeamWithMembers } from "./team-manager";
@@ -147,9 +148,22 @@ export default function CoachView({
             whatsappGroups={whatsappGroups}
           />
           {/* Même emplacement que côté Parent (family-view.tsx, onglet
-              "Mon Équipe") : la cotisation vit avec l'identité de
-              l'équipe, pas en haut de page. */}
-          {showOwnPlayerSummary && <FamilyCotisationCard cotisations={ownCotisations} />}
+              "Mon Équipe") : la cotisation et le bilan d'assiduité vivent
+              avec l'identité de l'équipe, pas en haut de page. Le bilan
+              avait été oublié à la création de cet espace replié — un
+              coach sans enfant n'avait alors aucun moyen de voir son
+              propre taux de présence, contrairement à n'importe quel
+              parent. */}
+          {showOwnPlayerSummary && (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FamilyCotisationCard cotisations={ownCotisations} />
+              <FamilyAttendanceSummary
+                events={events}
+                players={rsvpPlayers.filter((p) => p.id === ownPlayerId)}
+                rsvpStatusByKey={rsvpStatusByKey}
+              />
+            </div>
+          )}
         </div>
       ),
     },

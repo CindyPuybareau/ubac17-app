@@ -280,11 +280,26 @@ function isMinor(birthDate: string | null): boolean {
   if (!birthDate) return false;
   const birth = localDateFromParts(birthDate);
   if (!birth) return false;
-  const today = new Date();
-  let age = today.getFullYear() - birth.getFullYear();
+  // "Aujourd'hui" doit être le jour calendaire à Angoulins (Europe/Paris),
+  // pas celui du serveur qui exécute ce code — Vercel tourne ses fonctions
+  // en UTC. Paris étant en avance sur UTC (+1h/+2h), un `new Date()` lu tel
+  // quel resterait sur "hier" pendant l'heure ou les deux qui suivent
+  // minuit à Paris, retardant d'un jour le passage à la majorité de
+  // quelqu'un qui fête justement son 18e anniversaire ce jour-là.
+  const todayParisParts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Paris",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .format(new Date())
+    .split("-")
+    .map(Number);
+  const [todayYear, todayMonth, todayDay] = todayParisParts; // month: 1-indexé ici
+  let age = todayYear - birth.getFullYear();
   const hadBirthdayThisYear =
-    today.getMonth() > birth.getMonth() ||
-    (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate());
+    todayMonth - 1 > birth.getMonth() ||
+    (todayMonth - 1 === birth.getMonth() && todayDay >= birth.getDate());
   if (!hadBirthdayThisYear) age -= 1;
   return age < 18;
 }

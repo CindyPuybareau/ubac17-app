@@ -1,6 +1,8 @@
+import { useMemo, useState } from "react";
 import { Trophy } from "lucide-react";
 import { homeAwayLabel } from "@/app/dashboard/event-style";
 import { parseMatchTitle } from "@/lib/match-display";
+import { sortTeamsByGroup, teamLabel } from "@/lib/teams";
 import type { ChildEvent } from "./child-dashboard";
 
 // Même code couleur que MatchScore côté Bureau/Coach (victoire/défaite/nul)
@@ -44,18 +46,62 @@ function ResultRow({ event }: { event: ChildEvent }) {
   );
 }
 
-export default function ChildResultsTab({ seasonMatches }: { seasonMatches: ChildEvent[] }) {
+export default function ChildResultsTab({
+  seasonMatches,
+  teams,
+}: {
+  seasonMatches: ChildEvent[];
+  // Un enfant qui joue dans deux équipes (ex. "monte" ponctuellement dans
+  // la catégorie au-dessus) voyait tous les matchs des deux équipes
+  // mélangés dans un seul fil sans distinction — même sélecteur que côté
+  // Bureau/Coach/Parent (calendar-view.tsx) pour s'y retrouver.
+  teams: { id: string; name: string | null; category: string | null }[];
+}) {
+  const sortedTeams = useMemo(() => sortTeamsByGroup(teams), [teams]);
+  const [activeTeamId, setActiveTeamId] = useState<string | undefined>(undefined);
+  const activeTeamIdResolved = sortedTeams.some((t) => t.id === activeTeamId)
+    ? activeTeamId
+    : sortedTeams[0]?.id;
+
+  const visibleMatches = useMemo(
+    () =>
+      sortedTeams.length > 1
+        ? seasonMatches.filter((e) => e.teamId === activeTeamIdResolved)
+        : seasonMatches,
+    [seasonMatches, sortedTeams, activeTeamIdResolved]
+  );
+
   return (
     <div className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
       <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
         <Trophy className="h-3.5 w-3.5 text-navy" />
         Résultats
       </p>
+      {sortedTeams.length > 1 && (
+        <div className="mb-3 flex flex-wrap gap-2">
+          {sortedTeams.map((t) => {
+            const isActive = activeTeamIdResolved === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setActiveTeamId(t.id)}
+                className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                  isActive
+                    ? "border-navy bg-navy text-white"
+                    : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+                }`}
+              >
+                {teamLabel(t)}
+              </button>
+            );
+          })}
+        </div>
+      )}
       <div className="flex flex-col gap-1.5">
-        {seasonMatches.length === 0 ? (
+        {visibleMatches.length === 0 ? (
           <p className="text-sm text-zinc-500">Aucun match programmé pour le moment.</p>
         ) : (
-          seasonMatches.map((e) => <ResultRow key={e.id} event={e} />)
+          visibleMatches.map((e) => <ResultRow key={e.id} event={e} />)
         )}
       </div>
     </div>

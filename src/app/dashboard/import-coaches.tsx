@@ -2,9 +2,9 @@
 
 import { useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Upload } from "lucide-react";
 import * as XLSX from "xlsx";
 import { createClient } from "@/lib/supabase/client";
+import FilePickerButton from "./file-picker-button";
 
 type Team = { id: string; name: string | null; category: string | null };
 
@@ -145,25 +145,7 @@ export default function ImportCoaches({
         Fichier Excel &quot;Mails des coachs&quot;
       </p>
 
-      <div>
-        <label
-          htmlFor="import-coaches-file"
-          className="flex w-fit cursor-pointer items-center gap-1.5 rounded-full bg-ubac-yellow px-4 py-2 text-sm font-semibold text-navy shadow-sm transition-colors hover:bg-ubac-yellow-dark"
-        >
-          <Upload className="h-4 w-4 shrink-0" />
-          Choisir un fichier
-        </label>
-        <input
-          id="import-coaches-file"
-          type="file"
-          accept=".xlsx"
-          onChange={handleFile}
-          className="sr-only"
-        />
-        {fileName && (
-          <p className="mt-1.5 truncate text-xs text-zinc-500">{fileName}</p>
-        )}
-      </div>
+      <FilePickerButton id="import-coaches-file" fileName={fileName} onChange={handleFile} />
 
       {rows && (
         <div className="rounded-xl bg-zinc-50 p-4">
