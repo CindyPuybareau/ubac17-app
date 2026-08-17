@@ -8,18 +8,19 @@ import { parseMatchTitle } from "@/lib/match-display";
 // pense. Déclenché une fois par jour par Vercel Cron (voir vercel.json).
 // Protégé par CRON_SECRET : Vercel envoie automatiquement
 // "Authorization: Bearer <CRON_SECRET>" sur les appels programmés dès que
-// cette variable existe côté projet — un appel externe sans le bon
-// secret est rejeté. Si la variable n'est pas encore posée, la route
-// reste joignable sans vérification plutôt que de casser le premier
-// déploiement — à corriger dès que le secret est ajouté (voir le rappel
-// dans la réponse de Claude).
+// cette variable existe côté projet — un appel externe sans le bon secret
+// est rejeté. Fermé par défaut (fail closed) : si la variable n'est pas
+// posée côté Vercel, la route refuse tout appel plutôt que de rester
+// ouverte à qui la devine — sans ça, n'importe qui pouvait forcer l'envoi
+// de vraies notifications push à tout le club à volonté.
 export async function GET(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
-    }
+  if (!cronSecret) {
+    return NextResponse.json({ error: "CRON_SECRET non configuré." }, { status: 500 });
+  }
+  const auth = request.headers.get("authorization");
+  if (auth !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
   }
 
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
@@ -63,7 +64,10 @@ export async function GET(request: Request) {
     .is("reminder_sent_at", null);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    // Message générique côté client : le détail exact (colonnes, table)
+    // n'a rien à faire dans une réponse HTTP, même pour une route
+    // protégée par secret.
+    return NextResponse.json({ error: "Erreur lors de la lecture des événements." }, { status: 500 });
   }
 
   // Seuls les vrais matchs (pas les entraînements/tournois/événements

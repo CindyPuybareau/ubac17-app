@@ -95,7 +95,13 @@ export default async function ChildViewPage() {
       teammatesByPlayerId.set(row.players.id, {
         id: row.players.id,
         firstName: row.players.first_name,
-        birthDate: row.players.birth_date,
+        // Année neutralisée : l'UI (calendrier, pastille "Anniversaires")
+        // n'affiche jamais que le jour/mois, mais la vraie date de
+        // naissance complète — donc l'âge exact — partait quand même dans
+        // les props envoyées au client, lisible par n'importe quel enfant
+        // via les DevTools. Une année fixe garde le format "YYYY-MM-DD"
+        // que localDateFromParts() attend, sans exposer l'année réelle.
+        birthDate: row.players.birth_date ? `2000-${row.players.birth_date.slice(5)}` : null,
         jerseyNumber: row.jersey_number,
         position: row.position,
         isSelf: row.players.id === playerId,
@@ -189,11 +195,22 @@ export default async function ChildViewPage() {
   // Mon Équipe — jamais une action, juste une lecture de ce que les
   // coéquipiers ont déjà répondu ailleurs (dans leur propre espace).
   const nextEvent = events.find((e) => new Date(e.startTime).getTime() >= now) ?? null;
+  // Restreint à l'effectif de l'équipe du prochain événement : un enfant
+  // sur deux équipes (cas prévu ailleurs, voir le sélecteur d'équipe de
+  // ChildResultsTab) voyait sinon tous ses coéquipiers des DEUX équipes
+  // mélangés ici, même ceux jamais convoqués à ce rendez-vous précis.
+  const nextEventTeammateIds = nextEvent
+    ? new Set(
+        teammateRows.filter((r) => r.team_id === nextEvent.teamId).map((r) => r.players?.id).filter(Boolean)
+      )
+    : new Set<string | undefined>();
   const nextEventAttendance = nextEvent
-    ? teammates.map((t) => ({
-        name: t.firstName,
-        status: rsvpStatusByKey.get(`${nextEvent.id}:${t.id}`) ?? "PENDING",
-      }))
+    ? teammates
+        .filter((t) => nextEventTeammateIds.has(t.id))
+        .map((t) => ({
+          name: t.firstName,
+          status: rsvpStatusByKey.get(`${nextEvent.id}:${t.id}`) ?? "PENDING",
+        }))
     : [];
 
   // Cloche de notifications : mêmes alertes que Parent/Coach (voir la

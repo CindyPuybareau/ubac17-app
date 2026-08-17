@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     p_event_id: eventId,
   });
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ error: "eventId invalide ou non autorisé." }, { status: 400 });
   }
 
   // Historique en base pour la cloche in-app : indépendant du succès de

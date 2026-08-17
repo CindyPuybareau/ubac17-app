@@ -72,6 +72,7 @@ function PlanningTab({
   rsvpStatusByKey,
   rsvpReasonByKey,
   roles,
+  ownPlayerId,
 }: {
   cards: CoachTeamMatchCard[];
   tasksByEventId: Record<string, EventTasksState>;
@@ -80,6 +81,7 @@ function PlanningTab({
   rsvpStatusByKey: Record<string, string>;
   rsvpReasonByKey: Record<string, string | null>;
   roles: EventRoleType[];
+  ownPlayerId: string | null;
 }) {
   return (
     <div className="flex flex-col gap-4">
@@ -99,6 +101,9 @@ function PlanningTab({
           rsvpStatusByKey={rsvpStatusByKey}
           rsvpReasonByKey={rsvpReasonByKey}
           roles={roles}
+          // Ce coach est-il lui-même sur CETTE équipe précise ? (il peut
+          // coacher plusieurs équipes sans jouer dans toutes.)
+          selfPlayerId={ownPlayerId && roster.some((p) => p.id === ownPlayerId) ? ownPlayerId : null}
         />
       ))}
 
@@ -383,6 +388,7 @@ export default function CoachOrganisation({
   rsvpStatusByKey,
   rsvpReasonByKey,
   roles,
+  ownPlayerId = null,
 }: {
   cards: CoachTeamMatchCard[];
   tasksByEventId: Record<string, EventTasksState>;
@@ -392,6 +398,10 @@ export default function CoachOrganisation({
   rsvpStatusByKey: Record<string, string>;
   rsvpReasonByKey: Record<string, string | null>;
   roles: EventRoleType[];
+  // La propre fiche joueur du coach (coach qui joue aussi) — permet à
+  // MatchTasksPanel de le reconnaître sur ses propres matchs coachés, où
+  // il n'était jusqu'ici jamais "lui-même" (voir CoachNextMatchCard).
+  ownPlayerId?: string | null;
 }) {
   const [tab, setTab] = useState<SubTab>("planning");
   useScrollTopOnChange(tab);
@@ -440,6 +450,7 @@ export default function CoachOrganisation({
           rsvpStatusByKey={rsvpStatusByKey}
           rsvpReasonByKey={rsvpReasonByKey}
           roles={roles}
+          ownPlayerId={ownPlayerId}
         />
       ) : (
         <div className="flex flex-col gap-4">

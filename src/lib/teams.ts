@@ -3,8 +3,12 @@
 // wording — but that means naively concatenating "{name} · {category}"
 // prints "U13F · U13F". Only join the two when they actually differ.
 export function teamLabel(t: { name?: string | null; category?: string | null }): string {
-  const name = t.name ?? null;
-  const category = t.category ?? null;
+  // "" est traité comme absent, pas comme un nom valide — sinon
+  // teamLabel({ name: "", category: "U13F" }) renvoyait une étiquette
+  // vide au lieu de retomber sur "U13F" (?? ne réagit qu'à null/undefined,
+  // pas à une chaîne vide).
+  const name = t.name || null;
+  const category = t.category || null;
   if (name && category && name !== category) return `${name} · ${category}`;
   return name ?? category ?? "Équipe";
 }

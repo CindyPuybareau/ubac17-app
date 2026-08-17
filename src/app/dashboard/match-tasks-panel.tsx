@@ -109,24 +109,32 @@ export default function MatchTasksPanel({
   async function assign(taskType: TaskType, playerId: string) {
     if (!playerId) return;
     setPending(taskType);
+    setError(null);
     const supabase = createClient();
-    if (initialTasks[taskType]) {
-      await supabase
-        .from("event_tasks")
-        .update({ player_id: playerId, source: "COACH" })
-        .eq("event_id", eventId)
-        .eq("task_type", taskType);
-    } else {
-      await supabase
-        .from("event_tasks")
-        .insert({
+    // Contrairement à volunteer() juste au-dessus, cette écriture ne
+    // vérifiait jamais l'erreur : un parent qui vient de se porter
+    // volontaire une fraction de seconde avant que le coach (avec des
+    // props un peu périmées) ne réattribue le même rôle à quelqu'un
+    // d'autre déclenchait la contrainte unique (event_id, task_type) sans
+    // que rien ne le signale — le coach croyait avoir réattribué le rôle
+    // alors que l'attribution d'origine restait en base.
+    const { error: writeError } = initialTasks[taskType]
+      ? await supabase
+          .from("event_tasks")
+          .update({ player_id: playerId, source: "COACH" })
+          .eq("event_id", eventId)
+          .eq("task_type", taskType)
+      : await supabase.from("event_tasks").insert({
           event_id: eventId,
           task_type: taskType,
           player_id: playerId,
           source: "COACH",
         });
-    }
     setPending(null);
+    if (writeError) {
+      setError("Attribution impossible, réessaie.");
+      return;
+    }
     router.refresh();
   }
 
@@ -178,7 +186,14 @@ export default function MatchTasksPanel({
   }
 
   async function reserve(offer: CarpoolOffer) {
-    const seats = Number(reserveSeatsInput[offer.id] ?? "1") || 1;
+    // Contrairement à proposeOffer() (voir plus haut), rien ne rejetait un
+    // nombre négatif côté client : `Number("-2") || 1` vaut -2 (un nombre
+    // négatif est "truthy"), qui partait tel quel vers l'insert — rejeté
+    // seulement par la contrainte `check (seats > 0)` en base, avec le
+    // message générique "Réservation impossible" au lieu d'un vrai retour
+    // de validation.
+    const rawSeats = Number(reserveSeatsInput[offer.id] ?? "1");
+    const seats = Number.isFinite(rawSeats) && rawSeats > 0 ? rawSeats : 1;
     setPending(`reserve:${offer.id}`);
     setCarpoolError(null);
     const supabase = createClient();
@@ -255,7 +270,13 @@ export default function MatchTasksPanel({
 
             {canAssignAnyone ? (
               <select
-                defaultValue={assignment?.playerId ?? ""}
+                // Contrôlé (value, pas defaultValue) : sinon ce <select>
+                // gardait le nom affiché lors du montage même après une
+                // réattribution qui change assignment.playerId via un
+                // rafraîchissement des props (router.refresh()) — le
+                // libellé ci-dessus se mettait à jour, mais pas le menu
+                // déroulant lui-même, un décalage visuel trompeur.
+                value={assignment?.playerId ?? ""}
                 disabled={pending === taskType}
                 onChange={(e) => assign(taskType, e.target.value)}
                 className="w-full rounded-full border border-zinc-200 bg-white px-2.5 py-2 text-xs disabled:opacity-60 sm:w-auto"

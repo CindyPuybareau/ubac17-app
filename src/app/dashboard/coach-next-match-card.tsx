@@ -26,6 +26,7 @@ export default function CoachNextMatchCard({
   roles,
   rsvpStatusByKey = {},
   rsvpReasonByKey = {},
+  selfPlayerId = null,
 }: {
   teamName: string;
   event: UpcomingEvent | null;
@@ -37,6 +38,13 @@ export default function CoachNextMatchCard({
   // Réponses de l'effectif sur cet événement, clé "eventId:playerId".
   rsvpStatusByKey?: Record<string, string>;
   rsvpReasonByKey?: Record<string, string | null>;
+  // Fiche joueur du coach SUR CETTE équipe (null s'il ne joue pas dans
+  // cette équipe précise) — sans ça, un coach qui joue aussi dans une
+  // équipe qu'il entraîne ne pouvait jamais gérer son propre covoiturage/
+  // rôle sur ses propres matchs coachés (myPlayerIds restait toujours
+  // vide ici, alors qu'aucun autre endroit de l'app ne lui montre ce
+  // panneau pour ses propres équipes coachées).
+  selfPlayerId?: string | null;
 }) {
   const style = event ? styleFor(event.event_type) : null;
 
@@ -148,7 +156,7 @@ export default function CoachNextMatchCard({
             eventId={event.id}
             eventDate={event.start_time}
             roster={roster.map((p) => ({ id: p.id, name: fullName(p) }))}
-            myPlayerIds={[]}
+            myPlayerIds={selfPlayerId ? [selfPlayerId] : []}
             canAssignAnyone
             initialTasks={tasks}
             initialCarpool={carpool}

@@ -35,12 +35,25 @@ export default function ChildLoginForm({ code, children }: { code: string; child
     setLoading(true);
     setError(null);
 
-    const res = await fetch("/api/child-login", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code, playerId: selected.id, pin: fullPin }),
-    });
+    // Le clavier entier reste désactivé tant que loading est vrai — sans
+    // try/catch, une simple coupure réseau (wifi de gymnase capricieux)
+    // faisait rejeter fetch() et bloquait l'écran de connexion pour de
+    // bon, sans message ni moyen de réessayer autrement qu'en rechargeant
+    // la page à la main.
+    let res: Response;
+    try {
+      res = await fetch("/api/child-login", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, playerId: selected.id, pin: fullPin }),
+      });
+    } catch {
+      setLoading(false);
+      setPin("");
+      setError("Connexion impossible, réessaie.");
+      return;
+    }
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {

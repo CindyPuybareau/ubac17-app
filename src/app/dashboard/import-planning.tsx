@@ -74,10 +74,22 @@ function combineDateTime(dateValue: unknown, heureValue: unknown): string | null
 
 function findTeamForDivision(division: string, teams: Team[]): Team | null {
   const normDivision = normalize(division);
-  return (
-    teams.find((t) => t.category && normDivision.includes(normalize(t.category))) ??
-    null
-  );
+  // La catégorie la PLUS LONGUE qui matche, pas la première trouvée dans
+  // le tableau : avec à la fois une équipe "U13" et une équipe "U13F", une
+  // division "U13F A2" contient les deux catégories comme sous-chaîne — un
+  // simple .find() aurait pu assigner le match à la mauvaise équipe selon
+  // l'ordre du tableau, sans la moindre erreur pour le signaler.
+  let best: Team | null = null;
+  let bestLength = -1;
+  for (const t of teams) {
+    if (!t.category) continue;
+    const normCategory = normalize(t.category);
+    if (normDivision.includes(normCategory) && normCategory.length > bestLength) {
+      best = t;
+      bestLength = normCategory.length;
+    }
+  }
+  return best;
 }
 
 export default function ImportPlanning({

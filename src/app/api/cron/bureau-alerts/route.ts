@@ -107,7 +107,7 @@ async function runExpiryAlerts(supabase: ReturnType<typeof createServiceClient>)
     .is("archived_at", null)
     .or("license_expires_at.not.is.null,medical_certificate_expires_at.not.is.null");
 
-  if (error) return { sent: 0, skippedNoEmail: 0, checked: 0, error: error.message };
+  if (error) return { sent: 0, skippedNoEmail: 0, checked: 0, error: "Erreur lors de la lecture des données." };
 
   let sent = 0;
   let skippedNoEmail = 0;
@@ -191,7 +191,7 @@ async function runCotisationRelances(supabase: ReturnType<typeof createServiceCl
     .is("collecte_id", null)
     .or(`last_auto_relance_sent_at.is.null,last_auto_relance_sent_at.lt.${cooldownStartIso}`);
 
-  if (error) return { sent: 0, skippedNoEmail: 0, checked: 0, error: error.message };
+  if (error) return { sent: 0, skippedNoEmail: 0, checked: 0, error: "Erreur lors de la lecture des données." };
 
   let sent = 0;
   let skippedNoEmail = 0;
@@ -262,14 +262,17 @@ async function runCotisationRelances(supabase: ReturnType<typeof createServiceCl
 // planifiée (le plan Vercel Hobby plafonne à 2 crons — /api/cron/match-
 // reminders occupe déjà le premier) : échéances (licence FFBB, certificat
 // médical) + relance des cotisations encore impayées. Déclenché une fois
-// par jour (voir vercel.json), protégé par CRON_SECRET.
+// par jour (voir vercel.json), protégé par CRON_SECRET. Fermé par défaut
+// (fail closed) : sans la variable posée côté Vercel, la route refuse
+// tout appel plutôt que de rester ouverte à qui la devine.
 export async function GET(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
-    }
+  if (!cronSecret) {
+    return NextResponse.json({ error: "CRON_SECRET non configuré." }, { status: 500 });
+  }
+  const auth = request.headers.get("authorization");
+  if (auth !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
   }
 
   let supabase: ReturnType<typeof createServiceClient>;

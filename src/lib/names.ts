@@ -26,8 +26,13 @@ export function formatFirstName(first: string | null | undefined) {
   const trimmed = (first ?? "").trim();
   if (!trimmed) return "";
   return trimmed
-    .split(/(\s+|-|')/)
-    .map((part) => (/^(\s+|-|')$/.test(part) ? part : capitalizeWord(part)))
+    .split(/(\s+|-|['’])/)
+    // Apostrophe droite (') ET typographique ('), la seconde étant celle
+    // que l'autocorrection iOS/Word insère par défaut ("n'guyen" tapé sur
+    // iPhone devient "n’guyen") — sans les deux formes ici, ces prénoms
+    // n'étaient jamais coupés au bon endroit et ressortaient "N’guyen" au
+    // lieu de "N’Guyen".
+    .map((part) => (/^(\s+|-|['’])$/.test(part) ? part : capitalizeWord(part)))
     .join("");
 }
 

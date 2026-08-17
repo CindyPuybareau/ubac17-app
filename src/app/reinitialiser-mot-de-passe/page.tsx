@@ -21,13 +21,30 @@ export default function ReinitialiserMotDePassePage() {
   const [linkValid, setLinkValid] = useState<boolean | undefined>(undefined);
 
   useEffect(() => {
-    let cancelled = false;
     const supabase = createClient();
-    supabase.auth.getSession().then(({ data }) => {
-      if (!cancelled) setLinkValid(Boolean(data.session));
+    // `getSession()` renvoyait vrai dès qu'UNE session existait, sans
+    // distinguer "ce lien de réinitialisation vient d'être échangé contre
+    // une session" de "cet appareil était déjà connecté avant même de
+    // cliquer le lien" (ex. tablette familiale partagée). Un lien expiré
+    // ou déjà utilisé montrait alors quand même le formulaire, sans le
+    // moindre message d'erreur. onAuthStateChange("PASSWORD_RECOVERY") est
+    // l'événement que Supabase déclenche précisément quand le jeton de
+    // récupération de l'URL vient d'être échangé — le seul signal fiable
+    // ici.
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") setLinkValid(true);
     });
+    // Filet de sécurité : si l'événement n'arrive jamais (lien expiré/déjà
+    // utilisé), ne pas rester bloqué indéfiniment sur "Vérification du
+    // lien...".
+    const timeout = setTimeout(() => {
+      setLinkValid((current) => current ?? false);
+    }, 4000);
     return () => {
-      cancelled = true;
+      subscription.unsubscribe();
+      clearTimeout(timeout);
     };
   }, []);
 

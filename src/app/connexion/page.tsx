@@ -51,7 +51,7 @@ export default function ConnexionPage() {
     setMessage(null);
 
     const supabase = createClient();
-    await supabase.auth.signInWithOtp({
+    const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
         shouldCreateUser: false,
@@ -60,6 +60,15 @@ export default function ConnexionPage() {
     });
 
     setLoading(false);
+    // "Utilisateur introuvable" ne doit jamais fuiter (voir le commentaire
+    // au-dessus) — mais un vrai échec technique (limite de débit Supabase,
+    // panne réseau) mérite un vrai message : sans ce contrôle d'erreur, la
+    // personne croyait un email parti alors qu'aucun n'était jamais
+    // envoyé, sans aucun moyen de le savoir.
+    if (error && error.code !== "user_not_found") {
+      setError("Un problème est survenu, réessaie dans quelques instants.");
+      return;
+    }
     setMessage(
       "Si un compte existe avec cet email, un lien de connexion vient de t'être envoyé — vérifie ta boîte mail."
     );

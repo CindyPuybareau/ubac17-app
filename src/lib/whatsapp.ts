@@ -4,10 +4,25 @@
 // there isn't enough left to dial (wrong length after stripping).
 export function formatPhoneForWhatsApp(phone: string | null | undefined): string | null {
   if (!phone) return null;
-  const digits = phone.replace(/[^\d+]/g, "");
+  let digits = phone.replace(/[^\d+]/g, "");
+
+  // "00" est l'équivalent international de "+" (convention très courante
+  // en France, ex. "0033612345678") : sans cette étape, ces numéros
+  // ressortaient tels quels ("0033...") au lieu d'être ramenés à "33...".
+  if (!digits.startsWith("+") && digits.startsWith("00")) {
+    digits = `+${digits.slice(2)}`;
+  }
 
   if (digits.startsWith("+")) {
-    const rest = digits.slice(1);
+    let rest = digits.slice(1);
+    // Format international "officiel" français : "+33 (0)6 12 34 56 78"
+    // — le zéro entre parenthèses (déjà réduit à un simple "0" par le
+    // strip regex ci-dessus) ne fait PAS partie du numéro, il ne s'utilise
+    // qu'en local. Sans ce retrait, "+33 (0)6..." devenait "330612345678"
+    // (un chiffre de trop) au lieu de "33612345678".
+    if (rest.startsWith("330")) {
+      rest = `33${rest.slice(3)}`;
+    }
     return rest.length >= 8 ? rest : null;
   }
   if (digits.startsWith("0") && digits.length === 10) {

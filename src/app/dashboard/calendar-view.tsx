@@ -138,8 +138,6 @@ function buildMonthGrid(monthDate: Date): Date[] {
 }
 
 const weekdayLabels = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
-const today = new Date();
-const todayKey = toKey(today);
 
 export type CalendarTeamRef = {
   id: string;
@@ -262,6 +260,13 @@ export default function CalendarView({
   }[];
 }) {
   const router = useRouter();
+  // Recalculés à chaque rendu (pas au chargement du module) : un onglet
+  // Bureau laissé ouvert toute la nuit gardait sinon la pastille "jour
+  // même" sur la veille jusqu'au rechargement complet de la page — un
+  // simple router.refresh() (déclenché ailleurs par useRealtimeRefresh)
+  // suffit maintenant à corriger l'affichage sans reload.
+  const today = new Date();
+  const todayKey = toKey(today);
   const [viewMonth, setViewMonth] = useState<Date>(today);
   const [selectedDate, setSelectedDate] = useState<Date>(today);
   // Le calendrier s'ouvre sur la grille : on veut d'abord voir le mois.
@@ -723,7 +728,9 @@ export default function CalendarView({
                   ? { label: "Présent", dotClassName: "bg-green-500", className: "bg-green-100 text-green-700" }
                   : playerStatus === "ABSENT"
                     ? { label: "Absent", dotClassName: "bg-red-500", className: "bg-red-100 text-red-700" }
-                    : { label: "En attente", dotClassName: "bg-amber-500", className: "bg-amber-100 text-amber-700" };
+                    : playerStatus === "LATE"
+                      ? { label: "En retard", dotClassName: "bg-amber-500", className: "bg-amber-100 text-amber-700" }
+                      : { label: "En attente", dotClassName: "bg-zinc-400", className: "bg-zinc-100 text-zinc-600" };
               return (
                 <div key={p.id} className="flex flex-wrap items-center gap-2">
                   {rsvpVisiblePlayers.length > 1 && (

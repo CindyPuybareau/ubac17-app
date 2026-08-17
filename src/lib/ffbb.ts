@@ -22,8 +22,12 @@ function parseFrenchMatchDate(text: string): string | null {
   const monthIndex = FRENCH_MONTHS[monthRaw.toLowerCase()];
   if (monthIndex === undefined) return null;
 
+  // Les deux bornes doivent utiliser exactement le même mois de coupure
+  // (août, comme documenté ci-dessus) : un léger désaccord entre celle
+  // utilisée pour "maintenant" et celle utilisée pour le mois du match
+  // datait un match de juillet consulté en juillet un an trop tard.
   const now = new Date();
-  const seasonStartYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+  const seasonStartYear = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
   const year = monthIndex >= 7 ? seasonStartYear : seasonStartYear + 1;
 
   const date = new Date(Date.UTC(year, monthIndex, Number(day), Number(hour), Number(minute)));
@@ -59,8 +63,36 @@ export function parseFfbbTeamPage(html: string): FfbbMatch[] {
   return matches;
 }
 
+// teams.ffbb_url est un champ texte libre que n'importe quel coach peut
+// modifier depuis les réglages de son équipe (policy "coach update own
+// teams") — sans ce contrôle, la route qui appelle cette fonction ferait
+// une requête serveur vers N'IMPORTE QUELLE URL qu'un coach y colle (SSRF :
+// service interne, métadonnées cloud, etc.), le tout depuis l'infra
+// Vercel du projet. Seule la FFBB a une raison légitime d'être derrière ce
+// champ.
+const FFBB_ALLOWED_HOSTS = ["ffbb.com", "www.ffbb.com", "competitions.ffbb.com"];
+
+function assertFfbbUrl(url: string): URL {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error("URL FFBB invalide.");
+  }
+  if (parsed.protocol !== "https:") {
+    throw new Error("URL FFBB invalide : https requis.");
+  }
+  const host = parsed.hostname.toLowerCase();
+  const allowed = FFBB_ALLOWED_HOSTS.some((h) => host === h || host.endsWith(`.${h}`));
+  if (!allowed) {
+    throw new Error("URL FFBB invalide : domaine non autorisé.");
+  }
+  return parsed;
+}
+
 export async function fetchFfbbTeamCalendar(url: string): Promise<FfbbMatch[]> {
-  const res = await fetch(url, {
+  const validated = assertFfbbUrl(url);
+  const res = await fetch(validated, {
     headers: { "User-Agent": "Mozilla/5.0 (compatible; UBAC17App/1.0)" },
   });
   if (!res.ok) {

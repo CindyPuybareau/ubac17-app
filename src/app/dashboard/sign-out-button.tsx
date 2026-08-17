@@ -9,9 +9,16 @@ export default function SignOutButton() {
 
   async function handleSignOut() {
     const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/");
-    router.refresh();
+    // Redirection dans un `finally` : un signOut() qui échoue (réseau,
+    // verrou interne du SDK) faisait planter le clic silencieusement —
+    // rien ne se passait, sans erreur ni navigation, comme si le bouton
+    // ne répondait plus.
+    try {
+      await supabase.auth.signOut();
+    } finally {
+      router.push("/");
+      router.refresh();
+    }
   }
 
   return (

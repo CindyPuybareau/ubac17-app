@@ -185,6 +185,7 @@ export default function CoachView({
           rsvpStatusByKey={rsvpStatusByKey}
           rsvpReasonByKey={rsvpReasonByKey}
           roles={eventRoles}
+          ownPlayerId={ownPlayerId}
         />
       ),
     },

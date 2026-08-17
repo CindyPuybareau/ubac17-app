@@ -278,10 +278,20 @@ export default function TeamCard({
 
   async function addCoach(coachId: string) {
     if (!coachId) return;
+    setRemoveCoachError(null);
     const supabase = createClient();
-    await supabase
+    const { error } = await supabase
       .from("team_coaches")
       .insert({ team_id: team.id, coach_id: coachId });
+    // Contrairement à toutes les autres mutations de ce fichier, l'ajout
+    // ne vérifiait jamais l'erreur — un coach déjà assigné (contrainte
+    // unique) ou bloqué par une policy RLS échouait silencieusement : le
+    // menu se réinitialisait, router.refresh() tournait quand même, et
+    // rien ne disait au Bureau que l'ajout n'avait pas eu lieu.
+    if (error) {
+      setRemoveCoachError(`Ajout impossible : ${error.message}`);
+      return;
+    }
     router.refresh();
   }
 

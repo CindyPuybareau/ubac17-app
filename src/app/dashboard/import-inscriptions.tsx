@@ -227,7 +227,21 @@ export default function ImportInscriptions() {
             ? horodatageRaw
             : 0;
 
-      const numOrNull = (v: unknown) => (typeof v === "number" ? v : null);
+      // Une cellule Prix/Remise/Paiement formatée ou saisie en texte
+      // ("150,00", "150 €") ne passait pas typeof v === "number" et
+      // ressortait null — un montant réel effacé silencieusement au lieu
+      // d'être importé. On accepte aussi le texte, en gérant la virgule
+      // décimale française.
+      const numOrNull = (v: unknown): number | null => {
+        if (typeof v === "number") return Number.isFinite(v) ? v : null;
+        if (typeof v === "string") {
+          const cleaned = v.replace(/[^\d,.-]/g, "").replace(",", ".");
+          if (!cleaned) return null;
+          const parsed = Number(cleaned);
+          return Number.isFinite(parsed) ? parsed : null;
+        }
+        return null;
+      };
 
       parsed.push({
         firstName: String(r[idx.prenom] ?? "").trim(),

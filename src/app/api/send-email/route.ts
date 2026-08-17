@@ -40,6 +40,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
   }
 
+  // Cette route envoie un email "au nom du club" via le provider configuré
+  // (Resend/Gmail), sans aucune limite de destinataire ni de contenu — elle
+  // n'est censée servir qu'à la relance de cotisation depuis les écrans
+  // Bureau (email-template-modal.tsx, cotisation-participants-table.tsx).
+  // Sans ce contrôle, n'importe quel compte connecté (un simple parent)
+  // pouvait faire partir un email arbitraire vers n'importe quelle adresse
+  // avec la légitimité du domaine d'envoi du club.
+  const { data: adminRow } = await supabase
+    .from("club_administrators")
+    .select("email")
+    .eq("email", (user.email ?? "").toLowerCase())
+    .maybeSingle();
+
+  if (!adminRow) {
+    return NextResponse.json({ error: "Réservé au Bureau." }, { status: 403 });
+  }
+
   const result = await sendEmail({ to, subject, body, attachmentBase64, attachmentFilename });
 
   if (!result.ok) {

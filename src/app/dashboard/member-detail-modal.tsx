@@ -491,14 +491,24 @@ export default function MemberDetailModal({
 
     const currentTeamId = member.teams[0]?.id ?? "";
     if (canManageTeamAndRoles && teamId !== currentTeamId) {
-      const { error: deleteError } = await supabase
-        .from("team_players")
-        .delete()
-        .eq("player_id", member.id);
-      if (deleteError) {
-        setSaving(false);
-        setError(`Équipe non mise à jour : ${deleteError.message}`);
-        return;
+      // Uniquement la ligne de l'équipe affichée par ce sélecteur (team[0]),
+      // jamais un .delete() sans .eq("team_id", ...) : un membre "prêté" à
+      // une deuxième équipe depuis la fiche équipe (team-card.tsx,
+      // additif) a PLUSIEURS lignes team_players. Supprimer tout ici en
+      // corrigeant juste l'équipe principale désinscrivait aussi
+      // silencieusement le prêt — même classe de bug que l'incident
+      // d'import qui avait déjà effacé des affectations d'équipe.
+      if (currentTeamId) {
+        const { error: deleteError } = await supabase
+          .from("team_players")
+          .delete()
+          .eq("player_id", member.id)
+          .eq("team_id", currentTeamId);
+        if (deleteError) {
+          setSaving(false);
+          setError(`Équipe non mise à jour : ${deleteError.message}`);
+          return;
+        }
       }
       if (teamId) {
         const { error: insertError } = await supabase
@@ -547,7 +557,7 @@ export default function MemberDetailModal({
           // celui du parent, déjà rattaché à SA fiche. Le réutiliser ici
           // attacherait la fiche de l'enfant au compte du père, et le
           // retrait d'un rôle de coach viserait alors les équipes du père.
-          const { data: alreadyLinked } = await supabase
+          const { data: alreadyLinked, error: alreadyLinkedError } = await supabase
             .from("players")
             .select("id")
             .eq("profile_id", matchedProfile.id)
@@ -557,14 +567,21 @@ export default function MemberDetailModal({
           // Et même si ce compte n'est encore lié à aucune fiche : une fiche
           // déclarée comme l'enfant de ce compte n'est pas la fiche de son
           // titulaire.
-          const { data: declaredAsChild } = await supabase
+          const { data: declaredAsChild, error: declaredAsChildError } = await supabase
             .from("parent_player")
             .select("player_id")
             .eq("player_id", member.id)
             .eq("parent_id", matchedProfile.id)
             .maybeSingle();
 
-          if (!alreadyLinked && !declaredAsChild) {
+          // Un échec de l'une ou l'autre requête de garde (RLS, réseau)
+          // renvoyait data: undefined — donc "rien trouvé" — et laissait
+          // passer le rattachement automatique sans avoir vraiment vérifié
+          // l'absence de conflit. C'est exactement le mélange fiche
+          // enfant/compte parent que ces deux requêtes existent pour
+          // empêcher : mieux vaut ne pas rattacher du tout que de le faire
+          // sans garantie.
+          if (!alreadyLinkedError && !declaredAsChildError && !alreadyLinked && !declaredAsChild) {
             const { error: linkError } = await supabase
               .from("players")
               .update({ profile_id: matchedProfile.id })

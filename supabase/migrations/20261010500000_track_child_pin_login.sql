@@ -1,3 +1,17 @@
+-- RENOMMÉ (audit "check up général", voir la réponse de Claude) : ce
+-- fichier portait à l'origine le nom 20260817020000_track_child_pin_login.sql
+-- — une date antérieure à 20261008000000_child_pin_access.sql (qui crée
+-- les colonnes pin_hash/pin_failed_attempts/pin_locked_until utilisées
+-- ci-dessous) et à 20261009000000_fix_pgcrypto_search_path.sql (qui ajoute
+-- "extensions" au search_path, déjà présent ci-dessous). Rejouées dans
+-- l'ordre strict des noms de fichiers (ex. `supabase db reset` sur un
+-- environnement neuf), ces colonnes n'existaient pas encore : la création
+-- de la fonction ci-dessous aurait échoué et bloqué tous les fichiers
+-- suivants. Renommé pour se placer après ses dépendances ; le contenu est
+-- inchangé (déjà identique à la version finale de 20261010000000, donc un
+-- create-or-replace sans effet ici, simplement sans risque de casser un
+-- rejeu complet.
+--
 -- L'indicateur de connexion du tableau Membres (voir la migration
 -- 20260817010000) ne suivait que les comptes Supabase Auth classiques
 -- (Parent/Coach/Bureau) — un enfant qui se connecte par code PIN n'en a

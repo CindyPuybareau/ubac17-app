@@ -25,6 +25,14 @@ export function signatureIndex(body: string) {
   const normalized = normalizeApostrophes(body);
   const markerIdx = normalized.toLowerCase().lastIndexOf(SIGNATURE_MARKER);
   if (markerIdx === -1) return -1;
+  // Un simple lastIndexOf() se déclenchait sur n'importe quelle mention de
+  // "l'équipe UBAC" en plein milieu d'une phrase ("...toute l'équipe UBAC
+  // vous souhaite une bonne rentrée.") — withSignature() croyait alors le
+  // message déjà signé et n'ajoutait jamais la vraie signature. On exige
+  // que la mention commence bien sa PROPRE ligne (juste après un retour à
+  // la ligne, ou en tout début de texte).
+  const isStartOfLine = markerIdx === 0 || normalized[markerIdx - 1] === "\n";
+  if (!isStartOfLine) return -1;
   const before = normalized.slice(0, markerIdx).trimEnd();
   const lastBreak = before.lastIndexOf("\n");
   const lastLine = before.slice(lastBreak + 1).trim();

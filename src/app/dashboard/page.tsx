@@ -100,6 +100,12 @@ export type MemberDetail = {
   licenseExpiresAt: string | null;
   medicalCertificateExpiresAt: string | null;
   teams: AdminMemberTeam[];
+  // Un membre archivé (parti du club) ne doit plus apparaître dans les
+  // widgets "à venir" (anniversaires...) — utilisé aussi bien côté Bureau
+  // que Coach, d'où sa présence sur le type de base plutôt que sur
+  // AdminMember seul (un coach voyait sinon les anniversaires de joueurs
+  // partis, faute de ce champ sur sa propre vue).
+  archivedAt: string | null;
 };
 
 export type AdminMember = MemberDetail & {
@@ -107,7 +113,6 @@ export type AdminMember = MemberDetail & {
   phone: string | null;
   hasParent: boolean;
   pendingParentEmail: string | null;
-  archivedAt: string | null;
   // Teams this member also coaches, detected by matching their contact
   // email against a coach account's email — display-only (see the Membres
   // table's "Coach" badges), doesn't grant or reflect any actual access.
@@ -774,15 +779,23 @@ export default async function DashboardPage() {
       adminNextEventIds.length > 0
         ? await supabase
             .from("rsvps")
-            .select("player_id, status")
+            .select("player_id, status, event_id")
             .in("event_id", adminNextEventIds)
-        : { data: [] as { player_id: string; status: string }[] };
-    const adminNextEventStatusByPlayerId = new Map(
-      (adminNextEventRsvpRows ?? []).map((r) => [r.player_id, r.status])
+        : { data: [] as { player_id: string; status: string; event_id: string }[] };
+    // Clé "event_id:player_id", pas juste player_id : un joueur inscrit
+    // dans deux équipes a un "prochain événement" différent pour chacune,
+    // donc potentiellement deux statuts différents. Une clé par joueur
+    // seul écrasait l'un des deux et affichait le même statut sur les
+    // deux équipes.
+    const adminNextEventStatusByKey = new Map(
+      (adminNextEventRsvpRows ?? []).map((r) => [`${r.event_id}:${r.player_id}`, r.status])
     );
-    rosterByTeam.forEach((list) => {
+    rosterByTeam.forEach((list, teamId) => {
+      const nextEventId = adminNextEventIdByTeamId.get(teamId);
       list.forEach((p) => {
-        p.nextEventStatus = adminNextEventStatusByPlayerId.get(p.id) ?? null;
+        p.nextEventStatus = nextEventId
+          ? (adminNextEventStatusByKey.get(`${nextEventId}:${p.id}`) ?? null)
+          : null;
       });
     });
 
@@ -1275,15 +1288,21 @@ export default async function DashboardPage() {
       coachNextEventIds.length > 0
         ? await supabase
             .from("rsvps")
-            .select("player_id, status")
+            .select("player_id, status, event_id")
             .in("event_id", coachNextEventIds)
-        : { data: [] as { player_id: string; status: string }[] };
-    const coachNextEventStatusByPlayerId = new Map(
-      (coachNextEventRsvpRows ?? []).map((r) => [r.player_id, r.status])
+        : { data: [] as { player_id: string; status: string; event_id: string }[] };
+    // Voir le commentaire équivalent côté Bureau plus haut : clé par
+    // (event_id, player_id), pas juste player_id, pour ne pas confondre
+    // les statuts d'un joueur inscrit dans deux équipes coachées.
+    const coachNextEventStatusByKey = new Map(
+      (coachNextEventRsvpRows ?? []).map((r) => [`${r.event_id}:${r.player_id}`, r.status])
     );
-    rosterByTeam.forEach((list) => {
+    rosterByTeam.forEach((list, teamId) => {
+      const nextEventId = coachNextEventIdByTeamId.get(teamId);
       list.forEach((p) => {
-        p.nextEventStatus = coachNextEventStatusByPlayerId.get(p.id) ?? null;
+        p.nextEventStatus = nextEventId
+          ? (coachNextEventStatusByKey.get(`${nextEventId}:${p.id}`) ?? null)
+          : null;
       });
     });
 
@@ -1372,6 +1391,7 @@ export default async function DashboardPage() {
         license_number: string | null;
         license_expires_at: string | null;
         medical_certificate_expires_at: string | null;
+        archived_at: string | null;
       };
       coachMemberDetailsByPlayerId[player.id] = {
         id: player.id,
@@ -1403,6 +1423,7 @@ export default async function DashboardPage() {
         licenseExpiresAt: player.license_expires_at,
         medicalCertificateExpiresAt: player.medical_certificate_expires_at,
         teams: coachTeamRefsByPlayerId.get(player.id) ?? [],
+        archivedAt: player.archived_at,
       };
       // Deuxième clé pour une fiche de coach : le tableau d'équipe
       // identifie une ligne Coach par l'id de son compte, pas par celui de
@@ -1848,7 +1869,16 @@ export default async function DashboardPage() {
     : [];
 
   const coachBirthdayMembers: BirthdaySource[] = isCoach
-    ? Object.values(coachMemberDetailsByPlayerId).map((m) => ({
+    ? // coachMemberDetailsByPlayerId indexe la même fiche sous deux clés
+      // pour une ligne Coach (id joueur ET id compte, voir plus haut) :
+      // Object.values() la comptait donc deux fois sans ce dédoublonnage
+      // par m.id, et affichait le même anniversaire deux fois dans le
+      // widget. Un membre archivé (parti du club) ne doit plus non plus y
+      // figurer — filtre absent jusqu'ici côté Coach, déjà présent côté
+      // Bureau juste au-dessus.
+      Array.from(new Map(Object.values(coachMemberDetailsByPlayerId).map((m) => [m.id, m])).values())
+        .filter((m) => !m.archivedAt)
+        .map((m) => ({
         id: m.id,
         firstName: m.firstName,
         lastName: m.lastName,
