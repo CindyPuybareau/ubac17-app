@@ -954,9 +954,18 @@ export default async function DashboardPage() {
         coachTeams: player.profile_id
           ? (coachTeamsByProfileId.get(player.profile_id) ?? [])
           : [],
-        bureauRole: memberEmail
-          ? (bureauRoleByEmailLower.get(memberEmail.trim().toLowerCase()) ?? null)
-          : null,
+        // pending_parent_email exclu volontairement : cette fiche déclare
+        // alors un email de PARENT (souvent le même que registration_email
+        // pour un mineur inscrit par sa mère/son père), pas le sien
+        // propre. Sans cette exclusion, le fils d'une secrétaire du
+        // Bureau partageant l'adresse mail de sa mère héritait à tort du
+        // badge Bureau lui-même — même principe que le garde-fou
+        // "fiche déclarée comme l'enfant de quelqu'un n'est jamais la
+        // fiche de son titulaire" du trigger d'inscription.
+        bureauRole:
+          memberEmail && !player.pending_parent_email
+            ? (bureauRoleByEmailLower.get(memberEmail.trim().toLowerCase()) ?? null)
+            : null,
         pendingCoachTeams: pendingCoachTeamsByPlayerId.get(player.id) ?? [],
         email: memberEmail,
         phone:
