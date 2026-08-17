@@ -1002,17 +1002,23 @@ export default async function DashboardPage() {
         coachTeams: player.profile_id
           ? (coachTeamsByProfileId.get(player.profile_id) ?? [])
           : [],
-        // Un mineur ne peut jamais afficher le badge Bureau, même s'il
-        // partage l'email d'un parent qui, lui, en a un (cas remonté : le
-        // fils d'une secrétaire du Bureau, inscrit avec l'email de sa
-        // mère, héritait à tort du badge). pending_parent_email ne
-        // suffisait pas comme critère : l'import le remplit pour TOUT le
-        // monde, adultes compris, depuis la même colonne "email" du
-        // fichier — ça excluait aussi la secrétaire de son propre badge.
-        // L'âge réel (date de naissance) est le seul signal fiable ici.
+        // Le badge Bureau doit prouver que CETTE fiche est le compte du
+        // membre du Bureau, pas seulement qu'elle partage son email.
+        // isMinor() excluait déjà les mineurs (cas remonté : le fils d'une
+        // secrétaire du Bureau, inscrit avec l'email de sa mère, héritait
+        // du badge) — mais un jeune adulte majeur encore inscrit sous
+        // l'email familial (pas encore son propre compte) passait ce
+        // filtre-là et l'héritait quand même, puisque memberEmail retombe
+        // sur l'email du compte lié (le parent, via contactProfileId) dès
+        // que la fiche n'a pas la sienne. On exige maintenant que la fiche
+        // ait SON PROPRE compte relié (player.profile_id, jamais celui
+        // d'un parent) et on vérifie l'email de CE compte précis — jamais
+        // registration_email ni un repli familial.
         bureauRole:
-          memberEmail && !isMinor(player.birth_date)
-            ? (bureauRoleByEmailLower.get(memberEmail.trim().toLowerCase()) ?? null)
+          player.profile_id && !isMinor(player.birth_date)
+            ? (bureauRoleByEmailLower.get(
+                (emailByProfileId.get(player.profile_id) ?? "").trim().toLowerCase()
+              ) ?? null)
             : null,
         pendingCoachTeams: pendingCoachTeamsByPlayerId.get(player.id) ?? [],
         email: memberEmail,
