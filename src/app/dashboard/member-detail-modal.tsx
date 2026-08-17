@@ -1003,7 +1003,12 @@ export default function MemberDetailModal({
               <Field
                 label="N° Licence"
                 value={form.licenseNumber}
-                editable={editable}
+                // Réservé au Bureau (voir aussi le trigger
+                // protect_sensitive_player_fields côté base, qui refuse
+                // silencieusement toute autre écriture même hors de cette
+                // interface) : un coach a le droit de corriger la fiche
+                // pratique de ses joueurs, jamais leurs papiers officiels.
+                editable={editable && canManageTeamAndRoles}
                 onChange={(v) => set("licenseNumber", v)}
               />
               <Field
@@ -1023,7 +1028,8 @@ export default function MemberDetailModal({
                 label="Particularités médicales"
                 multiline
                 value={form.medicalNotes}
-                editable={editable}
+                // Réservé au Bureau, même raison que N° Licence ci-dessus.
+                editable={editable && canManageTeamAndRoles}
                 onChange={(v) => set("medicalNotes", v)}
               />
               <Field
