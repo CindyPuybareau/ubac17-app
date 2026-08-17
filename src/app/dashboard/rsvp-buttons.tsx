@@ -43,21 +43,19 @@ export default function RsvpButtons({
     setError(false);
     const supabase = createClient();
 
-    const { data: existing, error: selectError } = await supabase
+    // Vrai upsert : rsvps a maintenant une contrainte unique sur
+    // (event_id, player_id), donc plus besoin de lire avant d'écrire pour
+    // choisir insert/update — ça fermait la fenêtre où deux réponses
+    // simultanées pour la même personne pouvaient créer deux lignes.
+    const { error: writeError } = await supabase
       .from("rsvps")
-      .select("id")
-      .eq("event_id", eventId)
-      .eq("player_id", playerId)
-      .maybeSingle();
-
-    const { error: writeError } = existing
-      ? await supabase.from("rsvps").update({ status: newStatus }).eq("id", existing.id)
-      : await supabase
-          .from("rsvps")
-          .insert({ event_id: eventId, player_id: playerId, status: newStatus });
+      .upsert(
+        { event_id: eventId, player_id: playerId, status: newStatus },
+        { onConflict: "event_id,player_id" }
+      );
 
     setLoading(false);
-    if (selectError || writeError) {
+    if (writeError) {
       setError(true);
       return;
     }

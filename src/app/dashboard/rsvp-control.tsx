@@ -53,21 +53,17 @@ export default function RsvpControl({
     setError(null);
     const supabase = createClient();
 
-    // Pas d'upsert : rsvps n'a pas de contrainte unique sur
-    // (event_id, player_id), un onConflict échouerait donc.
-    const { data: existing } = await supabase
+    // Vrai upsert, plus de select-puis-écrit : rsvps a maintenant une
+    // contrainte unique sur (event_id, player_id), qui rend cet onConflict
+    // possible — l'ancien "lire, puis choisir insert/update" laissait une
+    // fenêtre où deux réponses simultanées pour la même personne pouvaient
+    // créer deux lignes au lieu d'une.
+    const { error: writeError } = await supabase
       .from("rsvps")
-      .select("id")
-      .eq("event_id", eventId)
-      .eq("player_id", playerId)
-      .maybeSingle();
-
-    const payload = { status: next };
-    const { error: writeError } = existing
-      ? await supabase.from("rsvps").update(payload).eq("id", existing.id)
-      : await supabase
-          .from("rsvps")
-          .insert({ event_id: eventId, player_id: playerId, ...payload });
+      .upsert(
+        { event_id: eventId, player_id: playerId, status: next },
+        { onConflict: "event_id,player_id" }
+      );
 
     setSaving(false);
     if (writeError) {
