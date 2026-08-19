@@ -68,21 +68,29 @@ export async function getVolunteerNeedsByEventId(
   const result: Record<string, VolunteerNeed[]> = {};
   if (eventIds.length === 0) return result;
 
-  const { data: needRows, error: needRowsError } = await supabase
+  // Pas de .in("event_id", eventIds) ici : depuis que ce fetch couvre
+  // TOUS les événements affichés (calendrier entier, plus seulement ceux
+  // à venir — voir plus haut), la liste d'ids pouvait dépasser plusieurs
+  // centaines d'entrées et produire une URL trop longue, rejetée par le
+  // serveur avec un "Bad Request" sans détail (bug remonté par Cindy le
+  // 2026-08-20, confirmé par les logs). La policy RLS "select volunteer
+  // needs for visible events" filtre déjà aux seuls événements visibles
+  // par l'utilisateur courant, donc récupérer sans filtre d'id renvoie
+  // exactement le même ensemble de lignes, sans construire une URL
+  // gigantesque — on ne garde ensuite que celles demandées.
+  const eventIdSet = new Set(eventIds);
+  const { data: allNeedRows, error: needRowsError } = await supabase
     .from("event_volunteer_needs")
     .select("id, event_id, role_code, custom_label, required_count, sort_order")
-    .in("event_id", eventIds)
     .order("sort_order", { ascending: true });
 
-  // Diagnostic temporaire (retour de Cindy du 2026-08-19/20 : besoins
-  // présents en base mais invisibles à l'écran) — l'appel ci-dessus
-  // ignorait silencieusement toute erreur ; à retirer une fois la cause
-  // confirmée.
   if (needRowsError) {
     console.error("[getVolunteerNeedsByEventId] select event_volunteer_needs failed:", needRowsError);
   }
 
-  const needIds = (needRows ?? []).map((row) => row.id as string);
+  const needRows = (allNeedRows ?? []).filter((row) => eventIdSet.has(row.event_id as string));
+
+  const needIds = needRows.map((row) => row.id as string);
 
   // Requête séparée plutôt qu'une jointure imbriquée à deux niveaux (mêmes
   // raisons que getCarpoolOffersByEventId dans event-tasks.ts : plus simple
@@ -111,7 +119,7 @@ export async function getVolunteerNeedsByEventId(
     });
   }
 
-  (needRows ?? []).forEach((row) => {
+  needRows.forEach((row) => {
     const eventId = row.event_id as string;
     const list = (result[eventId] ??= []);
     list.push({
