@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Minus, Plus, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import RoleIcon from "./role-icon";
@@ -46,6 +46,19 @@ export default function VolunteerNeedsPanel({
   const [newCustomLabel, setNewCustomLabel] = useState("");
   const [newCount, setNewCount] = useState("1");
 
+  // Copie locale affichée immédiatement au clic, plutôt que d'attendre le
+  // rafraîchissement temps réel (débounce ~0,8s + un aller-retour serveur
+  // complet qui recharge toutes les données du tableau de bord) pour voir
+  // le changement à l'écran — retour de Cindy du 2026-08-21 : "8 secondes
+  // au moins... vraiment trop long". Le rafraîchissement différé reste en
+  // place (realtime-sync.tsx) : il ne fait plus que confirmer en
+  // arrière-plan et resynchroniser les autres onglets/appareils, la copie
+  // locale ci-dessous étant écrasée par les props fraîches à son arrivée.
+  const [localNeeds, setLocalNeeds] = useState(needs);
+  useEffect(() => {
+    setLocalNeeds(needs);
+  }, [needs]);
+
   async function volunteer(need: VolunteerNeed) {
     if (myPlayerIds.length === 0) return;
     const label = volunteerRoleLabel(need.roleCode, need.customLabel);
@@ -54,11 +67,15 @@ export default function VolunteerNeedsPanel({
     setPending(need.id);
     setError(null);
     const supabase = createClient();
-    const { error: insertError } = await supabase.from("event_volunteer_signups").insert({
-      need_id: need.id,
-      player_id: myPlayerIds[0],
-      source: "VOLUNTEER",
-    });
+    const { data, error: insertError } = await supabase
+      .from("event_volunteer_signups")
+      .insert({
+        need_id: need.id,
+        player_id: myPlayerIds[0],
+        source: "VOLUNTEER",
+      })
+      .select("id")
+      .single();
     setPending(null);
     if (insertError) {
       // Message générique fixe par le passé ("Ce créneau est déjà
@@ -73,6 +90,22 @@ export default function VolunteerNeedsPanel({
       );
       return;
     }
+    // playerName vide : sans effet ici puisque cette branche (mySignup)
+    // n'affiche jamais le nom, seulement le bouton "Annuler" — le nom
+    // réel arrive avec le prochain rafraîchissement.
+    setLocalNeeds((prev) =>
+      prev.map((n) =>
+        n.id === need.id
+          ? {
+              ...n,
+              signups: [
+                ...n.signups,
+                { id: data.id, playerId: myPlayerIds[0], playerName: "", source: "VOLUNTEER" },
+              ],
+            }
+          : n
+      )
+    );
     // Pas de router.refresh() explicite ici : event_volunteer_signups est
     // surveillée en temps réel (realtime-sync.tsx) depuis l'audit du
     // 2026-08-20, qui déclenche déjà son propre rafraîchissement — le
@@ -84,6 +117,9 @@ export default function VolunteerNeedsPanel({
 
   async function withdraw(signupId: string) {
     setPending(signupId);
+    setLocalNeeds((prev) =>
+      prev.map((n) => ({ ...n, signups: n.signups.filter((s) => s.id !== signupId) }))
+    );
     const supabase = createClient();
     await supabase.from("event_volunteer_signups").delete().eq("id", signupId);
     setPending(null);
@@ -93,6 +129,7 @@ export default function VolunteerNeedsPanel({
     const ok = window.confirm("Supprimer ce besoin et toutes ses inscriptions ?");
     if (!ok) return;
     setPending(needId);
+    setLocalNeeds((prev) => prev.filter((n) => n.id !== needId));
     const supabase = createClient();
     await supabase.from("event_volunteer_needs").delete().eq("id", needId);
     setPending(null);
@@ -100,6 +137,9 @@ export default function VolunteerNeedsPanel({
 
   async function updateRequiredCount(needId: string, count: number) {
     if (count < 1) return;
+    setLocalNeeds((prev) =>
+      prev.map((n) => (n.id === needId ? { ...n, requiredCount: count } : n))
+    );
     const supabase = createClient();
     await supabase.from("event_volunteer_needs").update({ required_count: count }).eq("id", needId);
   }
@@ -114,13 +154,17 @@ export default function VolunteerNeedsPanel({
     setPending("add");
     setError(null);
     const supabase = createClient();
-    const { error: insertError } = await supabase.from("event_volunteer_needs").insert({
-      event_id: eventId,
-      role_code: newRoleCode,
-      custom_label: newRoleCode === CUSTOM_ROLE_CODE ? trimmedCustom : null,
-      required_count: count,
-      sort_order: needs.length,
-    });
+    const { data, error: insertError } = await supabase
+      .from("event_volunteer_needs")
+      .insert({
+        event_id: eventId,
+        role_code: newRoleCode,
+        custom_label: newRoleCode === CUSTOM_ROLE_CODE ? trimmedCustom : null,
+        required_count: count,
+        sort_order: localNeeds.length,
+      })
+      .select("id")
+      .single();
     setPending(null);
     if (insertError) {
       // Même correctif de clarté que volunteer()/removeNeed() plus haut
@@ -129,13 +173,24 @@ export default function VolunteerNeedsPanel({
       setError(`Ajout impossible : ${insertError.message}`);
       return;
     }
+    setLocalNeeds((prev) => [
+      ...prev,
+      {
+        id: data.id,
+        eventId,
+        roleCode: newRoleCode,
+        customLabel: newRoleCode === CUSTOM_ROLE_CODE ? trimmedCustom : null,
+        requiredCount: count,
+        signups: [],
+      },
+    ]);
     setNewRoleCode(STANDARD_VOLUNTEER_ROLES[0].code);
     setNewCustomLabel("");
     setNewCount("1");
     setAddOpen(false);
   }
 
-  if (needs.length === 0 && !canManage) return null;
+  if (localNeeds.length === 0 && !canManage) return null;
 
   return (
     <div
@@ -151,12 +206,12 @@ export default function VolunteerNeedsPanel({
         </p>
       )}
 
-      {needs.length === 0 && (
+      {localNeeds.length === 0 && (
         <p className="text-xs text-zinc-400">Aucun besoin défini pour cet événement.</p>
       )}
 
       <div className="flex flex-col gap-2">
-        {needs.map((need) => {
+        {localNeeds.map((need) => {
           const label = volunteerRoleLabel(need.roleCode, need.customLabel);
           const icon = volunteerRoleIcon(need.roleCode);
           const remaining = remainingSlots(need);

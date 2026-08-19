@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Car, Check, Clock, MapPin, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import TaskSourceBadge from "./task-source-badge";
@@ -73,6 +73,28 @@ export default function MatchTasksPanel({
   const [meetingPointInput, setMeetingPointInput] = useState("");
   const [reserveSeatsInput, setReserveSeatsInput] = useState<Record<string, string>>({});
 
+  // Copies locales affichées immédiatement au clic, plutôt que d'attendre
+  // le rafraîchissement temps réel (débounce ~0,8s + un aller-retour
+  // serveur complet qui recharge toutes les données du tableau de bord)
+  // pour voir le changement à l'écran — retour de Cindy du 2026-08-21 :
+  // "8 secondes au moins... vraiment trop long". Le rafraîchissement
+  // différé reste en place (realtime-sync.tsx) : il ne fait plus que
+  // confirmer en arrière-plan et resynchroniser les autres onglets/
+  // appareils, ces copies étant écrasées par les props fraîches à son
+  // arrivée. Même correctif que volunteer-needs-panel.tsx.
+  const [localTasks, setLocalTasks] = useState(initialTasks);
+  useEffect(() => {
+    setLocalTasks(initialTasks);
+  }, [initialTasks]);
+  const [localCarpool, setLocalCarpool] = useState(initialCarpool);
+  useEffect(() => {
+    setLocalCarpool(initialCarpool);
+  }, [initialCarpool]);
+
+  function rosterName(playerId: string) {
+    return roster.find((p) => p.id === playerId)?.name ?? "";
+  }
+
   // Engage réellement quelqu'un (soi ou son enfant) sur une tâche du jour
   // J : une confirmation évite qu'un clic exploratoire — le bouton est
   // juste sous Présent/Absent — s'engage sans le vouloir. Même principe
@@ -103,7 +125,12 @@ export default function MatchTasksPanel({
           ? "Déjà attribué à quelqu'un d'autre."
           : `Attribution impossible : ${insertError.message}`
       );
+      return;
     }
+    setLocalTasks((prev) => ({
+      ...prev,
+      [taskType]: { playerId, playerName: rosterName(playerId), source: "VOLUNTEER" },
+    }));
     // Pas de router.refresh() explicite : event_tasks/event_carpool_offers/
     // event_carpool_reservations sont surveillées en temps réel
     // (realtime-sync.tsx) depuis l'audit du 2026-08-20 — le garder ici en
@@ -115,6 +142,7 @@ export default function MatchTasksPanel({
 
   async function withdraw(taskType: TaskType) {
     setPending(taskType);
+    setLocalTasks((prev) => ({ ...prev, [taskType]: null }));
     const supabase = createClient();
     await supabase
       .from("event_tasks")
@@ -136,7 +164,7 @@ export default function MatchTasksPanel({
     // d'autre déclenchait la contrainte unique (event_id, task_type) sans
     // que rien ne le signale — le coach croyait avoir réattribué le rôle
     // alors que l'attribution d'origine restait en base.
-    const { error: writeError } = initialTasks[taskType]
+    const { error: writeError } = localTasks[taskType]
       ? await supabase
           .from("event_tasks")
           .update({ player_id: playerId, source: "COACH" })
@@ -153,9 +181,13 @@ export default function MatchTasksPanel({
       setError("Attribution impossible, réessaie.");
       return;
     }
+    setLocalTasks((prev) => ({
+      ...prev,
+      [taskType]: { playerId, playerName: rosterName(playerId), source: "COACH" },
+    }));
   }
 
-  const myOffer = initialCarpool.find((o) => myPlayerIds.includes(o.playerId));
+  const myOffer = localCarpool.find((o) => myPlayerIds.includes(o.playerId));
 
   async function proposeOffer() {
     const seats = Number(seatsInput);
@@ -166,17 +198,23 @@ export default function MatchTasksPanel({
     setPending("carpool");
     setCarpoolError(null);
     const supabase = createClient();
-    const { error: writeError } = await supabase.from("event_carpool_offers").upsert(
-      {
-        event_id: eventId,
-        player_id: myPlayerIds[0],
-        seats,
-        departure_time: timeInput ? combineDateAndTime(eventDate, timeInput) : null,
-        meeting_point: meetingPointInput.trim() || null,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "event_id,player_id" }
-    );
+    const departureTime = timeInput ? combineDateAndTime(eventDate, timeInput) : null;
+    const meetingPoint = meetingPointInput.trim() || null;
+    const { data, error: writeError } = await supabase
+      .from("event_carpool_offers")
+      .upsert(
+        {
+          event_id: eventId,
+          player_id: myPlayerIds[0],
+          seats,
+          departure_time: departureTime,
+          meeting_point: meetingPoint,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "event_id,player_id" }
+      )
+      .select("id")
+      .single();
     setPending(null);
     if (writeError) {
       setCarpoolError(
@@ -186,11 +224,25 @@ export default function MatchTasksPanel({
       );
       return;
     }
+    setLocalCarpool((prev) => {
+      const existing = prev.find((o) => o.id === data.id);
+      const patched: CarpoolOffer = {
+        id: data.id,
+        playerId: myPlayerIds[0],
+        playerName: rosterName(myPlayerIds[0]),
+        seats,
+        departureTime,
+        meetingPoint,
+        reservations: existing?.reservations ?? [],
+      };
+      return existing ? prev.map((o) => (o.id === data.id ? patched : o)) : [...prev, patched];
+    });
     setOfferFormOpen(false);
   }
 
   async function withdrawOffer() {
     setPending("carpool");
+    setLocalCarpool((prev) => prev.filter((o) => !myPlayerIds.includes(o.playerId)));
     const supabase = createClient();
     await supabase
       .from("event_carpool_offers")
@@ -225,10 +277,30 @@ export default function MatchTasksPanel({
       );
       return;
     }
+    setLocalCarpool((prev) =>
+      prev.map((o) => {
+        if (o.id !== offer.id) return o;
+        const reservation = { playerId: myPlayerIds[0], playerName: rosterName(myPlayerIds[0]), seats };
+        const already = o.reservations.some((r) => r.playerId === myPlayerIds[0]);
+        return {
+          ...o,
+          reservations: already
+            ? o.reservations.map((r) => (r.playerId === myPlayerIds[0] ? reservation : r))
+            : [...o.reservations, reservation],
+        };
+      })
+    );
   }
 
   async function cancelReservation(offerId: string) {
     setPending(`cancel:${offerId}`);
+    setLocalCarpool((prev) =>
+      prev.map((o) =>
+        o.id === offerId
+          ? { ...o, reservations: o.reservations.filter((r) => r.playerId !== myPlayerIds[0]) }
+          : o
+      )
+    );
     const supabase = createClient();
     await supabase
       .from("event_carpool_reservations")
@@ -261,7 +333,7 @@ export default function MatchTasksPanel({
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
       {roles.map((role) => {
         const taskType = role.code;
-        const assignment = initialTasks[taskType] ?? null;
+        const assignment = localTasks[taskType] ?? null;
         const assignedToMe = assignment ? myPlayerIds.includes(assignment.playerId) : false;
 
         return (
@@ -456,9 +528,9 @@ export default function MatchTasksPanel({
         {carpoolError && <p className="text-xs text-red-600">{carpoolError}</p>}
 
         {/* Trajets proposés par toute l'équipe, le mien compris. */}
-        {initialCarpool.length > 0 ? (
+        {localCarpool.length > 0 ? (
           <ul className="flex flex-col gap-2">
-            {initialCarpool.map((offer) => {
+            {localCarpool.map((offer) => {
               const remaining = remainingSeats(offer);
               const isMine = myPlayerIds.includes(offer.playerId);
               const myReservation = offer.reservations.find((r) =>
