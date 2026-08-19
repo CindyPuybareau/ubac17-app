@@ -95,13 +95,12 @@ export default function MatchTasksPanel({
     return roster.find((p) => p.id === playerId)?.name ?? "";
   }
 
-  // Engage réellement quelqu'un (soi ou son enfant) sur une tâche du jour
-  // J : une confirmation évite qu'un clic exploratoire — le bouton est
-  // juste sous Présent/Absent — s'engage sans le vouloir. Même principe
-  // que la suppression d'un événement (handleDeleteEvent).
-  async function volunteer(taskType: TaskType, playerId: string, roleLabel: string) {
-    const ok = window.confirm(`Confirmer : tu t'occupes de « ${roleLabel} » pour cet événement ?`);
-    if (!ok) return;
+  // Engage quelqu'un (soi ou son enfant) sur une tâche du jour J. Une
+  // confirmation bloquante protégeait jusqu'ici contre un clic
+  // exploratoire, mais "Annuler" juste à côté (une fois pris) suffit à se
+  // désengager aussi facilement — retour de Cindy du 2026-08-21 : ce
+  // popup n'apporte rien pour ce geste précis et ralentit le clic.
+  async function volunteer(taskType: TaskType, playerId: string) {
     setPending(taskType);
     setError(null);
     const supabase = createClient();
@@ -387,7 +386,7 @@ export default function MatchTasksPanel({
               <button
                 type="button"
                 disabled={pending === taskType}
-                onClick={() => volunteer(taskType, myPlayerIds[0], role.label)}
+                onClick={() => volunteer(taskType, myPlayerIds[0])}
                 className="w-fit shrink-0 rounded-full bg-navy px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-navy-dark disabled:opacity-60"
               >
                 Je m&apos;en occupe

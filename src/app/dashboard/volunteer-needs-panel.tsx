@@ -59,11 +59,11 @@ export default function VolunteerNeedsPanel({
     setLocalNeeds(needs);
   }, [needs]);
 
+  // Un popup de confirmation bloquait ce geste jusqu'ici ; "Annuler" juste
+  // à côté une fois pris suffit à se désengager aussi facilement — retour
+  // de Cindy du 2026-08-21, même correctif que match-tasks-panel.tsx.
   async function volunteer(need: VolunteerNeed) {
     if (myPlayerIds.length === 0) return;
-    const label = volunteerRoleLabel(need.roleCode, need.customLabel);
-    const ok = window.confirm(`Confirmer : tu t'occupes de « ${label} » pour cet événement ?`);
-    if (!ok) return;
     setPending(need.id);
     setError(null);
     const supabase = createClient();

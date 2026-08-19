@@ -561,11 +561,18 @@ export default async function DashboardPage() {
         return { player: p, event, status };
       })
     ),
-    // Priority zone: next match status per coached team.
+    // Priority zone: next match status per coached team. event et roster
+    // ne dépendent l'un de l'autre en rien (deux requêtes indépendantes
+    // sur le même team.id) — seul counts a besoin des deux résolus, donc
+    // lui seul reste après le couple plutôt que d'enchaîner les trois à
+    // la queue leu leu (retour de Cindy du 2026-08-21 sur la lenteur au
+    // chargement, même famille de correctif que les clics d'Organisation).
     Promise.all(
       coachedTeams.map(async (team) => {
-        const event = await getNextEventForTeams(supabase, [team.id]);
-        const roster = await getTeamRoster(supabase, team.id);
+        const [event, roster] = await Promise.all([
+          getNextEventForTeams(supabase, [team.id]),
+          getTeamRoster(supabase, team.id),
+        ]);
         const counts = event
           ? await getRsvpCounts(supabase, event.id, roster.length)
           : null;
