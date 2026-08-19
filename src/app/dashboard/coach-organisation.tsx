@@ -11,7 +11,6 @@ import SalleBadge from "./salle-badge";
 import type { RosterPlayer, RsvpCounts, UpcomingEvent } from "./family-data";
 import TaskSourceBadge from "./task-source-badge";
 import RoleIcon from "./role-icon";
-import EventRolesEditor from "./event-roles-editor";
 import type {
   CarpoolOffer,
   EventTasksState,
@@ -88,8 +87,6 @@ function PlanningTab({
 }) {
   return (
     <div className="flex flex-col gap-4">
-      <EventRolesEditor roles={roles} />
-
       {cards.map(({ team, event, counts, roster }) => (
         <CoachNextMatchCard
           key={team.id}

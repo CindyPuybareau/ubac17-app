@@ -8,8 +8,12 @@ import { SALLES } from "./salles";
 import { sendEventPush } from "./event-push";
 import DateTimePicker from "./date-time-picker";
 import RoleIcon from "./role-icon";
-import type { EventRoleType } from "./event-tasks";
-import { volunteerNeedRoles } from "./event-volunteer-needs";
+import { Plus, X } from "lucide-react";
+import {
+  CUSTOM_ROLE_CODE,
+  STANDARD_VOLUNTEER_ROLES,
+  volunteerRoleIcon,
+} from "./event-volunteer-needs";
 
 type Team = { id: string; name: string | null; category: string | null };
 type EventType = "MATCH" | "FRIENDLY" | "TRAINING" | "OTHER" | "TOURNAMENT";
@@ -54,17 +58,11 @@ const typeChoices: { value: EventType; label: string; active: string }[] = [
 export default function CreateEventForm({
   teams,
   allowClubWide = false,
-  roles = [],
   open,
   onClose,
 }: {
   teams: Team[];
   allowClubWide?: boolean;
-  // Catalogue des rôles d'organisation (buvette, arbitrage...) pour la
-  // section "Besoins en bénévoles" ci-dessous — vide (section masquée) si
-  // non fourni. Filtré dans le JSX pour exclure Maillots/Goûter (ancien
-  // système, event_tasks).
-  roles?: EventRoleType[];
   // Ouverture pilotee par l appelant : le bouton "+ Creer un evenement"
   // vit dans l en-tete du calendrier, a cote de la navigation de date,
   // pas au-dessus du formulaire.
@@ -89,18 +87,33 @@ export default function CreateEventForm({
   // objet dès qu'une équipe précise est choisie dans le select ci-dessus.
   const [clubScope, setClubScope] = useState<"all" | "specific">("all");
   const [targetTeamIds, setTargetTeamIds] = useState<string[]>([]);
-  // Besoins en bénévoles définis dès la création : un nombre par rôle du
-  // catalogue (vide/0 = pas besoin de ce rôle), rattachés à la première
-  // occurrence seulement si "Répéter chaque semaine" est coché — un besoin
-  // par séance n'aurait pas le même sens, à ajouter séance par séance
-  // ensuite depuis la carte de l'événement si besoin (voir retour de
+  // Besoins d'organisation définis dès la création (buvette, table de
+  // marque...) : une liste libre de lignes rôle + effectif, comme dans le
+  // formulaire "+ Ajouter un besoin" de la carte événement — rattachés à
+  // la première occurrence seulement si "Répéter chaque semaine" est
+  // coché, un besoin par séance n'aurait pas le même sens (voir retour de
   // Cindy du 2026-08-19 : elle veut pouvoir chiffrer sa demande dès la
-  // création, pas seulement après coup).
-  const [needsCount, setNeedsCount] = useState<Record<string, string>>({});
+  // création, pas seulement après coup, mais sans catalogue à gérer).
+  const [draftNeeds, setDraftNeeds] = useState<
+    { key: number; roleCode: string; customLabel: string; count: string }[]
+  >([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const needRoles = volunteerNeedRoles(roles);
+  function addDraftNeed() {
+    setDraftNeeds((rows) => [
+      ...rows,
+      { key: Date.now() + rows.length, roleCode: STANDARD_VOLUNTEER_ROLES[0].code, customLabel: "", count: "1" },
+    ]);
+  }
+
+  function removeDraftNeed(key: number) {
+    setDraftNeeds((rows) => rows.filter((r) => r.key !== key));
+  }
+
+  function updateDraftNeed(key: number, patch: Partial<{ roleCode: string; customLabel: string; count: string }>) {
+    setDraftNeeds((rows) => rows.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  }
 
   function toggleTargetTeam(id: string) {
     setTargetTeamIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
@@ -127,6 +140,13 @@ export default function CreateEventForm({
     }
     if (!teamId && clubScope === "specific" && targetTeamIds.length === 0) {
       setError("Choisis au moins une équipe pour un événement réservé.");
+      return;
+    }
+    const missingCustomLabel = draftNeeds.some(
+      (n) => n.roleCode === CUSTOM_ROLE_CODE && !n.customLabel.trim()
+    );
+    if (missingCustomLabel) {
+      setError("Précise le nom de chaque besoin \"Autre\".");
       return;
     }
 
@@ -213,18 +233,24 @@ export default function CreateEventForm({
       sendEventPush(first.id, `UBAC — ${team ? teamLabel(team) : "Tous les groupes"}`, body);
     }
 
-    // Besoins en bénévoles chiffrés dès la création — rattachés à la
-    // première occurrence seulement (voir le commentaire sur needsCount
+    // Besoins d'organisation chiffrés dès la création — rattachés à la
+    // première occurrence seulement (voir le commentaire sur draftNeeds
     // plus haut). Best-effort : une erreur ici ne doit pas faire croire
     // que l'événement lui-même n'a pas été créé, il l'a bien été.
-    const validNeeds = needRoles
-      .map((r, i) => ({ roleCode: r.code, count: Number(needsCount[r.code] || 0), sortOrder: i }))
+    const validNeeds = draftNeeds
+      .map((n, i) => ({
+        roleCode: n.roleCode,
+        customLabel: n.roleCode === CUSTOM_ROLE_CODE ? n.customLabel.trim() : null,
+        count: Number(n.count) || 0,
+        sortOrder: i,
+      }))
       .filter((n) => n.count > 0);
     if (first && validNeeds.length > 0) {
       const { error: needsError } = await supabase.from("event_volunteer_needs").insert(
         validNeeds.map((n) => ({
           event_id: first.id,
           role_code: n.roleCode,
+          custom_label: n.customLabel,
           required_count: n.count,
           sort_order: n.sortOrder,
         }))
@@ -233,7 +259,7 @@ export default function CreateEventForm({
         // On garde le formulaire ouvert : fermer maintenant masquerait ce
         // message alors que l'événement, lui, a bien été créé.
         setError(
-          `Événement créé, mais l'ajout des besoins en bénévoles a échoué : ${needsError.message}`
+          `Événement créé, mais l'ajout des besoins d'organisation a échoué : ${needsError.message}`
         );
         router.refresh();
         return;
@@ -251,7 +277,7 @@ export default function CreateEventForm({
     setRepeatUntil("");
     setClubScope("all");
     setTargetTeamIds([]);
-    setNeedsCount({});
+    setDraftNeeds([]);
     onClose();
     router.refresh();
   }
@@ -471,37 +497,72 @@ export default function CreateEventForm({
         className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
       />
 
-      {/* Chiffrer sa demande dès la création (ex. "3 pour la buvette") —
-          un simple nombre par rôle, pas un formulaire à remplir ligne par
-          ligne. Les rôles restent de toute façon modifiables/ajoutables
-          après coup sur la carte de l'événement une fois créé
-          (VolunteerNeedsPanel), ceci n'est qu'un raccourci pour ne pas
-          avoir à y retourner tout de suite. */}
-      {needRoles.length > 0 && (
-        <div className="flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3">
-          <p className="text-xs font-medium text-zinc-600">
-            Besoins en bénévoles (optionnel)
-          </p>
-          <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-            {needRoles.map((r) => (
-              <label key={r.code} className="flex items-center gap-2 text-xs text-zinc-700">
-                <RoleIcon icon={r.icon} className="h-3.5 w-3.5 shrink-0" />
-                <span className="flex-1 truncate">{r.label}</span>
-                <input
-                  type="number"
-                  min={0}
-                  placeholder="0"
-                  value={needsCount[r.code] ?? ""}
-                  onChange={(e) =>
-                    setNeedsCount((s) => ({ ...s, [r.code]: e.target.value }))
-                  }
-                  className="w-14 shrink-0 rounded-lg border border-zinc-200 px-2 py-1 text-center"
-                />
-              </label>
+      {/* Chiffrer sa demande dès la création (ex. "3 pour la buvette") avec
+          la même liste standard que sur la carte de l'événement une fois
+          créé (VolunteerNeedsPanel) — ceci n'est qu'un raccourci pour ne
+          pas avoir à y retourner tout de suite ; les besoins restent de
+          toute façon ajoutables/modifiables après coup. */}
+      <div className="flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3">
+        <p className="text-xs font-medium text-zinc-600">
+          Besoins d&apos;organisation (optionnel)
+        </p>
+        {draftNeeds.length > 0 && (
+          <div className="flex flex-col gap-1.5">
+            {draftNeeds.map((n) => (
+              <div key={n.key} className="flex flex-wrap items-center gap-1.5">
+                <RoleIcon icon={volunteerRoleIcon(n.roleCode)} className="h-3.5 w-3.5 shrink-0" />
+                <select
+                  value={n.roleCode}
+                  onChange={(e) => updateDraftNeed(n.key, { roleCode: e.target.value })}
+                  className="rounded-lg border border-zinc-200 px-2 py-1.5 text-xs"
+                >
+                  {STANDARD_VOLUNTEER_ROLES.map((r) => (
+                    <option key={r.code} value={r.code}>
+                      {r.label}
+                    </option>
+                  ))}
+                  <option value={CUSTOM_ROLE_CODE}>Autre...</option>
+                </select>
+                {n.roleCode === CUSTOM_ROLE_CODE && (
+                  <input
+                    type="text"
+                    placeholder="Nom du besoin"
+                    value={n.customLabel}
+                    onChange={(e) => updateDraftNeed(n.key, { customLabel: e.target.value })}
+                    className="min-w-0 flex-1 rounded-lg border border-zinc-200 px-2 py-1.5 text-xs"
+                  />
+                )}
+                <label className="ml-auto flex items-center gap-1.5 text-xs text-zinc-600">
+                  Nombre de personnes requises
+                  <input
+                    type="number"
+                    min={1}
+                    value={n.count}
+                    onChange={(e) => updateDraftNeed(n.key, { count: e.target.value })}
+                    className="w-14 shrink-0 rounded-lg border border-zinc-200 px-2 py-1 text-center"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => removeDraftNeed(n.key)}
+                  title="Retirer ce besoin"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-zinc-400 hover:bg-white hover:text-red-500"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+        <button
+          type="button"
+          onClick={addDraftNeed}
+          className="flex w-fit items-center gap-1 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Ajouter un besoin
+        </button>
+      </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 

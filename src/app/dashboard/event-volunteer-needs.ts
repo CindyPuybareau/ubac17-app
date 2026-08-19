@@ -1,22 +1,41 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatPersonName } from "@/lib/names";
-import type { EventRoleType } from "./event-tasks";
+import type { RoleIconName } from "./role-icon";
 
-// "Besoins en bénévoles" d'un événement club (buvette, table de marque,
-// arbitrage...) — voir 20261012000000_club_event_targeting_and_volunteer_needs.
-// Système volontairement séparé de event-tasks.ts (JERSEYS/SNACKS) : un
-// besoin peut demander PLUSIEURS bénévoles (event_tasks est verrouillé à
-// un seul par (event_id, task_type)), avec une tranche horaire optionnelle.
+// "Besoins d'organisation" d'un événement (buvette, table de marque,
+// arbitrage...) — voir 20261012000000_club_event_targeting_and_volunteer_needs
+// et 20261016000000_simplify_volunteer_needs_no_catalog. Liste FIXE plutôt
+// qu'un catalogue éditable en base (retour de Cindy du 2026-08-19,
+// inspiration SportEasy : "trop lourd, des doublons d'infos") — un rôle
+// hors liste se choisit via "Autre" (customLabel en texte libre). Système
+// volontairement séparé de event-tasks.ts (JERSEYS/SNACKS, maillots/goûter
+// géré par le coach côté match) : un besoin ici peut demander PLUSIEURS
+// bénévoles, event_tasks est verrouillé à un seul par (event_id, task_type).
+export type StandardVolunteerRole = {
+  code: string;
+  label: string;
+  icon: RoleIconName;
+};
 
-// JERSEYS/SNACKS restent gérés par l'ancien système (event_tasks,
-// MatchTasksPanel — un seul responsable, pas de notion de nombre requis) :
-// le catalogue event_role_types est commun aux deux systèmes, donc on
-// exclut explicitement ces deux codes partout où ce nouveau système liste
-// "ses" rôles, pour ne jamais dupliquer maillots/goûter ici.
-const LEGACY_TASK_CODES = new Set(["JERSEYS", "SNACKS"]);
+export const STANDARD_VOLUNTEER_ROLES: StandardVolunteerRole[] = [
+  { code: "BUVETTE", label: "Buvette", icon: "Coffee" },
+  { code: "TABLE_MARQUE", label: "Table de marque", icon: "Timer" },
+  { code: "ARBITRAGE", label: "Arbitrage", icon: "Flag" },
+  { code: "INSTALLATION", label: "Installation / Rangement", icon: "KeyRound" },
+  { code: "LAVAGE_MAILLOTS", label: "Lavage maillots", icon: "Shirt" },
+];
 
-export function volunteerNeedRoles(roles: EventRoleType[]): EventRoleType[] {
-  return roles.filter((r) => !LEGACY_TASK_CODES.has(r.code));
+// Un besoin hors liste standard : le code reste stable ("AUTRE"), le
+// libellé réel vit dans VolunteerNeed.customLabel.
+export const CUSTOM_ROLE_CODE = "AUTRE";
+
+export function volunteerRoleLabel(roleCode: string, customLabel: string | null): string {
+  if (roleCode === CUSTOM_ROLE_CODE) return customLabel || "Autre";
+  return STANDARD_VOLUNTEER_ROLES.find((r) => r.code === roleCode)?.label ?? roleCode;
+}
+
+export function volunteerRoleIcon(roleCode: string): RoleIconName {
+  return STANDARD_VOLUNTEER_ROLES.find((r) => r.code === roleCode)?.icon ?? "Users";
 }
 
 export type VolunteerSignupSource = "VOLUNTEER" | "ADMIN";
@@ -32,7 +51,8 @@ export type VolunteerNeed = {
   id: string;
   eventId: string;
   roleCode: string;
-  timeRange: string | null;
+  // Libellé libre quand roleCode === CUSTOM_ROLE_CODE, null sinon.
+  customLabel: string | null;
   requiredCount: number;
   signups: VolunteerSignup[];
 };
@@ -50,7 +70,7 @@ export async function getVolunteerNeedsByEventId(
 
   const { data: needRows } = await supabase
     .from("event_volunteer_needs")
-    .select("id, event_id, role_code, time_range, required_count, sort_order")
+    .select("id, event_id, role_code, custom_label, required_count, sort_order")
     .in("event_id", eventIds)
     .order("sort_order", { ascending: true });
 
@@ -90,7 +110,7 @@ export async function getVolunteerNeedsByEventId(
       id: row.id as string,
       eventId,
       roleCode: row.role_code as string,
-      timeRange: (row.time_range as string | null) ?? null,
+      customLabel: (row.custom_label as string | null) ?? null,
       requiredCount: (row.required_count as number | null) ?? 1,
       signups: signupsByNeedId.get(row.id as string) ?? [],
     });

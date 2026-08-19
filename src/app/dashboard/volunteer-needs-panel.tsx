@@ -5,84 +5,54 @@ import { useRouter } from "next/navigation";
 import { Check, Minus, Plus, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import RoleIcon from "./role-icon";
-import type { EventRoleType } from "./event-tasks";
-import { volunteerNeedRoles, type VolunteerNeed } from "./event-volunteer-needs";
+import {
+  CUSTOM_ROLE_CODE,
+  STANDARD_VOLUNTEER_ROLES,
+  volunteerRoleIcon,
+  volunteerRoleLabel,
+  type VolunteerNeed,
+} from "./event-volunteer-needs";
 
 function remainingSlots(need: VolunteerNeed) {
   return Math.max(0, need.requiredCount - need.signups.length);
 }
 
-// Une ligne affichée : soit un besoin réel (déjà en base), soit un rôle du
-// catalogue qui n'a encore aucun besoin défini pour CET événement. Côté
-// Bureau/coach, tous les rôles s'affichent pour qu'on sache ce qui existe
-// et ce qui manque encore — mais plus aucune affectation manuelle : les
-// membres se proposent eux-mêmes ("Je m'en occupe"), et les rôles se
-// remplissent automatiquement au fil de leurs réponses (retour de Cindy
-// du 2026-08-19 : "puisque les membres vont se mettre en disponible ou
-// non disponible, les rôles vont s'afficher en automatique"). Qui gère
-// garde la main pour définir/ajuster le nombre requis et retirer
-// quelqu'un si besoin, jamais pour choisir la personne à sa place.
-type Row = { need: VolunteerNeed | null; roleCode: string };
-
-// Besoins en bénévoles d'un événement club (buvette, table de marque...).
-// Deux modes dans le même composant plutôt que deux fichiers distincts :
-// les deux affichent la même jauge et la même liste, seule l'action change
-// (s'inscrire soi-même vs. gérer pour tout le monde) — les dupliquer aurait
-// fait vivre deux vérités de la même donnée.
+// Besoins d'organisation d'un événement (buvette, table de marque...).
+// Simplifié à l'inspiration de SportEasy (retour de Cindy du 2026-08-19) :
+// liste FIXE de rôles standard (+ "Autre" en texte libre), plus de
+// catalogue à gérer. Deux modes dans le même composant plutôt que deux
+// fichiers distincts : les deux affichent la même jauge et la même liste,
+// seule l'action change (s'inscrire soi-même vs. gérer pour tout le
+// monde) — les dupliquer aurait fait vivre deux vérités de la même donnée.
 export default function VolunteerNeedsPanel({
   eventId,
   needs,
-  roles: allRoles,
   myPlayerIds,
   canManage,
-  bare = false,
 }: {
   eventId: string;
   needs: VolunteerNeed[];
-  // Catalogue complet (pas filtré par type d'événement, contrairement à
-  // MatchTasksPanel) : un tournoi ou une fête peut avoir besoin de
-  // n'importe quel rôle, pas seulement ceux applicables à un match. Filtré
-  // ci-dessous pour exclure Maillots/Goûter (l'ancien système, event_tasks
-  // — un seul responsable, pas de notion de nombre requis).
-  roles: EventRoleType[];
   myPlayerIds: string[];
   canManage: boolean;
-  // Nu (sans son propre cadre/titre) pour être imbriqué dans le volet
-  // déroulant "Rôles d'organisation" (EventRolesEditor) — retour de Cindy
-  // du 2026-08-19 : un seul volet plutôt que deux blocs séparés.
-  bare?: boolean;
 }) {
-  const roles = volunteerNeedRoles(allRoles);
   const router = useRouter();
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Définir un nouveau créneau pour un rôle — premier besoin (rows sans
-  // need réel) ou créneau supplémentaire (ex. Buvette 16h-18h en plus de
-  // 14h-16h) : même petit formulaire dans les deux cas, indexé par rôle
-  // plutôt que par besoin puisqu'un rôle virtuel n'a pas encore d'id.
-  const [addFormFor, setAddFormFor] = useState<string | null>(null);
-  const [addFormTimeRange, setAddFormTimeRange] = useState("");
-  const [addFormCount, setAddFormCount] = useState("1");
+  const [addOpen, setAddOpen] = useState(false);
+  const [newRoleCode, setNewRoleCode] = useState(STANDARD_VOLUNTEER_ROLES[0].code);
+  const [newCustomLabel, setNewCustomLabel] = useState("");
+  const [newCount, setNewCount] = useState("1");
 
-  const rows: Row[] = canManage
-    ? roles.flatMap((r): Row[] => {
-        const existing = needs.filter((n) => n.roleCode === r.code);
-        return existing.length > 0
-          ? existing.map((n) => ({ need: n, roleCode: r.code }))
-          : [{ need: null, roleCode: r.code }];
-      })
-    : needs.map((n) => ({ need: n, roleCode: n.roleCode }));
-
-  async function volunteer(row: Row) {
-    if (!row.need || myPlayerIds.length === 0) return;
-    const roleLabel = roles.find((r) => r.code === row.roleCode)?.label ?? row.roleCode;
-    const ok = window.confirm(`Confirmer : tu t'occupes de « ${roleLabel} » pour cet événement ?`);
+  async function volunteer(need: VolunteerNeed) {
+    if (myPlayerIds.length === 0) return;
+    const label = volunteerRoleLabel(need.roleCode, need.customLabel);
+    const ok = window.confirm(`Confirmer : tu t'occupes de « ${label} » pour cet événement ?`);
     if (!ok) return;
-    setPending(row.need.id);
+    setPending(need.id);
     setError(null);
     const supabase = createClient();
     const { error: insertError } = await supabase.from("event_volunteer_signups").insert({
-      need_id: row.need.id,
+      need_id: need.id,
       player_id: myPlayerIds[0],
       source: "VOLUNTEER",
     });
@@ -112,17 +82,6 @@ export default function VolunteerNeedsPanel({
     router.refresh();
   }
 
-  // Modifiables après coup, jamais un préalable (voir échange avec Cindy) —
-  // enregistré au blur/changement plutôt qu'à chaque frappe.
-  async function updateTimeRange(needId: string, value: string) {
-    const supabase = createClient();
-    await supabase
-      .from("event_volunteer_needs")
-      .update({ time_range: value.trim() || null })
-      .eq("id", needId);
-    router.refresh();
-  }
-
   async function updateRequiredCount(needId: string, count: number) {
     if (count < 1) return;
     const supabase = createClient();
@@ -130,78 +89,63 @@ export default function VolunteerNeedsPanel({
     router.refresh();
   }
 
-  async function submitAddForm(roleCode: string) {
-    const count = Number(addFormCount) || 1;
+  async function addNeed() {
+    const count = Number(newCount) || 1;
+    const trimmedCustom = newCustomLabel.trim();
+    if (newRoleCode === CUSTOM_ROLE_CODE && !trimmedCustom) {
+      setError("Précise le nom de ce besoin.");
+      return;
+    }
     setPending("add");
     setError(null);
     const supabase = createClient();
     const { error: insertError } = await supabase.from("event_volunteer_needs").insert({
       event_id: eventId,
-      role_code: roleCode,
-      time_range: addFormTimeRange.trim() || null,
+      role_code: newRoleCode,
+      custom_label: newRoleCode === CUSTOM_ROLE_CODE ? trimmedCustom : null,
       required_count: count,
-      sort_order: roles.findIndex((r) => r.code === roleCode),
+      sort_order: needs.length,
     });
     setPending(null);
     if (insertError) {
       setError("Ajout impossible, réessaie.");
       return;
     }
-    setAddFormTimeRange("");
-    setAddFormCount("1");
-    setAddFormFor(null);
+    setNewRoleCode(STANDARD_VOLUNTEER_ROLES[0].code);
+    setNewCustomLabel("");
+    setNewCount("1");
+    setAddOpen(false);
     router.refresh();
   }
 
-  if (rows.length === 0) return null;
+  if (needs.length === 0 && !canManage) return null;
 
-  const body = (
-    <>
+  return (
+    <div className="mt-3 flex flex-col gap-2.5 rounded-xl border border-zinc-100 bg-zinc-50/60 p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+        Besoins d&apos;organisation
+      </p>
+
+      {needs.length === 0 && (
+        <p className="text-xs text-zinc-400">Aucun besoin défini pour cet événement.</p>
+      )}
+
       <div className="flex flex-col gap-2">
-        {rows.map((row, i) => {
-          const need = row.need;
-          const role = roles.find((r) => r.code === row.roleCode);
-          const remaining = need ? remainingSlots(need) : 0;
-          const mySignup = need?.signups.find((s) => myPlayerIds.includes(s.playerId));
+        {needs.map((need) => {
+          const label = volunteerRoleLabel(need.roleCode, need.customLabel);
+          const icon = volunteerRoleIcon(need.roleCode);
+          const remaining = remainingSlots(need);
+          const mySignup = need.signups.find((s) => myPlayerIds.includes(s.playerId));
 
           return (
-            <div
-              key={need?.id ?? `${row.roleCode}-${i}`}
-              className="flex flex-col gap-2 rounded-lg bg-white px-3 py-2.5"
-            >
+            <div key={need.id} className="flex flex-col gap-2 rounded-lg bg-white px-3 py-2.5">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <RoleIcon icon={role?.icon ?? null} />
-                  <div>
-                    <p className="text-xs font-medium text-zinc-700">
-                      {role?.label ?? row.roleCode}
-                    </p>
-                    {canManage && need ? (
-                      <input
-                        type="text"
-                        defaultValue={need.timeRange ?? ""}
-                        placeholder="+ tranche horaire"
-                        onBlur={(e) => {
-                          if (e.target.value.trim() !== (need.timeRange ?? "")) {
-                            updateTimeRange(need.id, e.target.value);
-                          }
-                        }}
-                        className="mt-0.5 w-32 rounded border-0 bg-transparent text-[11px] text-zinc-400 placeholder:text-zinc-300 focus:bg-zinc-50 focus:outline-none focus:ring-1 focus:ring-zinc-200"
-                      />
-                    ) : (
-                      need?.timeRange && (
-                        <p className="text-[11px] text-zinc-400">{need.timeRange}</p>
-                      )
-                    )}
-                    {!canManage && need && need.signups.length > 0 && (
-                      <p className="truncate text-[11px] text-zinc-400">
-                        {need.signups.map((s) => s.playerName).join(", ")}
-                      </p>
-                    )}
-                  </div>
+                  <RoleIcon icon={icon} />
+                  <p className="text-xs font-medium text-zinc-700">{label}</p>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  {canManage && need ? (
+                  {canManage ? (
                     <div className="flex items-center gap-0.5 rounded-full bg-zinc-100 px-1 py-0.5">
                       <button
                         type="button"
@@ -222,7 +166,7 @@ export default function VolunteerNeedsPanel({
                         <Plus className="h-3 w-3" />
                       </button>
                     </div>
-                  ) : need ? (
+                  ) : (
                     <span
                       className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
                         remaining > 0 ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
@@ -232,8 +176,8 @@ export default function VolunteerNeedsPanel({
                         ? `${need.signups.length}/${need.requiredCount}`
                         : `Complet (${need.signups.length}/${need.requiredCount})`}
                     </span>
-                  ) : null}
-                  {canManage && need && (
+                  )}
+                  {canManage && (
                     <button
                       type="button"
                       onClick={() => removeNeed(need.id)}
@@ -249,7 +193,7 @@ export default function VolunteerNeedsPanel({
               {/* Confirmation explicite plutôt que la seule jauge
                   numérique — retour de Cindy du 2026-08-19 : elle veut
                   voir clairement quand sa demande est couverte. */}
-              {need && need.requiredCount > 0 && remaining === 0 && (
+              {need.requiredCount > 0 && remaining === 0 && (
                 <p className="flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
                   <Check className="h-3 w-3 shrink-0" />
                   Nombre de bénévoles atteint
@@ -257,75 +201,26 @@ export default function VolunteerNeedsPanel({
               )}
 
               {canManage ? (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {need?.signups.map((s) => (
-                    <span
-                      key={s.id}
-                      className="flex items-center gap-1 rounded-full bg-navy/10 px-2 py-1 text-[11px] font-medium text-navy"
-                    >
-                      {s.playerName}
-                      <button
-                        type="button"
-                        disabled={pending === s.id}
-                        onClick={() => withdraw(s.id)}
-                        className="text-navy/60 hover:text-navy"
+                need.signups.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {need.signups.map((s) => (
+                      <span
+                        key={s.id}
+                        className="flex items-center gap-1 rounded-full bg-navy/10 px-2 py-1 text-[11px] font-medium text-navy"
                       >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
-                  {!need && (
-                    <p className="text-[11px] text-zinc-400">
-                      Pas encore de besoin défini pour ce rôle.
-                    </p>
-                  )}
-                  {/* Définir un premier besoin (rôle sans need réel) ou un
-                      créneau supplémentaire (ex. Buvette 16h-18h en plus de
-                      14h-16h) — même petit formulaire dans les deux cas. */}
-                  {addFormFor === row.roleCode ? (
-                    <span className="flex flex-wrap items-center gap-1">
-                      <input
-                        type="text"
-                        autoFocus
-                        placeholder="Horaire (optionnel)"
-                        value={addFormTimeRange}
-                        onChange={(e) => setAddFormTimeRange(e.target.value)}
-                        className="w-28 rounded-full border border-zinc-200 px-2 py-1 text-[11px]"
-                      />
-                      <input
-                        type="number"
-                        min={1}
-                        value={addFormCount}
-                        onChange={(e) => setAddFormCount(e.target.value)}
-                        className="w-12 rounded-full border border-zinc-200 px-2 py-1 text-center text-[11px]"
-                      />
-                      <button
-                        type="button"
-                        disabled={pending === "add"}
-                        onClick={() => submitAddForm(row.roleCode)}
-                        className="rounded-full bg-navy px-2 py-1 text-[11px] font-semibold text-white hover:bg-navy-dark disabled:opacity-60"
-                      >
-                        OK
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setAddFormFor(null)}
-                        className="rounded-full px-2 py-1 text-[11px] font-medium text-zinc-400 hover:bg-zinc-50"
-                      >
-                        Annuler
-                      </button>
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setAddFormFor(row.roleCode)}
-                      className="flex items-center gap-0.5 rounded-full px-2 py-1 text-[11px] font-medium text-zinc-400 hover:bg-zinc-50 hover:text-zinc-600"
-                    >
-                      <Plus className="h-3 w-3" />
-                      {need ? "Créneau" : "Définir ce besoin"}
-                    </button>
-                  )}
-                </div>
+                        {s.playerName}
+                        <button
+                          type="button"
+                          disabled={pending === s.id}
+                          onClick={() => withdraw(s.id)}
+                          className="text-navy/60 hover:text-navy"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )
               ) : mySignup ? (
                 <button
                   type="button"
@@ -336,11 +231,11 @@ export default function VolunteerNeedsPanel({
                   <X className="h-3 w-3" />
                   Annuler
                 </button>
-              ) : need && remaining > 0 && myPlayerIds.length > 0 ? (
+              ) : remaining > 0 && myPlayerIds.length > 0 ? (
                 <button
                   type="button"
                   disabled={pending === need.id}
-                  onClick={() => volunteer(row)}
+                  onClick={() => volunteer(need)}
                   className="w-fit rounded-full bg-navy px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-navy-dark disabled:opacity-60"
                 >
                   Je m&apos;en occupe
@@ -352,17 +247,75 @@ export default function VolunteerNeedsPanel({
       </div>
 
       {error && <p className="text-xs text-red-600">{error}</p>}
-    </>
-  );
 
-  if (bare) return body;
-
-  return (
-    <div className="mt-3 flex flex-col gap-2.5 rounded-xl border border-zinc-100 bg-zinc-50/60 p-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-        Besoins en bénévoles
-      </p>
-      {body}
+      {canManage && (
+        <div className="flex flex-col gap-2">
+          {addOpen ? (
+            <div className="flex flex-col gap-2 rounded-lg border border-zinc-200 bg-white p-2.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={newRoleCode}
+                  onChange={(e) => setNewRoleCode(e.target.value)}
+                  className="rounded-lg border border-zinc-200 px-2 py-1.5 text-xs"
+                >
+                  {STANDARD_VOLUNTEER_ROLES.map((r) => (
+                    <option key={r.code} value={r.code}>
+                      {r.label}
+                    </option>
+                  ))}
+                  <option value={CUSTOM_ROLE_CODE}>Autre...</option>
+                </select>
+                {newRoleCode === CUSTOM_ROLE_CODE && (
+                  <input
+                    type="text"
+                    autoFocus
+                    placeholder="Nom du besoin"
+                    value={newCustomLabel}
+                    onChange={(e) => setNewCustomLabel(e.target.value)}
+                    className="flex-1 rounded-lg border border-zinc-200 px-2 py-1.5 text-xs"
+                  />
+                )}
+                <label className="flex items-center gap-1.5 text-xs text-zinc-600">
+                  Nombre de personnes requises
+                  <input
+                    type="number"
+                    min={1}
+                    value={newCount}
+                    onChange={(e) => setNewCount(e.target.value)}
+                    className="w-14 rounded-lg border border-zinc-200 px-2 py-1 text-center"
+                  />
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAddOpen(false)}
+                  className="rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-white"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  disabled={pending === "add"}
+                  onClick={addNeed}
+                  className="rounded-full bg-navy px-3 py-1.5 text-xs font-semibold text-white hover:bg-navy-dark disabled:opacity-60"
+                >
+                  {pending === "add" ? "Ajout..." : "Ajouter"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAddOpen(true)}
+              className="flex w-fit items-center gap-1 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Ajouter un besoin
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -174,7 +174,6 @@ export default function CoachNextMatchCard({
           <VolunteerNeedsPanel
             eventId={event.id}
             needs={volunteerNeeds}
-            roles={roles}
             myPlayerIds={[]}
             canManage
           />

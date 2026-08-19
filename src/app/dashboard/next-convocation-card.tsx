@@ -96,7 +96,6 @@ export default function NextConvocationCard({
       <VolunteerNeedsPanel
         eventId={event.id}
         needs={volunteerNeeds}
-        roles={roles}
         myPlayerIds={[playerId]}
         canManage={false}
       />

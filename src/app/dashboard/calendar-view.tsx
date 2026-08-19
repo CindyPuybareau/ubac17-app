@@ -60,7 +60,6 @@ import {
   type EventTasksState,
 } from "./event-tasks";
 import VolunteerNeedsPanel from "./volunteer-needs-panel";
-import EventRolesEditor from "./event-roles-editor";
 import type { VolunteerNeed } from "./event-volunteer-needs";
 
 const emptyEventTasks: EventTasksState = {};
@@ -823,35 +822,22 @@ export default function CalendarView({
         {/* Besoins en bénévoles (buvette, table de marque...) : lecture +
             auto-inscription pour qui ne gère pas l'événement. Côté
             famille/coéquipier, ce panneau reste seul (pas de catalogue à
-            gérer). Côté Bureau/coach, il est fusionné dans le volet
-            "Rôles d'organisation" juste en dessous — un seul volet plutôt
-            que deux blocs séparés (retour de Cindy du 2026-08-19) —, sauf
-            sur un entraînement où ce volet n'existe pas : on garde alors
-            ce panneau seul, la possibilité de définir des besoins même sur
-            un entraînement restant voulue (retour antérieur du même jour). */}
+            gérer). Liste fixe de rôles standard, plus de catalogue à gérer
+            (retour de Cindy du 2026-08-19, inspiration SportEasy) — même
+            comportement sur tous les types d'événement, entraînement
+            compris. */}
         {!canManageEvent && (
           <VolunteerNeedsPanel
             eventId={event.id}
             needs={volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds}
-            roles={eventRoles}
             myPlayerIds={rsvpVisiblePlayers.map((p) => p.id)}
             canManage={false}
           />
         )}
-        {canManageEvent && event.event_type !== "TRAINING" && (
-          <EventRolesEditor
-            roles={eventRoles}
-            volunteerNeeds={{
-              eventId: event.id,
-              needs: volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds,
-            }}
-          />
-        )}
-        {canManageEvent && event.event_type === "TRAINING" && (
+        {canManageEvent && (
           <VolunteerNeedsPanel
             eventId={event.id}
             needs={volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds}
-            roles={eventRoles}
             myPlayerIds={[]}
             canManage
           />
@@ -1060,10 +1046,6 @@ export default function CalendarView({
         <CreateEventForm
           teams={createTeams}
           allowClubWide={allowClubWide}
-          // Bureau comme coach (retour de Cindy du 2026-08-19 : "pour le
-          // bureau et les coachs") — chacun peut chiffrer sa demande de
-          // bénévoles dès la création, sur ses propres événements.
-          roles={eventRoles}
           open={createOpen}
           onClose={() => setCreateOpen(false)}
         />
