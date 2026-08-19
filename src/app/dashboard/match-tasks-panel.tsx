@@ -42,6 +42,7 @@ export default function MatchTasksPanel({
   initialCarpool,
   roles,
   showCarpool,
+  bare = false,
 }: {
   eventId: string;
   // Date de l'événement (event.start_time) : sert uniquement à situer
@@ -57,6 +58,11 @@ export default function MatchTasksPanel({
   // Faux sur un entrainement ou un match a domicile : il n y a rien a
   // organiser, et un bloc vide invite a une action sans objet.
   showCarpool: boolean;
+  // Sans cadre ni titre propres : utilisé quand l'appelant regroupe ce
+  // panneau et VolunteerNeedsPanel sous un seul titre "Organisation"
+  // partagé (retour de Cindy du 2026-08-20 — les deux vivaient jusqu'ici
+  // dans deux encarts séparés, redondants visuellement).
+  bare?: boolean;
 }) {
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -237,10 +243,18 @@ export default function MatchTasksPanel({
   if (roles.length === 0 && !showCarpool) return null;
 
   return (
-    <div className="mt-3 flex flex-col gap-2.5 rounded-xl border border-zinc-100 bg-zinc-50/60 p-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-        Organisation
-      </p>
+    <div
+      className={
+        bare
+          ? "flex flex-col gap-2.5"
+          : "mt-3 flex flex-col gap-2.5 rounded-xl border border-zinc-100 bg-zinc-50/60 p-3"
+      }
+    >
+      {!bare && (
+        <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          Organisation
+        </p>
+      )}
 
       {/* Deux colonnes sur écran large, empilées sur mobile — même
           disposition que la liste des événements à venir côté parent. */}
@@ -302,16 +316,21 @@ export default function MatchTasksPanel({
                 type="button"
                 disabled={pending === taskType}
                 onClick={() => volunteer(taskType, myPlayerIds[0], role.label)}
-                className="w-full rounded-full bg-navy px-3 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-navy-dark disabled:opacity-60 sm:w-auto"
+                className="w-fit shrink-0 rounded-full bg-navy px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-navy-dark disabled:opacity-60"
               >
                 Je m&apos;en occupe
               </button>
             ) : assignedToMe ? (
+              // Vert plutôt qu'un gris neutre : une fois la tâche prise, le
+              // bouton doit lire "c'est confirmé, c'est toi" au premier
+              // coup d'œil, pas se fondre avec un simple bouton secondaire
+              // (retour de Cindy du 2026-08-20). Même style que
+              // volunteer-needs-panel.tsx, pour une seule vérité visuelle.
               <button
                 type="button"
                 disabled={pending === taskType}
                 onClick={() => withdraw(taskType)}
-                className="flex w-full items-center justify-center gap-1 rounded-full border border-zinc-200 px-3 py-2.5 text-xs font-medium text-zinc-500 hover:bg-zinc-50 disabled:opacity-60 sm:w-auto"
+                className="flex w-fit shrink-0 items-center justify-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-60"
               >
                 <X className="h-3 w-3" />
                 Annuler

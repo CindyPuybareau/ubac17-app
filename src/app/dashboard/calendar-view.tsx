@@ -792,43 +792,61 @@ export default function CalendarView({
             applicable (ex. un entraînement) : pas besoin d'un filtre par
             type d'événement en plus, qui ferait justement disparaître ce
             bloc sur un "Événement club" pourtant organisé. */}
-        {!canManageEvent && (
-          <MatchTasksPanel
-            eventId={event.id}
-            eventDate={event.start_time}
-            roster={[]}
-            // rsvpVisiblePlayers, pas respondingPlayers : un coach qui gère
-            // au moins une équipe (canManage) mais pas celle-ci
-            // (!canManageEvent) ne doit voir que SA propre fiche ici, pas
-            // tout l'effectif de l'équipe. respondingPlayers contient tout
-            // le roster côté Coach (coachRsvpPlayers, page.tsx) — l'utiliser
-            // tel quel ferait écrire volunteer()/reserve() sur
-            // myPlayerIds[0], c'est-à-dire un coéquipier arbitraire, pas le
-            // coach lui-même.
-            myPlayerIds={rsvpVisiblePlayers.map((p) => p.id)}
-            canAssignAnyone={false}
-            initialTasks={tasksByEventId[event.id] ?? emptyEventTasks}
-            initialCarpool={carpoolByEventId[event.id] ?? []}
-            roles={rolesForEventType(eventRoles, event.event_type)}
-            showCarpool={shouldOfferCarpool(event)}
-          />
-        )}
-
-        {/* Besoins en bénévoles (buvette, table de marque...) : lecture +
-            auto-inscription pour qui ne gère pas l'événement. Côté
-            famille/coéquipier, ce panneau reste seul (pas de catalogue à
-            gérer). Liste fixe de rôles standard, plus de catalogue à gérer
-            (retour de Cindy du 2026-08-19, inspiration SportEasy) — même
-            comportement sur tous les types d'événement, entraînement
-            compris. */}
-        {!canManageEvent && (
-          <VolunteerNeedsPanel
-            eventId={event.id}
-            needs={volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds}
-            myPlayerIds={rsvpVisiblePlayers.map((p) => p.id)}
-            canManage={false}
-          />
-        )}
+        {/* MatchTasksPanel (Maillots/Table de marque, ancien système) et
+            VolunteerNeedsPanel (Besoins d'organisation, nouveau système)
+            regroupés sous un seul titre "Organisation" plutôt que deux
+            encarts séparés qui répétaient la même idée visuellement
+            (retour de Cindy du 2026-08-20). Chacun garde son mode `bare`
+            (sans cadre ni titre propres) et reste responsable de sa
+            propre visibilité (roles/showCarpool pour l'un, needs pour
+            l'autre) — la boîte partagée ne s'affiche donc que si l'un des
+            deux a quelque chose à montrer. */}
+        {!canManageEvent && (() => {
+          const hasTasks =
+            rolesForEventType(eventRoles, event.event_type).length > 0 || shouldOfferCarpool(event);
+          const needs = volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds;
+          const hasNeeds = needs.length > 0;
+          if (!hasTasks && !hasNeeds) return null;
+          return (
+            <div className="mt-3 flex flex-col gap-3 rounded-xl border border-zinc-100 bg-zinc-50/60 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                Organisation
+              </p>
+              {hasTasks && (
+                <MatchTasksPanel
+                  eventId={event.id}
+                  eventDate={event.start_time}
+                  roster={[]}
+                  // rsvpVisiblePlayers, pas respondingPlayers : un coach
+                  // qui gère au moins une équipe (canManage) mais pas
+                  // celle-ci (!canManageEvent) ne doit voir que SA propre
+                  // fiche ici, pas tout l'effectif de l'équipe.
+                  // respondingPlayers contient tout le roster côté Coach
+                  // (coachRsvpPlayers, page.tsx) — l'utiliser tel quel
+                  // ferait écrire volunteer()/reserve() sur
+                  // myPlayerIds[0], c'est-à-dire un coéquipier arbitraire,
+                  // pas le coach lui-même.
+                  myPlayerIds={rsvpVisiblePlayers.map((p) => p.id)}
+                  canAssignAnyone={false}
+                  initialTasks={tasksByEventId[event.id] ?? emptyEventTasks}
+                  initialCarpool={carpoolByEventId[event.id] ?? []}
+                  roles={rolesForEventType(eventRoles, event.event_type)}
+                  showCarpool={shouldOfferCarpool(event)}
+                  bare
+                />
+              )}
+              {hasNeeds && (
+                <VolunteerNeedsPanel
+                  eventId={event.id}
+                  needs={needs}
+                  myPlayerIds={rsvpVisiblePlayers.map((p) => p.id)}
+                  canManage={false}
+                  bare
+                />
+              )}
+            </div>
+          );
+        })()}
         {canManageEvent && (
           <VolunteerNeedsPanel
             eventId={event.id}

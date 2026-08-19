@@ -159,24 +159,37 @@ export default function CoachNextMatchCard({
             />
           </div>
 
-          <MatchTasksPanel
-            eventId={event.id}
-            eventDate={event.start_time}
-            roster={roster.map((p) => ({ id: p.id, name: fullName(p) }))}
-            myPlayerIds={selfPlayerId ? [selfPlayerId] : []}
-            canAssignAnyone
-            initialTasks={tasks}
-            initialCarpool={carpool}
-            roles={rolesForEventType(roles, event.event_type)}
-            showCarpool={shouldOfferCarpool(event)}
-          />
-
-          <VolunteerNeedsPanel
-            eventId={event.id}
-            needs={volunteerNeeds}
-            myPlayerIds={[]}
-            canManage
-          />
+          {/* MatchTasksPanel (Maillots/Table de marque) et
+              VolunteerNeedsPanel (Besoins d'organisation) regroupés sous
+              un seul titre "Organisation" (retour de Cindy du
+              2026-08-20) — voir le même correctif dans
+              calendar-view.tsx. VolunteerNeedsPanel reste visible même
+              sans besoin existant : le coach doit toujours avoir accès à
+              "+ Ajouter un besoin". */}
+          <div className="mt-3 flex flex-col gap-3 rounded-xl border border-zinc-100 bg-zinc-50/60 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+              Organisation
+            </p>
+            <MatchTasksPanel
+              eventId={event.id}
+              eventDate={event.start_time}
+              roster={roster.map((p) => ({ id: p.id, name: fullName(p) }))}
+              myPlayerIds={selfPlayerId ? [selfPlayerId] : []}
+              canAssignAnyone
+              initialTasks={tasks}
+              initialCarpool={carpool}
+              roles={rolesForEventType(roles, event.event_type)}
+              showCarpool={shouldOfferCarpool(event)}
+              bare
+            />
+            <VolunteerNeedsPanel
+              eventId={event.id}
+              needs={volunteerNeeds}
+              myPlayerIds={[]}
+              canManage
+              bare
+            />
+          </div>
         </>
       ) : (
         <p className="mt-1 text-sm text-zinc-500">Aucun événement à venir.</p>

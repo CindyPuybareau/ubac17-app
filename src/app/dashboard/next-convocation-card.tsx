@@ -82,23 +82,45 @@ export default function NextConvocationCard({
         />
       </div>
       <NextMatchActions venue={venueQuery(event)} />
-      <MatchTasksPanel
-        eventId={event.id}
-        eventDate={event.start_time}
-        roster={roster}
-        myPlayerIds={[playerId]}
-        canAssignAnyone={false}
-        initialTasks={tasks}
-        initialCarpool={carpool}
-        roles={rolesForEventType(roles, event.event_type)}
-        showCarpool={shouldOfferCarpool(event)}
-      />
-      <VolunteerNeedsPanel
-        eventId={event.id}
-        needs={volunteerNeeds}
-        myPlayerIds={[playerId]}
-        canManage={false}
-      />
+      {(() => {
+        const applicableRoles = rolesForEventType(roles, event.event_type);
+        const hasTasks = applicableRoles.length > 0 || shouldOfferCarpool(event);
+        const hasNeeds = volunteerNeeds.length > 0;
+        // MatchTasksPanel et VolunteerNeedsPanel regroupés sous un seul
+        // titre "Organisation" (retour de Cindy du 2026-08-20) — même
+        // correctif que calendar-view.tsx/coach-next-match-card.tsx.
+        if (!hasTasks && !hasNeeds) return null;
+        return (
+          <div className="mt-3 flex flex-col gap-3 rounded-xl border border-zinc-100 bg-zinc-50/60 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+              Organisation
+            </p>
+            {hasTasks && (
+              <MatchTasksPanel
+                eventId={event.id}
+                eventDate={event.start_time}
+                roster={roster}
+                myPlayerIds={[playerId]}
+                canAssignAnyone={false}
+                initialTasks={tasks}
+                initialCarpool={carpool}
+                roles={applicableRoles}
+                showCarpool={shouldOfferCarpool(event)}
+                bare
+              />
+            )}
+            {hasNeeds && (
+              <VolunteerNeedsPanel
+                eventId={event.id}
+                needs={volunteerNeeds}
+                myPlayerIds={[playerId]}
+                canManage={false}
+                bare
+              />
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }

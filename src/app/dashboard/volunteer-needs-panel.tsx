@@ -28,11 +28,16 @@ export default function VolunteerNeedsPanel({
   needs,
   myPlayerIds,
   canManage,
+  bare = false,
 }: {
   eventId: string;
   needs: VolunteerNeed[];
   myPlayerIds: string[];
   canManage: boolean;
+  // Sans cadre ni titre propres : utilisé quand l'appelant regroupe ce
+  // panneau et MatchTasksPanel sous un seul titre "Organisation" partagé
+  // (retour de Cindy du 2026-08-20).
+  bare?: boolean;
 }) {
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -133,10 +138,18 @@ export default function VolunteerNeedsPanel({
   if (needs.length === 0 && !canManage) return null;
 
   return (
-    <div className="mt-3 flex flex-col gap-2.5 rounded-xl border border-zinc-100 bg-zinc-50/60 p-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-        Besoins d&apos;organisation
-      </p>
+    <div
+      className={
+        bare
+          ? "flex flex-col gap-2.5"
+          : "mt-3 flex flex-col gap-2.5 rounded-xl border border-zinc-100 bg-zinc-50/60 p-3"
+      }
+    >
+      {!bare && (
+        <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          Besoins d&apos;organisation
+        </p>
+      )}
 
       {needs.length === 0 && (
         <p className="text-xs text-zinc-400">Aucun besoin défini pour cet événement.</p>
@@ -234,11 +247,15 @@ export default function VolunteerNeedsPanel({
                   </div>
                 )
               ) : mySignup ? (
+                // Vert plutôt qu'un gris neutre : une fois inscrit, le
+                // bouton doit lire "c'est confirmé, c'est toi" au premier
+                // coup d'œil (retour de Cindy du 2026-08-20). Même style
+                // que match-tasks-panel.tsx, une seule vérité visuelle.
                 <button
                   type="button"
                   disabled={pending === mySignup.id}
                   onClick={() => withdraw(mySignup.id)}
-                  className="flex w-fit items-center gap-1 rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-500 hover:bg-zinc-50 disabled:opacity-60"
+                  className="flex w-fit shrink-0 items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-60"
                 >
                   <X className="h-3 w-3" />
                   Annuler
@@ -248,7 +265,7 @@ export default function VolunteerNeedsPanel({
                   type="button"
                   disabled={pending === need.id}
                   onClick={() => volunteer(need)}
-                  className="w-fit rounded-full bg-navy px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-navy-dark disabled:opacity-60"
+                  className="w-fit shrink-0 rounded-full bg-navy px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-navy-dark disabled:opacity-60"
                 >
                   Je m&apos;en occupe
                 </button>
