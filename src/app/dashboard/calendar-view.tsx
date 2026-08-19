@@ -825,16 +825,16 @@ export default function CalendarView({
 
         {/* Besoins en bénévoles (buvette, table de marque...) : lecture +
             auto-inscription pour qui ne gère pas l'événement, gestion
-            complète (affecter/retirer/ajouter un besoin) pour le Bureau —
-            jamais pour un coach, même sur une équipe qu'il gère, ce type de
-            besoin restant centralisé au Bureau (voir CLAUDE.md de la
-            demande). Catalogue complet (pas filtré par type d'événement,
-            contrairement à MatchTasksPanel), y compris un entraînement : le
-            Bureau doit pouvoir choisir librement, quel que soit le type
-            d'événement (retour de Cindy du 2026-08-19) — rien ne s'affiche
-            pour autant côté famille/coach tant que le Bureau n'a affecté
-            personne, donc pas de clutter par défaut sur un entraînement
-            ordinaire. */}
+            complète (affecter/retirer/ajouter un besoin) pour qui le gère —
+            Bureau comme coach, chacun sur les événements qu'il gère
+            réellement (canManageEvent), même logique de portée que les
+            maillots/goûter (voir retour de Cindy du 2026-08-19 : "quelque
+            chose de simple, pour le bureau et les coachs"). Catalogue
+            complet (pas filtré par type d'événement, contrairement à
+            MatchTasksPanel), y compris un entraînement : qui gère doit
+            pouvoir choisir librement — rien ne s'affiche pour autant côté
+            famille tant que personne n'a rien affecté, donc pas de clutter
+            par défaut sur un entraînement ordinaire non touché. */}
         {!canManageEvent && (
           <VolunteerNeedsPanel
             eventId={event.id}
@@ -845,7 +845,7 @@ export default function CalendarView({
             roster={[]}
           />
         )}
-        {canManageEvent && allowClubWide && (
+        {canManageEvent && (
           <VolunteerNeedsPanel
             eventId={event.id}
             needs={volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds}
