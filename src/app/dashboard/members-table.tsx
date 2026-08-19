@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
 import * as XLSX from "xlsx";
 import {
   Archive,
@@ -84,8 +84,21 @@ export default function MembersTable({
   members: AdminMember[];
   teams: AdminMemberTeam[];
 }) {
-  const router = useRouter();
   const searchParams = useSearchParams();
+
+  // Copie locale mise à jour immédiatement à l'archivage/réactivation/
+  // suppression/changement d'équipe, plutôt que d'attendre le
+  // rafraîchissement temps réel (players/team_players/team_coaches/
+  // club_administrators sont toutes surveillées par realtime-sync.tsx —
+  // le router.refresh() explicite qui vivait ici en plus déclenchait donc
+  // deux rechargements complets du tableau de bord pour une seule action,
+  // plusieurs secondes à chaque fois) — retour de Cindy du 2026-08-21 :
+  // "quand je supprime... un membre... trop long". Même correctif que
+  // calendar-view.tsx/volunteer-needs-panel.tsx.
+  const [localMembers, setLocalMembers] = useState(members);
+  useEffect(() => {
+    setLocalMembers(members);
+  }, [members]);
 
   const [search, setSearch] = useState("");
   const [teamFilter, setTeamFilter] = useState("");
@@ -161,14 +174,14 @@ export default function MembersTable({
 
   function memberLabel(ids: string[]) {
     if (ids.length === 1) {
-      const m = members.find((mm) => mm.id === ids[0]);
+      const m = localMembers.find((mm) => mm.id === ids[0]);
       return m ? formatPersonName(m.firstName, m.lastName, "ce membre") : "ce membre";
     }
     return `${ids.length} membres`;
   }
 
   const filtered = useMemo(() => {
-    let list = showArchived ? members : members.filter((m) => !m.archivedAt);
+    let list = showArchived ? localMembers : localMembers.filter((m) => !m.archivedAt);
     if (teamFilter) {
       list = list.filter(
         (m) =>
@@ -189,7 +202,7 @@ export default function MembersTable({
       const cmp = fullLastName(a).localeCompare(fullLastName(b), "fr");
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [members, teamFilter, search, sortDir, showArchived]);
+  }, [localMembers, teamFilter, search, sortDir, showArchived]);
 
   const allFilteredSelected =
     filtered.length > 0 && filtered.every((m) => selectedIds.has(m.id));
@@ -241,10 +254,10 @@ export default function MembersTable({
 
     // N'ajoute que les membres pas déjà dans cette équipe — évite un
     // conflit de clé (team_id, player_id) sur team_players côté additif,
-    // sans avoir à interroger la base : `members` porte déjà chaque
+    // sans avoir à interroger la base : `localMembers` porte déjà chaque
     // équipe actuelle de chacun.
     const alreadyInTeam = new Set(
-      members.filter((m) => m.teams.some((t) => t.id === reassignTeamId)).map((m) => m.id)
+      localMembers.filter((m) => m.teams.some((t) => t.id === reassignTeamId)).map((m) => m.id)
     );
     const idsToInsert = reassignIds.filter((id) => !alreadyInTeam.has(id));
 
@@ -258,10 +271,28 @@ export default function MembersTable({
         return;
       }
     }
+    // Affichage immédiat plutôt que d'attendre le rafraîchissement temps
+    // réel — voir le commentaire sur localMembers plus haut.
+    const newTeam = teams.find((t) => t.id === reassignTeamId);
+    if (newTeam) {
+      setLocalMembers((prev) =>
+        prev.map((m) =>
+          reassignIds.includes(m.id)
+            ? {
+                ...m,
+                teams: reassignReplace
+                  ? [newTeam]
+                  : m.teams.some((t) => t.id === newTeam.id)
+                    ? m.teams
+                    : [...m.teams, newTeam],
+              }
+            : m
+        )
+      );
+    }
     setReassignSaving(false);
     setReassignIds(null);
     setSelectedIds(new Set());
-    router.refresh();
   }
 
   // Members are never hard-deleted from the Bureau's table — archiving
@@ -305,10 +336,10 @@ export default function MembersTable({
     // équipe(s) remettre quelqu'un, ça reste un geste manuel du Bureau.
     if (archived) {
       const profileIds = ids
-        .map((id) => members.find((m) => m.id === id)?.profileId)
+        .map((id) => localMembers.find((m) => m.id === id)?.profileId)
         .filter((pid): pid is string => Boolean(pid));
       const emails = ids
-        .map((id) => members.find((m) => m.id === id)?.email?.trim().toLowerCase())
+        .map((id) => localMembers.find((m) => m.id === id)?.email?.trim().toLowerCase())
         .filter((e): e is string => Boolean(e));
 
       await Promise.all([
@@ -323,12 +354,29 @@ export default function MembersTable({
       ]);
     }
 
+    // Affichage immédiat plutôt que d'attendre le rafraîchissement temps
+    // réel — voir le commentaire sur localMembers plus haut. À l'archivage,
+    // reflète aussi le nettoyage ci-dessus (équipes/coach/Bureau) : sinon
+    // la fiche restait affichée coach/Bureau jusqu'au prochain
+    // rafraîchissement, contredisant ce qu'on vient de faire.
+    setLocalMembers((prev) =>
+      prev.map((m) =>
+        ids.includes(m.id)
+          ? {
+              ...m,
+              archivedAt: archived ? new Date().toISOString() : null,
+              ...(archived
+                ? { teams: [], coachTeams: [], pendingCoachTeams: [], bureauRole: null }
+                : {}),
+            }
+          : m
+      )
+    );
     setSelectedIds((prev) => {
       const next = new Set(prev);
       ids.forEach((id) => next.delete(id));
       return next;
     });
-    router.refresh();
     return true;
   }
 
@@ -387,6 +435,9 @@ export default function MembersTable({
       );
       return;
     }
+    // Disparition immédiate plutôt que d'attendre le rafraîchissement
+    // temps réel — voir le commentaire sur localMembers plus haut.
+    setLocalMembers((prev) => prev.filter((m) => m.id !== deleteTarget.id));
     setSelectedIds((prev) => {
       const next = new Set(prev);
       next.delete(deleteTarget.id);
@@ -394,10 +445,9 @@ export default function MembersTable({
     });
     setDeleteTarget(null);
     showToast("Membre supprimé définitivement.");
-    router.refresh();
   }
 
-  const selectedMembers = members.filter((m) => selectedIds.has(m.id));
+  const selectedMembers = localMembers.filter((m) => selectedIds.has(m.id));
   const bulkEmails = selectedMembers
     .map((m) => m.email)
     .filter((e): e is string => Boolean(e));
@@ -800,7 +850,7 @@ export default function MembersTable({
 
       {detailMemberId &&
         (() => {
-          const detailMember = members.find((m) => m.id === detailMemberId);
+          const detailMember = localMembers.find((m) => m.id === detailMemberId);
           if (!detailMember) return null;
           return (
             <MemberDetailModal
@@ -827,7 +877,7 @@ export default function MembersTable({
 
       {emailModalMemberId &&
         (() => {
-          const emailMember = members.find((m) => m.id === emailModalMemberId);
+          const emailMember = localMembers.find((m) => m.id === emailModalMemberId);
           // This row's own contact email (m.email, already the corrected
           // "registration_email wins" field — see the earlier phone/email
           // fix) must come first: pendingParentEmail is specifically the

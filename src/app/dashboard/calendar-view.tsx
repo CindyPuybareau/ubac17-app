@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ChevronDown,
   ChevronLeft,
@@ -146,6 +146,24 @@ export type CalendarTeamRef = {
   category: string | null;
 };
 
+// Même logique que resolveEventTeamName (page.tsx) et
+// create-event-form.tsx, rejouée ici pour patcher localEvents sans
+// attendre le serveur — voir confirmEdit ci-dessous.
+function resolveTeamNameLocal(
+  teamId: string | null,
+  targetTeamIds: string[] | null,
+  teams: CalendarTeamRef[]
+): string {
+  if (teamId) return teams.find((t) => t.id === teamId)?.name ?? "Équipe";
+  if (targetTeamIds && targetTeamIds.length > 0) {
+    const names = targetTeamIds
+      .map((id) => teams.find((t) => t.id === id)?.name)
+      .filter((n): n is string => Boolean(n));
+    return names.length > 0 ? names.join(", ") : "Équipes sélectionnées";
+  }
+  return "Tous les groupes";
+}
+
 export type CalendarRsvpPlayer = {
   id: string;
   name: string;
@@ -271,6 +289,17 @@ export default function CalendarView({
   // même" sur la veille jusqu'au rechargement complet de la page — le
   // rafraîchissement déclenché ailleurs par le temps réel (realtime-sync.tsx)
   // suffit maintenant à corriger l'affichage sans reload.
+  // Copie locale affichée immédiatement à la création/modification/
+  // suppression d'un événement, plutôt que d'attendre le rafraîchissement
+  // temps réel (débounce ~0,8s + un aller-retour serveur complet qui
+  // recharge tout le tableau de bord) — retour de Cindy du 2026-08-21 :
+  // "7-8 secondes... c'est long" à la création comme à la suppression.
+  // Même principe que volunteer-needs-panel.tsx/match-tasks-panel.tsx.
+  const [localEvents, setLocalEvents] = useState(events);
+  useEffect(() => {
+    setLocalEvents(events);
+  }, [events]);
+
   const today = new Date();
   const todayKey = toKey(today);
   const [viewMonth, setViewMonth] = useState<Date>(today);
@@ -420,6 +449,43 @@ export default function CalendarView({
       );
     }
 
+    // Affichage immédiat plutôt que d'attendre le rafraîchissement temps
+    // réel — retour de Cindy du 2026-08-21, même correctif que la création
+    // (voir onCreated plus bas) et la suppression (handleDeleteEvent).
+    const newTeamId = allowClubWide
+      ? editScopeMode === "single"
+        ? editTeamId || null
+        : null
+      : editingEvent.teamId;
+    const newTargetTeamIds = allowClubWide
+      ? editScopeMode === "specific"
+        ? editTargetTeamIds
+        : null
+      : editingEvent.targetTeamIds;
+    setLocalEvents((prev) =>
+      prev.map((e) =>
+        e.id === editingEvent.id
+          ? {
+              ...e,
+              title: editTitle || null,
+              event_type: editType,
+              isHome: isMatchType(editType) && editIsHome !== "" ? editIsHome === "true" : null,
+              location: editLocation || null,
+              salle: editSalle || null,
+              start_time: newStartIso,
+              end_time: editEndTime
+                ? new Date(`${editStartTime.slice(0, 10)}T${editEndTime}`).toISOString()
+                : null,
+              notes: editNotes || null,
+              teamId: newTeamId,
+              targetTeamIds: newTargetTeamIds,
+              teamName: allowClubWide
+                ? resolveTeamNameLocal(newTeamId, newTargetTeamIds, createTeams ?? [])
+                : e.teamName,
+            }
+          : e
+      )
+    );
     setEditingEvent(null);
     // Pas de router.refresh() explicite : events est surveillée en temps
     // réel (realtime-sync.tsx) — le garder ici en plus rechargeait la page
@@ -433,8 +499,18 @@ export default function CalendarView({
     );
     if (!ok) return;
 
-    // Bonus, pas bloquant : voir event-push.ts. Envoyé avant la
-    // suppression — push_targets_for_event a besoin de retrouver
+    // Disparition immédiate plutôt que d'attendre le rafraîchissement
+    // temps réel — retour de Cindy du 2026-08-21, même correctif que la
+    // création/modification ci-dessus. Levée avant sendEventPush (network,
+    // potentiellement lent) et pas seulement avant le delete : sinon le
+    // clic restait bloqué en apparence jusqu'à ce que CET appel-là
+    // termine, reproduisant exactement le même délai perçu sous un autre
+    // nom.
+    setLocalEvents((prev) => prev.filter((e) => e.id !== event.id));
+
+    // Bonus, pas bloquant pour l'utilisateur (déjà reparti visuellement
+    // ci-dessus) mais toujours attendu ici : voir event-push.ts. Envoyé
+    // avant la suppression — push_targets_for_event a besoin de retrouver
     // l'événement pour savoir à qui l'envoyer, ce qui ne serait plus
     // possible une fois la ligne effacée.
     const when = new Date(event.start_time).toLocaleDateString("fr-FR", {
@@ -480,14 +556,14 @@ export default function CalendarView({
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, AdminUpcomingEvent[]>();
-    events.forEach((e) => {
+    localEvents.forEach((e) => {
       const key = toKey(new Date(e.start_time));
       const list = map.get(key) ?? [];
       list.push(e);
       map.set(key, list);
     });
     return map;
-  }, [events]);
+  }, [localEvents]);
 
   const birthdaysByMonthDay = useMemo(
     () => groupBirthdaysByMonthDay(birthdayMembers),
@@ -530,10 +606,10 @@ export default function CalendarView({
   // disparaisse pas de la liste l'après-midi même.
   const upcomingEvents = useMemo(() => {
     const from = startOfTodayMs();
-    return events
+    return localEvents
       .filter((e) => new Date(e.start_time).getTime() >= from)
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
-  }, [events]);
+  }, [localEvents]);
 
   // Vue Résultats : tout le calendrier de matchs/amicaux de la saison,
   // joués ou non, dans l'ordre chronologique — même principe que la page
@@ -542,7 +618,7 @@ export default function CalendarView({
   // l'affichage "à venir" et empêche d'en saisir un avant que le match
   // ait réellement eu lieu).
   const seasonMatches = useMemo(() => {
-    return events
+    return localEvents
       .filter(
         (e) =>
           isMatchType(e.event_type) &&
@@ -552,7 +628,7 @@ export default function CalendarView({
           (!resultsTeams || resultsTeams.length <= 1 || e.teamId === activeResultsTeamIdResolved)
       )
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
-  }, [events, resultsTeams, activeResultsTeamIdResolved]);
+  }, [localEvents, resultsTeams, activeResultsTeamIdResolved]);
 
   // Anniversaires + événements mélangés dans un seul fil chronologique,
   // triés ensemble : un anniversaire vaut minuit ce jour-là (avant tout
@@ -1069,6 +1145,11 @@ export default function CalendarView({
           allowClubWide={allowClubWide}
           open={createOpen}
           onClose={() => setCreateOpen(false)}
+          onCreated={(created) =>
+            setLocalEvents((prev) =>
+              [...prev, ...created].sort((a, b) => a.start_time.localeCompare(b.start_time))
+            )
+          }
         />
       )}
 

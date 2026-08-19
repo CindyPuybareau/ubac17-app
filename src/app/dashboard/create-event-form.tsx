@@ -13,9 +13,28 @@ import {
   STANDARD_VOLUNTEER_ROLES,
   volunteerRoleIcon,
 } from "./event-volunteer-needs";
+import type { AdminUpcomingEvent } from "./page";
 
 type Team = { id: string; name: string | null; category: string | null };
 type EventType = "MATCH" | "FRIENDLY" | "TRAINING" | "OTHER" | "TOURNAMENT";
+
+// Même logique que resolveEventTeamName (page.tsx), rejouée côté client
+// pour construire une carte affichable immédiatement — voir onCreated
+// plus bas.
+function resolveTeamNameClient(
+  teamId: string | null,
+  targetTeamIds: string[] | null,
+  teams: Team[]
+): string {
+  if (teamId) return teams.find((t) => t.id === teamId)?.name ?? "Équipe";
+  if (targetTeamIds && targetTeamIds.length > 0) {
+    const names = targetTeamIds
+      .map((id) => teams.find((t) => t.id === id)?.name)
+      .filter((n): n is string => Boolean(n));
+    return names.length > 0 ? names.join(", ") : "Équipes sélectionnées";
+  }
+  return "Tous les groupes";
+}
 
 const defaultTitles: Record<EventType, string> = {
   MATCH: "Match",
@@ -59,6 +78,7 @@ export default function CreateEventForm({
   allowClubWide = false,
   open,
   onClose,
+  onCreated,
 }: {
   teams: Team[];
   allowClubWide?: boolean;
@@ -67,6 +87,12 @@ export default function CreateEventForm({
   // pas au-dessus du formulaire.
   open: boolean;
   onClose: () => void;
+  // Affiche la ou les occurrences créées sur le calendrier dès la
+  // validation, sans attendre le rafraîchissement temps réel (débounce
+  // ~0,8s + un aller-retour serveur complet qui recharge tout le tableau
+  // de bord) — retour de Cindy du 2026-08-21 : "7-8 secondes... c'est
+  // long". Même correctif que les panneaux Organisation.
+  onCreated?: (events: AdminUpcomingEvent[]) => void;
 }) {
   const [teamId, setTeamId] = useState(teams[0]?.id ?? "");
   const [title, setTitle] = useState("");
@@ -197,7 +223,9 @@ export default function CreateEventForm({
     const { data: inserted, error } = await supabase
       .from("events")
       .insert(rows)
-      .select("id, start_time")
+      .select(
+        "id, title, event_type, is_home, location, salle, start_time, end_time, notes, team_id, target_team_ids"
+      )
       .order("start_time", { ascending: true });
 
     setLoading(false);
@@ -205,6 +233,34 @@ export default function CreateEventForm({
     if (error) {
       setError(error.message);
       return;
+    }
+
+    // Affichage immédiat sur le calendrier (voir le commentaire sur
+    // onCreated plus haut) : construit ici plutôt qu'attendu du serveur,
+    // avec les compteurs RSVP à zéro (aucune réponse n'existe encore pour
+    // un événement qui vient d'être créé) — corrigé silencieusement par le
+    // prochain rafraîchissement temps réel si besoin.
+    if (inserted && inserted.length > 0) {
+      onCreated?.(
+        inserted.map((row) => ({
+          id: row.id,
+          title: row.title,
+          event_type: row.event_type,
+          isHome: row.is_home,
+          attendanceRequestedAt: null,
+          teamScore: null,
+          opponentScore: null,
+          location: row.location,
+          salle: row.salle,
+          start_time: row.start_time,
+          end_time: row.end_time,
+          notes: row.notes,
+          teamId: row.team_id,
+          targetTeamIds: row.target_team_ids,
+          teamName: resolveTeamNameClient(row.team_id, row.target_team_ids, teams),
+          rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
+        }))
+      );
     }
 
     // Bonus, pas bloquant : voir event-push.ts. La famille apprend le
