@@ -1131,13 +1131,16 @@ export default async function DashboardPage() {
       };
     });
 
-    // Besoins en bénévoles de tous les événements à venir : le Bureau doit
-    // pouvoir en ajouter/gérer sur n'importe lequel depuis le calendrier,
-    // pas seulement ceux de la zone prioritaire.
-    const upcomingAdminEventIds = adminUpcomingEvents
-      .filter((e) => new Date(e.start_time).getTime() >= Date.now())
-      .map((e) => e.id);
-    adminVolunteerNeedsByEventId = await getVolunteerNeedsByEventId(supabase, upcomingAdminEventIds);
+    // Besoins d'organisation de TOUS les événements, passés ou à venir : le
+    // panneau vit sur chaque carte du calendrier (mois entier, pas
+    // seulement les prochains) — un filtre "à venir" faisait disparaître
+    // les besoins d'un événement dès que son horaire était dépassé, même
+    // fraîchement créé (retour de Cindy du 2026-08-19 : besoins ajoutés à
+    // la création, introuvables juste après).
+    adminVolunteerNeedsByEventId = await getVolunteerNeedsByEventId(
+      supabase,
+      adminUpcomingEvents.map((e) => e.id)
+    );
   }
 
   let coachTeamsWithRoster: TeamWithMembers[] = [];
@@ -1569,9 +1572,11 @@ export default async function DashboardPage() {
       ...eventTasksByEventId,
       ...(await getEventTasksByEventId(supabase, upcomingCoachEventIds)),
     };
+    // Besoins d'organisation de TOUS les événements de l'équipe, pas
+    // seulement ceux à venir — même raison que côté Bureau juste plus haut.
     coachVolunteerNeedsByEventId = await getVolunteerNeedsByEventId(
       supabase,
-      upcomingCoachEventIds
+      coachEvents.map((e) => e.id)
     );
   }
 
@@ -1849,9 +1854,11 @@ export default async function DashboardPage() {
         : null,
       getEventTasksByEventId(supabase, upcomingFamilyEventIds),
     ]);
+    // Besoins d'organisation de TOUS les événements de la fratrie, pas
+    // seulement ceux à venir — même raison que côté Bureau plus haut.
     familyVolunteerNeedsByEventId = await getVolunteerNeedsByEventId(
       supabase,
-      upcomingFamilyEventIds
+      familyEvents.map((e) => e.id)
     );
 
     // Statuts par équipe/événement, pour construire à la fois
