@@ -1059,6 +1059,10 @@ export default function CalendarView({
         <CreateEventForm
           teams={createTeams}
           allowClubWide={allowClubWide}
+          // Bureau comme coach (retour de Cindy du 2026-08-19 : "pour le
+          // bureau et les coachs") — chacun peut chiffrer sa demande de
+          // bénévoles dès la création, sur ses propres événements.
+          roles={eventRoles}
           open={createOpen}
           onClose={() => setCreateOpen(false)}
         />

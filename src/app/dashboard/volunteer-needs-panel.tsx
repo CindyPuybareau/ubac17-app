@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Minus, Plus, Trash2, X } from "lucide-react";
+import { Check, Minus, Plus, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import RoleIcon from "./role-icon";
 import type { EventRoleType } from "./event-tasks";
-import type { VolunteerNeed } from "./event-volunteer-needs";
+import { volunteerNeedRoles, type VolunteerNeed } from "./event-volunteer-needs";
 
 function remainingSlots(need: VolunteerNeed) {
   return Math.max(0, need.requiredCount - need.signups.length);
@@ -28,7 +28,7 @@ type Row = { need: VolunteerNeed | null; roleCode: string };
 export default function VolunteerNeedsPanel({
   eventId,
   needs,
-  roles,
+  roles: allRoles,
   myPlayerIds,
   canManage,
   roster,
@@ -37,12 +37,15 @@ export default function VolunteerNeedsPanel({
   needs: VolunteerNeed[];
   // Catalogue complet (pas filtré par type d'événement, contrairement à
   // MatchTasksPanel) : un tournoi ou une fête peut avoir besoin de
-  // n'importe quel rôle, pas seulement ceux applicables à un match.
+  // n'importe quel rôle, pas seulement ceux applicables à un match. Filtré
+  // ci-dessous pour exclure Maillots/Goûter (l'ancien système, event_tasks
+  // — un seul responsable, pas de notion de nombre requis).
   roles: EventRoleType[];
   myPlayerIds: string[];
   canManage: boolean;
   roster: { id: string; name: string }[];
 }) {
+  const roles = volunteerNeedRoles(allRoles);
   const router = useRouter();
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -299,6 +302,16 @@ export default function VolunteerNeedsPanel({
                   )}
                 </div>
               </div>
+
+              {/* Confirmation explicite plutôt que la seule jauge
+                  numérique — retour de Cindy du 2026-08-19 : elle veut
+                  voir clairement quand sa demande est couverte. */}
+              {need && need.requiredCount > 0 && remaining === 0 && (
+                <p className="flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
+                  <Check className="h-3 w-3 shrink-0" />
+                  Nombre de bénévoles atteint
+                </p>
+              )}
 
               {canManage ? (
                 <div className="flex flex-wrap items-center gap-1.5">

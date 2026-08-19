@@ -1,11 +1,23 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatPersonName } from "@/lib/names";
+import type { EventRoleType } from "./event-tasks";
 
 // "Besoins en bénévoles" d'un événement club (buvette, table de marque,
 // arbitrage...) — voir 20261012000000_club_event_targeting_and_volunteer_needs.
 // Système volontairement séparé de event-tasks.ts (JERSEYS/SNACKS) : un
 // besoin peut demander PLUSIEURS bénévoles (event_tasks est verrouillé à
 // un seul par (event_id, task_type)), avec une tranche horaire optionnelle.
+
+// JERSEYS/SNACKS restent gérés par l'ancien système (event_tasks,
+// MatchTasksPanel — un seul responsable, pas de notion de nombre requis) :
+// le catalogue event_role_types est commun aux deux systèmes, donc on
+// exclut explicitement ces deux codes partout où ce nouveau système liste
+// "ses" rôles, pour ne jamais dupliquer maillots/goûter ici.
+const LEGACY_TASK_CODES = new Set(["JERSEYS", "SNACKS"]);
+
+export function volunteerNeedRoles(roles: EventRoleType[]): EventRoleType[] {
+  return roles.filter((r) => !LEGACY_TASK_CODES.has(r.code));
+}
 
 export type VolunteerSignupSource = "VOLUNTEER" | "ADMIN";
 
