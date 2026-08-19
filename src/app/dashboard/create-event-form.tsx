@@ -81,11 +81,13 @@ export default function CreateEventForm({
   const [notes, setNotes] = useState("");
   const [repeatWeekly, setRepeatWeekly] = useState(false);
   const [repeatUntil, setRepeatUntil] = useState("");
-  // Portée d'un événement "Tous les groupes" (teamId === "") : soit
-  // vraiment tout le club (comportement historique), soit réservé à
-  // quelques équipes précises (target_team_ids, voir 20261012000000). Sans
-  // objet dès qu'une équipe précise est choisie dans le select ci-dessus.
-  const [clubScope, setClubScope] = useState<"all" | "specific">("all");
+  // Portée de l'événement : un choix à plat, direct, plutôt que de faire
+  // passer "équipes spécifiques" par un détour via "Tous les groupes" —
+  // c'est ce détour qui donnait l'impression qu'on ne pouvait choisir
+  // qu'une seule équipe (retour de Cindy du 2026-08-20 : "à l'heure
+  // actuelle, quand je créer un evenement, je ne peux choisir qu'une
+  // equipe"). "specific"/"club" n'ont de sens que si allowClubWide.
+  const [scopeMode, setScopeMode] = useState<"single" | "specific" | "club">("single");
   const [targetTeamIds, setTargetTeamIds] = useState<string[]>([]);
   // Besoins d'organisation définis dès la création (buvette, table de
   // marque...) : une liste libre de lignes rôle + effectif, comme dans le
@@ -138,7 +140,7 @@ export default function CreateEventForm({
       setError("Choisis une date de fin pour la répétition.");
       return;
     }
-    if (!teamId && clubScope === "specific" && targetTeamIds.length === 0) {
+    if (scopeMode === "specific" && targetTeamIds.length === 0) {
       setError("Choisis au moins une équipe pour un événement réservé.");
       return;
     }
@@ -152,8 +154,8 @@ export default function CreateEventForm({
 
     // null = "Tous les groupes" (comportement historique) — seulement
     // rempli quand la portée "Équipes spécifiques" est choisie explicitement.
-    const effectiveTargetTeamIds =
-      !teamId && clubScope === "specific" ? targetTeamIds : null;
+    const effectiveTeamId = scopeMode === "single" ? teamId : "";
+    const effectiveTargetTeamIds = scopeMode === "specific" ? targetTeamIds : null;
 
     // Une occurrence par semaine, même jour même heure, jusqu'à la date de
     // fin incluse — pas un moteur de récurrence : chaque ligne est un
@@ -179,7 +181,7 @@ export default function CreateEventForm({
 
     const supabase = createClient();
     const rows = occurrences.map((dt) => ({
-      team_id: teamId || null,
+      team_id: effectiveTeamId || null,
       target_team_ids: effectiveTargetTeamIds,
       title: title || defaultTitles[eventType],
       event_type: eventType,
@@ -214,7 +216,7 @@ export default function CreateEventForm({
     // pas un service.
     const first = inserted?.[0];
     if (first) {
-      const team = teams.find((t) => t.id === teamId);
+      const team = teams.find((t) => t.id === effectiveTeamId);
       const when = new Date(first.start_time).toLocaleDateString("fr-FR", {
         weekday: "long",
         day: "numeric",
@@ -275,7 +277,7 @@ export default function CreateEventForm({
     setNotes("");
     setRepeatWeekly(false);
     setRepeatUntil("");
-    setClubScope("all");
+    setScopeMode("single");
     setTargetTeamIds([]);
     setDraftNeeds([]);
     onClose();
@@ -291,15 +293,43 @@ export default function CreateEventForm({
     >
       <h3 className="font-semibold text-zinc-900">Créer un événement</h3>
 
-      {(teams.length > 1 || allowClubWide) && (
+      {/* Portée : un choix à plat, direct, plutôt qu'un détour par "Tous
+          les groupes" pour arriver à "équipes spécifiques" (retour de
+          Cindy du 2026-08-20 — voir le commentaire sur scopeMode plus
+          haut). "Équipes spécifiques"/"Tout le club" n'ont de sens que
+          pour qui peut créer un événement club (allowClubWide) ; sinon,
+          un simple menu déroulant suffit comme avant. */}
+      {allowClubWide && (
+        <div className="flex flex-wrap gap-1.5">
+          {(
+            [
+              { value: "single" as const, label: "Une équipe" },
+              { value: "specific" as const, label: "Équipes spécifiques" },
+              { value: "club" as const, label: "Tout le club" },
+            ]
+          ).map((c) => (
+            <button
+              key={c.value}
+              type="button"
+              onClick={() => setScopeMode(c.value)}
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                scopeMode === c.value
+                  ? "border-navy bg-navy/10 text-navy"
+                  : "border-zinc-200 text-zinc-500 hover:bg-white"
+              }`}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {(!allowClubWide ? teams.length > 1 : scopeMode === "single") && (
         <select
           value={teamId}
           onChange={(e) => setTeamId(e.target.value)}
           className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
         >
-          {allowClubWide && (
-            <option value="">Tous les groupes (stage club)</option>
-          )}
           {teams.map((t) => (
             <option key={t.id} value={t.id}>
               {teamLabel(t)}
@@ -308,48 +338,19 @@ export default function CreateEventForm({
         </select>
       )}
 
-      {/* "Tous les groupes" se précise en deux sous-cas : vraiment tout le
-          club, ou réservé à quelques équipes (ex. Octobre Rose pour U18M
-          et U13M seulement) — sans objet dès qu'une équipe précise est
-          choisie dans le select ci-dessus. */}
-      {allowClubWide && !teamId && (
-        <div className="flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3">
-          <div className="flex gap-1.5">
-            {(
-              [
-                { value: "all" as const, label: "Tout le club" },
-                { value: "specific" as const, label: "Équipes spécifiques" },
-              ]
-            ).map((c) => (
-              <button
-                key={c.value}
-                type="button"
-                onClick={() => setClubScope(c.value)}
-                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                  clubScope === c.value
-                    ? "border-navy bg-navy/10 text-navy"
-                    : "border-zinc-200 text-zinc-500 hover:bg-white"
-                }`}
-              >
-                {c.label}
-              </button>
-            ))}
-          </div>
-          {clubScope === "specific" && (
-            <div className="grid max-h-40 grid-cols-2 gap-1.5 overflow-y-auto rounded-lg border border-zinc-200 bg-white p-2">
-              {teams.map((t) => (
-                <label key={t.id} className="flex items-center gap-1.5 text-xs text-zinc-700">
-                  <input
-                    type="checkbox"
-                    checked={targetTeamIds.includes(t.id)}
-                    onChange={() => toggleTargetTeam(t.id)}
-                    className="h-3.5 w-3.5 rounded border-zinc-300 text-navy focus:ring-navy"
-                  />
-                  {teamLabel(t)}
-                </label>
-              ))}
-            </div>
-          )}
+      {allowClubWide && scopeMode === "specific" && (
+        <div className="grid max-h-40 grid-cols-2 gap-1.5 overflow-y-auto rounded-lg border border-zinc-200 bg-white p-2">
+          {teams.map((t) => (
+            <label key={t.id} className="flex items-center gap-1.5 text-xs text-zinc-700">
+              <input
+                type="checkbox"
+                checked={targetTeamIds.includes(t.id)}
+                onChange={() => toggleTargetTeam(t.id)}
+                className="h-3.5 w-3.5 rounded border-zinc-300 text-navy focus:ring-navy"
+              />
+              {teamLabel(t)}
+            </label>
+          ))}
         </div>
       )}
 

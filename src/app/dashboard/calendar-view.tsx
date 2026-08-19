@@ -316,9 +316,10 @@ export default function CalendarView({
   const [editEndTime, setEditEndTime] = useState("");
   const [editNotes, setEditNotes] = useState("");
   const [editTeamId, setEditTeamId] = useState("");
-  // Même portée "Tous les groupes" à préciser qu'en création (voir
-  // create-event-form.tsx) — préremplie depuis event.targetTeamIds.
-  const [editClubScope, setEditClubScope] = useState<"all" | "specific">("all");
+  // Même choix à plat qu'en création (voir create-event-form.tsx,
+  // scopeMode) — préremplie depuis l'événement édité dans openEdit()
+  // ci-dessous plutôt que par défaut sur "single".
+  const [editScopeMode, setEditScopeMode] = useState<"single" | "specific" | "club">("single");
   const [editTargetTeamIds, setEditTargetTeamIds] = useState<string[]>([]);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
@@ -334,7 +335,9 @@ export default function CalendarView({
     setEditEndTime(event.end_time ? toTimeLocal(event.end_time) : "");
     setEditNotes(event.notes ?? "");
     setEditTeamId(event.teamId ?? "");
-    setEditClubScope(event.targetTeamIds && event.targetTeamIds.length > 0 ? "specific" : "all");
+    setEditScopeMode(
+      event.teamId ? "single" : event.targetTeamIds && event.targetTeamIds.length > 0 ? "specific" : "club"
+    );
     setEditTargetTeamIds(event.targetTeamIds ?? []);
     setEditError(null);
   }
@@ -353,7 +356,7 @@ export default function CalendarView({
       setEditError("L'heure de fin est obligatoire pour un entraînement.");
       return;
     }
-    if (allowClubWide && !editTeamId && editClubScope === "specific" && editTargetTeamIds.length === 0) {
+    if (allowClubWide && editScopeMode === "specific" && editTargetTeamIds.length === 0) {
       setEditError("Choisis au moins une équipe pour un événement réservé.");
       return;
     }
@@ -378,9 +381,8 @@ export default function CalendarView({
         notes: editNotes || null,
         ...(allowClubWide
           ? {
-              team_id: editTeamId || null,
-              target_team_ids:
-                !editTeamId && editClubScope === "specific" ? editTargetTeamIds : null,
+              team_id: editScopeMode === "single" ? editTeamId || null : null,
+              target_team_ids: editScopeMode === "specific" ? editTargetTeamIds : null,
             }
           : {}),
       })
@@ -1356,39 +1358,32 @@ export default function CalendarView({
                 />
               </div>
               {allowClubWide && createTeams && (
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-zinc-600">
-                    Groupe
-                  </label>
-                  <select
-                    value={editTeamId}
-                    onChange={(e) => setEditTeamId(e.target.value)}
-                    className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
-                  >
-                    <option value="">Tous les groupes (stage club)</option>
-                    {createTeams.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {teamLabel(t)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              {allowClubWide && createTeams && !editTeamId && (
-                <div className="flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-2.5">
-                  <div className="flex gap-1.5">
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-medium text-zinc-600">Portée</label>
+                  <div className="flex flex-wrap gap-1.5">
                     {(
                       [
-                        { value: "all" as const, label: "Tout le club" },
+                        { value: "single" as const, label: "Une équipe" },
                         { value: "specific" as const, label: "Équipes spécifiques" },
+                        { value: "club" as const, label: "Tout le club" },
                       ]
                     ).map((c) => (
                       <button
                         key={c.value}
                         type="button"
-                        onClick={() => setEditClubScope(c.value)}
+                        onClick={() => {
+                          setEditScopeMode(c.value);
+                          // Un événement jusque-là "Tout le club" ou
+                          // "Équipes spécifiques" n'a pas d'équipe unique
+                          // en mémoire : préremplir la première plutôt que
+                          // de laisser le menu vide au passage sur "Une
+                          // équipe".
+                          if (c.value === "single" && !editTeamId) {
+                            setEditTeamId(createTeams[0]?.id ?? "");
+                          }
+                        }}
                         className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
-                          editClubScope === c.value
+                          editScopeMode === c.value
                             ? "border-navy bg-navy/10 text-navy"
                             : "border-zinc-200 text-zinc-500 hover:bg-white"
                         }`}
@@ -1397,7 +1392,20 @@ export default function CalendarView({
                       </button>
                     ))}
                   </div>
-                  {editClubScope === "specific" && (
+                  {editScopeMode === "single" && (
+                    <select
+                      value={editTeamId}
+                      onChange={(e) => setEditTeamId(e.target.value)}
+                      className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+                    >
+                      {createTeams.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {teamLabel(t)}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {editScopeMode === "specific" && (
                     <div className="grid max-h-40 grid-cols-2 gap-1.5 overflow-y-auto rounded-lg border border-zinc-200 bg-white p-2">
                       {createTeams.map((t) => (
                         <label key={t.id} className="flex items-center gap-1.5 text-xs text-zinc-700">
