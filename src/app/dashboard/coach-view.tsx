@@ -22,6 +22,7 @@ import type {
   EventTasksState,
   SeasonTaskTally,
 } from "./event-tasks";
+import type { VolunteerNeed } from "./event-volunteer-needs";
 import type { BirthdaySource } from "./birthdays";
 
 export default function CoachView({
@@ -42,6 +43,7 @@ export default function CoachView({
   carpoolByEventId,
   whatsappGroups,
   eventRoles,
+  volunteerNeedsByEventId = {},
   ownPlayerId,
   showOwnPlayerSummary = false,
   ownCotisations = [],
@@ -68,6 +70,11 @@ export default function CoachView({
   whatsappGroups: WhatsAppGroup[];
   // Catalogue des roles d organisation (event_role_types).
   eventRoles: EventRoleType[];
+  // Besoins en bénévoles d'un événement club (buvette...) — un coach qui
+  // joue aussi dans une équipe ciblée doit pouvoir s'y inscrire depuis son
+  // propre calendrier, comme n'importe quel joueur/parent. Optionnel : vide
+  // par défaut plutôt qu'exigé partout où CoachView est instancié.
+  volunteerNeedsByEventId?: Record<string, VolunteerNeed[]>;
   // Sa propre fiche joueur (players.profile_id = son compte), si elle
   // existe — un coach qui joue aussi dans une autre équipe doit pouvoir
   // répondre présent/absent pour LUI-MÊME sur ses propres matchs.
@@ -122,6 +129,8 @@ export default function CoachView({
               category: t.category,
             }))}
             selfPlayerId={ownPlayerId}
+            eventRoles={eventRoles}
+            volunteerNeedsByEventId={volunteerNeedsByEventId}
           />
           {/* Même bloc que l'espace parent : un coach a lui aussi son
               propre agenda, et être coach ne devrait pas le priver de cet

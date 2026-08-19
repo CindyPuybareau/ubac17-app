@@ -2,14 +2,17 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { Plus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { teamLabel } from "@/lib/teams";
 import { SALLES } from "./salles";
 import { sendEventPush } from "./event-push";
 import DateTimePicker from "./date-time-picker";
+import type { EventRoleType } from "./event-tasks";
 
 type Team = { id: string; name: string | null; category: string | null };
 type EventType = "MATCH" | "FRIENDLY" | "TRAINING" | "OTHER" | "TOURNAMENT";
+type NeedDraft = { roleCode: string; timeRange: string; requiredCount: string };
 
 const defaultTitles: Record<EventType, string> = {
   MATCH: "Match",
@@ -51,11 +54,17 @@ const typeChoices: { value: EventType; label: string; active: string }[] = [
 export default function CreateEventForm({
   teams,
   allowClubWide = false,
+  roles = [],
   open,
   onClose,
 }: {
   teams: Team[];
   allowClubWide?: boolean;
+  // Catalogue des rôles d'organisation, pour la section "Besoins en
+  // bénévoles" ci-dessous — vide (pas de champ affiché) si non fourni,
+  // c-à-d partout où allowClubWide est faux (coach), cette section n'a de
+  // sens que côté Bureau.
+  roles?: EventRoleType[];
   // Ouverture pilotee par l appelant : le bouton "+ Creer un evenement"
   // vit dans l en-tete du calendrier, a cote de la navigation de date,
   // pas au-dessus du formulaire.
@@ -74,8 +83,38 @@ export default function CreateEventForm({
   const [notes, setNotes] = useState("");
   const [repeatWeekly, setRepeatWeekly] = useState(false);
   const [repeatUntil, setRepeatUntil] = useState("");
+  // Portée d'un événement "Tous les groupes" (teamId === "") : soit
+  // vraiment tout le club (comportement historique), soit réservé à
+  // quelques équipes précises (target_team_ids, voir 20261012000000). Sans
+  // objet dès qu'une équipe précise est choisie dans le select ci-dessus.
+  const [clubScope, setClubScope] = useState<"all" | "specific">("all");
+  const [targetTeamIds, setTargetTeamIds] = useState<string[]>([]);
+  // Besoins en bénévoles créés en même temps que l'événement — voir
+  // handleSubmit : rattachés à la première occurrence seulement si
+  // "Répéter chaque semaine" est coché (un besoin par séance n'aurait pas
+  // le même sens, à ajouter séance par séance depuis la fiche si besoin).
+  const [needsDraft, setNeedsDraft] = useState<NeedDraft[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  function toggleTargetTeam(id: string) {
+    setTargetTeamIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+  }
+
+  function addNeedDraft() {
+    setNeedsDraft((rows) => [
+      ...rows,
+      { roleCode: roles[0]?.code ?? "", timeRange: "", requiredCount: "1" },
+    ]);
+  }
+
+  function updateNeedDraft(index: number, patch: Partial<NeedDraft>) {
+    setNeedsDraft((rows) => rows.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+  }
+
+  function removeNeedDraft(index: number) {
+    setNeedsDraft((rows) => rows.filter((_, i) => i !== index));
+  }
 
   const isMatch = eventType === "MATCH" || eventType === "FRIENDLY";
 
@@ -96,6 +135,15 @@ export default function CreateEventForm({
       setError("Choisis une date de fin pour la répétition.");
       return;
     }
+    if (!teamId && clubScope === "specific" && targetTeamIds.length === 0) {
+      setError("Choisis au moins une équipe pour un événement réservé.");
+      return;
+    }
+
+    // null = "Tous les groupes" (comportement historique) — seulement
+    // rempli quand la portée "Équipes spécifiques" est choisie explicitement.
+    const effectiveTargetTeamIds =
+      !teamId && clubScope === "specific" ? targetTeamIds : null;
 
     // Une occurrence par semaine, même jour même heure, jusqu'à la date de
     // fin incluse — pas un moteur de récurrence : chaque ligne est un
@@ -122,6 +170,7 @@ export default function CreateEventForm({
     const supabase = createClient();
     const rows = occurrences.map((dt) => ({
       team_id: teamId || null,
+      target_team_ids: effectiveTargetTeamIds,
       title: title || defaultTitles[eventType],
       event_type: eventType,
       is_home: isMatch && isHome !== "" ? isHome === "true" : null,
@@ -174,6 +223,35 @@ export default function CreateEventForm({
       sendEventPush(first.id, `UBAC — ${team ? teamLabel(team) : "Tous les groupes"}`, body);
     }
 
+    // Besoins en bénévoles rattachés à la première occurrence seulement
+    // (voir le commentaire sur needsDraft plus haut) — best-effort : une
+    // erreur ici ne doit pas faire croire que l'événement lui-même n'a pas
+    // été créé, il l'a bien été.
+    const validNeeds = needsDraft.filter(
+      (n) => n.roleCode && Number(n.requiredCount) > 0
+    );
+    if (first && validNeeds.length > 0) {
+      const { error: needsError } = await supabase.from("event_volunteer_needs").insert(
+        validNeeds.map((n, i) => ({
+          event_id: first.id,
+          role_code: n.roleCode,
+          time_range: n.timeRange.trim() || null,
+          required_count: Number(n.requiredCount),
+          sort_order: i,
+        }))
+      );
+      if (needsError) {
+        // On garde le formulaire ouvert : fermer maintenant masquerait ce
+        // message alors que l'événement, lui, a bien été créé — seuls les
+        // besoins ont échoué, il faut que ce soit visible.
+        setError(
+          `Événement créé, mais l'ajout des besoins en bénévoles a échoué : ${needsError.message}`
+        );
+        router.refresh();
+        return;
+      }
+    }
+
     setTitle("");
     setIsHome("");
     setLocation("");
@@ -183,6 +261,9 @@ export default function CreateEventForm({
     setNotes("");
     setRepeatWeekly(false);
     setRepeatUntil("");
+    setClubScope("all");
+    setTargetTeamIds([]);
+    setNeedsDraft([]);
     onClose();
     router.refresh();
   }
@@ -211,6 +292,51 @@ export default function CreateEventForm({
             </option>
           ))}
         </select>
+      )}
+
+      {/* "Tous les groupes" se précise en deux sous-cas : vraiment tout le
+          club, ou réservé à quelques équipes (ex. Octobre Rose pour U18M
+          et U13M seulement) — sans objet dès qu'une équipe précise est
+          choisie dans le select ci-dessus. */}
+      {allowClubWide && !teamId && (
+        <div className="flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3">
+          <div className="flex gap-1.5">
+            {(
+              [
+                { value: "all" as const, label: "Tout le club" },
+                { value: "specific" as const, label: "Équipes spécifiques" },
+              ]
+            ).map((c) => (
+              <button
+                key={c.value}
+                type="button"
+                onClick={() => setClubScope(c.value)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  clubScope === c.value
+                    ? "border-navy bg-navy/10 text-navy"
+                    : "border-zinc-200 text-zinc-500 hover:bg-white"
+                }`}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+          {clubScope === "specific" && (
+            <div className="grid max-h-40 grid-cols-2 gap-1.5 overflow-y-auto rounded-lg border border-zinc-200 bg-white p-2">
+              {teams.map((t) => (
+                <label key={t.id} className="flex items-center gap-1.5 text-xs text-zinc-700">
+                  <input
+                    type="checkbox"
+                    checked={targetTeamIds.includes(t.id)}
+                    onChange={() => toggleTargetTeam(t.id)}
+                    className="h-3.5 w-3.5 rounded border-zinc-300 text-navy focus:ring-navy"
+                  />
+                  {teamLabel(t)}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       <div className="flex flex-col gap-2">
@@ -356,6 +482,67 @@ export default function CreateEventForm({
         rows={2}
         className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
       />
+
+      {/* Réservé au Bureau (roles non fourni ailleurs) — la gestion des
+          besoins bénévoles (buvette, table de marque...) reste centralisée,
+          pas ouverte aux coachs. */}
+      {roles.length > 0 && (
+        <div className="flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3">
+          <p className="text-xs font-medium text-zinc-600">
+            Besoins en bénévoles (optionnel)
+          </p>
+          {repeatWeekly && needsDraft.length > 0 && (
+            <p className="text-[11px] text-amber-700">
+              Ces besoins ne seront créés que pour la première séance — à
+              ajouter séance par séance ensuite si besoin.
+            </p>
+          )}
+          {needsDraft.map((n, i) => (
+            <div key={i} className="flex flex-wrap items-center gap-2">
+              <select
+                value={n.roleCode}
+                onChange={(e) => updateNeedDraft(i, { roleCode: e.target.value })}
+                className="rounded-lg border border-zinc-200 px-2 py-1.5 text-xs"
+              >
+                {roles.map((r) => (
+                  <option key={r.code} value={r.code}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="text"
+                placeholder="Tranche horaire (ex: 14h-16h)"
+                value={n.timeRange}
+                onChange={(e) => updateNeedDraft(i, { timeRange: e.target.value })}
+                className="flex-1 rounded-lg border border-zinc-200 px-2 py-1.5 text-xs"
+              />
+              <input
+                type="number"
+                min={1}
+                value={n.requiredCount}
+                onChange={(e) => updateNeedDraft(i, { requiredCount: e.target.value })}
+                className="w-16 rounded-lg border border-zinc-200 px-2 py-1.5 text-center text-xs"
+              />
+              <button
+                type="button"
+                onClick={() => removeNeedDraft(i)}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-red-400 hover:bg-red-50 hover:text-red-600"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={addNeedDraft}
+            className="flex w-fit items-center gap-1 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Ajouter un besoin
+          </button>
+        </div>
+      )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 

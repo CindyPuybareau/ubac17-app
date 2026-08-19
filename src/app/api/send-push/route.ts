@@ -46,9 +46,14 @@ export async function POST(request: Request) {
   // espace plus tard doit retrouver l'alerte même s'il n'était abonné à
   // rien au moment de l'envoi.
   try {
-    const { data: eventRow } = await supabase.from("events").select("team_id").eq("id", eventId).maybeSingle();
+    const { data: eventRow } = await supabase
+      .from("events")
+      .select("team_id, target_team_ids")
+      .eq("id", eventId)
+      .maybeSingle();
     await supabase.from("notifications").insert({
       team_id: eventRow?.team_id ?? null,
+      target_team_ids: eventRow?.target_team_ids ?? null,
       event_id: eventId,
       title: title ?? "UBAC",
       body: body ?? "Le coach attend ta réponse.",

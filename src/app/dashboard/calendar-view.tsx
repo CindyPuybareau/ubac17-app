@@ -59,8 +59,11 @@ import {
   type EventRoleType,
   type EventTasksState,
 } from "./event-tasks";
+import VolunteerNeedsPanel from "./volunteer-needs-panel";
+import type { VolunteerNeed } from "./event-volunteer-needs";
 
 const emptyEventTasks: EventTasksState = {};
+const emptyVolunteerNeeds: VolunteerNeed[] = [];
 
 // Ré-exportés : beaucoup d'écrans les importent historiquement d'ici, et
 // ce fichier reste le point d'entrée naturel du calendrier.
@@ -210,6 +213,8 @@ export default function CalendarView({
   tasksByEventId = {},
   carpoolByEventId = {},
   eventRoles = [],
+  volunteerNeedsByEventId = {},
+  volunteerRoster = [],
   selfPlayerId = null,
   forcedView,
   resultsTeams,
@@ -234,6 +239,14 @@ export default function CalendarView({
   tasksByEventId?: Record<string, EventTasksState>;
   carpoolByEventId?: Record<string, CarpoolOffer[]>;
   eventRoles?: EventRoleType[];
+  // Besoins en bénévoles (buvette, table de marque...) d'un événement club
+  // — auto-serve (Je m'en occupe) partout, gestion complète (affecter,
+  // retirer, ajouter/supprimer un besoin) réservée au Bureau, voir
+  // canManageEvent && allowClubWide dans renderEventCard.
+  volunteerNeedsByEventId?: Record<string, VolunteerNeed[]>;
+  // Membres du club pour le "+ Affecter..." du Bureau — jamais fourni côté
+  // Coach/Famille (pas de gestion là-bas, juste l'auto-inscription).
+  volunteerRoster?: { id: string; name: string }[];
   // La propre fiche joueur de qui consulte ce calendrier (coach qui joue
   // aussi dans une autre équipe) — jamais fourni côté Bureau/Famille.
   // Permet à un coach de répondre présent/absent pour LUI-MÊME sur un
@@ -307,6 +320,10 @@ export default function CalendarView({
   const [editEndTime, setEditEndTime] = useState("");
   const [editNotes, setEditNotes] = useState("");
   const [editTeamId, setEditTeamId] = useState("");
+  // Même portée "Tous les groupes" à préciser qu'en création (voir
+  // create-event-form.tsx) — préremplie depuis event.targetTeamIds.
+  const [editClubScope, setEditClubScope] = useState<"all" | "specific">("all");
+  const [editTargetTeamIds, setEditTargetTeamIds] = useState<string[]>([]);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
@@ -321,7 +338,13 @@ export default function CalendarView({
     setEditEndTime(event.end_time ? toTimeLocal(event.end_time) : "");
     setEditNotes(event.notes ?? "");
     setEditTeamId(event.teamId ?? "");
+    setEditClubScope(event.targetTeamIds && event.targetTeamIds.length > 0 ? "specific" : "all");
+    setEditTargetTeamIds(event.targetTeamIds ?? []);
     setEditError(null);
+  }
+
+  function toggleEditTargetTeam(id: string) {
+    setEditTargetTeamIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
   }
 
   async function confirmEdit() {
@@ -332,6 +355,10 @@ export default function CalendarView({
     }
     if (editType === "TRAINING" && !editEndTime) {
       setEditError("L'heure de fin est obligatoire pour un entraînement.");
+      return;
+    }
+    if (allowClubWide && !editTeamId && editClubScope === "specific" && editTargetTeamIds.length === 0) {
+      setEditError("Choisis au moins une équipe pour un événement réservé.");
       return;
     }
     setEditSaving(true);
@@ -353,7 +380,13 @@ export default function CalendarView({
           ? new Date(`${editStartTime.slice(0, 10)}T${editEndTime}`).toISOString()
           : null,
         notes: editNotes || null,
-        ...(allowClubWide ? { team_id: editTeamId || null } : {}),
+        ...(allowClubWide
+          ? {
+              team_id: editTeamId || null,
+              target_team_ids:
+                !editTeamId && editClubScope === "specific" ? editTargetTeamIds : null,
+            }
+          : {}),
       })
       .eq("id", editingEvent.id);
     setEditSaving(false);
@@ -789,6 +822,35 @@ export default function CalendarView({
             showCarpool={shouldOfferCarpool(event)}
           />
         )}
+
+        {/* Besoins en bénévoles (buvette, table de marque...) : lecture +
+            auto-inscription pour qui ne gère pas l'événement, gestion
+            complète (affecter/retirer/ajouter un besoin) pour le Bureau —
+            jamais pour un coach, même sur une équipe qu'il gère, ce type de
+            besoin restant centralisé au Bureau (voir CLAUDE.md de la
+            demande). Catalogue complet (pas filtré par type d'événement,
+            contrairement à MatchTasksPanel) : un tournoi ou une fête peut
+            avoir besoin de n'importe quel rôle. */}
+        {!canManageEvent && (
+          <VolunteerNeedsPanel
+            eventId={event.id}
+            needs={volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds}
+            roles={eventRoles}
+            myPlayerIds={rsvpVisiblePlayers.map((p) => p.id)}
+            canManage={false}
+            roster={[]}
+          />
+        )}
+        {canManageEvent && allowClubWide && (
+          <VolunteerNeedsPanel
+            eventId={event.id}
+            needs={volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds}
+            roles={eventRoles}
+            myPlayerIds={[]}
+            canManage
+            roster={volunteerRoster}
+          />
+        )}
       </div>
     );
   }
@@ -993,6 +1055,7 @@ export default function CalendarView({
         <CreateEventForm
           teams={createTeams}
           allowClubWide={allowClubWide}
+          roles={allowClubWide ? eventRoles : []}
           open={createOpen}
           onClose={() => setCreateOpen(false)}
         />
@@ -1318,6 +1381,46 @@ export default function CalendarView({
                       </option>
                     ))}
                   </select>
+                </div>
+              )}
+              {allowClubWide && createTeams && !editTeamId && (
+                <div className="flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-2.5">
+                  <div className="flex gap-1.5">
+                    {(
+                      [
+                        { value: "all" as const, label: "Tout le club" },
+                        { value: "specific" as const, label: "Équipes spécifiques" },
+                      ]
+                    ).map((c) => (
+                      <button
+                        key={c.value}
+                        type="button"
+                        onClick={() => setEditClubScope(c.value)}
+                        className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
+                          editClubScope === c.value
+                            ? "border-navy bg-navy/10 text-navy"
+                            : "border-zinc-200 text-zinc-500 hover:bg-white"
+                        }`}
+                      >
+                        {c.label}
+                      </button>
+                    ))}
+                  </div>
+                  {editClubScope === "specific" && (
+                    <div className="grid max-h-40 grid-cols-2 gap-1.5 overflow-y-auto rounded-lg border border-zinc-200 bg-white p-2">
+                      {createTeams.map((t) => (
+                        <label key={t.id} className="flex items-center gap-1.5 text-xs text-zinc-700">
+                          <input
+                            type="checkbox"
+                            checked={editTargetTeamIds.includes(t.id)}
+                            onChange={() => toggleEditTargetTeam(t.id)}
+                            className="h-3.5 w-3.5 rounded border-zinc-300 text-navy focus:ring-navy"
+                          />
+                          {teamLabel(t)}
+                        </label>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
               {editError && <p className="text-xs text-red-600">{editError}</p>}

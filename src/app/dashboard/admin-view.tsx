@@ -30,6 +30,9 @@ import type {
   WhatsAppGroup,
 } from "./page";
 import type { BirthdaySource } from "./birthdays";
+import type { EventRoleType } from "./event-tasks";
+import type { VolunteerNeed } from "./event-volunteer-needs";
+import { formatPersonName } from "@/lib/names";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 
@@ -47,6 +50,8 @@ export default function AdminView({
   canonicalTeamRefs,
   whatsappGroups,
   automationSettings,
+  eventRoles,
+  volunteerNeedsByEventId,
   familySection = null,
 }: {
   clubFunction?: string | null;
@@ -62,6 +67,11 @@ export default function AdminView({
   canonicalTeamRefs: { id: string; name: string | null; category: string | null }[];
   whatsappGroups: WhatsAppGroup[];
   automationSettings: Record<AutomationKey, boolean>;
+  // Catalogue des rôles d'organisation (buvette, table de marque...) et
+  // besoins déjà définis par événement — pour créer/gérer les besoins en
+  // bénévoles directement depuis la carte de l'événement.
+  eventRoles: EventRoleType[];
+  volunteerNeedsByEventId: Record<string, VolunteerNeed[]>;
   // Repris de l'espace Parent (family-view.tsx) : un membre du Bureau qui
   // a aussi des enfants (ou sa propre fiche joueur) n'a plus un onglet
   // "Mon espace" séparé, du même poids que "Bureau" — sa vie de parent
@@ -80,6 +90,15 @@ export default function AdminView({
     if (!e.teamId) return;
     (eventsByTeamId[e.teamId] ??= []).push(e);
   });
+
+  // Pour le "+ Affecter..." du panneau Besoins en bénévoles : n'importe
+  // quel membre du club, pas seulement l'effectif d'une équipe — un
+  // bénévole de buvette n'a pas besoin d'être joueur ou coach de l'équipe
+  // qui joue ce jour-là.
+  const volunteerRoster = members.map((m) => ({
+    id: m.id,
+    name: formatPersonName(m.firstName, m.lastName, "Membre"),
+  }));
 
   const iconClass = "h-4 w-4 shrink-0";
   const sections: AdminSection[] = [
@@ -122,6 +141,9 @@ export default function AdminView({
           createTeams={teamRefs}
           allowClubWide
           birthdayMembers={birthdayMembers}
+          eventRoles={eventRoles}
+          volunteerNeedsByEventId={volunteerNeedsByEventId}
+          volunteerRoster={volunteerRoster}
         />
       ),
     },

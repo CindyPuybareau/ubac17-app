@@ -17,6 +17,7 @@ import type { AdminCotisation, AdminUpcomingEvent, WhatsAppGroup } from "./page"
 import type { UpcomingEvent } from "./family-data";
 import type { BirthdaySource } from "./birthdays";
 import type { CarpoolOffer, EventRoleType, EventTasksState } from "./event-tasks";
+import type { VolunteerNeed } from "./event-volunteer-needs";
 
 const emptyEventTasks: EventTasksState = {};
 
@@ -44,6 +45,7 @@ export default function FamilyView({
   carpoolByEventId,
   whatsappGroups,
   eventRoles,
+  volunteerNeedsByEventId,
   cotisations,
 }: {
   events: AdminUpcomingEvent[];
@@ -57,6 +59,10 @@ export default function FamilyView({
   carpoolByEventId: Record<string, CarpoolOffer[]>;
   whatsappGroups: WhatsAppGroup[];
   eventRoles: EventRoleType[];
+  // Besoins en bénévoles (buvette, table de marque...) des événements club
+  // ciblés/ouverts à tous — affichés en lecture "Je m'en occupe" seulement,
+  // jamais en gestion (réservée au Bureau, voir admin-view.tsx).
+  volunteerNeedsByEventId: Record<string, VolunteerNeed[]>;
   cotisations: AdminCotisation[];
 }) {
   const iconClass = "h-4 w-4 shrink-0";
@@ -72,13 +78,23 @@ export default function FamilyView({
   );
 
   // Un événement concerne la famille s'il vise l'équipe d'un des enfants
-  // affichés, ou tout le club (teamId null).
+  // affichés, tout le club (teamId et targetTeamIds tous deux null), ou
+  // réserve l'événement à quelques équipes dont une correspond à un enfant
+  // affiché (targetTeamIds, voir 20261012000000) — sans ce dernier cas, un
+  // enfant sélectionné seul dans une famille à plusieurs enfants pouvait
+  // encore voir un événement réservé à l'équipe d'un AUTRE de ses frères et
+  // sœurs, teamId étant null dans les deux cas (club entier ou ciblé).
   const visibleTeamIds = useMemo(
     () => new Set(visiblePlayers.flatMap((p) => p.teamIds)),
     [visiblePlayers]
   );
   const visibleEvents = useMemo(
-    () => events.filter((e) => !e.teamId || visibleTeamIds.has(e.teamId)),
+    () =>
+      events.filter((e) => {
+        if (e.teamId) return visibleTeamIds.has(e.teamId);
+        if (e.targetTeamIds) return e.targetTeamIds.some((id) => visibleTeamIds.has(id));
+        return true;
+      }),
     [events, visibleTeamIds]
   );
   const visibleTeamCards = useMemo(() => {
@@ -176,6 +192,7 @@ export default function FamilyView({
             tasksByEventId={tasksByEventId}
             carpoolByEventId={carpoolByEventId}
             eventRoles={eventRoles}
+            volunteerNeedsByEventId={volunteerNeedsByEventId}
           />
           <CalendarSubscribe />
           <ChildAccessManager />

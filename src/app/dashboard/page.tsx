@@ -33,6 +33,7 @@ import {
   type EventTasksState,
   type SeasonTaskTally,
 } from "./event-tasks";
+import { getVolunteerNeedsByEventId, type VolunteerNeed } from "./event-volunteer-needs";
 
 type PlayerRow = {
   id: string;
@@ -259,6 +260,11 @@ export type AdminUpcomingEvent = {
   end_time: string | null;
   notes: string | null;
   teamId: string | null;
+  // Événement club réservé à quelques équipes (voir 20261012000000) —
+  // null pour un événement à une seule équipe ou vraiment "Tous les
+  // groupes". Sert à préremplir le sélecteur de portée en édition et à
+  // afficher un badge "Équipes ciblées" au lieu de "Tous les groupes".
+  targetTeamIds: string[] | null;
   teamName: string;
   rsvpCounts: {
     present: number;
@@ -307,6 +313,27 @@ function isMinor(birthDate: string | null): boolean {
     (todayMonth - 1 === birth.getMonth() && todayDay >= birth.getDate());
   if (!hadBirthdayThisYear) age -= 1;
   return age < 18;
+}
+
+// "Tous les groupes" ne veut plus dire "team_id null" à lui seul depuis
+// target_team_ids (20261012000000) : un événement réservé à deux équipes
+// a aussi team_id null, mais concerne précisément CES équipes-là, pas tout
+// le club — leur montrer "Tous les groupes" serait trompeur. teamsById
+// peut être partiel (scope de la requête appelante) : un id absent est
+// simplement omis plutôt que de casser l'affichage.
+function resolveEventTeamName<T extends { name: string | null }>(
+  team: { name: string | null } | null,
+  targetTeamIds: string[] | null,
+  teamsById: Map<string, T>
+): string {
+  if (team) return team.name ?? "Équipe";
+  if (targetTeamIds && targetTeamIds.length > 0) {
+    const names = targetTeamIds
+      .map((id) => teamsById.get(id)?.name)
+      .filter((n): n is string => Boolean(n));
+    return names.length > 0 ? names.join(", ") : "Équipes sélectionnées";
+  }
+  return "Tous les groupes";
 }
 
 // Plain (non-component) helper so the "now" read doesn't happen inside the
@@ -631,6 +658,7 @@ export default async function DashboardPage() {
   let adminCollectes: AdminCollecte[] = [];
   let adminCategoryTariffs: AdminCategoryTariff[] = [];
   let adminUpcomingEvents: AdminUpcomingEvent[] = [];
+  let adminVolunteerNeedsByEventId: Record<string, VolunteerNeed[]> = {};
   let adminMembers: AdminMember[] = [];
   // The Membres table's team pickers (filter + "Modifier le profil") only
   // offer teams with a sort_order set — any future leftover/legacy import
@@ -700,7 +728,7 @@ export default async function DashboardPage() {
       supabase
         .from("events")
         .select(
-          "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, teams(id, name, category)"
+          "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, teams(id, name, category)"
         )
         .order("start_time", { ascending: true }),
       supabase.from("parent_player").select("parent_id, player_id"),
@@ -1097,10 +1125,19 @@ export default async function DashboardPage() {
         end_time: e.end_time,
         notes: e.notes,
         teamId: team?.id ?? null,
-        teamName: team?.name ?? "Tous les groupes",
+        targetTeamIds: e.target_team_ids ?? null,
+        teamName: resolveEventTeamName(team, e.target_team_ids ?? null, teamsById),
         rsvpCounts: buildRsvpCounts(rsvpsByEvent, e.id, rosterSize),
       };
     });
+
+    // Besoins en bénévoles de tous les événements à venir : le Bureau doit
+    // pouvoir en ajouter/gérer sur n'importe lequel depuis le calendrier,
+    // pas seulement ceux de la zone prioritaire.
+    const upcomingAdminEventIds = adminUpcomingEvents
+      .filter((e) => new Date(e.start_time).getTime() >= Date.now())
+      .map((e) => e.id);
+    adminVolunteerNeedsByEventId = await getVolunteerNeedsByEventId(supabase, upcomingAdminEventIds);
   }
 
   let coachTeamsWithRoster: TeamWithMembers[] = [];
@@ -1110,6 +1147,7 @@ export default async function DashboardPage() {
   let coachTeamRoleByTeamId: Record<string, "COACH" | "PLAYER"> = {};
   let coachClubTeams: AdminMemberTeam[] = [];
   let coachOrganisationTasks: Record<string, EventTasksState> = {};
+  let coachVolunteerNeedsByEventId: Record<string, VolunteerNeed[]> = {};
   const coachContactPhoneByPlayerId: Record<string, string> = {};
   const coachContactEmailByPlayerId: Record<string, string> = {};
   const coachMemberDetailsByPlayerId: Record<string, MemberDetail> = {};
@@ -1158,7 +1196,7 @@ export default async function DashboardPage() {
         supabase
           .from("events")
           .select(
-            "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, teams(id, name, category)"
+            "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, teams(id, name, category)"
           )
           .or(teamOrClubWideFilter(coachCalendarTeamIds))
           .order("start_time", { ascending: true }),
@@ -1515,7 +1553,8 @@ export default async function DashboardPage() {
         end_time: e.end_time,
         notes: e.notes,
         teamId: team?.id ?? null,
-        teamName: team?.name ?? "Tous les groupes",
+        targetTeamIds: e.target_team_ids ?? null,
+        teamName: resolveEventTeamName(team, e.target_team_ids ?? null, clubTeamById),
         rsvpCounts: buildRsvpCounts(rsvpsByEvent, e.id, rosterSize),
       };
     });
@@ -1530,11 +1569,16 @@ export default async function DashboardPage() {
       ...eventTasksByEventId,
       ...(await getEventTasksByEventId(supabase, upcomingCoachEventIds)),
     };
+    coachVolunteerNeedsByEventId = await getVolunteerNeedsByEventId(
+      supabase,
+      upcomingCoachEventIds
+    );
   }
 
   // Parent/joueur: un seul calendrier lecture-seule + RSVP, tous enfants confondus.
   let familyEvents: AdminUpcomingEvent[] = [];
   let familyOrganisationTasks: Record<string, EventTasksState> = {};
+  let familyVolunteerNeedsByEventId: Record<string, VolunteerNeed[]> = {};
   let familyRsvpPlayers: { id: string; name: string; teamIds: string[] }[] = [];
   const familyRsvpStatusByKey: Record<string, string> = {};
   const familyBirthdayMembers: BirthdaySource[] = [];
@@ -1564,6 +1608,22 @@ export default async function DashboardPage() {
       string,
       (Person & { birthDate: string | null })[]
     >();
+    // Hissé hors du bloc teamsQueryResults comme rosterByTeamId ci-dessus :
+    // familyEvents (plus bas, hors de ce bloc) en a besoin pour nommer un
+    // événement club réservé à quelques équipes (target_team_ids) — sinon
+    // limité aux seules équipes des enfants, mais c'est déjà tout ce que
+    // cette page charge pour cette famille (voir resolveEventTeamName).
+    const teamsById = new Map<
+      string,
+      {
+        id: string;
+        name: string | null;
+        category: string | null;
+        ffbb_url: string | null;
+        sort_order: number | null;
+        pending_coach_names: string | null;
+      }
+    >();
 
     // Ces trois groupes de requêtes ne dépendent que de allTeamIds /
     // familyPlayerIds, déjà connus ci-dessus — jamais les uns des autres —
@@ -1592,7 +1652,7 @@ export default async function DashboardPage() {
       supabase
         .from("events")
         .select(
-          "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, teams(id, name, category)"
+          "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, teams(id, name, category)"
         )
         .or(teamOrClubWideFilter(allTeamIds))
         .order("start_time", { ascending: true }),
@@ -1615,9 +1675,7 @@ export default async function DashboardPage() {
       const [teamsRes, teammateRowsRes, teamCoachesRes, teamPendingCoachesRes] =
         teamsQueryResults;
 
-      const teamsById = new Map(
-        (teamsRes.data ?? []).map((t) => [t.id, t])
-      );
+      (teamsRes.data ?? []).forEach((t) => teamsById.set(t.id, t));
       const seenTeammateIds = new Set<string>();
       // Un même joueur peut apparaître dans plusieurs lignes (une par
       // équipe) : accumulé à part plutôt que de ne garder que la première
@@ -1746,7 +1804,8 @@ export default async function DashboardPage() {
         end_time: e.end_time,
         notes: e.notes,
         teamId: team?.id ?? null,
-        teamName: team?.name ?? "Tous les groupes",
+        targetTeamIds: e.target_team_ids ?? null,
+        teamName: resolveEventTeamName(team, e.target_team_ids ?? null, teamsById),
         rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
       };
     });
@@ -1790,6 +1849,10 @@ export default async function DashboardPage() {
         : null,
       getEventTasksByEventId(supabase, upcomingFamilyEventIds),
     ]);
+    familyVolunteerNeedsByEventId = await getVolunteerNeedsByEventId(
+      supabase,
+      upcomingFamilyEventIds
+    );
 
     // Statuts par équipe/événement, pour construire à la fois
     // familyRsvpStatusByKey (boutons Présent/Absent de ses propres
@@ -1921,6 +1984,7 @@ export default async function DashboardPage() {
         carpoolByEventId={carpoolOffersByEventId}
         whatsappGroups={whatsappGroups}
         eventRoles={eventRoleTypes}
+        volunteerNeedsByEventId={familyVolunteerNeedsByEventId}
         cotisations={familyCotisations}
       />
     ) : null;
@@ -1944,6 +2008,8 @@ export default async function DashboardPage() {
           canonicalTeamRefs={canonicalTeamRefs}
           whatsappGroups={whatsappGroups}
           automationSettings={adminAutomationSettings}
+          eventRoles={eventRoleTypes}
+          volunteerNeedsByEventId={adminVolunteerNeedsByEventId}
           familySection={foldFamilyIntoAdmin ? familyViewElement : null}
         />
       ),
@@ -1975,6 +2041,7 @@ export default async function DashboardPage() {
           carpoolByEventId={carpoolOffersByEventId}
           whatsappGroups={whatsappGroups}
           eventRoles={eventRoleTypes}
+          volunteerNeedsByEventId={coachVolunteerNeedsByEventId}
           ownPlayerId={ownPlayerId}
           showOwnPlayerSummary={foldFamilyIntoCoach}
           ownCotisations={

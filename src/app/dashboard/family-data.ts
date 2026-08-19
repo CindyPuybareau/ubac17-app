@@ -9,6 +9,7 @@ export type UpcomingEvent = {
   salle: string | null;
   start_time: string;
   team_id: string | null;
+  target_team_ids: string[] | null;
   // Date de la demande de presences faite par le coach, null si aucune.
   attendance_requested_at: string | null;
   // Ecrite par le coach/Bureau a la creation ou la modification de
@@ -29,13 +30,18 @@ export type RsvpCounts = {
   late: number;
 };
 
-// Club-wide events (team_id null — e.g. a summer stage open to every
-// category) must surface alongside a team's own events for every role,
-// not just the Bureau. PostgREST's .in() alone excludes NULL rows, so we
-// build an explicit "team_id is null OR team_id in (...)" filter instead.
+// Club-wide events (team_id null, target_team_ids null — e.g. a summer
+// stage open to every category) must surface alongside a team's own
+// events for every role, not just the Bureau. A THIRD case sits between
+// the two : team_id null but target_team_ids filled (a club event
+// reserved to a few teams, see 20261012000000) — visible only if one of
+// nos équipes apparaît dans ce tableau. PostgREST's .in() alone excludes
+// NULL rows, so we build an explicit OR filter combining all three
+// (target_team_ids.ov = "overlaps", l'équivalent PostgREST de &&).
 export function teamOrClubWideFilter(teamIds: string[]): string {
-  if (teamIds.length === 0) return "team_id.is.null";
-  return `team_id.is.null,team_id.in.(${teamIds.join(",")})`;
+  if (teamIds.length === 0) return "and(team_id.is.null,target_team_ids.is.null)";
+  const idList = teamIds.join(",");
+  return `and(team_id.is.null,target_team_ids.is.null),team_id.in.(${idList}),target_team_ids.ov.{${idList}}`;
 }
 
 export async function getNextEventForTeams(
@@ -44,7 +50,7 @@ export async function getNextEventForTeams(
 ): Promise<UpcomingEvent | null> {
   const { data } = await supabase
     .from("events")
-    .select("id, title, event_type, location, salle, start_time, team_id, attendance_requested_at, notes")
+    .select("id, title, event_type, location, salle, start_time, team_id, target_team_ids, attendance_requested_at, notes")
     .or(teamOrClubWideFilter(teamIds))
     .gte("start_time", new Date().toISOString())
     .order("start_time", { ascending: true })
@@ -61,7 +67,7 @@ export async function getUpcomingEventsForTeam(
 ): Promise<UpcomingEvent[]> {
   const { data } = await supabase
     .from("events")
-    .select("id, title, event_type, location, salle, start_time, team_id, attendance_requested_at, notes")
+    .select("id, title, event_type, location, salle, start_time, team_id, target_team_ids, attendance_requested_at, notes")
     .eq("team_id", teamId)
     .gte("start_time", new Date().toISOString())
     .order("start_time", { ascending: true })
