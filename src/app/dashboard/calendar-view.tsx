@@ -615,7 +615,10 @@ export default function CalendarView({
         className={`flex flex-col gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm border-l-4 ${style.border}`}
       >
         <div className="flex items-start justify-between gap-2">
-          <div className="flex flex-col gap-1">
+          {/* min-w-0 : même correctif que renderResultCard plus bas — sans
+              lui, le nom d'adversaire le plus long forçait toute la carte
+              (et l'écran, en mobile) à déborder au lieu de tronquer. */}
+          <div className="flex min-w-0 flex-col gap-1">
             <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
               {event.teamName}
             </span>
@@ -860,7 +863,15 @@ export default function CalendarView({
         key={event.id}
         className={`flex items-start justify-between gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm border-l-4 ${style.border}`}
       >
-        <div className="flex flex-col gap-1">
+        {/* min-w-0 indispensable ici : sans lui, un flex-item garde par
+            défaut sa largeur de contenu maximale (min-width: auto), donc le
+            nom de l'adversaire le plus long forçait toute la carte — et la
+            page entière en mobile — à déborder à droite, poussant les
+            boutons Modifier/Supprimer hors du cadre au lieu de les garder
+            dedans. OpponentDisplay a déjà son propre min-w-0 + truncate,
+            mais ça ne sert à rien sans celui-ci sur le parent (retour de
+            Cindy du 2026-08-20, capture mobile "Résultats"). */}
+        <div className="flex min-w-0 flex-col gap-1">
           <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
             {event.teamName}
           </span>

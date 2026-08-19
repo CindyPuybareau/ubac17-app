@@ -117,7 +117,10 @@ export default function VolunteerNeedsPanel({
     });
     setPending(null);
     if (insertError) {
-      setError("Ajout impossible, réessaie.");
+      // Même correctif de clarté que volunteer()/removeNeed() plus haut
+      // (retour de Cindy du 2026-08-20) : la vraie cause plutôt qu'un
+      // message générique qui ne dit rien en cas d'échec.
+      setError(`Ajout impossible : ${insertError.message}`);
       return;
     }
     setNewRoleCode(STANDARD_VOLUNTEER_ROLES[0].code);
