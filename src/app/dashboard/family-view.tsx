@@ -14,18 +14,12 @@ import NextConvocationCard from "./next-convocation-card";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import WhatsAppGroupsFamily from "./whatsapp-groups-family";
 import type { AdminCotisation, AdminUpcomingEvent, WhatsAppGroup } from "./page";
-import type { UpcomingEvent } from "./family-data";
+import type { ConvocationCard } from "./family-data";
 import type { BirthdaySource } from "./birthdays";
 import type { CarpoolOffer, EventRoleType, EventTasksState } from "./event-tasks";
 import type { VolunteerNeed } from "./event-volunteer-needs";
 
 const emptyEventTasks: EventTasksState = {};
-
-type ConvocationCard = {
-  player: { id: string; name: string; category: string | null; isSelf: boolean };
-  event: UpcomingEvent;
-  status: string;
-};
 
 // Navigation à 2 onglets, zéro redondance : "Planning & Matchs" concentre
 // tout ce qui est chronologique (prochain rendez-vous en tête, puis tous

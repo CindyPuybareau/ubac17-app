@@ -581,6 +581,24 @@ export default async function DashboardPage() {
     (c): c is NonNullable<typeof c> => Boolean(c)
   );
 
+  // Le propre prochain événement du coach en tant que JOUEUR, sur une
+  // équipe qu'il ne coache pas (ex. Basile, joueur Séniors 1, coach
+  // U13F/U13M/U13M-1) : "Planning & Rôles" ne montrait jusqu'ici que le
+  // prochain événement de chaque équipe COACHÉE, jamais le sien propre —
+  // retour de Cindy du 2026-08-20, "ça devrait apparaître en premier
+  // puisque c'est le prochain événement de son profil". convocationCards
+  // (zone prioritaire, calculée juste au-dessus) contient déjà cette info
+  // pour tout joueur lié, lui compris (voir ownPlayerRow plus haut) — pas
+  // besoin d'une requête de plus, juste retrouver sa propre entrée. Rien
+  // à afficher si son équipe est déjà une équipe coachée (déjà couverte
+  // par sa propre carte juste au-dessus, pas de doublon).
+  const ownPlayerNextEvent =
+    convocationCards.find(
+      (c) =>
+        c.player.id === ownPlayerId &&
+        !(c.event.team_id && coachedTeamIds.has(c.event.team_id))
+    ) ?? null;
+
   type WhatsAppGroupRow = {
     id: string;
     name: string;
@@ -2050,6 +2068,7 @@ export default async function DashboardPage() {
           eventRoles={eventRoleTypes}
           volunteerNeedsByEventId={coachVolunteerNeedsByEventId}
           ownPlayerId={ownPlayerId}
+          ownPlayerNextEvent={ownPlayerNextEvent}
           showOwnPlayerSummary={foldFamilyIntoCoach}
           ownCotisations={
             foldFamilyIntoCoach

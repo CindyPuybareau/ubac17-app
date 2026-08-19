@@ -24,6 +24,7 @@ import type {
 } from "./event-tasks";
 import type { VolunteerNeed } from "./event-volunteer-needs";
 import type { BirthdaySource } from "./birthdays";
+import type { ConvocationCard } from "./family-data";
 
 export default function CoachView({
   teams,
@@ -45,6 +46,7 @@ export default function CoachView({
   eventRoles,
   volunteerNeedsByEventId = {},
   ownPlayerId,
+  ownPlayerNextEvent = null,
   showOwnPlayerSummary = false,
   ownCotisations = [],
 }: {
@@ -79,6 +81,13 @@ export default function CoachView({
   // existe — un coach qui joue aussi dans une autre équipe doit pouvoir
   // répondre présent/absent pour LUI-MÊME sur ses propres matchs.
   ownPlayerId: string | null;
+  // Le prochain événement de ce coach en tant que JOUEUR, sur une équipe
+  // qu'il ne coache pas (ex. Basile, joueur Séniors 1) — null si aucun, ou
+  // si son équipe de joueur est de toute façon déjà une équipe coachée
+  // (voir page.tsx, ownPlayerNextEvent). Affiché en tête de "Planning &
+  // Rôles", trié par date avec les cartes des équipes coachées (retour de
+  // Cindy du 2026-08-20).
+  ownPlayerNextEvent?: ConvocationCard | null;
   // true seulement quand ce coach n'a aucun enfant rattaché (juste sa
   // propre fiche joueur) : l'onglet "Mon espace" est alors retiré et cet
   // espace reprend ses deux derniers morceaux (relance de présence,
@@ -196,6 +205,7 @@ export default function CoachView({
           rsvpReasonByKey={rsvpReasonByKey}
           roles={eventRoles}
           ownPlayerId={ownPlayerId}
+          ownPlayerNextEvent={ownPlayerNextEvent}
         />
       ),
     },

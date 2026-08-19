@@ -23,6 +23,17 @@ export type RosterPlayer = {
   last_name: string | null;
 };
 
+// Prochaine convocation d'un joueur lié au compte courant — soi-même
+// compris (voir page.tsx, ownPlayerRow) : un adulte inscrit lui-même
+// (Séniors, Loisirs...) a aussi sa propre carte. Partagé entre family-view
+// (tous les enfants) et coach-organisation (le coach lui-même, sur une
+// équipe qu'il ne coache pas — voir ownPlayerNextEvent dans page.tsx).
+export type ConvocationCard = {
+  player: { id: string; name: string; category: string | null; isSelf: boolean };
+  event: UpcomingEvent;
+  status: string;
+};
+
 export type RsvpCounts = {
   present: number;
   pending: number;

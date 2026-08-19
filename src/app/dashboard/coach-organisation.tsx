@@ -5,10 +5,11 @@ import { CalendarCheck2, CalendarDays, ChevronDown, ChevronUp, Trophy } from "lu
 import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
 import { formatPersonName } from "@/lib/names";
 import CoachNextMatchCard from "./coach-next-match-card";
+import NextConvocationCard from "./next-convocation-card";
 import { formatEventTime, styleFor } from "./calendar-view";
 import { rolesForEventType } from "./event-tasks";
 import SalleBadge from "./salle-badge";
-import type { RosterPlayer, RsvpCounts, UpcomingEvent } from "./family-data";
+import type { ConvocationCard, RosterPlayer, RsvpCounts, UpcomingEvent } from "./family-data";
 import TaskSourceBadge from "./task-source-badge";
 import RoleIcon from "./role-icon";
 import type {
@@ -74,6 +75,7 @@ function PlanningTab({
   rsvpReasonByKey,
   roles,
   ownPlayerId,
+  ownPlayerNextEvent,
 }: {
   cards: CoachTeamMatchCard[];
   tasksByEventId: Record<string, EventTasksState>;
@@ -84,29 +86,76 @@ function PlanningTab({
   rsvpReasonByKey: Record<string, string | null>;
   roles: EventRoleType[];
   ownPlayerId: string | null;
+  // Le prochain événement du coach lui-même, sur une équipe qu'il ne
+  // coache pas (ex. Basile, joueur Séniors 1) — fusionné et trié par date
+  // avec les cartes d'équipes coachées ci-dessous, pas relégué à part :
+  // retour de Cindy du 2026-08-20, "ça devrait apparaître en premier
+  // puisque c'est le prochain événement de son profil".
+  ownPlayerNextEvent: ConvocationCard | null;
 }) {
+  type PlanningCardItem =
+    | { kind: "team"; sortDate: string | null; card: CoachTeamMatchCard }
+    | { kind: "own"; sortDate: string; card: ConvocationCard };
+
+  const planningItems: PlanningCardItem[] = [
+    ...cards.map((c): PlanningCardItem => ({ kind: "team", sortDate: c.event?.start_time ?? null, card: c })),
+    ...(ownPlayerNextEvent
+      ? [{ kind: "own" as const, sortDate: ownPlayerNextEvent.event.start_time, card: ownPlayerNextEvent }]
+      : []),
+  ].sort((a, b) => {
+    // Sans date (aucun événement à venir pour cette équipe), la carte
+    // reste en fin de liste plutôt que de fausser le tri chronologique.
+    if (a.sortDate === null && b.sortDate === null) return 0;
+    if (a.sortDate === null) return 1;
+    if (b.sortDate === null) return -1;
+    return a.sortDate.localeCompare(b.sortDate);
+  });
+
   return (
     <div className="flex flex-col gap-4">
-      {cards.map(({ team, event, counts, roster }) => (
-        <CoachNextMatchCard
-          key={team.id}
-          teamName={`${team.name ?? "Équipe"}${
-            team.category && team.category !== team.name ? ` · ${team.category}` : ""
-          }`}
-          event={event}
-          counts={counts}
-          roster={roster}
-          tasks={event ? (tasksByEventId[event.id] ?? emptyEventTasks) : emptyEventTasks}
-          carpool={event ? (carpoolByEventId[event.id] ?? []) : []}
-          volunteerNeeds={event ? (volunteerNeedsByEventId[event.id] ?? []) : []}
-          rsvpStatusByKey={rsvpStatusByKey}
-          rsvpReasonByKey={rsvpReasonByKey}
-          roles={roles}
-          // Ce coach est-il lui-même sur CETTE équipe précise ? (il peut
-          // coacher plusieurs équipes sans jouer dans toutes.)
-          selfPlayerId={ownPlayerId && roster.some((p) => p.id === ownPlayerId) ? ownPlayerId : null}
-        />
-      ))}
+      {planningItems.map((item) =>
+        item.kind === "team" ? (
+          <CoachNextMatchCard
+            key={item.card.team.id}
+            teamName={`${item.card.team.name ?? "Équipe"}${
+              item.card.team.category && item.card.team.category !== item.card.team.name
+                ? ` · ${item.card.team.category}`
+                : ""
+            }`}
+            event={item.card.event}
+            counts={item.card.counts}
+            roster={item.card.roster}
+            tasks={item.card.event ? (tasksByEventId[item.card.event.id] ?? emptyEventTasks) : emptyEventTasks}
+            carpool={item.card.event ? (carpoolByEventId[item.card.event.id] ?? []) : []}
+            volunteerNeeds={item.card.event ? (volunteerNeedsByEventId[item.card.event.id] ?? []) : []}
+            rsvpStatusByKey={rsvpStatusByKey}
+            rsvpReasonByKey={rsvpReasonByKey}
+            roles={roles}
+            // Ce coach est-il lui-même sur CETTE équipe précise ? (il peut
+            // coacher plusieurs équipes sans jouer dans toutes.)
+            selfPlayerId={
+              ownPlayerId && item.card.roster.some((p) => p.id === ownPlayerId) ? ownPlayerId : null
+            }
+          />
+        ) : (
+          <NextConvocationCard
+            key={`own-${item.card.player.id}`}
+            playerName={item.card.player.name}
+            playerId={item.card.player.id}
+            event={item.card.event}
+            status={item.card.status}
+            // canAssignAnyone reste faux côté NextConvocationCard : ici le
+            // coach n'est que joueur, pas gestionnaire de cette équipe —
+            // pas besoin du roster complet pour le sélecteur d'attribution
+            // qu'il ne verra jamais.
+            roster={[]}
+            tasks={tasksByEventId[item.card.event.id] ?? emptyEventTasks}
+            carpool={carpoolByEventId[item.card.event.id] ?? []}
+            roles={roles}
+            volunteerNeeds={volunteerNeedsByEventId[item.card.event.id] ?? []}
+          />
+        )
+      )}
 
       <div className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm sm:p-5">
         <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
@@ -391,6 +440,7 @@ export default function CoachOrganisation({
   rsvpReasonByKey,
   roles,
   ownPlayerId = null,
+  ownPlayerNextEvent = null,
 }: {
   cards: CoachTeamMatchCard[];
   tasksByEventId: Record<string, EventTasksState>;
@@ -405,6 +455,9 @@ export default function CoachOrganisation({
   // MatchTasksPanel de le reconnaître sur ses propres matchs coachés, où
   // il n'était jusqu'ici jamais "lui-même" (voir CoachNextMatchCard).
   ownPlayerId?: string | null;
+  // Son propre prochain événement en tant que joueur, sur une équipe qu'il
+  // ne coache pas — voir PlanningTab plus haut.
+  ownPlayerNextEvent?: ConvocationCard | null;
 }) {
   const [tab, setTab] = useState<SubTab>("planning");
   useScrollTopOnChange(tab);
@@ -455,6 +508,7 @@ export default function CoachOrganisation({
           rsvpReasonByKey={rsvpReasonByKey}
           roles={roles}
           ownPlayerId={ownPlayerId}
+          ownPlayerNextEvent={ownPlayerNextEvent}
         />
       ) : (
         <div className="flex flex-col gap-4">
