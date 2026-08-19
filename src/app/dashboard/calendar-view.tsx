@@ -751,14 +751,6 @@ export default function CalendarView({
             {rsvpVisiblePlayers.map((p) => {
               const playerStatus =
                 rsvp?.statusByKey[`${event.id}:${p.id}`] ?? "PENDING";
-              const badge =
-                playerStatus === "PRESENT"
-                  ? { label: "Présent", dotClassName: "bg-green-500", className: "bg-green-100 text-green-700" }
-                  : playerStatus === "ABSENT"
-                    ? { label: "Absent", dotClassName: "bg-red-500", className: "bg-red-100 text-red-700" }
-                    : playerStatus === "LATE"
-                      ? { label: "En retard", dotClassName: "bg-amber-500", className: "bg-amber-100 text-amber-700" }
-                      : { label: "En attente", dotClassName: "bg-zinc-400", className: "bg-zinc-100 text-zinc-600" };
               return (
                 <div key={p.id} className="flex flex-wrap items-center gap-2">
                   {rsvpVisiblePlayers.length > 1 && (
@@ -766,12 +758,10 @@ export default function CalendarView({
                       {p.name}
                     </span>
                   )}
-                  <span
-                    className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${badge.className}`}
-                  >
-                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${badge.dotClassName}`} />
-                    {badge.label}
-                  </span>
+                  {/* Plus de pastille "Présent/Absent" séparée à côté des
+                      boutons : le bouton actif (RsvpButtons) porte déjà
+                      cette information, la répéter juste à côté faisait
+                      doublon (retour de Cindy du 2026-08-20). */}
                   <RsvpButtons
                     eventId={event.id}
                     playerId={p.id}
