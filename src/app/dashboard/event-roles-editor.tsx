@@ -5,7 +5,11 @@ import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronUp, Pencil, Plus, Settings, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import RoleIcon, { ROLE_ICONS, ROLE_ICON_NAMES } from "./role-icon";
-import { styleFor } from "./calendar-view";
+// Depuis ./event-style directement, pas ./calendar-view : ce fichier-là
+// réexporte styleFor mais importe lui-même EventRolesEditor plus bas dans
+// ce chantier (2026-08-19) — passer par calendar-view.tsx créerait un
+// cycle d'imports.
+import { styleFor } from "./event-style";
 import type { EventRoleType } from "./event-tasks";
 
 // Les types d'événement proposés à la restriction. Une table de marque

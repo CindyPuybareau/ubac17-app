@@ -60,6 +60,7 @@ import {
   type EventTasksState,
 } from "./event-tasks";
 import VolunteerNeedsPanel from "./volunteer-needs-panel";
+import EventRolesEditor from "./event-roles-editor";
 import type { VolunteerNeed } from "./event-volunteer-needs";
 
 const emptyEventTasks: EventTasksState = {};
@@ -844,6 +845,18 @@ export default function CalendarView({
             canManage={false}
             roster={[]}
           />
+        )}
+        {/* Accès direct au catalogue des rôles depuis la carte, pour
+            ajouter un rôle qui n'existe pas encore (ex. "Photographe") sans
+            quitter l'événement en cours — retour de Cindy du 2026-08-19,
+            explicitement exclu des entraînements ("cet onglet doit être
+            présent... sauf les entraînements"), contrairement au panneau
+            de besoins juste en dessous (lui reste voulu même sur un
+            entraînement, retour antérieur du même jour — voir le
+            commentaire au-dessus de VolunteerNeedsPanel). Repliée par
+            défaut (comportement natif du composant). */}
+        {canManageEvent && event.event_type !== "TRAINING" && (
+          <EventRolesEditor roles={eventRoles} />
         )}
         {canManageEvent && (
           <VolunteerNeedsPanel
