@@ -134,6 +134,16 @@ export default function TeamCard({
   // "Changer d'équipe" instead of "Retirer" — a coach lending a player to
   // another team is the real need; plain removal stays a Bureau gesture.
   clubTeams,
+  // Ce garde-fou n'était en réalité jamais appliqué : canSwitchTeam
+  // retombait sur le simple lien "Retirer" dès qu'il n'y avait pas
+  // d'équipe sœur vers laquelle basculer (cas de Basile/U13F, seule
+  // équipe de sa catégorie) — un coach pouvait donc bel et bien retirer
+  // un joueur de son équipe, alors que ça n'a jamais été voulu (retour de
+  // Cindy du 2026-08-20 : "les coachs ne peuvent pas supprimer des
+  // membres de leur équipe, cet accès est réservé au bureau"). Vrai
+  // droit dédié plutôt que readOnly, qui couvre bien plus large (Bureau
+  // ET coach sur sa propre équipe valent tous les deux readOnly=false).
+  canRemoveMembers = true,
   // Groupe WhatsApp de CETTE équipe (whatsapp_groups). En coach (readOnly
   // false), un bouton "Configurer WhatsApp" ouvre le lien d'invitation et
   // les membres — plus besoin d'un onglet séparé pour ça. En joueur
@@ -155,6 +165,7 @@ export default function TeamCard({
   showWhatsApp?: boolean;
   clubTeams?: AdminMemberTeam[];
   whatsappGroup?: WhatsAppGroup | null;
+  canRemoveMembers?: boolean;
 }) {
   const router = useRouter();
   const [detailPlayerId, setDetailPlayerId] = useState<string | null>(null);
@@ -674,13 +685,15 @@ export default function TeamCard({
                   {m.player &&
                     !readOnly &&
                     (isLentIn ? (
-                      <button
-                        onClick={() => setRemoveTarget(m.player)}
-                        title={`Retirer de ${team.name ?? "cette équipe"}`}
-                        className="rounded-full p-1.5 text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      canRemoveMembers && (
+                        <button
+                          onClick={() => setRemoveTarget(m.player)}
+                          title={`Retirer de ${team.name ?? "cette équipe"}`}
+                          className="rounded-full p-1.5 text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )
                     ) : canSwitchTeam ? (
                       <button
                         onClick={() => openSwitch(m.player!)}
@@ -690,12 +703,14 @@ export default function TeamCard({
                         <ArrowRightLeft className="h-3.5 w-3.5" />
                       </button>
                     ) : (
-                      <button
-                        onClick={() => setRemoveTarget(m.player)}
-                        className="shrink-0 text-xs font-medium text-red-600 hover:underline"
-                      >
-                        Retirer
-                      </button>
+                      canRemoveMembers && (
+                        <button
+                          onClick={() => setRemoveTarget(m.player)}
+                          className="shrink-0 text-xs font-medium text-red-600 hover:underline"
+                        >
+                          Retirer
+                        </button>
+                      )
                     ))}
                 </div>
               </td>

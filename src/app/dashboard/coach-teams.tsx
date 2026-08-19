@@ -97,9 +97,14 @@ export default function CoachTeams({
         clubTeams={clubTeams}
         // La création de membres et la gestion des coachs sont centralisées
         // côté Bureau : un coach ne crée pas de fiche joueur et ne retire
-        // pas un collègue de l'encadrement.
+        // pas un collègue de l'encadrement. Idem pour retirer un joueur de
+        // l'équipe (retour de Cindy du 2026-08-20) : readOnly ne suffit
+        // pas ici puisqu'il vaut déjà false pour l'équipe que ce coach
+        // entraîne (il doit pouvoir ajouter/gérer), donc le droit de
+        // retrait doit être coupé explicitement plutôt que déduit.
         allowCreatePlayer={false}
         allowAssignCoach={false}
+        canRemoveMembers={false}
         whatsappGroup={activeWhatsappGroup}
       />
 
