@@ -30,6 +30,12 @@ const WATCHED_TABLES = [
   "whatsapp_messages", // historique des messages par membre
   "collectes", // stages & événements payants
   "category_tariffs", // tarifs par catégorie
+  // Besoins d'organisation (buvette, table de marque...) : déjà publiées
+  // côté Supabase (20261012000000) mais jamais ajoutées ici — un "Je m'en
+  // occupe" n'atteignait donc les autres onglets ouverts qu'après un F5
+  // (trouvé lors de l'audit du 2026-08-20).
+  "event_volunteer_needs",
+  "event_volunteer_signups",
 ] as const;
 
 // Mounted once at the dashboard root (src/app/dashboard/page.tsx) so it
