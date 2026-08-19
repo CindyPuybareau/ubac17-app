@@ -58,7 +58,16 @@ export default function VolunteerNeedsPanel({
     });
     setPending(null);
     if (insertError) {
-      setError("Ce créneau est déjà complet.");
+      // Message générique fixe par le passé ("Ce créneau est déjà
+      // complet.") même quand la vraie cause était tout autre chose (droit
+      // refusé, etc.) — retour de Cindy du 2026-08-20 : "on ne comprend pas
+      // qui a pris l'organisation de quel évènement", un message qui ment
+      // sur la cause rend le diagnostic impossible depuis l'appli.
+      setError(
+        insertError.code === "23505"
+          ? "Ce créneau est déjà complet."
+          : `Inscription impossible : ${insertError.message}`
+      );
       return;
     }
     router.refresh();

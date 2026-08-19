@@ -89,7 +89,16 @@ export default function MatchTasksPanel({
       });
     setPending(null);
     if (insertError) {
-      setError("Déjà attribué à quelqu'un d'autre.");
+      // Message générique fixe par le passé ("Déjà attribué à quelqu'un
+      // d'autre.") même quand la vraie cause était un refus RLS (droit non
+      // couvert pour un joueur majeur agissant pour lui-même — voir la
+      // migration RLS ci-après) — retour de Cindy du 2026-08-20 : un
+      // message qui ment sur la cause rend le diagnostic impossible.
+      setError(
+        insertError.code === "23505"
+          ? "Déjà attribué à quelqu'un d'autre."
+          : `Attribution impossible : ${insertError.message}`
+      );
     }
     router.refresh();
   }
@@ -232,7 +241,7 @@ export default function MatchTasksPanel({
   return (
     <div className="mt-3 flex flex-col gap-2.5 rounded-xl border border-zinc-100 bg-zinc-50/60 p-3">
       <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-        Organisation Parents
+        Organisation
       </p>
 
       {/* Deux colonnes sur écran large, empilées sur mobile — même
