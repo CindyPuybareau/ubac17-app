@@ -68,11 +68,19 @@ export async function getVolunteerNeedsByEventId(
   const result: Record<string, VolunteerNeed[]> = {};
   if (eventIds.length === 0) return result;
 
-  const { data: needRows } = await supabase
+  const { data: needRows, error: needRowsError } = await supabase
     .from("event_volunteer_needs")
     .select("id, event_id, role_code, custom_label, required_count, sort_order")
     .in("event_id", eventIds)
     .order("sort_order", { ascending: true });
+
+  // Diagnostic temporaire (retour de Cindy du 2026-08-19/20 : besoins
+  // présents en base mais invisibles à l'écran) — l'appel ci-dessus
+  // ignorait silencieusement toute erreur ; à retirer une fois la cause
+  // confirmée.
+  if (needRowsError) {
+    console.error("[getVolunteerNeedsByEventId] select event_volunteer_needs failed:", needRowsError);
+  }
 
   const needIds = (needRows ?? []).map((row) => row.id as string);
 
