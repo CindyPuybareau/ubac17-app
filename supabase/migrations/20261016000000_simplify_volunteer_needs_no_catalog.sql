@@ -22,4 +22,12 @@ alter table public.event_volunteer_needs
 -- Parents" (maillots/goûter), exactement le bug remonté par Cindy plus tôt
 -- dans ce même chantier. "Table de marque" existait déjà avant ce
 -- chantier (pas ajouté par nous) : laissé intact.
-delete from public.event_role_types where code in ('BUVETTE', 'ARBITRAGE', 'INSTALLATION');
+--
+-- Archivage plutôt que suppression : ces 3 codes ont déjà de vraies
+-- attributions dans event_tasks (contrainte event_tasks_task_type_fkey),
+-- un delete casserait cette référence. getEventRoleTypes() exclut déjà
+-- les lignes archivées (archived_at is null) — l'ancien catalogue ne les
+-- verra donc plus, sans toucher aux attributions existantes.
+update public.event_role_types
+  set archived_at = now()
+  where code in ('BUVETTE', 'ARBITRAGE', 'INSTALLATION') and archived_at is null;
