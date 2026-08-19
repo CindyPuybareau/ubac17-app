@@ -1055,7 +1055,6 @@ export default function CalendarView({
         <CreateEventForm
           teams={createTeams}
           allowClubWide={allowClubWide}
-          roles={allowClubWide ? eventRoles : []}
           open={createOpen}
           onClose={() => setCreateOpen(false)}
         />

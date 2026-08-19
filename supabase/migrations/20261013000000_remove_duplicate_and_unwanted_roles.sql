@@ -1,0 +1,13 @@
+-- Retrait de deux rôles ajoutés par erreur dans 20261012000000 :
+-- - TABLE_MARQUE faisait doublon avec un rôle "Table de marque" déjà
+--   existant (créé avant cette migration, restreint à Match/Tournoi/
+--   Événement club) — deux entrées identiques dans le sélecteur.
+-- - PATISSERIE ("Pâtisserie / Remplacement") ne correspond à rien pour ce
+--   club, retiré à la demande de Cindy.
+-- delete plutôt qu'un simple archived_at : ces deux rôles viennent d'être
+-- créés par la migration précédente, aucun besoin/tâche réel n'a encore pu
+-- s'y attacher (la cascade on delete des tables event_volunteer_needs /
+-- event_tasks empêcherait de toute façon un delete s'il y avait une vraie
+-- ligne dépendante — via la contrainte de clé étrangère sur task_type/
+-- role_code).
+delete from public.event_role_types where code in ('TABLE_MARQUE', 'PATISSERIE');
