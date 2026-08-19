@@ -13,11 +13,15 @@ function remainingSlots(need: VolunteerNeed) {
 }
 
 // Une ligne affichée : soit un besoin réel (déjà en base), soit un rôle du
-// catalogue qui n'a encore aucun besoin défini pour CET événement — auto-
-// listé côté Bureau pour affecter en un clic, comme dans l'espace Coach
-// (voir échange avec Cindy du 2026-08-19 : "aussi simple que chez Basile").
-// Le besoin réel n'est créé qu'au moment de la première affectation, pas
-// avant — rien à remplir ni valider en amont.
+// catalogue qui n'a encore aucun besoin défini pour CET événement. Côté
+// Bureau/coach, tous les rôles s'affichent pour qu'on sache ce qui existe
+// et ce qui manque encore — mais plus aucune affectation manuelle : les
+// membres se proposent eux-mêmes ("Je m'en occupe"), et les rôles se
+// remplissent automatiquement au fil de leurs réponses (retour de Cindy
+// du 2026-08-19 : "puisque les membres vont se mettre en disponible ou
+// non disponible, les rôles vont s'afficher en automatique"). Qui gère
+// garde la main pour définir/ajuster le nombre requis et retirer
+// quelqu'un si besoin, jamais pour choisir la personne à sa place.
 type Row = { need: VolunteerNeed | null; roleCode: string };
 
 // Besoins en bénévoles d'un événement club (buvette, table de marque...).
@@ -31,7 +35,7 @@ export default function VolunteerNeedsPanel({
   roles: allRoles,
   myPlayerIds,
   canManage,
-  roster,
+  bare = false,
 }: {
   eventId: string;
   needs: VolunteerNeed[];
@@ -43,23 +47,23 @@ export default function VolunteerNeedsPanel({
   roles: EventRoleType[];
   myPlayerIds: string[];
   canManage: boolean;
-  roster: { id: string; name: string }[];
+  // Nu (sans son propre cadre/titre) pour être imbriqué dans le volet
+  // déroulant "Rôles d'organisation" (EventRolesEditor) — retour de Cindy
+  // du 2026-08-19 : un seul volet plutôt que deux blocs séparés.
+  bare?: boolean;
 }) {
   const roles = volunteerNeedRoles(allRoles);
   const router = useRouter();
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [assignPlayerId, setAssignPlayerId] = useState<Record<string, string>>({});
-  // Second créneau pour un rôle déjà couvert (ex. Buvette 14h-16h ET
-  // 16h-18h) : cas rare, gardé discret plutôt qu'un vrai formulaire —
-  // juste le rôle (déjà connu) et une tranche horaire.
-  const [extraSlotFor, setExtraSlotFor] = useState<string | null>(null);
-  const [extraSlotTimeRange, setExtraSlotTimeRange] = useState("");
+  // Définir un nouveau créneau pour un rôle — premier besoin (rows sans
+  // need réel) ou créneau supplémentaire (ex. Buvette 16h-18h en plus de
+  // 14h-16h) : même petit formulaire dans les deux cas, indexé par rôle
+  // plutôt que par besoin puisqu'un rôle virtuel n'a pas encore d'id.
+  const [addFormFor, setAddFormFor] = useState<string | null>(null);
+  const [addFormTimeRange, setAddFormTimeRange] = useState("");
+  const [addFormCount, setAddFormCount] = useState("1");
 
-  // Un rôle sans besoin réel pour cet événement devient une ligne "virtuelle"
-  // (need: null) — visible côté Bureau uniquement, pour affecter en un clic
-  // sans étape de création préalable. Côté Parent/Joueur, seuls les besoins
-  // réels comptent : rien à faire tant que le Bureau n'a affecté personne.
   const rows: Row[] = canManage
     ? roles.flatMap((r): Row[] => {
         const existing = needs.filter((n) => n.roleCode === r.code);
@@ -69,50 +73,21 @@ export default function VolunteerNeedsPanel({
       })
     : needs.map((n) => ({ need: n, roleCode: n.roleCode }));
 
-  async function createNeedAndSignup(roleCode: string, playerId: string, source: "VOLUNTEER" | "ADMIN") {
-    const supabase = createClient();
-    const { data: newNeed, error: needError } = await supabase
-      .from("event_volunteer_needs")
-      .insert({
-        event_id: eventId,
-        role_code: roleCode,
-        required_count: 1,
-        sort_order: roles.findIndex((r) => r.code === roleCode),
-      })
-      .select("id")
-      .single();
-    if (needError || !newNeed) {
-      return needError?.message ?? "Création du besoin impossible.";
-    }
-    const { error: signupError } = await supabase.from("event_volunteer_signups").insert({
-      need_id: newNeed.id,
-      player_id: playerId,
-      source,
-    });
-    return signupError?.message ?? null;
-  }
-
   async function volunteer(row: Row) {
+    if (!row.need || myPlayerIds.length === 0) return;
     const roleLabel = roles.find((r) => r.code === row.roleCode)?.label ?? row.roleCode;
     const ok = window.confirm(`Confirmer : tu t'occupes de « ${roleLabel} » pour cet événement ?`);
-    if (!ok || myPlayerIds.length === 0) return;
-    const pendingKey = row.need?.id ?? row.roleCode;
-    setPending(pendingKey);
+    if (!ok) return;
+    setPending(row.need.id);
     setError(null);
-    let failed: string | null;
-    if (row.need) {
-      const supabase = createClient();
-      const { error: insertError } = await supabase.from("event_volunteer_signups").insert({
-        need_id: row.need.id,
-        player_id: myPlayerIds[0],
-        source: "VOLUNTEER",
-      });
-      failed = insertError?.message ?? null;
-    } else {
-      failed = await createNeedAndSignup(row.roleCode, myPlayerIds[0], "VOLUNTEER");
-    }
+    const supabase = createClient();
+    const { error: insertError } = await supabase.from("event_volunteer_signups").insert({
+      need_id: row.need.id,
+      player_id: myPlayerIds[0],
+      source: "VOLUNTEER",
+    });
     setPending(null);
-    if (failed) {
+    if (insertError) {
       setError("Ce créneau est déjà complet.");
       return;
     }
@@ -124,33 +99,6 @@ export default function VolunteerNeedsPanel({
     const supabase = createClient();
     await supabase.from("event_volunteer_signups").delete().eq("id", signupId);
     setPending(null);
-    router.refresh();
-  }
-
-  async function assign(row: Row) {
-    const pendingKey = row.need?.id ?? row.roleCode;
-    const playerId = assignPlayerId[pendingKey];
-    if (!playerId) return;
-    setPending(pendingKey);
-    setError(null);
-    let failed: string | null;
-    if (row.need) {
-      const supabase = createClient();
-      const { error: insertError } = await supabase.from("event_volunteer_signups").insert({
-        need_id: row.need.id,
-        player_id: playerId,
-        source: "ADMIN",
-      });
-      failed = insertError?.message ?? null;
-    } else {
-      failed = await createNeedAndSignup(row.roleCode, playerId, "ADMIN");
-    }
-    setPending(null);
-    if (failed) {
-      setError("Attribution impossible, réessaie.");
-      return;
-    }
-    setAssignPlayerId((s) => ({ ...s, [pendingKey]: "" }));
     router.refresh();
   }
 
@@ -182,15 +130,16 @@ export default function VolunteerNeedsPanel({
     router.refresh();
   }
 
-  async function addExtraSlot(roleCode: string) {
-    setPending("extra");
+  async function submitAddForm(roleCode: string) {
+    const count = Number(addFormCount) || 1;
+    setPending("add");
     setError(null);
     const supabase = createClient();
     const { error: insertError } = await supabase.from("event_volunteer_needs").insert({
       event_id: eventId,
       role_code: roleCode,
-      time_range: extraSlotTimeRange.trim() || null,
-      required_count: 1,
+      time_range: addFormTimeRange.trim() || null,
+      required_count: count,
       sort_order: roles.findIndex((r) => r.code === roleCode),
     });
     setPending(null);
@@ -198,26 +147,22 @@ export default function VolunteerNeedsPanel({
       setError("Ajout impossible, réessaie.");
       return;
     }
-    setExtraSlotTimeRange("");
-    setExtraSlotFor(null);
+    setAddFormTimeRange("");
+    setAddFormCount("1");
+    setAddFormFor(null);
     router.refresh();
   }
 
   if (rows.length === 0) return null;
 
-  return (
-    <div className="mt-3 flex flex-col gap-2.5 rounded-xl border border-zinc-100 bg-zinc-50/60 p-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-        Besoins en bénévoles
-      </p>
-
+  const body = (
+    <>
       <div className="flex flex-col gap-2">
         {rows.map((row, i) => {
           const need = row.need;
           const role = roles.find((r) => r.code === row.roleCode);
-          const remaining = need ? remainingSlots(need) : 1;
+          const remaining = need ? remainingSlots(need) : 0;
           const mySignup = need?.signups.find((s) => myPlayerIds.includes(s.playerId));
-          const pendingKey = need?.id ?? row.roleCode;
 
           return (
             <div
@@ -277,19 +222,17 @@ export default function VolunteerNeedsPanel({
                         <Plus className="h-3 w-3" />
                       </button>
                     </div>
-                  ) : (
+                  ) : need ? (
                     <span
                       className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
                         remaining > 0 ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
                       }`}
                     >
-                      {need
-                        ? remaining > 0
-                          ? `${need.signups.length}/${need.requiredCount}`
-                          : `Complet (${need.signups.length}/${need.requiredCount})`
-                        : "0/1"}
+                      {remaining > 0
+                        ? `${need.signups.length}/${need.requiredCount}`
+                        : `Complet (${need.signups.length}/${need.requiredCount})`}
                     </span>
-                  )}
+                  ) : null}
                   {canManage && need && (
                     <button
                       type="button"
@@ -331,64 +274,57 @@ export default function VolunteerNeedsPanel({
                       </button>
                     </span>
                   ))}
-                  <select
-                    value={assignPlayerId[pendingKey] ?? ""}
-                    disabled={pending === pendingKey}
-                    onChange={(e) =>
-                      setAssignPlayerId((s) => ({ ...s, [pendingKey]: e.target.value }))
-                    }
-                    className="rounded-full border border-zinc-200 bg-white px-2 py-1 text-[11px] disabled:opacity-60"
-                  >
-                    <option value="">+ Affecter...</option>
-                    {roster.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                  {assignPlayerId[pendingKey] && (
-                    <button
-                      type="button"
-                      disabled={pending === pendingKey}
-                      onClick={() => assign(row)}
-                      className="rounded-full bg-navy px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-navy-dark disabled:opacity-60"
-                    >
-                      Valider
-                    </button>
+                  {!need && (
+                    <p className="text-[11px] text-zinc-400">
+                      Pas encore de besoin défini pour ce rôle.
+                    </p>
                   )}
-                  {/* Un second créneau pour ce même rôle (ex. Buvette
-                      16h-18h en plus de 14h-16h) : seulement proposé une
-                      fois qu'un premier existe déjà, cas rare gardé discret. */}
-                  {need &&
-                    (extraSlotFor === need.id ? (
-                      <span className="flex items-center gap-1">
-                        <input
-                          type="text"
-                          autoFocus
-                          placeholder="Horaire du 2e créneau"
-                          value={extraSlotTimeRange}
-                          onChange={(e) => setExtraSlotTimeRange(e.target.value)}
-                          className="w-32 rounded-full border border-zinc-200 px-2 py-1 text-[11px]"
-                        />
-                        <button
-                          type="button"
-                          disabled={pending === "extra"}
-                          onClick={() => addExtraSlot(row.roleCode)}
-                          className="rounded-full bg-navy px-2 py-1 text-[11px] font-semibold text-white hover:bg-navy-dark disabled:opacity-60"
-                        >
-                          OK
-                        </button>
-                      </span>
-                    ) : (
+                  {/* Définir un premier besoin (rôle sans need réel) ou un
+                      créneau supplémentaire (ex. Buvette 16h-18h en plus de
+                      14h-16h) — même petit formulaire dans les deux cas. */}
+                  {addFormFor === row.roleCode ? (
+                    <span className="flex flex-wrap items-center gap-1">
+                      <input
+                        type="text"
+                        autoFocus
+                        placeholder="Horaire (optionnel)"
+                        value={addFormTimeRange}
+                        onChange={(e) => setAddFormTimeRange(e.target.value)}
+                        className="w-28 rounded-full border border-zinc-200 px-2 py-1 text-[11px]"
+                      />
+                      <input
+                        type="number"
+                        min={1}
+                        value={addFormCount}
+                        onChange={(e) => setAddFormCount(e.target.value)}
+                        className="w-12 rounded-full border border-zinc-200 px-2 py-1 text-center text-[11px]"
+                      />
                       <button
                         type="button"
-                        onClick={() => setExtraSlotFor(need.id)}
-                        className="flex items-center gap-0.5 rounded-full px-2 py-1 text-[11px] font-medium text-zinc-400 hover:bg-zinc-50 hover:text-zinc-600"
+                        disabled={pending === "add"}
+                        onClick={() => submitAddForm(row.roleCode)}
+                        className="rounded-full bg-navy px-2 py-1 text-[11px] font-semibold text-white hover:bg-navy-dark disabled:opacity-60"
                       >
-                        <Plus className="h-3 w-3" />
-                        Créneau
+                        OK
                       </button>
-                    ))}
+                      <button
+                        type="button"
+                        onClick={() => setAddFormFor(null)}
+                        className="rounded-full px-2 py-1 text-[11px] font-medium text-zinc-400 hover:bg-zinc-50"
+                      >
+                        Annuler
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setAddFormFor(row.roleCode)}
+                      className="flex items-center gap-0.5 rounded-full px-2 py-1 text-[11px] font-medium text-zinc-400 hover:bg-zinc-50 hover:text-zinc-600"
+                    >
+                      <Plus className="h-3 w-3" />
+                      {need ? "Créneau" : "Définir ce besoin"}
+                    </button>
+                  )}
                 </div>
               ) : mySignup ? (
                 <button
@@ -400,10 +336,10 @@ export default function VolunteerNeedsPanel({
                   <X className="h-3 w-3" />
                   Annuler
                 </button>
-              ) : remaining > 0 && myPlayerIds.length > 0 ? (
+              ) : need && remaining > 0 && myPlayerIds.length > 0 ? (
                 <button
                   type="button"
-                  disabled={pending === pendingKey}
+                  disabled={pending === need.id}
                   onClick={() => volunteer(row)}
                   className="w-fit rounded-full bg-navy px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-navy-dark disabled:opacity-60"
                 >
@@ -416,6 +352,17 @@ export default function VolunteerNeedsPanel({
       </div>
 
       {error && <p className="text-xs text-red-600">{error}</p>}
+    </>
+  );
+
+  if (bare) return body;
+
+  return (
+    <div className="mt-3 flex flex-col gap-2.5 rounded-xl border border-zinc-100 bg-zinc-50/60 p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+        Besoins en bénévoles
+      </p>
+      {body}
     </div>
   );
 }

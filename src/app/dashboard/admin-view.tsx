@@ -32,7 +32,6 @@ import type {
 import type { BirthdaySource } from "./birthdays";
 import type { EventRoleType } from "./event-tasks";
 import type { VolunteerNeed } from "./event-volunteer-needs";
-import { formatPersonName } from "@/lib/names";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 
@@ -91,15 +90,6 @@ export default function AdminView({
     (eventsByTeamId[e.teamId] ??= []).push(e);
   });
 
-  // Pour le "+ Affecter..." du panneau Besoins en bénévoles : n'importe
-  // quel membre du club, pas seulement l'effectif d'une équipe — un
-  // bénévole de buvette n'a pas besoin d'être joueur ou coach de l'équipe
-  // qui joue ce jour-là.
-  const volunteerRoster = members.map((m) => ({
-    id: m.id,
-    name: formatPersonName(m.firstName, m.lastName, "Membre"),
-  }));
-
   const iconClass = "h-4 w-4 shrink-0";
   const sections: AdminSection[] = [
     {
@@ -143,7 +133,6 @@ export default function AdminView({
           birthdayMembers={birthdayMembers}
           eventRoles={eventRoles}
           volunteerNeedsByEventId={volunteerNeedsByEventId}
-          volunteerRoster={volunteerRoster}
         />
       ),
     },

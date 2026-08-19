@@ -177,7 +177,6 @@ export default function CoachNextMatchCard({
             roles={roles}
             myPlayerIds={[]}
             canManage
-            roster={roster.map((p) => ({ id: p.id, name: fullName(p) }))}
           />
         </>
       ) : (

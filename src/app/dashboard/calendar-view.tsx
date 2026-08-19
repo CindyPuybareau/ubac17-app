@@ -215,7 +215,6 @@ export default function CalendarView({
   carpoolByEventId = {},
   eventRoles = [],
   volunteerNeedsByEventId = {},
-  volunteerRoster = [],
   selfPlayerId = null,
   forcedView,
   resultsTeams,
@@ -241,13 +240,10 @@ export default function CalendarView({
   carpoolByEventId?: Record<string, CarpoolOffer[]>;
   eventRoles?: EventRoleType[];
   // Besoins en bénévoles (buvette, table de marque...) d'un événement club
-  // — auto-serve (Je m'en occupe) partout, gestion complète (affecter,
-  // retirer, ajouter/supprimer un besoin) réservée au Bureau, voir
-  // canManageEvent && allowClubWide dans renderEventCard.
+  // — auto-serve (Je m'en occupe) partout ; qui gère l'événement peut en
+  // plus définir/ajuster le nombre requis et retirer quelqu'un, mais
+  // n'affecte plus personne à la main (les membres se proposent eux-mêmes).
   volunteerNeedsByEventId?: Record<string, VolunteerNeed[]>;
-  // Membres du club pour le "+ Affecter..." du Bureau — jamais fourni côté
-  // Coach/Famille (pas de gestion là-bas, juste l'auto-inscription).
-  volunteerRoster?: { id: string; name: string }[];
   // La propre fiche joueur de qui consulte ce calendrier (coach qui joue
   // aussi dans une autre équipe) — jamais fourni côté Bureau/Famille.
   // Permet à un coach de répondre présent/absent pour LUI-MÊME sur un
@@ -825,17 +821,14 @@ export default function CalendarView({
         )}
 
         {/* Besoins en bénévoles (buvette, table de marque...) : lecture +
-            auto-inscription pour qui ne gère pas l'événement, gestion
-            complète (affecter/retirer/ajouter un besoin) pour qui le gère —
-            Bureau comme coach, chacun sur les événements qu'il gère
-            réellement (canManageEvent), même logique de portée que les
-            maillots/goûter (voir retour de Cindy du 2026-08-19 : "quelque
-            chose de simple, pour le bureau et les coachs"). Catalogue
-            complet (pas filtré par type d'événement, contrairement à
-            MatchTasksPanel), y compris un entraînement : qui gère doit
-            pouvoir choisir librement — rien ne s'affiche pour autant côté
-            famille tant que personne n'a rien affecté, donc pas de clutter
-            par défaut sur un entraînement ordinaire non touché. */}
+            auto-inscription pour qui ne gère pas l'événement. Côté
+            famille/coéquipier, ce panneau reste seul (pas de catalogue à
+            gérer). Côté Bureau/coach, il est fusionné dans le volet
+            "Rôles d'organisation" juste en dessous — un seul volet plutôt
+            que deux blocs séparés (retour de Cindy du 2026-08-19) —, sauf
+            sur un entraînement où ce volet n'existe pas : on garde alors
+            ce panneau seul, la possibilité de définir des besoins même sur
+            un entraînement restant voulue (retour antérieur du même jour). */}
         {!canManageEvent && (
           <VolunteerNeedsPanel
             eventId={event.id}
@@ -843,29 +836,24 @@ export default function CalendarView({
             roles={eventRoles}
             myPlayerIds={rsvpVisiblePlayers.map((p) => p.id)}
             canManage={false}
-            roster={[]}
           />
         )}
-        {/* Accès direct au catalogue des rôles depuis la carte, pour
-            ajouter un rôle qui n'existe pas encore (ex. "Photographe") sans
-            quitter l'événement en cours — retour de Cindy du 2026-08-19,
-            explicitement exclu des entraînements ("cet onglet doit être
-            présent... sauf les entraînements"), contrairement au panneau
-            de besoins juste en dessous (lui reste voulu même sur un
-            entraînement, retour antérieur du même jour — voir le
-            commentaire au-dessus de VolunteerNeedsPanel). Repliée par
-            défaut (comportement natif du composant). */}
         {canManageEvent && event.event_type !== "TRAINING" && (
-          <EventRolesEditor roles={eventRoles} />
+          <EventRolesEditor
+            roles={eventRoles}
+            volunteerNeeds={{
+              eventId: event.id,
+              needs: volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds,
+            }}
+          />
         )}
-        {canManageEvent && (
+        {canManageEvent && event.event_type === "TRAINING" && (
           <VolunteerNeedsPanel
             eventId={event.id}
             needs={volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds}
             roles={eventRoles}
             myPlayerIds={[]}
             canManage
-            roster={volunteerRoster}
           />
         )}
       </div>

@@ -99,7 +99,6 @@ export default function NextConvocationCard({
         roles={roles}
         myPlayerIds={[playerId]}
         canManage={false}
-        roster={[]}
       />
     </div>
   );

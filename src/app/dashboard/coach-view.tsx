@@ -131,10 +131,6 @@ export default function CoachView({
             selfPlayerId={ownPlayerId}
             eventRoles={eventRoles}
             volunteerNeedsByEventId={volunteerNeedsByEventId}
-            // Pour le "+ Affecter..." du panneau Besoins en bénévoles côté
-            // coach (retour de Cindy du 2026-08-19 : "pour le bureau et les
-            // coachs") — le roster de ses équipes, déjà disponible ici.
-            volunteerRoster={rsvpPlayers.map((p) => ({ id: p.id, name: p.name }))}
           />
           {/* Même bloc que l'espace parent : un coach a lui aussi son
               propre agenda, et être coach ne devrait pas le priver de cet

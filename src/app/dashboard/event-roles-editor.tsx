@@ -11,6 +11,8 @@ import RoleIcon, { ROLE_ICONS, ROLE_ICON_NAMES } from "./role-icon";
 // cycle d'imports.
 import { styleFor } from "./event-style";
 import type { EventRoleType } from "./event-tasks";
+import VolunteerNeedsPanel from "./volunteer-needs-panel";
+import type { VolunteerNeed } from "./event-volunteer-needs";
 
 // Les types d'événement proposés à la restriction. Une table de marque
 // n'a de sens que sur un match ; laisser la case vide = tous les types.
@@ -94,7 +96,21 @@ function EventTypePicker({
   );
 }
 
-export default function EventRolesEditor({ roles }: { roles: EventRoleType[] }) {
+export default function EventRolesEditor({
+  roles,
+  volunteerNeeds,
+}: {
+  roles: EventRoleType[];
+  // Fusionné dans ce même volet déroulant plutôt que dans un second bloc
+  // séparé — retour de Cindy du 2026-08-19 : "un seul volet". Absent
+  // (undefined) là où ce composant sert uniquement à gérer le catalogue,
+  // sans lien à un événement précis (ex. usage historique dans
+  // coach-organisation.tsx, hors contexte d'une carte).
+  volunteerNeeds?: {
+    eventId: string;
+    needs: VolunteerNeed[];
+  };
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [label, setLabel] = useState("");
@@ -237,7 +253,29 @@ export default function EventRolesEditor({ roles }: { roles: EventRoleType[] }) 
 
       {open && (
         <div className="flex flex-col gap-3 border-t border-zinc-100 px-4 py-3">
+          {volunteerNeeds && (
+            <div className="flex flex-col gap-2 rounded-lg bg-zinc-50/60 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                Besoins de cet événement
+              </p>
+              <p className="text-[11px] text-zinc-400">
+                Les membres se proposent eux-mêmes (« Je m&apos;en occupe ») — définis
+                juste le nombre voulu, la jauge se remplit toute seule au fil de leurs
+                réponses.
+              </p>
+              <VolunteerNeedsPanel
+                bare
+                eventId={volunteerNeeds.eventId}
+                needs={volunteerNeeds.needs}
+                roles={roles}
+                myPlayerIds={[]}
+                canManage
+              />
+            </div>
+          )}
+
           <p className="text-xs text-zinc-500">
+            {volunteerNeeds ? "Catalogue des rôles du club : " : ""}
             Ces rôles apparaissent sur chaque événement, côté coach comme côté parent.
             Un rôle restreint à certains types n&apos;est proposé que sur ceux-là.
           </p>
