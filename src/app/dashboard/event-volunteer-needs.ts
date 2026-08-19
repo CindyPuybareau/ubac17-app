@@ -57,10 +57,6 @@ export type VolunteerNeed = {
   signups: VolunteerSignup[];
 };
 
-function fullName(p: { first_name: string | null; last_name: string | null }) {
-  return formatPersonName(p.first_name, p.last_name);
-}
-
 export async function getVolunteerNeedsByEventId(
   supabase: SupabaseClient,
   eventIds: string[]
@@ -99,20 +95,32 @@ export async function getVolunteerNeedsByEventId(
   if (needIds.length > 0) {
     const { data: signupRows } = await supabase
       .from("event_volunteer_signups")
-      .select("id, need_id, player_id, source, players(first_name, last_name)")
+      .select("id, need_id, player_id, source")
       .in("need_id", needIds);
 
+    // Noms résolus via teammate_names plutôt qu'une jointure players(...)
+    // directe : un coéquipier n'a pas accès à la fiche complète d'un autre
+    // (vie privée), la jointure revenait vide et affichait "Bénévole" à la
+    // place du vrai nom (retour de Cindy du 2026-08-20).
+    const signupPlayerIds = [...new Set((signupRows ?? []).map((row) => row.player_id as string))];
+    const nameByPlayerId = new Map<string, string>();
+    if (signupPlayerIds.length > 0) {
+      const { data: nameRows } = await supabase
+        .from("teammate_names")
+        .select("id, first_name, last_name")
+        .in("id", signupPlayerIds);
+      (nameRows ?? []).forEach((row) => {
+        nameByPlayerId.set(row.id as string, formatPersonName(row.first_name, row.last_name));
+      });
+    }
+
     (signupRows ?? []).forEach((row) => {
-      const player = row.players as unknown as {
-        first_name: string | null;
-        last_name: string | null;
-      } | null;
       const needId = row.need_id as string;
       const list = signupsByNeedId.get(needId) ?? [];
       list.push({
         id: row.id as string,
         playerId: row.player_id as string,
-        playerName: player ? fullName(player) : "Bénévole",
+        playerName: nameByPlayerId.get(row.player_id as string) ?? "Bénévole",
         source: (row.source as VolunteerSignupSource | null) ?? "VOLUNTEER",
       });
       signupsByNeedId.set(needId, list);

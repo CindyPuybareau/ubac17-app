@@ -93,20 +93,36 @@ export async function getEventTasksByEventId(
 
   const { data } = await supabase
     .from("event_tasks")
-    .select("event_id, task_type, player_id, source, players(first_name, last_name)")
+    .select("event_id, task_type, player_id, source")
     .in("event_id", eventIds);
 
+  // Requête séparée vers teammate_names plutôt qu'une jointure players(...)
+  // directe : la fiche players complète d'un coéquipier n'est pas visible
+  // pour un simple joueur (vie privée — téléphone, adresse, notes
+  // médicales), la jointure revenait donc vide et affichait "Non attribué"
+  // même quand le rôle était déjà pris (retour de Cindy du 2026-08-20).
+  // teammate_names n'expose que prénom/nom, à qui a le droit de les voir.
+  const playerIds = [...new Set((data ?? []).map((row) => row.player_id as string))];
+  const nameByPlayerId = new Map<string, string>();
+  if (playerIds.length > 0) {
+    const { data: nameRows } = await supabase
+      .from("teammate_names")
+      .select("id, first_name, last_name")
+      .in("id", playerIds);
+    (nameRows ?? []).forEach((row) => {
+      nameByPlayerId.set(row.id as string, fullName(row));
+    });
+  }
+
   (data ?? []).forEach((row) => {
-    const player = row.players as unknown as {
-      first_name: string | null;
-      last_name: string | null;
-    } | null;
     const eventId = row.event_id as string;
     const state = (result[eventId] ??= {});
-    state[row.task_type as string] = player
+    const playerId = row.player_id as string;
+    const playerName = nameByPlayerId.get(playerId);
+    state[row.task_type as string] = playerName
       ? {
-          playerId: row.player_id as string,
-          playerName: fullName(player),
+          playerId,
+          playerName,
           source: (row.source as TaskSource | null) ?? null,
         }
       : null;
@@ -124,9 +140,7 @@ export async function getCarpoolOffersByEventId(
 
   const { data: offerRows } = await supabase
     .from("event_carpool_offers")
-    .select(
-      "id, event_id, player_id, seats, departure_time, meeting_point, players(first_name, last_name)"
-    )
+    .select("id, event_id, player_id, seats, departure_time, meeting_point")
     .in("event_id", eventIds)
     .gt("seats", 0);
 
@@ -136,40 +150,54 @@ export async function getCarpoolOffersByEventId(
   // (offres -> réservations -> fiches) : plus simple à relire, et cohérent
   // avec le reste du fichier (team_players -> players fait déjà pareil).
   const reservationsByOfferId = new Map<string, CarpoolReservation[]>();
-  if (offerIds.length > 0) {
-    const { data: reservationRows } = await supabase
-      .from("event_carpool_reservations")
-      .select("offer_id, player_id, seats, players(first_name, last_name)")
-      .in("offer_id", offerIds);
+  const reservationRowsResult = offerIds.length > 0
+    ? await supabase
+        .from("event_carpool_reservations")
+        .select("offer_id, player_id, seats")
+        .in("offer_id", offerIds)
+    : { data: null };
+  const reservationRows = reservationRowsResult.data;
 
-    (reservationRows ?? []).forEach((row) => {
-      const player = row.players as unknown as {
-        first_name: string | null;
-        last_name: string | null;
-      } | null;
-      const offerId = row.offer_id as string;
-      const list = reservationsByOfferId.get(offerId) ?? [];
-      list.push({
-        playerId: row.player_id as string,
-        playerName: player ? fullName(player) : "Famille",
-        seats: row.seats as number,
-      });
-      reservationsByOfferId.set(offerId, list);
+  // Noms résolus via teammate_names plutôt qu'une jointure players(...)
+  // directe : un coéquipier n'a pas accès à la fiche complète d'un autre
+  // (vie privée), la jointure revenait vide et affichait "Famille" à la
+  // place du vrai nom (retour de Cindy du 2026-08-20).
+  const carpoolPlayerIds = [
+    ...new Set([
+      ...(offerRows ?? []).map((row) => row.player_id as string),
+      ...(reservationRows ?? []).map((row) => row.player_id as string),
+    ]),
+  ];
+  const nameByPlayerId = new Map<string, string>();
+  if (carpoolPlayerIds.length > 0) {
+    const { data: nameRows } = await supabase
+      .from("teammate_names")
+      .select("id, first_name, last_name")
+      .in("id", carpoolPlayerIds);
+    (nameRows ?? []).forEach((row) => {
+      nameByPlayerId.set(row.id as string, fullName(row));
     });
   }
 
+  (reservationRows ?? []).forEach((row) => {
+    const offerId = row.offer_id as string;
+    const list = reservationsByOfferId.get(offerId) ?? [];
+    list.push({
+      playerId: row.player_id as string,
+      playerName: nameByPlayerId.get(row.player_id as string) ?? "Famille",
+      seats: row.seats as number,
+    });
+    reservationsByOfferId.set(offerId, list);
+  });
+
   (offerRows ?? []).forEach((row) => {
-    const player = row.players as unknown as {
-      first_name: string | null;
-      last_name: string | null;
-    } | null;
     const eventId = row.event_id as string;
     const offerId = row.id as string;
     const list = (result[eventId] ??= []);
     list.push({
       id: offerId,
       playerId: row.player_id as string,
-      playerName: player ? fullName(player) : "Famille",
+      playerName: nameByPlayerId.get(row.player_id as string) ?? "Famille",
       seats: row.seats as number,
       departureTime: (row.departure_time as string | null) ?? null,
       meetingPoint: (row.meeting_point as string | null) ?? null,
