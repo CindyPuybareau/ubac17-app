@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Check, Clock, Undo2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -26,7 +25,11 @@ function badgeFor(status: Status) {
 
 // Répondre présent/absent depuis la carte de l'événement, sans passer par
 // une page de détail. L'écriture est optimiste : le badge bascule tout de
-// suite, le router.refresh() ne sert qu'à réaligner le reste de l'écran.
+// suite en local (setStatus) ; rsvps étant surveillée en temps réel
+// (realtime-sync.tsx), pas besoin d'un router.refresh() en plus pour
+// réaligner le reste de l'écran — ça rechargeait la page deux fois pour un
+// seul clic (retour de Cindy du 2026-08-20, même correctif que
+// rsvp-buttons.tsx/volunteer-needs-panel.tsx).
 export default function RsvpControl({
   eventId,
   playerId,
@@ -39,7 +42,6 @@ export default function RsvpControl({
   playerName?: string;
   currentStatus: string;
 }) {
-  const router = useRouter();
   const [status, setStatus] = useState<Status>(
     currentStatus === "PRESENT" || currentStatus === "ABSENT" || currentStatus === "LATE"
       ? currentStatus
@@ -73,7 +75,6 @@ export default function RsvpControl({
       return;
     }
     setStatus(next);
-    router.refresh();
   }
 
   // Revenir à "en attente", c'est supprimer la ligne : l'app lit déjà
@@ -93,7 +94,6 @@ export default function RsvpControl({
       return;
     }
     setStatus("PENDING");
-    router.refresh();
   }
 
   const badge = badgeFor(status);

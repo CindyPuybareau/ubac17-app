@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   ChevronDown,
   ChevronLeft,
@@ -267,11 +266,10 @@ export default function CalendarView({
     role?: "COACH" | "PLAYER";
   }[];
 }) {
-  const router = useRouter();
   // Recalculés à chaque rendu (pas au chargement du module) : un onglet
   // Bureau laissé ouvert toute la nuit gardait sinon la pastille "jour
-  // même" sur la veille jusqu'au rechargement complet de la page — un
-  // simple router.refresh() (déclenché ailleurs par useRealtimeRefresh)
+  // même" sur la veille jusqu'au rechargement complet de la page — le
+  // rafraîchissement déclenché ailleurs par le temps réel (realtime-sync.tsx)
   // suffit maintenant à corriger l'affichage sans reload.
   const today = new Date();
   const todayKey = toKey(today);
@@ -423,7 +421,10 @@ export default function CalendarView({
     }
 
     setEditingEvent(null);
-    router.refresh();
+    // Pas de router.refresh() explicite : events est surveillée en temps
+    // réel (realtime-sync.tsx) — le garder ici en plus rechargeait la page
+    // deux fois pour une seule modification (retour de Cindy du
+    // 2026-08-20, même correctif que rsvp-buttons.tsx et consorts).
   }
 
   async function handleDeleteEvent(event: AdminUpcomingEvent) {
@@ -456,7 +457,6 @@ export default function CalendarView({
 
     const supabase = createClient();
     await supabase.from("events").delete().eq("id", event.id);
-    router.refresh();
   }
 
   function relanceMailto(event: AdminUpcomingEvent) {

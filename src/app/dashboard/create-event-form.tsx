@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { teamLabel } from "@/lib/teams";
 import { SALLES } from "./salles";
@@ -69,7 +68,6 @@ export default function CreateEventForm({
   open: boolean;
   onClose: () => void;
 }) {
-  const router = useRouter();
   const [teamId, setTeamId] = useState(teams[0]?.id ?? "");
   const [title, setTitle] = useState("");
   const [eventType, setEventType] = useState<EventType>("TRAINING");
@@ -263,7 +261,6 @@ export default function CreateEventForm({
         setError(
           `Événement créé, mais l'ajout des besoins d'organisation a échoué : ${needsError.message}`
         );
-        router.refresh();
         return;
       }
     }
@@ -281,7 +278,11 @@ export default function CreateEventForm({
     setTargetTeamIds([]);
     setDraftNeeds([]);
     onClose();
-    router.refresh();
+    // Pas de router.refresh() explicite : events/event_volunteer_needs
+    // sont surveillées en temps réel (realtime-sync.tsx) — le garder ici
+    // en plus rechargeait la page deux fois pour une seule création
+    // (retour de Cindy du 2026-08-20, même correctif que partout ailleurs
+    // dans ce chantier).
   }
 
   if (!open) return null;

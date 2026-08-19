@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Car, Check, Clock, MapPin, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import TaskSourceBadge from "./task-source-badge";
@@ -59,7 +58,6 @@ export default function MatchTasksPanel({
   // organiser, et un bloc vide invite a une action sans objet.
   showCarpool: boolean;
 }) {
-  const router = useRouter();
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [carpoolError, setCarpoolError] = useState<string | null>(null);
@@ -100,7 +98,13 @@ export default function MatchTasksPanel({
           : `Attribution impossible : ${insertError.message}`
       );
     }
-    router.refresh();
+    // Pas de router.refresh() explicite : event_tasks/event_carpool_offers/
+    // event_carpool_reservations sont surveillées en temps réel
+    // (realtime-sync.tsx) depuis l'audit du 2026-08-20 — le garder ici en
+    // plus rechargeait la page deux fois pour un seul clic, ressenti comme
+    // un délai anormalement long (retour de Cindy, même correctif que
+    // volunteer-needs-panel.tsx/rsvp-buttons.tsx). Vaut pour toutes les
+    // fonctions d'écriture de ce fichier.
   }
 
   async function withdraw(taskType: TaskType) {
@@ -112,7 +116,6 @@ export default function MatchTasksPanel({
       .eq("event_id", eventId)
       .eq("task_type", taskType);
     setPending(null);
-    router.refresh();
   }
 
   async function assign(taskType: TaskType, playerId: string) {
@@ -144,7 +147,6 @@ export default function MatchTasksPanel({
       setError("Attribution impossible, réessaie.");
       return;
     }
-    router.refresh();
   }
 
   const myOffer = initialCarpool.find((o) => myPlayerIds.includes(o.playerId));
@@ -179,7 +181,6 @@ export default function MatchTasksPanel({
       return;
     }
     setOfferFormOpen(false);
-    router.refresh();
   }
 
   async function withdrawOffer() {
@@ -191,7 +192,6 @@ export default function MatchTasksPanel({
       .eq("event_id", eventId)
       .eq("player_id", myPlayerIds[0]);
     setPending(null);
-    router.refresh();
   }
 
   async function reserve(offer: CarpoolOffer) {
@@ -219,7 +219,6 @@ export default function MatchTasksPanel({
       );
       return;
     }
-    router.refresh();
   }
 
   async function cancelReservation(offerId: string) {
@@ -231,7 +230,6 @@ export default function MatchTasksPanel({
       .eq("offer_id", offerId)
       .eq("player_id", myPlayerIds[0]);
     setPending(null);
-    router.refresh();
   }
 
   // Sur un entraînement il ne reste ni rôle applicable ni covoiturage : le

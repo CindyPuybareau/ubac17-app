@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { BellRing, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -23,7 +22,6 @@ export default function RequestAttendanceButton({
   teamName: string;
   startTime: string;
 }) {
-  const router = useRouter();
   const [sentAt, setSentAt] = useState<string | null>(requestedAt);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,8 +66,10 @@ export default function RequestAttendanceButton({
     } catch {
       // Silencieux volontairement : voir ci-dessus.
     }
-
-    router.refresh();
+    // Pas de router.refresh() : le bandeau se met déjà à jour ci-dessus
+    // (setSentAt) et events est surveillée en temps réel (realtime-sync.tsx)
+    // pour le reste de l'écran — un refresh explicite en plus rechargeait
+    // deux fois pour un seul clic (retour de Cindy du 2026-08-20).
   }
 
   if (pendingCount === 0) {

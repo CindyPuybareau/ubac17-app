@@ -39,8 +39,13 @@ export default function ConnexionPage() {
         return;
       }
 
+      // router.refresh() juste après push() était redondant : la
+      // navigation vers /dashboard déclenche déjà son propre chargement
+      // (et c'est une page lourde en données) — l'appeler une deuxième
+      // fois rechargeait tout deux fois de suite, ressenti comme une
+      // connexion lente (retour de Cindy du 2026-08-20, même famille de
+      // souci que le double rafraîchissement des besoins d'organisation).
       router.push("/dashboard");
-      router.refresh();
     } catch {
       setError("Connexion impossible, vérifie ta connexion et réessaie.");
     } finally {

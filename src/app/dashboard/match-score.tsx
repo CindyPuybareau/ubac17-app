@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Check, Pencil, Trophy, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -22,7 +21,6 @@ export default function MatchScore({
   opponentScore: number | null;
   canEdit: boolean;
 }) {
-  const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [team, setTeam] = useState("");
   const [opponent, setOpponent] = useState("");
@@ -63,7 +61,9 @@ export default function MatchScore({
       return;
     }
     setEditing(false);
-    router.refresh();
+    // Pas de router.refresh() explicite : events est surveillée en temps
+    // réel (realtime-sync.tsx) — le garder ici en plus rechargeait la page
+    // deux fois pour une seule saisie (retour de Cindy du 2026-08-20).
   }
 
   if (editing) {

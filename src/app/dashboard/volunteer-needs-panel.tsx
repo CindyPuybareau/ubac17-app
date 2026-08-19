@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Check, Minus, Plus, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import RoleIcon from "./role-icon";
@@ -35,7 +34,6 @@ export default function VolunteerNeedsPanel({
   myPlayerIds: string[];
   canManage: boolean;
 }) {
-  const router = useRouter();
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -70,7 +68,13 @@ export default function VolunteerNeedsPanel({
       );
       return;
     }
-    router.refresh();
+    // Pas de router.refresh() explicite ici : event_volunteer_signups est
+    // surveillée en temps réel (realtime-sync.tsx) depuis l'audit du
+    // 2026-08-20, qui déclenche déjà son propre rafraîchissement — le
+    // garder en plus faisait recharger la page DEUX fois de suite pour un
+    // seul clic (une fois ici, une fois ~0,8s après via le temps réel),
+    // perçu comme un délai anormalement long (retour de Cindy). Un seul
+    // rafraîchissement, légèrement différé, reste plus rapide que deux.
   }
 
   async function withdraw(signupId: string) {
@@ -78,7 +82,6 @@ export default function VolunteerNeedsPanel({
     const supabase = createClient();
     await supabase.from("event_volunteer_signups").delete().eq("id", signupId);
     setPending(null);
-    router.refresh();
   }
 
   async function removeNeed(needId: string) {
@@ -88,14 +91,12 @@ export default function VolunteerNeedsPanel({
     const supabase = createClient();
     await supabase.from("event_volunteer_needs").delete().eq("id", needId);
     setPending(null);
-    router.refresh();
   }
 
   async function updateRequiredCount(needId: string, count: number) {
     if (count < 1) return;
     const supabase = createClient();
     await supabase.from("event_volunteer_needs").update({ required_count: count }).eq("id", needId);
-    router.refresh();
   }
 
   async function addNeed() {
@@ -127,7 +128,6 @@ export default function VolunteerNeedsPanel({
     setNewCustomLabel("");
     setNewCount("1");
     setAddOpen(false);
-    router.refresh();
   }
 
   if (needs.length === 0 && !canManage) return null;

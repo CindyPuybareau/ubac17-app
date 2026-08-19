@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Check, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -21,7 +20,6 @@ export default function RsvpButtons({
   playerId: string;
   currentStatus: string;
 }) {
-  const router = useRouter();
   const [status, setStatus] = useState(currentStatus);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,8 +62,14 @@ export default function RsvpButtons({
       return;
     }
 
+    // Le bouton lui-même se met déjà à jour ci-dessus (setStatus) : pas
+    // besoin d'un router.refresh() ici pour SON propre affichage. rsvps
+    // est surveillée en temps réel (realtime-sync.tsx) — la garder en plus
+    // rechargeait toute la page une deuxième fois pour un seul clic,
+    // ressenti comme un délai (retour de Cindy du 2026-08-20, même
+    // correctif que volunteer-needs-panel.tsx). Le temps réel se charge de
+    // répercuter le changement sur le reste de la page (compteurs...).
     setStatus(newStatus);
-    router.refresh();
   }
 
   return (
