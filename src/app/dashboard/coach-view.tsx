@@ -193,6 +193,7 @@ export default function CoachView({
           cards={organisationCards}
           tasksByEventId={tasksByEventId}
           carpoolByEventId={carpoolByEventId}
+          volunteerNeedsByEventId={volunteerNeedsByEventId}
           events={events}
           taskTallyByTeamId={taskTallyByTeamId}
           rsvpStatusByKey={rsvpStatusByKey}

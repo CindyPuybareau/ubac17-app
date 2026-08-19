@@ -3,11 +3,13 @@ import RsvpButtons from "./rsvp-buttons";
 import OpponentDisplay from "./opponent-display";
 import NextMatchActions from "./next-match-actions";
 import MatchTasksPanel from "./match-tasks-panel";
+import VolunteerNeedsPanel from "./volunteer-needs-panel";
 import type { UpcomingEvent } from "./family-data";
 import { isMatchType } from "./event-style";
 import { rolesForEventType } from "./event-tasks";
 import { shouldOfferCarpool, venueQuery } from "./salles";
 import type { CarpoolOffer, EventRoleType, EventTasksState } from "./event-tasks";
+import type { VolunteerNeed } from "./event-volunteer-needs";
 
 function formatEventDate(iso: string) {
   return new Date(iso).toLocaleString("fr-FR", {
@@ -28,6 +30,7 @@ export default function NextConvocationCard({
   tasks,
   carpool,
   roles,
+  volunteerNeeds = [],
 }: {
   playerName: string;
   playerId: string;
@@ -37,6 +40,7 @@ export default function NextConvocationCard({
   tasks: EventTasksState;
   carpool: CarpoolOffer[];
   roles: EventRoleType[];
+  volunteerNeeds?: VolunteerNeed[];
 }) {
   return (
     <div className="rounded-2xl border border-ubac-yellow/40 bg-ubac-yellow/5 p-5 shadow-sm">
@@ -88,6 +92,14 @@ export default function NextConvocationCard({
         initialCarpool={carpool}
         roles={rolesForEventType(roles, event.event_type)}
         showCarpool={shouldOfferCarpool(event)}
+      />
+      <VolunteerNeedsPanel
+        eventId={event.id}
+        needs={volunteerNeeds}
+        roles={roles}
+        myPlayerIds={[playerId]}
+        canManage={false}
+        roster={[]}
       />
     </div>
   );

@@ -2,6 +2,7 @@ import { CalendarDays, Check, Clock, MapPin, StickyNote, X } from "lucide-react"
 import OpponentDisplay from "./opponent-display";
 import NextMatchActions from "./next-match-actions";
 import MatchTasksPanel from "./match-tasks-panel";
+import VolunteerNeedsPanel from "./volunteer-needs-panel";
 import AttendanceBadges from "./attendance-badges";
 import RequestAttendanceButton from "./request-attendance-button";
 import SalleBadge from "./salle-badge";
@@ -11,6 +12,7 @@ import { formatPersonName } from "@/lib/names";
 import { rolesForEventType } from "./event-tasks";
 import { shouldOfferCarpool, venueQuery } from "./salles";
 import type { CarpoolOffer, EventRoleType, EventTasksState } from "./event-tasks";
+import type { VolunteerNeed } from "./event-volunteer-needs";
 
 function fullName(p: RosterPlayer) {
   return formatPersonName(p.first_name, p.last_name);
@@ -24,6 +26,7 @@ export default function CoachNextMatchCard({
   tasks,
   carpool,
   roles,
+  volunteerNeeds = [],
   rsvpStatusByKey = {},
   rsvpReasonByKey = {},
   selfPlayerId = null,
@@ -35,6 +38,10 @@ export default function CoachNextMatchCard({
   tasks: EventTasksState;
   carpool: CarpoolOffer[];
   roles: EventRoleType[];
+  // Besoins en bénévoles (buvette, arbitrage...) de CET événement — le
+  // coach les gère ici au même titre que maillots/goûter, avec le roster
+  // de son équipe pour affecter (voir retour de Cindy du 2026-08-19).
+  volunteerNeeds?: VolunteerNeed[];
   // Réponses de l'effectif sur cet événement, clé "eventId:playerId".
   rsvpStatusByKey?: Record<string, string>;
   rsvpReasonByKey?: Record<string, string | null>;
@@ -162,6 +169,15 @@ export default function CoachNextMatchCard({
             initialCarpool={carpool}
             roles={rolesForEventType(roles, event.event_type)}
             showCarpool={shouldOfferCarpool(event)}
+          />
+
+          <VolunteerNeedsPanel
+            eventId={event.id}
+            needs={volunteerNeeds}
+            roles={roles}
+            myPlayerIds={[]}
+            canManage
+            roster={roster.map((p) => ({ id: p.id, name: fullName(p) }))}
           />
         </>
       ) : (

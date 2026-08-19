@@ -178,6 +178,7 @@ export default function FamilyView({
               tasks={tasksByEventId[event.id] ?? emptyEventTasks}
               carpool={carpoolByEventId[event.id] ?? []}
               roles={eventRoles}
+              volunteerNeeds={volunteerNeedsByEventId[event.id] ?? []}
             />
           ))}
 

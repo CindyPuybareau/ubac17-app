@@ -19,6 +19,7 @@ import type {
   SeasonTaskTally,
   TaskAssignment,
 } from "./event-tasks";
+import type { VolunteerNeed } from "./event-volunteer-needs";
 import type { AdminUpcomingEvent } from "./page";
 
 const emptyEventTasks: EventTasksState = {};
@@ -68,6 +69,7 @@ function PlanningTab({
   cards,
   tasksByEventId,
   carpoolByEventId,
+  volunteerNeedsByEventId,
   upcomingEvents,
   rsvpStatusByKey,
   rsvpReasonByKey,
@@ -77,6 +79,7 @@ function PlanningTab({
   cards: CoachTeamMatchCard[];
   tasksByEventId: Record<string, EventTasksState>;
   carpoolByEventId: Record<string, CarpoolOffer[]>;
+  volunteerNeedsByEventId: Record<string, VolunteerNeed[]>;
   upcomingEvents: AdminUpcomingEvent[];
   rsvpStatusByKey: Record<string, string>;
   rsvpReasonByKey: Record<string, string | null>;
@@ -98,6 +101,7 @@ function PlanningTab({
           roster={roster}
           tasks={event ? (tasksByEventId[event.id] ?? emptyEventTasks) : emptyEventTasks}
           carpool={event ? (carpoolByEventId[event.id] ?? []) : []}
+          volunteerNeeds={event ? (volunteerNeedsByEventId[event.id] ?? []) : []}
           rsvpStatusByKey={rsvpStatusByKey}
           rsvpReasonByKey={rsvpReasonByKey}
           roles={roles}
@@ -383,6 +387,7 @@ export default function CoachOrganisation({
   cards,
   tasksByEventId,
   carpoolByEventId,
+  volunteerNeedsByEventId = {},
   events,
   taskTallyByTeamId,
   rsvpStatusByKey,
@@ -393,6 +398,7 @@ export default function CoachOrganisation({
   cards: CoachTeamMatchCard[];
   tasksByEventId: Record<string, EventTasksState>;
   carpoolByEventId: Record<string, CarpoolOffer[]>;
+  volunteerNeedsByEventId?: Record<string, VolunteerNeed[]>;
   events: AdminUpcomingEvent[];
   taskTallyByTeamId: Record<string, SeasonTaskTally>;
   rsvpStatusByKey: Record<string, string>;
@@ -446,6 +452,7 @@ export default function CoachOrganisation({
           cards={cards}
           tasksByEventId={tasksByEventId}
           carpoolByEventId={carpoolByEventId}
+          volunteerNeedsByEventId={volunteerNeedsByEventId}
           upcomingEvents={upcomingEvents}
           rsvpStatusByKey={rsvpStatusByKey}
           rsvpReasonByKey={rsvpReasonByKey}
