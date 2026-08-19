@@ -67,7 +67,9 @@ export default function RsvpControl({
 
     setSaving(false);
     if (writeError) {
-      setError("Réponse non enregistrée, réessaie.");
+      // Message générique par le passé, sans la vraie cause — même
+      // correctif que rsvp-buttons.tsx (retour de Cindy du 2026-08-20).
+      setError(writeError.message);
       return;
     }
     setStatus(next);

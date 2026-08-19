@@ -24,7 +24,7 @@ export default function RsvpButtons({
   const router = useRouter();
   const [status, setStatus] = useState(currentStatus);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // La carte qui affiche ce bouton (NextConvocationCard) n'est pas
   // remontée quand "le prochain événement" change (même clé React) — un
@@ -35,12 +35,12 @@ export default function RsvpButtons({
   // mercredi).
   useEffect(() => {
     setStatus(currentStatus);
-    setError(false);
+    setError(null);
   }, [eventId, currentStatus]);
 
   async function respond(newStatus: "PRESENT" | "ABSENT") {
     setLoading(true);
-    setError(false);
+    setError(null);
     const supabase = createClient();
 
     // Vrai upsert : rsvps a maintenant une contrainte unique sur
@@ -56,7 +56,11 @@ export default function RsvpButtons({
 
     setLoading(false);
     if (writeError) {
-      setError(true);
+      // Message générique par le passé, sans la vraie cause — retour de
+      // Cindy du 2026-08-20 (même famille de bug que event_tasks/
+      // volunteer_needs, un refus RLS non couvert affiché comme une panne
+      // générique impossible à diagnostiquer depuis l'appli).
+      setError(writeError.message);
       return;
     }
 
@@ -88,7 +92,7 @@ export default function RsvpButtons({
           Absent
         </button>
       </div>
-      {error && <p className="text-[11px] text-red-600">Réponse non enregistrée, réessaie.</p>}
+      {error && <p className="text-[11px] text-red-600">Réponse non enregistrée : {error}</p>}
     </div>
   );
 }
