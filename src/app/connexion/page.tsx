@@ -22,21 +22,30 @@ export default function ConnexionPage() {
     setLoading(true);
     setError(null);
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    // try/finally : un souci réseau (coupure, 4G capricieuse) fait échouer
+    // l'appel lui-même, pas juste renvoyer { error } — sans filet, le
+    // bouton restait bloqué sur "Connexion..." indéfiniment, sans aucun
+    // message, avec pour seul recours de forcer l'arrêt de l'appli (vécu
+    // par Cindy le 2026-08-18 sur mobile).
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    setLoading(false);
+      if (error) {
+        setError("Email ou mot de passe incorrect.");
+        return;
+      }
 
-    if (error) {
-      setError("Email ou mot de passe incorrect.");
-      return;
+      router.push("/dashboard");
+      router.refresh();
+    } catch {
+      setError("Connexion impossible, vérifie ta connexion et réessaie.");
+    } finally {
+      setLoading(false);
     }
-
-    router.push("/dashboard");
-    router.refresh();
   }
 
   // Même formulation "Si un compte existe..." que la page mot de passe
@@ -50,28 +59,35 @@ export default function ConnexionPage() {
     setError(null);
     setMessage(null);
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        shouldCreateUser: false,
-        emailRedirectTo: `${window.location.origin}/lien-de-connexion`,
-      },
-    });
+    // Même filet que handlePasswordSubmit ci-dessus : un échec réseau ne
+    // doit jamais laisser le bouton bloqué sans message.
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          shouldCreateUser: false,
+          emailRedirectTo: `${window.location.origin}/lien-de-connexion`,
+        },
+      });
 
-    setLoading(false);
-    // "Utilisateur introuvable" ne doit jamais fuiter (voir le commentaire
-    // au-dessus) — mais un vrai échec technique (limite de débit Supabase,
-    // panne réseau) mérite un vrai message : sans ce contrôle d'erreur, la
-    // personne croyait un email parti alors qu'aucun n'était jamais
-    // envoyé, sans aucun moyen de le savoir.
-    if (error && error.code !== "user_not_found") {
+      // "Utilisateur introuvable" ne doit jamais fuiter (voir le commentaire
+      // au-dessus) — mais un vrai échec technique (limite de débit Supabase,
+      // panne réseau) mérite un vrai message : sans ce contrôle d'erreur, la
+      // personne croyait un email parti alors qu'aucun n'était jamais
+      // envoyé, sans aucun moyen de le savoir.
+      if (error && error.code !== "user_not_found") {
+        setError("Un problème est survenu, réessaie dans quelques instants.");
+        return;
+      }
+      setMessage(
+        "Si un compte existe avec cet email, un lien de connexion vient de t'être envoyé — vérifie ta boîte mail."
+      );
+    } catch {
       setError("Un problème est survenu, réessaie dans quelques instants.");
-      return;
+    } finally {
+      setLoading(false);
     }
-    setMessage(
-      "Si un compte existe avec cet email, un lien de connexion vient de t'être envoyé — vérifie ta boîte mail."
-    );
   }
 
   return (

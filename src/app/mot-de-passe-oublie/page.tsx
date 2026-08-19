@@ -17,21 +17,28 @@ export default function MotDePasseOubliePage() {
     setError(null);
     setMessage(null);
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reinitialiser-mot-de-passe`,
-    });
+    // try/finally : un souci réseau fait échouer l'appel lui-même, pas
+    // juste renvoyer { error } — sans filet, le bouton restait bloqué sur
+    // "Envoi..." indéfiniment (même défaut que connexion/page.tsx).
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reinitialiser-mot-de-passe`,
+      });
 
-    setLoading(false);
+      if (error) {
+        setError(error.message);
+        return;
+      }
 
-    if (error) {
-      setError(error.message);
-      return;
+      setMessage(
+        "Si un compte existe avec cet email, un lien de réinitialisation vient de t'être envoyé."
+      );
+    } catch {
+      setError("Un problème est survenu, réessaie dans quelques instants.");
+    } finally {
+      setLoading(false);
     }
-
-    setMessage(
-      "Si un compte existe avec cet email, un lien de réinitialisation vient de t'être envoyé."
-    );
   }
 
   return (

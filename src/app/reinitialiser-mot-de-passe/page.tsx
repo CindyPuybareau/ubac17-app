@@ -59,20 +59,27 @@ export default function ReinitialiserMotDePassePage() {
     }
 
     setLoading(true);
-    const supabase = createClient();
-    const { error } = await supabase.auth.updateUser({ password });
-    setLoading(false);
+    // try/finally : même filet que connexion/page.tsx — un souci réseau ne
+    // doit jamais laisser le bouton bloqué sur "Mise à jour..." sans message.
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.updateUser({ password });
 
-    if (error) {
-      setError(error.message);
-      return;
+      if (error) {
+        setError(error.message);
+        return;
+      }
+
+      setMessage("Mot de passe mis à jour ! Redirection...");
+      setTimeout(() => {
+        router.push("/dashboard");
+        router.refresh();
+      }, 1200);
+    } catch {
+      setError("Un problème est survenu, réessaie dans quelques instants.");
+    } finally {
+      setLoading(false);
     }
-
-    setMessage("Mot de passe mis à jour ! Redirection...");
-    setTimeout(() => {
-      router.push("/dashboard");
-      router.refresh();
-    }, 1200);
   }
 
   return (
