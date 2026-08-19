@@ -830,8 +830,10 @@ export default function CalendarView({
             besoin restant centralisé au Bureau (voir CLAUDE.md de la
             demande). Catalogue complet (pas filtré par type d'événement,
             contrairement à MatchTasksPanel) : un tournoi ou une fête peut
-            avoir besoin de n'importe quel rôle. */}
-        {!canManageEvent && (
+            avoir besoin de n'importe quel rôle — sauf un entraînement, qui
+            n'a jamais besoin d'organisation (déjà vu avec Cindy, hors
+            sujet même pour le Bureau). */}
+        {event.event_type !== "TRAINING" && !canManageEvent && (
           <VolunteerNeedsPanel
             eventId={event.id}
             needs={volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds}
@@ -841,7 +843,7 @@ export default function CalendarView({
             roster={[]}
           />
         )}
-        {canManageEvent && allowClubWide && (
+        {event.event_type !== "TRAINING" && canManageEvent && allowClubWide && (
           <VolunteerNeedsPanel
             eventId={event.id}
             needs={volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds}
