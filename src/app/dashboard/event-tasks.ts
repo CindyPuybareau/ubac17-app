@@ -96,17 +96,20 @@ export async function getEventTasksByEventId(
     .select("event_id, task_type, player_id, source")
     .in("event_id", eventIds);
 
-  // Requête séparée vers teammate_names plutôt qu'une jointure players(...)
-  // directe : la fiche players complète d'un coéquipier n'est pas visible
-  // pour un simple joueur (vie privée — téléphone, adresse, notes
-  // médicales), la jointure revenait donc vide et affichait "Non attribué"
-  // même quand le rôle était déjà pris (retour de Cindy du 2026-08-20).
-  // teammate_names n'expose que prénom/nom, à qui a le droit de les voir.
+  // Requête séparée vers club_member_names plutôt qu'une jointure
+  // players(...) directe : la fiche players complète d'un autre membre
+  // n'est pas visible pour un simple joueur (vie privée — téléphone,
+  // adresse, notes médicales), la jointure revenait donc vide et
+  // affichait "Non attribué" même quand le rôle était déjà pris (retour
+  // de Cindy du 2026-08-20). club_member_names n'expose que prénom/nom,
+  // à tout le club (élargi depuis "coéquipier seulement" le 2026-08-21 —
+  // retour de Cindy : "Bénévole" au lieu d'un vrai nom pour quelqu'un
+  // hors de l'équipe de qui consulte).
   const playerIds = [...new Set((data ?? []).map((row) => row.player_id as string))];
   const nameByPlayerId = new Map<string, string>();
   if (playerIds.length > 0) {
     const { data: nameRows } = await supabase
-      .from("teammate_names")
+      .from("club_member_names")
       .select("id, first_name, last_name")
       .in("id", playerIds);
     (nameRows ?? []).forEach((row) => {
@@ -158,10 +161,11 @@ export async function getCarpoolOffersByEventId(
     : { data: null };
   const reservationRows = reservationRowsResult.data;
 
-  // Noms résolus via teammate_names plutôt qu'une jointure players(...)
-  // directe : un coéquipier n'a pas accès à la fiche complète d'un autre
+  // Noms résolus via club_member_names plutôt qu'une jointure players(...)
+  // directe : la fiche complète d'un autre membre n'est pas accessible
   // (vie privée), la jointure revenait vide et affichait "Famille" à la
-  // place du vrai nom (retour de Cindy du 2026-08-20).
+  // place du vrai nom (retour de Cindy du 2026-08-20 ; élargi à tout le
+  // club le 2026-08-21).
   const carpoolPlayerIds = [
     ...new Set([
       ...(offerRows ?? []).map((row) => row.player_id as string),
@@ -171,7 +175,7 @@ export async function getCarpoolOffersByEventId(
   const nameByPlayerId = new Map<string, string>();
   if (carpoolPlayerIds.length > 0) {
     const { data: nameRows } = await supabase
-      .from("teammate_names")
+      .from("club_member_names")
       .select("id, first_name, last_name")
       .in("id", carpoolPlayerIds);
     (nameRows ?? []).forEach((row) => {

@@ -98,15 +98,19 @@ export async function getVolunteerNeedsByEventId(
       .select("id, need_id, player_id, source")
       .in("need_id", needIds);
 
-    // Noms résolus via teammate_names plutôt qu'une jointure players(...)
-    // directe : un coéquipier n'a pas accès à la fiche complète d'un autre
-    // (vie privée), la jointure revenait vide et affichait "Bénévole" à la
-    // place du vrai nom (retour de Cindy du 2026-08-20).
+    // Noms résolus via club_member_names plutôt qu'une jointure
+    // players(...) directe : la fiche complète d'un autre membre n'est
+    // pas accessible (vie privée), la jointure revenait vide et
+    // affichait "Bénévole" à la place du vrai nom (retour de Cindy du
+    // 2026-08-20). D'abord scopée "coéquipier", élargie à tout le club le
+    // 2026-08-21 (retour de Cindy : "Bénévole" persistait pour un
+    // bénévole hors de l'équipe de qui consulte — capture d'écran espace
+    // Parent).
     const signupPlayerIds = [...new Set((signupRows ?? []).map((row) => row.player_id as string))];
     const nameByPlayerId = new Map<string, string>();
     if (signupPlayerIds.length > 0) {
       const { data: nameRows } = await supabase
-        .from("teammate_names")
+        .from("club_member_names")
         .select("id, first_name, last_name")
         .in("id", signupPlayerIds);
       (nameRows ?? []).forEach((row) => {
