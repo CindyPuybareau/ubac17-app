@@ -20,6 +20,7 @@ import { formatLocalDateFr } from "@/lib/local-date";
 import { teamLabel } from "@/lib/teams";
 import { buildAppDeepLink, buildWhatsAppLink } from "@/lib/whatsapp";
 import DateTimePicker from "./date-time-picker";
+import ConfirmDialog from "./confirm-dialog";
 import type { AdminMemberTeam, MemberDetail } from "./page";
 
 const BUREAU_ROLE_OPTIONS = [
@@ -303,7 +304,7 @@ export default function MemberDetailModal({
   member: MemberDetail;
   readOnly: boolean;
   onClose: () => void;
-  // Already-confirmed by handleArchiveClick below — this callback performs
+  // Already-confirmed by confirmArchiveClick below — this callback performs
   // the archive directly (no second confirm dialog of its own), unlike
   // members-table.tsx's row-menu/bulk-toolbar handleArchive which owns its
   // own confirmation because it isn't gated by a modal already.
@@ -417,12 +418,15 @@ export default function MemberDetailModal({
     });
   }
 
-  async function handleArchiveClick() {
-    const name = formatPersonName(member.firstName, member.lastName, "ce membre");
-    const ok = window.confirm(
-      `Archiver la fiche de ${name} ? Elle n'apparaîtra plus dans la liste par défaut, mais ses données restent conservées et tu peux réactiver à tout moment.`
-    );
-    if (!ok || !onArchive) return;
+  // Confirmation déplacée dans archiveConfirmOpen + le <ConfirmDialog>
+  // rendu plus bas — retour de Cindy du 2026-08-21 : window.confirm()
+  // affiche le chrome du navigateur, impossible à styler pour ressembler
+  // à l'appli.
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
+
+  async function confirmArchiveClick() {
+    setArchiveConfirmOpen(false);
+    if (!onArchive) return;
     await onArchive();
     onClose();
   }
@@ -1080,7 +1084,7 @@ export default function MemberDetailModal({
               {onArchive && !archivedAt && (
                 <button
                   type="button"
-                  onClick={handleArchiveClick}
+                  onClick={() => setArchiveConfirmOpen(true)}
                   className="flex shrink-0 items-center gap-1.5 rounded-full border border-red-200 px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -1098,6 +1102,24 @@ export default function MemberDetailModal({
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={archiveConfirmOpen}
+        title="Archiver ce membre ?"
+        message={
+          <>
+            Es-tu sûr de vouloir archiver la fiche de{" "}
+            <span className="font-semibold text-zinc-900">
+              {formatPersonName(member.firstName, member.lastName, "ce membre")}
+            </span>{" "}
+            ? Elle n&apos;apparaîtra plus dans la liste par défaut, mais ses données restent
+            conservées et tu peux réactiver à tout moment.
+          </>
+        }
+        confirmLabel="Archiver"
+        onConfirm={confirmArchiveClick}
+        onCancel={() => setArchiveConfirmOpen(false)}
+      />
     </div>
   );
 }

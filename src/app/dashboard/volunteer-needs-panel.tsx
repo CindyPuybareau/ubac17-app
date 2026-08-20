@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Check, Minus, Plus, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import RoleIcon from "./role-icon";
+import ConfirmDialog from "./confirm-dialog";
 import {
   CUSTOM_ROLE_CODE,
   STANDARD_VOLUNTEER_ROLES,
@@ -42,6 +43,7 @@ export default function VolunteerNeedsPanel({
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [removeNeedTarget, setRemoveNeedTarget] = useState<string | null>(null);
   const [newRoleCode, setNewRoleCode] = useState(STANDARD_VOLUNTEER_ROLES[0].code);
   const [newCustomLabel, setNewCustomLabel] = useState("");
   const [newCount, setNewCount] = useState("1");
@@ -125,9 +127,12 @@ export default function VolunteerNeedsPanel({
     setPending(null);
   }
 
+  // Confirmation déplacée dans removeNeedTarget + le <ConfirmDialog> rendu
+  // plus bas — retour de Cindy du 2026-08-21 : window.confirm() affiche le
+  // chrome du navigateur ("ubac17-app.vercel.app indique..."), impossible
+  // à styler pour ressembler à l'appli.
   async function removeNeed(needId: string) {
-    const ok = window.confirm("Supprimer ce besoin et toutes ses inscriptions ?");
-    if (!ok) return;
+    setRemoveNeedTarget(null);
     setPending(needId);
     setLocalNeeds((prev) => prev.filter((n) => n.id !== needId));
     const supabase = createClient();
@@ -260,7 +265,7 @@ export default function VolunteerNeedsPanel({
                   {canManage && (
                     <button
                       type="button"
-                      onClick={() => removeNeed(need.id)}
+                      onClick={() => setRemoveNeedTarget(need.id)}
                       title="Supprimer ce besoin"
                       className="flex h-7 w-7 items-center justify-center rounded-full text-red-400 hover:bg-red-50 hover:text-red-600"
                     >
@@ -400,6 +405,15 @@ export default function VolunteerNeedsPanel({
           )}
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(removeNeedTarget)}
+        title="Supprimer ce besoin ?"
+        message="Êtes-vous sûr de vouloir supprimer ce besoin et toutes ses inscriptions ?"
+        confirmLabel="Supprimer"
+        onConfirm={() => removeNeedTarget && removeNeed(removeNeedTarget)}
+        onCancel={() => setRemoveNeedTarget(null)}
+      />
     </div>
   );
 }

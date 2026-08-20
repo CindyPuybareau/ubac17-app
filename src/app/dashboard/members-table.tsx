@@ -129,6 +129,7 @@ export default function MembersTable({
   const [showAddMember, setShowAddMember] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminMember | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<string[] | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   function showToast(message: string) {
@@ -385,16 +386,18 @@ export default function MembersTable({
   // modal. MemberDetailModal's own archive button confirms itself and calls
   // setArchived directly instead (see its onArchive prop below), so a
   // member is never asked to confirm the same action twice in a row.
-  async function handleArchive(ids: string[]) {
-    const label = ids.length > 1 ? `ces ${ids.length} membres` : "ce membre";
-    const ok = window.confirm(
-      `Archiver ${label} ? Il${ids.length > 1 ? "s" : ""} n'apparaîtra${
-        ids.length > 1 ? "ont" : ""
-      } plus dans la liste par défaut, mais ${
-        ids.length > 1 ? "leurs données restent" : "ses données restent"
-      } conservées et tu peux réactiver à tout moment.`
-    );
-    if (!ok) return;
+  // Ouvre la confirmation ; l'archivage effectif vit dans confirmArchive
+  // ci-dessous, déclenché par le <ConfirmDialog> rendu plus bas — retour
+  // de Cindy du 2026-08-21 : window.confirm() affiche le chrome du
+  // navigateur, impossible à styler pour ressembler à l'appli.
+  function handleArchive(ids: string[]) {
+    setArchiveTarget(ids);
+  }
+
+  async function confirmArchive() {
+    if (!archiveTarget) return;
+    const ids = archiveTarget;
+    setArchiveTarget(null);
     const label2 = memberLabel(ids);
     const ok2 = await setArchived(ids, true);
     if (ok2) {
@@ -989,6 +992,40 @@ export default function MembersTable({
           </div>
         </Modal>
       )}
+
+      {archiveTarget &&
+        (() => {
+          const many = archiveTarget.length > 1;
+          return (
+            <Modal
+              title={many ? "Archiver ces membres ?" : "Archiver ce membre ?"}
+              onClose={() => setArchiveTarget(null)}
+              widthClassName="max-w-md"
+            >
+              <div className="flex flex-col gap-3">
+                <p className="text-sm text-zinc-700">
+                  {many
+                    ? `Ils n'apparaîtront plus dans la liste par défaut, mais leurs données restent conservées et tu peux réactiver à tout moment.`
+                    : `Il n'apparaîtra plus dans la liste par défaut, mais ses données restent conservées et tu peux réactiver à tout moment.`}
+                </p>
+                <div className="flex items-stretch gap-2">
+                  <button
+                    onClick={() => setArchiveTarget(null)}
+                    className="flex-1 whitespace-nowrap rounded-full border border-zinc-200 px-3 py-2 text-[14px] font-medium text-zinc-600 hover:bg-zinc-50"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    onClick={confirmArchive}
+                    className="flex-1 whitespace-nowrap rounded-full bg-red-600 px-3 py-2 text-[14px] font-semibold text-white transition-colors hover:bg-red-700"
+                  >
+                    Archiver
+                  </button>
+                </div>
+              </div>
+            </Modal>
+          );
+        })()}
 
       {toast && (
         <div className="fixed bottom-6 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-2 rounded-full bg-navy px-4 py-2.5 text-sm font-semibold text-white shadow-lg">

@@ -39,6 +39,7 @@ import {
   type StatusKey,
 } from "./cotisation-shared";
 import type { AdminCotisation, CotisationPayment } from "./page";
+import ConfirmDialog from "./confirm-dialog";
 
 // Ré-exportées : plusieurs écrans importent encore ces fonctions d'ici par
 // habitude (family-cotisation-card.tsx, cotisations-manager.tsx) — inutile
@@ -272,6 +273,10 @@ export default function CotisationParticipantsTable({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [clearRemiseTarget, setClearRemiseTarget] = useState<string | null>(null);
+  const [deletePaymentTarget, setDeletePaymentTarget] = useState<
+    { paymentId: string; cotisationId: string } | null
+  >(null);
   const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(
     null
   );
@@ -516,9 +521,12 @@ export default function CotisationParticipantsTable({
     router.refresh();
   }
 
+  // Confirmation déplacée dans clearRemiseTarget + le <ConfirmDialog>
+  // rendu plus bas — retour de Cindy du 2026-08-21 : window.confirm()
+  // affiche le chrome du navigateur, impossible à styler pour ressembler
+  // à l'appli.
   async function clearRemise(id: string) {
-    const ok = window.confirm("Supprimer la remise appliquée à ce membre ?");
-    if (!ok) return;
+    setClearRemiseTarget(null);
     setActionError(null);
     const supabase = createClient();
     const c = byId.get(id);
@@ -622,11 +630,9 @@ export default function CotisationParticipantsTable({
     router.refresh();
   }
 
+  // Même correctif que clearRemise ci-dessus.
   async function deletePayment(paymentId: string, cotisationId: string) {
-    const ok = window.confirm(
-      "Supprimer ce règlement ? Le total payé et le solde seront recalculés automatiquement."
-    );
-    if (!ok) return;
+    setDeletePaymentTarget(null);
     setActionError(null);
     const supabase = createClient();
     const { error } = await supabase.from("cotisation_payments").delete().eq("id", paymentId);
@@ -1087,7 +1093,7 @@ export default function CotisationParticipantsTable({
                         <span className="font-semibold text-zinc-800">{formatAmount(c.remise)}</span>
                         {(c.remise ?? 0) > 0 && (
                           <button
-                            onClick={() => clearRemise(c.id)}
+                            onClick={() => setClearRemiseTarget(c.id)}
                             title="Supprimer la remise"
                             className="rounded p-0.5 text-red-500 hover:bg-red-50 hover:text-red-700"
                           >
@@ -1154,7 +1160,7 @@ export default function CotisationParticipantsTable({
                               <Pencil className="h-3 w-3" />
                             </button>
                             <button
-                              onClick={() => deletePayment(p.id, c.id)}
+                              onClick={() => setDeletePaymentTarget({ paymentId: p.id, cotisationId: c.id })}
                               title="Supprimer ce règlement"
                               className="rounded p-0.5 text-red-400 hover:bg-red-50 hover:text-red-600"
                             >
@@ -1515,6 +1521,26 @@ export default function CotisationParticipantsTable({
           {toast.message}
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(clearRemiseTarget)}
+        title="Supprimer la remise ?"
+        message="Êtes-vous sûr de vouloir supprimer la remise appliquée à ce membre ?"
+        confirmLabel="Supprimer"
+        onConfirm={() => clearRemiseTarget && clearRemise(clearRemiseTarget)}
+        onCancel={() => setClearRemiseTarget(null)}
+      />
+      <ConfirmDialog
+        open={Boolean(deletePaymentTarget)}
+        title="Supprimer ce règlement ?"
+        message="Le total payé et le solde seront recalculés automatiquement."
+        confirmLabel="Supprimer"
+        onConfirm={() =>
+          deletePaymentTarget &&
+          deletePayment(deletePaymentTarget.paymentId, deletePaymentTarget.cotisationId)
+        }
+        onCancel={() => setDeletePaymentTarget(null)}
+      />
     </div>
   );
 }

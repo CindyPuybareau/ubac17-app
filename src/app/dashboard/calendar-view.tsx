@@ -60,6 +60,7 @@ import {
 } from "./event-tasks";
 import VolunteerNeedsPanel from "./volunteer-needs-panel";
 import type { VolunteerNeed } from "./event-volunteer-needs";
+import ConfirmDialog from "./confirm-dialog";
 
 const emptyEventTasks: EventTasksState = {};
 const emptyVolunteerNeeds: VolunteerNeed[] = [];
@@ -334,6 +335,7 @@ export default function CalendarView({
   const canManage = Boolean(createTeams && createTeams.length > 0);
 
   const [editingEvent, setEditingEvent] = useState<AdminUpcomingEvent | null>(null);
+  const [deleteEventTarget, setDeleteEventTarget] = useState<AdminUpcomingEvent | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editType, setEditType] = useState("MATCH");
   const [editIsHome, setEditIsHome] = useState<"" | "true" | "false">("");
@@ -493,12 +495,13 @@ export default function CalendarView({
     // 2026-08-20, même correctif que rsvp-buttons.tsx et consorts).
   }
 
-  async function handleDeleteEvent(event: AdminUpcomingEvent) {
-    const ok = window.confirm(
-      "Supprimer définitivement cet événement ? Cette action est irréversible."
-    );
-    if (!ok) return;
-
+  // Déclenché par le bouton "Supprimer" ; la confirmation elle-même vit
+  // dans deleteEventTarget + le <ConfirmDialog> rendu plus bas (retour de
+  // Cindy du 2026-08-21 : la popup native window.confirm() ne ressemble
+  // pas à l'appli et affiche son propre chrome de navigateur, impossible
+  // à styler ou à retirer).
+  async function confirmDeleteEvent(event: AdminUpcomingEvent) {
+    setDeleteEventTarget(null);
     // Disparition immédiate plutôt que d'attendre le rafraîchissement
     // temps réel — retour de Cindy du 2026-08-21, même correctif que la
     // création/modification ci-dessus. Levée avant sendEventPush (network,
@@ -749,7 +752,7 @@ export default function CalendarView({
                 <Pencil className="h-4 w-4" />
               </button>
               <button
-                onClick={() => handleDeleteEvent(event)}
+                onClick={() => setDeleteEventTarget(event)}
                 title="Supprimer"
                 className="flex h-8 w-8 items-center justify-center rounded-full text-red-400 hover:bg-red-50 hover:text-red-600"
               >
@@ -1008,7 +1011,7 @@ export default function CalendarView({
               <Pencil className="h-4 w-4" />
             </button>
             <button
-              onClick={() => handleDeleteEvent(event)}
+              onClick={() => setDeleteEventTarget(event)}
               title="Supprimer"
               className="flex h-8 w-8 items-center justify-center rounded-full text-red-400 hover:bg-red-50 hover:text-red-600"
             >
@@ -1533,6 +1536,15 @@ export default function CalendarView({
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(deleteEventTarget)}
+        title="Supprimer l'événement ?"
+        message="Êtes-vous sûr de vouloir supprimer définitivement cet événement ?"
+        confirmLabel="Supprimer"
+        onConfirm={() => deleteEventTarget && confirmDeleteEvent(deleteEventTarget)}
+        onCancel={() => setDeleteEventTarget(null)}
+      />
     </div>
   );
 }
