@@ -61,6 +61,7 @@ import {
 import VolunteerNeedsPanel from "./volunteer-needs-panel";
 import type { VolunteerNeed } from "./event-volunteer-needs";
 import ConfirmDialog from "./confirm-dialog";
+import OrganisationCard from "./organisation-card";
 
 const emptyEventTasks: EventTasksState = {};
 const emptyVolunteerNeeds: VolunteerNeed[] = [];
@@ -887,10 +888,7 @@ export default function CalendarView({
           const hasNeeds = needs.length > 0;
           if (!hasTasks && !hasNeeds) return null;
           return (
-            <div className="mt-3 flex flex-col gap-3 rounded-xl border border-zinc-100 bg-zinc-50/60 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                Organisation
-              </p>
+            <OrganisationCard>
               {hasTasks && (
                 <MatchTasksPanel
                   eventId={event.id}
@@ -923,7 +921,7 @@ export default function CalendarView({
                   bare
                 />
               )}
-            </div>
+            </OrganisationCard>
           );
         })()}
         {canManageEvent && (

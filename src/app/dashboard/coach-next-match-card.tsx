@@ -3,6 +3,7 @@ import OpponentDisplay from "./opponent-display";
 import NextMatchActions from "./next-match-actions";
 import MatchTasksPanel from "./match-tasks-panel";
 import VolunteerNeedsPanel from "./volunteer-needs-panel";
+import OrganisationCard from "./organisation-card";
 import AttendanceBadges from "./attendance-badges";
 import RequestAttendanceButton from "./request-attendance-button";
 import SalleBadge from "./salle-badge";
@@ -166,10 +167,7 @@ export default function CoachNextMatchCard({
               calendar-view.tsx. VolunteerNeedsPanel reste visible même
               sans besoin existant : le coach doit toujours avoir accès à
               "+ Ajouter un besoin". */}
-          <div className="mt-3 flex flex-col gap-3 rounded-xl border border-zinc-100 bg-zinc-50/60 p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-              Organisation
-            </p>
+          <OrganisationCard>
             <MatchTasksPanel
               eventId={event.id}
               eventDate={event.start_time}
@@ -189,7 +187,7 @@ export default function CoachNextMatchCard({
               canManage
               bare
             />
-          </div>
+          </OrganisationCard>
         </>
       ) : (
         <p className="mt-1 text-sm text-zinc-500">Aucun événement à venir.</p>

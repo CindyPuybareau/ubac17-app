@@ -4,6 +4,7 @@ import OpponentDisplay from "./opponent-display";
 import NextMatchActions from "./next-match-actions";
 import MatchTasksPanel from "./match-tasks-panel";
 import VolunteerNeedsPanel from "./volunteer-needs-panel";
+import OrganisationCard from "./organisation-card";
 import type { UpcomingEvent } from "./family-data";
 import { isMatchType } from "./event-style";
 import { rolesForEventType } from "./event-tasks";
@@ -91,10 +92,7 @@ export default function NextConvocationCard({
         // correctif que calendar-view.tsx/coach-next-match-card.tsx.
         if (!hasTasks && !hasNeeds) return null;
         return (
-          <div className="mt-3 flex flex-col gap-3 rounded-xl border border-zinc-100 bg-zinc-50/60 p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-              Organisation
-            </p>
+          <OrganisationCard>
             {hasTasks && (
               <MatchTasksPanel
                 eventId={event.id}
@@ -118,7 +116,7 @@ export default function NextConvocationCard({
                 bare
               />
             )}
-          </div>
+          </OrganisationCard>
         );
       })()}
     </div>

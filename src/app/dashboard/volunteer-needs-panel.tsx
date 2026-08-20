@@ -285,15 +285,22 @@ export default function VolunteerNeedsPanel({
                 </p>
               )}
 
-              {canManage ? (
-                need.signups.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {need.signups.map((s) => (
-                      <span
-                        key={s.id}
-                        className="flex items-center gap-1 rounded-full bg-navy/10 px-2 py-1 text-[11px] font-medium text-navy"
-                      >
-                        {s.playerName}
+              {/* Qui s'en occupe, visible partout (Bureau/Coach/Famille) —
+                  pas seulement en gestion. Avant ce correctif, un simple
+                  joueur voyait juste "1/4" sans jamais savoir qui, et devait
+                  demander autour de lui (retour de Cindy du 2026-08-21).
+                  Le bouton de retrait individuel (X sur le nom) reste
+                  réservé à la gestion ; côté lecture seule, seul "Annuler"
+                  sur SA PROPRE inscription reste possible, juste en dessous. */}
+              {need.signups.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {need.signups.map((s) => (
+                    <span
+                      key={s.id}
+                      className="flex items-center gap-1 rounded-full bg-navy/10 px-2 py-1 text-[11px] font-medium text-navy"
+                    >
+                      {s.playerName}
+                      {canManage && (
                         <button
                           type="button"
                           disabled={pending === s.id}
@@ -302,34 +309,36 @@ export default function VolunteerNeedsPanel({
                         >
                           <X className="h-3 w-3" />
                         </button>
-                      </span>
-                    ))}
-                  </div>
-                )
-              ) : mySignup ? (
-                // Vert plutôt qu'un gris neutre : une fois inscrit, le
-                // bouton doit lire "c'est confirmé, c'est toi" au premier
-                // coup d'œil (retour de Cindy du 2026-08-20). Même style
-                // que match-tasks-panel.tsx, une seule vérité visuelle.
-                <button
-                  type="button"
-                  disabled={pending === mySignup.id}
-                  onClick={() => withdraw(mySignup.id)}
-                  className="flex w-fit shrink-0 items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-60"
-                >
-                  <X className="h-3 w-3" />
-                  Annuler
-                </button>
-              ) : remaining > 0 && myPlayerIds.length > 0 ? (
-                <button
-                  type="button"
-                  disabled={pending === need.id}
-                  onClick={() => volunteer(need)}
-                  className="w-fit shrink-0 rounded-full bg-navy px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-navy-dark disabled:opacity-60"
-                >
-                  Je m&apos;en occupe
-                </button>
-              ) : null}
+                      )}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {!canManage &&
+                (mySignup ? (
+                  // Vert plutôt qu'un gris neutre : une fois inscrit, le
+                  // bouton doit lire "c'est confirmé, c'est toi" au premier
+                  // coup d'œil (retour de Cindy du 2026-08-20). Même style
+                  // que match-tasks-panel.tsx, une seule vérité visuelle.
+                  <button
+                    type="button"
+                    disabled={pending === mySignup.id}
+                    onClick={() => withdraw(mySignup.id)}
+                    className="flex w-fit shrink-0 items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-60"
+                  >
+                    <X className="h-3 w-3" />
+                    Annuler
+                  </button>
+                ) : remaining > 0 && myPlayerIds.length > 0 ? (
+                  <button
+                    type="button"
+                    disabled={pending === need.id}
+                    onClick={() => volunteer(need)}
+                    className="w-fit shrink-0 rounded-full bg-navy px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-navy-dark disabled:opacity-60"
+                  >
+                    Je m&apos;en occupe
+                  </button>
+                ) : null)}
             </div>
           );
         })}
