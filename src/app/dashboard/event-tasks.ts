@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { unstable_cache } from "next/cache";
 import { formatPersonName } from "@/lib/names";
+import { createServiceClient } from "@/lib/supabase/service";
 
 // Un rôle est désormais une donnée (table event_role_types) et non plus
 // une valeur en dur : "JERSEYS" et "SNACKS" ne sont que les deux premières
@@ -70,6 +72,39 @@ export async function getEventRoleTypes(
     sortOrder: (r.sort_order as number | null) ?? 100,
   }));
 }
+
+// Même catalogue, mis en cache 60s : "read event_role_types" est
+// `using (true)` (aucune donnée sensible, identique pour tout le monde),
+// et pourtant re-interrogé à CHAQUE chargement du tableau de bord, pour
+// TOUS les rôles (Bureau/Coach/Famille) — un aller-retour réseau de plus
+// à chaque fois, payé même quand personne n'a touché aux rôles depuis des
+// jours. Un vrai coût sur mobile où chaque aller-retour compte (retour de
+// Cindy du 2026-08-22 : "chargement... très long sur téléphone"). Le
+// client service_role (pas le client de la requête en cours) est
+// nécessaire ici : unstable_cache met en cache la VALEUR renvoyée, pas le
+// client — mais le résultat doit être obtenu une fois indépendamment de
+// qui déclenche le cache-miss, donc avec un client qui ne dépend pas des
+// cookies de session de cet utilisateur précis.
+export const getEventRoleTypesCached = unstable_cache(
+  async (): Promise<EventRoleType[]> => {
+    const supabase = createServiceClient();
+    const { data } = await supabase
+      .from("event_role_types")
+      .select("code, label, icon, event_types, sort_order")
+      .is("archived_at", null)
+      .order("sort_order");
+
+    return (data ?? []).map((r) => ({
+      code: r.code as string,
+      label: r.label as string,
+      icon: (r.icon as string | null) ?? null,
+      eventTypes: (r.event_types as string[] | null) ?? [],
+      sortOrder: (r.sort_order as number | null) ?? 100,
+    }));
+  },
+  ["event-role-types"],
+  { revalidate: 60 }
+);
 
 // Rôles applicables à un type d'événement donné : ceux sans restriction,
 // plus ceux qui le mentionnent explicitement.

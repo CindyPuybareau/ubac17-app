@@ -26,10 +26,9 @@ import {
 } from "./family-data";
 import {
   getCarpoolOffersByEventId,
-  getEventRoleTypes,
+  getEventRoleTypesCached,
   getEventTasksByEventId,
   getSeasonTaskTallyByTeamIds,
-  type EventRoleType,
   type EventTasksState,
   type SeasonTaskTally,
 } from "./event-tasks";
@@ -580,8 +579,10 @@ export default async function DashboardPage() {
       })
     ),
     // Catalogue des roles d organisation, commun au club et lu par les
-    // trois espaces. Une seule requete, hors branche de role.
-    getEventRoleTypes(supabase),
+    // trois espaces. Version mise en cache 60s (voir getEventRoleTypesCached,
+    // event-tasks.ts) : identique pour tout le monde, pas la peine de la
+    // redemander à Supabase à chaque chargement.
+    getEventRoleTypesCached(),
   ]);
 
   const convocationCards = convocationCardsRaw.filter(
@@ -702,6 +703,20 @@ export default async function DashboardPage() {
     cotisation_relance_enabled: false,
   };
 
+  // Les trois blocs ci-dessous (Bureau, Coach, Famille) tournaient jusqu'ici
+  // en séquence — if (isAdmin) {...} PUIS if (isCoach) {...} PUIS
+  // if (players.length > 0) {...} — alors qu'ils sont totalement
+  // indépendants : aucun ne lit une variable produite par un autre (voir
+  // recherche faite avant ce correctif). Un compte qui cumule plusieurs
+  // rôles (Cindy elle-même : Bureau ET parente) payait donc la SOMME des
+  // trois chargements au lieu du plus lent des trois — un contributeur
+  // réel et évitable à la lenteur du "chargement de ton espace" sur
+  // mobile (retour de Cindy du 2026-08-22). Chaque bloc est encapsulé
+  // tel quel (aucune ligne de logique changée à l'intérieur) dans une
+  // IIFE async assignée à une promesse, les trois promesses étant
+  // attendues ensemble juste avant le premier endroit qui a besoin de
+  // leur résultat (voir "await Promise.all([adminPromise..." plus bas).
+  const adminPromise = (async () => {
   if (isAdmin) {
     const [
       teamsRes,
@@ -772,6 +787,13 @@ export default async function DashboardPage() {
     ]);
 
     const clubSettingsRow = clubSettingsRes.data as Record<AutomationKey, boolean> | null;
+    // Le compilateur React signale la réaffectation d'une variable de portée
+    // externe depuis cette IIFE async (pensée pour un composant client qui
+    // re-render) — sans objet ici : ce composant serveur exécute chaque
+    // bloc une seule fois, et tout est relu seulement après le
+    // "await Promise.all(...)" plus bas, jamais pendant l'exécution des
+    // trois blocs en parallèle.
+    // eslint-disable-next-line react-hooks/immutability
     adminAutomationSettings = {
       match_reminder_enabled: Boolean(clubSettingsRow?.match_reminder_enabled),
       expiry_alert_enabled: Boolean(clubSettingsRow?.expiry_alert_enabled),
@@ -1167,6 +1189,7 @@ export default async function DashboardPage() {
       adminUpcomingEvents.map((e) => e.id)
     );
   }
+  })();
 
   let coachTeamsWithRoster: TeamWithMembers[] = [];
   let coachEvents: AdminUpcomingEvent[] = [];
@@ -1183,6 +1206,7 @@ export default async function DashboardPage() {
   // Motif d'absence saisi par la famille, affiché sur la carte du coach.
   const coachRsvpReasonByKey: Record<string, string | null> = {};
 
+  const coachPromise = (async () => {
   if (isCoach) {
     const coachedTeamIds = coachedTeams.map((t) => t.id);
     // Les deux ne dépendent pas l'une de l'autre — parties ensemble
@@ -1604,6 +1628,7 @@ export default async function DashboardPage() {
       coachEvents.map((e) => e.id)
     );
   }
+  })();
 
   // Parent/joueur: un seul calendrier lecture-seule + RSVP, tous enfants confondus.
   let familyEvents: AdminUpcomingEvent[] = [];
@@ -1615,6 +1640,7 @@ export default async function DashboardPage() {
   const familyTeamCards: FamilyTeamCardData[] = [];
   let familyCotisations: AdminCotisation[] = [];
 
+  const familyPromise = (async () => {
   if (players.length > 0) {
     const playerTeamIdsList = await Promise.all(
       players.map((p) => getPlayerTeamIds(supabase, p.id))
@@ -1950,6 +1976,12 @@ export default async function DashboardPage() {
       ...extraFamilyTasks,
     };
   }
+  })();
+
+  // Les trois blocs Bureau/Coach/Famille ci-dessus tournent en parallèle
+  // (voir commentaire au-dessus de adminPromise) : on attend ici le plus
+  // lent des trois, juste avant le premier endroit qui lit leurs résultats.
+  await Promise.all([adminPromise, coachPromise, familyPromise]);
 
   const adminBirthdayMembers: BirthdaySource[] = isAdmin
     ? adminMembers
