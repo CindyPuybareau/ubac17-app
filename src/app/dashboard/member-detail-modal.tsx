@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
 import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
 import {
   AlertTriangle,
@@ -21,7 +20,7 @@ import { teamLabel } from "@/lib/teams";
 import { buildAppDeepLink, buildWhatsAppLink } from "@/lib/whatsapp";
 import DateTimePicker from "./date-time-picker";
 import ConfirmDialog from "./confirm-dialog";
-import type { AdminMemberTeam, MemberDetail } from "./page";
+import type { AdminMember, AdminMemberTeam, MemberDetail } from "./page";
 
 const BUREAU_ROLE_OPTIONS = [
   "Président / Vice-Président",
@@ -288,6 +287,7 @@ export default function MemberDetailModal({
   readOnly,
   onClose,
   onArchive,
+  onSaved,
   archivedAt = null,
   teams = [],
   profileId = null,
@@ -309,6 +309,14 @@ export default function MemberDetailModal({
   // members-table.tsx's row-menu/bulk-toolbar handleArchive which owns its
   // own confirmation because it isn't gated by a modal already.
   onArchive?: () => void | Promise<void>;
+  // Appelé juste avant la fermeture, avec les champs modifiés : permet à
+  // members-table.tsx de patcher sa copie locale immédiatement plutôt que
+  // d'attendre router.refresh() — retour de Cindy du 2026-08-21 : ce
+  // rechargement complet du tableau de bord faisait aussi apparaître le
+  // nouvel écran de chargement plein écran (loading.tsx), qui remplace
+  // toute la page et fait perdre la position de défilement dans le
+  // tableau ("je reviens au début du tableau, c'est chiant").
+  onSaved?: (patch: Partial<AdminMember>) => void;
   archivedAt?: string | null;
   teams?: AdminMemberTeam[];
   profileId?: string | null;
@@ -317,7 +325,6 @@ export default function MemberDetailModal({
   pendingCoachTeams?: AdminMemberTeam[];
   canManageTeamAndRoles?: boolean;
 }) {
-  const router = useRouter();
   const [tab, setTab] = useState<TabKey>("identity");
   const [linkCopied, setLinkCopied] = useState(false);
   const tabBodyRef = useRef<HTMLDivElement>(null);
@@ -493,6 +500,44 @@ export default function MemberDetailModal({
       return;
     }
 
+    // Reflète immédiatement les champs de la fiche players (voir onSaved
+    // sur le composant) : construit à partir de `form`, pas re-demandé au
+    // serveur — même valeurs que celles qu'on vient d'écrire ci-dessus.
+    // email/phone (AdminMember, dérivés côté serveur avec des replis sur
+    // le compte lié) restent volontairement approchés par
+    // registrationEmail/registrationPhone ici : le prochain
+    // rafraîchissement temps réel (players est surveillée) corrige
+    // silencieusement le rare écart, sans qu'il faille reproduire ici
+    // toute la logique de repli de page.tsx.
+    const basePatch: Partial<AdminMember> = {
+      firstName: form.firstName || null,
+      lastName: form.lastName || null,
+      birthDate: form.birthDate || null,
+      category,
+      sex: form.sex || null,
+      registrationEmail: form.registrationEmail || null,
+      registrationPhone: form.registrationPhone || null,
+      address: form.address || null,
+      postalCode: form.postalCode || null,
+      city: form.city || null,
+      secondaryEmail: form.secondaryEmail || null,
+      motherPhone: form.motherPhone || null,
+      fatherPhone: form.fatherPhone || null,
+      otherPhones: form.otherPhones || null,
+      secondaryAddress: form.secondaryAddress || null,
+      licenseType: form.licenseType || null,
+      membershipType: form.membershipType || null,
+      fbiStatus: form.fbiStatus || null,
+      medicalNotes: form.medicalNotes || null,
+      otherNotes: form.otherNotes || null,
+      imageRights: form.imageRights || null,
+      licenseNumber: form.licenseNumber || null,
+      licenseExpiresAt: form.licenseExpiresAt || null,
+      medicalCertificateExpiresAt: form.medicalCertificateExpiresAt || null,
+      email: form.registrationEmail || member.registrationEmail || null,
+      phone: form.registrationPhone || member.registrationPhone || null,
+    };
+
     const currentTeamId = member.teams[0]?.id ?? "";
     if (canManageTeamAndRoles && teamId !== currentTeamId) {
       // Uniquement la ligne de l'équipe affichée par ce sélecteur (team[0]),
@@ -526,11 +571,22 @@ export default function MemberDetailModal({
       }
     }
 
+    // Nouvelle équipe affichable immédiatement (voir basePatch plus haut) :
+    // seulement si elle a effectivement changé, sinon la fiche garde ses
+    // équipes actuelles telles quelles (un prêt additif n'apparaît jamais
+    // dans ce sélecteur à une seule équipe, pas de raison de le perdre ici).
+    const newTeams =
+      canManageTeamAndRoles && teamId !== currentTeamId
+        ? teamOptions.find((t) => t.id === teamId)
+          ? [teamOptions.find((t) => t.id === teamId)!]
+          : []
+        : member.teams;
+
     // Sans droit sur les rôles, l'enregistrement s'arrête aux informations
     // pratiques : ni désignation de coach, ni accès Bureau.
     if (!canManageTeamAndRoles) {
       setSaving(false);
-      router.refresh();
+      onSaved?.({ ...basePatch, teams: newTeams });
       onClose();
       return;
     }
@@ -676,8 +732,27 @@ export default function MemberDetailModal({
       }
     }
 
+    // Équipes coachées affichables immédiatement (voir basePatch) :
+    // resolvedProfileId détermine dans quelle table toute la liste désirée
+    // vient d'être écrite ci-dessus (team_coaches si un compte est lié,
+    // team_pending_coaches sinon) — même logique reprise ici, en
+    // approximation suffisante pour un affichage optimiste (le prochain
+    // rafraîchissement temps réel corrige silencieusement le rare écart,
+    // ex. une entrée déjà "en attente" avant l'auto-rattachement du
+    // compte plus haut, qui n'est pas migrée de table par ce save-ci).
+    const desiredCoachTeamRefs = Array.from(desiredCoachIds)
+      .map((id) => teams.find((t) => t.id === id))
+      .filter((t): t is AdminMemberTeam => Boolean(t));
+
     setSaving(false);
-    router.refresh();
+    onSaved?.({
+      ...basePatch,
+      teams: newTeams,
+      profileId: resolvedProfileId ?? profileId,
+      coachTeams: resolvedProfileId ? desiredCoachTeamRefs : [],
+      pendingCoachTeams: resolvedProfileId ? [] : desiredCoachTeamRefs,
+      bureauRole: bureauRole || null,
+    });
     onClose();
   }
 

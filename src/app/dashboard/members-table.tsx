@@ -868,6 +868,11 @@ export default function MembersTable({
                   );
                 }
               }}
+              onSaved={(patch) =>
+                setLocalMembers((prev) =>
+                  prev.map((m) => (m.id === detailMember.id ? { ...m, ...patch } : m))
+                )
+              }
               archivedAt={detailMember.archivedAt}
               teams={teams}
               profileId={detailMember.profileId}
