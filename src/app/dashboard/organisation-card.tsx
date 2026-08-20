@@ -16,15 +16,21 @@ export default function OrganisationCard({ children }: { children: ReactNode }) 
 
   return (
     <div className="mt-3 flex flex-col gap-3 rounded-xl border border-zinc-100 bg-zinc-50/60 p-3">
+      {/* Flèche agrandie + pastille visible même sans survol (avant : même
+          gris discret que le libellé, quasi invisible — retour de Cindy du
+          2026-08-21 : "la petite fleche retractable n'est pas assez
+          visible c'est pour ça que je ne l'ai pas vu"). */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center justify-between gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-500"
+        className="flex items-center justify-between gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 transition-colors hover:text-navy"
       >
         Organisation
-        <ChevronDown
-          className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
-        />
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-navy/10 text-navy">
+          <ChevronDown
+            className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
+          />
+        </span>
       </button>
       {open && <div className="flex flex-col gap-3">{children}</div>}
     </div>

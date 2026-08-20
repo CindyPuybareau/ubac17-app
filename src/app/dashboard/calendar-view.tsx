@@ -924,13 +924,22 @@ export default function CalendarView({
             </OrganisationCard>
           );
         })()}
+        {/* Même boîte "Organisation" rétractable que la branche
+            !canManageEvent ci-dessus — elle en était encore dépourvue
+            (juste "Besoins d'organisation" nu, sans repli), alors que
+            c'est justement la vue Bureau/Coach qui gère l'événement,
+            probablement la plus consultée (retour de Cindy du
+            2026-08-21 : "dans le bureau aussi il y en a"). */}
         {canManageEvent && (
-          <VolunteerNeedsPanel
-            eventId={event.id}
-            needs={volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds}
-            myPlayerIds={[]}
-            canManage
-          />
+          <OrganisationCard>
+            <VolunteerNeedsPanel
+              eventId={event.id}
+              needs={volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds}
+              myPlayerIds={[]}
+              canManage
+              bare
+            />
+          </OrganisationCard>
         )}
       </div>
     );
