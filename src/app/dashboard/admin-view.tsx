@@ -4,11 +4,13 @@ import {
   Heart,
   LayoutDashboard,
   MessageCircle,
+  ShoppingBag,
   Trophy,
   Users,
   Wallet,
   RefreshCw,
 } from "lucide-react";
+import { BOUTIQUE_URL } from "./boutique";
 import TeamManager, { type TeamWithMembers } from "./team-manager";
 import ImportInscriptions from "./import-inscriptions";
 import ImportPlanning from "./import-planning";
@@ -206,6 +208,15 @@ export default function AdminView({
           <ImportCoaches existingTeams={teamRefs} />
         </div>
       ),
+    },
+    {
+      // Dernier de la liste, comme demandé : un lien externe, pas un onglet
+      // de contenu (voir href sur AdminSection).
+      key: "boutique",
+      label: "Boutique",
+      icon: <ShoppingBag className={iconClass} />,
+      content: null,
+      href: BOUTIQUE_URL,
     },
   ];
 

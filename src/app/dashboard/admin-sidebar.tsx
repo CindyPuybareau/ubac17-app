@@ -15,6 +15,10 @@ export type AdminSection = {
   shortLabel?: string;
   icon: ReactNode;
   content: ReactNode;
+  // Lien externe (ex. "Boutique") plutôt qu'un onglet de contenu : rendu
+  // comme un <a target="_blank"> à la place du bouton habituel, jamais
+  // sélectionnable/actif. `content` reste ignoré dans ce cas (passer null).
+  href?: string;
 };
 
 export default function AdminSidebar({
@@ -56,6 +60,21 @@ export default function AdminSidebar({
       <nav className="hidden h-fit w-56 shrink-0 rounded-2xl bg-navy p-3 lg:sticky lg:top-20 lg:block">
         <ul className="flex flex-col gap-1">
           {sections.map((section) => {
+            if (section.href) {
+              return (
+                <li key={section.key}>
+                  <a
+                    href={section.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-white/70 transition-colors hover:bg-white/5 hover:text-white"
+                  >
+                    {section.icon}
+                    {section.label}
+                  </a>
+                </li>
+              );
+            }
             const isActive = section.key === current.key;
             return (
               <li key={section.key}>
@@ -82,6 +101,22 @@ export default function AdminSidebar({
       {/* Mobile / tablet: bottom tab bar */}
       <nav className="fixed inset-x-0 bottom-0 z-20 flex gap-1 overflow-x-auto border-t border-navy-dark bg-navy px-1 py-1.5 lg:hidden">
         {sections.map((section) => {
+          if (section.href) {
+            return (
+              <a
+                key={section.key}
+                href={section.href}
+                target="_blank"
+                rel="noreferrer"
+                className="flex min-w-[68px] flex-1 flex-col items-center gap-0.5 rounded-lg px-1.5 py-1.5 text-[11px] font-medium text-white/60"
+              >
+                {section.icon}
+                <span className="w-full truncate text-center leading-tight">
+                  {section.shortLabel ?? section.label}
+                </span>
+              </a>
+            );
+          }
           const isActive = section.key === current.key;
           return (
             <button

@@ -1,4 +1,5 @@
-import { CalendarDays, ClipboardList, RefreshCw, Trophy, Users } from "lucide-react";
+import { CalendarDays, ClipboardList, RefreshCw, ShoppingBag, Trophy, Users } from "lucide-react";
+import { BOUTIQUE_URL } from "./boutique";
 import CalendarView from "./calendar-view";
 import CalendarSubscribe from "./calendar-subscribe";
 import CoachTeams from "./coach-teams";
@@ -241,6 +242,15 @@ export default function CoachView({
       label: "FFBB",
       icon: <RefreshCw className={iconClass} />,
       content: <CoachFfbb teams={teams} teamRoleByTeamId={teamRoleByTeamId} />,
+    },
+    {
+      // Dernier de la liste, comme demandé : un lien externe, pas un onglet
+      // de contenu (voir href sur AdminSection).
+      key: "boutique",
+      label: "Boutique",
+      icon: <ShoppingBag className={iconClass} />,
+      content: null,
+      href: BOUTIQUE_URL,
     },
   ];
 

@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarDays, MessageCircle, Trophy, Users } from "lucide-react";
+import { CalendarDays, MessageCircle, ShoppingBag, Trophy, Users } from "lucide-react";
+import { BOUTIQUE_URL } from "./boutique";
 import { sortTeamsByGroup } from "@/lib/teams";
 import CalendarView, { type CalendarRsvpPlayer } from "./calendar-view";
 import FamilyTeamCard, { type FamilyTeamCardData } from "./family-team-card";
@@ -243,6 +244,15 @@ export default function FamilyView({
           resultsTeams={visibleResultsTeams.map((t) => ({ ...t, role: "PLAYER" as const }))}
         />
       ),
+    },
+    {
+      // Dernier de la liste, comme demandé : un lien externe, pas un onglet
+      // de contenu (voir href sur AdminSection).
+      key: "boutique",
+      label: "Boutique",
+      icon: <ShoppingBag className={iconClass} />,
+      content: null,
+      href: BOUTIQUE_URL,
     },
   ];
 
