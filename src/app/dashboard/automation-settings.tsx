@@ -45,9 +45,10 @@ export default function AutomationSettings({
   // Repliable (retour de Cindy du 2026-08-21, même demande et même flèche
   // visible que OrganisationCard) : une fois réglé, ce bloc n'a plus besoin
   // d'être vu à chaque ouverture d'Accueil — surtout maintenant qu'Accueil
-  // porte aussi le calendrier juste en dessous. Ouvert par défaut : ne
-  // change rien pour qui ne touche jamais au chevron.
-  const [open, setOpen] = useState(true);
+  // porte aussi le calendrier juste en dessous. Fermé par défaut cette
+  // fois (contrairement à OrganisationCard) : Cindy le veut hors de vue
+  // dès l'arrivée sur la page, pas seulement repliable.
+  const [open, setOpen] = useState(false);
 
   async function toggle(key: AutomationKey) {
     const next = !state[key];
