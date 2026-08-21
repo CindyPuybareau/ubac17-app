@@ -2,7 +2,6 @@ import {
   CalendarDays,
   Contact,
   Heart,
-  LayoutDashboard,
   MessageCircle,
   ShoppingBag,
   Trophy,
@@ -105,12 +104,16 @@ export default function AdminView({
   const iconClass = "h-4 w-4 shrink-0";
   const sections: AdminSection[] = [
     {
-      // Premier onglet, avant Calendrier : le Bureau atterrissait jusqu'ici
-      // directement dans le détail (grille du mois), sans jamais voir de
-      // résumé "où est-ce que ça coince" avant d'ouvrir un onglet précis.
+      // Premier onglet : fusionné avec l'ancien onglet "Calendrier" séparé
+      // (retour de Cindy du 2026-08-21 : "l'onglet accueil devrait être
+      // calendrier et intégrer l'onglet existant 'calendrier'), pour ne
+      // plus avoir à ouvrir deux onglets pour voir "où est-ce que ça
+      // coince" PUIS le planning complet. Le résumé (chiffres clés,
+      // prochain événement, alertes) reste en haut, le calendrier complet
+      // juste en dessous.
       key: "home",
-      label: "Accueil",
-      icon: <LayoutDashboard className={iconClass} />,
+      label: "Calendrier",
+      icon: <CalendarDays className={iconClass} />,
       content: (
         <BureauDashboard
           cotisations={cotisations}
@@ -118,14 +121,18 @@ export default function AdminView({
           teams={teams}
           events={upcomingEvents}
           automationSettings={automationSettings}
+          createTeams={teamRefs}
+          birthdayMembers={birthdayMembers}
+          eventRoles={eventRoles}
+          volunteerNeedsByEventId={volunteerNeedsByEventId}
         />
       ),
     },
     ...(familySection
       ? [
           {
-            // Juste après "Accueil" : c'est la partie personnelle, avant
-            // les outils de gestion du club qui suivent.
+            // Juste après le premier onglet : c'est la partie personnelle,
+            // avant les outils de gestion du club qui suivent.
             key: "family",
             label: "Ma famille",
             icon: <Heart className={iconClass} />,
@@ -133,21 +140,6 @@ export default function AdminView({
           },
         ]
       : []),
-    {
-      key: "calendar",
-      label: "Calendrier",
-      icon: <CalendarDays className={iconClass} />,
-      content: (
-        <CalendarView
-          events={upcomingEvents}
-          createTeams={teamRefs}
-          allowClubWide
-          birthdayMembers={birthdayMembers}
-          eventRoles={eventRoles}
-          volunteerNeedsByEventId={volunteerNeedsByEventId}
-        />
-      ),
-    },
     {
       key: "members",
       label: "Membres",

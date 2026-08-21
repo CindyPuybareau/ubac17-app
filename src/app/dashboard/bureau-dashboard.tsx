@@ -6,8 +6,12 @@ import { formatEventTime, isMatchType, styleFor } from "./event-style";
 import OpponentDisplay from "./opponent-display";
 import SalleBadge from "./salle-badge";
 import AutomationSettings, { type AutomationKey } from "./automation-settings";
-import type { AdminCotisation, AdminMember, AdminUpcomingEvent } from "./page";
+import CalendarView from "./calendar-view";
+import type { AdminMemberTeam, AdminCotisation, AdminMember, AdminUpcomingEvent } from "./page";
 import type { TeamWithMembers } from "./team-manager";
+import type { BirthdaySource } from "./birthdays";
+import type { EventRoleType } from "./event-tasks";
+import type { VolunteerNeed } from "./event-volunteer-needs";
 
 // Fenêtre "à surveiller" — même horizon que /api/cron/expiry-alerts (30
 // jours), pour que le tableau de bord et le rappel automatique par email
@@ -56,12 +60,24 @@ export default function BureauDashboard({
   teams,
   events,
   automationSettings,
+  createTeams,
+  birthdayMembers,
+  eventRoles,
+  volunteerNeedsByEventId,
 }: {
   cotisations: AdminCotisation[];
   members: AdminMember[];
   teams: TeamWithMembers[];
   events: AdminUpcomingEvent[];
   automationSettings: Record<AutomationKey, boolean>;
+  // Le calendrier complet vit désormais sous ce résumé plutôt que dans son
+  // propre onglet séparé (retour de Cindy du 2026-08-21 : "l'onglet
+  // accueil devrait être calendrier et intégrer l'onglet existant
+  // 'calendrier'") — mêmes props que l'ancien onglet Calendrier du Bureau.
+  createTeams: AdminMemberTeam[];
+  birthdayMembers: BirthdaySource[];
+  eventRoles: EventRoleType[];
+  volunteerNeedsByEventId: Record<string, VolunteerNeed[]>;
 }) {
   // Même périmètre que l'onglet Cotisations & Licences (KpiHeader) : les
   // stages/événements/boutique (collecteId non nul) ont leur propre suivi
@@ -227,6 +243,19 @@ export default function BureauDashboard({
           </div>
         </div>
       )}
+
+      {/* Calendrier complet, sous les cotisations/montants en attente : plus
+          d'onglet "Calendrier" séparé, c'est la suite naturelle du
+          "Prochain événement" ci-dessus plutôt qu'un aller-retour entre
+          deux onglets. */}
+      <CalendarView
+        events={events}
+        createTeams={createTeams}
+        allowClubWide
+        birthdayMembers={birthdayMembers}
+        eventRoles={eventRoles}
+        volunteerNeedsByEventId={volunteerNeedsByEventId}
+      />
     </div>
   );
 }

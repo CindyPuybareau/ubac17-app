@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, BellOff } from "lucide-react";
+import { Bell, BellOff, ChevronDown } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 export type AutomationKey =
@@ -42,6 +42,12 @@ export default function AutomationSettings({
   const [state, setState] = useState(settings);
   const [savingKey, setSavingKey] = useState<AutomationKey | null>(null);
   const [toggleError, setToggleError] = useState<string | null>(null);
+  // Repliable (retour de Cindy du 2026-08-21, même demande et même flèche
+  // visible que OrganisationCard) : une fois réglé, ce bloc n'a plus besoin
+  // d'être vu à chaque ouverture d'Accueil — surtout maintenant qu'Accueil
+  // porte aussi le calendrier juste en dessous. Ouvert par défaut : ne
+  // change rien pour qui ne touche jamais au chevron.
+  const [open, setOpen] = useState(true);
 
   async function toggle(key: AutomationKey) {
     const next = !state[key];
@@ -63,8 +69,18 @@ export default function AutomationSettings({
 
   return (
     <div className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
-      <p className="mb-3 text-sm font-semibold text-zinc-900">Envois automatiques</p>
-      <div className="flex flex-col gap-2.5">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-2 text-sm font-semibold text-zinc-900 transition-colors hover:text-navy"
+      >
+        Envois automatiques
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-navy/10 text-navy">
+          <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
+        </span>
+      </button>
+      {open && (
+      <div className="mt-3 flex flex-col gap-2.5">
         {AUTOMATIONS.map((a) => {
           const enabled = state[a.key];
           return (
@@ -98,6 +114,7 @@ export default function AutomationSettings({
           );
         })}
       </div>
+      )}
       {toggleError && <p className="mt-2 text-xs text-red-600">{toggleError}</p>}
     </div>
   );
