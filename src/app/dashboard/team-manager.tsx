@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import TeamCard from "./team-card";
 import TeamFilterDropdown from "./team-filter-dropdown";
-import type { AdminUpcomingEvent } from "./page";
+import type { AdminMemberTeam, AdminUpcomingEvent, MemberDetail } from "./page";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 
@@ -45,11 +45,15 @@ export default function TeamManager({
   allProfiles,
   eventsByTeamId,
   contactPhoneByPlayerId,
+  memberDetailsByPlayerId,
+  clubTeams,
 }: {
   teams: TeamWithMembers[];
   allProfiles: Person[];
   eventsByTeamId: Record<string, AdminUpcomingEvent[]>;
   contactPhoneByPlayerId: Record<string, string>;
+  memberDetailsByPlayerId: Record<string, MemberDetail>;
+  clubTeams: AdminMemberTeam[];
 }) {
   const router = useRouter();
   const categoryListId = useId();
@@ -137,6 +141,17 @@ export default function TeamManager({
             contactPhoneByPlayerId={contactPhoneByPlayerId}
             allowCreatePlayer={false}
             allowAssignCoach={false}
+            memberDetailsByPlayerId={memberDetailsByPlayerId}
+            clubTeams={clubTeams}
+            // Retirer un joueur de son équipe depuis cette carte n'existe
+            // plus pour le Bureau non plus (retour de Cindy du
+            // 2026-08-21 : "le 'retirer' ne doit pas exister") — même
+            // logique que côté coach : "Affecter à une autre équipe"
+            // (flèches, voir clubTeams/memberDetailsByPlayerId ci-dessus)
+            // couvre le vrai besoin (U13/U18/Séniors ont plusieurs
+            // groupes), et un retrait complet du club passe par
+            // Archiver/Réactiver dans l'onglet Membres.
+            canRemoveMembers={false}
           />
         ))}
         {teams.length === 0 && (

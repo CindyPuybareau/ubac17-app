@@ -29,6 +29,7 @@ import type {
   AdminCotisation,
   AdminMember,
   AdminUpcomingEvent,
+  MemberDetail,
   WhatsAppGroup,
 } from "./page";
 import type { BirthdaySource } from "./birthdays";
@@ -91,6 +92,15 @@ export default function AdminView({
     if (!e.teamId) return;
     (eventsByTeamId[e.teamId] ??= []).push(e);
   });
+
+  // AdminMember est un MemberDetail (+ des champs propres au Bureau) : pas
+  // besoin d'une requête séparée, ce même tableau ré-indexé par id sert de
+  // memberDetailsByPlayerId pour "Affecter à une autre équipe" dans
+  // l'onglet Équipes (voir team-card.tsx) — même donnée déjà chargée pour
+  // la table Membres.
+  const memberDetailsByPlayerId: Record<string, MemberDetail> = Object.fromEntries(
+    members.map((m) => [m.id, m])
+  );
 
   const iconClass = "h-4 w-4 shrink-0";
   const sections: AdminSection[] = [
@@ -156,6 +166,8 @@ export default function AdminView({
           allProfiles={allProfiles}
           eventsByTeamId={eventsByTeamId}
           contactPhoneByPlayerId={contactPhoneByPlayerId}
+          memberDetailsByPlayerId={memberDetailsByPlayerId}
+          clubTeams={canonicalTeamRefs}
         />
       ),
     },
