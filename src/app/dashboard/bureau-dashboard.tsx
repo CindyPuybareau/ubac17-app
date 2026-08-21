@@ -6,7 +6,7 @@ import { formatEventTime, isMatchType, styleFor } from "./event-style";
 import OpponentDisplay from "./opponent-display";
 import SalleBadge from "./salle-badge";
 import AutomationSettings, { type AutomationKey } from "./automation-settings";
-import CalendarView from "./calendar-view";
+import DeferredCalendar from "./deferred-calendar";
 import type { AdminMemberTeam, AdminCotisation, AdminMember, AdminUpcomingEvent } from "./page";
 import type { TeamWithMembers } from "./team-manager";
 import type { BirthdaySource } from "./birthdays";
@@ -248,7 +248,7 @@ export default function BureauDashboard({
           d'onglet "Calendrier" séparé, c'est la suite naturelle du
           "Prochain événement" ci-dessus plutôt qu'un aller-retour entre
           deux onglets. */}
-      <CalendarView
+      <DeferredCalendar
         events={events}
         createTeams={createTeams}
         allowClubWide
