@@ -29,6 +29,7 @@ import EmailTemplateModal from "./email-template-modal";
 import MemberDetailModal from "./member-detail-modal";
 import PlayerYearBadge from "./player-year-badge";
 import WhatsAppButton from "./whatsapp-button";
+import WhatsAppDirectButton from "./whatsapp-direct-button";
 import { formatFirstName, formatLastName, formatPersonName } from "@/lib/names";
 import type { AdminMember, AdminMemberTeam } from "./page";
 
@@ -728,6 +729,11 @@ export default function MembersTable({
                     <span className="flex items-center gap-1 whitespace-nowrap">
                       <Phone className="h-3 w-3 shrink-0 text-zinc-400" />
                       {m.phone}
+                      <WhatsAppDirectButton
+                        phone={m.phone}
+                        message={`Bonjour ${m.firstName ? formatFirstName(m.firstName) : ""}, ici l'UBAC.`}
+                        playerId={m.id}
+                      />
                     </span>
                   ) : (
                     <span className="text-zinc-300">—</span>

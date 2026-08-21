@@ -23,6 +23,7 @@ import MemberDetailModal from "./member-detail-modal";
 import PlayerYearBadge from "./player-year-badge";
 import SalleBadge from "./salle-badge";
 import WhatsAppButton from "./whatsapp-button";
+import WhatsAppDirectButton from "./whatsapp-direct-button";
 import WhatsAppGroupButton from "./whatsapp-group-button";
 import TeamWhatsAppSettings from "./team-whatsapp-settings";
 import type { AdminMemberTeam, AdminUpcomingEvent, MemberDetail, WhatsAppGroup } from "./page";
@@ -627,14 +628,25 @@ export default function TeamCard({
               </td>
               <td className="whitespace-nowrap px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
                 {phone ? (
-                  <a
-                    href={`tel:${phone}`}
-                    title="Appeler"
-                    className="inline-flex items-center gap-1.5 text-zinc-600 hover:text-navy hover:underline"
-                  >
-                    <Phone className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-                    {phone}
-                  </a>
+                  <span className="flex items-center gap-1">
+                    <a
+                      href={`tel:${phone}`}
+                      title="Appeler"
+                      className="inline-flex items-center gap-1.5 text-zinc-600 hover:text-navy hover:underline"
+                    >
+                      <Phone className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                      {phone}
+                    </a>
+                    {/* Bascule directe, indépendante de showWhatsApp (qui ne
+                        gate que le bouton avec composition plus loin dans la
+                        ligne) — retour de Cindy du 2026-08-21, voulue à la
+                        fois Bureau et Coach. */}
+                    <WhatsAppDirectButton
+                      phone={phone}
+                      message={`Bonjour, ici le coach de ${team.name ?? "l'équipe"}.`}
+                      playerId={m.id}
+                    />
+                  </span>
                 ) : (
                   <span className="text-zinc-400">—</span>
                 )}
