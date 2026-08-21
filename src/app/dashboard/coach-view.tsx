@@ -151,7 +151,12 @@ export default function CoachView({
     },
     {
       key: "teams",
-      label: "Mes Équipes",
+      // "Mes Équipes" ne tenait pas dans la barre du bas mobile (retour de
+      // Cindy du 2026-08-21) — au singulier/pluriel selon le nombre réel
+      // d'équipes du coach plutôt qu'un "Mes" générique, à la fois plus
+      // court et plus précis (un coach d'une seule équipe n'a pas
+      // vraiment plusieurs "équipes").
+      label: teams.length > 1 ? "Équipes" : "Équipe",
       icon: <Users className={iconClass} />,
       content: (
         <div className="flex flex-col gap-4">
@@ -188,11 +193,13 @@ export default function CoachView({
     },
     {
       key: "organisation",
-      label: "Organisation & Bilan",
-      // "Organisation & Bilan" se fait tronquer en "Organisation ..." dans
-      // la barre du bas sur mobile, serrée entre plusieurs autres onglets —
-      // un seul mot y tient sans coupure.
-      shortLabel: "Organisation",
+      // "Organisation & Bilan" se faisait tronquer en "Organisation ..."
+      // dans la barre du bas mobile, et même son shortLabel "Organisation"
+      // seul ne tenait pas (retour de Cindy du 2026-08-21) — "Suivi"
+      // reprend les deux volets de cet onglet (rôles à venir ET bilan de
+      // saison) en un mot assez court pour ne jamais se faire couper, plus
+      // besoin d'un shortLabel séparé.
+      label: "Suivi",
       icon: <ClipboardList className={iconClass} />,
       content: (
         <CoachOrganisation

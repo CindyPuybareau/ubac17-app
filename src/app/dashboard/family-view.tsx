@@ -156,7 +156,11 @@ export default function FamilyView({
   const sections: AdminSection[] = [
     {
       key: "planning",
-      label: "Planning & Matchs",
+      // "Planning & Matchs" se faisait tronquer en "Planning & M..." dans
+      // la barre du bas mobile (retour de Cindy du 2026-08-21) —
+      // "Calendrier" tout court, comme dans les 3 autres espaces
+      // (Bureau/Coach/Enfant), en plus d'être cohérent partout.
+      label: "Calendrier",
       icon: <CalendarDays className={iconClass} />,
       content: (
         <div className="flex flex-col gap-4">
