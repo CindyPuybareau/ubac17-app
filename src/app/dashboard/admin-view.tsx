@@ -1,15 +1,12 @@
 import {
   CalendarDays,
   Contact,
-  Dumbbell,
   Flag,
   Gavel,
   Handshake,
   Heart,
-  ListOrdered,
   LogOut,
   MessageCircle,
-  Shield,
   ShoppingBag,
   Tag,
   Ticket,
@@ -193,7 +190,7 @@ export default function AdminView({
       children: [
         {
           key: "cotisations-licences",
-          label: "Cotisations et licences",
+          label: "Cotisations & Licences",
           icon: <Tag className={iconClass} />,
           content: (
             <CotisationsManager
@@ -242,77 +239,44 @@ export default function AdminView({
       ],
     },
     {
-      // Sous-menu (retour de Cindy du 2026-08-22) : mêmes 4 vues que côté
-      // Coach ("Entraînements" / "Matchs officiels" / "Événements" /
-      // "Résultats"), avec le même sélecteur compact d'équipe en haut de
-      // page (TeamSelectorPills, voir calendar-view.tsx) plutôt qu'un
-      // sous-menu à 13+ entrées — choix explicite de Cindy pour le Bureau,
-      // qui gère toutes les équipes du club d'un coup.
-      key: "results",
-      label: "Événements et Résultats",
+      // Retour de Cindy du 2026-08-22 : "Événements" regroupe tout le
+      // calendrier du club sauf les matchs officiels, avec le sélecteur
+      // d'équipe façon case à cocher de l'onglet "Équipes" du Bureau
+      // (TeamFilterDropdown, voir resultsTeamSelector="dropdown" sur
+      // CalendarView) plutôt que le sélecteur compact "une équipe à la
+      // fois" utilisé côté Coach.
+      key: "events",
+      label: "Événements",
+      icon: <Flag className={iconClass} />,
+      content: (
+        <CalendarView
+          events={upcomingEvents}
+          createTeams={teamRefs}
+          allowClubWide
+          forcedView="clubEvents"
+          resultsTeams={teamRefs}
+          resultsTeamSelector="dropdown"
+        />
+      ),
+    },
+    {
+      // "Matchs et Résultats" (retour de Cindy du 2026-08-22) : les
+      // matchs officiels et leurs résultats restent groupés dans un seul
+      // onglet de menu, avec un petit bouton interne pour basculer entre
+      // les deux (voir forcedViewOptions sur CalendarView).
+      key: "matches",
+      label: "Matchs & Résultats",
       icon: <Trophy className={iconClass} />,
-      content: null,
-      children: [
-        {
-          key: "results-trainings",
-          label: "Entraînements",
-          icon: <Dumbbell className={iconClass} />,
-          content: (
-            <CalendarView
-              events={upcomingEvents}
-              createTeams={teamRefs}
-              allowClubWide
-              forcedView="trainings"
-              resultsTeams={teamRefs}
-            />
-          ),
-        },
-        {
-          key: "results-official-matches",
-          label: "Matchs officiels",
-          icon: <Shield className={iconClass} />,
-          content: (
-            <CalendarView
-              events={upcomingEvents}
-              createTeams={teamRefs}
-              allowClubWide
-              forcedView="officialMatches"
-              resultsTeams={teamRefs}
-            />
-          ),
-        },
-        {
-          key: "results-other-events",
-          label: "Événements",
-          icon: <Flag className={iconClass} />,
-          content: (
-            <CalendarView
-              events={upcomingEvents}
-              createTeams={teamRefs}
-              allowClubWide
-              forcedView="otherEvents"
-              resultsTeams={teamRefs}
-            />
-          ),
-        },
-        {
-          key: "results-scores",
-          label: "Résultats",
-          icon: <ListOrdered className={iconClass} />,
-          content: (
-            <CalendarView
-              events={upcomingEvents}
-              createTeams={teamRefs}
-              allowClubWide
-              forcedView="results"
-              // Sans ça, toutes les équipes du club défilaient dans un seul
-              // fil de ~200 matchs sur la saison — même sélecteur que côté
-              // Coach/Parents (voir calendar-view.tsx), une équipe à la fois.
-              resultsTeams={teamRefs}
-            />
-          ),
-        },
-      ],
+      content: (
+        <CalendarView
+          events={upcomingEvents}
+          createTeams={teamRefs}
+          allowClubWide
+          forcedViewOptions={["officialMatches", "officialResults"]}
+          resultsTeams={teamRefs}
+          resultsTeamSelector="dropdown"
+        />
+      ),
     },
     {
       key: "sponsors",

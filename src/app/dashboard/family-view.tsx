@@ -260,7 +260,7 @@ export default function FamilyView({
     },
     {
       key: "results",
-      label: "Événements et Résultats",
+      label: "Événements & Résultats",
       icon: <Trophy className={iconClass} />,
       content: (
         <CalendarView

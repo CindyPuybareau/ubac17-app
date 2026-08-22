@@ -1,13 +1,11 @@
 import {
   CalendarDays,
   ClipboardList,
-  Dumbbell,
   Flag,
   ListOrdered,
   LogOut,
   MessageCircle,
   RefreshCw,
-  Shield,
   ShoppingBag,
   Trophy,
   Users,
@@ -254,7 +252,7 @@ export default function CoachView({
       // Bilan" (retour de Cindy du 2026-08-22), maintenant en sous-menu
       // (retour de Cindy du 2026-08-22) plutôt qu'en bascule interne.
       key: "organisation",
-      label: "Organisation et Bilan",
+      label: "Organisation & Bilan",
       icon: <ClipboardList className={iconClass} />,
       content: null,
       children: [
@@ -303,72 +301,46 @@ export default function CoachView({
       ],
     },
     {
-      key: "results",
-      label: "Événements et Résultats",
+      // Retour de Cindy du 2026-08-22 : l'ancien parent "Événements et
+      // Résultats" à 4 sous-onglets est retiré au profit de deux onglets
+      // de menu directs. "Événements" regroupe tout le calendrier du club
+      // sauf les matchs officiels (entraînements, amicaux, tournois,
+      // événements club) en un seul fil, plus besoin de les voir séparés.
+      key: "events",
+      label: "Événements",
+      icon: <Flag className={iconClass} />,
+      content: (
+        <CalendarView
+          events={events}
+          createTeams={createTeams}
+          scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
+          forcedView="clubEvents"
+          // Un coach qui encadre plusieurs équipes (et joue parfois dans
+          // une autre) doit pouvoir choisir laquelle regarder, comme dans
+          // "Équipe" — sinon tous les événements de toutes ses équipes se
+          // mélangent dans un seul fil.
+          resultsTeams={resultsTeamsForCalendar}
+        />
+      ),
+    },
+    {
+      // "Matchs et Résultats" (retour de Cindy du 2026-08-22) : les
+      // matchs officiels et leurs résultats restent groupés dans un seul
+      // onglet de menu, avec un petit bouton interne pour basculer entre
+      // les deux (voir forcedViewOptions sur CalendarView) plutôt que
+      // deux entrées de menu séparées.
+      key: "matches",
+      label: "Matchs & Résultats",
       icon: <Trophy className={iconClass} />,
-      content: null,
-      children: [
-        {
-          key: "results-trainings",
-          label: "Entraînements",
-          icon: <Dumbbell className={iconClass} />,
-          content: (
-            <CalendarView
-              events={events}
-              createTeams={createTeams}
-              scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
-              forcedView="trainings"
-              resultsTeams={resultsTeamsForCalendar}
-            />
-          ),
-        },
-        {
-          key: "results-official-matches",
-          label: "Matchs officiels",
-          icon: <Shield className={iconClass} />,
-          content: (
-            <CalendarView
-              events={events}
-              createTeams={createTeams}
-              scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
-              forcedView="officialMatches"
-              resultsTeams={resultsTeamsForCalendar}
-            />
-          ),
-        },
-        {
-          key: "results-other-events",
-          label: "Événements",
-          icon: <Flag className={iconClass} />,
-          content: (
-            <CalendarView
-              events={events}
-              createTeams={createTeams}
-              scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
-              forcedView="otherEvents"
-              resultsTeams={resultsTeamsForCalendar}
-            />
-          ),
-        },
-        {
-          key: "results-scores",
-          label: "Résultats",
-          icon: <ListOrdered className={iconClass} />,
-          content: (
-            <CalendarView
-              events={events}
-              createTeams={createTeams}
-              scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
-              forcedView="results"
-              // Un coach qui encadre plusieurs équipes (et joue parfois dans
-              // une autre) doit pouvoir choisir laquelle regarder, comme
-              // dans "Équipe" — sinon tous les événements de toutes ses
-              // équipes se mélangent dans un seul fil.
-              resultsTeams={resultsTeamsForCalendar}
-            />
-          ),
-        },
-      ],
+      content: (
+        <CalendarView
+          events={events}
+          createTeams={createTeams}
+          scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
+          forcedViewOptions={["officialMatches", "officialResults"]}
+          resultsTeams={resultsTeamsForCalendar}
+        />
+      ),
     },
     {
       key: "ffbb",
