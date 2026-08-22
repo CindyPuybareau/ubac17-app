@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { X } from "lucide-react";
 import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
 import { useMobileNav } from "./mobile-nav-context";
+import { createClient } from "@/lib/supabase/client";
 
 export type AdminSection = {
   key: string;
@@ -20,6 +21,15 @@ export type AdminSection = {
   // comme un <a target="_blank"> à la place du bouton habituel, jamais
   // sélectionnable/actif. `content` reste ignoré dans ce cas (passer null).
   href?: string;
+  // "Déconnexion" (retour de Cindy du 2026-08-22 : déplacée de la bande
+  // bleue vers la toute fin du menu) — un geste immédiat, pas un onglet à
+  // sélectionner, donc géré ici plutôt que via `content`/`onClick` côté
+  // appelant : admin-view.tsx et coach-view.tsx sont des Server
+  // Components, incapables de porter un handler client — ce composant,
+  // déjà "use client", s'en charge lui-même. "supabase" pour
+  // Bureau/Coach/Famille (vraie session Supabase Auth), "child" pour
+  // l'espace Enfant (cookie de session signé, voir child-session.ts).
+  logoutAction?: "supabase" | "child";
 };
 
 export default function AdminSidebar({
@@ -64,6 +74,25 @@ export default function AdminSidebar({
     setOpen(false);
   }
 
+  const router = useRouter();
+  async function handleLogout(kind: "supabase" | "child") {
+    if (kind === "supabase") {
+      const supabase = createClient();
+      // Redirection dans un `finally` : un signOut() qui échoue (réseau,
+      // verrou interne du SDK) ne doit pas laisser le bouton sans effet.
+      try {
+        await supabase.auth.signOut();
+      } finally {
+        router.push("/");
+        router.refresh();
+      }
+    } else {
+      await fetch("/api/child-logout", { method: "POST" });
+      router.push("/");
+      router.refresh();
+    }
+  }
+
   if (!current) return null;
 
   return (
@@ -84,6 +113,19 @@ export default function AdminSidebar({
                     {section.icon}
                     {section.label}
                   </a>
+                </li>
+              );
+            }
+            if (section.logoutAction) {
+              return (
+                <li key={section.key} className="mt-1 border-t border-white/10 pt-1">
+                  <button
+                    onClick={() => handleLogout(section.logoutAction!)}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-white/70 transition-colors hover:bg-white/5 hover:text-white"
+                  >
+                    {section.icon}
+                    {section.label}
+                  </button>
                 </li>
               );
             }
@@ -147,6 +189,22 @@ export default function AdminSidebar({
                         {section.icon}
                         {section.label}
                       </a>
+                    </li>
+                  );
+                }
+                if (section.logoutAction) {
+                  return (
+                    <li key={section.key} className="mt-1 border-t border-white/10 pt-1">
+                      <button
+                        onClick={() => {
+                          setOpen(false);
+                          handleLogout(section.logoutAction!);
+                        }}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-white/70 transition-colors hover:bg-white/5 hover:text-white"
+                      >
+                        {section.icon}
+                        {section.label}
+                      </button>
                     </li>
                   );
                 }

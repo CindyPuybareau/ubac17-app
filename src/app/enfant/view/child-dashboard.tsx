@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { BarChart3, Cake, CalendarDays, Trophy, Users } from "lucide-react";
+import { BarChart3, Cake, CalendarDays, LogOut, Trophy, Users } from "lucide-react";
 import AdminSidebar, { type AdminSection } from "@/app/dashboard/admin-sidebar";
 import OrgChartButton from "@/app/dashboard/org-chart-button";
 import PenalitesCard from "@/app/dashboard/penalites-card";
@@ -12,7 +12,6 @@ import { formatFirstName } from "@/lib/names";
 import { styleFor, isMatchType, homeAwayLabel, formatEventTime } from "@/app/dashboard/event-style";
 import { parseMatchTitle } from "@/lib/match-display";
 import { localDateFromParts } from "@/lib/local-date";
-import ChildLogoutButton from "./child-logout-button";
 import ChildCalendarTab from "./child-calendar-tab";
 import ChildTeamTab from "./child-team-tab";
 import ChildResultsTab from "./child-results-tab";
@@ -188,9 +187,18 @@ export default function ChildDashboard({
     },
     {
       key: "results",
-      label: "Matchs et résultats",
+      label: "Événements et Résultats",
       icon: <Trophy className={iconClass} />,
       content: <ChildResultsTab seasonMatches={seasonMatches} teams={teams} />,
+    },
+    {
+      // Tout à la fin du menu (retour de Cindy du 2026-08-22) — déplacé
+      // depuis la bande bleue.
+      key: "logout",
+      label: "Déconnexion",
+      icon: <LogOut className={iconClass} />,
+      content: null,
+      logoutAction: "child",
     },
   ];
 
@@ -202,14 +210,17 @@ export default function ChildDashboard({
           items-center pour un vrai centrage vertical (logo et icônes), et
           avatar à plat sous la bande bleue (le débordement façon Facebook,
           essayé d'abord, entrait en collision avec un logo plus grand —
-          même bord gauche). */}
-      <header className="sticky top-0 z-10 bg-navy px-4 sm:px-6">
-        <div className="mx-auto flex h-16 w-full max-w-[1600px] items-center justify-between sm:h-20">
-          <Image src="/logo.png" alt="UBAC" width={48} height={48} className="h-10 w-10 object-contain sm:h-11 sm:w-11" priority />
+          même bord gauche). Retour de Cindy du 2026-08-22 (message
+          suivant) : bandeau encore trop épais, remis à sa hauteur
+          d'origine (simple padding py-3, logo 32px) plutôt que la
+          hauteur fixe agrandie du tour précédent. Déconnexion déplacée
+          en toute fin du menu (voir admin-sidebar.tsx, logoutAction). */}
+      <header className="sticky top-0 z-10 bg-navy px-4 py-3 sm:px-6">
+        <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between">
+          <Image src="/logo.png" alt="UBAC" width={32} height={32} className="h-8 w-8 object-contain" priority />
           <div className="flex items-center gap-1">
             <OrgChartButton />
             <ChildNotificationBell initialNotifications={notifications} initialEnabled={notificationsEnabled} />
-            <ChildLogoutButton />
             <MobileMenuButton />
           </div>
         </div>

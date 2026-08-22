@@ -1,4 +1,4 @@
-import { CalendarDays, ClipboardList, RefreshCw, ShoppingBag, Trophy, Users } from "lucide-react";
+import { CalendarDays, ClipboardList, LogOut, RefreshCw, ShoppingBag, Trophy, Users } from "lucide-react";
 import { BOUTIQUE_URL } from "./boutique";
 import CalendarView from "./calendar-view";
 import CalendarSubscribe from "./calendar-subscribe";
@@ -214,13 +214,12 @@ export default function CoachView({
     },
     {
       key: "organisation",
-      // "Organisation & Bilan" se faisait tronquer en "Organisation ..."
-      // dans la barre du bas mobile, et même son shortLabel "Organisation"
-      // seul ne tenait pas (retour de Cindy du 2026-08-21) — "Suivi"
-      // reprend les deux volets de cet onglet (rôles à venir ET bilan de
-      // saison) en un mot assez court pour ne jamais se faire couper, plus
-      // besoin d'un shortLabel séparé.
-      label: "Suivi",
+      // "Suivi" (retour de Cindy du 2026-08-21) redevient "Organisation et
+      // Bilan" (retour de Cindy du 2026-08-22) — le panneau hamburger sur
+      // mobile (plus de barre du bas serrée depuis, voir mobile-nav-context.tsx)
+      // n'a plus le même besoin de brièveté qu'à l'époque du premier
+      // renommage.
+      label: "Organisation et Bilan",
       icon: <ClipboardList className={iconClass} />,
       content: (
         <CoachOrganisation
@@ -240,7 +239,7 @@ export default function CoachView({
     },
     {
       key: "results",
-      label: "Matchs et résultats",
+      label: "Événements et Résultats",
       icon: <Trophy className={iconClass} />,
       content: (
         <CalendarView
@@ -272,13 +271,21 @@ export default function CoachView({
       content: <CoachFfbb teams={teams} teamRoleByTeamId={teamRoleByTeamId} />,
     },
     {
-      // Dernier de la liste, comme demandé : un lien externe, pas un onglet
-      // de contenu (voir href sur AdminSection).
+      // Un lien externe, pas un onglet de contenu (voir href sur AdminSection).
       key: "boutique",
-      label: "Boutique",
+      label: "Boutique en ligne",
       icon: <ShoppingBag className={iconClass} />,
       content: null,
       href: BOUTIQUE_URL,
+    },
+    {
+      // Tout à la fin du menu (retour de Cindy du 2026-08-22) — déplacé
+      // depuis la bande bleue.
+      key: "logout",
+      label: "Déconnexion",
+      icon: <LogOut className={iconClass} />,
+      content: null,
+      logoutAction: "supabase",
     },
   ];
 

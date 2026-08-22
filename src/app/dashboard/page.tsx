@@ -5,7 +5,6 @@ import { createClient } from "@/lib/supabase/server";
 import { formatFirstName, formatPersonName } from "@/lib/names";
 import { EMAIL_REPLY_TO } from "@/lib/email";
 import { localDateFromParts } from "@/lib/local-date";
-import SignOutButton from "./sign-out-button";
 import NotificationBell from "./notification-bell";
 import OrgChartButton from "./org-chart-button";
 import AvatarUpload from "./avatar-upload";
@@ -2291,20 +2290,20 @@ export default async function DashboardPage() {
       <RealtimeSync />
       {/* Retour de Cindy du 2026-08-22 : logo seul (plus de texte "UBAC" à
           côté — la photo de profil ci-dessous porte désormais l'identité
-          de la page), agrandi. Hauteur fixe + items-center : logo et
-          icônes vraiment centrés verticalement dans toute la bande bleue
-          (un simple padding les laissait collés en haut). Le débordement
-          de l'avatar façon Facebook, essayé dans un premier temps, est
-          abandonné : avec un logo plus grand et bien centré, les deux se
-          chevauchaient géométriquement (même bord gauche) — l'avatar
-          reste maintenant entièrement sous la bande bleue, à plat. */}
-      <header className="sticky top-0 z-10 bg-navy px-4 sm:px-6">
-        <div className="mx-auto flex h-16 w-full max-w-[1600px] items-center justify-between sm:h-20">
-          <Image src="/logo.png" alt="UBAC" width={48} height={48} className="h-10 w-10 object-contain sm:h-11 sm:w-11" priority />
+          de la page). Le débordement de l'avatar façon Facebook, essayé
+          dans un premier temps, est abandonné : avec un logo agrandi et
+          bien centré, les deux se chevauchaient géométriquement (même
+          bord gauche) — l'avatar reste sous la bande bleue, à plat.
+          Bandeau jugé encore trop épais ensuite : remis à sa hauteur
+          d'origine (simple padding py-3, logo 32px) plutôt que la
+          hauteur fixe agrandie du tour précédent. Déconnexion déplacée
+          en toute fin du menu (voir admin-sidebar.tsx, logoutAction). */}
+      <header className="sticky top-0 z-10 bg-navy px-4 py-3 sm:px-6">
+        <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between">
+          <Image src="/logo.png" alt="UBAC" width={32} height={32} className="h-8 w-8 object-contain" priority />
           <div className="flex items-center gap-1">
             <OrgChartButton />
             <NotificationBell />
-            <SignOutButton />
             <MobileMenuButton />
           </div>
         </div>

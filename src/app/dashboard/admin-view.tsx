@@ -3,6 +3,7 @@ import {
   Contact,
   Handshake,
   Heart,
+  LogOut,
   MessageCircle,
   ShoppingBag,
   Trophy,
@@ -189,7 +190,7 @@ export default function AdminView({
     },
     {
       key: "results",
-      label: "Matchs et résultats",
+      label: "Événements et Résultats",
       icon: <Trophy className={iconClass} />,
       content: (
         <CalendarView
@@ -203,12 +204,6 @@ export default function AdminView({
           resultsTeams={teamRefs}
         />
       ),
-    },
-    {
-      key: "whatsapp",
-      label: "WhatsApp",
-      icon: <MessageCircle className={iconClass} />,
-      content: <WhatsAppGroupsManager groups={whatsappGroups} teams={canonicalTeamRefs} />,
     },
     {
       key: "sponsors",
@@ -230,13 +225,29 @@ export default function AdminView({
       ),
     },
     {
-      // Dernier de la liste, comme demandé : un lien externe, pas un onglet
-      // de contenu (voir href sur AdminSection).
+      // Retour de Cindy du 2026-08-22 : renommé et déplacé après FFBB
+      // (était juste après "Événements et Résultats").
+      key: "whatsapp",
+      label: "Groupes WhatsApp",
+      icon: <MessageCircle className={iconClass} />,
+      content: <WhatsAppGroupsManager groups={whatsappGroups} teams={canonicalTeamRefs} />,
+    },
+    {
+      // Un lien externe, pas un onglet de contenu (voir href sur AdminSection).
       key: "boutique",
-      label: "Boutique",
+      label: "Boutique en ligne",
       icon: <ShoppingBag className={iconClass} />,
       content: null,
       href: BOUTIQUE_URL,
+    },
+    {
+      // Tout à la fin du menu (retour de Cindy du 2026-08-22) — déplacé
+      // depuis la bande bleue.
+      key: "logout",
+      label: "Déconnexion",
+      icon: <LogOut className={iconClass} />,
+      content: null,
+      logoutAction: "supabase",
     },
   ];
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarDays, MessageCircle, ShoppingBag, Trophy, Users } from "lucide-react";
+import { CalendarDays, LogOut, MessageCircle, ShoppingBag, Trophy, Users } from "lucide-react";
 import { BOUTIQUE_URL } from "./boutique";
 import { sortTeamsByGroup } from "@/lib/teams";
 import CalendarView, { type CalendarRsvpPlayer } from "./calendar-view";
@@ -254,7 +254,7 @@ export default function FamilyView({
     },
     {
       key: "results",
-      label: "Matchs et résultats",
+      label: "Événements et Résultats",
       icon: <Trophy className={iconClass} />,
       content: (
         <CalendarView
@@ -265,13 +265,21 @@ export default function FamilyView({
       ),
     },
     {
-      // Dernier de la liste, comme demandé : un lien externe, pas un onglet
-      // de contenu (voir href sur AdminSection).
+      // Un lien externe, pas un onglet de contenu (voir href sur AdminSection).
       key: "boutique",
-      label: "Boutique",
+      label: "Boutique en ligne",
       icon: <ShoppingBag className={iconClass} />,
       content: null,
       href: BOUTIQUE_URL,
+    },
+    {
+      // Tout à la fin du menu (retour de Cindy du 2026-08-22) — déplacé
+      // depuis la bande bleue.
+      key: "logout",
+      label: "Déconnexion",
+      icon: <LogOut className={iconClass} />,
+      content: null,
+      logoutAction: "supabase",
     },
   ];
 
