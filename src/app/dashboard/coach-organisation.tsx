@@ -469,7 +469,11 @@ export default function CoachOrganisation({
   forcedTab?: SubTab;
 }) {
   const [tab, setTab] = useState<SubTab>(forcedTab ?? "planning");
-  useScrollTopOnChange(tab);
+  // Désactivé quand forcedTab est fourni : le montage vient alors d'un
+  // clic dans le menu (sous-onglet dédié), qui ne scrolle déjà plus (voir
+  // use-scroll-top-on-change.ts) — sans ce garde-fou, le montage du
+  // composant relancerait quand même le saut de scroll à chaque clic.
+  useScrollTopOnChange(tab, undefined, !forcedTab);
 
   // Filtré côté client : Date.now() dans un composant serveur rendrait le
   // rendu impur, et la liste reste juste après un router.refresh().

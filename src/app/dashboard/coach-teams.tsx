@@ -49,7 +49,12 @@ export default function CoachTeams({
     ? (sortedTeams.find((t) => t.id === forcedTeamId) ?? sortedTeams[0])
     : (sortedTeams.find((t) => t.id === activeId) ?? sortedTeams[0]);
 
-  useScrollTopOnChange(active?.id);
+  // Désactivé quand forcedTeamId est fourni : le montage vient alors d'un
+  // clic dans le menu (sous-onglet "Équipe" dédié), qui ne scrolle déjà
+  // plus (voir use-scroll-top-on-change.ts) — sans ce garde-fou, le
+  // montage du composant relancerait quand même le saut de scroll à
+  // chaque clic.
+  useScrollTopOnChange(active?.id, undefined, !forcedTeamId);
 
   if (!active) {
     return (

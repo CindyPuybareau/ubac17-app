@@ -189,7 +189,11 @@ export default function CotisationsManager({
   const router = useRouter();
   const [tab, setTab] = useState<CotisationsTab>(forcedTab ?? "cotisations");
   const shownTab = forcedTab ?? tab;
-  useScrollTopOnChange(tab);
+  // Désactivé quand forcedTab est fourni : le montage vient alors d'un
+  // clic dans le menu (sous-onglet dédié), qui ne scrolle déjà plus (voir
+  // use-scroll-top-on-change.ts) — sans ce garde-fou, le montage du
+  // composant relancerait quand même le saut de scroll à chaque clic.
+  useScrollTopOnChange(tab, undefined, !forcedTab);
   const [selectedCollecteId, setSelectedCollecteId] = useState<string | null>(
     collectes[0]?.id ?? null
   );

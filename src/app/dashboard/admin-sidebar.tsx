@@ -3,7 +3,6 @@
 import { useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronRight, X } from "lucide-react";
-import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
 import { useMobileNav } from "./mobile-nav-context";
 import { createClient } from "@/lib/supabase/client";
 
@@ -148,10 +147,13 @@ export default function AdminSidebar({
     });
   }
 
-  // Every role's top-level tab bar (Calendrier/Membres/Équipes/...) runs
-  // through this one shared component, so this single hook covers the
-  // scroll-to-top requirement for Bureau, Coach, and Famille alike.
-  useScrollTopOnChange(active);
+  // Pas de scroll-to-top forcé ici (retour de Cindy du 2026-08-22, "au
+  // clique sur les onglets du menu, mon écran remonte, c'est
+  // désagréable") : avec les sous-menus, cliquer sur un onglet est devenu
+  // bien plus fréquent (naviguer entre équipes, entre Cotisations et
+  // Pénalités...) et un saut de scroll à chaque clic gênait plus qu'il
+  // n'aidait. La sidebar est de toute façon sticky (voir plus bas) : elle
+  // reste atteignable sans avoir à remonter la page.
 
   // Panneau mobile/tablette (retour de Cindy du 2026-08-22 : la barre du
   // bas imposait un défilement horizontal dès qu'il y avait beaucoup
