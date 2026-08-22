@@ -5,6 +5,7 @@ import { BarChart3, Cake, CalendarDays, Trophy, Users } from "lucide-react";
 import AdminSidebar, { type AdminSection } from "@/app/dashboard/admin-sidebar";
 import OrgChartButton from "@/app/dashboard/org-chart-button";
 import PenalitesCard from "@/app/dashboard/penalites-card";
+import ChildAvatarUpload from "./child-avatar-upload";
 import { MobileNavProvider } from "@/app/dashboard/mobile-nav-context";
 import MobileMenuButton from "@/app/dashboard/mobile-menu-button";
 import { formatFirstName } from "@/lib/names";
@@ -65,6 +66,7 @@ export type ChildPenalite = {
 // éditable, pas de lien WhatsApp.
 export default function ChildDashboard({
   firstName,
+  avatarUrl,
   category,
   teams,
   ownJersey,
@@ -78,6 +80,7 @@ export default function ChildDashboard({
   penalites,
 }: {
   firstName: string | null;
+  avatarUrl: string | null;
   category: string | null;
   teams: { id: string; name: string | null; category: string | null }[];
   ownJersey: { jersey: number | null; position: string | null } | null;
@@ -194,12 +197,12 @@ export default function ChildDashboard({
   return (
     <MobileNavProvider>
     <div className="flex flex-1 flex-col">
-      <header className="sticky top-0 z-10 bg-navy px-4 py-3 sm:px-6">
+      {/* Même traitement que l'en-tête de l'Espace Parent (dashboard/page.tsx,
+          retour de Cindy du 2026-08-22) : logo seul, padding bas généreux
+          pour le débordement de l'avatar. */}
+      <header className="sticky top-0 z-10 bg-navy px-4 pb-9 pt-3 sm:px-6 sm:pb-11">
         <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Image src="/logo.png" alt="UBAC" width={32} height={32} className="h-8 w-8 object-contain" priority />
-            <span className="text-sm font-semibold text-white">UBAC</span>
-          </div>
+          <Image src="/logo.png" alt="UBAC" width={40} height={40} className="h-9 w-9 object-contain" priority />
           <div className="flex items-center gap-1">
             <OrgChartButton />
             <ChildNotificationBell initialNotifications={notifications} initialEnabled={notificationsEnabled} />
@@ -209,15 +212,14 @@ export default function ChildDashboard({
         </div>
       </header>
 
-      <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
-        {/* Même gabarit que l'en-tête de l'Espace Parent (dashboard/page.tsx)
-            — sobre, sur fond blanc, sans carte pleine couleur — pour que les
-            deux espaces se ressemblent au premier coup d'œil. */}
+      <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-6 px-4 pb-6 sm:px-6 sm:pb-10">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-900">
-            <span className="font-medium text-zinc-500">Bienvenue</span>{" "}
-            <span className="text-navy">{formatFirstName(firstName) || "champion"}</span>
-          </h1>
+          <div className="-mt-10 flex items-end gap-3 sm:-mt-12">
+            <ChildAvatarUpload avatarUrl={avatarUrl} name={firstName} />
+            <h1 className="pb-1.5 text-2xl font-bold text-navy sm:pb-2">
+              {formatFirstName(firstName) || "champion"}
+            </h1>
+          </div>
           {(teams.length > 0 || ownJersey?.jersey != null) && (
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               {teams.map((t) => (

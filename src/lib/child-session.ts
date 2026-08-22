@@ -3,9 +3,12 @@ import { createHmac, timingSafeEqual } from "crypto";
 // Session enfant volontairement séparée d'auth.users/Supabase Auth : un
 // enfant n'a ni email ni téléphone, donc aucune session Supabase classique
 // à lui donner. À la place, un cookie signé (HMAC, jamais un JWT Supabase)
-// qui ne porte qu'un player_id et une expiration — jamais de droit
-// d'écriture nulle part : /enfant/view (seul endroit qui le lit) ne fait
-// que des lectures en dur, jamais un insert/update/delete.
+// qui ne porte qu'un player_id et une expiration. /enfant/view (la page qui
+// le lit) ne fait que des lectures en dur, jamais d'insert/update/delete.
+// Seule exception, volontaire et confirmée par Cindy le 2026-08-22 :
+// /api/child-avatar, qui vérifie ce même cookie pour n'autoriser qu'une
+// seule écriture précise (players.avatar_url, sur SON PROPRE player_id) —
+// jamais un accès direct à Supabase depuis le navigateur.
 export const CHILD_SESSION_COOKIE = "ubac_child_session";
 const SESSION_DURATION_MS = 1000 * 60 * 60 * 24 * 30; // 30 jours : appareil familial partagé, pas de mot de passe à retaper sans cesse.
 

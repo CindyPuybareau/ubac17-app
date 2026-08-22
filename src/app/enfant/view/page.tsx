@@ -14,7 +14,10 @@ import ChildDashboard, {
 // composants n'importe jamais createClient() ni ne fait le moindre appel
 // réseau capable d'écrire. C'est cette page, pas une policy RLS, qui
 // garantit qu'un enfant ne peut jamais rien modifier : elle ne construit
-// que des select en dur.
+// que des select en dur. Seule exception à ce principe dans tout l'espace
+// Enfant : /api/child-avatar (photo de profil, retour de Cindy du
+// 2026-08-22, confirmé explicitement) — une route séparée, jamais cette
+// page.
 export default async function ChildViewPage() {
   const cookieStore = await cookies();
   const playerId = verifyChildSession(cookieStore.get(CHILD_SESSION_COOKIE)?.value);
@@ -33,7 +36,7 @@ export default async function ChildViewPage() {
 
   const { data: player } = await supabase
     .from("players")
-    .select("id, first_name, category, notifications_enabled")
+    .select("id, first_name, category, notifications_enabled, avatar_url")
     .eq("id", playerId)
     .maybeSingle();
 
@@ -281,6 +284,7 @@ export default async function ChildViewPage() {
   return (
     <ChildDashboard
       firstName={player.first_name}
+      avatarUrl={player.avatar_url}
       category={player.category}
       teams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
       ownJersey={teamIds.length > 0 ? ownJerseyByTeamId.get(teamIds[0]) ?? null : null}

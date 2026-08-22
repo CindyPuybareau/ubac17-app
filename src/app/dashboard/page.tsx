@@ -8,6 +8,7 @@ import { localDateFromParts } from "@/lib/local-date";
 import SignOutButton from "./sign-out-button";
 import NotificationBell from "./notification-bell";
 import OrgChartButton from "./org-chart-button";
+import AvatarUpload from "./avatar-upload";
 import { MobileNavProvider } from "./mobile-nav-context";
 import MobileMenuButton from "./mobile-menu-button";
 import RealtimeSync from "./realtime-sync";
@@ -444,7 +445,7 @@ export default async function DashboardPage() {
     await Promise.all([
       supabase
         .from("profiles")
-        .select("first_name, last_name")
+        .select("first_name, last_name, avatar_url")
         .eq("id", user.id)
         .single(),
       // En minuscules : club_administrators.email est désormais toujours
@@ -2288,12 +2289,13 @@ export default async function DashboardPage() {
     <MobileNavProvider>
     <div className="flex flex-1 flex-col">
       <RealtimeSync />
-      <header className="sticky top-0 z-10 bg-navy px-4 py-3 sm:px-6">
+      {/* Retour de Cindy du 2026-08-22 : logo seul (plus de texte "UBAC"
+          à côté — la photo de profil ci-dessous porte désormais
+          l'identité de la page) ; padding bas généreux pour laisser la
+          place au débordement de l'avatar façon Facebook. */}
+      <header className="sticky top-0 z-10 bg-navy px-4 pb-9 pt-3 sm:px-6 sm:pb-11">
         <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Image src="/logo.png" alt="UBAC" width={32} height={32} className="h-8 w-8 object-contain" priority />
-            <span className="text-sm font-semibold text-white">UBAC</span>
-          </div>
+          <Image src="/logo.png" alt="UBAC" width={40} height={40} className="h-9 w-9 object-contain" priority />
           <div className="flex items-center gap-1">
             <OrgChartButton />
             <NotificationBell />
@@ -2303,16 +2305,13 @@ export default async function DashboardPage() {
         </div>
       </header>
 
-      <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
-        <div>
-          <h1 className="text-2xl font-bold text-zinc-900">
-            <span className="font-medium text-zinc-500">Bienvenue</span>{" "}
-            <span className="text-navy">
-              {profile?.first_name ? formatFirstName(profile.first_name) : user.email}
-            </span>
+      <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-6 px-4 pb-6 sm:px-6 sm:pb-10">
+        <div className="-mt-10 flex items-end gap-3 sm:-mt-12">
+          <AvatarUpload userId={user.id} avatarUrl={profile?.avatar_url ?? null} name={profile?.first_name ?? null} size="lg" />
+          <h1 className="pb-1.5 text-2xl font-bold text-navy sm:pb-2">
+            {profile?.first_name ? formatFirstName(profile.first_name) : user.email}
           </h1>
         </div>
-
 
       <DashboardTabs tabs={tabs} />
 
