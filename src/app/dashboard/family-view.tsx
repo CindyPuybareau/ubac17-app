@@ -1,7 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarDays, Flag, LogOut, MessageCircle, ShoppingBag, Trophy, Users } from "lucide-react";
+import {
+  CalendarDays,
+  Flag,
+  ListOrdered,
+  LogOut,
+  MessageCircle,
+  Shield,
+  ShoppingBag,
+  Trophy,
+  Users,
+} from "lucide-react";
 import { BOUTIQUE_URL } from "./boutique";
 import { sortTeamsByGroup } from "@/lib/teams";
 import CalendarView, { type CalendarRsvpPlayer } from "./calendar-view";
@@ -279,16 +289,39 @@ export default function FamilyView({
       ),
     },
     {
+      // Retour de Cindy du 2026-08-22 : "Matchs officiels" / "Résultats"
+      // deviennent un vrai sous-menu au lieu d'un bouton interne sur la
+      // page — même traitement que côté Bureau/Coach.
       key: "matches",
       label: "Matchs & Résultats",
       icon: <Trophy className={iconClass} />,
-      content: (
-        <CalendarView
-          events={visibleEvents}
-          forcedViewOptions={["officialMatches", "officialResults"]}
-          resultsTeams={visibleResultsTeams.map((t) => ({ ...t, role: "PLAYER" as const }))}
-        />
-      ),
+      content: null,
+      children: [
+        {
+          key: "matches-official",
+          label: "Matchs officiels",
+          icon: <Shield className={iconClass} />,
+          content: (
+            <CalendarView
+              events={visibleEvents}
+              forcedView="officialMatches"
+              resultsTeams={visibleResultsTeams.map((t) => ({ ...t, role: "PLAYER" as const }))}
+            />
+          ),
+        },
+        {
+          key: "matches-results",
+          label: "Résultats",
+          icon: <ListOrdered className={iconClass} />,
+          content: (
+            <CalendarView
+              events={visibleEvents}
+              forcedView="officialResults"
+              resultsTeams={visibleResultsTeams.map((t) => ({ ...t, role: "PLAYER" as const }))}
+            />
+          ),
+        },
+      ],
     },
     {
       // Un lien externe, pas un onglet de contenu (voir href sur AdminSection).

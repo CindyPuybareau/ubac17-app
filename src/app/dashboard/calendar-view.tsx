@@ -18,7 +18,6 @@ import {
   Pencil,
   PartyPopper,
   Plus,
-  Shield,
   StickyNote,
   Trash2,
   Users,
@@ -237,7 +236,6 @@ export default function CalendarView({
   volunteerNeedsByEventId = {},
   selfPlayerId = null,
   forcedView,
-  forcedViewOptions,
   resultsTeamSelector = "pills",
   resultsTeams,
 }: {
@@ -285,13 +283,6 @@ export default function CalendarView({
   // - "clubEvents" : tout le calendrier du club sauf les matchs officiels
   //   (entraînements, amicaux, tournois, événements club) en un seul fil.
   forcedView?: "results" | "officialMatches" | "officialResults" | "clubEvents";
-  // Variante de forcedView pour "Matchs & Résultats" (retour de Cindy du
-  // 2026-08-22) : au lieu d'une seule vue verrouillée, un choix entre
-  // exactement ces vues via un petit bouton interne (voir plus bas) —
-  // "Matchs officiels" / "Résultats" restent deux angles sur les mêmes
-  // matchs plutôt que deux onglets de menu séparés. Ignoré si `forcedView`
-  // est fourni.
-  forcedViewOptions?: ("officialMatches" | "officialResults")[];
   // Sélecteur d'équipe façon "Mes Équipes" (voir coach-teams.tsx) : sans
   // lui, ces vues mélangeaient les événements de toutes les équipes dans
   // un seul fil, sans aucun moyen de s'y retrouver — vrai pour un coach
@@ -337,7 +328,7 @@ export default function CalendarView({
   // suite ?".
   const [view, setView] = useState<
     "list" | "month" | "results" | "officialMatches" | "officialResults" | "clubEvents"
-  >(forcedView ?? forcedViewOptions?.[0] ?? "month");
+  >(forcedView ?? "month");
   const [createOpen, setCreateOpen] = useState(false);
 
   // Même ordre que "Mes Équipes" : l'équipe mère avant ses déclinaisons.
@@ -1226,11 +1217,11 @@ export default function CalendarView({
 
           {/* Tout à droite : c'est un réglage d'affichage, pas une action
               sur les données — il vient après ce qu'on fait, pas avant.
-              Masqué sur les pages dédiées "Événements" / "Matchs &
-              Résultats" (forcedView/forcedViewOptions) : basculer vers
-              Mois n'y aurait pas de sens, l'onglet Calendrier existe déjà
-              pour ça. */}
-          {!forcedView && !forcedViewOptions && (
+              Masqué sur les pages dédiées "Événements" / "Matchs
+              officiels" / "Résultats" (forcedView) : basculer vers Mois
+              n'y aurait pas de sens, l'onglet Calendrier existe déjà pour
+              ça. */}
+          {!forcedView && (
             <div className="flex items-center gap-0.5 rounded-full border border-zinc-200 p-0.5">
               <button
                 onClick={() => setView("list")}
@@ -1393,34 +1384,6 @@ export default function CalendarView({
         view === "officialResults" ||
         view === "clubEvents") && (
         <div className="flex flex-col gap-3">
-          {/* "Matchs & Résultats" (forcedViewOptions) : deux angles sur les
-              mêmes matchs officiels plutôt que deux onglets de menu
-              séparés — un petit bouton interne comme les autres bascules
-              internes de l'app (Cotisations, Organisation...), pas la
-              bascule Liste/Mois (masquée juste au-dessus, voir
-              forcedViewOptions). */}
-          {forcedViewOptions && forcedViewOptions.length > 1 && (
-            <div className="flex flex-wrap gap-2">
-              {forcedViewOptions.map((kind) => (
-                <button
-                  key={kind}
-                  onClick={() => setView(kind)}
-                  className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors ${
-                    view === kind
-                      ? "bg-navy text-white"
-                      : "border border-zinc-200 text-zinc-600 hover:bg-zinc-50"
-                  }`}
-                >
-                  {kind === "officialMatches" ? (
-                    <Shield className="h-3.5 w-3.5" />
-                  ) : (
-                    <ListOrdered className="h-3.5 w-3.5" />
-                  )}
-                  {kind === "officialMatches" ? "Matchs officiels" : "Résultats"}
-                </button>
-              ))}
-            </div>
-          )}
           {/* Même sélecteur que "Mes Équipes" (team-selector-pills.tsx), ou
               la version "case à cocher" façon team-manager.tsx (Bureau) —
               voir resultsTeamSelector. Indispensable dès qu'on encadre ou

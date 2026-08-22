@@ -5,6 +5,7 @@ import {
   ListOrdered,
   LogOut,
   RefreshCw,
+  Shield,
   ShoppingBag,
   Trophy,
   Users,
@@ -309,23 +310,44 @@ export default function CoachView({
       ),
     },
     {
-      // "Matchs et Résultats" (retour de Cindy du 2026-08-22) : les
-      // matchs officiels et leurs résultats restent groupés dans un seul
-      // onglet de menu, avec un petit bouton interne pour basculer entre
-      // les deux (voir forcedViewOptions sur CalendarView) plutôt que
-      // deux entrées de menu séparées.
+      // Retour de Cindy du 2026-08-22 : "Matchs officiels" / "Résultats"
+      // deviennent un vrai sous-menu (comme Organisation & Bilan) au lieu
+      // d'un bouton interne sur la page — moins de contrôles empilés
+      // quand il y a aussi le sélecteur d'équipe à afficher.
       key: "matches",
       label: "Matchs & Résultats",
       icon: <Trophy className={iconClass} />,
-      content: (
-        <CalendarView
-          events={events}
-          createTeams={createTeams}
-          scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
-          forcedViewOptions={["officialMatches", "officialResults"]}
-          resultsTeams={resultsTeamsForCalendar}
-        />
-      ),
+      content: null,
+      children: [
+        {
+          key: "matches-official",
+          label: "Matchs officiels",
+          icon: <Shield className={iconClass} />,
+          content: (
+            <CalendarView
+              events={events}
+              createTeams={createTeams}
+              scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
+              forcedView="officialMatches"
+              resultsTeams={resultsTeamsForCalendar}
+            />
+          ),
+        },
+        {
+          key: "matches-results",
+          label: "Résultats",
+          icon: <ListOrdered className={iconClass} />,
+          content: (
+            <CalendarView
+              events={events}
+              createTeams={createTeams}
+              scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
+              forcedView="officialResults"
+              resultsTeams={resultsTeamsForCalendar}
+            />
+          ),
+        },
+      ],
     },
     {
       key: "ffbb",

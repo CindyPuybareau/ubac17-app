@@ -55,15 +55,17 @@ function ResultRow({ event }: { event: ChildEvent }) {
 }
 
 // "Matchs & Résultats" (retour de Cindy du 2026-08-22) : les matchs
-// officiels et leurs résultats, avec un petit bouton interne pour
-// basculer entre les deux — "Matchs officiels" montre tout le calendrier
-// (à venir compris), "Résultats" ne montre que ceux déjà joués. Même
-// principe que forcedViewOptions côté Bureau/Coach/Parent
-// (calendar-view.tsx), en lecture seule ici comme tout le reste de
-// l'espace Enfant.
+// officiels et leurs résultats. "Matchs officiels" / "Résultats" sont
+// maintenant deux sous-onglets de menu à part entière (voir
+// child-dashboard.tsx, forcedMode) plutôt qu'un bouton interne — même
+// bascule que forcedTab côté Coach/Bureau (coach-organisation.tsx,
+// cotisations-manager.tsx). "Matchs officiels" montre tout le calendrier
+// (à venir compris), "Résultats" ne montre que ceux déjà joués. En
+// lecture seule ici comme tout le reste de l'espace Enfant.
 export default function ChildResultsTab({
   events,
   teams,
+  forcedMode,
 }: {
   events: ChildEvent[];
   // Un enfant qui joue dans deux équipes (ex. "monte" ponctuellement dans
@@ -71,8 +73,12 @@ export default function ChildResultsTab({
   // mélangés dans un seul fil sans distinction — même sélecteur que côté
   // Bureau/Coach/Parent (calendar-view.tsx) pour s'y retrouver.
   teams: { id: string; name: string | null; category: string | null }[];
+  forcedMode?: "officialMatches" | "officialResults";
 }) {
-  const [mode, setMode] = useState<"officialMatches" | "officialResults">("officialMatches");
+  const [mode, setMode] = useState<"officialMatches" | "officialResults">(
+    forcedMode ?? "officialMatches"
+  );
+  const shownMode = forcedMode ?? mode;
   const sortedTeams = useMemo(() => sortTeamsByGroup(teams), [teams]);
   const [activeTeamId, setActiveTeamId] = useState<string | undefined>(undefined);
   const activeTeamIdResolved = sortedTeams.some((t) => t.id === activeTeamId)
@@ -84,39 +90,42 @@ export default function ChildResultsTab({
       events
         .filter((e) => e.eventType === "MATCH")
         .filter(
-          (e) => mode === "officialMatches" || new Date(e.startTime).getTime() < new Date().getTime()
+          (e) =>
+            shownMode === "officialMatches" || new Date(e.startTime).getTime() < new Date().getTime()
         )
         .filter((e) => sortedTeams.length <= 1 || e.teamId === activeTeamIdResolved)
         .sort((a, b) => a.startTime.localeCompare(b.startTime)),
-    [events, mode, sortedTeams, activeTeamIdResolved]
+    [events, shownMode, sortedTeams, activeTeamIdResolved]
   );
 
   return (
     <div className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
-      <div className="mb-3 flex flex-wrap gap-2">
-        <button
-          onClick={() => setMode("officialMatches")}
-          className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors ${
-            mode === "officialMatches"
-              ? "bg-navy text-white"
-              : "border border-zinc-200 text-zinc-600 hover:bg-zinc-50"
-          }`}
-        >
-          <Shield className="h-3.5 w-3.5" />
-          Matchs officiels
-        </button>
-        <button
-          onClick={() => setMode("officialResults")}
-          className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors ${
-            mode === "officialResults"
-              ? "bg-navy text-white"
-              : "border border-zinc-200 text-zinc-600 hover:bg-zinc-50"
-          }`}
-        >
-          <ListOrdered className="h-3.5 w-3.5" />
-          Résultats
-        </button>
-      </div>
+      {!forcedMode && (
+        <div className="mb-3 flex flex-wrap gap-2">
+          <button
+            onClick={() => setMode("officialMatches")}
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors ${
+              mode === "officialMatches"
+                ? "bg-navy text-white"
+                : "border border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+            }`}
+          >
+            <Shield className="h-3.5 w-3.5" />
+            Matchs officiels
+          </button>
+          <button
+            onClick={() => setMode("officialResults")}
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors ${
+              mode === "officialResults"
+                ? "bg-navy text-white"
+                : "border border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+            }`}
+          >
+            <ListOrdered className="h-3.5 w-3.5" />
+            Résultats
+          </button>
+        </div>
+      )}
       {sortedTeams.length > 1 && (
         <div className="mb-3 flex flex-wrap gap-2">
           {sortedTeams.map((t) => {
@@ -140,7 +149,7 @@ export default function ChildResultsTab({
       <div className="flex flex-col gap-1.5">
         {visibleMatches.length === 0 ? (
           <p className="text-sm text-zinc-500">
-            {mode === "officialMatches"
+            {shownMode === "officialMatches"
               ? "Aucun match officiel programmé pour le moment."
               : "Aucun résultat pour le moment."}
           </p>

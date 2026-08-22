@@ -5,8 +5,10 @@ import {
   Gavel,
   Handshake,
   Heart,
+  ListOrdered,
   LogOut,
   MessageCircle,
+  Shield,
   ShoppingBag,
   Tag,
   Ticket,
@@ -260,23 +262,45 @@ export default function AdminView({
       ),
     },
     {
-      // "Matchs et Résultats" (retour de Cindy du 2026-08-22) : les
-      // matchs officiels et leurs résultats restent groupés dans un seul
-      // onglet de menu, avec un petit bouton interne pour basculer entre
-      // les deux (voir forcedViewOptions sur CalendarView).
+      // Retour de Cindy du 2026-08-22 : "Matchs officiels" / "Résultats"
+      // deviennent un vrai sous-menu (comme Cotisations) au lieu d'un
+      // bouton interne sur la page.
       key: "matches",
       label: "Matchs & Résultats",
       icon: <Trophy className={iconClass} />,
-      content: (
-        <CalendarView
-          events={upcomingEvents}
-          createTeams={teamRefs}
-          allowClubWide
-          forcedViewOptions={["officialMatches", "officialResults"]}
-          resultsTeams={teamRefs}
-          resultsTeamSelector="dropdown"
-        />
-      ),
+      content: null,
+      children: [
+        {
+          key: "matches-official",
+          label: "Matchs officiels",
+          icon: <Shield className={iconClass} />,
+          content: (
+            <CalendarView
+              events={upcomingEvents}
+              createTeams={teamRefs}
+              allowClubWide
+              forcedView="officialMatches"
+              resultsTeams={teamRefs}
+              resultsTeamSelector="dropdown"
+            />
+          ),
+        },
+        {
+          key: "matches-results",
+          label: "Résultats",
+          icon: <ListOrdered className={iconClass} />,
+          content: (
+            <CalendarView
+              events={upcomingEvents}
+              createTeams={teamRefs}
+              allowClubWide
+              forcedView="officialResults"
+              resultsTeams={teamRefs}
+              resultsTeamSelector="dropdown"
+            />
+          ),
+        },
+      ],
     },
     {
       key: "sponsors",

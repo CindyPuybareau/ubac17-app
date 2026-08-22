@@ -1,7 +1,17 @@
 "use client";
 
 import Image from "next/image";
-import { BarChart3, Cake, CalendarDays, Flag, LogOut, Trophy, Users } from "lucide-react";
+import {
+  BarChart3,
+  Cake,
+  CalendarDays,
+  Flag,
+  ListOrdered,
+  LogOut,
+  Shield,
+  Trophy,
+  Users,
+} from "lucide-react";
 import AdminSidebar, { type AdminSection } from "@/app/dashboard/admin-sidebar";
 import OrgChartButton from "@/app/dashboard/org-chart-button";
 import PenalitesCard from "@/app/dashboard/penalites-card";
@@ -190,10 +200,27 @@ export default function ChildDashboard({
       content: <ChildEventsTab events={events} teams={teams} />,
     },
     {
+      // Retour de Cindy du 2026-08-22 : "Matchs officiels" / "Résultats"
+      // deviennent un vrai sous-menu au lieu d'un bouton interne sur la
+      // page — même traitement que côté Bureau/Coach/Parent.
       key: "matches",
       label: "Matchs & Résultats",
       icon: <Trophy className={iconClass} />,
-      content: <ChildResultsTab events={events} teams={teams} />,
+      content: null,
+      children: [
+        {
+          key: "matches-official",
+          label: "Matchs officiels",
+          icon: <Shield className={iconClass} />,
+          content: <ChildResultsTab events={events} teams={teams} forcedMode="officialMatches" />,
+        },
+        {
+          key: "matches-results",
+          label: "Résultats",
+          icon: <ListOrdered className={iconClass} />,
+          content: <ChildResultsTab events={events} teams={teams} forcedMode="officialResults" />,
+        },
+      ],
     },
     {
       // Tout à la fin du menu (retour de Cindy du 2026-08-22) — déplacé
