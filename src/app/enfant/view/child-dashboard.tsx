@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { BarChart3, Cake, CalendarDays, LogOut, Trophy, Users } from "lucide-react";
+import { BarChart3, Cake, CalendarDays, Flag, LogOut, Trophy, Users } from "lucide-react";
 import AdminSidebar, { type AdminSection } from "@/app/dashboard/admin-sidebar";
 import OrgChartButton from "@/app/dashboard/org-chart-button";
 import PenalitesCard from "@/app/dashboard/penalites-card";
@@ -14,6 +14,7 @@ import { parseMatchTitle } from "@/lib/match-display";
 import { localDateFromParts } from "@/lib/local-date";
 import ChildCalendarTab from "./child-calendar-tab";
 import ChildTeamTab from "./child-team-tab";
+import ChildEventsTab from "./child-events-tab";
 import ChildResultsTab from "./child-results-tab";
 import ChildPresenceTab from "./child-presence-tab";
 import ChildNotificationBell, { type ChildNotification } from "./child-notification-bell";
@@ -96,14 +97,6 @@ export default function ChildDashboard({
 }) {
   const now = Date.now();
   const nextEvent = events.find((e) => new Date(e.startTime).getTime() >= now) ?? null;
-  // Onglet "Résultats" : tout le calendrier de matchs/amicaux de la
-  // saison, joués ou non, dans l'ordre chronologique — mêmes règles que
-  // la vue Résultats du calendrier Bureau/Coach/Parent (calendar-view.tsx,
-  // seasonMatches), en lecture seule ici comme tout le reste de l'espace
-  // Enfant.
-  const seasonMatches = events
-    .filter((e) => isMatchType(e.eventType))
-    .sort((a, b) => a.startTime.localeCompare(b.startTime));
   const teammatesOnly = teammates.filter((t) => !t.isSelf);
 
   const thisMonth = new Date().getMonth();
@@ -186,10 +179,21 @@ export default function ChildDashboard({
       ),
     },
     {
-      key: "results",
-      label: "Événements & Résultats",
+      // Retour de Cindy du 2026-08-22 : "Événements & Résultats" éclaté en
+      // deux onglets, même découpage que côté Bureau/Coach/Parent
+      // (calendar-view.tsx) — "Événements" pour tout le calendrier du
+      // club sauf les matchs officiels, "Matchs & Résultats" pour les
+      // matchs officiels et leurs résultats.
+      key: "events",
+      label: "Événements",
+      icon: <Flag className={iconClass} />,
+      content: <ChildEventsTab events={events} teams={teams} />,
+    },
+    {
+      key: "matches",
+      label: "Matchs & Résultats",
       icon: <Trophy className={iconClass} />,
-      content: <ChildResultsTab seasonMatches={seasonMatches} teams={teams} />,
+      content: <ChildResultsTab events={events} teams={teams} />,
     },
     {
       // Tout à la fin du menu (retour de Cindy du 2026-08-22) — déplacé

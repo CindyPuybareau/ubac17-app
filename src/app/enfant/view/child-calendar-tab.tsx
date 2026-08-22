@@ -365,7 +365,9 @@ function BirthdayRow({ name }: { name: string | null }) {
   );
 }
 
-function EventRow({ event, faded }: { event: ChildEvent; faded?: boolean }) {
+// Exporté : réutilisé tel quel par l'onglet "Événements" (voir
+// child-events-tab.tsx) plutôt que de dupliquer ce même gabarit de carte.
+export function EventRow({ event, faded }: { event: ChildEvent; faded?: boolean }) {
   const style = styleFor(event.eventType);
   const parsed = parseMatchTitle(event.title);
   const home = event.isHome ?? parsed.isHome;

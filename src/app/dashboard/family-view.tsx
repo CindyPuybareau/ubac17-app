@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarDays, LogOut, MessageCircle, ShoppingBag, Trophy, Users } from "lucide-react";
+import { CalendarDays, Flag, LogOut, MessageCircle, ShoppingBag, Trophy, Users } from "lucide-react";
 import { BOUTIQUE_URL } from "./boutique";
 import { sortTeamsByGroup } from "@/lib/teams";
 import CalendarView, { type CalendarRsvpPlayer } from "./calendar-view";
@@ -259,13 +259,30 @@ export default function FamilyView({
       ),
     },
     {
-      key: "results",
-      label: "Événements & Résultats",
+      // Retour de Cindy du 2026-08-22 : "Événements & Résultats" éclaté en
+      // deux onglets, même découpage que côté Bureau/Coach (calendar-view.tsx)
+      // — "Événements" pour tout le calendrier du club sauf les matchs
+      // officiels, "Matchs & Résultats" pour les matchs officiels et
+      // leurs résultats (bouton interne "Matchs officiels"/"Résultats").
+      key: "events",
+      label: "Événements",
+      icon: <Flag className={iconClass} />,
+      content: (
+        <CalendarView
+          events={visibleEvents}
+          forcedView="clubEvents"
+          resultsTeams={visibleResultsTeams.map((t) => ({ ...t, role: "PLAYER" as const }))}
+        />
+      ),
+    },
+    {
+      key: "matches",
+      label: "Matchs & Résultats",
       icon: <Trophy className={iconClass} />,
       content: (
         <CalendarView
           events={visibleEvents}
-          forcedView="results"
+          forcedViewOptions={["officialMatches", "officialResults"]}
           resultsTeams={visibleResultsTeams.map((t) => ({ ...t, role: "PLAYER" as const }))}
         />
       ),
