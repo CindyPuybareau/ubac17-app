@@ -1316,12 +1316,23 @@ export default function CalendarView({
           ) : (
             seasonMatches.map((event) => (
               <div key={event.id} className="flex flex-col gap-1">
-                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                  {new Date(event.start_time).toLocaleDateString("fr-FR", {
-                    weekday: "long",
-                    day: "numeric",
-                    month: "long",
-                  })}
+                {/* Retour de Cindy du 2026-08-22 : la date n'était visible
+                    qu'en petit gris pâle, et l'heure n'apparaissait nulle
+                    part dans cette vue (il fallait ouvrir "Modifier" côté
+                    Bureau pour la voir — inexistant côté Famille/Joueur).
+                    Remontée en plus grand/contrasté, avec l'heure toujours
+                    affichée à côté, pour tout le monde. */}
+                <p className="flex items-baseline gap-1.5 text-sm font-bold text-zinc-700">
+                  <span className="capitalize">
+                    {new Date(event.start_time).toLocaleDateString("fr-FR", {
+                      weekday: "long",
+                      day: "numeric",
+                      month: "long",
+                    })}
+                  </span>
+                  <span className="font-semibold text-ubac-blue">
+                    {formatEventTime(event.start_time, event.end_time)}
+                  </span>
                 </p>
                 {renderResultCard(event)}
               </div>

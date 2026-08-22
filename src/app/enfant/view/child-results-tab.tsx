@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Trophy } from "lucide-react";
-import { homeAwayLabel } from "@/app/dashboard/event-style";
+import { formatEventTime, homeAwayLabel } from "@/app/dashboard/event-style";
 import { parseMatchTitle } from "@/lib/match-display";
 import { sortTeamsByGroup, teamLabel } from "@/lib/teams";
 import type { ChildEvent } from "./child-dashboard";
@@ -28,8 +28,14 @@ function ResultRow({ event }: { event: ChildEvent }) {
     <div className="flex items-center justify-between gap-2 rounded-xl bg-zinc-50 px-3 py-2">
       <div className="flex min-w-0 flex-col">
         <span className="truncate text-sm font-medium text-zinc-800">{opponent}</span>
-        <span className="text-[11px] text-zinc-400">
+        {/* Retour de Cindy du 2026-08-22 : côté Joueur, l'heure du match
+            n'apparaissait nulle part sur cette page — seule la date, en
+            petit gris pâle. Ajout de l'heure et un peu plus de contraste
+            sur la date, sans changer le gabarit compact de la ligne. */}
+        <span className="text-[11px] font-medium text-zinc-500">
           {new Date(event.startTime).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
+          {" · "}
+          {formatEventTime(event.startTime, null)}
           {home ? ` · ${home}` : ""}
         </span>
       </div>
