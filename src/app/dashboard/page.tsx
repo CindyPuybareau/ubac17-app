@@ -2295,7 +2295,7 @@ export default async function DashboardPage() {
           place au débordement de l'avatar façon Facebook. */}
       <header className="sticky top-0 z-10 bg-navy px-4 pb-9 pt-3 sm:px-6 sm:pb-11">
         <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between">
-          <Image src="/logo.png" alt="UBAC" width={40} height={40} className="h-9 w-9 object-contain" priority />
+          <Image src="/logo.png" alt="UBAC" width={48} height={48} className="h-11 w-11 object-contain sm:h-12 sm:w-12" priority />
           <div className="flex items-center gap-1">
             <OrgChartButton />
             <NotificationBell />
@@ -2305,10 +2305,15 @@ export default async function DashboardPage() {
         </div>
       </header>
 
-      <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-6 px-4 pb-6 sm:px-6 sm:pb-10">
-        <div className="-mt-10 flex items-end gap-3 sm:-mt-12">
+      {/* z-20 > le z-10 de l'en-tête sticky ci-dessus : sans ça, l'avatar
+          qui déborde dessus (marge négative) se faisait recouvrir par le
+          fond plein de l'en-tête au lieu de passer visuellement devant
+          (retour de Cindy du 2026-08-22, capture "le rond est sous la
+          bande bleue"). */}
+      <div className="relative z-20 mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-6 px-4 pb-6 sm:px-6 sm:pb-10">
+        <div className="-mt-10 flex items-center gap-3 sm:-mt-12">
           <AvatarUpload userId={user.id} avatarUrl={profile?.avatar_url ?? null} name={profile?.first_name ?? null} size="lg" />
-          <h1 className="pb-1.5 text-2xl font-bold text-navy sm:pb-2">
+          <h1 className="text-2xl font-bold text-navy">
             {profile?.first_name ? formatFirstName(profile.first_name) : user.email}
           </h1>
         </div>

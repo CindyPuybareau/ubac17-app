@@ -202,7 +202,7 @@ export default function ChildDashboard({
           pour le débordement de l'avatar. */}
       <header className="sticky top-0 z-10 bg-navy px-4 pb-9 pt-3 sm:px-6 sm:pb-11">
         <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between">
-          <Image src="/logo.png" alt="UBAC" width={40} height={40} className="h-9 w-9 object-contain" priority />
+          <Image src="/logo.png" alt="UBAC" width={48} height={48} className="h-11 w-11 object-contain sm:h-12 sm:w-12" priority />
           <div className="flex items-center gap-1">
             <OrgChartButton />
             <ChildNotificationBell initialNotifications={notifications} initialEnabled={notificationsEnabled} />
@@ -212,11 +212,13 @@ export default function ChildDashboard({
         </div>
       </header>
 
-      <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-6 px-4 pb-6 sm:px-6 sm:pb-10">
+      {/* z-20 > le z-10 de l'en-tête sticky (voir dashboard/page.tsx pour
+          l'explication complète — même correctif ici). */}
+      <div className="relative z-20 mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-6 px-4 pb-6 sm:px-6 sm:pb-10">
         <div>
-          <div className="-mt-10 flex items-end gap-3 sm:-mt-12">
+          <div className="-mt-10 flex items-center gap-3 sm:-mt-12">
             <ChildAvatarUpload avatarUrl={avatarUrl} name={firstName} />
-            <h1 className="pb-1.5 text-2xl font-bold text-navy sm:pb-2">
+            <h1 className="text-2xl font-bold text-navy">
               {formatFirstName(firstName) || "champion"}
             </h1>
           </div>
