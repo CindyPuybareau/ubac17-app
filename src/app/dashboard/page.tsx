@@ -1618,13 +1618,20 @@ export default async function DashboardPage() {
     // Aucune ne dépend de l'autre — parties ensemble plutôt qu'à la queue
     // leu leu.
     const coachEventIds = (eventsRes.data ?? []).map((e) => e.id);
-    // Filtre explicite par effectif coaché plutôt que de compter sur la
-    // seule RLS (même raison que familyPlayerIds pour les cotisations,
-    // plus bas) : teamPlayersRes est déjà résolue (Promise.all du tout
-    // début de ce bloc), pas besoin d'attendre coachRosterPlayerIds
-    // (calculée à nouveau plus bas, identique) pour ce filtre.
+    // Retour de Cindy du 2026-08-22 : Basile (coach ET joueur Séniors 1)
+    // voyait sa propre pénalité apparaître sous "Pénalités de l'équipe" —
+    // teamPlayersRes est scopée à coachCalendarTeamIds (équipes coachées
+    // ET équipe jouée, voir plus haut, pensé pour le calendrier fusionné),
+    // ce qui mélangeait l'effectif de son équipe JOUÉE dans ce filtre.
+    // "Pénalités de l'équipe" doit rester strictement scopée aux équipes
+    // réellement COACHÉES (sa propre pénalité comme joueur reste visible
+    // via "Mes pénalités" juste au-dessus, filtrée sur ownPlayerId).
     const coachPenaliteScope = Array.from(
-      new Set((teamPlayersRes.data ?? []).map((tp) => tp.player_id))
+      new Set(
+        (teamPlayersRes.data ?? [])
+          .filter((tp) => coachedTeamIds.includes(tp.team_id))
+          .map((tp) => tp.player_id)
+      )
     );
     const [rsvpsByEvent, coachRsvpRowsRes, coachPenaliteRes] = await Promise.all([
       fetchRsvpsByEvent(supabase, coachEventIds),
