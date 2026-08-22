@@ -31,6 +31,7 @@ import PlayerYearBadge from "./player-year-badge";
 import WhatsAppButton from "./whatsapp-button";
 import WhatsAppDirectButton from "./whatsapp-direct-button";
 import { formatFirstName, formatLastName, formatPersonName } from "@/lib/names";
+import { formatLocalDateFr } from "@/lib/local-date";
 import type { AdminMember, AdminMemberTeam } from "./page";
 
 // "12 août 2026 à 09:36" — utilisé uniquement dans l'infobulle de
@@ -147,25 +148,82 @@ export default function MembersTable({
   // différence de l'export de l'onglet Cotisations qui part d'une
   // sélection. Utile en fin de saison pour la compta, une déclaration
   // FFBB/assurance, ou tout usage hors de l'appli.
+  //
+  // Toutes les colonnes de la fiche Membre (retour de Cindy du
+  // 2026-08-22 : "j'aimerai qu'ils exportent toutes les données de la
+  // fiche membre... de l'identité à santé et chartre") — mêmes intitulés
+  // et même ordre que les 4 onglets de MemberDetailModal (Identité,
+  // Licence & Équipe, Parents & Urgence, Santé & Chartes), pour qu'une
+  // colonne se retrouve d'un coup d'œil dans l'appli.
   function exportMembers() {
+    const acceptedLabel = (v: string | null) => (v ? "Acceptée" : "Non acceptée");
     const header = [
+      // Identité
       "Nom",
       "Prénom",
+      "Date de naissance",
+      "Sexe",
+      "Email",
+      "Téléphone",
+      "Adresse",
+      "Code postal",
+      "Commune",
+      // Licence & Équipe
       "Catégorie",
       "Équipe(s)",
       "Coach de",
-      "Email",
-      "Téléphone",
+      "Type de licence demandée",
+      "Type d'adhésion",
+      "Statut FBI",
+      "Statut Club",
+      "N° Licence",
+      "Licence valable jusqu'au",
+      // Parents & Urgence
+      "Email secondaire",
+      "Mère / conjointe",
+      "Père / conjoint",
+      "Autres téléphones",
+      "Adresse secondaire",
+      // Santé & Chartes
+      "Particularités médicales",
+      "Certificat médical valable jusqu'au",
+      "Autres informations utiles",
+      "Droit à l'image",
+      "Charte Joueur",
+      "Charte Parent",
+      // Statut de la fiche
       "Statut",
     ];
     const rows = filtered.map((m) => [
       fullLastName(m),
       m.firstName ?? "",
+      formatLocalDateFr(m.birthDate ?? "") ?? "",
+      m.sex ?? "",
+      m.registrationEmail ?? "",
+      m.registrationPhone ?? "",
+      m.address ?? "",
+      m.postalCode ?? "",
+      m.city ?? "",
       m.category ?? "",
       m.teams.map((t) => t.category ?? t.name ?? "").join(", "),
       [...m.coachTeams, ...m.pendingCoachTeams].map((t) => t.category ?? t.name ?? "").join(", "),
-      m.email ?? "",
-      m.phone ?? "",
+      m.licenseType ?? "",
+      m.membershipType ?? "",
+      m.fbiStatus ?? "",
+      m.clubStatus ?? "",
+      m.licenseNumber ?? "",
+      formatLocalDateFr(m.licenseExpiresAt ?? "") ?? "",
+      m.secondaryEmail ?? "",
+      m.motherPhone ?? "",
+      m.fatherPhone ?? "",
+      m.otherPhones ?? "",
+      m.secondaryAddress ?? "",
+      m.medicalNotes ?? "",
+      formatLocalDateFr(m.medicalCertificateExpiresAt ?? "") ?? "",
+      m.otherNotes ?? "",
+      m.imageRights ?? "",
+      acceptedLabel(m.playerCharterAccepted),
+      acceptedLabel(m.parentCharterAccepted),
       m.archivedAt ? "Archivé" : "Actif",
     ]);
     const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
