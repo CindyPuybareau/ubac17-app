@@ -2170,6 +2170,7 @@ export default async function DashboardPage() {
             <span className="text-sm font-semibold text-white">UBAC</span>
           </div>
           <div className="flex items-center gap-1">
+            <OrgChartButton />
             <NotificationBell />
             <SignOutButton />
             <MobileMenuButton />
@@ -2178,14 +2179,13 @@ export default async function DashboardPage() {
       </header>
 
       <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
-        <div className="flex items-center justify-between gap-2">
+        <div>
           <h1 className="text-2xl font-bold text-zinc-900">
             <span className="font-medium text-zinc-500">Bienvenue</span>{" "}
             <span className="text-navy">
               {profile?.first_name ? formatFirstName(profile.first_name) : user.email}
             </span>
           </h1>
-          <OrgChartButton />
         </div>
 
 

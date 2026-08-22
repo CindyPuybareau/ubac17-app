@@ -175,6 +175,7 @@ export default function ChildDashboard({
             <span className="text-sm font-semibold text-white">UBAC</span>
           </div>
           <div className="flex items-center gap-1">
+            <OrgChartButton />
             <ChildNotificationBell initialNotifications={notifications} initialEnabled={notificationsEnabled} />
             <ChildLogoutButton />
             <MobileMenuButton />
@@ -187,13 +188,10 @@ export default function ChildDashboard({
             — sobre, sur fond blanc, sans carte pleine couleur — pour que les
             deux espaces se ressemblent au premier coup d'œil. */}
         <div>
-          <div className="flex items-center justify-between gap-2">
-            <h1 className="text-2xl font-bold text-zinc-900">
-              <span className="font-medium text-zinc-500">Bienvenue</span>{" "}
-              <span className="text-navy">{formatFirstName(firstName) || "champion"}</span>
-            </h1>
-            <OrgChartButton />
-          </div>
+          <h1 className="text-2xl font-bold text-zinc-900">
+            <span className="font-medium text-zinc-500">Bienvenue</span>{" "}
+            <span className="text-navy">{formatFirstName(firstName) || "champion"}</span>
+          </h1>
           {(teams.length > 0 || ownJersey?.jersey != null) && (
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               {teams.map((t) => (

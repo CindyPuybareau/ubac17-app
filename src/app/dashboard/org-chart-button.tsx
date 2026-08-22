@@ -15,11 +15,16 @@ export default function OrgChartButton() {
 
   return (
     <>
+      {/* Retour de Cindy du 2026-08-22 : déplacé dans la bande bleue de
+          l'en-tête (à gauche de la cloche), plutôt qu'à côté de
+          "Bienvenue" — mêmes codes couleur que les autres boutons de cet
+          en-tête (notification-bell.tsx, mobile-menu-button.tsx) pour
+          rester visible sur fond navy. */}
       <button
         type="button"
         onClick={() => setOpen(true)}
         title="Voir l'organigramme du club"
-        className="flex shrink-0 items-center gap-1.5 rounded-full p-2 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-navy"
+        className="flex shrink-0 items-center gap-1.5 rounded-full p-2 text-white/80 transition-colors hover:bg-white/10 hover:text-white"
       >
         <ChartNetwork className="h-5 w-5 shrink-0" />
       </button>
