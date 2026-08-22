@@ -219,7 +219,7 @@ export default function CoachView({
     },
     {
       key: "results",
-      label: "Résultats",
+      label: "Matchs et résultats",
       icon: <Trophy className={iconClass} />,
       content: (
         <CalendarView

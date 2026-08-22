@@ -159,7 +159,7 @@ export default function ChildDashboard({
     },
     {
       key: "results",
-      label: "Résultats",
+      label: "Matchs et résultats",
       icon: <Trophy className={iconClass} />,
       content: <ChildResultsTab seasonMatches={seasonMatches} teams={teams} />,
     },
