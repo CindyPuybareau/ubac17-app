@@ -9,9 +9,12 @@ import {
 } from "@/app/dashboard/cotisation-shared";
 import type { AdminCotisation } from "@/app/dashboard/page";
 
-// Une cotisation encore due n'est jamais relancée plus souvent que ça —
-// pas de date d'échéance propre à surveiller (contrairement à une
-// licence), donc un cooldown plutôt qu'une fenêtre.
+// Une cotisation ou une pénalité encore due n'est jamais relancée plus
+// souvent que ça — pas de date d'échéance propre à surveiller
+// (contrairement à une licence), donc un cooldown plutôt qu'une fenêtre.
+// Même délai pour les deux depuis que "Relance pénalités" (retour de
+// Cindy du 2026-08-22) a fusionné les deux mécanismes sous un seul
+// interrupteur.
 const COTISATION_RELANCE_COOLDOWN_DAYS = 14;
 
 type PlayerRow = {
@@ -33,6 +36,21 @@ type CotisationRow = {
   paiement: number | null;
   statut: string | null;
   player_id: string;
+  last_auto_relance_sent_at: string | null;
+  players: {
+    first_name: string | null;
+    last_name: string | null;
+    registration_email: string | null;
+    profile_id: string | null;
+  } | null;
+};
+
+type PenaliteRow = {
+  id: string;
+  player_id: string;
+  amount: number;
+  notes: string | null;
+  penalite_date: string | null;
   last_auto_relance_sent_at: string | null;
   players: {
     first_name: string | null;
@@ -258,6 +276,74 @@ async function runCotisationRelances(supabase: ReturnType<typeof createServiceCl
   return { sent, skippedNoEmail, checked };
 }
 
+// Retour de Cindy du 2026-08-22 : "Relance pénalités" — même interrupteur
+// que les cotisations (cotisation_relance_enabled), même cooldown, mais un
+// message simple plutôt que le système de templates par saison/tarif de
+// RELANCE_TEMPLATES (pensé pour les cotisations, sans rapport avec une
+// pénalité ponctuelle).
+async function runPenaliteRelances(supabase: ReturnType<typeof createServiceClient>) {
+  const { data: settings } = await supabase
+    .from("club_settings")
+    .select("cotisation_relance_enabled")
+    .eq("id", true)
+    .maybeSingle();
+  if (!settings?.cotisation_relance_enabled) {
+    return { sent: 0, skippedNoEmail: 0, checked: 0, paused: true };
+  }
+
+  const cooldownStart = new Date();
+  cooldownStart.setDate(cooldownStart.getDate() - COTISATION_RELANCE_COOLDOWN_DAYS);
+  const cooldownStartIso = cooldownStart.toISOString();
+
+  const { data: penalitesData, error } = await supabase
+    .from("penalites")
+    .select(
+      "id, player_id, amount, notes, penalite_date, last_auto_relance_sent_at, players(first_name, last_name, registration_email, profile_id)"
+    )
+    .eq("statut", "EN_ATTENTE")
+    .or(`last_auto_relance_sent_at.is.null,last_auto_relance_sent_at.lt.${cooldownStartIso}`);
+
+  if (error) return { sent: 0, skippedNoEmail: 0, checked: 0, error: "Erreur lors de la lecture des données." };
+
+  let sent = 0;
+  let skippedNoEmail = 0;
+  let checked = 0;
+
+  for (const row of (penalitesData ?? []) as unknown as PenaliteRow[]) {
+    const player = row.players;
+    if (!player) continue;
+    checked += 1;
+
+    const fullName = [player.first_name, player.last_name].filter(Boolean).join(" ") || "ce membre";
+    const email = await resolveContactEmail(supabase, {
+      id: row.player_id,
+      registration_email: player.registration_email,
+      profile_id: player.profile_id,
+    });
+    if (!email) {
+      skippedNoEmail += 1;
+      continue;
+    }
+
+    const amountFr = row.amount.toLocaleString("fr-FR", { minimumFractionDigits: 2 });
+    const dateLine = row.penalite_date ? ` (${formatDateFr(row.penalite_date)})` : "";
+    const notesLine = row.notes ? `\nMotif : ${row.notes}` : "";
+    const subject = `UBAC — Pénalité à régler pour ${fullName}`;
+    const body = `Bonjour,\n\nUne pénalité de ${amountFr} €${dateLine} reste à régler pour ${fullName}.${notesLine}\n\nMerci de vous rapprocher du Bureau pour le règlement.\n\nSportivement,\nL'UBAC`;
+
+    const result = await sendEmail({ to: email, subject, body });
+    if (result.ok && !result.simulated) {
+      sent += 1;
+      await supabase
+        .from("penalites")
+        .update({ last_auto_relance_sent_at: new Date().toISOString() })
+        .eq("id", row.id);
+    }
+  }
+
+  return { sent, skippedNoEmail, checked };
+}
+
 // Rappels Bureau automatiques, tous regroupés dans une seule tâche
 // planifiée (le plan Vercel Hobby plafonne à 2 crons — /api/cron/match-
 // reminders occupe déjà le premier) : échéances (licence FFBB, certificat
@@ -282,10 +368,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
 
-  const [expiry, cotisations] = await Promise.all([
+  const [expiry, cotisations, penalites] = await Promise.all([
     runExpiryAlerts(supabase),
     runCotisationRelances(supabase),
+    runPenaliteRelances(supabase),
   ]);
 
-  return NextResponse.json({ expiry, cotisations });
+  return NextResponse.json({ expiry, cotisations, penalites });
 }

@@ -23,8 +23,12 @@ const AUTOMATIONS: { key: AutomationKey; title: string; description: string }[] 
   },
   {
     key: "cotisation_relance_enabled",
-    title: "Relances de cotisation impayée",
-    description: "Email de rappel envoyé tous les 14 jours pour chaque cotisation encore due.",
+    // Retour de Cindy du 2026-08-22 : ce même interrupteur couvre
+    // désormais aussi les pénalités impayées (voir runPenaliteRelances,
+    // /api/cron/bureau-alerts), pas un réglage séparé à gérer en plus.
+    title: "Relance pénalités",
+    description:
+      "Email de rappel envoyé tous les 14 jours pour chaque cotisation ou pénalité encore due.",
   },
 ];
 

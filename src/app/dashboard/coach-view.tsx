@@ -8,11 +8,13 @@ import CoachOrganisation, { type CoachTeamMatchCard } from "./coach-organisation
 import FamilyAttendanceRequests from "./family-attendance-requests";
 import FamilyAttendanceSummary from "./family-attendance-summary";
 import FamilyCotisationCard from "./family-cotisation-card";
+import PenalitesCard from "./penalites-card";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import type { TeamWithMembers } from "./team-manager";
 import type {
   AdminCotisation,
   AdminMemberTeam,
+  AdminPenalite,
   AdminUpcomingEvent,
   MemberDetail,
   WhatsAppGroup,
@@ -50,6 +52,7 @@ export default function CoachView({
   ownPlayerNextEvent = null,
   showOwnPlayerSummary = false,
   ownCotisations = [],
+  penalites = [],
 }: {
   teams: TeamWithMembers[];
   events: AdminUpcomingEvent[];
@@ -98,6 +101,10 @@ export default function CoachView({
   // vide sinon), pour ne jamais les faire apparaître en double.
   showOwnPlayerSummary?: boolean;
   ownCotisations?: AdminCotisation[];
+  // Lecture seule (retour de Cindy du 2026-08-22) : les pénalités des
+  // joueurs de TOUTES les équipes de ce coach, saisies par le Bureau
+  // (voir penalites-manager.tsx) — jamais de droit de saisie ici.
+  penalites?: AdminPenalite[];
 }) {
   // Créer / modifier / supprimer un événement n'est permis que pour les
   // équipes réellement entraînées : proposer celle où l'utilisateur n'est
@@ -179,15 +186,29 @@ export default function CoachView({
               propre taux de présence, contrairement à n'importe quel
               parent. */}
           {showOwnPlayerSummary && (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <FamilyCotisationCard cotisations={ownCotisations} />
               <FamilyAttendanceSummary
                 events={events}
                 players={rsvpPlayers.filter((p) => p.id === ownPlayerId)}
                 rsvpStatusByKey={rsvpStatusByKey}
               />
+              <PenalitesCard
+                title="Mes pénalités"
+                penalites={penalites.filter((p) => p.playerId === ownPlayerId)}
+              />
             </div>
           )}
+          {/* Visible pour tout coach, pas seulement le cas replié
+              ci-dessus (retour de Cindy du 2026-08-22, "dans tous les
+              espaces") : les pénalités des joueurs de ses équipes,
+              lecture seule. */}
+          <PenalitesCard
+            title="Pénalités de l'équipe"
+            penalites={penalites}
+            showPlayerName
+            emptyLabel="Aucune pénalité pour tes joueurs."
+          />
         </div>
       ),
     },

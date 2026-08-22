@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
+  Gavel,
   Plus,
   Search,
   ShieldCheck,
@@ -25,12 +26,14 @@ import CotisationParticipantsTable, {
   formatAmount,
   roundCents,
 } from "./cotisation-participants-table";
+import PenalitesManager from "./penalites-manager";
 import type {
   AdminCategoryTariff,
   AdminCollecte,
   AdminCotisation,
   AdminMember,
   AdminMemberTeam,
+  AdminPenalite,
   CollecteType,
 } from "./page";
 
@@ -165,15 +168,17 @@ export default function CotisationsManager({
   members,
   categoryTariffs,
   canonicalTeamRefs,
+  penalites,
 }: {
   cotisations: AdminCotisation[];
   collectes: AdminCollecte[];
   members: AdminMember[];
   categoryTariffs: AdminCategoryTariff[];
   canonicalTeamRefs: AdminMemberTeam[];
+  penalites: AdminPenalite[];
 }) {
   const router = useRouter();
-  const [tab, setTab] = useState<"cotisations" | "collectes">("cotisations");
+  const [tab, setTab] = useState<"cotisations" | "collectes" | "penalites">("cotisations");
   useScrollTopOnChange(tab);
   const [selectedCollecteId, setSelectedCollecteId] = useState<string | null>(
     collectes[0]?.id ?? null
@@ -311,7 +316,13 @@ export default function CotisationsManager({
           <Ticket className="h-3.5 w-3.5" />
           Stages &amp; Événements Payants
         </button>
+        <button onClick={() => setTab("penalites")} className={tabButtonClass(tab === "penalites")}>
+          <Gavel className="h-3.5 w-3.5" />
+          Pénalités
+        </button>
       </div>
+
+      {tab === "penalites" && <PenalitesManager penalites={penalites} members={members} />}
 
       {tab === "cotisations" && (
         <div className="flex flex-col gap-4">

@@ -53,6 +53,17 @@ export type AdminMemberTeam = {
   category: string | null;
 };
 
+export type AdminPenalite = {
+  id: string;
+  playerId: string;
+  playerName: string;
+  amount: number;
+  notes: string | null;
+  penaliteDate: string | null;
+  statut: string | null;
+  paidAt: string | null;
+};
+
 export type AdminSponsor = {
   id: string;
   name: string;
@@ -700,6 +711,7 @@ export default async function DashboardPage() {
   let adminVolunteerNeedsByEventId: Record<string, VolunteerNeed[]> = {};
   let adminMembers: AdminMember[] = [];
   let adminSponsors: AdminSponsor[] = [];
+  let adminPenalites: AdminPenalite[] = [];
   // The Membres table's team pickers (filter + "Modifier le profil") only
   // offer teams with a sort_order set — any future leftover/legacy import
   // row without one is excluded here (though still visible in the
@@ -748,6 +760,7 @@ export default async function DashboardPage() {
       categoryTariffsRes,
       clubSettingsRes,
       sponsorsRes,
+      penalitesRes,
     ] = await Promise.all([
       supabase
         .from("teams")
@@ -805,6 +818,12 @@ export default async function DashboardPage() {
         .from("sponsors")
         .select("id, name, contact_name, contact_email, contact_phone, renewal_date, notes")
         .order("renewal_date", { ascending: true, nullsFirst: false }),
+      // Toutes les pénalités du club — le Bureau les gère toutes (onglet
+      // Pénalités, à côté de Stages & Événements Payants).
+      supabase
+        .from("penalites")
+        .select("id, player_id, amount, notes, penalite_date, statut, paid_at, players(first_name, last_name)")
+        .order("penalite_date", { ascending: false }),
     ]);
 
     const clubSettingsRow = clubSettingsRes.data as Record<AutomationKey, boolean> | null;
@@ -1182,6 +1201,23 @@ export default async function DashboardPage() {
       notes: s.notes,
     }));
 
+    adminPenalites = (penalitesRes.data ?? []).map((p) => {
+      const player = p.players as unknown as {
+        first_name: string | null;
+        last_name: string | null;
+      } | null;
+      return {
+        id: p.id,
+        playerId: p.player_id,
+        playerName: [player?.first_name, player?.last_name].filter(Boolean).join(" ") || "Joueur",
+        amount: p.amount,
+        notes: p.notes,
+        penaliteDate: p.penalite_date,
+        statut: p.statut,
+        paidAt: p.paid_at,
+      };
+    });
+
     adminUpcomingEvents = (upcomingEventsRes.data ?? []).map((e) => {
       const team = e.teams as unknown as {
         id: string;
@@ -1230,6 +1266,10 @@ export default async function DashboardPage() {
   let coachClubTeams: AdminMemberTeam[] = [];
   let coachOrganisationTasks: Record<string, EventTasksState> = {};
   let coachVolunteerNeedsByEventId: Record<string, VolunteerNeed[]> = {};
+  // Lecture seule (retour de Cindy du 2026-08-22) : le coach voit les
+  // pénalités des joueurs de ses équipes, mais ne peut ni en créer ni en
+  // modifier — seul le Bureau saisit une pénalité.
+  let coachPenalites: AdminPenalite[] = [];
   const coachContactPhoneByPlayerId: Record<string, string> = {};
   const coachContactEmailByPlayerId: Record<string, string> = {};
   const coachMemberDetailsByPlayerId: Record<string, MemberDetail> = {};
@@ -1578,7 +1618,15 @@ export default async function DashboardPage() {
     // Aucune ne dépend de l'autre — parties ensemble plutôt qu'à la queue
     // leu leu.
     const coachEventIds = (eventsRes.data ?? []).map((e) => e.id);
-    const [rsvpsByEvent, coachRsvpRowsRes] = await Promise.all([
+    // Filtre explicite par effectif coaché plutôt que de compter sur la
+    // seule RLS (même raison que familyPlayerIds pour les cotisations,
+    // plus bas) : teamPlayersRes est déjà résolue (Promise.all du tout
+    // début de ce bloc), pas besoin d'attendre coachRosterPlayerIds
+    // (calculée à nouveau plus bas, identique) pour ce filtre.
+    const coachPenaliteScope = Array.from(
+      new Set((teamPlayersRes.data ?? []).map((tp) => tp.player_id))
+    );
+    const [rsvpsByEvent, coachRsvpRowsRes, coachPenaliteRes] = await Promise.all([
       fetchRsvpsByEvent(supabase, coachEventIds),
       coachEventIds.length > 0
         ? supabase
@@ -1593,7 +1641,37 @@ export default async function DashboardPage() {
               reason: string | null;
             }[],
           }),
+      coachPenaliteScope.length > 0
+        ? supabase
+            .from("penalites")
+            .select(
+              "id, player_id, amount, notes, penalite_date, statut, paid_at, players(first_name, last_name)"
+            )
+            .in("player_id", coachPenaliteScope)
+        : Promise.resolve({ data: [] as unknown[] }),
     ]);
+    coachPenalites = (
+      (coachPenaliteRes.data ?? []) as unknown as {
+        id: string;
+        player_id: string;
+        amount: number;
+        notes: string | null;
+        penalite_date: string | null;
+        statut: string | null;
+        paid_at: string | null;
+        players: { first_name: string | null; last_name: string | null } | null;
+      }[]
+    ).map((p) => ({
+      id: p.id,
+      playerId: p.player_id,
+      playerName:
+        [p.players?.first_name, p.players?.last_name].filter(Boolean).join(" ") || "Joueur",
+      amount: p.amount,
+      notes: p.notes,
+      penaliteDate: p.penalite_date,
+      statut: p.statut,
+      paidAt: p.paid_at,
+    }));
     const coachRsvpRows = coachRsvpRowsRes.data;
     (coachRsvpRows ?? []).forEach((r) => {
       coachRsvpStatusByKey[`${r.event_id}:${r.player_id}`] = r.status;
@@ -1670,6 +1748,9 @@ export default async function DashboardPage() {
   const familyBirthdayMembers: BirthdaySource[] = [];
   const familyTeamCards: FamilyTeamCardData[] = [];
   let familyCotisations: AdminCotisation[] = [];
+  // "Mes pénalités" (retour de Cindy du 2026-08-22) : toutes celles de tous
+  // les enfants de la famille, comme familyCotisations juste au-dessus.
+  let familyPenalites: AdminPenalite[] = [];
 
   const familyPromise = (async () => {
   if (players.length > 0) {
@@ -1715,7 +1796,7 @@ export default async function DashboardPage() {
     // Ces trois groupes de requêtes ne dépendent que de allTeamIds /
     // familyPlayerIds, déjà connus ci-dessus — jamais les uns des autres —
     // donc partis ensemble plutôt qu'à la queue leu leu.
-    const [teamsQueryResults, eventsRes, familyCotisationRes] = await Promise.all([
+    const [teamsQueryResults, eventsRes, familyCotisationRes, familyPenaliteRes] = await Promise.all([
       allTeamIds.length > 0
         ? Promise.all([
             supabase
@@ -1756,7 +1837,41 @@ export default async function DashboardPage() {
             .in("player_id", familyPlayerIds)
             .order("saison", { ascending: false })
         : null,
+      // Même garde-fou que la requête cotisations juste au-dessus (Cindy
+      // Bureau + parente) : filtre explicite plutôt que la seule RLS.
+      familyPlayerIds.length > 0
+        ? supabase
+            .from("penalites")
+            .select(
+              "id, player_id, amount, notes, penalite_date, statut, paid_at, players(first_name, last_name)"
+            )
+            .in("player_id", familyPlayerIds)
+            .order("penalite_date", { ascending: false })
+        : null,
     ]);
+
+    familyPenalites = (
+      (familyPenaliteRes?.data ?? []) as unknown as {
+        id: string;
+        player_id: string;
+        amount: number;
+        notes: string | null;
+        penalite_date: string | null;
+        statut: string | null;
+        paid_at: string | null;
+        players: { first_name: string | null; last_name: string | null } | null;
+      }[]
+    ).map((p) => ({
+      id: p.id,
+      playerId: p.player_id,
+      playerName:
+        [p.players?.first_name, p.players?.last_name].filter(Boolean).join(" ") || "Joueur",
+      amount: p.amount,
+      notes: p.notes,
+      penaliteDate: p.penalite_date,
+      statut: p.statut,
+      paidAt: p.paid_at,
+    }));
 
     if (teamsQueryResults) {
       const [teamsRes, teammateRowsRes, teamCoachesRes, teamPendingCoachesRes] =
@@ -2081,6 +2196,7 @@ export default async function DashboardPage() {
         eventRoles={eventRoleTypes}
         volunteerNeedsByEventId={familyVolunteerNeedsByEventId}
         cotisations={familyCotisations}
+        penalites={familyPenalites}
       />
     ) : null;
 
@@ -2103,6 +2219,7 @@ export default async function DashboardPage() {
           canonicalTeamRefs={canonicalTeamRefs}
           whatsappGroups={whatsappGroups}
           sponsors={adminSponsors}
+          penalites={adminPenalites}
           automationSettings={adminAutomationSettings}
           eventRoles={eventRoleTypes}
           volunteerNeedsByEventId={adminVolunteerNeedsByEventId}
@@ -2146,6 +2263,7 @@ export default async function DashboardPage() {
               ? familyCotisations.filter((c) => c.playerId === ownPlayerId)
               : []
           }
+          penalites={coachPenalites}
         />
       ),
     });

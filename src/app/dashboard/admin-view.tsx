@@ -29,6 +29,7 @@ import type {
   AdminCollecte,
   AdminCotisation,
   AdminMember,
+  AdminPenalite,
   AdminSponsor,
   AdminUpcomingEvent,
   MemberDetail,
@@ -54,6 +55,7 @@ export default function AdminView({
   canonicalTeamRefs,
   whatsappGroups,
   sponsors,
+  penalites,
   automationSettings,
   eventRoles,
   volunteerNeedsByEventId,
@@ -72,6 +74,7 @@ export default function AdminView({
   canonicalTeamRefs: { id: string; name: string | null; category: string | null }[];
   whatsappGroups: WhatsAppGroup[];
   sponsors: AdminSponsor[];
+  penalites: AdminPenalite[];
   automationSettings: Record<AutomationKey, boolean>;
   // Catalogue des rôles d'organisation (buvette, table de marque...) et
   // besoins déjà définis par événement — pour créer/gérer les besoins en
@@ -179,6 +182,7 @@ export default function AdminView({
           members={members}
           categoryTariffs={categoryTariffs}
           canonicalTeamRefs={canonicalTeamRefs}
+          penalites={penalites}
         />
       ),
     },

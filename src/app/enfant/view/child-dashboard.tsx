@@ -4,6 +4,7 @@ import Image from "next/image";
 import { BarChart3, Cake, CalendarDays, Trophy, Users } from "lucide-react";
 import AdminSidebar, { type AdminSection } from "@/app/dashboard/admin-sidebar";
 import OrgChartButton from "@/app/dashboard/org-chart-button";
+import PenalitesCard from "@/app/dashboard/penalites-card";
 import { MobileNavProvider } from "@/app/dashboard/mobile-nav-context";
 import MobileMenuButton from "@/app/dashboard/mobile-menu-button";
 import { formatFirstName } from "@/lib/names";
@@ -45,6 +46,18 @@ export type ChildCoach = { id: string; firstName: string | null; lastName: strin
 
 export type ChildAttendanceStats = { present: number; total: number };
 
+// Pas de playerId/playerName ici (contrairement à AdminPenalite) : un
+// enfant ne voit jamais que SES propres pénalités — voir PenalitesCard
+// (dashboard/penalites-card.tsx, réutilisée telle quelle, même précédent
+// que OrgChartButton/MobileNavProvider importés depuis dashboard/).
+export type ChildPenalite = {
+  id: string;
+  amount: number;
+  notes: string | null;
+  penaliteDate: string | null;
+  statut: string | null;
+};
+
 // Un seul composant, jamais un import de createClient() nulle part dans
 // cet arbre : chaque onglet ne fait que présenter les props reçues de
 // page.tsx (déjà lues en service_role côté serveur). Aucune écriture
@@ -62,6 +75,7 @@ export default function ChildDashboard({
   nextEventAttendance,
   notifications,
   notificationsEnabled,
+  penalites,
 }: {
   firstName: string | null;
   category: string | null;
@@ -74,6 +88,9 @@ export default function ChildDashboard({
   nextEventAttendance: { name: string | null; status: string }[];
   notifications: ChildNotification[];
   notificationsEnabled: boolean;
+  // Lecture seule (retour de Cindy du 2026-08-22, "près de Bilan de
+  // présence") : saisies par le Bureau, jamais modifiables ici.
+  penalites: ChildPenalite[];
 }) {
   const now = Date.now();
   const nextEvent = events.find((e) => new Date(e.startTime).getTime() >= now) ?? null;
@@ -155,7 +172,16 @@ export default function ChildDashboard({
       key: "presence",
       label: "Mes Présences",
       icon: <BarChart3 className={iconClass} />,
-      content: <ChildPresenceTab trainings={presence.trainings} matches={presence.matches} />,
+      content: (
+        <div className="flex flex-col gap-4">
+          <ChildPresenceTab trainings={presence.trainings} matches={presence.matches} />
+          <PenalitesCard
+            title="Mes pénalités"
+            penalites={penalites}
+            emptyLabel="Aucune pénalité."
+          />
+        </div>
+      ),
     },
     {
       key: "results",

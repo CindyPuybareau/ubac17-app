@@ -10,11 +10,12 @@ import FamilyAttendanceRequests from "./family-attendance-requests";
 import FamilyAttendanceSummary from "./family-attendance-summary";
 import CalendarSubscribe from "./calendar-subscribe";
 import FamilyCotisationCard from "./family-cotisation-card";
+import PenalitesCard from "./penalites-card";
 import ChildAccessManager from "./child-access-manager";
 import NextConvocationCard from "./next-convocation-card";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import WhatsAppGroupsFamily from "./whatsapp-groups-family";
-import type { AdminCotisation, AdminUpcomingEvent, WhatsAppGroup } from "./page";
+import type { AdminCotisation, AdminPenalite, AdminUpcomingEvent, WhatsAppGroup } from "./page";
 import type { ConvocationCard } from "./family-data";
 import type { BirthdaySource } from "./birthdays";
 import type { CarpoolOffer, EventRoleType, EventTasksState } from "./event-tasks";
@@ -42,6 +43,7 @@ export default function FamilyView({
   eventRoles,
   volunteerNeedsByEventId,
   cotisations,
+  penalites,
 }: {
   events: AdminUpcomingEvent[];
   rsvpPlayers: CalendarRsvpPlayer[];
@@ -59,6 +61,9 @@ export default function FamilyView({
   // jamais en gestion (réservée au Bureau, voir admin-view.tsx).
   volunteerNeedsByEventId: Record<string, VolunteerNeed[]>;
   cotisations: AdminCotisation[];
+  // Lecture seule (retour de Cindy du 2026-08-22) : toutes celles de tous
+  // les enfants, saisies par le Bureau (voir penalites-manager.tsx).
+  penalites: AdminPenalite[];
 }) {
   const iconClass = "h-4 w-4 shrink-0";
 
@@ -119,6 +124,10 @@ export default function FamilyView({
   const visibleCotisations = useMemo(
     () => cotisations.filter((c) => visiblePlayerIds.includes(c.playerId)),
     [cotisations, visiblePlayerIds]
+  );
+  const visiblePenalites = useMemo(
+    () => penalites.filter((p) => visiblePlayerIds.includes(p.playerId)),
+    [penalites, visiblePlayerIds]
   );
   const visibleConvocations = useMemo(
     () =>
@@ -226,12 +235,18 @@ export default function FamilyView({
           {/* Deux encarts discrets, en pied de page : la situation
               administrative n'a rien à faire mêlée au planning, mais
               reste à portée d'un scroll depuis l'écran "identité". */}
-          <div className="grid grid-cols-1 gap-4 border-t border-zinc-100 pt-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 border-t border-zinc-100 pt-4 sm:grid-cols-2 lg:grid-cols-3">
             <FamilyCotisationCard cotisations={visibleCotisations} />
             <FamilyAttendanceSummary
               events={visibleEvents}
               players={visiblePlayers}
               rsvpStatusByKey={rsvpStatusByKey}
+            />
+            <PenalitesCard
+              title="Mes pénalités"
+              penalites={visiblePenalites}
+              showPlayerName={hasSeveralChildren}
+              emptyLabel="Aucune pénalité."
             />
           </div>
         </div>

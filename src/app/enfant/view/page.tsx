@@ -259,6 +259,25 @@ export default async function ChildViewPage() {
     }));
   }
 
+  // "Mes pénalités" (retour de Cindy du 2026-08-22), lecture seule, comme
+  // le reste de cet espace — lues en service_role et filtrées à la main
+  // sur playerId, même raison que notifications ci-dessus (pas
+  // d'auth.uid() côté enfant, la RLS "select own linked penalites" ne
+  // s'applique pas à cette session).
+  const { data: penaliteRows } = await supabase
+    .from("penalites")
+    .select("id, amount, notes, penalite_date, statut, paid_at")
+    .eq("player_id", playerId)
+    .order("penalite_date", { ascending: false });
+  const penalites = (penaliteRows ?? []).map((p) => ({
+    id: p.id,
+    amount: p.amount,
+    notes: p.notes,
+    penaliteDate: p.penalite_date,
+    statut: p.statut,
+    paidAt: p.paid_at,
+  }));
+
   return (
     <ChildDashboard
       firstName={player.first_name}
@@ -272,6 +291,7 @@ export default async function ChildViewPage() {
       nextEventAttendance={nextEventAttendance}
       notifications={notifications}
       notificationsEnabled={notificationsEnabled}
+      penalites={penalites}
     />
   );
 }
