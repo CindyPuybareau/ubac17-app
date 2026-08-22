@@ -4,6 +4,8 @@ import Image from "next/image";
 import { BarChart3, Cake, CalendarDays, Trophy, Users } from "lucide-react";
 import AdminSidebar, { type AdminSection } from "@/app/dashboard/admin-sidebar";
 import OrgChartButton from "@/app/dashboard/org-chart-button";
+import { MobileNavProvider } from "@/app/dashboard/mobile-nav-context";
+import MobileMenuButton from "@/app/dashboard/mobile-menu-button";
 import { formatFirstName } from "@/lib/names";
 import { styleFor, isMatchType, homeAwayLabel, formatEventTime } from "@/app/dashboard/event-style";
 import { parseMatchTitle } from "@/lib/match-display";
@@ -164,6 +166,7 @@ export default function ChildDashboard({
   ];
 
   return (
+    <MobileNavProvider>
     <div className="flex flex-1 flex-col">
       <header className="sticky top-0 z-10 bg-navy px-4 py-3 sm:px-6">
         <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between">
@@ -174,11 +177,12 @@ export default function ChildDashboard({
           <div className="flex items-center gap-1">
             <ChildNotificationBell initialNotifications={notifications} initialEnabled={notificationsEnabled} />
             <ChildLogoutButton />
+            <MobileMenuButton />
           </div>
         </div>
       </header>
 
-      <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-6 px-4 pt-6 pb-24 sm:px-6 sm:py-10">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
         {/* Même gabarit que l'en-tête de l'Espace Parent (dashboard/page.tsx)
             — sobre, sur fond blanc, sans carte pleine couleur — pour que les
             deux espaces se ressemblent au premier coup d'œil. */}
@@ -212,6 +216,7 @@ export default function ChildDashboard({
         <AdminSidebar sections={sections} />
       </div>
     </div>
+    </MobileNavProvider>
   );
 }
 

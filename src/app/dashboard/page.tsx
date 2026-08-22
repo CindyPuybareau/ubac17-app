@@ -8,6 +8,8 @@ import { localDateFromParts } from "@/lib/local-date";
 import SignOutButton from "./sign-out-button";
 import NotificationBell from "./notification-bell";
 import OrgChartButton from "./org-chart-button";
+import { MobileNavProvider } from "./mobile-nav-context";
+import MobileMenuButton from "./mobile-menu-button";
 import RealtimeSync from "./realtime-sync";
 import DashboardTabs, { type DashboardTab } from "./dashboard-tabs";
 import AdminView from "./admin-view";
@@ -2129,6 +2131,7 @@ export default async function DashboardPage() {
   }
 
   return (
+    <MobileNavProvider>
     <div className="flex flex-1 flex-col">
       <RealtimeSync />
       <header className="sticky top-0 z-10 bg-navy px-4 py-3 sm:px-6">
@@ -2140,11 +2143,12 @@ export default async function DashboardPage() {
           <div className="flex items-center gap-1">
             <NotificationBell />
             <SignOutButton />
+            <MobileMenuButton />
           </div>
         </div>
       </header>
 
-      <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-6 px-4 pt-6 pb-24 sm:px-6 sm:py-10">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
         <div className="flex items-center justify-between gap-2">
           <h1 className="text-2xl font-bold text-zinc-900">
             <span className="font-medium text-zinc-500">Bienvenue</span>{" "}
@@ -2192,5 +2196,6 @@ export default async function DashboardPage() {
       )}
       </div>
     </div>
+    </MobileNavProvider>
   );
 }
