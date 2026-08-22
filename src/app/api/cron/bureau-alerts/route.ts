@@ -110,12 +110,21 @@ async function runExpiryAlerts(supabase: ReturnType<typeof createServiceClient>)
     return { sent: 0, skippedNoEmail: 0, checked: 0, paused: true };
   }
 
-  // Fenêtre large (30 jours), bornée seulement en haut : une échéance déjà
-  // dépassée mérite tout autant un rappel qu'une échéance à venir — pas de
-  // borne basse.
-  const windowEnd = new Date();
-  windowEnd.setDate(windowEnd.getDate() + 30);
-  const windowEndIso = windowEnd.toISOString().slice(0, 10);
+  // Retour de Cindy du 2026-08-22 : n'est plus une relance en continu toute
+  // l'année (fenêtre glissante 30 jours) mais une seule campagne annuelle,
+  // en avril, avant que la saison suivante démarre — le cron continue de
+  // tourner tous les jours (voir vercel.json), mais ne fait rien en dehors
+  // d'avril.
+  const now = new Date();
+  if (now.getMonth() !== 3 /* avril, 0-indexé */) {
+    return { sent: 0, skippedNoEmail: 0, checked: 0, paused: true, reason: "hors campagne (avril uniquement)" };
+  }
+
+  // Fenêtre bornée au démarrage de la saison suivante (1er août de l'année
+  // en cours, même convention "saison = août -> juillet" que le reste de
+  // l'appli, voir src/lib/ffbb.ts) — pas de borne basse : une échéance déjà
+  // dépassée mérite tout autant un rappel.
+  const windowEndIso = `${now.getFullYear()}-08-01`;
 
   const { data: playersData, error } = await supabase
     .from("players")

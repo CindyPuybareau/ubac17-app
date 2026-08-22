@@ -19,7 +19,11 @@ const AUTOMATIONS: { key: AutomationKey; title: string; description: string }[] 
   {
     key: "expiry_alert_enabled",
     title: "Alertes licence & certificat médical",
-    description: "Email envoyé aux membres dont un document arrive à échéance (30 jours).",
+    // Retour de Cindy du 2026-08-22 : n'est plus une relance continue tout
+    // au long de l'année (fenêtre glissante 30 jours) mais une seule
+    // campagne annuelle, en avril, avant la saison suivante — voir
+    // runExpiryAlerts (/api/cron/bureau-alerts).
+    description: "Email envoyé aux membres dont un document arrive à échéance en fin d'année.",
   },
   {
     key: "cotisation_relance_enabled",
