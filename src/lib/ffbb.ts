@@ -13,6 +13,53 @@ const FRENCH_MONTHS: Record<string, number> = {
   "juil": 6, "août": 7, "sept": 8, "oct": 9, "nov": 10, "déc": 11,
 };
 
+// L'heure FFBB est une heure locale de Paris (CET l'hiver = UTC+1, CEST
+// l'été = UTC+2) — décalage variable selon la période de l'année. Aucune
+// librairie de fuseaux horaires dans ce projet : on interroge directement
+// Intl (natif, toujours à jour sur les règles DST) pour connaître l'écart
+// Paris/UTC au moment visé, plutôt que de le coder en dur.
+function parisOffsetMinutes(utcInstant: Date): number {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Paris",
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const parts = dtf.formatToParts(utcInstant).reduce<Record<string, string>>((acc, p) => {
+    if (p.type !== "literal") acc[p.type] = p.value;
+    return acc;
+  }, {});
+  const asIfUtc = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour),
+    Number(parts.minute),
+    Number(parts.second)
+  );
+  return (asIfUtc - utcInstant.getTime()) / 60000;
+}
+
+// Convertit une heure murale de Paris (année/mois/jour/heure/minute, tous
+// tels qu'affichés sur le site FFBB) en instant UTC réel.
+function parisWallTimeToUtc(
+  year: number,
+  monthIndex: number,
+  day: number,
+  hour: number,
+  minute: number
+): Date {
+  // Première approximation en traitant l'heure murale comme de l'UTC, pour
+  // avoir un instant proche duquel lire le bon décalage saisonnier.
+  const guess = new Date(Date.UTC(year, monthIndex, day, hour, minute));
+  const offsetMin = parisOffsetMinutes(guess);
+  return new Date(guess.getTime() - offsetMin * 60000);
+}
+
 // FFBB shows a day + short month name with no year (e.g. "20 sept. 17h00").
 // Infer the year from a basketball season spanning Aug (year N) -> Jul (year N+1).
 function parseFrenchMatchDate(text: string): string | null {
@@ -30,7 +77,7 @@ function parseFrenchMatchDate(text: string): string | null {
   const seasonStartYear = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
   const year = monthIndex >= 7 ? seasonStartYear : seasonStartYear + 1;
 
-  const date = new Date(Date.UTC(year, monthIndex, Number(day), Number(hour), Number(minute)));
+  const date = parisWallTimeToUtc(year, monthIndex, Number(day), Number(hour), Number(minute));
   return date.toISOString();
 }
 
