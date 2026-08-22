@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { BarChart3, Cake, CalendarDays, Trophy, Users } from "lucide-react";
 import AdminSidebar, { type AdminSection } from "@/app/dashboard/admin-sidebar";
+import OrgChartButton from "@/app/dashboard/org-chart-button";
 import { formatFirstName } from "@/lib/names";
 import { styleFor, isMatchType, homeAwayLabel, formatEventTime } from "@/app/dashboard/event-style";
 import { parseMatchTitle } from "@/lib/match-display";
@@ -182,10 +183,13 @@ export default function ChildDashboard({
             — sobre, sur fond blanc, sans carte pleine couleur — pour que les
             deux espaces se ressemblent au premier coup d'œil. */}
         <div>
-          <h1 className="text-2xl font-bold text-zinc-900">
-            <span className="font-medium text-zinc-500">Bienvenue</span>{" "}
-            <span className="text-navy">{formatFirstName(firstName) || "champion"}</span>
-          </h1>
+          <div className="flex items-center justify-between gap-2">
+            <h1 className="text-2xl font-bold text-zinc-900">
+              <span className="font-medium text-zinc-500">Bienvenue</span>{" "}
+              <span className="text-navy">{formatFirstName(firstName) || "champion"}</span>
+            </h1>
+            <OrgChartButton />
+          </div>
           {(teams.length > 0 || ownJersey?.jersey != null) && (
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               {teams.map((t) => (

@@ -7,6 +7,7 @@ import { EMAIL_REPLY_TO } from "@/lib/email";
 import { localDateFromParts } from "@/lib/local-date";
 import SignOutButton from "./sign-out-button";
 import NotificationBell from "./notification-bell";
+import OrgChartButton from "./org-chart-button";
 import RealtimeSync from "./realtime-sync";
 import DashboardTabs, { type DashboardTab } from "./dashboard-tabs";
 import AdminView from "./admin-view";
@@ -2144,12 +2145,15 @@ export default async function DashboardPage() {
       </header>
 
       <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-6 px-4 pt-6 pb-24 sm:px-6 sm:py-10">
-        <h1 className="text-2xl font-bold text-zinc-900">
-          <span className="font-medium text-zinc-500">Bienvenue</span>{" "}
-          <span className="text-navy">
-            {profile?.first_name ? formatFirstName(profile.first_name) : user.email}
-          </span>
-        </h1>
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-2xl font-bold text-zinc-900">
+            <span className="font-medium text-zinc-500">Bienvenue</span>{" "}
+            <span className="text-navy">
+              {profile?.first_name ? formatFirstName(profile.first_name) : user.email}
+            </span>
+          </h1>
+          <OrgChartButton />
+        </div>
 
 
       <DashboardTabs tabs={tabs} />
