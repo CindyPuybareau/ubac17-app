@@ -1088,36 +1088,10 @@ export default function CalendarView({
   return (
     <div className="flex w-full max-w-full min-w-0 flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        {view === "month" ? (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => step(-1)}
-              aria-label="Précédent"
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-navy text-white transition-colors hover:bg-navy-dark"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => step(1)}
-              aria-label="Suivant"
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-navy text-white transition-colors hover:bg-navy-dark"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-            <span className="text-sm font-semibold capitalize text-zinc-900">
-              {headerLabel}
-            </span>
-          </div>
-        ) : (
-          // Rien à gauche en vue Liste : le titre de la page dit déjà où on
-          // est. Le div vide garde la bascule alignée à droite.
-          <div />
-        )}
-
         <div className="flex flex-wrap items-center gap-2">
-          {/* Action principale de l'écran : elle mérite un fond plein, sur
-              la même ligne que la navigation de date plutôt qu'un bouton
-              de plus empilé au-dessus de la grille. */}
+          {/* Retour de Cindy du 2026-08-22 : l'action principale de l'écran
+              passe avant la navigation de date (flèches + mois), pas
+              après. */}
           {canManage && (
             <button
               onClick={() => setCreateOpen((v) => !v)}
@@ -1128,6 +1102,30 @@ export default function CalendarView({
             </button>
           )}
 
+          {view === "month" && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => step(-1)}
+                aria-label="Précédent"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-navy text-white transition-colors hover:bg-navy-dark"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => step(1)}
+                aria-label="Suivant"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-navy text-white transition-colors hover:bg-navy-dark"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+              <span className="text-sm font-semibold capitalize text-zinc-900">
+                {headerLabel}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
           {view === "month" && (
             <button
               onClick={goToday}

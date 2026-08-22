@@ -204,8 +204,8 @@ export default function ChildDashboard({
           essayé d'abord, entrait en collision avec un logo plus grand —
           même bord gauche). */}
       <header className="sticky top-0 z-10 bg-navy px-4 sm:px-6">
-        <div className="mx-auto flex h-20 w-full max-w-[1600px] items-center justify-between sm:h-24">
-          <Image src="/logo.png" alt="UBAC" width={56} height={56} className="h-11 w-11 object-contain sm:h-[52px] sm:w-[52px]" priority />
+        <div className="mx-auto flex h-16 w-full max-w-[1600px] items-center justify-between sm:h-20">
+          <Image src="/logo.png" alt="UBAC" width={48} height={48} className="h-10 w-10 object-contain sm:h-11 sm:w-11" priority />
           <div className="flex items-center gap-1">
             <OrgChartButton />
             <ChildNotificationBell initialNotifications={notifications} initialEnabled={notificationsEnabled} />
