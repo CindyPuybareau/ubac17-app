@@ -967,64 +967,89 @@ export default function CalendarView({
     return (
       <div
         key={event.id}
-        className={`flex items-start justify-between gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm border-l-4 ${style.border}`}
+        className={`flex flex-col gap-1.5 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm border-l-4 ${style.border}`}
       >
-        {/* min-w-0 indispensable ici : sans lui, un flex-item garde par
-            défaut sa largeur de contenu maximale (min-width: auto), donc le
-            nom de l'adversaire le plus long forçait toute la carte — et la
-            page entière en mobile — à déborder à droite, poussant les
-            boutons Modifier/Supprimer hors du cadre au lieu de les garder
-            dedans. OpponentDisplay a déjà son propre min-w-0 + truncate,
-            mais ça ne sert à rien sans celui-ci sur le parent (retour de
-            Cindy du 2026-08-20, capture mobile "Résultats"). */}
-        <div className="flex min-w-0 flex-col gap-1">
-          <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+        {/* Retour de Cindy du 2026-08-22 : reprend le visuel déjà en place
+            pour "Prochains événements" (team-card.tsx) plutôt qu'un
+            nouveau traitement — date en badge bleu bien visible en haut à
+            droite, heure et lieu sur leur propre ligne avec icône, au lieu
+            de tout reléguer dans un texte gris pâle qu'il fallait deviner
+            ou aller chercher dans "Modifier". */}
+        <div className="flex items-start justify-between gap-2">
+          {/* min-w-0 indispensable ici : sans lui, un flex-item garde par
+              défaut sa largeur de contenu maximale (min-width: auto), donc
+              le nom de l'adversaire le plus long forçait toute la carte —
+              et la page entière en mobile — à déborder à droite. */}
+          <span className="min-w-0 truncate text-xs font-semibold uppercase tracking-wide text-zinc-400">
             {event.teamName}
           </span>
-          <span className="flex flex-wrap items-center gap-2">
-            <span
-              className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${style.badge}`}
-            >
-              {style.label}
+          <div className="flex shrink-0 items-center gap-1">
+            <span className="whitespace-nowrap text-xs font-bold text-ubac-blue">
+              {new Date(event.start_time).toLocaleDateString("fr-FR", {
+                day: "numeric",
+                month: "short",
+              })}
             </span>
-            {homeAway && (
-              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-600">
-                {homeAway}
-              </span>
+            {canManageEvent && (
+              <>
+                <button
+                  onClick={() => openEdit(event)}
+                  title="Modifier"
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setDeleteEventTarget(event)}
+                  title="Supprimer"
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-red-400 hover:bg-red-50 hover:text-red-600"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </>
             )}
-            {event.salle && <SalleBadge salle={event.salle} />}
+          </div>
+        </div>
+
+        <span className="flex flex-wrap items-center gap-2">
+          <span
+            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${style.badge}`}
+          >
+            {style.label}
           </span>
-          <OpponentDisplay title={event.title} size="sm" />
-          {alreadyPlayed ? (
-            <MatchScore
-              eventId={event.id}
-              teamScore={event.teamScore}
-              opponentScore={event.opponentScore}
-              canEdit={canManageEvent}
-            />
-          ) : (
-            <span className="w-fit rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-semibold text-zinc-400">
-              À venir
+          {homeAway && (
+            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-600">
+              {homeAway}
+            </span>
+          )}
+        </span>
+
+        <OpponentDisplay title={event.title} size="sm" />
+
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-zinc-500">
+          <span className="flex items-center gap-1">
+            <Clock className="h-3 w-3 shrink-0" />
+            {formatEventTime(event.start_time, event.end_time)}
+          </span>
+          {(event.salle || event.location) && (
+            <span className="flex items-center gap-1 truncate">
+              <MapPin className="h-3 w-3 shrink-0" />
+              {event.salle ? <SalleBadge salle={event.salle} /> : event.location}
             </span>
           )}
         </div>
-        {canManageEvent && (
-          <div className="flex shrink-0 items-center gap-1">
-            <button
-              onClick={() => openEdit(event)}
-              title="Modifier"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
-            >
-              <Pencil className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setDeleteEventTarget(event)}
-              title="Supprimer"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-red-400 hover:bg-red-50 hover:text-red-600"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          </div>
+
+        {alreadyPlayed ? (
+          <MatchScore
+            eventId={event.id}
+            teamScore={event.teamScore}
+            opponentScore={event.opponentScore}
+            canEdit={canManageEvent}
+          />
+        ) : (
+          <span className="w-fit rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-semibold text-zinc-400">
+            À venir
+          </span>
         )}
       </div>
     );
@@ -1314,29 +1339,7 @@ export default function CalendarView({
               Aucun match programmé pour le moment — le calendrier de la saison apparaîtra ici.
             </p>
           ) : (
-            seasonMatches.map((event) => (
-              <div key={event.id} className="flex flex-col gap-1">
-                {/* Retour de Cindy du 2026-08-22 : la date n'était visible
-                    qu'en petit gris pâle, et l'heure n'apparaissait nulle
-                    part dans cette vue (il fallait ouvrir "Modifier" côté
-                    Bureau pour la voir — inexistant côté Famille/Joueur).
-                    Remontée en plus grand/contrasté, avec l'heure toujours
-                    affichée à côté, pour tout le monde. */}
-                <p className="flex items-baseline gap-1.5 text-sm font-bold text-zinc-700">
-                  <span className="capitalize">
-                    {new Date(event.start_time).toLocaleDateString("fr-FR", {
-                      weekday: "long",
-                      day: "numeric",
-                      month: "long",
-                    })}
-                  </span>
-                  <span className="font-semibold text-ubac-blue">
-                    {formatEventTime(event.start_time, event.end_time)}
-                  </span>
-                </p>
-                {renderResultCard(event)}
-              </div>
-            ))
+            seasonMatches.map((event) => renderResultCard(event))
           )}
         </div>
       )}

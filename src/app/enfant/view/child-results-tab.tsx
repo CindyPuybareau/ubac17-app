@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Trophy } from "lucide-react";
+import { Clock, Trophy } from "lucide-react";
 import { formatEventTime, homeAwayLabel } from "@/app/dashboard/event-style";
 import { parseMatchTitle } from "@/lib/match-display";
 import { sortTeamsByGroup, teamLabel } from "@/lib/teams";
@@ -30,11 +30,13 @@ function ResultRow({ event }: { event: ChildEvent }) {
         <span className="truncate text-sm font-medium text-zinc-800">{opponent}</span>
         {/* Retour de Cindy du 2026-08-22 : côté Joueur, l'heure du match
             n'apparaissait nulle part sur cette page — seule la date, en
-            petit gris pâle. Ajout de l'heure et un peu plus de contraste
-            sur la date, sans changer le gabarit compact de la ligne. */}
-        <span className="text-[11px] font-medium text-zinc-500">
+            petit gris pâle. Icône horloge + heure ajoutées, même codes
+            visuels que "Prochains événements" (team-card.tsx) plutôt
+            qu'un nouveau traitement, sans changer le gabarit compact de
+            la ligne. */}
+        <span className="flex items-center gap-1 text-[11px] font-medium text-zinc-500">
           {new Date(event.startTime).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
-          {" · "}
+          <Clock className="h-3 w-3 shrink-0" />
           {formatEventTime(event.startTime, null)}
           {home ? ` · ${home}` : ""}
         </span>
