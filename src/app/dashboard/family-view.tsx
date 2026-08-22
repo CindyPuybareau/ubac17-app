@@ -215,8 +215,11 @@ export default function FamilyView({
       ),
     },
     {
+      // Au pluriel si l'enfant sélectionné (ou l'ensemble des enfants,
+      // sans sélection) joue dans plusieurs équipes — retour de Cindy du
+      // 2026-08-22, même logique que "Équipe"/"Équipes" côté Coach.
       key: "teams",
-      label: "Mon Équipe",
+      label: visibleTeamCards.length > 1 ? "Mes Équipes" : "Mon Équipe",
       icon: <Users className={iconClass} />,
       content: (
         <div className="flex flex-col gap-4">

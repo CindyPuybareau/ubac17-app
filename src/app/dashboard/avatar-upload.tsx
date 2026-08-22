@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Camera } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -26,6 +26,20 @@ export default function AvatarUpload({
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Affichage optimiste (retour de Cindy du 2026-08-22, "l'affichage après
+  // l'import de la photo est trèèèèèès long") : la page dashboard charge
+  // beaucoup de données, et router.refresh() re-render tout l'arbre
+  // Server Component avec les nouvelles props une fois SEULEMENT ce
+  // rechargement complet terminé — la nouvelle photo n'apparaissait donc
+  // qu'après plusieurs secondes, alors que l'envoi lui-même est rapide.
+  // En gardant l'URL localement et en l'affichant tout de suite, la photo
+  // change à l'instant ; router.refresh() continue en arrière-plan pour
+  // que le reste de la page (et un futur rechargement) reflète la même
+  // valeur, sans plus jamais bloquer l'affichage.
+  const [localAvatarUrl, setLocalAvatarUrl] = useState(avatarUrl);
+  useEffect(() => {
+    setLocalAvatarUrl(avatarUrl);
+  }, [avatarUrl]);
 
   async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -67,6 +81,10 @@ export default function AvatarUpload({
       setError("Enregistrement impossible, réessaie.");
       return;
     }
+    // Affiché tout de suite, sans attendre router.refresh() ci-dessous
+    // (voir commentaire plus haut) — c'est ce qui rendait le changement de
+    // photo si lent à se voir.
+    setLocalAvatarUrl(bustedUrl);
     router.refresh();
   }
 
@@ -79,23 +97,28 @@ export default function AvatarUpload({
       <div
         className={`overflow-hidden rounded-full border-4 border-white bg-amber-100 shadow-md ${dimensionClass}`}
       >
-        {avatarUrl ? (
+        {localAvatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+          <img src={localAvatarUrl} alt="" className="h-full w-full object-cover" />
         ) : (
           <span className={`flex h-full w-full items-center justify-center font-bold text-navy ${textClass}`}>
             {initial}
           </span>
         )}
       </div>
+      {/* Icône plus discrète (retour de Cindy du 2026-08-22, "sur
+          téléphone, l'icône appareil photo prend trop de place sur mon
+          image") : plus petite, décalée vers l'extérieur du rond (déborde
+          un peu du cadre plutôt que de s'écraser dessus) et fond
+          semi-transparent pour laisser deviner la photo en dessous. */}
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
         disabled={uploading}
         title="Changer la photo de profil"
-        className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-navy text-white shadow-sm transition-colors hover:bg-navy-dark disabled:opacity-60"
+        className="absolute -bottom-0.5 -right-0.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-navy/70 text-white shadow-sm backdrop-blur-sm transition-colors hover:bg-navy-dark disabled:opacity-60"
       >
-        <Camera className="h-3.5 w-3.5" />
+        <Camera className="h-3 w-3" />
       </button>
       <input
         ref={inputRef}
