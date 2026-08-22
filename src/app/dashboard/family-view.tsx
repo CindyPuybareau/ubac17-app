@@ -69,7 +69,13 @@ export default function FamilyView({
 
   // Sélecteur d'enfant : n'a de sens qu'à partir de deux. Avec un seul
   // enfant, une puce unique ne ferait qu'occuper de la place.
-  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+  // Retour de Cindy du 2026-08-22 : plus de vue "Tous" combinée — avec
+  // plusieurs enfants, un seul est affiché à la fois, jamais mélangé.
+  // Présélectionne le premier enfant plutôt que null (qui signifiait
+  // "Tous" avant ce changement).
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(
+    () => rsvpPlayers[0]?.id ?? null
+  );
   const hasSeveralChildren = rsvpPlayers.length > 1;
   const visiblePlayers = useMemo(
     () =>
@@ -298,16 +304,6 @@ export default function FamilyView({
           <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
             Enfant
           </span>
-          <button
-            onClick={() => setSelectedPlayerId(null)}
-            className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
-              selectedPlayerId === null
-                ? "border-navy bg-navy text-white"
-                : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
-            }`}
-          >
-            Tous
-          </button>
           {rsvpPlayers.map((p) => (
             <button
               key={p.id}
