@@ -1,14 +1,19 @@
-import { CalendarDays, FileWarning, MapPin, ShieldAlert, Users, Wallet } from "lucide-react";
-import { teamLabel } from "@/lib/teams";
+import { CalendarDays, FileWarning, Handshake, MapPin, Users, Wallet } from "lucide-react";
 import { formatPersonName } from "@/lib/names";
+import { formatLocalDateFr } from "@/lib/local-date";
 import { balanceDue, computeStatus, formatAmount } from "./cotisation-shared";
 import { formatEventTime, isMatchType, styleFor } from "./event-style";
 import OpponentDisplay from "./opponent-display";
 import SalleBadge from "./salle-badge";
 import AutomationSettings, { type AutomationKey } from "./automation-settings";
 import DeferredCalendar from "./deferred-calendar";
-import type { AdminMemberTeam, AdminCotisation, AdminMember, AdminUpcomingEvent } from "./page";
-import type { TeamWithMembers } from "./team-manager";
+import type {
+  AdminMemberTeam,
+  AdminCotisation,
+  AdminMember,
+  AdminSponsor,
+  AdminUpcomingEvent,
+} from "./page";
 import type { BirthdaySource } from "./birthdays";
 import type { EventRoleType } from "./event-tasks";
 import type { VolunteerNeed } from "./event-volunteer-needs";
@@ -57,17 +62,16 @@ function KpiCard({
 export default function BureauDashboard({
   cotisations,
   members,
-  teams,
   events,
   automationSettings,
   createTeams,
   birthdayMembers,
   eventRoles,
   volunteerNeedsByEventId,
+  sponsors,
 }: {
   cotisations: AdminCotisation[];
   members: AdminMember[];
-  teams: TeamWithMembers[];
   events: AdminUpcomingEvent[];
   automationSettings: Record<AutomationKey, boolean>;
   // Le calendrier complet vit désormais sous ce résumé plutôt que dans son
@@ -78,6 +82,10 @@ export default function BureauDashboard({
   birthdayMembers: BirthdaySource[];
   eventRoles: EventRoleType[];
   volunteerNeedsByEventId: Record<string, VolunteerNeed[]>;
+  // Remplace la carte "Documents à renouveler" (retour de Cindy du
+  // 2026-08-22 : "pas d'intérêt") — voir sponsors-manager.tsx pour la
+  // gestion complète (ajout/modification/suppression).
+  sponsors: AdminSponsor[];
 }) {
   // Même périmètre que l'onglet Cotisations & Licences (KpiHeader) : les
   // stages/événements/boutique (collecteId non nul) ont leur propre suivi
@@ -91,9 +99,10 @@ export default function BureauDashboard({
 
   const activeMembers = members.filter((m) => !m.archivedAt).length;
 
-  const teamsWithoutCoach = teams.filter(
-    (t) => t.coaches.length === 0 && t.pendingCoaches.length === 0
-  );
+  // Même fenêtre "à surveiller" que les licences/certificats médicaux
+  // ci-dessous : un sponsor sans date de renouvellement connue n'apparaît
+  // jamais ici (rien à surveiller tant que la date n'est pas négociée).
+  const sponsorsNeedingRenewal = sponsors.filter((s) => isExpiringSoon(s.renewalDate));
 
   const membersWithExpiringDocs = members.filter(
     (m) =>
@@ -112,14 +121,13 @@ export default function BureauDashboard({
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-lg font-semibold text-zinc-900">Bienvenue</h2>
-        <p className="text-sm text-zinc-500">Vue d&apos;ensemble du club, en un coup d&apos;œil.</p>
-      </div>
-
       <AutomationSettings settings={automationSettings} />
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      {/* Retour de Cindy du 2026-08-22 : "Équipes sans coach" retirée
+          (pas d'intérêt) ; "Documents à renouveler" devenue
+          "Renouvellement Sponsors" (nouvelle fonctionnalité, voir
+          sponsors-manager.tsx) — grille passée de 5 à 4 cartes. */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <KpiCard
           icon={Wallet}
           iconClass="text-rose-600"
@@ -133,16 +141,10 @@ export default function BureauDashboard({
           label="Montant en attente"
         />
         <KpiCard
-          icon={ShieldAlert}
-          iconClass="text-amber-600"
-          value={String(teamsWithoutCoach.length)}
-          label="Équipes sans coach"
-        />
-        <KpiCard
-          icon={FileWarning}
+          icon={Handshake}
           iconClass="text-orange-600"
-          value={String(membersWithExpiringDocs.length)}
-          label="Documents à renouveler"
+          value={String(sponsorsNeedingRenewal.length)}
+          label="Renouvellement Sponsors"
         />
         <KpiCard
           icon={Users}
@@ -202,19 +204,20 @@ export default function BureauDashboard({
           );
         })()}
 
-      {teamsWithoutCoach.length > 0 && (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-          <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-amber-800">
-            <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
-            Équipes sans coach assigné
+      {sponsorsNeedingRenewal.length > 0 && (
+        <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4">
+          <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-orange-800">
+            <Handshake className="h-3.5 w-3.5 shrink-0" />
+            Sponsors à renouveler (30 jours)
           </p>
           <div className="flex flex-wrap gap-1.5">
-            {teamsWithoutCoach.map((t) => (
+            {sponsorsNeedingRenewal.map((s) => (
               <span
-                key={t.id}
-                className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-amber-800 shadow-sm"
+                key={s.id}
+                className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-orange-800 shadow-sm"
               >
-                {teamLabel(t)}
+                {s.name}
+                {s.renewalDate ? ` · ${formatLocalDateFr(s.renewalDate)}` : ""}
               </span>
             ))}
           </div>

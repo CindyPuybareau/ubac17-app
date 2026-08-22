@@ -1,6 +1,7 @@
 import {
   CalendarDays,
   Contact,
+  Handshake,
   Heart,
   MessageCircle,
   ShoppingBag,
@@ -20,6 +21,7 @@ import MembersTable from "./members-table";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import FfbbManager from "./ffbb-manager";
 import WhatsAppGroupsManager from "./whatsapp-groups-manager";
+import SponsorsManager from "./sponsors-manager";
 import BureauDashboard from "./bureau-dashboard";
 import type { AutomationKey } from "./automation-settings";
 import type {
@@ -27,6 +29,7 @@ import type {
   AdminCollecte,
   AdminCotisation,
   AdminMember,
+  AdminSponsor,
   AdminUpcomingEvent,
   MemberDetail,
   WhatsAppGroup,
@@ -50,6 +53,7 @@ export default function AdminView({
   birthdayMembers,
   canonicalTeamRefs,
   whatsappGroups,
+  sponsors,
   automationSettings,
   eventRoles,
   volunteerNeedsByEventId,
@@ -67,6 +71,7 @@ export default function AdminView({
   birthdayMembers: BirthdaySource[];
   canonicalTeamRefs: { id: string; name: string | null; category: string | null }[];
   whatsappGroups: WhatsAppGroup[];
+  sponsors: AdminSponsor[];
   automationSettings: Record<AutomationKey, boolean>;
   // Catalogue des rôles d'organisation (buvette, table de marque...) et
   // besoins déjà définis par événement — pour créer/gérer les besoins en
@@ -118,13 +123,13 @@ export default function AdminView({
         <BureauDashboard
           cotisations={cotisations}
           members={members}
-          teams={teams}
           events={upcomingEvents}
           automationSettings={automationSettings}
           createTeams={teamRefs}
           birthdayMembers={birthdayMembers}
           eventRoles={eventRoles}
           volunteerNeedsByEventId={volunteerNeedsByEventId}
+          sponsors={sponsors}
         />
       ),
     },
@@ -199,6 +204,12 @@ export default function AdminView({
       label: "WhatsApp",
       icon: <MessageCircle className={iconClass} />,
       content: <WhatsAppGroupsManager groups={whatsappGroups} teams={canonicalTeamRefs} />,
+    },
+    {
+      key: "sponsors",
+      label: "Sponsors",
+      icon: <Handshake className={iconClass} />,
+      content: <SponsorsManager sponsors={sponsors} />,
     },
     {
       key: "ffbb",

@@ -53,6 +53,16 @@ export type AdminMemberTeam = {
   category: string | null;
 };
 
+export type AdminSponsor = {
+  id: string;
+  name: string;
+  contactName: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  renewalDate: string | null;
+  notes: string | null;
+};
+
 export type WhatsAppGroup = {
   id: string;
   name: string;
@@ -689,6 +699,7 @@ export default async function DashboardPage() {
   let adminUpcomingEvents: AdminUpcomingEvent[] = [];
   let adminVolunteerNeedsByEventId: Record<string, VolunteerNeed[]> = {};
   let adminMembers: AdminMember[] = [];
+  let adminSponsors: AdminSponsor[] = [];
   // The Membres table's team pickers (filter + "Modifier le profil") only
   // offer teams with a sort_order set — any future leftover/legacy import
   // row without one is excluded here (though still visible in the
@@ -736,6 +747,7 @@ export default async function DashboardPage() {
       cotisationPaymentsRes,
       categoryTariffsRes,
       clubSettingsRes,
+      sponsorsRes,
     ] = await Promise.all([
       supabase
         .from("teams")
@@ -787,6 +799,12 @@ export default async function DashboardPage() {
         .select("match_reminder_enabled, expiry_alert_enabled, cotisation_relance_enabled")
         .eq("id", true)
         .maybeSingle(),
+      // Réservé au Bureau (voir policy "admin manage sponsors") : aucun
+      // lien avec une équipe ou un joueur, pas besoin côté Coach/Famille.
+      supabase
+        .from("sponsors")
+        .select("id, name, contact_name, contact_email, contact_phone, renewal_date, notes")
+        .order("renewal_date", { ascending: true, nullsFirst: false }),
     ]);
 
     const clubSettingsRow = clubSettingsRes.data as Record<AutomationKey, boolean> | null;
@@ -1152,6 +1170,16 @@ export default async function DashboardPage() {
     adminCategoryTariffs = (categoryTariffsRes.data ?? []).map((t) => ({
       category: t.category,
       prix: t.prix,
+    }));
+
+    adminSponsors = (sponsorsRes.data ?? []).map((s) => ({
+      id: s.id,
+      name: s.name,
+      contactName: s.contact_name,
+      contactEmail: s.contact_email,
+      contactPhone: s.contact_phone,
+      renewalDate: s.renewal_date,
+      notes: s.notes,
     }));
 
     adminUpcomingEvents = (upcomingEventsRes.data ?? []).map((e) => {
@@ -2074,6 +2102,7 @@ export default async function DashboardPage() {
           birthdayMembers={adminBirthdayMembers}
           canonicalTeamRefs={canonicalTeamRefs}
           whatsappGroups={whatsappGroups}
+          sponsors={adminSponsors}
           automationSettings={adminAutomationSettings}
           eventRoles={eventRoleTypes}
           volunteerNeedsByEventId={adminVolunteerNeedsByEventId}
