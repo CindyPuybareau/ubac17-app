@@ -3,9 +3,11 @@
 import { useMemo, useState } from "react";
 import { CalendarCheck2, CalendarDays, ChevronDown, ChevronUp, Trophy } from "lucide-react";
 import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
+import { sortTeamsByGroup } from "@/lib/teams";
 import { formatPersonName } from "@/lib/names";
 import CoachNextMatchCard from "./coach-next-match-card";
 import NextConvocationCard from "./next-convocation-card";
+import TeamSelectorPills from "./team-selector-pills";
 import { formatEventTime, styleFor } from "./calendar-view";
 import { rolesForEventType } from "./event-tasks";
 import SalleBadge from "./salle-badge";
@@ -484,6 +486,23 @@ export default function CoachOrganisation({
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
   }, [events]);
 
+  // Sélecteur d'équipe (retour de Cindy du 2026-08-22, "on a tout sur une
+  // seule et même page, peu pratique... faire comme dans l'onglet
+  // événement coach") : même pill compact que la vue Événements
+  // (calendar-view.tsx, TeamSelectorPills) plutôt que d'empiler les
+  // cartes/tableaux de toutes les équipes coachées à la fois.
+  const sortedTeams = useMemo(() => sortTeamsByGroup(cards.map((c) => c.team)), [cards]);
+  const [activeTeamId, setActiveTeamId] = useState<string | undefined>(sortedTeams[0]?.id);
+  const activeTeamIdResolved = sortedTeams.some((t) => t.id === activeTeamId)
+    ? activeTeamId
+    : sortedTeams[0]?.id;
+  const visibleCards =
+    sortedTeams.length > 1 ? cards.filter((c) => c.team.id === activeTeamIdResolved) : cards;
+  const visibleUpcomingEvents =
+    sortedTeams.length > 1
+      ? upcomingEvents.filter((e) => e.teamId === activeTeamIdResolved)
+      : upcomingEvents;
+
   if (cards.length === 0) {
     return (
       <p className="text-sm text-zinc-500">
@@ -514,13 +533,15 @@ export default function CoachOrganisation({
         </div>
       )}
 
+      <TeamSelectorPills teams={sortedTeams} activeId={activeTeamIdResolved} onSelect={setActiveTeamId} />
+
       {shownTab === "planning" ? (
         <PlanningTab
-          cards={cards}
+          cards={visibleCards}
           tasksByEventId={tasksByEventId}
           carpoolByEventId={carpoolByEventId}
           volunteerNeedsByEventId={volunteerNeedsByEventId}
-          upcomingEvents={upcomingEvents}
+          upcomingEvents={visibleUpcomingEvents}
           rsvpStatusByKey={rsvpStatusByKey}
           rsvpReasonByKey={rsvpReasonByKey}
           roles={roles}
@@ -534,7 +555,7 @@ export default function CoachOrganisation({
             colonne pour trier — par défaut, l&apos;assiduité la plus faible apparaît en
             premier.
           </p>
-          {cards.map(({ team, roster }) => (
+          {visibleCards.map(({ team, roster }) => (
             <BilanTeamTable
               key={team.id}
               team={team}

@@ -330,9 +330,6 @@ export default function AdminView({
         Espace Bureau
         {clubFunction ? ` · ${clubFunction}` : ""}
       </span>
-      <p className="text-sm text-zinc-500">
-        Accès complet à la gestion du club.
-      </p>
 
       <AdminSidebar sections={sections} />
     </div>

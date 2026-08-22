@@ -103,8 +103,15 @@ function containsKey(sections: AdminSection[], targetKey: string): boolean {
 
 export default function AdminSidebar({
   sections,
+  contentHeader,
 }: {
   sections: AdminSection[];
+  // Bloc rendu au-dessus du contenu de l'onglet actif, dans la colonne de
+  // contenu — jamais au-dessus de toute la page ni du menu (retour de
+  // Cindy du 2026-08-22, sélecteur d'enfant côté Famille : "au-dessus de
+  // l'encart entraînement, pas au-dessus du menu"). Visible sur tous les
+  // onglets puisqu'il vit ici plutôt que dans un `content` particulier.
+  contentHeader?: ReactNode;
 }) {
   // Deep-link support (see buildAppDeepLink in lib/whatsapp.ts): a shared
   // "?section=…" URL — or an "?openMember=…" / "?openGroup=…" link, which
@@ -286,7 +293,10 @@ export default function AdminSidebar({
       </nav>
 
       {/* Content: rendered once, shared by both layouts */}
-      <div className="min-w-0 flex-1">{current.content}</div>
+      <div className="min-w-0 flex-1 flex-col gap-4 flex">
+        {contentHeader}
+        {current.content}
+      </div>
 
       {/* Mobile / tablette : panneau ouvert depuis le bouton hamburger de
           la bande bleue, plus de barre fixe en bas — même liste que la

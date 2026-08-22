@@ -316,27 +316,37 @@ export default function FamilyView({
         statusByKey={rsvpStatusByKey}
       />
 
-      {hasSeveralChildren && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-            Enfant
-          </span>
-          {rsvpPlayers.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setSelectedPlayerId(p.id)}
-              className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
-                selectedPlayerId === p.id
-                  ? "border-navy bg-navy text-white"
-                  : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
-              }`}
-            >
-              {p.name}
-            </button>
-          ))}
-        </div>
-      )}
-      <AdminSidebar sections={sections} />
+      <AdminSidebar
+        sections={sections}
+        // Retour de Cindy du 2026-08-22 : le sélecteur d'enfant doit vivre
+        // au-dessus du contenu de l'onglet actif (ex. juste au-dessus de
+        // "Prochaine convocation" dans Calendrier), pas au-dessus de toute
+        // la page ni du menu — même emplacement que les autres sélecteurs
+        // pill de l'appli (TeamSelectorPills), via contentHeader plutôt
+        // qu'un bloc affiché avant AdminSidebar.
+        contentHeader={
+          hasSeveralChildren ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                Enfant
+              </span>
+              {rsvpPlayers.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setSelectedPlayerId(p.id)}
+                  className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                    selectedPlayerId === p.id
+                      ? "border-navy bg-navy text-white"
+                      : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+                  }`}
+                >
+                  {p.name}
+                </button>
+              ))}
+            </div>
+          ) : undefined
+        }
+      />
     </div>
   );
 }

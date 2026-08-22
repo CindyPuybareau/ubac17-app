@@ -2295,12 +2295,14 @@ export default async function DashboardPage() {
           bien centré, les deux se chevauchaient géométriquement (même
           bord gauche) — l'avatar reste sous la bande bleue, à plat.
           Bandeau jugé encore trop épais ensuite : remis à sa hauteur
-          d'origine (simple padding py-3, logo 32px) plutôt que la
-          hauteur fixe agrandie du tour précédent. Déconnexion déplacée
-          en toute fin du menu (voir admin-sidebar.tsx, logoutAction). */}
-      <header className="sticky top-0 z-10 bg-navy px-4 py-3 sm:px-6">
+          d'origine (simple padding). Logo ensuite jugé "tout petit" à 32px
+          — agrandi à 44px, padding vertical resserré à py-2 pour absorber
+          la croissance sans faire gonfler le bandeau ni laisser le logo
+          en déborder. Déconnexion déplacée en toute fin du menu (voir
+          admin-sidebar.tsx, logoutAction). */}
+      <header className="sticky top-0 z-10 bg-navy px-4 py-2 sm:px-6">
         <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between">
-          <Image src="/logo.png" alt="UBAC" width={32} height={32} className="h-8 w-8 object-contain" priority />
+          <Image src="/logo.png" alt="UBAC" width={44} height={44} className="h-11 w-11 object-contain" priority />
           <div className="flex items-center gap-1">
             <OrgChartButton />
             <NotificationBell />
