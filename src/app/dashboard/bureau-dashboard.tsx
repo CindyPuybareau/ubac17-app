@@ -1,4 +1,4 @@
-import { CalendarDays, FileWarning, Handshake, MapPin, Users, Wallet } from "lucide-react";
+import { CalendarDays, FileWarning, Gavel, Handshake, MapPin, Users, Wallet } from "lucide-react";
 import { formatPersonName } from "@/lib/names";
 import { formatLocalDateFr } from "@/lib/local-date";
 import { balanceDue, computeStatus, formatAmount } from "./cotisation-shared";
@@ -11,6 +11,7 @@ import type {
   AdminMemberTeam,
   AdminCotisation,
   AdminMember,
+  AdminPenalite,
   AdminSponsor,
   AdminUpcomingEvent,
 } from "./page";
@@ -69,6 +70,7 @@ export default function BureauDashboard({
   eventRoles,
   volunteerNeedsByEventId,
   sponsors,
+  penalites,
 }: {
   cotisations: AdminCotisation[];
   members: AdminMember[];
@@ -86,6 +88,10 @@ export default function BureauDashboard({
   // 2026-08-22 : "pas d'intérêt") — voir sponsors-manager.tsx pour la
   // gestion complète (ajout/modification/suppression).
   sponsors: AdminSponsor[];
+  // Nouvelle carte "Pénalités" (retour de Cindy du 2026-08-22), juste
+  // après "Montant en attente" — même famille de chiffre (un montant en
+  // euros restant à encaisser), voir penalites-manager.tsx pour la saisie.
+  penalites: AdminPenalite[];
 }) {
   // Même périmètre que l'onglet Cotisations & Licences (KpiHeader) : les
   // stages/événements/boutique (collecteId non nul) ont leur propre suivi
@@ -98,6 +104,10 @@ export default function BureauDashboard({
   const pendingAmount = pending.reduce((sum, c) => sum + balanceDue(c), 0);
 
   const activeMembers = members.filter((m) => !m.archivedAt).length;
+
+  const penalitesPendingAmount = penalites
+    .filter((p) => p.statut !== "PAYE")
+    .reduce((sum, p) => sum + p.amount, 0);
 
   // Même fenêtre "à surveiller" que les licences/certificats médicaux
   // ci-dessous : un sponsor sans date de renouvellement connue n'apparaît
@@ -125,9 +135,12 @@ export default function BureauDashboard({
 
       {/* Retour de Cindy du 2026-08-22 : "Équipes sans coach" retirée
           (pas d'intérêt) ; "Documents à renouveler" devenue
-          "Renouvellement Sponsors" (nouvelle fonctionnalité, voir
-          sponsors-manager.tsx) — grille passée de 5 à 4 cartes. */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          "Renouvellement Sponsors" ; carte "Pénalités" ajoutée juste après
+          "Montant en attente" (nouvelles fonctionnalités, voir
+          sponsors-manager.tsx / penalites-manager.tsx) — grille passée de
+          5 à 5 cartes (4 puis +1, jamais 6 : "Équipes sans coach" partie
+          en a laissé la place). */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <KpiCard
           icon={Wallet}
           iconClass="text-rose-600"
@@ -139,6 +152,12 @@ export default function BureauDashboard({
           iconClass="text-amber-700"
           value={formatAmount(pendingAmount)}
           label="Montant en attente"
+        />
+        <KpiCard
+          icon={Gavel}
+          iconClass="text-rose-600"
+          value={formatAmount(penalitesPendingAmount)}
+          label="Pénalités"
         />
         <KpiCard
           icon={Handshake}

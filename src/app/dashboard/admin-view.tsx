@@ -133,6 +133,7 @@ export default function AdminView({
           eventRoles={eventRoles}
           volunteerNeedsByEventId={volunteerNeedsByEventId}
           sponsors={sponsors}
+          penalites={penalites}
         />
       ),
     },
