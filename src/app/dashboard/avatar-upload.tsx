@@ -77,7 +77,7 @@ export default function AvatarUpload({
   return (
     <div className="relative shrink-0">
       <div
-        className={`overflow-hidden rounded-full border-4 border-white bg-ubac-yellow/20 shadow-md ${dimensionClass}`}
+        className={`overflow-hidden rounded-full border-4 border-white bg-amber-100 shadow-md ${dimensionClass}`}
       >
         {avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element

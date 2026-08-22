@@ -51,7 +51,7 @@ export default function ChildAvatarUpload({
 
   return (
     <div className="relative shrink-0">
-      <div className="h-20 w-20 overflow-hidden rounded-full border-4 border-white bg-ubac-yellow/20 shadow-md sm:h-24 sm:w-24">
+      <div className="h-20 w-20 overflow-hidden rounded-full border-4 border-white bg-amber-100 shadow-md sm:h-24 sm:w-24">
         {avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={avatarUrl} alt="" className="h-full w-full object-cover" />

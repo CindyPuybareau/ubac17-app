@@ -2289,13 +2289,18 @@ export default async function DashboardPage() {
     <MobileNavProvider>
     <div className="flex flex-1 flex-col">
       <RealtimeSync />
-      {/* Retour de Cindy du 2026-08-22 : logo seul (plus de texte "UBAC"
-          à côté — la photo de profil ci-dessous porte désormais
-          l'identité de la page) ; padding bas généreux pour laisser la
-          place au débordement de l'avatar façon Facebook. */}
-      <header className="sticky top-0 z-10 bg-navy px-4 pb-9 pt-3 sm:px-6 sm:pb-11">
-        <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between">
-          <Image src="/logo.png" alt="UBAC" width={48} height={48} className="h-11 w-11 object-contain sm:h-12 sm:w-12" priority />
+      {/* Retour de Cindy du 2026-08-22 : logo seul (plus de texte "UBAC" à
+          côté — la photo de profil ci-dessous porte désormais l'identité
+          de la page), agrandi. Hauteur fixe + items-center : logo et
+          icônes vraiment centrés verticalement dans toute la bande bleue
+          (un simple padding les laissait collés en haut). Le débordement
+          de l'avatar façon Facebook, essayé dans un premier temps, est
+          abandonné : avec un logo plus grand et bien centré, les deux se
+          chevauchaient géométriquement (même bord gauche) — l'avatar
+          reste maintenant entièrement sous la bande bleue, à plat. */}
+      <header className="sticky top-0 z-10 bg-navy px-4 sm:px-6">
+        <div className="mx-auto flex h-20 w-full max-w-[1600px] items-center justify-between sm:h-24">
+          <Image src="/logo.png" alt="UBAC" width={56} height={56} className="h-11 w-11 object-contain sm:h-[52px] sm:w-[52px]" priority />
           <div className="flex items-center gap-1">
             <OrgChartButton />
             <NotificationBell />
@@ -2305,13 +2310,8 @@ export default async function DashboardPage() {
         </div>
       </header>
 
-      {/* z-20 > le z-10 de l'en-tête sticky ci-dessus : sans ça, l'avatar
-          qui déborde dessus (marge négative) se faisait recouvrir par le
-          fond plein de l'en-tête au lieu de passer visuellement devant
-          (retour de Cindy du 2026-08-22, capture "le rond est sous la
-          bande bleue"). */}
-      <div className="relative z-20 mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-6 px-4 pb-6 sm:px-6 sm:pb-10">
-        <div className="-mt-10 flex items-center gap-3 sm:-mt-12">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
+        <div className="flex items-center gap-3">
           <AvatarUpload userId={user.id} avatarUrl={profile?.avatar_url ?? null} name={profile?.first_name ?? null} size="lg" />
           <h1 className="text-2xl font-bold text-navy">
             {profile?.first_name ? formatFirstName(profile.first_name) : user.email}
