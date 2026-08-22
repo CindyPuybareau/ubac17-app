@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { X } from "lucide-react";
+import { ChevronDown, ChevronRight, X } from "lucide-react";
 import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
 import { useMobileNav } from "./mobile-nav-context";
 import { createClient } from "@/lib/supabase/client";
@@ -30,7 +30,77 @@ export type AdminSection = {
   // Bureau/Coach/Famille (vraie session Supabase Auth), "child" pour
   // l'espace Enfant (cookie de session signé, voir child-session.ts).
   logoutAction?: "supabase" | "child";
+  // Sous-menu (retour de Cindy du 2026-08-22 : "créer des sous menus
+  // directement dans le menu, plus d'onglets en haut"). Une section avec
+  // `children` n'est plus elle-même sélectionnable — cliquer dessus
+  // déplie/replie la liste, exactement comme un accordéon ; `content` reste
+  // ignoré dans ce cas (passer null). Seules les feuilles (sections sans
+  // `children`) portent du contenu et peuvent devenir `active`.
+  children?: AdminSection[];
 };
+
+// Recherche récursive : une fois les sous-menus en place, `active` peut
+// pointer sur une feuille nichée à n'importe quelle profondeur, un simple
+// `sections.find` de premier niveau ne la trouverait plus.
+function findSection(sections: AdminSection[], key: string): AdminSection | undefined {
+  for (const section of sections) {
+    if (section.key === key) return section;
+    if (section.children) {
+      const found = findSection(section.children, key);
+      if (found) return found;
+    }
+  }
+  return undefined;
+}
+
+function sectionExists(sections: AdminSection[], key: string): boolean {
+  return Boolean(findSection(sections, key));
+}
+
+// Première feuille réellement sélectionnable : un parent avec `children`
+// n'a pas de contenu propre, donc l'état "actif" par défaut doit descendre
+// jusqu'à sa première feuille plutôt que de pointer sur un parent muet.
+// Un lien externe (`href`) ou l'action "Déconnexion" (`logoutAction`) n'a
+// pas de contenu non plus et ne peut donc jamais devenir la sélection par
+// défaut.
+function firstLeafKey(sections: AdminSection[]): string | undefined {
+  for (const section of sections) {
+    if (section.children && section.children.length > 0) {
+      const leaf = firstLeafKey(section.children);
+      if (leaf) return leaf;
+      continue;
+    }
+    if (!section.href && !section.logoutAction) {
+      return section.key;
+    }
+  }
+  return undefined;
+}
+
+// Chaîne des clés de parents à ouvrir pour qu'une feuille donnée soit
+// visible dans l'accordéon — utilisée pour pré-déplier le bon sous-menu au
+// premier rendu (sélection par défaut ou lien profond "?section=…"). `null`
+// distingue "pas trouvé du tout" de "trouvé au premier niveau" (trail []).
+function ancestorKeys(
+  sections: AdminSection[],
+  targetKey: string,
+  trail: string[] = []
+): string[] | null {
+  for (const section of sections) {
+    if (section.key === targetKey) return trail;
+    if (section.children) {
+      const found = ancestorKeys(section.children, targetKey, [...trail, section.key]);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function containsKey(sections: AdminSection[], targetKey: string): boolean {
+  return sections.some(
+    (s) => s.key === targetKey || (s.children ? containsKey(s.children, targetKey) : false)
+  );
+}
 
 export default function AdminSidebar({
   sections,
@@ -45,18 +115,38 @@ export default function AdminSidebar({
   const searchParams = useSearchParams();
   const [active, setActive] = useState(() => {
     const sectionParam = searchParams.get("section");
-    if (sectionParam && sections.some((s) => s.key === sectionParam)) {
+    if (sectionParam && sectionExists(sections, sectionParam)) {
       return sectionParam;
     }
-    if (searchParams.get("openMember") && sections.some((s) => s.key === "members")) {
+    if (searchParams.get("openMember") && sectionExists(sections, "members")) {
       return "members";
     }
-    if (searchParams.get("openGroup") && sections.some((s) => s.key === "whatsapp")) {
+    if (searchParams.get("openGroup") && sectionExists(sections, "whatsapp")) {
       return "whatsapp";
     }
-    return sections[0]?.key;
+    return firstLeafKey(sections) ?? sections[0]?.key;
   });
-  const current = sections.find((s) => s.key === active) ?? sections[0];
+  const current = findSection(sections, active) ?? sections[0];
+
+  // Sous-menus dépliés — plusieurs à la fois, pas de mode accordéon
+  // exclusif : rien n'empêche de garder "Cotisations" ouvert en
+  // consultant "Événements et Résultats". Initialisé sur la chaîne de
+  // parents de la sélection de départ pour que la feuille active soit
+  // visible d'entrée, sans clic supplémentaire.
+  const [expanded, setExpanded] = useState<Set<string>>(
+    () => new Set(active ? (ancestorKeys(sections, active) ?? []) : [])
+  );
+  function toggleExpanded(key: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }
 
   // Every role's top-level tab bar (Calendrier/Membres/Équipes/...) runs
   // through this one shared component, so this single hook covers the
@@ -95,57 +185,101 @@ export default function AdminSidebar({
 
   if (!current) return null;
 
+  // Un seul rendu récursif partagé par la sidebar desktop et le panneau
+  // mobile : les deux affichaient déjà une liste identique, la seule
+  // différence était que la sélection ferme aussi le panneau côté mobile
+  // (onSelect le porte) — dupliquer la logique d'accordéon en plus de ça
+  // aurait doublé la surface à faire évoluer à chaque futur sous-menu.
+  function renderSection(section: AdminSection, onSelect: (key: string) => void) {
+    if (section.href) {
+      return (
+        <li key={section.key}>
+          <a
+            href={section.href}
+            target="_blank"
+            rel="noreferrer"
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-white/70 transition-colors hover:bg-white/5 hover:text-white"
+          >
+            {section.icon}
+            {section.label}
+          </a>
+        </li>
+      );
+    }
+    if (section.logoutAction) {
+      return (
+        <li key={section.key} className="mt-1 border-t border-white/10 pt-1">
+          <button
+            onClick={() => {
+              setOpen(false);
+              handleLogout(section.logoutAction!);
+            }}
+            className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-white/70 transition-colors hover:bg-white/5 hover:text-white"
+          >
+            {section.icon}
+            {section.label}
+          </button>
+        </li>
+      );
+    }
+    if (section.children && section.children.length > 0) {
+      const isExpanded = expanded.has(section.key);
+      // Un rappel visuel discret quand le sous-menu est replié mais
+      // contient tout de même la sélection en cours — sans ça, un clic
+      // ailleurs qui replie accidentellement le groupe donne l'impression
+      // d'avoir perdu sa place.
+      const hasActiveDescendant = containsKey(section.children, current.key);
+      return (
+        <li key={section.key}>
+          <button
+            onClick={() => toggleExpanded(section.key)}
+            className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+              hasActiveDescendant && !isExpanded
+                ? "text-ubac-yellow"
+                : "text-white/70 hover:bg-white/5 hover:text-white"
+            }`}
+          >
+            {section.icon}
+            <span className="flex-1">{section.label}</span>
+            {isExpanded ? (
+              <ChevronDown className="h-4 w-4 shrink-0" />
+            ) : (
+              <ChevronRight className="h-4 w-4 shrink-0" />
+            )}
+          </button>
+          {isExpanded && (
+            <ul className="mt-1 flex flex-col gap-1 border-l border-white/10 pl-3">
+              {section.children.map((child) => renderSection(child, onSelect))}
+            </ul>
+          )}
+        </li>
+      );
+    }
+    const isActive = section.key === current.key;
+    return (
+      <li key={section.key}>
+        <button
+          onClick={() => onSelect(section.key)}
+          className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+            isActive
+              ? "bg-white/10 text-ubac-yellow"
+              : "text-white/70 hover:bg-white/5 hover:text-white"
+          }`}
+        >
+          {section.icon}
+          {section.label}
+        </button>
+      </li>
+    );
+  }
+
   return (
     <div className="lg:flex lg:gap-6">
       {/* Desktop: fixed-style vertical sidebar, inchangée */}
       <nav className="hidden h-fit w-56 shrink-0 rounded-2xl bg-navy p-3 lg:sticky lg:top-20 lg:block">
         <ul className="flex flex-col gap-1">
-          {sections.map((section) => {
-            if (section.href) {
-              return (
-                <li key={section.key}>
-                  <a
-                    href={section.href}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-white/70 transition-colors hover:bg-white/5 hover:text-white"
-                  >
-                    {section.icon}
-                    {section.label}
-                  </a>
-                </li>
-              );
-            }
-            if (section.logoutAction) {
-              return (
-                <li key={section.key} className="mt-1 border-t border-white/10 pt-1">
-                  <button
-                    onClick={() => handleLogout(section.logoutAction!)}
-                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-white/70 transition-colors hover:bg-white/5 hover:text-white"
-                  >
-                    {section.icon}
-                    {section.label}
-                  </button>
-                </li>
-              );
-            }
-            const isActive = section.key === current.key;
-            return (
-              <li key={section.key}>
-                <button
-                  onClick={() => setActive(section.key)}
-                  className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-colors ${
-                    isActive
-                      ? "bg-white/10 text-ubac-yellow"
-                      : "text-white/70 hover:bg-white/5 hover:text-white"
-                  }`}
-                >
-                  {section.icon}
-                  {section.label}
-                </button>
-              </li>
-            );
-          })}
+          {sections.map((section) => renderSection(section, setActive))}
         </ul>
       </nav>
 
@@ -175,56 +309,7 @@ export default function AdminSidebar({
               </button>
             </div>
             <ul className="flex flex-col gap-1">
-              {sections.map((section) => {
-                if (section.href) {
-                  return (
-                    <li key={section.key}>
-                      <a
-                        href={section.href}
-                        target="_blank"
-                        rel="noreferrer"
-                        onClick={() => setOpen(false)}
-                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-white/70 transition-colors hover:bg-white/5 hover:text-white"
-                      >
-                        {section.icon}
-                        {section.label}
-                      </a>
-                    </li>
-                  );
-                }
-                if (section.logoutAction) {
-                  return (
-                    <li key={section.key} className="mt-1 border-t border-white/10 pt-1">
-                      <button
-                        onClick={() => {
-                          setOpen(false);
-                          handleLogout(section.logoutAction!);
-                        }}
-                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-white/70 transition-colors hover:bg-white/5 hover:text-white"
-                      >
-                        {section.icon}
-                        {section.label}
-                      </button>
-                    </li>
-                  );
-                }
-                const isActive = section.key === current.key;
-                return (
-                  <li key={section.key}>
-                    <button
-                      onClick={() => selectSection(section.key)}
-                      className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-colors ${
-                        isActive
-                          ? "bg-white/10 text-ubac-yellow"
-                          : "text-white/70 hover:bg-white/5 hover:text-white"
-                      }`}
-                    >
-                      {section.icon}
-                      {section.label}
-                    </button>
-                  </li>
-                );
-              })}
+              {sections.map((section) => renderSection(section, selectSection))}
             </ul>
           </nav>
         </div>

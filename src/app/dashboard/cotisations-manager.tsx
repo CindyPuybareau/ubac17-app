@@ -162,6 +162,8 @@ function KpiHeader({ cotisations }: { cotisations: AdminCotisation[] }) {
   );
 }
 
+type CotisationsTab = "cotisations" | "collectes" | "penalites";
+
 export default function CotisationsManager({
   cotisations,
   collectes,
@@ -169,6 +171,7 @@ export default function CotisationsManager({
   categoryTariffs,
   canonicalTeamRefs,
   penalites,
+  forcedTab,
 }: {
   cotisations: AdminCotisation[];
   collectes: AdminCollecte[];
@@ -176,9 +179,16 @@ export default function CotisationsManager({
   categoryTariffs: AdminCategoryTariff[];
   canonicalTeamRefs: AdminMemberTeam[];
   penalites: AdminPenalite[];
+  // Retour de Cindy du 2026-08-22 : "Cotisations" éclatée en 3 entrées du
+  // menu latéral ("Cotisations et licences" / "Événements payants" /
+  // "Pénalités") plutôt que des onglets en haut de page — même
+  // convention que forcedTab sur CoachOrganisation / forcedView sur
+  // CalendarView.
+  forcedTab?: CotisationsTab;
 }) {
   const router = useRouter();
-  const [tab, setTab] = useState<"cotisations" | "collectes" | "penalites">("cotisations");
+  const [tab, setTab] = useState<CotisationsTab>(forcedTab ?? "cotisations");
+  const shownTab = forcedTab ?? tab;
   useScrollTopOnChange(tab);
   const [selectedCollecteId, setSelectedCollecteId] = useState<string | null>(
     collectes[0]?.id ?? null
@@ -307,24 +317,26 @@ export default function CotisationsManager({
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        <button onClick={() => setTab("cotisations")} className={tabButtonClass(tab === "cotisations")}>
-          <Tag className="h-3.5 w-3.5" />
-          Cotisations &amp; Licences
-        </button>
-        <button onClick={() => setTab("collectes")} className={tabButtonClass(tab === "collectes")}>
-          <Ticket className="h-3.5 w-3.5" />
-          Stages &amp; Événements Payants
-        </button>
-        <button onClick={() => setTab("penalites")} className={tabButtonClass(tab === "penalites")}>
-          <Gavel className="h-3.5 w-3.5" />
-          Pénalités
-        </button>
-      </div>
+      {!forcedTab && (
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => setTab("cotisations")} className={tabButtonClass(tab === "cotisations")}>
+            <Tag className="h-3.5 w-3.5" />
+            Cotisations &amp; Licences
+          </button>
+          <button onClick={() => setTab("collectes")} className={tabButtonClass(tab === "collectes")}>
+            <Ticket className="h-3.5 w-3.5" />
+            Événements payants
+          </button>
+          <button onClick={() => setTab("penalites")} className={tabButtonClass(tab === "penalites")}>
+            <Gavel className="h-3.5 w-3.5" />
+            Pénalités
+          </button>
+        </div>
+      )}
 
-      {tab === "penalites" && <PenalitesManager penalites={penalites} members={members} />}
+      {shownTab === "penalites" && <PenalitesManager penalites={penalites} members={members} />}
 
-      {tab === "cotisations" && (
+      {shownTab === "cotisations" && (
         <div className="flex flex-col gap-4">
           {/* L'interrupteur des relances automatiques vit désormais dans
               l'onglet Accueil, avec les autres envois automatiques du
@@ -339,7 +351,7 @@ export default function CotisationsManager({
         </div>
       )}
 
-      {tab === "collectes" && (
+      {shownTab === "collectes" && (
         <div className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center gap-2">
             {collectes.map((c) => (

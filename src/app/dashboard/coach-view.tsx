@@ -1,8 +1,22 @@
-import { CalendarDays, ClipboardList, LogOut, RefreshCw, ShoppingBag, Trophy, Users } from "lucide-react";
+import {
+  CalendarDays,
+  ClipboardList,
+  Dumbbell,
+  Flag,
+  ListOrdered,
+  LogOut,
+  MessageCircle,
+  RefreshCw,
+  Shield,
+  ShoppingBag,
+  Trophy,
+  Users,
+} from "lucide-react";
+import { sortTeamsByGroup, teamLabel } from "@/lib/teams";
 import { BOUTIQUE_URL } from "./boutique";
 import CalendarView from "./calendar-view";
 import CalendarSubscribe from "./calendar-subscribe";
-import CoachTeams from "./coach-teams";
+import CoachTeams, { CoachCommissionGroups } from "./coach-teams";
 import CoachFfbb from "./coach-ffbb";
 import CoachOrganisation, { type CoachTeamMatchCard } from "./coach-organisation";
 import FamilyAttendanceRequests from "./family-attendance-requests";
@@ -123,6 +137,17 @@ export default function CoachView({
     (eventsByTeamId[e.teamId] ??= []).push(e);
   });
 
+  // Même ordre canonique que CoachTeams (l'équipe mère avant ses
+  // déclinaisons) pour que les sous-onglets "Équipe" du menu suivent
+  // exactement l'ordre déjà vu partout ailleurs dans l'app.
+  const sortedTeamsForMenu = sortTeamsByGroup(teams);
+  const resultsTeamsForCalendar = teams.map((t) => ({
+    id: t.id,
+    name: t.name,
+    category: t.category,
+    role: teamRoleByTeamId[t.id] ?? "COACH",
+  }));
+
   const iconClass = "h-4 w-4 shrink-0";
   const sections: AdminSection[] = [
     {
@@ -157,112 +182,193 @@ export default function CoachView({
       ),
     },
     {
+      // Sous-menu déroulant (retour de Cindy du 2026-08-22) : un enfant par
+      // équipe+rôle réellement tenu (utile à un coach multi-équipes comme
+      // Basile, "U13F Coach" / "U13M Coach" / "U13M-1 Coach" / "Séniors 1
+      // Joueur"), plus un dernier enfant pour les commissions (Bureau,
+      // Coachs UBAC...), qui ne sont rattachées à aucune équipe. La
+      // section parente elle-même n'a pas de contenu propre — cliquer
+      // dessus ne fait plus que déplier/replier la liste.
       key: "teams",
-      // "Mes Équipes" ne tenait pas dans la barre du bas mobile (retour de
-      // Cindy du 2026-08-21) — au singulier/pluriel selon le nombre réel
-      // d'équipes du coach plutôt qu'un "Mes" générique, à la fois plus
-      // court et plus précis (un coach d'une seule équipe n'a pas
-      // vraiment plusieurs "équipes").
       label: teams.length > 1 ? "Équipes" : "Équipe",
       icon: <Users className={iconClass} />,
-      content: (
-        <div className="flex flex-col gap-4">
-          <CoachTeams
-            teams={teams}
-            allProfiles={[]}
-            eventsByTeamId={eventsByTeamId}
-            contactPhoneByPlayerId={contactPhoneByPlayerId}
-            contactEmailByPlayerId={contactEmailByPlayerId}
-            memberDetailsByPlayerId={memberDetailsByPlayerId}
-            teamRoleByTeamId={teamRoleByTeamId}
-            clubTeams={clubTeams}
-            whatsappGroups={whatsappGroups}
-          />
-          {/* Même emplacement que côté Parent (family-view.tsx, onglet
-              "Mon Équipe") : la cotisation et le bilan d'assiduité vivent
-              avec l'identité de l'équipe, pas en haut de page. Le bilan
-              avait été oublié à la création de cet espace replié — un
-              coach sans enfant n'avait alors aucun moyen de voir son
-              propre taux de présence, contrairement à n'importe quel
-              parent. */}
-          {showOwnPlayerSummary && (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <FamilyCotisationCard cotisations={ownCotisations} />
-              <FamilyAttendanceSummary
-                events={events}
-                players={rsvpPlayers.filter((p) => p.id === ownPlayerId)}
-                rsvpStatusByKey={rsvpStatusByKey}
+      content: null,
+      children: [
+        ...sortedTeamsForMenu.map((t) => ({
+          key: `team-${t.id}`,
+          label: `${teamLabel(t)} ${teamRoleByTeamId[t.id] === "PLAYER" ? "Joueur" : "Coach"}`,
+          icon: <Users className={iconClass} />,
+          content: (
+            <div className="flex flex-col gap-4">
+              <CoachTeams
+                teams={teams}
+                allProfiles={[]}
+                eventsByTeamId={eventsByTeamId}
+                contactPhoneByPlayerId={contactPhoneByPlayerId}
+                contactEmailByPlayerId={contactEmailByPlayerId}
+                memberDetailsByPlayerId={memberDetailsByPlayerId}
+                teamRoleByTeamId={teamRoleByTeamId}
+                clubTeams={clubTeams}
+                whatsappGroups={whatsappGroups}
+                forcedTeamId={t.id}
               />
+              {/* Ni l'un ni l'autre de ces deux blocs n'est propre à une
+                  équipe précise (voir plus haut, CoachTeams) — ils
+                  apparaissaient déjà quel que soit l'onglet équipe actif
+                  avant l'introduction des sous-menus, donc répétés
+                  ici sur chaque équipe pour garder ce même repère
+                  toujours visible. */}
+              {showOwnPlayerSummary && (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <FamilyCotisationCard cotisations={ownCotisations} />
+                  <FamilyAttendanceSummary
+                    events={events}
+                    players={rsvpPlayers.filter((p) => p.id === ownPlayerId)}
+                    rsvpStatusByKey={rsvpStatusByKey}
+                  />
+                  <PenalitesCard
+                    title="Mes pénalités"
+                    penalites={penalites.filter((p) => p.playerId === ownPlayerId)}
+                  />
+                </div>
+              )}
               <PenalitesCard
-                title="Mes pénalités"
-                penalites={penalites.filter((p) => p.playerId === ownPlayerId)}
+                title="Pénalités de l'équipe"
+                penalites={penalites}
+                showPlayerName
+                emptyLabel="Aucune pénalité pour tes joueurs."
               />
             </div>
-          )}
-          {/* Visible pour tout coach, pas seulement le cas replié
-              ci-dessus (retour de Cindy du 2026-08-22, "dans tous les
-              espaces") : les pénalités des joueurs de ses équipes,
-              lecture seule. */}
-          <PenalitesCard
-            title="Pénalités de l'équipe"
-            penalites={penalites}
-            showPlayerName
-            emptyLabel="Aucune pénalité pour tes joueurs."
-          />
-        </div>
-      ),
+          ),
+        })),
+        {
+          key: "team-commissions",
+          label: "Commissions & Admin",
+          icon: <MessageCircle className={iconClass} />,
+          content: <CoachCommissionGroups whatsappGroups={whatsappGroups} />,
+        },
+      ],
     },
     {
-      key: "organisation",
       // "Suivi" (retour de Cindy du 2026-08-21) redevient "Organisation et
-      // Bilan" (retour de Cindy du 2026-08-22) — le panneau hamburger sur
-      // mobile (plus de barre du bas serrée depuis, voir mobile-nav-context.tsx)
-      // n'a plus le même besoin de brièveté qu'à l'époque du premier
-      // renommage.
+      // Bilan" (retour de Cindy du 2026-08-22), maintenant en sous-menu
+      // (retour de Cindy du 2026-08-22) plutôt qu'en bascule interne.
+      key: "organisation",
       label: "Organisation et Bilan",
       icon: <ClipboardList className={iconClass} />,
-      content: (
-        <CoachOrganisation
-          cards={organisationCards}
-          tasksByEventId={tasksByEventId}
-          carpoolByEventId={carpoolByEventId}
-          volunteerNeedsByEventId={volunteerNeedsByEventId}
-          events={events}
-          taskTallyByTeamId={taskTallyByTeamId}
-          rsvpStatusByKey={rsvpStatusByKey}
-          rsvpReasonByKey={rsvpReasonByKey}
-          roles={eventRoles}
-          ownPlayerId={ownPlayerId}
-          ownPlayerNextEvent={ownPlayerNextEvent}
-        />
-      ),
+      content: null,
+      children: [
+        {
+          key: "organisation-planning",
+          label: "Planning & Rôles",
+          icon: <ClipboardList className={iconClass} />,
+          content: (
+            <CoachOrganisation
+              cards={organisationCards}
+              tasksByEventId={tasksByEventId}
+              carpoolByEventId={carpoolByEventId}
+              volunteerNeedsByEventId={volunteerNeedsByEventId}
+              events={events}
+              taskTallyByTeamId={taskTallyByTeamId}
+              rsvpStatusByKey={rsvpStatusByKey}
+              rsvpReasonByKey={rsvpReasonByKey}
+              roles={eventRoles}
+              ownPlayerId={ownPlayerId}
+              ownPlayerNextEvent={ownPlayerNextEvent}
+              forcedTab="planning"
+            />
+          ),
+        },
+        {
+          key: "organisation-bilan",
+          label: "Bilan de la saison",
+          icon: <ListOrdered className={iconClass} />,
+          content: (
+            <CoachOrganisation
+              cards={organisationCards}
+              tasksByEventId={tasksByEventId}
+              carpoolByEventId={carpoolByEventId}
+              volunteerNeedsByEventId={volunteerNeedsByEventId}
+              events={events}
+              taskTallyByTeamId={taskTallyByTeamId}
+              rsvpStatusByKey={rsvpStatusByKey}
+              rsvpReasonByKey={rsvpReasonByKey}
+              roles={eventRoles}
+              ownPlayerId={ownPlayerId}
+              ownPlayerNextEvent={ownPlayerNextEvent}
+              forcedTab="bilan"
+            />
+          ),
+        },
+      ],
     },
     {
       key: "results",
       label: "Événements et Résultats",
       icon: <Trophy className={iconClass} />,
-      content: (
-        <CalendarView
-          events={events}
-          createTeams={createTeams}
-          scopeTeams={teams.map((t) => ({
-            id: t.id,
-            name: t.name,
-            category: t.category,
-          }))}
-          forcedView="results"
-          // Un coach qui encadre plusieurs équipes (et joue parfois dans
-          // une autre) doit pouvoir choisir laquelle regarder, comme dans
-          // "Mes Équipes" — sinon tous les matchs de toutes ses équipes
-          // se mélangent dans un seul fil.
-          resultsTeams={teams.map((t) => ({
-            id: t.id,
-            name: t.name,
-            category: t.category,
-            role: teamRoleByTeamId[t.id] ?? "COACH",
-          }))}
-        />
-      ),
+      content: null,
+      children: [
+        {
+          key: "results-trainings",
+          label: "Entraînements",
+          icon: <Dumbbell className={iconClass} />,
+          content: (
+            <CalendarView
+              events={events}
+              createTeams={createTeams}
+              scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
+              forcedView="trainings"
+              resultsTeams={resultsTeamsForCalendar}
+            />
+          ),
+        },
+        {
+          key: "results-official-matches",
+          label: "Matchs officiels",
+          icon: <Shield className={iconClass} />,
+          content: (
+            <CalendarView
+              events={events}
+              createTeams={createTeams}
+              scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
+              forcedView="officialMatches"
+              resultsTeams={resultsTeamsForCalendar}
+            />
+          ),
+        },
+        {
+          key: "results-other-events",
+          label: "Événements",
+          icon: <Flag className={iconClass} />,
+          content: (
+            <CalendarView
+              events={events}
+              createTeams={createTeams}
+              scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
+              forcedView="otherEvents"
+              resultsTeams={resultsTeamsForCalendar}
+            />
+          ),
+        },
+        {
+          key: "results-scores",
+          label: "Résultats",
+          icon: <ListOrdered className={iconClass} />,
+          content: (
+            <CalendarView
+              events={events}
+              createTeams={createTeams}
+              scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
+              forcedView="results"
+              // Un coach qui encadre plusieurs équipes (et joue parfois dans
+              // une autre) doit pouvoir choisir laquelle regarder, comme
+              // dans "Équipe" — sinon tous les événements de toutes ses
+              // équipes se mélangent dans un seul fil.
+              resultsTeams={resultsTeamsForCalendar}
+            />
+          ),
+        },
+      ],
     },
     {
       key: "ffbb",

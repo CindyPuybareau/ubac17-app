@@ -441,6 +441,7 @@ export default function CoachOrganisation({
   roles,
   ownPlayerId = null,
   ownPlayerNextEvent = null,
+  forcedTab,
 }: {
   cards: CoachTeamMatchCard[];
   tasksByEventId: Record<string, EventTasksState>;
@@ -458,8 +459,16 @@ export default function CoachOrganisation({
   // Son propre prochain événement en tant que joueur, sur une équipe qu'il
   // ne coache pas — voir PlanningTab plus haut.
   ownPlayerNextEvent?: ConvocationCard | null;
+  // Retour de Cindy du 2026-08-22 : "Organisation et Bilan" éclatée en
+  // deux entrées du menu latéral ("Planning & Rôles" / "Bilan de la
+  // saison") plutôt qu'un choix d'onglet en haut de page — même
+  // convention que `forcedView` sur CalendarView. Non fourni : conserve
+  // l'ancien comportement (deux onglets internes, page "Organisation et
+  // Bilan" seule dans coach-view.tsx pour compat, non utilisée après ce
+  // découpage mais gardée pour ne pas casser un futur appelant simple).
+  forcedTab?: SubTab;
 }) {
-  const [tab, setTab] = useState<SubTab>("planning");
+  const [tab, setTab] = useState<SubTab>(forcedTab ?? "planning");
   useScrollTopOnChange(tab);
 
   // Filtré côté client : Date.now() dans un composant serveur rendrait le
@@ -484,20 +493,24 @@ export default function CoachOrganisation({
       active ? "bg-navy text-white" : "text-navy hover:bg-blue-50"
     }`;
 
+  const shownTab = forcedTab ?? tab;
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap gap-2">
-        <button onClick={() => setTab("planning")} className={tabButtonClass(tab === "planning")}>
-          <CalendarDays className="h-3.5 w-3.5" />
-          Planning &amp; Rôles
-        </button>
-        <button onClick={() => setTab("bilan")} className={tabButtonClass(tab === "bilan")}>
-          <Trophy className="h-3.5 w-3.5" />
-          Bilan de la saison
-        </button>
-      </div>
+      {!forcedTab && (
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => setTab("planning")} className={tabButtonClass(tab === "planning")}>
+            <CalendarDays className="h-3.5 w-3.5" />
+            Planning &amp; Rôles
+          </button>
+          <button onClick={() => setTab("bilan")} className={tabButtonClass(tab === "bilan")}>
+            <Trophy className="h-3.5 w-3.5" />
+            Bilan de la saison
+          </button>
+        </div>
+      )}
 
-      {tab === "planning" ? (
+      {shownTab === "planning" ? (
         <PlanningTab
           cards={cards}
           tasksByEventId={tasksByEventId}

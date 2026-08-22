@@ -1,11 +1,18 @@
 import {
   CalendarDays,
   Contact,
+  Dumbbell,
+  Flag,
+  Gavel,
   Handshake,
   Heart,
+  ListOrdered,
   LogOut,
   MessageCircle,
+  Shield,
   ShoppingBag,
+  Tag,
+  Ticket,
   Trophy,
   Users,
   Wallet,
@@ -174,36 +181,138 @@ export default function AdminView({
       ),
     },
     {
+      // Sous-menu (retour de Cindy du 2026-08-22) : "cotisations et
+      // licences" / "évenements payants" / "pénalités". La section
+      // parente n'a plus de contenu propre, elle ne fait plus que
+      // déplier/replier — chaque enfant verrouille CotisationsManager sur
+      // son propre onglet interne (voir forcedTab).
       key: "cotisations",
       label: "Cotisations",
       icon: <Wallet className={iconClass} />,
-      content: (
-        <CotisationsManager
-          cotisations={cotisations}
-          collectes={collectes}
-          members={members}
-          categoryTariffs={categoryTariffs}
-          canonicalTeamRefs={canonicalTeamRefs}
-          penalites={penalites}
-        />
-      ),
+      content: null,
+      children: [
+        {
+          key: "cotisations-licences",
+          label: "Cotisations et licences",
+          icon: <Tag className={iconClass} />,
+          content: (
+            <CotisationsManager
+              cotisations={cotisations}
+              collectes={collectes}
+              members={members}
+              categoryTariffs={categoryTariffs}
+              canonicalTeamRefs={canonicalTeamRefs}
+              penalites={penalites}
+              forcedTab="cotisations"
+            />
+          ),
+        },
+        {
+          key: "cotisations-evenements",
+          label: "Événements payants",
+          icon: <Ticket className={iconClass} />,
+          content: (
+            <CotisationsManager
+              cotisations={cotisations}
+              collectes={collectes}
+              members={members}
+              categoryTariffs={categoryTariffs}
+              canonicalTeamRefs={canonicalTeamRefs}
+              penalites={penalites}
+              forcedTab="collectes"
+            />
+          ),
+        },
+        {
+          key: "cotisations-penalites",
+          label: "Pénalités",
+          icon: <Gavel className={iconClass} />,
+          content: (
+            <CotisationsManager
+              cotisations={cotisations}
+              collectes={collectes}
+              members={members}
+              categoryTariffs={categoryTariffs}
+              canonicalTeamRefs={canonicalTeamRefs}
+              penalites={penalites}
+              forcedTab="penalites"
+            />
+          ),
+        },
+      ],
     },
     {
+      // Sous-menu (retour de Cindy du 2026-08-22) : mêmes 4 vues que côté
+      // Coach ("Entraînements" / "Matchs officiels" / "Événements" /
+      // "Résultats"), avec le même sélecteur compact d'équipe en haut de
+      // page (TeamSelectorPills, voir calendar-view.tsx) plutôt qu'un
+      // sous-menu à 13+ entrées — choix explicite de Cindy pour le Bureau,
+      // qui gère toutes les équipes du club d'un coup.
       key: "results",
       label: "Événements et Résultats",
       icon: <Trophy className={iconClass} />,
-      content: (
-        <CalendarView
-          events={upcomingEvents}
-          createTeams={teamRefs}
-          allowClubWide
-          forcedView="results"
-          // Sans ça, toutes les équipes du club défilaient dans un seul
-          // fil de ~200 matchs sur la saison — même sélecteur que côté
-          // Coach/Parents (voir calendar-view.tsx), une équipe à la fois.
-          resultsTeams={teamRefs}
-        />
-      ),
+      content: null,
+      children: [
+        {
+          key: "results-trainings",
+          label: "Entraînements",
+          icon: <Dumbbell className={iconClass} />,
+          content: (
+            <CalendarView
+              events={upcomingEvents}
+              createTeams={teamRefs}
+              allowClubWide
+              forcedView="trainings"
+              resultsTeams={teamRefs}
+            />
+          ),
+        },
+        {
+          key: "results-official-matches",
+          label: "Matchs officiels",
+          icon: <Shield className={iconClass} />,
+          content: (
+            <CalendarView
+              events={upcomingEvents}
+              createTeams={teamRefs}
+              allowClubWide
+              forcedView="officialMatches"
+              resultsTeams={teamRefs}
+            />
+          ),
+        },
+        {
+          key: "results-other-events",
+          label: "Événements",
+          icon: <Flag className={iconClass} />,
+          content: (
+            <CalendarView
+              events={upcomingEvents}
+              createTeams={teamRefs}
+              allowClubWide
+              forcedView="otherEvents"
+              resultsTeams={teamRefs}
+            />
+          ),
+        },
+        {
+          key: "results-scores",
+          label: "Résultats",
+          icon: <ListOrdered className={iconClass} />,
+          content: (
+            <CalendarView
+              events={upcomingEvents}
+              createTeams={teamRefs}
+              allowClubWide
+              forcedView="results"
+              // Sans ça, toutes les équipes du club défilaient dans un seul
+              // fil de ~200 matchs sur la saison — même sélecteur que côté
+              // Coach/Parents (voir calendar-view.tsx), une équipe à la fois.
+              resultsTeams={teamRefs}
+            />
+          ),
+        },
+      ],
     },
     {
       key: "sponsors",

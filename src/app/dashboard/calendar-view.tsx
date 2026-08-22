@@ -268,12 +268,17 @@ export default function CalendarView({
   // événement d'une équipe qu'il ne coache pas, sans jamais lui montrer
   // le bouton de ses coéquipiers (voir rsvpVisiblePlayers plus bas).
   selfPlayerId?: string | null;
-  // Utilisé par l'onglet "Résultats" dédié (sidebar Bureau/Coach/Parent) :
-  // verrouille la vue sur les résultats, cette page n'ayant plus besoin
-  // de bascule Liste/Mois — celle-ci reste dans l'onglet Calendrier.
-  forcedView?: "results";
+  // Utilisé par les sous-onglets "Événements et Résultats" dédiés (sidebar
+  // Bureau/Coach/Parent) : verrouille la vue sur un sous-ensemble filtré
+  // par type d'événement, cette page n'ayant plus besoin de bascule
+  // Liste/Mois — celle-ci reste dans l'onglet Calendrier.
+  // - "results" : matchs officiels + amicaux, avec score (inchangé).
+  // - "officialMatches" : uniquement les matchs officiels (type MATCH).
+  // - "trainings" : uniquement les entraînements (type TRAINING).
+  // - "otherEvents" : tout le reste (amical, tournoi, événement club).
+  forcedView?: "results" | "officialMatches" | "trainings" | "otherEvents";
   // Sélecteur d'équipe façon "Mes Équipes" (voir coach-teams.tsx) : sans
-  // lui, la vue Résultats mélangeait les matchs de toutes les équipes dans
+  // lui, ces vues mélangeaient les événements de toutes les équipes dans
   // un seul fil, sans aucun moyen de s'y retrouver — vrai pour un coach
   // multi-équipes comme pour le Bureau qui voit tout le club. Omis
   // (undefined) là où une seule équipe est en jeu (le sélecteur ne
@@ -309,7 +314,9 @@ export default function CalendarView({
   // Le calendrier s'ouvre sur la grille : on veut d'abord voir le mois.
   // La liste chronologique reste à un clic pour répondre à "c'est quoi la
   // suite ?".
-  const [view, setView] = useState<"list" | "month" | "results">(forcedView ?? "month");
+  const [view, setView] = useState<
+    "list" | "month" | "results" | "officialMatches" | "trainings" | "otherEvents"
+  >(forcedView ?? "month");
   const [createOpen, setCreateOpen] = useState(false);
 
   // Même ordre que "Mes Équipes" : l'équipe mère avant ses déclinaisons.
@@ -324,7 +331,7 @@ export default function CalendarView({
   // après le montage (enfant sélectionné différent côté Famille, effectif
   // d'un coach modifié en direct via useRealtimeRefresh) et que l'équipe
   // choisie n'existe plus dans la nouvelle liste, l'id retenu deviendrait
-  // orphelin et seasonMatches ne matcherait plus rien — un fil Résultats
+  // orphelin et seasonListEvents ne matcherait plus rien — un fil Résultats
   // vide sans raison apparente. On retombe alors sur la première équipe
   // disponible plutôt que de garder un id qui ne correspond plus à rien.
   const activeResultsTeamIdResolved = sortedResultsTeams.some(
@@ -615,24 +622,42 @@ export default function CalendarView({
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
   }, [localEvents]);
 
-  // Vue Résultats : tout le calendrier de matchs/amicaux de la saison,
-  // joués ou non, dans l'ordre chronologique — même principe que la page
-  // FFBB (J1, J2, J3...) plutôt qu'un historique séparé du planning. Un
-  // match à venir apparaît donc aussi, sans score (renderResultCard gère
-  // l'affichage "à venir" et empêche d'en saisir un avant que le match
-  // ait réellement eu lieu).
-  const seasonMatches = useMemo(() => {
+  // Les 4 vues "saison" (Résultats / Matchs officiels / Entraînements /
+  // Événements) partagent le même principe : tout le calendrier de la
+  // saison filtré par type, joué ou non, dans l'ordre chronologique — même
+  // logique que la page FFBB (J1, J2, J3...) plutôt qu'un historique
+  // séparé du planning. Un événement à venir apparaît donc aussi (sans
+  // score pour un match — renderResultCard gère l'affichage "à venir" et
+  // empêche d'en saisir un avant que le match ait réellement eu lieu).
+  function matchesSeasonView(eventType: string | null, kind: typeof view) {
+    switch (kind) {
+      case "results":
+        return isMatchType(eventType); // MATCH + FRIENDLY, inchangé.
+      case "officialMatches":
+        return eventType === "MATCH";
+      case "trainings":
+        return eventType === "TRAINING";
+      case "otherEvents":
+        // Tout ce qui n'est ni un entraînement ni un match officiel.
+        return eventType === "FRIENDLY" || eventType === "TOURNAMENT" || eventType === "OTHER";
+      default:
+        return false;
+    }
+  }
+
+  const seasonListEvents = useMemo(() => {
     return localEvents
       .filter(
         (e) =>
-          isMatchType(e.event_type) &&
+          matchesSeasonView(e.event_type, view) &&
           // Filtré sur l'équipe active du sélecteur seulement quand il y en
           // a un (plusieurs équipes en jeu) — sinon (Bureau, ou une seule
           // équipe) on garde tout, comme avant.
           (!resultsTeams || resultsTeams.length <= 1 || e.teamId === activeResultsTeamIdResolved)
       )
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
-  }, [localEvents, resultsTeams, activeResultsTeamIdResolved]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localEvents, resultsTeams, activeResultsTeamIdResolved, view]);
 
   // Anniversaires + événements mélangés dans un seul fil chronologique,
   // triés ensemble : un anniversaire vaut minuit ce jour-là (avant tout
@@ -959,9 +984,10 @@ export default function CalendarView({
       (event.teamId
         ? Boolean(createTeams?.some((t) => t.id === event.teamId))
         : allowClubWide);
-    // La vue Résultats montre désormais toute la saison, match à venir
-    // compris (voir seasonMatches) : le bouton "Ajouter le score" ne doit
-    // s'afficher qu'une fois le match réellement joué, jamais avant.
+    // Les vues Résultats/Matchs officiels montrent désormais toute la
+    // saison, match à venir compris (voir seasonListEvents) : le bouton
+    // "Ajouter le score" ne doit s'afficher qu'une fois le match
+    // réellement joué, jamais avant.
     const alreadyPlayed = new Date(event.start_time).getTime() < Date.now();
 
     return (
@@ -1137,9 +1163,10 @@ export default function CalendarView({
 
           {/* Tout à droite : c'est un réglage d'affichage, pas une action
               sur les données — il vient après ce qu'on fait, pas avant.
-              Masqué sur la page "Résultats" dédiée (forcedView) : basculer
-              vers Mois n'y aurait pas de sens, l'onglet Calendrier existe
-              déjà pour ça. */}
+              Masqué sur les pages dédiées "Résultats" / "Matchs officiels" /
+              "Entraînements" / "Événements" (forcedView) : basculer vers
+              Mois n'y aurait pas de sens, l'onglet Calendrier existe déjà
+              pour ça. */}
           {!forcedView && (
             <div className="flex items-center gap-0.5 rounded-full border border-zinc-200 p-0.5">
               <button
@@ -1298,11 +1325,14 @@ export default function CalendarView({
         </div>
       )}
 
-      {view === "results" && (
+      {(view === "results" ||
+        view === "officialMatches" ||
+        view === "trainings" ||
+        view === "otherEvents") && (
         <div className="flex flex-col gap-3">
           {/* Même sélecteur que "Mes Équipes" (team-selector-pills.tsx) :
               indispensable dès qu'on encadre ou joue dans plusieurs
-              équipes, sans quoi les résultats de toutes se mélangeaient
+              équipes, sans quoi les événements de toutes se mélangeaient
               dans un seul fil illisible. */}
           <TeamSelectorPills
             teams={sortedResultsTeams}
@@ -1315,29 +1345,39 @@ export default function CalendarView({
               publie le classement qu'une fois les premiers résultats de
               la saison tombés. Cette carte disparaît d'elle-même le jour
               où le classement réel prend sa place ici — même
-              emplacement, pas de nouvel onglet à chercher. */}
-          {sortedResultsTeams.length > 0 && (
-            <div className="flex items-start gap-2 rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/60 px-4 py-3">
-              <ListOrdered className="h-4 w-4 shrink-0 text-zinc-400" />
-              <p className="text-sm text-zinc-500">
-                <span className="font-semibold text-zinc-600">Classement</span>
-                {(() => {
-                  const activeTeam = sortedResultsTeams.find(
-                    (t) => t.id === activeResultsTeamIdResolved
-                  );
-                  return activeTeam ? ` — ${teamLabel(activeTeam)}` : "";
-                })()}{" "}
-                : pas encore publié par la FFBB — apparaîtra ici automatiquement dès les
-                premiers résultats de la saison.
-              </p>
-            </div>
-          )}
-          {seasonMatches.length === 0 ? (
+              emplacement, pas de nouvel onglet à chercher. N'a de sens que
+              pour les deux vues centrées sur les matchs : un classement
+              n'existe pas pour les entraînements ni les autres
+              événements. */}
+          {(view === "results" || view === "officialMatches") &&
+            sortedResultsTeams.length > 0 && (
+              <div className="flex items-start gap-2 rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/60 px-4 py-3">
+                <ListOrdered className="h-4 w-4 shrink-0 text-zinc-400" />
+                <p className="text-sm text-zinc-500">
+                  <span className="font-semibold text-zinc-600">Classement</span>
+                  {(() => {
+                    const activeTeam = sortedResultsTeams.find(
+                      (t) => t.id === activeResultsTeamIdResolved
+                    );
+                    return activeTeam ? ` — ${teamLabel(activeTeam)}` : "";
+                  })()}{" "}
+                  : pas encore publié par la FFBB — apparaîtra ici automatiquement dès les
+                  premiers résultats de la saison.
+                </p>
+              </div>
+            )}
+          {seasonListEvents.length === 0 ? (
             <p className="text-sm text-zinc-500">
-              Aucun match programmé pour le moment — le calendrier de la saison apparaîtra ici.
+              {view === "results" &&
+                "Aucun match programmé pour le moment — le calendrier de la saison apparaîtra ici."}
+              {view === "officialMatches" && "Aucun match officiel programmé pour le moment."}
+              {view === "trainings" && "Aucun entraînement programmé pour le moment."}
+              {view === "otherEvents" && "Aucun événement programmé pour le moment."}
             </p>
+          ) : view === "results" || view === "officialMatches" ? (
+            seasonListEvents.map((event) => renderResultCard(event))
           ) : (
-            seasonMatches.map((event) => renderResultCard(event))
+            seasonListEvents.map((event) => renderEventCard(event))
           )}
         </div>
       )}
