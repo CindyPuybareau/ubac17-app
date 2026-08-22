@@ -62,6 +62,12 @@ function parisWallTimeToUtc(
 
 // FFBB shows a day + short month name with no year (e.g. "20 sept. 17h00").
 // Infer the year from a basketball season spanning Aug (year N) -> Jul (year N+1).
+//
+// N'est plus la source principale (voir dateRencontreByMatchNumber
+// ci-dessous) : gardée en repli si jamais le bloc JSON interne de FFBB
+// disparaît un jour, mais son heure affichée s'est révélée fausse (voir
+// commentaire sur parseDateRencontreMap) — seuls jour/mois/année en sont
+// encore fiables dans ce fallback.
 function parseFrenchMatchDate(text: string): string | null {
   const m = text.match(/(\d{1,2})\s+([a-zéû]+)\.?\s+(\d{1,2})h(\d{2})/i);
   if (!m) return null;
@@ -81,9 +87,52 @@ function parseFrenchMatchDate(text: string): string | null {
   return date.toISOString();
 }
 
+// Retour de Cindy du 2026-08-22 (match #2009, "20 sept.") : l'heure lue sur
+// le texte affiché de la page FFBB ("17h00") ne correspondait pas à
+// l'heure réelle du match ("15h00", confirmé par Cindy en direct sur le
+// site FFBB). Vérifié en récupérant la page : FFBB embarque dans son HTML
+// un bloc de données JSON (utilisé pour l'hydratation React) contenant le
+// vrai horaire de chaque match — {"date_rencontre":"2026-09-20T15:00:00",
+// "joue":false,"numero":"2009"} — et CE texte-là affiché ("17h00") est
+// systématiquement 2h en avance sur cette donnée (vérifié sur deux matchs
+// différents, dont un du soir) : un bug d'affichage côté FFBB, pas chez
+// nous. On lit donc directement ce JSON plutôt que le texte visible,
+// beaucoup plus fiable en plus d'éviter le mois abrégé français à parser.
+function parseDateRencontreMap(html: string): Map<string, string> {
+  // Ce bloc apparaît parfois échappé (\") selon l'endroit de la page où
+  // Next.js l'a sérialisé pour l'hydratation — normalisé une fois ici
+  // plutôt que de dupliquer le regex pour les deux formes.
+  const normalized = html.replace(/\\"/g, '"');
+  const re = /"date_rencontre":"([^"]+)","joue":(?:true|false),"numero":"(\d+)"/g;
+  const map = new Map<string, string>();
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(normalized)) !== null) {
+    map.set(m[2], m[1]);
+  }
+  return map;
+}
+
+// "2026-09-20T15:00:00" (naïf, sans fuseau) — c'est l'heure murale de
+// Paris telle qu'affichée aux joueurs après hydratation côté FFBB, donc la
+// même conversion que le texte scrappé (parisWallTimeToUtc).
+function parseDateRencontre(value: string): string | null {
+  const m = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!m) return null;
+  const [, year, month, day, hour, minute] = m;
+  const date = parisWallTimeToUtc(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute)
+  );
+  return date.toISOString();
+}
+
 export function parseFfbbTeamPage(html: string): FfbbMatch[] {
   const $ = cheerio.load(html);
   const matches: FfbbMatch[] = [];
+  const dateRencontreByMatchNumber = parseDateRencontreMap(html);
 
   $("div").each((_, el) => {
     const text = $(el).text().trim();
@@ -98,12 +147,17 @@ export function parseFfbbTeamPage(html: string): FfbbMatch[] {
     const oppBlock = infoBlock.next();
     const opponent = oppBlock.find("a[title]").first().attr("title") ?? null;
 
+    const dateRencontre = dateRencontreByMatchNumber.get(matchNumber);
+    const startTime = dateRencontre
+      ? (parseDateRencontre(dateRencontre) ?? parseFrenchMatchDate(dateHeure))
+      : parseFrenchMatchDate(dateHeure);
+
     matches.push({
       matchNumber,
       journee,
       isHome: /domicile/i.test(domExt),
       opponent,
-      startTime: parseFrenchMatchDate(dateHeure),
+      startTime,
     });
   });
 
