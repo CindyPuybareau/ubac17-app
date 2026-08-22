@@ -157,6 +157,10 @@ export default function CoachNextMatchCard({
               roster={roster}
               statusByKey={rsvpStatusByKey}
               reasonByKey={rsvpReasonByKey}
+              // Ce composant n'est utilisé que côté Coach (coach-organisation.tsx) :
+              // toujours vrai ici, jamais affiché côté Famille/Parent (retour de
+              // Cindy du 2026-08-22 — voir attendance-badges.tsx).
+              canManage
             />
           </div>
 
