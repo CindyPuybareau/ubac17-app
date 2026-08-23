@@ -769,12 +769,26 @@ export default function CalendarView({
     const rsvpVisiblePlayers = canManage
       ? respondingPlayers.filter((p) => p.id === selfPlayerId)
       : respondingPlayers;
+    // Différenciation visuelle par nature d'événement (direction
+    // artistique validée le 2026-08-23) : un match officiel doit peser un
+    // peu plus qu'un entraînement ordinaire, un tournoi doit sauter aux
+    // yeux avant même d'être lu. Volontairement limité à la bordure/au
+    // fond (jamais aux couleurs de texte à l'intérieur) : cette carte
+    // porte beaucoup de contenu (RSVP, tâches, covoiturage...) partagé
+    // sur les 4 espaces — un vrai fond sombre façon maquette aurait
+    // demandé de recolorer chaque élément interne un par un, bien plus
+    // risqué qu'un simple accent de bordure pour le même effet de lecture
+    // rapide.
+    const isTournament = event.event_type === "TOURNAMENT";
+    const isOfficialMatch = event.event_type === "MATCH";
+    const cardShellClass = isTournament
+      ? "rounded-2xl border-2 border-dashed border-ubac-yellow bg-white p-4 shadow-sm"
+      : isOfficialMatch
+        ? `rounded-2xl border border-navy/15 bg-navy/5 p-4 shadow-sm border-l-8 ${style.border}`
+        : `rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm border-l-4 ${style.border}`;
 
     return (
-      <div
-        key={event.id}
-        className={`flex flex-col gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm border-l-4 ${style.border}`}
-      >
+      <div key={event.id} className={`flex flex-col gap-2 ${cardShellClass}`}>
         <div className="flex items-start justify-between gap-2">
           {/* min-w-0 : même correctif que renderResultCard plus bas — sans
               lui, le nom d'adversaire le plus long forçait toute la carte
@@ -1045,12 +1059,20 @@ export default function CalendarView({
     // "Ajouter le score" ne doit s'afficher qu'une fois le match
     // réellement joué, jamais avant.
     const alreadyPlayed = new Date(event.start_time).getTime() < Date.now();
+    // Même logique d'accent que renderEventCard ci-dessus (direction
+    // artistique du 2026-08-23), gardée cohérente entre "à venir" et
+    // "résultats" pour ne pas avoir deux traitements différents du même
+    // match selon l'onglet où on le regarde.
+    const isTournament = event.event_type === "TOURNAMENT";
+    const isOfficialMatch = event.event_type === "MATCH";
+    const cardShellClass = isTournament
+      ? "rounded-2xl border-2 border-dashed border-ubac-yellow bg-white p-4 shadow-sm"
+      : isOfficialMatch
+        ? `rounded-2xl border border-navy/15 bg-navy/5 p-4 shadow-sm border-l-8 ${style.border}`
+        : `rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm border-l-4 ${style.border}`;
 
     return (
-      <div
-        key={event.id}
-        className={`flex flex-col gap-1.5 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm border-l-4 ${style.border}`}
-      >
+      <div key={event.id} className={`flex flex-col gap-1.5 ${cardShellClass}`}>
         {/* Retour de Cindy du 2026-08-22 : reprend le visuel déjà en place
             pour "Prochains événements" (team-card.tsx) plutôt qu'un
             nouveau traitement — date en badge bleu bien visible en haut à
