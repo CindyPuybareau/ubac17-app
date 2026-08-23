@@ -60,6 +60,12 @@
   --color-coral-dark: var(--coral-dark);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  /* Police d'affichage (direction artistique validée le 2026-08-23) :
+     réservée aux titres (voir règle h1-h4 plus bas), jamais au texte
+     courant — c'est ce contraste qui donne l'esprit "chaleureux,
+     dynamique" de la maquette sans sacrifier la lisibilité du texte
+     dense (tableaux, listes). */
+  --font-display: var(--font-poppins);
 }
 
 html,
@@ -67,4 +73,15 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Titres partout dans l'appli : un seul point de bascule plutôt que de
+   retoucher chaque composant un par un. Les poids déjà posés par chaque
+   composant (font-bold, font-semibold...) restent inchangés, seule la
+   famille de police change. */
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display), Arial, Helvetica, sans-serif;
 }

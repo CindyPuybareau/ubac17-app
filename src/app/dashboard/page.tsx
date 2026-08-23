@@ -2332,7 +2332,12 @@ export default async function DashboardPage() {
           la croissance sans faire gonfler le bandeau ni laisser le logo
           en déborder. Déconnexion déplacée en toute fin du menu (voir
           admin-sidebar.tsx, logoutAction). */}
-      <header className="sticky top-0 z-10 bg-navy px-4 py-2 sm:px-6">
+      {/* Dégradé + coins arrondis en bas (direction artistique validée le
+          2026-08-23, "faire ressembler visuellement... à la maquette
+          proposée") : reprend le traitement du bandeau marine de la
+          maquette, sans rien changer au contenu (logo, cloche,
+          organigramme, menu mobile identiques). */}
+      <header className="sticky top-0 z-10 rounded-b-3xl bg-gradient-to-r from-navy to-navy-dark px-4 py-3 shadow-sm sm:px-6 sm:py-4">
         <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between">
           <Image src="/logo.png" alt="UBAC" width={44} height={44} className="h-11 w-11 object-contain" priority />
           <div className="flex items-center gap-1">

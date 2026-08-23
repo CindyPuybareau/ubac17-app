@@ -245,7 +245,10 @@ export default function ChildDashboard({
           absorber la croissance sans faire gonfler le bandeau ni laisser
           le logo en déborder. Déconnexion déplacée en toute fin du menu
           (voir admin-sidebar.tsx, logoutAction). */}
-      <header className="sticky top-0 z-10 bg-navy px-4 py-2 sm:px-6">
+      {/* Même traitement que le tableau de bord principal (direction
+          artistique du 2026-08-23) : dégradé + coins arrondis en bas,
+          contenu inchangé. */}
+      <header className="sticky top-0 z-10 rounded-b-3xl bg-gradient-to-r from-navy to-navy-dark px-4 py-3 shadow-sm sm:px-6 sm:py-4">
         <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between">
           <Image src="/logo.png" alt="UBAC" width={44} height={44} className="h-11 w-11 object-contain" priority />
           <div className="flex items-center gap-1">
