@@ -177,21 +177,18 @@ export default function AdminSidebar({
   async function handleLogout(kind: "supabase" | "child") {
     if (kind === "supabase") {
       const supabase = createClient();
-      // Retour de Cindy du 2026-08-23 (audit sécurité) : sur un appareil
-      // familial partagé, une session Enfant (cookie signé à part, 30
-      // jours — voir child-session.ts) pouvait rester active après la
-      // déconnexion du parent. Se déconnecter avec un vrai compte doit
-      // donc aussi couper cette session-là, même si elle n'a jamais été
-      // ouverte depuis cet onglet — Promise.allSettled : l'échec de l'une
-      // (ex. pas de cookie enfant à couper) ne doit jamais empêcher
-      // l'autre, ni bloquer la redirection ci-dessous.
-      // Redirection dans un `finally` : un échec réseau ne doit pas
-      // laisser le bouton sans effet.
+      // Volontairement indépendant de la session Enfant (retour de Cindy
+      // du 2026-08-23, revenu sur son propre signalement précédent) : le
+      // compte enfant (cookie séparé, 30 jours — voir child-session.ts)
+      // doit continuer de vivre même si le parent se déconnecte, pour ne
+      // jamais couper l'enfant en train d'utiliser l'appareil pour une
+      // action du parent qui n'a rien à voir avec lui. Seule une
+      // déconnexion explicite depuis /enfant (kind === "child",
+      // ci-dessous) coupe cette session-là.
+      // Redirection dans un `finally` : un signOut() qui échoue (réseau,
+      // verrou interne du SDK) ne doit pas laisser le bouton sans effet.
       try {
-        await Promise.allSettled([
-          supabase.auth.signOut(),
-          fetch("/api/child-logout", { method: "POST" }),
-        ]);
+        await supabase.auth.signOut();
       } finally {
         router.push("/");
         router.refresh();
