@@ -679,7 +679,11 @@ export default function MembersTable({
                 // that entirely, with no visible side effect (the "Archivé"
                 // badge stays fully legible either way).
                 className={`cursor-pointer align-middle border-b border-slate-100 last:border-0 transition-colors duration-150 hover:bg-amber-50/40 ${
-                  index % 2 === 1 ? "bg-slate-50/50" : ""
+                  // Zébrage retiré (direction artistique du 2026-08-23,
+                  // "fond blanc") : en semi-transparence il laissait le
+                  // fond crème de la page passer au travers des lignes
+                  // impaires, viré au beige au lieu du gris attendu.
+                  ""
                 } ${m.archivedAt && openMenuId !== m.id ? "opacity-50" : ""}`}
               >
                 <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>

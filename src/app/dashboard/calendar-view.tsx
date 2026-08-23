@@ -784,7 +784,7 @@ export default function CalendarView({
     const cardShellClass = isTournament
       ? "rounded-2xl border-2 border-dashed border-ubac-yellow bg-white p-4 shadow-sm"
       : isOfficialMatch
-        ? `rounded-2xl border border-navy/15 bg-navy/5 p-4 shadow-sm border-l-8 ${style.border}`
+        ? `rounded-2xl border border-navy/15 bg-white p-4 shadow-sm border-l-8 ${style.border}`
         : `rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm border-l-4 ${style.border}`;
 
     return (
@@ -1068,7 +1068,7 @@ export default function CalendarView({
     const cardShellClass = isTournament
       ? "rounded-2xl border-2 border-dashed border-ubac-yellow bg-white p-4 shadow-sm"
       : isOfficialMatch
-        ? `rounded-2xl border border-navy/15 bg-navy/5 p-4 shadow-sm border-l-8 ${style.border}`
+        ? `rounded-2xl border border-navy/15 bg-white p-4 shadow-sm border-l-8 ${style.border}`
         : `rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm border-l-4 ${style.border}`;
 
     return (

@@ -947,7 +947,7 @@ export default function CotisationParticipantsTable({
             </tr>
           </thead>
           <tbody>
-            {filtered.map((c, index) => {
+            {filtered.map((c) => {
               const status = statusBadge[computeStatus(c)];
               const contactEmail = contactEmailByPlayerId[c.playerId] ?? null;
               return (
@@ -955,7 +955,11 @@ export default function CotisationParticipantsTable({
                   key={c.id}
                   onClick={() => openPayment([c.id])}
                   className={`cursor-pointer border-b border-slate-100 last:border-0 transition-colors duration-150 hover:bg-amber-50/40 ${
-                    index % 2 === 1 ? "bg-slate-50/50" : ""
+                    // Zébrage retiré (direction artistique du 2026-08-23,
+                    // "fond blanc") : en semi-transparence il laissait le
+                    // fond crème de la page passer au travers des lignes
+                    // impaires, viré au beige au lieu du gris attendu.
+                    ""
                   }`}
                 >
                   <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
