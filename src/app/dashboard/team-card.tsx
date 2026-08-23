@@ -730,7 +730,7 @@ export default function TeamCard({
 
   return (
     <div
-      className={`rounded-2xl border border-t-4 ${theme.border} border-t-ubac-yellow bg-white p-5 shadow-sm transition-all hover:shadow-md`}
+      className={`rounded-2xl border border-l-4 ${theme.border} border-l-ubac-yellow bg-white p-5 shadow-sm transition-all hover:shadow-md`}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">

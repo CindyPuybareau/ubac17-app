@@ -445,7 +445,7 @@ export default function CotisationsManager({
                         value={participantSearch}
                         onChange={(e) => setParticipantSearch(e.target.value)}
                         placeholder="Rechercher un membre..."
-                        className="w-full rounded-full border border-zinc-200 py-1.5 pl-9 pr-3 text-sm focus:border-ubac-yellow focus:outline-none"
+                        className="w-full rounded-full border border-zinc-200 bg-white py-1.5 pl-9 pr-3 text-sm focus:border-ubac-yellow focus:outline-none"
                       />
                     </div>
                     <ul className="flex max-h-56 flex-col gap-0.5 overflow-y-auto rounded-lg bg-zinc-50 p-2">

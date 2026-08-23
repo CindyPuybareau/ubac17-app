@@ -553,13 +553,13 @@ export default function MembersTable({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Rechercher un membre..."
-            className="w-full rounded-full border border-zinc-200 py-1.5 pl-9 pr-3 text-sm focus:border-ubac-yellow focus:outline-none"
+            className="w-full rounded-full border border-zinc-200 bg-white py-1.5 pl-9 pr-3 text-sm focus:border-ubac-yellow focus:outline-none"
           />
         </div>
         <select
           value={teamFilter}
           onChange={(e) => setTeamFilter(e.target.value)}
-          className="rounded-full border border-zinc-200 px-3 py-1.5 text-sm text-zinc-700"
+          className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-700"
         >
           <option value="">Toutes les équipes</option>
           {teams.map((t) => (
@@ -628,7 +628,7 @@ export default function MembersTable({
         </div>
       )}
 
-      <div className="w-full overflow-x-auto rounded-2xl border border-t-4 border-zinc-100 border-t-ubac-yellow">
+      <div className="w-full overflow-x-auto rounded-2xl border border-l-4 border-zinc-100 border-l-ubac-yellow bg-white">
         <table className="w-full table-auto border-collapse text-sm">
           <thead>
             <tr className="border-b border-slate-100 bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-400">

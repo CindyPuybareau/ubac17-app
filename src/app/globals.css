@@ -3,15 +3,20 @@
 :root {
   /* Fond crème (direction artistique validée le 2026-08-23) : le canevas
      général de chaque écran, derrière les cartes/tableaux qui restent
-     blancs pour la lisibilité. Éclairci deux fois de suite à la demande
-     de Cindy (#F1E9D6 maquette -> #F8F4EB -> #FCFAF5) — à peine perceptible
-     à dessein, juste assez pour ne plus être un blanc pur.
+     blancs pour la lisibilité. Revenu à #F8F4EB après un aller-retour :
+     l'étape suivante (#FCFAF5, "encore plus clair") était si proche du
+     blanc pur que les cartes/tableaux (bg-white) ne se détachaient plus
+     du tout de la page — l'inverse du problème de fuite de transparence
+     (voir plus bas), mais le même symptôme au final ("tableau mélangé au
+     fond"). #F8F4EB avait déjà été validé une première fois ("top on
+     garde ce fond") : assez de contraste pour que le blanc reste
+     visible, assez léger pour ne plus être un blanc pur.
      ATTENTION fonds SEMI-TRANSPARENTS (bg-slate-50/50, bg-navy/5...) :
      ils laissent CE fond passer au travers et viraient au beige au lieu
-     du blanc attendu — bug reel rencontre sur les cartes Match (calendar-view.tsx)
-     et le zebrage des tableaux Membres/Cotisations, corrige en les
-     rendant opaques plutot que transparents. */
-  --background: #fcfaf5;
+     du blanc attendu — bug reel rencontre sur les cartes Match
+     (calendar-view.tsx) et le zebrage des tableaux Membres/Cotisations,
+     corrige en les rendant opaques plutot que transparents. */
+  --background: #f8f4eb;
   --foreground: #0f172a;
   /* Bleu Nuit / Marine Profond — sampled from the official logo & ubac17.fr */
   --navy: #203090;

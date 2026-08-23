@@ -45,7 +45,7 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
   const categoryLabel = card.category ?? card.teamName;
 
   return (
-    <div className="rounded-2xl border border-t-4 border-zinc-100 border-t-ubac-yellow bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-l-4 border-zinc-100 border-l-ubac-yellow bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-center gap-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-ubac-blue">
           Équipe de {card.playerName}
