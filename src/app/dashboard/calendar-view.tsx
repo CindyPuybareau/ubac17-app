@@ -785,12 +785,12 @@ export default function CalendarView({
             </span>
             <span className="flex flex-wrap items-center gap-2">
               <span
-                className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${style.badge}`}
+                className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${style.badge}`}
               >
                 {style.label}
               </span>
               {homeAway && (
-                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-600">
+                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-bold uppercase text-zinc-600">
                   {homeAway}
                 </span>
               )}
@@ -1095,12 +1095,12 @@ export default function CalendarView({
 
         <span className="flex flex-wrap items-center gap-2">
           <span
-            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${style.badge}`}
+            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${style.badge}`}
           >
             {style.label}
           </span>
           {homeAway && (
-            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-600">
+            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-bold uppercase text-zinc-600">
               {homeAway}
             </span>
           )}
@@ -1152,7 +1152,7 @@ export default function CalendarView({
       >
         <PartyPopper className="h-5 w-5 shrink-0 text-pink-500" />
         <div className="flex flex-col gap-1">
-          <span className="w-fit rounded-full bg-pink-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-pink-700">
+          <span className="w-fit rounded-full bg-pink-100 px-2 py-0.5 text-[10px] font-bold uppercase text-pink-700">
             Anniversaire
           </span>
           <span className="font-semibold text-zinc-900">

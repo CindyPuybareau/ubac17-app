@@ -23,7 +23,7 @@ export default function OpponentDisplay({
       </span>
       {isHome !== null && (
         <span
-          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
             isHome
               ? "bg-green-100 text-green-700"
               : "bg-ubac-blue/10 text-ubac-blue"

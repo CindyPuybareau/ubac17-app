@@ -16,40 +16,44 @@ export const EVENT_TYPE_OPTIONS: { value: string; label: string }[] = [
 ];
 
 // Un code couleur par type, repris à l'identique partout (pastilles du
-// calendrier, badges des cartes, bordure gauche) : rouge = match officiel,
-// bleu = amical, orange = tournoi, vert = entraînement.
+// calendrier, badges des cartes, bordure gauche). Palette de marque
+// (direction artistique validée par Cindy le 2026-08-23) plutôt que des
+// teintes Tailwind génériques : marine = match officiel (le plus
+// solennel), bleu ciel = amical, or = tournoi/plateau (sort du lot), vert
+// terrain = entraînement (le plus fréquent, le plus "normal"), parquet =
+// événement club (fourre-tout chaleureux).
 const typeStyles: Record<
   string,
   { pill: string; border: string; badge: string; label: string }
 > = {
   MATCH: {
-    pill: "bg-red-100 text-red-700",
-    border: "border-l-red-400",
-    badge: "bg-red-100 text-red-700",
+    pill: "bg-navy/10 text-navy",
+    border: "border-l-navy",
+    badge: "bg-navy/10 text-navy",
     label: "Match officiel",
   },
   FRIENDLY: {
-    pill: "bg-blue-100 text-blue-700",
-    border: "border-l-blue-400",
-    badge: "bg-blue-100 text-blue-700",
+    pill: "bg-sky-100 text-sky-700",
+    border: "border-l-sky-400",
+    badge: "bg-sky-100 text-sky-700",
     label: "Match amical",
   },
   TOURNAMENT: {
-    pill: "bg-amber-100 text-amber-800",
-    border: "border-l-amber-400",
-    badge: "bg-amber-100 text-amber-800",
+    pill: "bg-ubac-yellow/15 text-ubac-yellow-dark",
+    border: "border-l-ubac-yellow",
+    badge: "bg-ubac-yellow/15 text-ubac-yellow-dark",
     label: "Tournoi / Plateau",
   },
   OTHER: {
-    pill: "bg-purple-100 text-purple-700",
-    border: "border-l-purple-400",
-    badge: "bg-purple-100 text-purple-700",
+    pill: "bg-parquet/15 text-parquet-dark",
+    border: "border-l-parquet",
+    badge: "bg-parquet/15 text-parquet-dark",
     label: "Événement club",
   },
   TRAINING: {
-    pill: "bg-green-100 text-green-700",
-    border: "border-l-green-400",
-    badge: "bg-green-100 text-green-700",
+    pill: "bg-court-green/10 text-court-green",
+    border: "border-l-court-green",
+    badge: "bg-court-green/10 text-court-green",
     label: "Entraînement",
   },
 };

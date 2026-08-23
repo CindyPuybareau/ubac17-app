@@ -73,7 +73,7 @@ export default function CoachNextMatchCard({
           <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
             <div className="flex min-w-0 flex-col gap-1">
               <span
-                className={`w-fit rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${style.badge}`}
+                className={`w-fit rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${style.badge}`}
               >
                 {style.label}
               </span>

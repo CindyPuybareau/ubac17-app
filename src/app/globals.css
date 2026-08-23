@@ -11,6 +11,15 @@
   --accent: #f4c430;
   --accent-dark: #cfa629;
   --accent-light: #f7d466;
+  /* Palette étendue "club sportif familial" (direction artistique validée
+     par Cindy le 2026-08-23) — vient compléter marine/or, jamais les
+     remplacer : parquet pour la chaleur, terrain pour le dynamisme,
+     corail réservé à l'espace Enfant. */
+  --parquet: #e0a05c;
+  --parquet-dark: #b97430;
+  --court-green: #3e8f5f;
+  --coral: #f0653a;
+  --coral-dark: #d14a22;
 }
 
 @theme inline {
@@ -29,6 +38,11 @@
   --color-ubac-blue-light: var(--navy-light);
   --color-ubac-yellow: var(--accent);
   --color-ubac-yellow-dark: var(--accent-dark);
+  --color-parquet: var(--parquet);
+  --color-parquet-dark: var(--parquet-dark);
+  --color-court-green: var(--court-green);
+  --color-coral: var(--coral);
+  --color-coral-dark: var(--coral-dark);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }

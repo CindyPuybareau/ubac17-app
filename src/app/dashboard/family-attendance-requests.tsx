@@ -69,7 +69,7 @@ export default function FamilyAttendanceRequests({
           >
             <div className="flex flex-wrap items-center gap-2">
               <span
-                className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${style.badge}`}
+                className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${style.badge}`}
               >
                 {style.label}
               </span>
