@@ -675,31 +675,18 @@ export default async function DashboardPage() {
     )
   );
 
-  // Convocation cards need the convened-players list of their own event's
-  // team, for the task-assignment picker's context.
-  const convocationRosterByEventId: Record<
-    string,
-    { id: string; name: string }[]
-  > = {};
-
-  // Les trois ne dépendent que de priorityEventIds/convocationCards, déjà
-  // résolus juste au-dessus — encore un groupe qui tournait en file avant.
+  // Les deux ne dépendent que de priorityEventIds, déjà résolu juste
+  // au-dessus.
+  //
+  // Un troisième calcul vivait ici (convocationRosterByEventId, le roster
+  // de chaque carte "Prochaine convocation" de l'espace Famille) — retiré
+  // avec la carte elle-même (retour de Cindy du 2026-08-23, "on simplifie
+  // le visuel") : plus aucun appelant n'en avait besoin, autant ne plus
+  // faire l'appel getTeamRoster correspondant à chaque chargement du
+  // tableau de bord.
   const [eventTasksByEventId, carpoolOffersByEventId] = await Promise.all([
     getEventTasksByEventId(supabase, priorityEventIds),
     getCarpoolOffersByEventId(supabase, priorityEventIds),
-    Promise.all(
-      convocationCards.map(async (c) => {
-        if (!c.event.team_id) {
-          convocationRosterByEventId[c.event.id] = [];
-          return;
-        }
-        const roster = await getTeamRoster(supabase, c.event.team_id);
-        convocationRosterByEventId[c.event.id] = roster.map((p) => ({
-          id: p.id,
-          name: formatPersonName(p.first_name, p.last_name),
-        }));
-      })
-    ),
   ]);
 
   let adminTeams: TeamWithMembers[] = [];
@@ -2195,8 +2182,6 @@ export default async function DashboardPage() {
         rsvpStatusByKey={familyRsvpStatusByKey}
         birthdayMembers={familyBirthdayMembers}
         teamCards={familyTeamCards}
-        convocationCards={convocationCards}
-        rosterByEventId={convocationRosterByEventId}
         tasksByEventId={familyOrganisationTasks}
         carpoolByEventId={carpoolOffersByEventId}
         whatsappGroups={whatsappGroups}

@@ -22,16 +22,12 @@ import CalendarSubscribe from "./calendar-subscribe";
 import FamilyCotisationCard from "./family-cotisation-card";
 import PenalitesCard from "./penalites-card";
 import ChildAccessManager from "./child-access-manager";
-import NextConvocationCard from "./next-convocation-card";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import WhatsAppGroupsFamily from "./whatsapp-groups-family";
 import type { AdminCotisation, AdminPenalite, AdminUpcomingEvent, WhatsAppGroup } from "./page";
-import type { ConvocationCard } from "./family-data";
 import type { BirthdaySource } from "./birthdays";
 import type { CarpoolOffer, EventRoleType, EventTasksState } from "./event-tasks";
 import type { VolunteerNeed } from "./event-volunteer-needs";
-
-const emptyEventTasks: EventTasksState = {};
 
 // Navigation à 2 onglets, zéro redondance : "Planning & Matchs" concentre
 // tout ce qui est chronologique (prochain rendez-vous en tête, puis tous
@@ -45,8 +41,6 @@ export default function FamilyView({
   rsvpStatusByKey,
   birthdayMembers,
   teamCards,
-  convocationCards,
-  rosterByEventId,
   tasksByEventId,
   carpoolByEventId,
   whatsappGroups,
@@ -60,8 +54,6 @@ export default function FamilyView({
   rsvpStatusByKey: Record<string, string>;
   birthdayMembers: BirthdaySource[];
   teamCards: FamilyTeamCardData[];
-  convocationCards: ConvocationCard[];
-  rosterByEventId: Record<string, { id: string; name: string }[]>;
   tasksByEventId: Record<string, EventTasksState>;
   carpoolByEventId: Record<string, CarpoolOffer[]>;
   whatsappGroups: WhatsAppGroup[];
@@ -145,14 +137,6 @@ export default function FamilyView({
     () => penalites.filter((p) => visiblePlayerIds.includes(p.playerId)),
     [penalites, visiblePlayerIds]
   );
-  const visibleConvocations = useMemo(
-    () =>
-      selectedPlayerId
-        ? convocationCards.filter((c) => c.player.id === selectedPlayerId)
-        : convocationCards,
-    [convocationCards, selectedPlayerId]
-  );
-
   // Un groupe "Équipe" ne concerne qu'une seule équipe : il ne s'affiche
   // que si cette équipe fait partie de l'enfant/des enfants actuellement
   // sélectionnés. Les groupes "Commission" (Buvette...) ne sont rattachés
@@ -189,27 +173,12 @@ export default function FamilyView({
       icon: <CalendarDays className={iconClass} />,
       content: (
         <div className="flex flex-col gap-4">
-          {/* Le prochain rassemblement en tête : présences, itinéraire et
-              rôles/covoiturage accessibles sans le moindre clic de plus. */}
-          {visibleConvocations.map(({ player, event, status }) => (
-            <NextConvocationCard
-              key={player.id}
-              playerName={player.isSelf ? "toi" : player.name}
-              playerId={player.id}
-              event={event}
-              status={status}
-              roster={rosterByEventId[event.id] ?? []}
-              tasks={tasksByEventId[event.id] ?? emptyEventTasks}
-              carpool={carpoolByEventId[event.id] ?? []}
-              roles={eventRoles}
-              volunteerNeeds={volunteerNeedsByEventId[event.id] ?? []}
-            />
-          ))}
-
-          {/* Tout le reste du calendrier : bascule liste/mois, même carte
-              interactive (présences, itinéraire, rôles) sur chaque
-              événement, qu'il s'agisse d'un match, d'un entraînement ou
-              d'un stage. */}
+          {/* Carte "Prochaine convocation" retirée (retour de Cindy du
+              2026-08-23, "on simplifie le visuel") : le calendrier
+              ci-dessous, avec son panneau "Aujourd'hui" sous la grille,
+              montre déjà le prochain rendez-vous — présences, itinéraire
+              et rôles/covoiturage restent accessibles depuis sa propre
+              carte, sans ce doublon en tête de page. */}
           <CalendarView
             events={visibleEvents}
             rsvp={{ players: visiblePlayers, statusByKey: rsvpStatusByKey }}

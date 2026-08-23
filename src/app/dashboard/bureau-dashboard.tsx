@@ -1,10 +1,7 @@
-import { CalendarDays, FileWarning, Gavel, Handshake, MapPin, Users, Wallet } from "lucide-react";
+import { FileWarning, Gavel, Handshake, Users, Wallet } from "lucide-react";
 import { formatPersonName } from "@/lib/names";
 import { formatLocalDateFr } from "@/lib/local-date";
 import { balanceDue, computeStatus, formatAmount } from "./cotisation-shared";
-import { formatEventTime, isMatchType, styleFor } from "./event-style";
-import OpponentDisplay from "./opponent-display";
-import SalleBadge from "./salle-badge";
 import AutomationSettings, { type AutomationKey } from "./automation-settings";
 import DeferredCalendar from "./deferred-calendar";
 import type {
@@ -120,15 +117,6 @@ export default function BureauDashboard({
       (isExpiringSoon(m.licenseExpiresAt) || isExpiringSoon(m.medicalCertificateExpiresAt))
   );
 
-  // Seuil "aujourd'hui à minuit", même logique que calendar-view.tsx : un
-  // match du matin ne doit pas disparaître du tableau de bord l'après-midi
-  // même.
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-  const nextEvent = [...events]
-    .filter((e) => new Date(e.start_time).getTime() >= startOfToday.getTime())
-    .sort((a, b) => a.start_time.localeCompare(b.start_time))[0];
-
   return (
     <div className="flex flex-col gap-4">
       <AutomationSettings settings={automationSettings} />
@@ -172,56 +160,6 @@ export default function BureauDashboard({
           label="Membres actifs"
         />
       </div>
-
-      {nextEvent &&
-        (() => {
-          const style = styleFor(nextEvent.event_type);
-          return (
-            <div
-              className={`rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm border-l-4 ${style.border}`}
-            >
-              <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                <CalendarDays className="h-3.5 w-3.5 shrink-0" />
-                Prochain événement
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${style.badge}`}
-                >
-                  {style.label}
-                </span>
-                <span className="text-xs font-semibold text-zinc-500">{nextEvent.teamName}</span>
-              </div>
-              <p className="mt-1 font-semibold text-zinc-900">
-                {isMatchType(nextEvent.event_type) ? (
-                  <OpponentDisplay title={nextEvent.title} size="sm" />
-                ) : (
-                  nextEvent.title ?? style.label
-                )}
-              </p>
-              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500">
-                <span>
-                  {new Date(nextEvent.start_time).toLocaleDateString("fr-FR", {
-                    weekday: "long",
-                    day: "numeric",
-                    month: "long",
-                  })}
-                  , {formatEventTime(nextEvent.start_time, nextEvent.end_time)}
-                </span>
-                {nextEvent.salle ? (
-                  <SalleBadge salle={nextEvent.salle} />
-                ) : (
-                  nextEvent.location && (
-                    <span className="flex items-center gap-1">
-                      <MapPin className="h-3.5 w-3.5" />
-                      {nextEvent.location}
-                    </span>
-                  )
-                )}
-              </div>
-            </div>
-          );
-        })()}
 
       {sponsorsNeedingRenewal.length > 0 && (
         <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4">
@@ -267,9 +205,11 @@ export default function BureauDashboard({
       )}
 
       {/* Calendrier complet, sous les cotisations/montants en attente : plus
-          d'onglet "Calendrier" séparé, c'est la suite naturelle du
-          "Prochain événement" ci-dessus plutôt qu'un aller-retour entre
-          deux onglets. */}
+          d'onglet "Calendrier" séparé. La carte "Prochain événement"
+          affichée ici a été retirée (retour de Cindy du 2026-08-23,
+          "on simplifie le visuel") — le calendrier ci-dessous, avec son
+          panneau "Aujourd'hui" sous la grille, suffit à retrouver le
+          prochain rendez-vous sans doublon. */}
       <DeferredCalendar
         events={events}
         createTeams={createTeams}

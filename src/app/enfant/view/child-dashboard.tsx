@@ -19,8 +19,6 @@ import ChildAvatarUpload from "./child-avatar-upload";
 import { MobileNavProvider } from "@/app/dashboard/mobile-nav-context";
 import MobileMenuButton from "@/app/dashboard/mobile-menu-button";
 import { formatFirstName } from "@/lib/names";
-import { styleFor, isMatchType, homeAwayLabel, formatEventTime } from "@/app/dashboard/event-style";
-import { parseMatchTitle } from "@/lib/match-display";
 import { localDateFromParts } from "@/lib/local-date";
 import ChildCalendarTab from "./child-calendar-tab";
 import ChildTeamTab from "./child-team-tab";
@@ -131,12 +129,11 @@ export default function ChildDashboard({
       icon: <CalendarDays className={iconClass} />,
       content: (
         <div className="flex flex-col gap-4">
-          {nextEvent ? <NextEventCard event={nextEvent} /> : (
-            <div className="rounded-2xl border border-zinc-100 bg-white p-4 text-sm text-zinc-500 shadow-sm">
-              Rien de prévu pour le moment.
-            </div>
-          )}
-
+          {/* Carte "Prochain événement" retirée (retour de Cindy du
+              2026-08-23, "on simplifie le visuel") : le calendrier
+              ci-dessous, avec son panneau "Aujourd'hui" sous la grille,
+              montre déjà le prochain rendez-vous, sans ce doublon en tête
+              de page. */}
           {birthdaysThisMonth.length > 0 && (
             <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-4 shadow-sm">
               <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-amber-800">
@@ -293,52 +290,3 @@ export default function ChildDashboard({
   );
 }
 
-// Compte à rebours simple ("Aujourd'hui" / "Demain" / "Dans N jours"),
-// calculé à l'ouverture de la page — pas besoin d'un vrai minuteur pour
-// une granularité à la journée.
-function daysUntilLabel(startIso: string): string {
-  const start = new Date(startIso);
-  const startOfDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-  const days = Math.round((startOfDay.getTime() - startOfToday.getTime()) / 86400000);
-  if (days <= 0) return "Aujourd'hui !";
-  if (days === 1) return "Demain !";
-  return `Dans ${days} jours`;
-}
-
-function NextEventCard({ event }: { event: ChildEvent }) {
-  const style = styleFor(event.eventType);
-  const parsed = parseMatchTitle(event.title);
-  const home = event.isHome ?? parsed.isHome;
-  const lieu = event.salle || event.location;
-
-  return (
-    <div className={`rounded-2xl border-2 bg-white p-4 shadow-sm ${style.border.replace("border-l-", "border-")}`}>
-      <div className="flex items-center justify-between gap-2">
-        <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${style.badge}`}>
-          {style.label}
-        </span>
-        <span className="rounded-full bg-navy px-3 py-1 text-xs font-bold text-ubac-yellow">
-          {daysUntilLabel(event.startTime)}
-        </span>
-      </div>
-      <p className="mt-2 text-lg font-bold text-zinc-900">
-        {isMatchType(event.eventType)
-          ? [homeAwayLabel(home), parsed.opponent ? `vs ${parsed.opponent}` : null].filter(Boolean).join(" · ")
-          : event.title ?? style.label}
-      </p>
-      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500">
-        <span>
-          {new Date(event.startTime).toLocaleDateString("fr-FR", {
-            weekday: "long",
-            day: "numeric",
-            month: "long",
-          })}
-          , {formatEventTime(event.startTime, event.endTime)}
-        </span>
-        {lieu && <span>· {lieu}</span>}
-      </div>
-    </div>
-  );
-}
