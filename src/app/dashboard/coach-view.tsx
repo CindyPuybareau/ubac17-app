@@ -299,6 +299,7 @@ export default function CoachView({
         <CalendarView
           events={events}
           createTeams={createTeams}
+          rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
           scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
           forcedView="clubEvents"
           // Un coach qui encadre plusieurs équipes (et joue parfois dans
@@ -327,6 +328,7 @@ export default function CoachView({
             <CalendarView
               events={events}
               createTeams={createTeams}
+              rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
               scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
               forcedView="officialMatches"
               resultsTeams={resultsTeamsForCalendar}
@@ -341,6 +343,7 @@ export default function CoachView({
             <CalendarView
               events={events}
               createTeams={createTeams}
+              rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
               scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
               forcedView="officialResults"
               resultsTeams={resultsTeamsForCalendar}

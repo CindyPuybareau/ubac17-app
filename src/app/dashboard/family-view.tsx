@@ -252,6 +252,7 @@ export default function FamilyView({
       content: (
         <CalendarView
           events={visibleEvents}
+          rsvp={{ players: visiblePlayers, statusByKey: rsvpStatusByKey }}
           forcedView="clubEvents"
           resultsTeams={visibleResultsTeams.map((t) => ({ ...t, role: "PLAYER" as const }))}
         />
@@ -273,6 +274,7 @@ export default function FamilyView({
           content: (
             <CalendarView
               events={visibleEvents}
+              rsvp={{ players: visiblePlayers, statusByKey: rsvpStatusByKey }}
               forcedView="officialMatches"
               resultsTeams={visibleResultsTeams.map((t) => ({ ...t, role: "PLAYER" as const }))}
             />
@@ -285,6 +287,7 @@ export default function FamilyView({
           content: (
             <CalendarView
               events={visibleEvents}
+              rsvp={{ players: visiblePlayers, statusByKey: rsvpStatusByKey }}
               forcedView="officialResults"
               resultsTeams={visibleResultsTeams.map((t) => ({ ...t, role: "PLAYER" as const }))}
             />
