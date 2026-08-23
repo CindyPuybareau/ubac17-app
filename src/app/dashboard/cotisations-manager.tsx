@@ -123,25 +123,25 @@ function KpiHeader({ cotisations }: { cotisations: AdminCotisation[] }) {
       />
       <KpiCard
         icon={CheckCircle2}
-        iconClass="text-emerald-600"
+        iconClass="text-court-green"
         value={String(kpis.payeCount)}
         label="Payés"
       />
       <KpiCard
         icon={Clock}
-        iconClass="text-amber-600"
+        iconClass="text-parquet-dark"
         value={String(kpis.partielCount)}
         label="Partiels"
       />
       <KpiCard
         icon={ShieldCheck}
-        iconClass="text-blue-600"
+        iconClass="text-navy"
         value={String(kpis.offertCount)}
         label="Offerts / Dispensés"
       />
       <KpiCard
         icon={AlertTriangle}
-        iconClass="text-rose-600"
+        iconClass="text-coral-dark"
         value={String(kpis.enAttenteCount)}
         label="En attente / Non payés"
       />

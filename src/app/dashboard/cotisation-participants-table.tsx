@@ -47,11 +47,17 @@ import ConfirmDialog from "./confirm-dialog";
 // marche déjà.
 export { balanceDue, computeStatus, due, formatAmount, roundCents };
 
+// Palette de marque (direction artistique validée par Cindy le 2026-08-23)
+// plutôt que des teintes Tailwind au hasard — mais "En attente" reste un
+// signal d'alerte (corail, pas l'or de marque) : l'or est déjà utilisé
+// comme accent positif partout ailleurs dans l'appli, le réutiliser ici
+// aurait dilué le repère visuel "il manque un paiement" que le Bureau
+// scanne d'un coup d'œil sur 95 fiches.
 const statusBadge: Record<StatusKey, { label: string; className: string }> = {
-  PAYE: { label: "Payé", className: "bg-green-100 text-green-700" },
-  PARTIEL: { label: "Partiel", className: "bg-orange-100 text-orange-700" },
-  OFFERT: { label: "Offert", className: "bg-amber-100 text-amber-700" },
-  EN_ATTENTE: { label: "En attente", className: "bg-red-100 text-red-700" },
+  PAYE: { label: "Payé", className: "bg-court-green/10 text-court-green" },
+  PARTIEL: { label: "Partiel", className: "bg-parquet/15 text-parquet-dark" },
+  OFFERT: { label: "Offert", className: "bg-navy/10 text-navy" },
+  EN_ATTENTE: { label: "En attente", className: "bg-coral/15 text-coral-dark" },
 };
 
 const paymentModes = [
