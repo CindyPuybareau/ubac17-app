@@ -1002,7 +1002,7 @@ export default function CotisationParticipantsTable({
                             className={menuItemClass}
                           >
                             <CreditCard className="h-3.5 w-3.5" />
-                            Enregistrer un paiement / Suivi financier
+                            Suivi/enregistrer paiement
                           </button>
                           {contactEmail ? (
                             <button

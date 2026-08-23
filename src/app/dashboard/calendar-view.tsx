@@ -844,7 +844,9 @@ export default function CalendarView({
 
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-500">
           <span className="flex items-center gap-1">
-            <CalendarDays className="h-4 w-4" />
+            {/* Bleu (retour de Cindy du 2026-08-23) : la petite icône
+                calendrier se fondait dans le texte gris de la date. */}
+            <CalendarDays className="h-4 w-4 text-navy" />
             {new Date(event.start_time).toLocaleString("fr-FR", {
               weekday: "short",
               day: "numeric",
