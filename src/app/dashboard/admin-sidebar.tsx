@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronRight, X } from "lucide-react";
 import { useMobileNav } from "./mobile-nav-context";
@@ -292,10 +292,21 @@ export default function AdminSidebar({
         </ul>
       </nav>
 
-      {/* Content: rendered once, shared by both layouts */}
+      {/* Content: rendered once, shared by both layouts. La key sur ce
+          Fragment force un vrai démontage/remontage à chaque changement de
+          feuille (retour de Cindy du 2026-08-23 : "Matchs & Résultats" se
+          dépliait mais cliquer sur "Matchs officiels"/"Résultats" ne
+          faisait rien). Sans elle, deux feuilles qui rendent le même type
+          de composant (ex. CalendarView avec un forcedView différent,
+          CoachOrganisation/CotisationsManager avec un forcedTab différent)
+          faisaient réutiliser par React la même instance montée au lieu
+          d'en remonter une nouvelle — leur useState(forcedX ?? défaut) ne
+          se réexécute qu'au tout premier montage, donc l'état interne
+          restait bloqué sur la toute première valeur cliquée, quel que
+          soit le sous-onglet choisi ensuite. */}
       <div className="min-w-0 flex-1 flex-col gap-4 flex">
         {contentHeader}
-        {current.content}
+        <Fragment key={current.key}>{current.content}</Fragment>
       </div>
 
       {/* Mobile / tablette : panneau ouvert depuis le bouton hamburger de
