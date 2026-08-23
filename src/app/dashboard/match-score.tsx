@@ -139,7 +139,7 @@ export default function MatchScore({
   return (
     <div className="flex items-center gap-1.5">
       <span
-        className={`rounded-full px-2.5 py-0.5 text-sm font-bold tabular-nums ${resultClass}`}
+        className={`font-numeric rounded-full px-2.5 py-0.5 text-sm font-bold ${resultClass}`}
       >
         {teamScore} – {opponentScore}
       </span>

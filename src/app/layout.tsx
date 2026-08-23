@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Poppins } from "next/font/google";
+import { Geist, Geist_Mono, Inter, Poppins, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -12,16 +12,32 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// Police d'affichage (direction artistique validée par Cindy le
-// 2026-08-23) : plus ronde et affirmée que la police système, réservée
-// aux titres/libellés forts (voir globals.css, appliquée via
-// --font-display). Auto-hébergée par next/font au moment du build —
-// aucune requête vers Google au chargement, contrairement à un <link>
-// classique.
+// Trio typographique de la direction artistique (maquette "Maillot Neuf
+// UBAC", suivie à la lettre à la demande de Cindy le 2026-08-23) —
+// chacune auto-hébergée par next/font au moment du build, aucune requête
+// vers Google au chargement :
+// - Poppins (700-900) : titres, réservée aux gros libellés (globals.css,
+//   --font-display).
+// - Inter : texte courant, remplace Arial/la police système par défaut
+//   (globals.css, --font-body sur html/body).
+// - Space Grotesk : chiffres/scores, appliquée ponctuellement via la
+//   classe .font-numeric là où un nombre doit se détacher (montants,
+//   scores de match, gros chiffres de KPI).
 const poppins = Poppins({
   variable: "--font-poppins",
   subsets: ["latin"],
   weight: ["700", "800", "900"],
+});
+
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
+});
+
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
+  subsets: ["latin"],
+  weight: ["500", "700"],
 });
 
 export const metadata: Metadata = {
@@ -63,7 +79,7 @@ export default function RootLayout({
   return (
     <html
       lang="fr"
-      className={`${geistSans.variable} ${geistMono.variable} ${poppins.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${poppins.variable} ${inter.variable} ${spaceGrotesk.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

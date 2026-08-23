@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import {
   BarChart3,
   Cake,
@@ -245,13 +244,34 @@ export default function ChildDashboard({
           absorber la croissance sans faire gonfler le bandeau ni laisser
           le logo en déborder. Déconnexion déplacée en toute fin du menu
           (voir admin-sidebar.tsx, logoutAction). */}
-      {/* Même traitement que le tableau de bord principal (direction
-          artistique du 2026-08-23) : dégradé + coins arrondis en bas,
-          contenu inchangé. */}
-      <header className="sticky top-0 z-10 rounded-b-3xl bg-gradient-to-r from-navy to-navy-dark px-4 py-3 shadow-sm sm:px-6 sm:py-4">
-        <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between">
-          <Image src="/logo.png" alt="UBAC" width={44} height={44} className="h-11 w-11 object-contain" priority />
-          <div className="flex items-center gap-1">
+      {/* Même bandeau unifié que le tableau de bord principal (direction
+          artistique du 2026-08-23, confirmée avec Cindy via question
+          directe) : avatar + "Bonjour" + prénom à gauche, grand logo en
+          filigrane semi-transparent à droite (derrière les icônes,
+          jamais au-dessus), icônes fonctionnelles inchangées par-dessus. */}
+      <header className="sticky top-0 z-10 relative overflow-hidden bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-4 shadow-md sm:px-6 sm:py-5">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/[0.06] to-transparent"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-2 top-1/2 h-28 w-28 -translate-y-1/2 bg-contain bg-right bg-no-repeat opacity-25 sm:h-36 sm:w-36"
+          style={{ backgroundImage: "url(/logo.png)" }}
+        />
+        <div className="relative mx-auto flex w-full max-w-[1600px] items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <ChildAvatarUpload avatarUrl={avatarUrl} name={firstName} />
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">
+                Bonjour
+              </p>
+              <h1 className="truncate text-xl font-bold text-white sm:text-2xl">
+                {formatFirstName(firstName) || "champion"}
+              </h1>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
             <OrgChartButton />
             <ChildNotificationBell initialNotifications={notifications} initialEnabled={notificationsEnabled} />
             <MobileMenuButton />
@@ -261,12 +281,6 @@ export default function ChildDashboard({
 
       <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
         <div>
-          <div className="flex items-center gap-3">
-            <ChildAvatarUpload avatarUrl={avatarUrl} name={firstName} />
-            <h1 className="text-2xl font-bold text-navy">
-              {formatFirstName(firstName) || "champion"}
-            </h1>
-          </div>
           {(teams.length > 0 || ownJersey?.jersey != null) && (
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               {teams.map((t) => (

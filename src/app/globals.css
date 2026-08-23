@@ -60,19 +60,24 @@
   --color-coral-dark: var(--coral-dark);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  /* Police d'affichage (direction artistique validée le 2026-08-23) :
-     réservée aux titres (voir règle h1-h4 plus bas), jamais au texte
-     courant — c'est ce contraste qui donne l'esprit "chaleureux,
-     dynamique" de la maquette sans sacrifier la lisibilité du texte
-     dense (tableaux, listes). */
+  /* Trio typographique de la maquette (direction artistique validée le
+     2026-08-23, "je veux celle-ci, comme la maquette !") :
+     - --font-display (Poppins) : titres, jamais le texte courant.
+     - --font-body (Inter) : texte courant partout, remplace l'Arial par
+       défaut du navigateur.
+     - --font-numeric (Space Grotesk) : chiffres qui doivent se détacher
+       (scores, montants, gros chiffres de KPI) — via la classe
+       .font-numeric, posée au cas par cas, jamais globalement. */
   --font-display: var(--font-poppins);
+  --font-body: var(--font-inter);
+  --font-numeric: var(--font-space-grotesk);
 }
 
 html,
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body), Arial, Helvetica, sans-serif;
 }
 
 /* Titres partout dans l'appli : un seul point de bascule plutôt que de
@@ -84,4 +89,12 @@ h2,
 h3,
 h4 {
   font-family: var(--font-display), Arial, Helvetica, sans-serif;
+}
+
+/* Chiffres qui doivent se détacher (scores de match, montants,
+   compteurs de KPI) — posée ponctuellement dans les composants
+   concernés, jamais globalement (le texte courant reste sur --font-body). */
+.font-numeric {
+  font-family: var(--font-numeric), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
 }

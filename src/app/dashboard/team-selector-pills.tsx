@@ -39,7 +39,7 @@ export default function TeamSelectorPills({
             className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
               isActive
                 ? "border-navy bg-navy text-white"
-                : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+                : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
             }`}
           >
             {t.role === "PLAYER" ? (

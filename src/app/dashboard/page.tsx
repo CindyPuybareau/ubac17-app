@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import Image from "next/image";
 import { Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { formatFirstName, formatPersonName } from "@/lib/names";
@@ -2332,15 +2331,36 @@ export default async function DashboardPage() {
           la croissance sans faire gonfler le bandeau ni laisser le logo
           en déborder. Déconnexion déplacée en toute fin du menu (voir
           admin-sidebar.tsx, logoutAction). */}
-      {/* Dégradé + coins arrondis en bas (direction artistique validée le
-          2026-08-23, "faire ressembler visuellement... à la maquette
-          proposée") : reprend le traitement du bandeau marine de la
-          maquette, sans rien changer au contenu (logo, cloche,
-          organigramme, menu mobile identiques). */}
-      <header className="sticky top-0 z-10 rounded-b-3xl bg-gradient-to-r from-navy to-navy-dark px-4 py-3 shadow-sm sm:px-6 sm:py-4">
-        <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between">
-          <Image src="/logo.png" alt="UBAC" width={44} height={44} className="h-11 w-11 object-contain" priority />
-          <div className="flex items-center gap-1">
+      {/* Bandeau unifié (direction artistique du 2026-08-23, confirmée
+          avec Cindy via question directe) : avatar + "Bonjour" + prénom
+          à gauche, grand logo en filigrane semi-transparent à droite
+          (derrière les icônes, jamais au-dessus : pointer-events-none),
+          icônes fonctionnelles inchangées par-dessus. */}
+      <header className="sticky top-0 z-10 relative overflow-hidden bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-4 shadow-md sm:px-6 sm:py-5">
+        {/* Léger reflet en haut, pour donner un peu de profondeur au
+            dégradé plutôt qu'un aplat totalement plat. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/[0.06] to-transparent"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-2 top-1/2 h-28 w-28 -translate-y-1/2 bg-contain bg-right bg-no-repeat opacity-25 sm:h-36 sm:w-36"
+          style={{ backgroundImage: "url(/logo.png)" }}
+        />
+        <div className="relative mx-auto flex w-full max-w-[1600px] items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <AvatarUpload userId={user.id} avatarUrl={profile?.avatar_url ?? null} name={profile?.first_name ?? null} size="lg" />
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">
+                Bonjour
+              </p>
+              <h1 className="truncate text-xl font-bold text-white sm:text-2xl">
+                {profile?.first_name ? formatFirstName(profile.first_name) : user.email}
+              </h1>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
             <OrgChartButton />
             <NotificationBell />
             <MobileMenuButton />
@@ -2349,13 +2369,6 @@ export default async function DashboardPage() {
       </header>
 
       <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
-        <div className="flex items-center gap-3">
-          <AvatarUpload userId={user.id} avatarUrl={profile?.avatar_url ?? null} name={profile?.first_name ?? null} size="lg" />
-          <h1 className="text-2xl font-bold text-navy">
-            {profile?.first_name ? formatFirstName(profile.first_name) : user.email}
-          </h1>
-        </div>
-
       <DashboardTabs tabs={tabs} />
 
       {/* Cas normalement rare depuis que "Mon espace" couvre aussi un
