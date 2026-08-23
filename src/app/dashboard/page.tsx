@@ -877,13 +877,23 @@ export default async function DashboardPage() {
       upcomingEventsRes.data ?? []
     );
     const adminNextEventIds = Array.from(adminNextEventIdByTeamId.values());
-    const { data: adminNextEventRsvpRows } =
+    // Les trois lignes ci-dessous ne dépendent que des ids déjà connus
+    // (upcomingEventsRes, résolu plus haut dans le gros Promise.all) —
+    // lancées ensemble ici puis attendues chacune à son point d'usage plus
+    // bas, au lieu de trois allers-retours séquentiels entrecoupés de
+    // calculs synchrones. Même correctif que coachPromise (Stage D),
+    // creusé suite au retour de Cindy sur la lenteur de connexion.
+    const upcomingEventIds = (upcomingEventsRes.data ?? []).map((e) => e.id);
+    const adminNextEventRsvpPromise =
       adminNextEventIds.length > 0
-        ? await supabase
+        ? supabase
             .from("rsvps")
             .select("player_id, status, event_id")
             .in("event_id", adminNextEventIds)
-        : { data: [] as { player_id: string; status: string; event_id: string }[] };
+        : Promise.resolve({ data: [] as { player_id: string; status: string; event_id: string }[] });
+    const rsvpsByEventPromise = fetchRsvpsByEvent(supabase, upcomingEventIds);
+    const adminVolunteerNeedsPromise = getVolunteerNeedsByEventId(supabase, upcomingEventIds);
+    const { data: adminNextEventRsvpRows } = await adminNextEventRsvpPromise;
     // Clé "event_id:player_id", pas juste player_id : un joueur inscrit
     // dans deux équipes a un "prochain événement" différent pour chacune,
     // donc potentiellement deux statuts différents. Une clé par joueur
@@ -1140,10 +1150,7 @@ export default async function DashboardPage() {
       };
     });
 
-    const rsvpsByEvent = await fetchRsvpsByEvent(
-      supabase,
-      (upcomingEventsRes.data ?? []).map((e) => e.id)
-    );
+    const rsvpsByEvent = await rsvpsByEventPromise;
 
     // paid_at desc order from the query above is preserved here (most
     // recent payment first per cotisation), which is what the payment
@@ -1238,10 +1245,7 @@ export default async function DashboardPage() {
     // les besoins d'un événement dès que son horaire était dépassé, même
     // fraîchement créé (retour de Cindy du 2026-08-19 : besoins ajoutés à
     // la création, introuvables juste après).
-    adminVolunteerNeedsByEventId = await getVolunteerNeedsByEventId(
-      supabase,
-      adminUpcomingEvents.map((e) => e.id)
-    );
+    adminVolunteerNeedsByEventId = await adminVolunteerNeedsPromise;
   }
   })();
 
@@ -1365,6 +1369,96 @@ export default async function DashboardPage() {
     const playerColumns =
       "id, profile_id, first_name, last_name, birth_date, category, sex, registration_email, registration_phone, address, postal_code, city, secondary_email, mother_phone, father_phone, other_phones, secondary_address, license_type, membership_type, fbi_status, medical_notes, other_notes, image_rights, player_charter_accepted, parent_charter_accepted, license_number, license_expires_at, medical_certificate_expires_at, archived_at";
 
+    // Retour de Cindy du 2026-08-23 : "les connexions qui sont lentes,
+    // surtout celle de Basile" (coach de plusieurs équipes ET joueur —
+    // exactement le profil qui traverse toutes les branches ci-dessous).
+    // Cinq groupes de requêtes plus bas (coachNextEventRsvpPromise,
+    // allMembershipsPromise, rsvpsByEvent/coachRsvpRows/coachPenalite,
+    // coachOrganisationTasks, coachVolunteerNeedsByEventId) ne dépendaient
+    // en réalité QUE de teamPlayersRes/eventsRes (déjà résolus juste
+    // au-dessus) mais étaient lancées après coup, à la queue leu leu,
+    // ajoutant plusieurs aller-retours réseau strictement séquentiels en
+    // plus de ceux réellement nécessaires. Elles démarrent maintenant ici
+    // (sans attendre) pour tourner EN MÊME TEMPS que le Promise.all
+    // players/profiles/parent_player/coachFiches juste en dessous, plutôt
+    // qu'après lui — seul leur `await`, plus bas, à l'endroit où le
+    // résultat sert réellement, reste à sa place.
+    const coachEventIds = (eventsRes.data ?? []).map((e) => e.id);
+    const coachNextEventIdByTeamId = findNextEventIdByTeamId(eventsRes.data ?? []);
+    const coachNextEventIds = Array.from(coachNextEventIdByTeamId.values());
+    // Retour de Cindy du 2026-08-22 : Basile (coach ET joueur Séniors 1)
+    // voyait sa propre pénalité apparaître sous "Pénalités de l'équipe" —
+    // teamPlayersRes est scopée à coachCalendarTeamIds (équipes coachées
+    // ET équipe jouée, voir plus haut, pensé pour le calendrier fusionné),
+    // ce qui mélangeait l'effectif de son équipe JOUÉE dans ce filtre.
+    // "Pénalités de l'équipe" doit rester strictement scopée aux équipes
+    // réellement COACHÉES (sa propre pénalité comme joueur reste visible
+    // via "Mes pénalités" juste au-dessus, filtrée sur ownPlayerId).
+    const coachPenaliteScope = Array.from(
+      new Set(
+        (teamPlayersRes.data ?? [])
+          .filter((tp) => coachedTeamIds.includes(tp.team_id))
+          .map((tp) => tp.player_id)
+      )
+    );
+    // Mêmes id que coachEvents.map(e => e.id)/le filtre "à venir" plus bas
+    // (start_time/id ne changent pas entre la ligne brute et la version
+    // enrichie) — inutile d'attendre l'enrichissement pour les calculer.
+    const upcomingCoachEventIds = (eventsRes.data ?? [])
+      .filter((e) => new Date(e.start_time).getTime() >= Date.now())
+      .map((e) => e.id);
+
+    const coachNextEventRsvpPromise =
+      coachNextEventIds.length > 0
+        ? supabase
+            .from("rsvps")
+            .select("player_id, status, event_id")
+            .in("event_id", coachNextEventIds)
+        : Promise.resolve({ data: [] as { player_id: string; status: string; event_id: string }[] });
+    // EVERY team each of these players belongs to, not just the coach's own
+    // — that's what tells a player of the team apart from one lent by
+    // another group, and it drives the roster's "Retirer" vs "Affecter"
+    // action. Readable thanks to the "coach select all teams of own
+    // players" policy.
+    const allMembershipsPromise =
+      playerIds.length > 0
+        ? supabase.from("team_players").select("team_id, player_id").in("player_id", playerIds)
+        : Promise.resolve({ data: [] as { team_id: string; player_id: string }[] });
+    const rsvpsByEventPromise = fetchRsvpsByEvent(supabase, coachEventIds);
+    const coachRsvpRowsPromise =
+      coachEventIds.length > 0
+        ? supabase
+            .from("rsvps")
+            .select("event_id, player_id, status, reason")
+            .in("event_id", coachEventIds)
+        : Promise.resolve({
+            data: [] as {
+              event_id: string;
+              player_id: string;
+              status: string;
+              reason: string | null;
+            }[],
+          });
+    const coachPenalitePromise =
+      coachPenaliteScope.length > 0
+        ? supabase
+            .from("penalites")
+            .select(
+              "id, player_id, amount, notes, penalite_date, statut, paid_at, players(first_name, last_name)"
+            )
+            .in("player_id", coachPenaliteScope)
+        : Promise.resolve({ data: [] as unknown[] });
+    // Les rôles (maillots/goûter) de TOUS les événements à venir, pas
+    // seulement du prochain match : l'onglet "Planning & Rôles" les liste
+    // date par date.
+    const coachOrganisationTasksExtraPromise = getEventTasksByEventId(
+      supabase,
+      upcomingCoachEventIds
+    );
+    // Besoins d'organisation de TOUS les événements de l'équipe, pas
+    // seulement ceux à venir — même raison que côté Bureau juste plus haut.
+    const coachVolunteerNeedsPromise = getVolunteerNeedsByEventId(supabase, coachEventIds);
+
     const [playersRes, coachProfilesRes, parentPlayerRes, coachFichesRes] =
       await Promise.all([
         playerIds.length > 0
@@ -1430,15 +1524,10 @@ export default async function DashboardPage() {
     });
 
     // Same "next event per team" presence badge as the Bureau's roster.
-    const coachNextEventIdByTeamId = findNextEventIdByTeamId(eventsRes.data ?? []);
-    const coachNextEventIds = Array.from(coachNextEventIdByTeamId.values());
-    const { data: coachNextEventRsvpRows } =
-      coachNextEventIds.length > 0
-        ? await supabase
-            .from("rsvps")
-            .select("player_id, status, event_id")
-            .in("event_id", coachNextEventIds)
-        : { data: [] as { player_id: string; status: string; event_id: string }[] };
+    // (coachNextEventIdByTeamId/coachNextEventIds calculés plus haut, la
+    // requête elle-même déjà lancée en parallèle — voir
+    // coachNextEventRsvpPromise.)
+    const { data: coachNextEventRsvpRows } = await coachNextEventRsvpPromise;
     // Voir le commentaire équivalent côté Bureau plus haut : clé par
     // (event_id, player_id), pas juste player_id, pour ne pas confondre
     // les statuts d'un joueur inscrit dans deux équipes coachées.
@@ -1485,13 +1574,9 @@ export default async function DashboardPage() {
 
     // EVERY team each of these players belongs to, not just the coach's own
     // — that's what tells a player of the team apart from one lent by
-    // another group, and it drives the roster's "Retirer" vs "Affecter"
-    // action. Readable thanks to the "coach select all teams of own
-    // players" policy.
-    const { data: allMembershipsData } =
-      playerIds.length > 0
-        ? await supabase.from("team_players").select("team_id, player_id").in("player_id", playerIds)
-        : { data: [] as { team_id: string; player_id: string }[] };
+    // another group, et pilote le "Retirer" vs "Affecter" du tableau
+    // (requête déjà lancée en parallèle — voir allMembershipsPromise).
+    const { data: allMembershipsData } = await allMembershipsPromise;
     const clubTeamById = new Map(coachClubTeams.map((t) => [t.id, t]));
 
     const coachTeamRefsByPlayerId = new Map<string, AdminMemberTeam[]>();
@@ -1602,47 +1687,13 @@ export default async function DashboardPage() {
       if (email) coachContactEmailByPlayerId[pp.player_id] = email;
     });
 
-    // Aucune ne dépend de l'autre — parties ensemble plutôt qu'à la queue
-    // leu leu.
-    const coachEventIds = (eventsRes.data ?? []).map((e) => e.id);
-    // Retour de Cindy du 2026-08-22 : Basile (coach ET joueur Séniors 1)
-    // voyait sa propre pénalité apparaître sous "Pénalités de l'équipe" —
-    // teamPlayersRes est scopée à coachCalendarTeamIds (équipes coachées
-    // ET équipe jouée, voir plus haut, pensé pour le calendrier fusionné),
-    // ce qui mélangeait l'effectif de son équipe JOUÉE dans ce filtre.
-    // "Pénalités de l'équipe" doit rester strictement scopée aux équipes
-    // réellement COACHÉES (sa propre pénalité comme joueur reste visible
-    // via "Mes pénalités" juste au-dessus, filtrée sur ownPlayerId).
-    const coachPenaliteScope = Array.from(
-      new Set(
-        (teamPlayersRes.data ?? [])
-          .filter((tp) => coachedTeamIds.includes(tp.team_id))
-          .map((tp) => tp.player_id)
-      )
-    );
+    // Aucune ne dépend de l'autre — et déjà lancées en parallèle plus haut
+    // (voir rsvpsByEventPromise/coachRsvpRowsPromise/coachPenalitePromise),
+    // ne reste ici qu'à en récupérer le résultat.
     const [rsvpsByEvent, coachRsvpRowsRes, coachPenaliteRes] = await Promise.all([
-      fetchRsvpsByEvent(supabase, coachEventIds),
-      coachEventIds.length > 0
-        ? supabase
-            .from("rsvps")
-            .select("event_id, player_id, status, reason")
-            .in("event_id", coachEventIds)
-        : Promise.resolve({
-            data: [] as {
-              event_id: string;
-              player_id: string;
-              status: string;
-              reason: string | null;
-            }[],
-          }),
-      coachPenaliteScope.length > 0
-        ? supabase
-            .from("penalites")
-            .select(
-              "id, player_id, amount, notes, penalite_date, statut, paid_at, players(first_name, last_name)"
-            )
-            .in("player_id", coachPenaliteScope)
-        : Promise.resolve({ data: [] as unknown[] }),
+      rsvpsByEventPromise,
+      coachRsvpRowsPromise,
+      coachPenalitePromise,
     ]);
     coachPenalites = (
       (coachPenaliteRes.data ?? []) as unknown as {
@@ -1714,22 +1765,16 @@ export default async function DashboardPage() {
       };
     });
 
-    // Les rôles (maillots/goûter) de TOUS les événements à venir, pas
-    // seulement du prochain match : l'onglet "Planning & Rôles" les liste
-    // date par date.
-    const upcomingCoachEventIds = coachEvents
-      .filter((e) => new Date(e.start_time).getTime() >= Date.now())
-      .map((e) => e.id);
+    // Les rôles (maillots/goûter) de TOUS les événements à venir (requête
+    // déjà lancée en parallèle plus haut — voir
+    // coachOrganisationTasksExtraPromise/coachVolunteerNeedsPromise).
     coachOrganisationTasks = {
       ...eventTasksByEventId,
-      ...(await getEventTasksByEventId(supabase, upcomingCoachEventIds)),
+      ...(await coachOrganisationTasksExtraPromise),
     };
     // Besoins d'organisation de TOUS les événements de l'équipe, pas
     // seulement ceux à venir — même raison que côté Bureau juste plus haut.
-    coachVolunteerNeedsByEventId = await getVolunteerNeedsByEventId(
-      supabase,
-      coachEvents.map((e) => e.id)
-    );
+    coachVolunteerNeedsByEventId = await coachVolunteerNeedsPromise;
   }
   })();
 
@@ -2028,29 +2073,31 @@ export default async function DashboardPage() {
     // Ces trois-là ne dépendent que de ce qui est déjà résolu ci-dessus,
     // mais pas les uns des autres — dernier groupe parallélisable de ce
     // bloc plutôt qu'à la queue leu leu.
-    const [rsvpRowsRes, familyPaymentRes, extraFamilyTasks] = await Promise.all([
-      eventIds.length > 0 && allRosterPlayerIds.length > 0
-        ? supabase
-            .from("rsvps")
-            .select("event_id, player_id, status")
-            .in("event_id", eventIds)
-            .in("player_id", allRosterPlayerIds)
-        : null,
-      familyCotisationIds.length > 0
-        ? supabase
-            .from("cotisation_payments")
-            .select("id, cotisation_id, amount, mode, detail, expected_cash_date, paid_at")
-            .in("cotisation_id", familyCotisationIds)
-            .order("paid_at", { ascending: false })
-        : null,
-      getEventTasksByEventId(supabase, upcomingFamilyEventIds),
-    ]);
     // Besoins d'organisation de TOUS les événements de la fratrie, pas
     // seulement ceux à venir — même raison que côté Bureau plus haut.
-    familyVolunteerNeedsByEventId = await getVolunteerNeedsByEventId(
-      supabase,
-      familyEvents.map((e) => e.id)
-    );
+    // Ne dépend que de eventIds (déjà connu ci-dessus) : parti dans ce
+    // même Promise.all au lieu d'un aller-retour séquentiel à part après
+    // coup — même correctif que adminPromise/coachPromise plus haut.
+    const [rsvpRowsRes, familyPaymentRes, extraFamilyTasks, familyVolunteerNeedsData] =
+      await Promise.all([
+        eventIds.length > 0 && allRosterPlayerIds.length > 0
+          ? supabase
+              .from("rsvps")
+              .select("event_id, player_id, status")
+              .in("event_id", eventIds)
+              .in("player_id", allRosterPlayerIds)
+          : null,
+        familyCotisationIds.length > 0
+          ? supabase
+              .from("cotisation_payments")
+              .select("id, cotisation_id, amount, mode, detail, expected_cash_date, paid_at")
+              .in("cotisation_id", familyCotisationIds)
+              .order("paid_at", { ascending: false })
+          : null,
+        getEventTasksByEventId(supabase, upcomingFamilyEventIds),
+        getVolunteerNeedsByEventId(supabase, eventIds),
+      ]);
+    familyVolunteerNeedsByEventId = familyVolunteerNeedsData;
 
     // Statuts par équipe/événement, pour construire à la fois
     // familyRsvpStatusByKey (boutons Présent/Absent de ses propres
