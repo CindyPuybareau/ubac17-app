@@ -15,6 +15,7 @@ import {
 import { BOUTIQUE_URL } from "./boutique";
 import { sortTeamsByGroup } from "@/lib/teams";
 import CalendarView, { type CalendarRsvpPlayer } from "./calendar-view";
+import FamilyWeekBanner from "./family-week-banner";
 import FamilyTeamCard, { type FamilyTeamCardData } from "./family-team-card";
 import FamilyAttendanceRequests from "./family-attendance-requests";
 import FamilyAttendanceSummary from "./family-attendance-summary";
@@ -178,7 +179,12 @@ export default function FamilyView({
               ci-dessous, avec son panneau "Aujourd'hui" sous la grille,
               montre déjà le prochain rendez-vous — présences, itinéraire
               et rôles/covoiturage restent accessibles depuis sa propre
-              carte, sans ce doublon en tête de page. */}
+              carte, sans ce doublon en tête de page.
+              Le bandeau ci-dessous (même jour, direction artistique
+              validée) n'est PAS ce même doublon : ni bouton de présence,
+              ni détail d'événement, juste une phrase de résumé + une frise
+              des 7 jours — un repère rapide, pas une convocation. */}
+          <FamilyWeekBanner events={visibleEvents} />
           <CalendarView
             events={visibleEvents}
             rsvp={{ players: visiblePlayers, statusByKey: rsvpStatusByKey }}

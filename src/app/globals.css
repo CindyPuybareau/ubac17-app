@@ -3,8 +3,14 @@
 :root {
   /* Fond crème (direction artistique validée le 2026-08-23) : le canevas
      général de chaque écran, derrière les cartes/tableaux qui restent
-     blancs (bg-white explicite) pour la lisibilité. */
-  --background: #f1e9d6;
+     blancs (bg-white explicite) pour la lisibilité. Très clair à la
+     demande de Cindy ("entre ce crème et le blanc") — #F1E9D6 (couleur de
+     la maquette) était jugé trop marqué une fois vu en vrai sur toute la
+     page. Attention aux fonds SEMI-TRANSPARENTS (bg-white/50,
+     bg-slate-50/50...) : eux laissent ce fond passer au travers — vérifié
+     que le tableau Membres est protégé par son conteneur bg-white opaque,
+     donc pas de fuite là où c'est le plus sensible. */
+  --background: #f8f4eb;
   --foreground: #0f172a;
   /* Bleu Nuit / Marine Profond — sampled from the official logo & ubac17.fr */
   --navy: #203090;
