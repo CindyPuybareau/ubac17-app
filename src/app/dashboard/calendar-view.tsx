@@ -1295,7 +1295,7 @@ export default function CalendarView({
               className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
                 hideTrainings
                   ? "border-navy/30 bg-navy/10 text-navy"
-                  : "border-zinc-200 text-zinc-500 hover:bg-zinc-50"
+                  : "border-zinc-200 bg-white text-zinc-500 hover:bg-zinc-50"
               }`}
             >
               {hideTrainings ? (
