@@ -1799,7 +1799,11 @@ export default async function DashboardPage() {
     );
     familyRsvpPlayers = players.map((p, i) => ({
       id: p.id,
-      name: p.isSelf ? "Toi" : p.name,
+      // Prénom réel plutôt que "Toi" (retour de Cindy du 2026-08-24,
+      // "renommer l'onglet 'toi' qui le concerne par mon prénom") : la
+      // pastille "Enfant" se lit d'un coup d'œil comme les autres,
+      // Raphaël/Léonie, plutôt que de faire l'exception.
+      name: p.name,
       teamIds: playerTeamIdsList[i],
       avatarUrl: p.avatarUrl,
     }));
@@ -2005,7 +2009,9 @@ export default async function DashboardPage() {
           if (!team) return;
           familyTeamCards.push({
             playerId: p.id,
-            playerName: p.isSelf ? "Toi" : p.name,
+            // Même correctif que familyRsvpPlayers plus haut : prénom réel
+            // plutôt que "Toi", pour "Équipe de {prénom}".
+            playerName: p.name,
             teamId,
             teamName: team.name,
             category: team.category,
