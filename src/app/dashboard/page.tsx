@@ -42,6 +42,7 @@ type PlayerRow = {
   last_name: string | null;
   category: string | null;
   profile_id: string | null;
+  avatar_url: string | null;
 };
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
@@ -464,7 +465,7 @@ export default async function DashboardPage() {
         .eq("coach_id", user.id),
       supabase
         .from("parent_player")
-        .select("players(id, first_name, last_name, category, profile_id)")
+        .select("players(id, first_name, last_name, category, profile_id, avatar_url)")
         .eq("parent_id", user.id),
       // This user's own player row, if any (players.profile_id = user.id) —
       // reused below both to also surface teams where THEY are only a
@@ -476,7 +477,7 @@ export default async function DashboardPage() {
       // the empty "Aucun espace" message despite being validly linked).
       supabase
         .from("players")
-        .select("id, first_name, last_name, category, profile_id")
+        .select("id, first_name, last_name, category, profile_id, avatar_url")
         .eq("profile_id", user.id)
         .maybeSingle(),
     ]);
@@ -545,6 +546,7 @@ export default async function DashboardPage() {
     name: p.first_name ? formatFirstName(p.first_name) : "Joueur",
     category: p.category,
     isSelf: p.profile_id === user.id,
+    avatarUrl: p.avatar_url,
   }));
 
   const coachedTeamIds = new Set(coachedTeams.map((t) => t.id));
@@ -1781,7 +1783,7 @@ export default async function DashboardPage() {
   let familyEvents: AdminUpcomingEvent[] = [];
   let familyOrganisationTasks: Record<string, EventTasksState> = {};
   let familyVolunteerNeedsByEventId: Record<string, VolunteerNeed[]> = {};
-  let familyRsvpPlayers: { id: string; name: string; teamIds: string[] }[] = [];
+  let familyRsvpPlayers: { id: string; name: string; teamIds: string[]; avatarUrl: string | null }[] = [];
   const familyRsvpStatusByKey: Record<string, string> = {};
   const familyBirthdayMembers: BirthdaySource[] = [];
   const familyTeamCards: FamilyTeamCardData[] = [];
@@ -1799,6 +1801,7 @@ export default async function DashboardPage() {
       id: p.id,
       name: p.isSelf ? "Toi" : p.name,
       teamIds: playerTeamIdsList[i],
+      avatarUrl: p.avatarUrl,
     }));
 
     const allTeamIds = Array.from(new Set(playerTeamIdsList.flat()));

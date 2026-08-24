@@ -173,6 +173,10 @@ export type CalendarRsvpPlayer = {
   id: string;
   name: string;
   teamIds: string[];
+  // Photo mise en ligne par l'enfant lui-même (players.avatar_url, voir
+  // ChildAvatarUpload) — optionnel : absent côté Coach (coachRsvpPlayers,
+  // page.tsx, où seul un joueur/coach adulte apparaît, jamais un enfant).
+  avatarUrl?: string | null;
 };
 
 // Module "Qui sera là ?" : repliée par défaut pour garder la carte

@@ -13,6 +13,7 @@ import {
   Users,
 } from "lucide-react";
 import { BOUTIQUE_URL } from "./boutique";
+import { avatarColor } from "@/lib/avatar-color";
 import { sortTeamsByGroup } from "@/lib/teams";
 import CalendarView, { type CalendarRsvpPlayer } from "./calendar-view";
 import FamilyTeamCard, { type FamilyTeamCardData } from "./family-team-card";
@@ -341,19 +342,44 @@ export default function FamilyView({
               <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
                 Enfant
               </span>
-              {rsvpPlayers.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => setSelectedPlayerId(p.id)}
-                  className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
-                    selectedPlayerId === p.id
-                      ? "border-navy bg-navy text-white"
-                      : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
-                  }`}
-                >
-                  {p.name}
-                </button>
-              ))}
+              {rsvpPlayers.map((p) => {
+                const isActive = selectedPlayerId === p.id;
+                const color = avatarColor(p.id);
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => setSelectedPlayerId(p.id)}
+                    className={`flex items-center gap-2 rounded-full border py-1 pl-1 pr-3 text-sm font-medium transition-colors ${
+                      isActive
+                        ? "border-navy/30 bg-navy/10 ring-2 ring-navy/20"
+                        : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
+                    }`}
+                  >
+                    {/* Photo de l'enfant si elle existe (players.avatar_url,
+                        mise en ligne depuis son propre Espace Enfant),
+                        sinon repli sur une initiale colorée — même
+                        principe que les coéquipiers dans child-team-tab.tsx.
+                        Retour de Cindy du 2026-08-24 : "faire comme la
+                        capture en y incrémentant les images qu'ils
+                        mettent sur leur espace". */}
+                    {p.avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={p.avatarUrl}
+                        alt=""
+                        className="h-6 w-6 shrink-0 rounded-full object-cover"
+                      />
+                    ) : (
+                      <span
+                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${color}`}
+                      >
+                        {p.name.charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                    <span className={isActive ? "font-semibold text-navy" : ""}>{p.name}</span>
+                  </button>
+                );
+              })}
             </div>
           ) : undefined
         }

@@ -1,4 +1,5 @@
 import { ShieldCheck } from "lucide-react";
+import { avatarColor } from "@/lib/avatar-color";
 import { formatFirstName, formatPersonName, sortByLastName } from "@/lib/names";
 import type { ChildCoach, ChildEvent } from "./child-dashboard";
 
@@ -19,24 +20,10 @@ const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   PENDING: { label: "En attente", className: "bg-zinc-100 text-zinc-500" },
 };
 
-// Avatar générique (initiale + couleur dérivée du nom) : aucune photo
-// n'existe dans l'appli, et il n'y a aucune raison d'en ajouter une rien
-// que pour cet écran — un rond coloré fait le même travail visuel.
-const AVATAR_COLORS = [
-  "bg-ubac-blue",
-  "bg-emerald-500",
-  "bg-amber-500",
-  "bg-purple-500",
-  "bg-pink-500",
-  "bg-teal-500",
-];
-
-function avatarColor(seed: string) {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) % AVATAR_COLORS.length;
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-}
-
+// Avatar générique (initiale + couleur dérivée du nom, voir
+// @/lib/avatar-color) : le type ChildTeammate ne porte volontairement
+// aucun champ photo (confidentialité, voir plus haut) — un rond coloré
+// fait le même travail visuel sans jamais pouvoir en afficher une.
 export default function ChildTeamTab({
   coaches,
   nextEvent,
