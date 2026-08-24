@@ -16,7 +16,7 @@ export default async function ChildLoginPage({
 }) {
   // Un enfant qui a ajouté ce lien à son écran d'accueil (PWA) le
   // rouvrira ici à chaque fois, jamais directement sur /enfant/view — le
-  // cookie de session (30 jours, voir child-session.ts) doit donc être
+  // cookie de session (400 jours, voir child-session.ts) doit donc être
   // revérifié à cette entrée-là aussi, pas seulement sur /enfant/view.
   const cookieStore = await cookies();
   if (verifyChildSession(cookieStore.get(CHILD_SESSION_COOKIE)?.value)) {

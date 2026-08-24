@@ -10,7 +10,15 @@ import { createHmac, timingSafeEqual } from "crypto";
 // seule écriture précise (players.avatar_url, sur SON PROPRE player_id) —
 // jamais un accès direct à Supabase depuis le navigateur.
 export const CHILD_SESSION_COOKIE = "ubac_child_session";
-const SESSION_DURATION_MS = 1000 * 60 * 60 * 24 * 30; // 30 jours : appareil familial partagé, pas de mot de passe à retaper sans cesse.
+// Retour de Cindy du 2026-08-24 : "la session enfant ne doit pas être
+// déconnectée sous 30 jours, elle doit rester active toujours une fois
+// connectée" — appareil familial/personnel partagé, pas de mot de passe à
+// retaper sans cesse. 400 jours plutôt qu'une durée "infinie" : c'est le
+// plafond que Chrome et Safari imposent eux-mêmes sur Max-Age depuis 2023
+// (un cookie posé avec une durée plus longue est silencieusement ramené à
+// 400 jours par le navigateur) — c'est donc, en pratique, le maximum
+// réellement "toujours" qu'on puisse offrir avec un cookie.
+const SESSION_DURATION_MS = 1000 * 60 * 60 * 24 * 400;
 
 function secret(): string {
   const s = process.env.CHILD_SESSION_SECRET;

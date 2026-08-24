@@ -179,7 +179,7 @@ export default function AdminSidebar({
       const supabase = createClient();
       // Volontairement indépendant de la session Enfant (retour de Cindy
       // du 2026-08-23, revenu sur son propre signalement précédent) : le
-      // compte enfant (cookie séparé, 30 jours — voir child-session.ts)
+      // compte enfant (cookie séparé, 400 jours — voir child-session.ts)
       // doit continuer de vivre même si le parent se déconnecte, pour ne
       // jamais couper l'enfant en train d'utiliser l'appareil pour une
       // action du parent qui n'a rien à voir avec lui. Seule une
