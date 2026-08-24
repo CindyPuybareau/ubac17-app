@@ -10,6 +10,8 @@ import {
   Cake,
   Check,
   Clock,
+  Eye,
+  EyeOff,
   LayoutGrid,
   List,
   Mail,
@@ -329,6 +331,16 @@ export default function CalendarView({
   const todayKey = toKey(today);
   const [viewMonth, setViewMonth] = useState<Date>(today);
   const [selectedDate, setSelectedDate] = useState<Date>(today);
+  // Retour de Cindy/Sandrine Manzelle du 2026-08-24 : "les entraînements
+  // polluent le calendrier" — un cumul Bureau + joueuse + parent voit tout
+  // empilé, et les entraînements (2-3 par semaine et par équipe) noient
+  // les événements plus rares. Un simple interrupteur, pas de nouveau
+  // menu : filtre la grille du mois, le panneau du jour et la liste
+  // Événements en même temps (voir visibleEvents plus bas), jamais
+  // localEvents lui-même (les formulaires d'édition en ont besoin en
+  // entier). Volontairement en mémoire seulement (pas persistant) — un
+  // interrupteur toujours visible se retrouve facilement à chaque visite.
+  const [hideTrainings, setHideTrainings] = useState(false);
   // Le calendrier s'ouvre sur la grille : on veut d'abord voir le mois.
   // La liste chronologique reste à un clic pour répondre à "c'est quoi la
   // suite ?".
@@ -608,16 +620,25 @@ export default function CalendarView({
     });
   }
 
+  // Source unique du filtre "Masquer les entraînements" : localEvents
+  // reste intact (édition/suppression en ont besoin en entier), seule
+  // cette liste dérivée alimente l'affichage (grille du mois, panneau du
+  // jour, liste Événements).
+  const visibleEvents = useMemo(
+    () => (hideTrainings ? localEvents.filter((e) => e.event_type !== "TRAINING") : localEvents),
+    [localEvents, hideTrainings]
+  );
+
   const eventsByDate = useMemo(() => {
     const map = new Map<string, AdminUpcomingEvent[]>();
-    localEvents.forEach((e) => {
+    visibleEvents.forEach((e) => {
       const key = toKey(new Date(e.start_time));
       const list = map.get(key) ?? [];
       list.push(e);
       map.set(key, list);
     });
     return map;
-  }, [localEvents]);
+  }, [visibleEvents]);
 
   const birthdaysByMonthDay = useMemo(
     () => groupBirthdaysByMonthDay(birthdayMembers),
@@ -660,10 +681,10 @@ export default function CalendarView({
   // disparaisse pas de la liste l'après-midi même.
   const upcomingEvents = useMemo(() => {
     const from = startOfTodayMs();
-    return localEvents
+    return visibleEvents
       .filter((e) => new Date(e.start_time).getTime() >= from)
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
-  }, [localEvents]);
+  }, [visibleEvents]);
 
   // Les vues "saison" (Résultats / Matchs officiels / Résultats officiels /
   // Événements) partagent le même principe : tout le calendrier de la
@@ -691,7 +712,7 @@ export default function CalendarView({
   }
 
   const seasonListEvents = useMemo(() => {
-    return localEvents
+    return visibleEvents
       .filter((e) => {
         if (!matchesSeasonView(e.event_type, view)) return false;
         // "Résultats" (des matchs officiels) : seulement ceux déjà joués,
@@ -711,7 +732,7 @@ export default function CalendarView({
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    localEvents,
+    visibleEvents,
     resultsTeams,
     resultsTeamSelector,
     activeResultsTeamIdResolved,
@@ -1258,6 +1279,31 @@ export default function CalendarView({
               className="rounded-full border border-ubac-yellow px-3 py-1 text-xs font-semibold text-ubac-yellow-dark hover:bg-ubac-yellow/10"
             >
               Aujourd&apos;hui
+            </button>
+          )}
+
+          {/* Retour Cindy/Sandrine Manzelle du 2026-08-24 : les
+              entraînements (2-3 par semaine et par équipe) noient les
+              événements plus rares pour qui cumule Bureau + joueuse +
+              parent. Un interrupteur simple, visible sur le Calendrier et
+              sur "Événements" (là où les entraînements peuvent
+              apparaître), masqué sur les vues Matchs/Résultats où ils
+              n'apparaissent de toute façon jamais. */}
+          {(!forcedView || forcedView === "clubEvents") && (
+            <button
+              onClick={() => setHideTrainings((v) => !v)}
+              className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+                hideTrainings
+                  ? "border-navy/30 bg-navy/10 text-navy"
+                  : "border-zinc-200 text-zinc-500 hover:bg-zinc-50"
+              }`}
+            >
+              {hideTrainings ? (
+                <EyeOff className="h-3.5 w-3.5" />
+              ) : (
+                <Eye className="h-3.5 w-3.5" />
+              )}
+              {hideTrainings ? "Entraînements masqués" : "Masquer les entraînements"}
             </button>
           )}
 
