@@ -519,6 +519,117 @@ export default function MembersTable({
   const menuItemClass =
     "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-zinc-700 hover:bg-zinc-50";
 
+  // Menu ⋮ (Voir/Modifier, WhatsApp, e-mail, Archiver/Réactiver, Supprimer)
+  // partagé entre la ligne de tableau (≥640px) et la carte mobile
+  // (<640px, voir plus bas) — un seul endroit à faire évoluer plutôt que
+  // deux copies qui divergent avec le temps. Le conteneur appelant doit
+  // être positionné (`relative`) pour que le menu déroulant s'ancre au
+  // bon endroit.
+  function renderMemberMenu(m: AdminMember) {
+    return (
+      <>
+        <div className="flex items-center justify-end">
+          <button
+            onClick={() => setOpenMenuId((cur) => (cur === m.id ? null : m.id))}
+            className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+          >
+            <MoreVertical className="h-4 w-4" />
+          </button>
+        </div>
+        {openMenuId === m.id && (
+          <>
+            <div className="fixed inset-0 z-30" onClick={() => setOpenMenuId(null)} />
+            <div className="absolute right-0 z-40 mt-1 w-56 rounded-xl border border-zinc-100 bg-white p-1.5 text-left shadow-lg">
+              <button
+                onClick={() => {
+                  setOpenMenuId(null);
+                  setDetailMemberId(m.id);
+                }}
+                className={menuItemClass}
+              >
+                <User className="h-3.5 w-3.5 text-zinc-500" />
+                Voir / Modifier le profil
+              </button>
+              {m.phone ? (
+                <WhatsAppButton
+                  phone={m.phone}
+                  message={`Bonjour ${m.firstName ? formatFirstName(m.firstName) : ""}, ici l'UBAC.`}
+                  label="Contacter sur WhatsApp"
+                  playerId={m.id}
+                  onTriggerClick={() => setOpenMenuId(null)}
+                  className={menuItemClass}
+                />
+              ) : (
+                <span
+                  title="Aucun numéro de téléphone connu"
+                  className={`${menuItemClass} cursor-not-allowed text-zinc-300 hover:bg-transparent`}
+                >
+                  <MessageCircle className="h-3.5 w-3.5" />
+                  Contacter sur WhatsApp
+                </span>
+              )}
+              {m.pendingParentEmail || m.email ? (
+                <button
+                  onClick={() => {
+                    setOpenMenuId(null);
+                    setEmailModalMemberId(m.id);
+                  }}
+                  className={menuItemClass}
+                >
+                  <Mail className="h-3.5 w-3.5 text-navy" />
+                  Envoyer un e-mail
+                </button>
+              ) : (
+                <span
+                  title="Aucun email connu pour ce membre"
+                  className={`${menuItemClass} cursor-not-allowed text-zinc-300 hover:bg-transparent`}
+                >
+                  <Mail className="h-3.5 w-3.5" />
+                  Envoyer un e-mail
+                </span>
+              )}
+              {m.archivedAt ? (
+                <>
+                  <button
+                    onClick={() => {
+                      setOpenMenuId(null);
+                      handleReactivate([m.id]);
+                    }}
+                    className={menuItemClass}
+                  >
+                    <RefreshCw className="h-3.5 w-3.5 text-zinc-500" />
+                    Réactiver le membre
+                  </button>
+                  <button
+                    onClick={() => {
+                      setOpenMenuId(null);
+                      setDeleteTarget(m);
+                    }}
+                    className={`${menuItemClass} text-red-600 hover:bg-red-50`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Supprimer définitivement
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => {
+                    setOpenMenuId(null);
+                    handleArchive([m.id]);
+                  }}
+                  className={`${menuItemClass} text-red-600 hover:bg-red-50`}
+                >
+                  <Archive className="h-3.5 w-3.5" />
+                  Archiver le membre
+                </button>
+              )}
+            </div>
+          </>
+        )}
+      </>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4">
       {actionError && (
@@ -629,7 +740,12 @@ export default function MembersTable({
         </div>
       )}
 
-      <div className="w-full overflow-x-auto rounded-2xl border border-l-4 border-zinc-100 border-l-ubac-yellow bg-white">
+      {/* Tableau classique à partir de 640px (sm) ; en dessous, les 9
+          colonnes ne laissaient plus que 2-3 caractères par cellule et
+          forçaient un défilement horizontal sur l'écran le plus consulté
+          au quotidien — remplacé par des cartes empilées, voir plus bas
+          (item 10 du topo, retour de Cindy du 2026-08-24). */}
+      <div className="hidden w-full overflow-x-auto rounded-2xl border border-l-4 border-zinc-100 border-l-ubac-yellow bg-white sm:block">
         <table className="w-full table-auto border-collapse text-sm">
           <thead>
             <tr className="border-b border-slate-100 bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-400">
@@ -803,109 +919,7 @@ export default function MembersTable({
                   )}
                 </td>
                 <td className="relative px-2 py-3" onClick={(e) => e.stopPropagation()}>
-                  <div className="flex items-center justify-end">
-                    <button
-                      onClick={() =>
-                        setOpenMenuId((cur) => (cur === m.id ? null : m.id))
-                      }
-                      className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </button>
-                  </div>
-                  {openMenuId === m.id && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-30"
-                        onClick={() => setOpenMenuId(null)}
-                      />
-                      <div className="absolute right-0 z-40 mt-1 w-56 rounded-xl border border-zinc-100 bg-white p-1.5 text-left shadow-lg">
-                        <button
-                          onClick={() => {
-                            setOpenMenuId(null);
-                            setDetailMemberId(m.id);
-                          }}
-                          className={menuItemClass}
-                        >
-                          <User className="h-3.5 w-3.5 text-zinc-500" />
-                          Voir / Modifier le profil
-                        </button>
-                        {m.phone ? (
-                          <WhatsAppButton
-                            phone={m.phone}
-                            message={`Bonjour ${m.firstName ? formatFirstName(m.firstName) : ""}, ici l'UBAC.`}
-                            label="Contacter sur WhatsApp"
-                            playerId={m.id}
-                            onTriggerClick={() => setOpenMenuId(null)}
-                            className={menuItemClass}
-                          />
-                        ) : (
-                          <span
-                            title="Aucun numéro de téléphone connu"
-                            className={`${menuItemClass} cursor-not-allowed text-zinc-300 hover:bg-transparent`}
-                          >
-                            <MessageCircle className="h-3.5 w-3.5" />
-                            Contacter sur WhatsApp
-                          </span>
-                        )}
-                        {m.pendingParentEmail || m.email ? (
-                          <button
-                            onClick={() => {
-                              setOpenMenuId(null);
-                              setEmailModalMemberId(m.id);
-                            }}
-                            className={menuItemClass}
-                          >
-                            <Mail className="h-3.5 w-3.5 text-navy" />
-                            Envoyer un e-mail
-                          </button>
-                        ) : (
-                          <span
-                            title="Aucun email connu pour ce membre"
-                            className={`${menuItemClass} cursor-not-allowed text-zinc-300 hover:bg-transparent`}
-                          >
-                            <Mail className="h-3.5 w-3.5" />
-                            Envoyer un e-mail
-                          </span>
-                        )}
-                        {m.archivedAt ? (
-                          <>
-                            <button
-                              onClick={() => {
-                                setOpenMenuId(null);
-                                handleReactivate([m.id]);
-                              }}
-                              className={menuItemClass}
-                            >
-                              <RefreshCw className="h-3.5 w-3.5 text-zinc-500" />
-                              Réactiver le membre
-                            </button>
-                            <button
-                              onClick={() => {
-                                setOpenMenuId(null);
-                                setDeleteTarget(m);
-                              }}
-                              className={`${menuItemClass} text-red-600 hover:bg-red-50`}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                              Supprimer définitivement
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              setOpenMenuId(null);
-                              handleArchive([m.id]);
-                            }}
-                            className={`${menuItemClass} text-red-600 hover:bg-red-50`}
-                          >
-                            <Archive className="h-3.5 w-3.5" />
-                            Archiver le membre
-                          </button>
-                        )}
-                      </div>
-                    </>
-                  )}
+                  {renderMemberMenu(m)}
                 </td>
               </tr>
             ))}
@@ -918,6 +932,119 @@ export default function MembersTable({
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Cartes empilées en dessous de 640px (sm) — même contenu que le
+          tableau (nom/prénom, indicateur de connexion, rôle Bureau,
+          équipes jouées/coachées, année/statut, email, téléphone), même
+          actions (tap = fiche, ⋮ = menu partagé via renderMemberMenu),
+          juste sans les colonnes qui n'ont plus de sens en carte (# et
+          case à cocher "tout sélectionner" restent, la sélection groupée
+          garde son utilité même sur mobile). */}
+      <div className="flex flex-col gap-3 sm:hidden">
+        {filtered.length > 0 && (
+          <label className="flex items-center gap-2 self-start text-xs font-medium text-zinc-500">
+            <input
+              type="checkbox"
+              checked={allFilteredSelected}
+              onChange={toggleAll}
+              className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
+            />
+            Tout sélectionner
+          </label>
+        )}
+        {filtered.map((m, index) => (
+          <div
+            key={m.id}
+            onClick={() => setDetailMemberId(m.id)}
+            className={`rounded-2xl border border-l-4 border-zinc-100 border-l-ubac-yellow bg-white p-3.5 shadow-sm transition-colors ${
+              m.archivedAt && openMenuId !== m.id ? "opacity-50" : ""
+            }`}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex min-w-0 items-start gap-2">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(m.id)}
+                  onChange={() => toggleOne(m.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
+                />
+                <div className="min-w-0">
+                  <p className="flex flex-wrap items-center gap-1 font-semibold text-zinc-900">
+                    <span
+                      title={
+                        m.lastLoginAt
+                          ? `Déjà connecté(e) — dernière connexion le ${formatLastLogin(m.lastLoginAt)}`
+                          : "Jamais connecté(e) à l'application"
+                      }
+                      className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center ${
+                        m.lastLoginAt ? "text-emerald-500" : "text-zinc-300"
+                      }`}
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="truncate">
+                      {fullLastName(m)} {m.firstName ? formatFirstName(m.firstName) : ""}
+                    </span>
+                    {m.bureauRole && (
+                      <Shield className="h-3.5 w-3.5 shrink-0 text-ubac-yellow-dark" />
+                    )}
+                    {m.archivedAt && (
+                      <span className="inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none text-zinc-500">
+                        Archivé
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-[11px] text-zinc-400">#{index + 1}</p>
+                </div>
+              </div>
+              <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
+                {renderMemberMenu(m)}
+              </div>
+            </div>
+
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {m.teams.map((t) => (
+                <span
+                  key={`m-player-${t.id}`}
+                  className="inline-flex max-w-full items-center justify-center truncate whitespace-nowrap rounded-full bg-navy/10 px-2 py-0.5 text-xs font-semibold leading-none text-navy"
+                >
+                  {t.category ?? t.name ?? "Équipe"}
+                </span>
+              ))}
+              {[...m.coachTeams, ...m.pendingCoachTeams].map((t) => (
+                <span
+                  key={`m-coach-${t.id}`}
+                  className="inline-flex items-center justify-center whitespace-nowrap rounded-full bg-purple-100 px-2 py-0.5 text-xs font-semibold leading-none text-purple-700"
+                >
+                  Coach {t.category ?? t.name ?? "Équipe"}
+                </span>
+              ))}
+              <PlayerYearBadge birthDate={m.birthDate} category={m.teams[0]?.category ?? m.category} />
+            </div>
+
+            {(m.email || m.phone) && (
+              <div className="mt-2 flex flex-col gap-1 border-t border-zinc-50 pt-2 text-xs text-zinc-600">
+                {m.email && <p className="truncate">{m.email}</p>}
+                {m.phone && (
+                  <p className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                    <Phone className="h-3 w-3 shrink-0 text-zinc-400" />
+                    {m.phone}
+                    <WhatsAppDirectButton
+                      phone={m.phone}
+                      message={`Bonjour ${m.firstName ? formatFirstName(m.firstName) : ""}, ici l'UBAC.`}
+                      playerId={m.id}
+                    />
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+        {filtered.length === 0 && (
+          <EmptyState icon={User} message="Aucun membre trouvé." className="rounded-2xl border border-zinc-100 bg-white" />
+        )}
       </div>
 
       {detailMemberId &&
