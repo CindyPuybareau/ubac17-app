@@ -76,7 +76,7 @@ export default async function ChildViewPage() {
       ? supabase
           .from("events")
           .select(
-            "id, title, event_type, is_home, location, salle, start_time, end_time, team_id, team_score, opponent_score, teams(name)"
+            "id, title, event_type, is_home, location, salle, start_time, end_time, team_id, team_score, opponent_score, teams(name), collectes(id)"
           )
           .in("team_id", teamIds)
           .order("start_time", { ascending: true })
@@ -143,6 +143,7 @@ export default async function ChildViewPage() {
     team_score: number | null;
     opponent_score: number | null;
     teams: { name: string | null } | null;
+    collectes: unknown;
   }[];
   const events: ChildEvent[] = eventRows.map((e) => ({
     id: e.id,
@@ -157,6 +158,11 @@ export default async function ChildViewPage() {
     teamName: e.teams?.name ?? null,
     teamScore: e.team_score,
     opponentScore: e.opponent_score,
+    // Badge "Payant" uniquement côté Enfant (retour de Cindy du
+    // 2026-08-25) : jamais de bouton/lien de paiement dans cet espace,
+    // conforme aux autres restrictions déjà en place (pas de RSVP, pas de
+    // détail financier).
+    isPaid: Array.isArray(e.collectes) ? e.collectes.length > 0 : Boolean(e.collectes),
   }));
 
   // RSVPs : nécessaires à la fois pour "qui vient au prochain rendez-vous"

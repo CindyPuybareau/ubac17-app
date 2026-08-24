@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Cake, ChevronLeft, ChevronRight, LayoutGrid, List, MapPin, PartyPopper, Sparkles } from "lucide-react";
+import { Cake, ChevronLeft, ChevronRight, Euro, LayoutGrid, List, MapPin, PartyPopper, Sparkles } from "lucide-react";
 import {
   styleFor,
   isMatchType,
@@ -369,6 +369,15 @@ export function EventRow({ event, faded }: { event: ChildEvent; faded?: boolean 
           {style.label}
         </span>
         {event.teamName && <span className="text-xs font-semibold text-zinc-500">{event.teamName}</span>}
+        {/* Badge seulement (retour de Cindy du 2026-08-25) : jamais de lien
+            de paiement affiché côté Enfant, voir isPaid dans
+            child-dashboard.tsx. */}
+        {event.isPaid && (
+          <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-800">
+            <Euro className="h-3 w-3" />
+            Payant
+          </span>
+        )}
       </div>
       <p className="mt-1 font-semibold text-zinc-900">
         {isMatchType(event.eventType)

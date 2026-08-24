@@ -39,6 +39,10 @@ export type ChildEvent = {
   teamName: string | null;
   teamScore: number | null;
   opponentScore: number | null;
+  // Badge "Payant" seulement (retour de Cindy du 2026-08-25) : jamais de
+  // lien de paiement affiché ici, voir le commentaire sur isPaid dans
+  // enfant/view/page.tsx.
+  isPaid: boolean;
 };
 
 export type ChildTeammate = {

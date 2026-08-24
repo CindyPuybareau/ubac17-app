@@ -44,25 +44,6 @@ const defaultTitles: Record<EventType, string> = {
   TOURNAMENT: "Tournoi",
 };
 
-// Garde-fou plutôt qu'une vraie limite métier : une saison complète
-// hebdomadaire tient largement dedans (~43 semaines), au-delà c'est plus
-// probablement une erreur de date de fin qu'une vraie intention.
-const MAX_OCCURRENCES = 52;
-
-// Ajoute N semaines à un "YYYY-MM-DDTHH:MM" (valeur d'un <input
-// datetime-local>) en ne touchant qu'à la date, jamais à l'heure — et en
-// restant en local tout du long, contrairement à un aller-retour par
-// toISOString() qui peut faire glisser la date d'un jour selon l'heure et
-// le fuseau.
-function addWeeksToLocalDatetime(datetimeLocal: string, weeks: number): string {
-  const [datePart, timePart] = datetimeLocal.split("T");
-  const [y, m, d] = datePart.split("-").map(Number);
-  const date = new Date(y, m - 1, d);
-  date.setDate(date.getDate() + weeks * 7);
-  const newDatePart = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-  return `${newDatePart}T${timePart}`;
-}
-
 // Le choix du type se fait en un geste, avec la couleur qu'aura ensuite
 // l'événement dans le calendrier : on voit ce qu'on crée.
 const typeChoices: { value: EventType; label: string; active: string }[] = [
@@ -103,8 +84,16 @@ export default function CreateEventForm({
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [notes, setNotes] = useState("");
-  const [repeatWeekly, setRepeatWeekly] = useState(false);
-  const [repeatUntil, setRepeatUntil] = useState("");
+  // Retour de Cindy du 2026-08-25 : remplace "Répéter chaque semaine" (voir
+  // git history pour l'ancienne version) — un événement payant crée
+  // automatiquement sa collecte de suivi (Cotisations -> Événements
+  // payants), avec les participants pré-remplis d'après la portée choisie
+  // ci-dessus (équipe/équipes/tout le club), et un lien de paiement externe
+  // (HelloAsso...) affiché directement sur la carte de l'événement pour que
+  // chaque famille paie elle-même.
+  const [isPaid, setIsPaid] = useState(false);
+  const [paidAmount, setPaidAmount] = useState("");
+  const [paidLink, setPaidLink] = useState("");
   // Portée de l'événement : un choix à plat, direct, plutôt que de faire
   // passer "équipes spécifiques" par un détour via "Tous les groupes" —
   // c'est ce détour qui donnait l'impression qu'on ne pouvait choisir
@@ -160,10 +149,6 @@ export default function CreateEventForm({
       setError("L'heure de fin est obligatoire pour un entraînement.");
       return;
     }
-    if (repeatWeekly && !repeatUntil) {
-      setError("Choisis une date de fin pour la répétition.");
-      return;
-    }
     if (scopeMode === "specific" && targetTeamIds.length === 0) {
       setError("Choisis au moins une équipe pour un événement réservé.");
       return;
@@ -175,124 +160,177 @@ export default function CreateEventForm({
       setError("Précise le nom de chaque besoin \"Autre\".");
       return;
     }
+    const amountNum = Number(paidAmount);
+    if (isPaid && (!paidAmount || !Number.isFinite(amountNum) || amountNum <= 0)) {
+      setError("Indique un tarif pour un événement payant.");
+      return;
+    }
 
     // null = "Tous les groupes" (comportement historique) — seulement
     // rempli quand la portée "Équipes spécifiques" est choisie explicitement.
     const effectiveTeamId = scopeMode === "single" ? teamId : "";
     const effectiveTargetTeamIds = scopeMode === "specific" ? targetTeamIds : null;
 
-    // Une occurrence par semaine, même jour même heure, jusqu'à la date de
-    // fin incluse — pas un moteur de récurrence : chaque ligne est un
-    // événement normal comme un autre une fois créée, modifiable ou
-    // supprimable seule sans toucher aux autres.
-    const occurrences = [startTime];
-    if (repeatWeekly && repeatUntil) {
-      for (let i = 1; i <= MAX_OCCURRENCES; i += 1) {
-        const candidate = addWeeksToLocalDatetime(startTime, i);
-        if (candidate.slice(0, 10) > repeatUntil) break;
-        occurrences.push(candidate);
-      }
-      if (occurrences.length > MAX_OCCURRENCES) {
-        setError(
-          `Trop de séances (${occurrences.length}) pour une seule création — choisis une date de fin plus proche (${MAX_OCCURRENCES} maximum).`
-        );
-        return;
-      }
-    }
-
     setLoading(true);
     setError(null);
 
     const supabase = createClient();
-    const rows = occurrences.map((dt) => ({
-      team_id: effectiveTeamId || null,
-      target_team_ids: effectiveTargetTeamIds,
-      title: title || defaultTitles[eventType],
-      event_type: eventType,
-      is_home: isMatch && isHome !== "" ? isHome === "true" : null,
-      location: location || null,
-      salle: salle || null,
-      start_time: new Date(dt).toISOString(),
-      // Même jour que le début de CETTE occurrence — pas celui de la
-      // première : sinon toute la série hériterait de la date du premier
-      // entraînement pour son heure de fin.
-      end_time: endTime ? new Date(`${dt.slice(0, 10)}T${endTime}`).toISOString() : null,
-      notes: notes || null,
-    }));
-
+    const eventName = title || defaultTitles[eventType];
     const { data: inserted, error } = await supabase
       .from("events")
-      .insert(rows)
+      .insert({
+        team_id: effectiveTeamId || null,
+        target_team_ids: effectiveTargetTeamIds,
+        title: eventName,
+        event_type: eventType,
+        is_home: isMatch && isHome !== "" ? isHome === "true" : null,
+        location: location || null,
+        salle: salle || null,
+        start_time: new Date(startTime).toISOString(),
+        end_time: endTime ? new Date(`${startTime.slice(0, 10)}T${endTime}`).toISOString() : null,
+        notes: notes || null,
+      })
       .select(
         "id, title, event_type, is_home, location, salle, start_time, end_time, notes, team_id, target_team_ids"
       )
-      .order("start_time", { ascending: true });
+      .single();
 
-    setLoading(false);
-
-    if (error) {
-      setError(error.message);
+    if (error || !inserted) {
+      setLoading(false);
+      setError(error?.message ?? "La création a échoué.");
       return;
     }
+
+    // Événement payant (retour de Cindy du 2026-08-25) : crée la collecte
+    // de suivi (Cotisations -> Événements payants), rattachée à cet
+    // événement, puis pré-remplit ses participants d'après la portée
+    // choisie plus haut (équipe/équipes/tout le club) — même geste que
+    // "Ajouter des participants" dans cotisations-manager.tsx, mais
+    // automatique. Best-effort après coup : une erreur ici ne doit pas
+    // faire croire que l'événement lui-même n'a pas été créé.
+    let paymentLink: string | null = null;
+    if (isPaid) {
+      paymentLink = paidLink.trim() || null;
+      const { data: collecte, error: collecteError } = await supabase
+        .from("collectes")
+        .insert({
+          name: eventName,
+          type: "EVENEMENT",
+          prix: amountNum,
+          event_id: inserted.id,
+          payment_link: paymentLink,
+        })
+        .select("id")
+        .single();
+
+      if (collecteError || !collecte) {
+        setLoading(false);
+        setError(
+          `Événement créé, mais la création du suivi de paiement a échoué : ${collecteError?.message ?? "erreur inconnue"}`
+        );
+        return;
+      }
+
+      let participantIds: string[] = [];
+      if (effectiveTeamId) {
+        const { data: rosterRows } = await supabase
+          .from("team_players")
+          .select("player_id")
+          .eq("team_id", effectiveTeamId);
+        participantIds = (rosterRows ?? []).map((r) => r.player_id);
+      } else if (effectiveTargetTeamIds && effectiveTargetTeamIds.length > 0) {
+        const { data: rosterRows } = await supabase
+          .from("team_players")
+          .select("player_id")
+          .in("team_id", effectiveTargetTeamIds);
+        participantIds = Array.from(new Set((rosterRows ?? []).map((r) => r.player_id)));
+      } else {
+        // "Tout le club" : tous les membres actifs (retour de Cindy — un
+        // événement payant sans équipe précise, ex. une AG ou un loto,
+        // concerne tout le monde).
+        const { data: allPlayers } = await supabase
+          .from("players")
+          .select("id")
+          .is("archived_at", null);
+        participantIds = (allPlayers ?? []).map((p) => p.id);
+      }
+
+      if (participantIds.length > 0) {
+        const { error: cotisationsError } = await supabase.from("cotisations").insert(
+          participantIds.map((playerId) => ({
+            player_id: playerId,
+            collecte_id: collecte.id,
+            saison: eventName,
+            prix: amountNum,
+            remise: 0,
+            paiement: 0,
+            statut: null,
+          }))
+        );
+        if (cotisationsError) {
+          setLoading(false);
+          setError(
+            `Événement payant créé, mais l'ajout des participants a échoué : ${cotisationsError.message}`
+          );
+          return;
+        }
+      }
+    }
+
+    setLoading(false);
 
     // Affichage immédiat sur le calendrier (voir le commentaire sur
     // onCreated plus haut) : construit ici plutôt qu'attendu du serveur,
     // avec les compteurs RSVP à zéro (aucune réponse n'existe encore pour
     // un événement qui vient d'être créé) — corrigé silencieusement par le
     // prochain rafraîchissement temps réel si besoin.
-    if (inserted && inserted.length > 0) {
-      onCreated?.(
-        inserted.map((row) => ({
-          id: row.id,
-          title: row.title,
-          event_type: row.event_type,
-          isHome: row.is_home,
-          attendanceRequestedAt: null,
-          teamScore: null,
-          opponentScore: null,
-          location: row.location,
-          salle: row.salle,
-          start_time: row.start_time,
-          end_time: row.end_time,
-          notes: row.notes,
-          teamId: row.team_id,
-          targetTeamIds: row.target_team_ids,
-          teamName: resolveTeamNameClient(row.team_id, row.target_team_ids, teams),
-          rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
-        }))
-      );
-    }
+    onCreated?.([
+      {
+        id: inserted.id,
+        title: inserted.title,
+        event_type: inserted.event_type,
+        isHome: inserted.is_home,
+        attendanceRequestedAt: null,
+        teamScore: null,
+        opponentScore: null,
+        location: inserted.location,
+        salle: inserted.salle,
+        start_time: inserted.start_time,
+        end_time: inserted.end_time,
+        notes: inserted.notes,
+        isPaid,
+        paymentLink,
+        teamId: inserted.team_id,
+        targetTeamIds: inserted.target_team_ids,
+        teamName: resolveTeamNameClient(inserted.team_id, inserted.target_team_ids, teams),
+        rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
+      },
+    ]);
 
     // Bonus, pas bloquant : voir event-push.ts. La famille apprend le
     // nouveau rendez-vous sans avoir à ouvrir l'appli ni passer par
-    // WhatsApp. Une seule notification même pour une série entière : dix
-    // pushs d'affilée pour dix entraînements identiques serait du bruit,
-    // pas un service.
-    const first = inserted?.[0];
-    if (first) {
-      const team = teams.find((t) => t.id === effectiveTeamId);
-      const when = new Date(first.start_time).toLocaleDateString("fr-FR", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-      });
-      const heure = new Date(first.start_time).toLocaleTimeString("fr-FR", {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-      const lieu = salle || location;
-      const label = typeChoices.find((c) => c.value === eventType)?.label ?? "Événement";
-      const body =
-        inserted.length > 1
-          ? `Nouveau : ${label} chaque semaine (${inserted.length} séances), à partir du ${when} à ${heure}${lieu ? ` · ${lieu}` : ""}.`
-          : `Nouveau : ${label}, ${when} à ${heure}${lieu ? ` · ${lieu}` : ""}.`;
-      sendEventPush(first.id, `UBAC — ${team ? teamLabel(team) : "Tous les groupes"}`, body);
-    }
+    // WhatsApp.
+    const team = teams.find((t) => t.id === effectiveTeamId);
+    const when = new Date(inserted.start_time).toLocaleDateString("fr-FR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    });
+    const heure = new Date(inserted.start_time).toLocaleTimeString("fr-FR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    const lieu = salle || location;
+    const label = typeChoices.find((c) => c.value === eventType)?.label ?? "Événement";
+    sendEventPush(
+      inserted.id,
+      `UBAC — ${team ? teamLabel(team) : "Tous les groupes"}`,
+      `Nouveau : ${label}, ${when} à ${heure}${lieu ? ` · ${lieu}` : ""}.`
+    );
 
-    // Besoins d'organisation chiffrés dès la création — rattachés à la
-    // première occurrence seulement (voir le commentaire sur draftNeeds
-    // plus haut). Best-effort : une erreur ici ne doit pas faire croire
-    // que l'événement lui-même n'a pas été créé, il l'a bien été.
+    // Besoins d'organisation chiffrés dès la création. Best-effort : une
+    // erreur ici ne doit pas faire croire que l'événement lui-même n'a pas
+    // été créé, il l'a bien été.
     const validNeeds = draftNeeds
       .map((n, i) => ({
         roleCode: n.roleCode,
@@ -301,10 +339,10 @@ export default function CreateEventForm({
         sortOrder: i,
       }))
       .filter((n) => n.count > 0);
-    if (first && validNeeds.length > 0) {
+    if (validNeeds.length > 0) {
       const { error: needsError } = await supabase.from("event_volunteer_needs").insert(
         validNeeds.map((n) => ({
-          event_id: first.id,
+          event_id: inserted.id,
           role_code: n.roleCode,
           custom_label: n.customLabel,
           required_count: n.count,
@@ -328,8 +366,9 @@ export default function CreateEventForm({
     setStartTime("");
     setEndTime("");
     setNotes("");
-    setRepeatWeekly(false);
-    setRepeatUntil("");
+    setIsPaid(false);
+    setPaidAmount("");
+    setPaidLink("");
     setScopeMode("single");
     setTargetTeamIds([]);
     setDraftNeeds([]);
@@ -515,33 +554,54 @@ export default function CreateEventForm({
         </div>
       </div>
 
+      {/* Retour de Cindy du 2026-08-25 : remplace "Répéter chaque semaine"
+          (voir le commentaire sur isPaid plus haut). */}
       <div className="flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3">
         <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
           <input
             type="checkbox"
-            checked={repeatWeekly}
-            onChange={(e) => setRepeatWeekly(e.target.checked)}
+            checked={isPaid}
+            onChange={(e) => setIsPaid(e.target.checked)}
             className="h-4 w-4 rounded border-zinc-300 text-navy focus:ring-navy"
           />
-          Répéter chaque semaine
+          Événement payant
         </label>
-        {repeatWeekly && (
-          <div>
-            <label className="mb-1 block text-xs font-medium text-zinc-600">
-              Jusqu&apos;au (inclus)
-            </label>
-            <input
-              type="date"
-              required={repeatWeekly}
-              min={startTime ? startTime.slice(0, 10) : undefined}
-              value={repeatUntil}
-              onChange={(e) => setRepeatUntil(e.target.value)}
-              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-            />
-            <p className="mt-1 text-[11px] text-zinc-400">
-              Une séance créée chaque semaine, même jour et même heure, jusqu&apos;à
-              cette date incluse ({MAX_OCCURRENCES} séances maximum en une fois).
-              Chacune reste ensuite modifiable ou supprimable indépendamment.
+        {isPaid && (
+          <div className="flex flex-col gap-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-600">
+                Tarif (€) *
+              </label>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                required={isPaid}
+                value={paidAmount}
+                onChange={(e) => setPaidAmount(e.target.value)}
+                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-600">
+                Lien HelloAsso (optionnel)
+              </label>
+              <input
+                type="url"
+                placeholder="https://www.helloasso.com/..."
+                value={paidLink}
+                onChange={(e) => setPaidLink(e.target.value)}
+                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              />
+            </div>
+            <p className="text-[11px] text-zinc-400">
+              Crée automatiquement un suivi de paiement dans Cotisations →
+              Événements payants, avec les familles concernées déjà ajoutées
+              d&apos;après l&apos;équipe (ou les équipes) choisie ci-dessus.
+              Le lien, s&apos;il est renseigné, s&apos;affiche directement sur la
+              carte de l&apos;événement pour que chaque famille paie
+              elle-même — ajoutable ou modifiable après coup depuis
+              Cotisations si tu ne l&apos;as pas encore.
             </p>
           </div>
         )}

@@ -168,6 +168,13 @@ export type AdminCollecte = {
   name: string;
   type: CollecteType;
   prix: number | null;
+  // Retour de Cindy du 2026-08-25 : un événement payant créé depuis "Créer
+  // un événement" (create-event-form.tsx) rattache automatiquement sa
+  // collecte à l'événement, avec un lien de paiement externe affiché sur sa
+  // carte — voir aussi AdminUpcomingEvent.paymentLink plus bas.
+  eventId: string | null;
+  eventStartTime: string | null;
+  paymentLink: string | null;
 };
 
 // Default season price per team category (Bureau-editable, see
@@ -283,6 +290,14 @@ export type AdminUpcomingEvent = {
   start_time: string;
   end_time: string | null;
   notes: string | null;
+  // Retour de Cindy du 2026-08-25 ("Créer un événement" -> "Événement
+  // payant") : dérivé de la présence d'une collecte rattachée à cet
+  // événement (collectes.event_id) — jamais stocké sur events lui-même, la
+  // collecte reste la source de vérité pour le prix/suivi des paiements
+  // (Cotisations -> Événements payants). paymentLink alimente le bouton
+  // "Payer" affiché sur la carte ; null tant qu'il n'a pas été renseigné.
+  isPaid: boolean;
+  paymentLink: string | null;
   teamId: string | null;
   // Événement club réservé à quelques équipes (voir 20261012000000) —
   // null pour un événement à une seule équipe ou vraiment "Tous les
@@ -358,6 +373,18 @@ function resolveEventTeamName<T extends { name: string | null }>(
     return names.length > 0 ? names.join(", ") : "Équipes sélectionnées";
   }
   return "Tous les groupes";
+}
+
+// Retour de Cindy du 2026-08-25 ("Créer un événement" -> "Événement
+// payant") : events.collectes est une jointure inverse (collectes.event_id
+// -> events.id), donc un tableau côté PostgREST même s'il n'y a jamais
+// qu'une seule collecte par événement en pratique — on prend la première.
+function resolvePaidInfo(collectes: unknown): { isPaid: boolean; paymentLink: string | null } {
+  const rows = (Array.isArray(collectes) ? collectes : collectes ? [collectes] : []) as {
+    payment_link: string | null;
+  }[];
+  if (rows.length === 0) return { isPaid: false, paymentLink: null };
+  return { isPaid: true, paymentLink: rows[0].payment_link };
 }
 
 // Plain (non-component) helper so the "now" read doesn't happen inside the
@@ -780,12 +807,12 @@ export default async function DashboardPage() {
         .order("saison", { ascending: false }),
       supabase
         .from("collectes")
-        .select("id, name, type, prix")
+        .select("id, name, type, prix, event_id, payment_link, events(start_time)")
         .order("created_at", { ascending: false }),
       supabase
         .from("events")
         .select(
-          "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, teams(id, name, category)"
+          "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, teams(id, name, category), collectes(payment_link)"
         )
         .order("start_time", { ascending: true }),
       supabase.from("parent_player").select("parent_id, player_id"),
@@ -1175,12 +1202,21 @@ export default async function DashboardPage() {
       mapCotisationRow(c, paymentsByCotisationId)
     );
 
-    adminCollectes = (collectesRes.data ?? []).map((c) => ({
-      id: c.id,
-      name: c.name,
-      type: c.type as CollecteType,
-      prix: c.prix,
-    }));
+    adminCollectes = (collectesRes.data ?? []).map((c) => {
+      // Jointure directe (collectes.event_id -> events.id) : un seul objet,
+      // pas un tableau, contrairement à resolvePaidInfo plus haut qui lit
+      // la relation dans l'autre sens.
+      const event = c.events as unknown as { start_time: string } | null;
+      return {
+        id: c.id,
+        name: c.name,
+        type: c.type as CollecteType,
+        prix: c.prix,
+        eventId: c.event_id ?? null,
+        eventStartTime: event?.start_time ?? null,
+        paymentLink: c.payment_link ?? null,
+      };
+    });
 
     adminCategoryTariffs = (categoryTariffsRes.data ?? []).map((t) => ({
       category: t.category,
@@ -1221,6 +1257,7 @@ export default async function DashboardPage() {
         category: string | null;
       } | null;
       const rosterSize = team ? rosterByTeam.get(team.id)?.length ?? 0 : 0;
+      const paidInfo = resolvePaidInfo(e.collectes);
       return {
         id: e.id,
         title: e.title,
@@ -1234,6 +1271,8 @@ export default async function DashboardPage() {
         start_time: e.start_time,
         end_time: e.end_time,
         notes: e.notes,
+        isPaid: paidInfo.isPaid,
+        paymentLink: paidInfo.paymentLink,
         teamId: team?.id ?? null,
         targetTeamIds: e.target_team_ids ?? null,
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, teamsById),
@@ -1312,7 +1351,7 @@ export default async function DashboardPage() {
         supabase
           .from("events")
           .select(
-            "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, teams(id, name, category)"
+            "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, teams(id, name, category), collectes(payment_link)"
           )
           .or(teamOrClubWideFilter(coachCalendarTeamIds))
           .order("start_time", { ascending: true }),
@@ -1747,6 +1786,7 @@ export default async function DashboardPage() {
         category: string | null;
       } | null;
       const rosterSize = team ? rosterByTeam.get(team.id)?.length ?? 0 : 0;
+      const paidInfo = resolvePaidInfo(e.collectes);
       return {
         id: e.id,
         title: e.title,
@@ -1760,6 +1800,8 @@ export default async function DashboardPage() {
         start_time: e.start_time,
         end_time: e.end_time,
         notes: e.notes,
+        isPaid: paidInfo.isPaid,
+        paymentLink: paidInfo.paymentLink,
         teamId: team?.id ?? null,
         targetTeamIds: e.target_team_ids ?? null,
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, clubTeamById),
@@ -1866,7 +1908,7 @@ export default async function DashboardPage() {
       supabase
         .from("events")
         .select(
-          "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, teams(id, name, category)"
+          "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, teams(id, name, category), collectes(payment_link)"
         )
         .or(teamOrClubWideFilter(allTeamIds))
         .order("start_time", { ascending: true }),
@@ -2040,6 +2082,7 @@ export default async function DashboardPage() {
         name: string | null;
         category: string | null;
       } | null;
+      const paidInfo = resolvePaidInfo(e.collectes);
       return {
         id: e.id,
         title: e.title,
@@ -2053,6 +2096,8 @@ export default async function DashboardPage() {
         start_time: e.start_time,
         end_time: e.end_time,
         notes: e.notes,
+        isPaid: paidInfo.isPaid,
+        paymentLink: paidInfo.paymentLink,
         teamId: team?.id ?? null,
         targetTeamIds: e.target_team_ids ?? null,
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, teamsById),

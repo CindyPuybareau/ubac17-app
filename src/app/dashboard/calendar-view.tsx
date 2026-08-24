@@ -10,6 +10,8 @@ import {
   Cake,
   Check,
   Clock,
+  Euro,
+  ExternalLink,
   Eye,
   EyeOff,
   LayoutGrid,
@@ -845,6 +847,16 @@ export default function CalendarView({
                   {homeAway}
                 </span>
               )}
+              {/* Retour de Cindy du 2026-08-25 ("Créer un événement" ->
+                  "Événement payant") : badge visible sur tous les espaces
+                  (y compris Enfant, en lecture seule) — voir
+                  child-calendar-tab.tsx pour son équivalent. */}
+              {event.isPaid && (
+                <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-800">
+                  <Euro className="h-3 w-3" />
+                  Payant
+                </span>
+              )}
             </span>
             {isMatchType(event.event_type) ? (
               <>
@@ -922,6 +934,23 @@ export default function CalendarView({
             <StickyNote className="h-3.5 w-3.5 shrink-0 translate-y-0.5" />
             {event.notes}
           </p>
+        )}
+
+        {/* Bouton "Payer" (retour de Cindy du 2026-08-25) : accessible à
+            qui voit la carte (Bureau/Coach/Famille — jamais côté Enfant,
+            qui n'a que le badge "Payant" ci-dessus), pas seulement à
+            canManageEvent — chaque famille paie elle-même, sans envoi
+            groupé à faire à la main. */}
+        {event.isPaid && event.paymentLink && (
+          <a
+            href={event.paymentLink}
+            target="_blank"
+            rel="noreferrer"
+            className="flex w-fit items-center gap-1.5 rounded-full bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-600"
+          >
+            <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+            Payer via HelloAsso
+          </a>
         )}
 
         <ItineraryButton query={venueQuery(event)} />

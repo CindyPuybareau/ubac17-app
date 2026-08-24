@@ -6,7 +6,10 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
+  ExternalLink,
   Gavel,
+  Link2,
+  Pencil,
   Plus,
   Search,
   ShieldCheck,
@@ -209,6 +212,13 @@ export default function CotisationsManager({
   const [selectedNewIds, setSelectedNewIds] = useState<Set<string>>(new Set());
   const [addingSaving, setAddingSaving] = useState(false);
 
+  // Retour de Cindy du 2026-08-25 : le lien HelloAsso peut être ajouté ou
+  // corrigé après coup ici, sans repasser par l'événement — utile pour un
+  // événement payant créé sans lien renseigné, ou un lien mal collé.
+  const [editingLink, setEditingLink] = useState(false);
+  const [linkDraft, setLinkDraft] = useState("");
+  const [savingLink, setSavingLink] = useState(false);
+
   const contactEmailByPlayerId = useMemo(() => {
     const map: Record<string, string> = {};
     members.forEach((m) => {
@@ -299,6 +309,24 @@ export default function CotisationsManager({
     router.refresh();
   }
 
+  async function saveLink() {
+    if (!selectedCollecte) return;
+    setSavingLink(true);
+    setError(null);
+    const supabase = createClient();
+    const { error: updateError } = await supabase
+      .from("collectes")
+      .update({ payment_link: linkDraft.trim() || null })
+      .eq("id", selectedCollecte.id);
+    setSavingLink(false);
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+    setEditingLink(false);
+    router.refresh();
+  }
+
   const tabButtonClass = (active: boolean) =>
     `flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${
       // Inactive keeps the club navy (icon + label) instead of grey: on a
@@ -371,6 +399,11 @@ export default function CotisationsManager({
                 {c.name}
                 <span className="ml-1.5 text-xs opacity-70">
                   · {collecteTypeLabels[c.type]}
+                  {/* Retour de Cindy du 2026-08-25 : la date de l'événement
+                      rattaché aide à retrouver la bonne collecte quand
+                      plusieurs événements payants portent un nom proche. */}
+                  {c.eventStartTime &&
+                    ` · ${new Date(c.eventStartTime).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}`}
                 </span>
               </button>
             ))}
@@ -428,6 +461,78 @@ export default function CotisationsManager({
           {selectedCollecte ? (
             <div className="flex flex-col gap-4">
               <KpiHeader cotisations={collecteCotisations} />
+
+              {/* Lien HelloAsso (retour de Cindy du 2026-08-25) : affiché
+                  ici même pour une collecte non liée à un événement (ex.
+                  Stage) — un lien de paiement externe peut être utile pour
+                  n'importe quel type de collecte, pas seulement un
+                  "Événement". Éditable après coup si absent ou à corriger. */}
+              <div className="flex flex-col gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
+                <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  <Link2 className="h-3.5 w-3.5 text-navy" />
+                  Lien de paiement (HelloAsso...)
+                </p>
+                {editingLink ? (
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <input
+                      type="url"
+                      autoFocus
+                      placeholder="https://www.helloasso.com/..."
+                      value={linkDraft}
+                      onChange={(e) => setLinkDraft(e.target.value)}
+                      className="min-w-0 flex-1 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+                    />
+                    <div className="flex shrink-0 gap-2">
+                      <button
+                        onClick={saveLink}
+                        disabled={savingLink}
+                        className="rounded-full bg-ubac-yellow px-3.5 py-1.5 text-xs font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+                      >
+                        {savingLink ? "Enregistrement..." : "Enregistrer"}
+                      </button>
+                      <button
+                        onClick={() => setEditingLink(false)}
+                        className="text-xs text-zinc-500 hover:underline"
+                      >
+                        Annuler
+                      </button>
+                    </div>
+                  </div>
+                ) : selectedCollecte.paymentLink ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <a
+                      href={selectedCollecte.paymentLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex min-w-0 items-center gap-1.5 truncate text-sm text-navy hover:underline"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{selectedCollecte.paymentLink}</span>
+                    </a>
+                    <button
+                      onClick={() => {
+                        setLinkDraft(selectedCollecte.paymentLink ?? "");
+                        setEditingLink(true);
+                      }}
+                      title="Modifier le lien"
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setLinkDraft("");
+                      setEditingLink(true);
+                    }}
+                    className="flex w-fit items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Ajouter un lien de paiement
+                  </button>
+                )}
+              </div>
 
               <div className="flex flex-col gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
                 <button
