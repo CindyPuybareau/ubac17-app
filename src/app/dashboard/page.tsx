@@ -2467,8 +2467,17 @@ export default async function DashboardPage() {
           avec Cindy via question directe) : avatar + "Bonjour" + prénom
           à gauche, grand logo en filigrane semi-transparent à droite
           (derrière les icônes, jamais au-dessus : pointer-events-none),
-          icônes fonctionnelles inchangées par-dessus. */}
-      <header className="sticky top-0 z-10 relative overflow-hidden bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-4 shadow-md sm:px-6 sm:py-5">
+          icônes fonctionnelles inchangées par-dessus.
+          Pas d'overflow-hidden ici (retour de Cindy du 2026-08-25,
+          "quand je clique sur les notifications, elles sont masquées") :
+          combiné à position sticky sur ce même élément, overflow-hidden
+          rognait le popover des notifications (position fixed/absolute,
+          voir notification-bell.tsx) dès qu'il dépassait la hauteur de
+          l'en-tête — un piège CSS classique de ce duo sticky+overflow.
+          Le logo en filigrane ci-dessous, lui, ne déborde que de
+          quelques pixels (-right-2) : invisible en pratique sans
+          clipping. */}
+      <header className="sticky top-0 z-10 relative bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-4 shadow-md sm:px-6 sm:py-5">
         {/* Léger reflet en haut, pour donner un peu de profondeur au
             dégradé plutôt qu'un aplat totalement plat. */}
         <div

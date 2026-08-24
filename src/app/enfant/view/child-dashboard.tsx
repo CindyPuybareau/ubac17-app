@@ -268,8 +268,12 @@ export default function ChildDashboard({
           (retour de Cindy du 2026-08-24, item 7 du topo : "logo plus
           présent", propre à l'Espace Enfant) — plus grand et moins
           transparent, sans empiéter sur les icônes qui restent
-          par-dessus. */}
-      <header className="sticky top-0 z-10 relative overflow-hidden bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-4 shadow-md sm:px-6 sm:py-5">
+          par-dessus.
+          Pas d'overflow-hidden (retour de Cindy du 2026-08-25, même
+          correctif que page.tsx) : combiné à position sticky sur ce même
+          élément, ça rognait le popover des notifications dès qu'il
+          dépassait la hauteur de l'en-tête. */}
+      <header className="sticky top-0 z-10 relative bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-4 shadow-md sm:px-6 sm:py-5">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/[0.06] to-transparent"
