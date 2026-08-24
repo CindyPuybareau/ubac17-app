@@ -2497,46 +2497,38 @@ export default async function DashboardPage() {
           className="pointer-events-none absolute -right-2 top-1/2 h-28 w-28 -translate-y-1/2 bg-contain bg-right bg-no-repeat opacity-25 sm:h-36 sm:w-36"
           style={{ backgroundImage: "url(/logo.png)" }}
         />
-        {/* Retour de Cindy du 2026-08-24 ("remonter le planning de la
-            semaine a hauteur de l'existant photo et symbole") : sur PC,
-            photo/Bonjour, bandeau "Cette semaine" et icônes sur UNE seule
-            ligne (sm:contents fait sortir les deux blocs de leur wrapper
-            mobile pour rejoindre le bandeau comme 3 éléments flex côte à
-            côte, ordonnés via sm:order-*). Sur mobile, le wrapper reste un
-            vrai bloc (photo + icônes sur la même ligne) et le bandeau
-            repasse dessous, comme confirmé "propre" par Cindy. */}
-        {/* Retour de Cindy du 2026-08-25 ("le texte et le calendrier de 7
-            jours doit etre centré") : une grille 1fr/auto/photo et icônes
-            avaient des largeurs différentes, donc "centrer dans l'espace
-            restant" (flex-1) ne tombait pas au vrai centre de la ligne.
-            Grille à 3 colonnes 1fr/auto/1fr : les deux colonnes extrêmes
-            étant strictement égales, la colonne du milieu (le bandeau)
-            tombe exactement au centre géométrique de la ligne, quelle que
-            soit la largeur réelle de la photo ou des icônes. */}
-        <div className="relative mx-auto grid w-full max-w-[1600px] grid-cols-1 items-center gap-3 sm:grid-cols-[1fr_minmax(0,auto)_1fr] sm:gap-4">
-          <div className="flex items-center justify-between gap-3 sm:contents">
-            <div className="flex min-w-0 items-center gap-3 sm:col-start-1 sm:shrink-0 sm:justify-self-start">
-              <AvatarUpload userId={user.id} avatarUrl={profile?.avatar_url ?? null} name={profile?.first_name ?? null} size="lg" />
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">
-                  Bonjour
-                </p>
-                <h1 className="truncate text-xl font-bold text-white sm:text-2xl">
-                  {profile?.first_name ? formatFirstName(profile.first_name) : user.email}
-                </h1>
-              </div>
+        {/* Retour de Cindy du 2026-08-25 ("toujours pas bon tout doit etre
+            aligné") : la grille 1fr/auto/1fr essayée avant ne tombait
+            toujours pas au centre réel. Repris avec une méthode qui ne
+            dépend plus du tout de la largeur de la photo ou des icônes —
+            photo et icônes restent une simple ligne flex justify-between
+            (déjà correcte, elles s'affichaient bien aux deux bords), et le
+            bandeau devient une superposition (absolute, left-1/2
+            -translate-x-1/2) centrée sur ce conteneur relatif lui-même :
+            un centrage géométrique garanti, indépendant de tout calcul de
+            grille/flex fragile. */}
+        <div className="relative mx-auto flex w-full max-w-[1600px] flex-col gap-3 sm:min-h-[3.5rem] sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <AvatarUpload userId={user.id} avatarUrl={profile?.avatar_url ?? null} name={profile?.first_name ?? null} size="lg" />
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">
+                Bonjour
+              </p>
+              <h1 className="truncate text-xl font-bold text-white sm:text-2xl">
+                {profile?.first_name ? formatFirstName(profile.first_name) : user.email}
+              </h1>
             </div>
-            <div className="flex shrink-0 items-center gap-1 sm:col-start-3 sm:justify-self-end">
-              <OrgChartButton />
-              <NotificationBell />
-              <MobileMenuButton />
-            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <OrgChartButton />
+            <NotificationBell />
+            <MobileMenuButton />
           </div>
           {/* Bandeau "Cette semaine" (retour de Cindy/Sandrine Manzelle du
               2026-08-24) : jamais pour le Bureau, voir showHeaderWeekBanner
               plus haut. */}
           {showHeaderWeekBanner && (
-            <div className="min-w-0 sm:col-start-2 sm:justify-self-center">
+            <div className="sm:absolute sm:left-1/2 sm:top-1/2 sm:max-w-[calc(100%-18rem)] sm:-translate-x-1/2 sm:-translate-y-1/2">
               <WeekStripBanner events={headerWeekEvents} />
             </div>
           )}

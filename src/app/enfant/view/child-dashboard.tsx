@@ -286,39 +286,31 @@ export default function ChildDashboard({
           className="pointer-events-none absolute -right-2 top-1/2 h-36 w-36 -translate-y-1/2 bg-contain bg-right bg-no-repeat opacity-40 sm:h-44 sm:w-44"
           style={{ backgroundImage: "url(/logo.png)" }}
         />
-        {/* Retour de Cindy du 2026-08-24 ("remonter le planning de la
-            semaine a hauteur de l'existant photo et symbole"), même
-            restructuration que page.tsx : sur PC, photo/Bonjour, bandeau
-            "Cette semaine" et icônes sur UNE seule ligne (sm:contents fait
-            sortir les deux blocs de leur wrapper mobile). Sur mobile, le
-            wrapper reste un vrai bloc (photo + icônes ensemble) et le
-            bandeau repasse dessous. */}
-        {/* Retour de Cindy du 2026-08-25 ("le texte et le calendrier de 7
-            jours doit etre centré"), même correctif que page.tsx : grille
-            1fr/auto/1fr — les deux colonnes extrêmes égales garantissent
-            que le bandeau tombe au vrai centre géométrique de la ligne,
-            quelle que soit la largeur réelle de la photo/des icônes
-            (centrer "dans l'espace restant" via flex-1 ne suffisait pas,
-            cet espace n'étant pas symétrique). */}
-        <div className="relative mx-auto grid w-full max-w-[1600px] grid-cols-1 items-center gap-3 sm:grid-cols-[1fr_minmax(0,auto)_1fr] sm:gap-4">
-          <div className="flex items-center justify-between gap-3 sm:contents">
-            <div className="flex min-w-0 items-center gap-3 sm:col-start-1 sm:shrink-0 sm:justify-self-start">
-              <ChildAvatarUpload avatarUrl={avatarUrl} name={firstName} />
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">
-                  Bonjour
-                </p>
-                <h1 className="truncate text-xl font-bold text-white sm:text-2xl">
-                  {formatFirstName(firstName) || "champion"}
-                </h1>
-              </div>
-            </div>
-            <div className="flex shrink-0 items-center gap-1 sm:col-start-3 sm:justify-self-end">
-              <OrgChartButton />
-              <ChildNotificationBell initialNotifications={notifications} initialEnabled={notificationsEnabled} />
+        {/* Retour de Cindy du 2026-08-25 ("toujours pas bon tout doit etre
+            aligné"), même correctif que page.tsx : la grille 1fr/auto/1fr
+            essayée avant ne tombait toujours pas au centre réel. Photo et
+            icônes redeviennent une simple ligne flex justify-between
+            (déjà correcte en pratique), et le bandeau devient une
+            superposition (absolute, left-1/2 -translate-x-1/2) centrée
+            sur ce conteneur relatif — centrage géométrique garanti,
+            indépendant de la largeur de la photo/des icônes. */}
+        <div className="relative mx-auto flex w-full max-w-[1600px] flex-col gap-3 sm:min-h-[3.5rem] sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <ChildAvatarUpload avatarUrl={avatarUrl} name={firstName} />
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">
+                Bonjour
+              </p>
+              <h1 className="truncate text-xl font-bold text-white sm:text-2xl">
+                {formatFirstName(firstName) || "champion"}
+              </h1>
             </div>
           </div>
-          <div className="min-w-0 sm:col-start-2 sm:justify-self-center">
+          <div className="flex shrink-0 items-center gap-1">
+            <OrgChartButton />
+            <ChildNotificationBell initialNotifications={notifications} initialEnabled={notificationsEnabled} />
+          </div>
+          <div className="sm:absolute sm:left-1/2 sm:top-1/2 sm:max-w-[calc(100%-18rem)] sm:-translate-x-1/2 sm:-translate-y-1/2">
             <WeekStripBanner events={headerWeekEvents} />
           </div>
         </div>
