@@ -518,6 +518,20 @@ export default function TeamCard({
         <td colSpan={5} />
       </tr>
     ) : null;
+  // Même repli, en carte — voir renderMemberCard plus bas pour le reste
+  // de la liste.
+  const legacyPendingCoachCard =
+    team.pendingCoaches.length === 0 && team.pendingCoachNames ? (
+      <div
+        key="legacy-pending-coach-card"
+        className="rounded-2xl border border-l-4 border-zinc-100 border-l-navy bg-white p-3.5 shadow-sm"
+      >
+        <p className="font-semibold text-zinc-900">{team.pendingCoachNames}</p>
+        <span className="mt-1 inline-flex items-center justify-center whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold leading-none text-amber-700">
+          Coach
+        </span>
+      </div>
+    ) : null;
 
   // La fiche est la source de vérité : dès que le Bureau modifie le
   // téléphone/email d'inscription, cette valeur doit primer partout,
@@ -546,38 +560,101 @@ export default function TeamCard({
 
   const theme = categoryTheme(team.category);
 
+  // Calcul partagé entre la ligne de tableau (renderMemberRow, ≥640px) et
+  // la carte mobile (renderMemberCard, <640px, voir plus bas) — même
+  // correctif que members-table.tsx/cotisation-participants-table.tsx :
+  // une seule source de vérité pour ces champs dérivés plutôt que deux
+  // copies qui pourraient diverger.
+  function computeRowData(m: MemberRow) {
+    const { phone, email } = contactsFor(m.id);
+    const detail = memberDetailsByPlayerId?.[m.id];
+    const role = roleBadge(m.role);
+    // La catégorie de l'équipe prime sur players.category : ce
+    // dernier vient de l'import du club et vaut parfois "U13"
+    // là où l'équipe est U13F. Dans une carte d'équipe, toutes
+    // les lignes appartiennent à cette équipe, donc c'est elle
+    // qui fait foi.
+    const category = team.category ?? detail?.category;
+    // PlayerYearBadge renders nothing when the birth date is
+    // missing (or the category can't be read), so the status is
+    // computed here too, to fall back on a neutral dash rather
+    // than an empty cell.
+    const birthDate = m.player?.birthDate ?? detail?.birthDate ?? null;
+    // L'ancienneté d'un joueur se lit dans la catégorie de
+    // l'équipe où il joue. Celle d'un coach, non : la catégorie
+    // de l'équipe qu'il encadre n'a aucun rapport avec son âge,
+    // c'est sa propre fiche qui fait foi (un coach Séniors né en
+    // 1986 est "Old Soldier", pas "Sparring Partner" des U13).
+    const statusCategory =
+      m.role === "JOUEUR" ? team.category : (detail?.category ?? team.category);
+    const yearStatus = computePlayerYearStatus(birthDate, statusCategory);
+    // Belongs to another team as well: he was lent to this one,
+    // so the useful action is to send him back — a plain
+    // "Retirer" that only drops this membership. A player of
+    // this team only gets the "Affecter" picker instead, since
+    // removing him here would leave him with no team at all.
+    const otherTeams = (detail?.teams ?? []).filter((t) => t.id !== team.id);
+    const isLentIn = otherTeams.length > 0;
+    return { phone, email, detail, role, category, birthDate, statusCategory, yearStatus, isLentIn };
+  }
+
+  // Boutons d'action (retirer coach/joueur, affecter à une autre équipe) —
+  // identiques dans la ligne de tableau et la carte mobile.
+  function renderActions(m: MemberRow, isLentIn: boolean) {
+    return (
+      <>
+        {(m.role === "COACH" || m.role === "COACH_PENDING") && canAssignCoach && (
+          <button
+            onClick={() =>
+              m.role === "COACH"
+                ? setRemoveCoachTarget({ id: m.id, first_name: m.firstName, last_name: m.lastName })
+                : setRemovePendingCoachTarget({ id: m.id, first_name: m.firstName, last_name: m.lastName })
+            }
+            title={`Retirer comme coach de ${team.name ?? "cette équipe"}`}
+            className="rounded-full p-1.5 text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        )}
+        {m.player &&
+          !readOnly &&
+          (isLentIn ? (
+            canRemoveMembers && (
+              <button
+                onClick={() => setRemoveTarget(m.player)}
+                title={`Retirer de ${team.name ?? "cette équipe"}`}
+                className="rounded-full p-1.5 text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            )
+          ) : canSwitchTeam ? (
+            <button
+              onClick={() => openSwitch(m.player!)}
+              title="Affecter à une autre équipe"
+              className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-navy"
+            >
+              <ArrowRightLeft className="h-3.5 w-3.5" />
+            </button>
+          ) : (
+            canRemoveMembers && (
+              <button
+                onClick={() => setRemoveTarget(m.player)}
+                className="shrink-0 text-xs font-medium text-red-600 hover:underline"
+              >
+                Retirer
+              </button>
+            )
+          ))}
+      </>
+    );
+  }
+
   // Une seule definition de ligne pour les deux sections : Encadrement et
   // Joueurs affichent les memes colonnes, seul le fond change.
   function renderMemberRow(m: MemberRow, isStaff: boolean) {
-          const { phone, email } = contactsFor(m.id);
-          const detail = memberDetailsByPlayerId?.[m.id];
-          const role = roleBadge(m.role);
-          // La catégorie de l'équipe prime sur players.category : ce
-          // dernier vient de l'import du club et vaut parfois "U13"
-          // là où l'équipe est U13F. Dans une carte d'équipe, toutes
-          // les lignes appartiennent à cette équipe, donc c'est elle
-          // qui fait foi.
-          const category = team.category ?? detail?.category;
-          // PlayerYearBadge renders nothing when the birth date is
-          // missing (or the category can't be read), so the status is
-          // computed here too, to fall back on a neutral dash rather
-          // than an empty cell.
-          const birthDate = m.player?.birthDate ?? detail?.birthDate ?? null;
-          // L'ancienneté d'un joueur se lit dans la catégorie de
-          // l'équipe où il joue. Celle d'un coach, non : la catégorie
-          // de l'équipe qu'il encadre n'a aucun rapport avec son âge,
-          // c'est sa propre fiche qui fait foi (un coach Séniors né en
-          // 1986 est "Old Soldier", pas "Sparring Partner" des U13).
-          const statusCategory =
-            m.role === "JOUEUR" ? team.category : (detail?.category ?? team.category);
-          const yearStatus = computePlayerYearStatus(birthDate, statusCategory);
-          // Belongs to another team as well: he was lent to this one,
-          // so the useful action is to send him back — a plain
-          // "Retirer" that only drops this membership. A player of
-          // this team only gets the "Affecter" picker instead, since
-          // removing him here would leave him with no team at all.
-          const otherTeams = (detail?.teams ?? []).filter((t) => t.id !== team.id);
-          const isLentIn = otherTeams.length > 0;
+          const { phone, email, detail, role, category, birthDate, statusCategory, yearStatus, isLentIn } =
+            computeRowData(m);
     return (
             <tr
               key={m.key}
@@ -670,67 +747,107 @@ export default function TeamCard({
                 )}
               </td>
               <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
-                <div className="flex items-center gap-1">
-                  {/* Icône WhatsApp retirée d'ici (retour de Cindy du
-                      2026-08-23, "doublon du symbole whattsapp dans les
-                      cartes des équipes") : WhatsAppDirectButton, juste à
-                      côté du numéro de téléphone un peu plus haut sur la
-                      même ligne, ouvrait déjà WhatsApp pour cette même
-                      personne — celle-ci (avec sa modale de composition)
-                      faisait doublon. */}
-                  {/* Retirer comme coach : jusqu'ici seulement possible
-                      depuis le bloc "Coachs" séparé sous le tableau — la
-                      seule action que ce tableau ne couvrait pas encore
-                      pour une fiche sans joueur associé (m.player null).
-                      Distincte de l'action joueur juste en dessous : un
-                      coach qui joue aussi dans l'équipe peut avoir les
-                      deux, l'une ne remplace pas l'autre. */}
-                  {(m.role === "COACH" || m.role === "COACH_PENDING") && canAssignCoach && (
-                    <button
-                      onClick={() =>
-                        m.role === "COACH"
-                          ? setRemoveCoachTarget({ id: m.id, first_name: m.firstName, last_name: m.lastName })
-                          : setRemovePendingCoachTarget({ id: m.id, first_name: m.firstName, last_name: m.lastName })
-                      }
-                      title={`Retirer comme coach de ${team.name ?? "cette équipe"}`}
-                      className="rounded-full p-1.5 text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                  {m.player &&
-                    !readOnly &&
-                    (isLentIn ? (
-                      canRemoveMembers && (
-                        <button
-                          onClick={() => setRemoveTarget(m.player)}
-                          title={`Retirer de ${team.name ?? "cette équipe"}`}
-                          className="rounded-full p-1.5 text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      )
-                    ) : canSwitchTeam ? (
-                      <button
-                        onClick={() => openSwitch(m.player!)}
-                        title="Affecter à une autre équipe"
-                        className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-navy"
-                      >
-                        <ArrowRightLeft className="h-3.5 w-3.5" />
-                      </button>
-                    ) : (
-                      canRemoveMembers && (
-                        <button
-                          onClick={() => setRemoveTarget(m.player)}
-                          className="shrink-0 text-xs font-medium text-red-600 hover:underline"
-                        >
-                          Retirer
-                        </button>
-                      )
-                    ))}
-                </div>
+                {/* Icône WhatsApp retirée d'ici (retour de Cindy du
+                    2026-08-23, "doublon du symbole whattsapp dans les
+                    cartes des équipes") : WhatsAppDirectButton, juste à
+                    côté du numéro de téléphone un peu plus haut sur la
+                    même ligne, ouvrait déjà WhatsApp pour cette même
+                    personne — celle-ci (avec sa modale de composition)
+                    faisait doublon. */}
+                <div className="flex items-center gap-1">{renderActions(m, isLentIn)}</div>
               </td>
             </tr>
+    );
+  }
+
+  // Carte mobile (<640px, retour de Cindy du 2026-08-24 : "un système de
+  // cartes comme le tableau des membres... en gardant les options
+  // disponibles et les fonctionnalités de l'onglet équipe") — même
+  // computeRowData/renderActions que la ligne de tableau ci-dessus, juste
+  // réagencés verticalement plutôt qu'en colonnes.
+  function renderMemberCard(m: MemberRow, isStaff: boolean) {
+    const { phone, email, detail, role, category, birthDate, statusCategory, yearStatus, isLentIn } =
+      computeRowData(m);
+    return (
+      <div
+        key={m.key}
+        onClick={detail ? () => setDetailPlayerId(m.id) : undefined}
+        className={`rounded-2xl border border-l-4 border-zinc-100 bg-white p-3.5 shadow-sm ${
+          isStaff ? "border-l-navy" : "border-l-emerald-400"
+        } ${detail ? "cursor-pointer" : ""}`}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="truncate font-semibold text-zinc-900">
+              {formatLastName(m.lastName) || "—"}{" "}
+              {m.firstName ? formatFirstName(m.firstName) : ""}
+            </p>
+            <span className="mt-1 flex flex-wrap items-center gap-1">
+              <span
+                className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold leading-none ${role.className}`}
+              >
+                {role.label}
+              </span>
+              {m.role !== "JOUEUR" && m.player && (
+                <span className="inline-flex items-center justify-center whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold leading-none text-emerald-700">
+                  Joueur
+                </span>
+              )}
+            </span>
+          </div>
+          <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
+            {renderActions(m, isLentIn)}
+          </div>
+        </div>
+
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {yearStatus ? (
+            <PlayerYearBadge birthDate={birthDate} category={statusCategory} />
+          ) : (
+            <span className="text-xs text-zinc-300">—</span>
+          )}
+          {category && (
+            <span
+              className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold leading-none ${theme.badge}`}
+            >
+              {category}
+            </span>
+          )}
+        </div>
+
+        {(phone || email) && (
+          <div
+            className="mt-2 flex flex-col gap-1 border-t border-zinc-50 pt-2 text-xs text-zinc-600"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {phone && (
+              <span className="flex items-center gap-1">
+                <a
+                  href={`tel:${phone}`}
+                  className="inline-flex items-center gap-1.5 hover:text-navy hover:underline"
+                >
+                  <Phone className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                  {phone}
+                </a>
+                <WhatsAppDirectButton
+                  phone={phone}
+                  message={`Bonjour, ici le coach de ${team.name ?? "l'équipe"}.`}
+                  playerId={m.id}
+                />
+              </span>
+            )}
+            {email && (
+              <a
+                href={`mailto:${email}`}
+                className="flex min-w-0 items-center gap-1.5 hover:text-navy hover:underline"
+              >
+                <Mail className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                <span className="truncate">{email}</span>
+              </a>
+            )}
+          </div>
+        )}
+      </div>
     );
   }
 
@@ -792,7 +909,12 @@ export default function TeamCard({
             </div>
           )}
         </div>
-        <div className="w-full overflow-x-auto rounded-xl border border-zinc-100">
+        {/* Tableau classique à partir de 640px (sm) ; en dessous, cartes
+            empilées (voir plus bas) — retour de Cindy du 2026-08-24 :
+            "un système de cartes comme le tableau des membres... en
+            gardant les options disponibles et les fonctionnalités de
+            l'onglet équipe". */}
+        <div className="hidden w-full overflow-x-auto rounded-xl border border-zinc-100 sm:block">
           <table className="w-full table-auto border-collapse text-sm">
             <thead>
               <tr className="border-b border-zinc-100 bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-400">
@@ -870,6 +992,47 @@ export default function TeamCard({
             </tbody>
           </table>
         </div>
+
+        {/* Cartes empilées en dessous de 640px (sm) — même contenu et
+            mêmes actions que le tableau (renderMemberCard réutilise
+            computeRowData/renderActions), juste réagencées verticalement.
+            Groupes Coachs/Joueurs conservés en en-tête de section, comme
+            le tableau. */}
+        <div className="flex flex-col gap-4 sm:hidden">
+          {(staffMembers.length > 0 || legacyPendingCoachCard) && (
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-bold uppercase tracking-wide text-navy">
+                Coachs
+                <span className="ml-1.5 font-semibold normal-case tracking-normal text-navy/60">
+                  ({staffMembers.length + (legacyPendingCoachCard ? 1 : 0)})
+                </span>
+              </p>
+              <div className="flex flex-col gap-2">
+                {staffMembers.map((m) => renderMemberCard(m, true))}
+                {legacyPendingCoachCard}
+              </div>
+            </div>
+          )}
+          {playerMembers.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">
+                Joueurs
+                <span className="ml-1.5 font-semibold normal-case tracking-normal text-emerald-600/70">
+                  ({playerMembers.length})
+                </span>
+              </p>
+              <div className="flex flex-col gap-2">
+                {playerMembers.map((m) => renderMemberCard(m, false))}
+              </div>
+            </div>
+          )}
+          {visibleMembers.length === 0 && !legacyPendingCoachCard && (
+            <p className="px-3 py-4 text-center text-sm text-zinc-400">
+              {rosterQuery ? "Aucun membre ne correspond à cette recherche" : "Aucun membre"}
+            </p>
+          )}
+        </div>
+
         {canCreatePlayer && (openPlayerForm ? (
           <form
             onSubmit={createPlayer}
