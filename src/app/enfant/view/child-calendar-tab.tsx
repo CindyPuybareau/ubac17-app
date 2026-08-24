@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import { Cake, ChevronLeft, ChevronRight, LayoutGrid, List, MapPin, PartyPopper } from "lucide-react";
 import {
-  EVENT_TYPE_OPTIONS,
   styleFor,
   isMatchType,
   homeAwayLabel,
@@ -80,23 +79,20 @@ export default function ChildCalendarTab({
   const [view, setView] = useState<"month" | "list">("month");
   const [viewMonth, setViewMonth] = useState<Date>(today);
   const [selectedDate, setSelectedDate] = useState<Date>(today);
-  const [filter, setFilter] = useState<string | null>(null);
 
-  const filtered = useMemo(
-    () => (filter ? events.filter((e) => e.eventType === filter) : events),
-    [events, filter]
-  );
-
+  // Filtre par type d'événement retiré (retour de Cindy du 2026-08-24,
+  // "supprimer ça sur le haut du calendrier ... pas necessaire") : le
+  // calendrier affiche systématiquement tous les événements.
   const eventsByDate = useMemo(() => {
     const map = new Map<string, ChildEvent[]>();
-    filtered.forEach((e) => {
+    events.forEach((e) => {
       const key = toKey(new Date(e.startTime));
       const list = map.get(key) ?? [];
       list.push(e);
       map.set(key, list);
     });
     return map;
-  }, [filtered]);
+  }, [events]);
 
   const birthdaySources: BirthdaySource[] = useMemo(
     () => teammates.map((t) => ({ id: t.id, firstName: t.firstName, lastName: null, birthDate: t.birthDate })),
@@ -127,41 +123,15 @@ export default function ChildCalendarTab({
   }
 
   const now = Date.now();
-  const upcoming = filtered
+  const upcoming = events
     .filter((e) => new Date(e.startTime).getTime() >= now)
     .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-  const past = filtered
+  const past = events
     .filter((e) => new Date(e.startTime).getTime() < now)
     .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap gap-1.5">
-        <button
-          onClick={() => setFilter(null)}
-          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-            filter === null ? "border-navy bg-navy text-white" : "border-zinc-200 text-zinc-500 hover:bg-zinc-50"
-          }`}
-        >
-          Tout
-        </button>
-        {EVENT_TYPE_OPTIONS.map((opt) => {
-          const style = styleFor(opt.value);
-          const active = filter === opt.value;
-          return (
-            <button
-              key={opt.value}
-              onClick={() => setFilter(active ? null : opt.value)}
-              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                active ? `border-transparent ${style.badge}` : "border-zinc-200 text-zinc-500 hover:bg-zinc-50"
-              }`}
-            >
-              {opt.label}
-            </button>
-          );
-        })}
-      </div>
-
       <div className="flex flex-wrap items-center justify-between gap-3">
         {view === "month" ? (
           <div className="flex items-center gap-2">

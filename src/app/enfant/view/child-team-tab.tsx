@@ -1,6 +1,6 @@
-import { ShieldCheck, Users } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { formatFirstName, formatPersonName, sortByLastName } from "@/lib/names";
-import type { ChildCoach, ChildEvent, ChildTeammate } from "./child-dashboard";
+import type { ChildCoach, ChildEvent } from "./child-dashboard";
 
 // Trombinoscope et présences : jamais de nom de famille exposé à l'enfant
 // (choix de confidentialité délibéré, voir child-dashboard.tsx), donc le
@@ -38,12 +38,10 @@ function avatarColor(seed: string) {
 }
 
 export default function ChildTeamTab({
-  teammates,
   coaches,
   nextEvent,
   nextEventAttendance,
 }: {
-  teammates: ChildTeammate[];
   coaches: ChildCoach[];
   nextEvent: ChildEvent | null;
   nextEventAttendance: { name: string | null; status: string }[];
@@ -99,33 +97,6 @@ export default function ChildTeamTab({
           </div>
         </div>
       )}
-
-      <div className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
-        <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-          <Users className="h-3.5 w-3.5 text-navy" />
-          L&apos;équipe ({teammates.length})
-        </p>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {sortByFirstName(teammates, (t) => t.firstName).map((t) => (
-            <div key={t.id} className="flex flex-col items-center gap-1.5 rounded-xl bg-zinc-50 p-3 text-center">
-              <span
-                className={`flex h-12 w-12 items-center justify-center rounded-full text-lg font-bold text-white ${avatarColor(t.id)}`}
-              >
-                {(t.firstName ?? "?").charAt(0).toUpperCase()}
-              </span>
-              <span className="text-sm font-semibold text-zinc-800">{formatFirstName(t.firstName)}</span>
-              {(t.jerseyNumber != null || t.position) && (
-                <span className="text-[11px] text-zinc-400">
-                  {[t.jerseyNumber != null ? `N°${t.jerseyNumber}` : null, t.position].filter(Boolean).join(" · ")}
-                </span>
-              )}
-            </div>
-          ))}
-          {teammates.length === 0 && (
-            <p className="col-span-full text-sm text-zinc-500">Personne d&apos;autre dans l&apos;équipe pour le moment.</p>
-          )}
-        </div>
-      </div>
     </div>
   );
 }

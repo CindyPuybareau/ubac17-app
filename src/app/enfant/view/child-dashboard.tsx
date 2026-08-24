@@ -162,7 +162,6 @@ export default function ChildDashboard({
       icon: <Users className={iconClass} />,
       content: (
         <ChildTeamTab
-          teammates={teammatesOnly}
           coaches={coaches}
           nextEvent={nextEvent}
           nextEventAttendance={nextEventAttendance}
