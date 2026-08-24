@@ -181,14 +181,17 @@ export default function WeekStripBanner({ events }: { events: WeekStripEvent[] }
           toujours valable) : en sm:justify-between, la frise finissait
           collée au bord droit. Centré en groupe (texte + frise) au lieu
           d'étiré — mobile (colonne empilée, non concerné) inchangé. */}
-      {/* sm:flex-wrap (retour de Cindy du 2026-08-25, "pas de scroll droite
-          gauche sur grand écran surtout") : sur une largeur serrée, texte
-          et frise refusaient de passer à la ligne (frise en sm:shrink-0),
-          ce qui poussait toute la ligne — puis l'en-tête, puis la page —
-          en débordement horizontal. Le passage à la ligne ici reste propre
-          (les deux restent centrés, voir sm:justify-center) plutôt que de
-          laisser échapper un débordement. */}
-      <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-center sm:gap-8">
+      {/* Retour de Cindy du 2026-08-25 ("le texte en haut et le calendrier
+          en bas... ce n'est pas bon c'est vilain") : sm:flex-wrap, ajouté
+          au tour précédent contre le débordement horizontal, faisait
+          justement passer la frise à la ligne sous le texte dès que la
+          largeur disponible (contrainte par le wrapper absolute côté
+          page.tsx/child-dashboard.tsx) était un peu juste — retiré.
+          Le filet de sécurité anti-débordement reste : overflow-x-hidden
+          sur le conteneur racine de la page (voir dashboard/page.tsx),
+          qui rogne un éventuel dépassement au lieu de faire apparaître
+          une barre de défilement, sans jamais casser la ligne texte+frise. */}
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-center sm:gap-8">
         {/* Retour de Cindy du 2026-08-24 ("même emplacement, plus gros") :
             même poids typographique que l'ancienne carte séparée
             (family-week-banner.tsx) — eyebrow "CETTE SEMAINE" + phrase en
