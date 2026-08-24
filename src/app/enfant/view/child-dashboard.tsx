@@ -275,13 +275,16 @@ export default function ChildDashboard({
           className="pointer-events-none absolute -right-2 top-1/2 h-36 w-36 -translate-y-1/2 bg-contain bg-right bg-no-repeat opacity-40 sm:h-44 sm:w-44"
           style={{ backgroundImage: "url(/logo.png)" }}
         />
-        <div className="relative mx-auto flex w-full max-w-[1600px] flex-col gap-3">
-          {/* Retour de Cindy du 2026-08-24 : revient sur le recentrage
-              précédent — seul le bandeau "Cette semaine" en dessous doit
-              être centré ("planing centrer seulement"), cette ligne-ci
-              reste sur toute la largeur comme avant. */}
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
+        {/* Retour de Cindy du 2026-08-24 ("remonter le planning de la
+            semaine a hauteur de l'existant photo et symbole"), même
+            restructuration que page.tsx : sur PC, photo/Bonjour, bandeau
+            "Cette semaine" et icônes sur UNE seule ligne (sm:contents fait
+            sortir les deux blocs de leur wrapper mobile). Sur mobile, le
+            wrapper reste un vrai bloc (photo + icônes ensemble) et le
+            bandeau repasse dessous. */}
+        <div className="relative mx-auto flex w-full max-w-[1600px] flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <div className="flex items-center justify-between gap-3 sm:contents">
+            <div className="flex min-w-0 items-center gap-3 sm:order-1 sm:shrink-0">
               <ChildAvatarUpload avatarUrl={avatarUrl} name={firstName} />
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">
@@ -292,12 +295,14 @@ export default function ChildDashboard({
                 </h1>
               </div>
             </div>
-            <div className="flex shrink-0 items-center gap-1">
+            <div className="flex shrink-0 items-center gap-1 sm:order-3">
               <OrgChartButton />
               <ChildNotificationBell initialNotifications={notifications} initialEnabled={notificationsEnabled} />
             </div>
           </div>
-          <WeekStripBanner events={headerWeekEvents} />
+          <div className="sm:order-2 sm:flex sm:min-w-0 sm:flex-1 sm:justify-center">
+            <WeekStripBanner events={headerWeekEvents} />
+          </div>
         </div>
       </header>
 
