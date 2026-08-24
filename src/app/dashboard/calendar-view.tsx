@@ -36,7 +36,6 @@ import { parseMatchTitle } from "@/lib/match-display";
 import { sortTeamsByGroup, teamLabel } from "@/lib/teams";
 import OpponentDisplay from "./opponent-display";
 import CreateEventForm from "./create-event-form";
-import DateTimePicker from "./date-time-picker";
 import RsvpButtons from "./rsvp-buttons";
 import ItineraryButton from "./itinerary-button";
 import MatchTasksPanel from "./match-tasks-panel";
@@ -50,7 +49,7 @@ import {
   upcomingBirthdays,
   type BirthdaySource,
 } from "./birthdays";
-import { SALLES, shouldOfferCarpool, venueQuery } from "./salles";
+import { shouldOfferCarpool, venueQuery } from "./salles";
 import SalleBadge from "./salle-badge";
 import {
   EVENT_TYPE_OPTIONS,
@@ -76,20 +75,6 @@ const emptyVolunteerNeeds: VolunteerNeed[] = [];
 // Ré-exportés : beaucoup d'écrans les importent historiquement d'ici, et
 // ce fichier reste le point d'entrée naturel du calendrier.
 export { EVENT_TYPE_OPTIONS, formatEventTime, homeAwayLabel, isMatchType, styleFor };
-
-function toDatetimeLocal(iso: string) {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-// Just "HH:MM" — the end time field only ever asks for the hour, since an
-// event's end is always the same calendar day as its start for this club.
-function toTimeLocal(iso: string) {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 
 function pillLabel(event: AdminUpcomingEvent) {
   if (isMatchType(event.event_type)) {
@@ -155,24 +140,6 @@ export type CalendarTeamRef = {
   category: string | null;
 };
 
-// Même logique que resolveEventTeamName (page.tsx) et
-// create-event-form.tsx, rejouée ici pour patcher localEvents sans
-// attendre le serveur — voir confirmEdit ci-dessous.
-function resolveTeamNameLocal(
-  teamId: string | null,
-  targetTeamIds: string[] | null,
-  teams: CalendarTeamRef[]
-): string {
-  if (teamId) return teams.find((t) => t.id === teamId)?.name ?? "Équipe";
-  if (targetTeamIds && targetTeamIds.length > 0) {
-    const names = targetTeamIds
-      .map((id) => teams.find((t) => t.id === id)?.name)
-      .filter((n): n is string => Boolean(n));
-    return names.length > 0 ? names.join(", ") : "Équipes sélectionnées";
-  }
-  return "Tous les groupes";
-}
-
 export type CalendarRsvpPlayer = {
   id: string;
   name: string;
@@ -221,6 +188,53 @@ function PresentPlayersList({
             <span
               key={p.id}
               className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700"
+            >
+              {formatFirstName(p.firstName)}{" "}
+              <span className="font-bold uppercase">{formatLastName(p.lastName)}</span>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Même principe que PresentPlayersList ci-dessus, en ambre plutôt qu'en
+// émeraude pour ne jamais se confondre avec "Qui sera là ?" (retour de
+// Cindy du 2026-08-25, "il faut que l'on comprenne le stage concerné") :
+// qui est inscrit/concerné par le paiement, pas qui a répondu présent à
+// CET événement précis — deux informations différentes, même sur la même
+// carte.
+function PaidParticipantsList({
+  players,
+}: {
+  players: { id: string; firstName: string | null; lastName: string | null }[];
+}) {
+  const [open, setOpen] = useState(false);
+
+  if (players.length === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-1.5 border-t border-zinc-100 pt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:text-zinc-900"
+      >
+        <Euro className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+        {players.length} {players.length > 1 ? "joueurs/joueuses concerné(e)s" : "joueur/joueuse concerné(e)"}
+        {open ? (
+          <ChevronUp className="h-3.5 w-3.5 shrink-0" />
+        ) : (
+          <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+        )}
+      </button>
+      {open && (
+        <div className="flex flex-wrap gap-1.5">
+          {sortByLastName(players, (p) => p.lastName).map((p) => (
+            <span
+              key={p.id}
+              className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800"
             >
               {formatFirstName(p.firstName)}{" "}
               <span className="font-bold uppercase">{formatLastName(p.lastName)}</span>
@@ -399,166 +413,14 @@ export default function CalendarView({
 
   const canManage = Boolean(createTeams && createTeams.length > 0);
 
+  // Retour de Cindy du 2026-08-25 ("je ne peux pas modifier ce que je veux,
+  // il faudrait qu'il se réouvre comme lors d'une création, meme visuel,
+  // pas un popup") : le formulaire de modification n'est plus une modale à
+  // part (state edit* + confirmEdit, retiré) mais CreateEventForm lui-même
+  // en mode édition (prop editingEvent) — mêmes champs, y compris
+  // "Événement payant", jamais en reste par rapport à la création.
   const [editingEvent, setEditingEvent] = useState<AdminUpcomingEvent | null>(null);
   const [deleteEventTarget, setDeleteEventTarget] = useState<AdminUpcomingEvent | null>(null);
-  const [editTitle, setEditTitle] = useState("");
-  const [editType, setEditType] = useState("MATCH");
-  const [editIsHome, setEditIsHome] = useState<"" | "true" | "false">("");
-  const [editLocation, setEditLocation] = useState("");
-  const [editSalle, setEditSalle] = useState("");
-  const [editStartTime, setEditStartTime] = useState("");
-  const [editEndTime, setEditEndTime] = useState("");
-  const [editNotes, setEditNotes] = useState("");
-  const [editTeamId, setEditTeamId] = useState("");
-  // Même choix à plat qu'en création (voir create-event-form.tsx,
-  // scopeMode) — préremplie depuis l'événement édité dans openEdit()
-  // ci-dessous plutôt que par défaut sur "single".
-  const [editScopeMode, setEditScopeMode] = useState<"single" | "specific" | "club">("single");
-  const [editTargetTeamIds, setEditTargetTeamIds] = useState<string[]>([]);
-  const [editSaving, setEditSaving] = useState(false);
-  const [editError, setEditError] = useState<string | null>(null);
-
-  function openEdit(event: AdminUpcomingEvent) {
-    setEditingEvent(event);
-    setEditTitle(event.title ?? "");
-    setEditType(event.event_type ?? "MATCH");
-    setEditIsHome(event.isHome === null ? "" : event.isHome ? "true" : "false");
-    setEditLocation(event.location ?? "");
-    setEditSalle(event.salle ?? "");
-    setEditStartTime(toDatetimeLocal(event.start_time));
-    setEditEndTime(event.end_time ? toTimeLocal(event.end_time) : "");
-    setEditNotes(event.notes ?? "");
-    setEditTeamId(event.teamId ?? "");
-    setEditScopeMode(
-      event.teamId ? "single" : event.targetTeamIds && event.targetTeamIds.length > 0 ? "specific" : "club"
-    );
-    setEditTargetTeamIds(event.targetTeamIds ?? []);
-    setEditError(null);
-  }
-
-  function toggleEditTargetTeam(id: string) {
-    setEditTargetTeamIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
-  }
-
-  async function confirmEdit() {
-    if (!editingEvent) return;
-    if (!editStartTime) {
-      setEditError("La date et l'heure de début sont requises.");
-      return;
-    }
-    if (editType === "TRAINING" && !editEndTime) {
-      setEditError("L'heure de fin est obligatoire pour un entraînement.");
-      return;
-    }
-    if (allowClubWide && editScopeMode === "specific" && editTargetTeamIds.length === 0) {
-      setEditError("Choisis au moins une équipe pour un événement réservé.");
-      return;
-    }
-    setEditSaving(true);
-    setEditError(null);
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("events")
-      .update({
-        title: editTitle || null,
-        event_type: editType,
-        // Le domicile/extérieur ne veut rien dire hors d'un match : le
-        // remettre à null évite qu'un entraînement garde la mention d'un
-        // ancien type.
-        is_home: isMatchType(editType) && editIsHome !== "" ? editIsHome === "true" : null,
-        location: editLocation || null,
-        salle: editSalle || null,
-        start_time: new Date(editStartTime).toISOString(),
-        end_time: editEndTime
-          ? new Date(`${editStartTime.slice(0, 10)}T${editEndTime}`).toISOString()
-          : null,
-        notes: editNotes || null,
-        ...(allowClubWide
-          ? {
-              team_id: editScopeMode === "single" ? editTeamId || null : null,
-              target_team_ids: editScopeMode === "specific" ? editTargetTeamIds : null,
-            }
-          : {}),
-      })
-      .eq("id", editingEvent.id);
-    setEditSaving(false);
-    if (error) {
-      setEditError(error.message);
-      return;
-    }
-
-    // Bonus, pas bloquant : voir event-push.ts. Seul un vrai changement
-    // d'horaire ou de lieu justifie de déranger les familles — pas une
-    // note ou un titre corrigé. Tolérance d'une minute sur l'heure pour
-    // ignorer un arrondi de saisie sans rapport avec un vrai déplacement.
-    const newStartIso = new Date(editStartTime).toISOString();
-    const timeMoved =
-      Math.abs(new Date(newStartIso).getTime() - new Date(editingEvent.start_time).getTime()) >
-      60000;
-    const placeMoved =
-      (editLocation || "") !== (editingEvent.location ?? "") ||
-      (editSalle || "") !== (editingEvent.salle ?? "");
-    if (timeMoved || placeMoved) {
-      const when = new Date(newStartIso).toLocaleDateString("fr-FR", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-      });
-      const heure = new Date(newStartIso).toLocaleTimeString("fr-FR", {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-      const lieu = editSalle || editLocation;
-      sendEventPush(
-        editingEvent.id,
-        `UBAC — ${editingEvent.teamName}`,
-        `Changement : ${when} à ${heure}${lieu ? ` · ${lieu}` : ""}.`
-      );
-    }
-
-    // Affichage immédiat plutôt que d'attendre le rafraîchissement temps
-    // réel — retour de Cindy du 2026-08-21, même correctif que la création
-    // (voir onCreated plus bas) et la suppression (handleDeleteEvent).
-    const newTeamId = allowClubWide
-      ? editScopeMode === "single"
-        ? editTeamId || null
-        : null
-      : editingEvent.teamId;
-    const newTargetTeamIds = allowClubWide
-      ? editScopeMode === "specific"
-        ? editTargetTeamIds
-        : null
-      : editingEvent.targetTeamIds;
-    setLocalEvents((prev) =>
-      prev.map((e) =>
-        e.id === editingEvent.id
-          ? {
-              ...e,
-              title: editTitle || null,
-              event_type: editType,
-              isHome: isMatchType(editType) && editIsHome !== "" ? editIsHome === "true" : null,
-              location: editLocation || null,
-              salle: editSalle || null,
-              start_time: newStartIso,
-              end_time: editEndTime
-                ? new Date(`${editStartTime.slice(0, 10)}T${editEndTime}`).toISOString()
-                : null,
-              notes: editNotes || null,
-              teamId: newTeamId,
-              targetTeamIds: newTargetTeamIds,
-              teamName: allowClubWide
-                ? resolveTeamNameLocal(newTeamId, newTargetTeamIds, createTeams ?? [])
-                : e.teamName,
-            }
-          : e
-      )
-    );
-    setEditingEvent(null);
-    // Pas de router.refresh() explicite : events est surveillée en temps
-    // réel (realtime-sync.tsx) — le garder ici en plus rechargeait la page
-    // deux fois pour une seule modification (retour de Cindy du
-    // 2026-08-20, même correctif que rsvp-buttons.tsx et consorts).
-  }
 
   // Déclenché par le bouton "Supprimer" ; la confirmation elle-même vit
   // dans deleteEventTarget + le <ConfirmDialog> rendu plus bas (retour de
@@ -906,7 +768,7 @@ export default function CalendarView({
                 </a>
               )}
               <button
-                onClick={() => openEdit(event)}
+                onClick={() => setEditingEvent(event)}
                 title="Modifier"
                 className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
               >
@@ -970,6 +832,11 @@ export default function CalendarView({
             Payer via HelloAsso
           </a>
         )}
+
+        {/* Qui est concerné par ce stage/événement payant (retour de Cindy
+            du 2026-08-25) — distinct de "Qui sera là ?" plus bas, qui ne
+            parle que de présence à cet événement précis. */}
+        {event.isPaid && <PaidParticipantsList players={event.paidParticipants} />}
 
         <ItineraryButton query={venueQuery(event)} />
 
@@ -1187,7 +1054,7 @@ export default function CalendarView({
             {canManageEvent && (
               <>
                 <button
-                  onClick={() => openEdit(event)}
+                  onClick={() => setEditingEvent(event)}
                   title="Modifier"
                   className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
                 >
@@ -1394,15 +1261,28 @@ export default function CalendarView({
 
       {createTeams && createTeams.length > 0 && (
         <CreateEventForm
+          // Remonte le formulaire à chaque changement d'événement édité (ou
+          // au retour en mode création) : ses champs se préremplissent via
+          // de simples initialiseurs d'état plutôt qu'un useEffect qui
+          // ferait setState après coup (voir create-event-form.tsx).
+          key={editingEvent?.id ?? "create"}
           teams={createTeams}
           allowClubWide={allowClubWide}
-          open={createOpen}
-          onClose={() => setCreateOpen(false)}
+          open={createOpen || Boolean(editingEvent)}
+          editingEvent={editingEvent}
+          onClose={() => {
+            setCreateOpen(false);
+            setEditingEvent(null);
+          }}
           onCreated={(created) =>
             setLocalEvents((prev) =>
               [...prev, ...created].sort((a, b) => a.start_time.localeCompare(b.start_time))
             )
           }
+          onUpdated={(updated) => {
+            setLocalEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+            setEditingEvent(null);
+          }}
         />
       )}
 
@@ -1612,197 +1492,6 @@ export default function CalendarView({
           </>
         )}
       </div>
-      )}
-
-      {editingEvent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[85vh] w-full max-w-sm overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="font-semibold text-zinc-900">Modifier l&apos;événement</h3>
-              <button
-                onClick={() => setEditingEvent(null)}
-                className="rounded-full p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="flex flex-col gap-2">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-600">Titre</label>
-                <input
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-600">Type</label>
-                <select
-                  value={editType}
-                  onChange={(e) => setEditType(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
-                >
-                  {EVENT_TYPE_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {isMatchType(editType) && (
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-zinc-600">
-                    Lieu du match
-                  </label>
-                  <select
-                    value={editIsHome}
-                    onChange={(e) => setEditIsHome(e.target.value as "" | "true" | "false")}
-                    className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
-                  >
-                    <option value="">Non précisé</option>
-                    <option value="true">Domicile</option>
-                    <option value="false">Extérieur</option>
-                  </select>
-                </div>
-              )}
-              <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-600">
-                  Adresse ou lieu
-                </label>
-                <input
-                  value={editLocation}
-                  onChange={(e) => setEditLocation(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
-                />
-                {/* Même rappel qu'à la création : sans salle du club
-                    reconnue, c'est ce texte qui part vers l'itinéraire et
-                    le covoiturage — une adresse précise vaut mieux qu'un
-                    nom de ville. */}
-                <p className="mt-1 text-[11px] text-zinc-400">
-                  Utilisée pour l&apos;itinéraire et le covoiturage.
-                </p>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-600">Salle</label>
-                <select
-                  value={editSalle}
-                  onChange={(e) => setEditSalle(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
-                >
-                  <option value="">—</option>
-                  {SALLES.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-600">
-                  Date &amp; heure de début
-                </label>
-                <DateTimePicker value={editStartTime} onChange={setEditStartTime} />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-600">
-                  Heure de fin
-                  {editType === "TRAINING" ? " *" : " (optionnel)"}
-                </label>
-                <input
-                  type="time"
-                  required={editType === "TRAINING"}
-                  value={editEndTime}
-                  onChange={(e) => setEditEndTime(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-600">
-                  Notes
-                </label>
-                <textarea
-                  value={editNotes}
-                  onChange={(e) => setEditNotes(e.target.value)}
-                  rows={2}
-                  className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
-                />
-              </div>
-              {allowClubWide && createTeams && (
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-medium text-zinc-600">Portée</label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {(
-                      [
-                        { value: "single" as const, label: "Une équipe" },
-                        { value: "specific" as const, label: "Équipes spécifiques" },
-                        { value: "club" as const, label: "Tout le club" },
-                      ]
-                    ).map((c) => (
-                      <button
-                        key={c.value}
-                        type="button"
-                        onClick={() => {
-                          setEditScopeMode(c.value);
-                          // Un événement jusque-là "Tout le club" ou
-                          // "Équipes spécifiques" n'a pas d'équipe unique
-                          // en mémoire : préremplir la première plutôt que
-                          // de laisser le menu vide au passage sur "Une
-                          // équipe".
-                          if (c.value === "single" && !editTeamId) {
-                            setEditTeamId(createTeams[0]?.id ?? "");
-                          }
-                        }}
-                        className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
-                          editScopeMode === c.value
-                            ? "border-navy bg-navy/10 text-navy"
-                            : "border-zinc-200 text-zinc-500 hover:bg-white"
-                        }`}
-                      >
-                        {c.label}
-                      </button>
-                    ))}
-                  </div>
-                  {editScopeMode === "single" && (
-                    <select
-                      value={editTeamId}
-                      onChange={(e) => setEditTeamId(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
-                    >
-                      {createTeams.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {teamLabel(t)}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                  {editScopeMode === "specific" && (
-                    <div className="grid max-h-40 grid-cols-2 gap-1.5 overflow-y-auto rounded-lg border border-zinc-200 bg-white p-2">
-                      {createTeams.map((t) => (
-                        <label key={t.id} className="flex items-center gap-1.5 text-xs text-zinc-700">
-                          <input
-                            type="checkbox"
-                            checked={editTargetTeamIds.includes(t.id)}
-                            onChange={() => toggleEditTargetTeam(t.id)}
-                            className="h-3.5 w-3.5 rounded border-zinc-300 text-navy focus:ring-navy"
-                          />
-                          {teamLabel(t)}
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-              {editError && <p className="text-xs text-red-600">{editError}</p>}
-              <button
-                onClick={confirmEdit}
-                disabled={editSaving}
-                className="mt-1 rounded-full bg-ubac-yellow px-3 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
-              >
-                {editSaving ? "Enregistrement..." : "Enregistrer"}
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       <ConfirmDialog

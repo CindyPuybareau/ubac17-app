@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { teamLabel } from "@/lib/teams";
 import { SALLES } from "./salles";
@@ -19,8 +19,8 @@ type Team = { id: string; name: string | null; category: string | null };
 type EventType = "MATCH" | "FRIENDLY" | "TRAINING" | "OTHER" | "TOURNAMENT";
 
 // Même logique que resolveEventTeamName (page.tsx), rejouée côté client
-// pour construire une carte affichable immédiatement — voir onCreated
-// plus bas.
+// pour construire une carte affichable immédiatement — voir onCreated/
+// onUpdated plus bas.
 function resolveTeamNameClient(
   teamId: string | null,
   targetTeamIds: string[] | null,
@@ -34,6 +34,23 @@ function resolveTeamNameClient(
     return names.length > 0 ? names.join(", ") : "Équipes sélectionnées";
   }
   return "Tous les groupes";
+}
+
+// "YYYY-MM-DDTHH:MM" (valeur d'un <input datetime-local> / DateTimePicker)
+// et "HH:MM", pour préremplir le formulaire depuis un événement existant
+// en mode édition — mêmes fonctions que l'ancienne modale de modification
+// (calendar-view.tsx), reprises ici puisque c'est ce formulaire-ci qui gère
+// désormais la modification.
+function toDatetimeLocal(iso: string) {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function toTimeLocal(iso: string) {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 const defaultTitles: Record<EventType, string> = {
@@ -58,8 +75,10 @@ export default function CreateEventForm({
   teams,
   allowClubWide = false,
   open,
+  editingEvent,
   onClose,
   onCreated,
+  onUpdated,
 }: {
   teams: Team[];
   allowClubWide?: boolean;
@@ -67,6 +86,12 @@ export default function CreateEventForm({
   // vit dans l en-tete du calendrier, a cote de la navigation de date,
   // pas au-dessus du formulaire.
   open: boolean;
+  // Retour de Cindy du 2026-08-25 ("je ne peux pas modifier ce que je
+  // veux, il faudrait qu'il se réouvre comme lors d'une création, meme
+  // visuel, pas un popup") : ce même formulaire sert aussi à la
+  // modification — non-null = mode édition, préremplit tous les champs
+  // (y compris "Événement payant") et fait un UPDATE au lieu d'un INSERT.
+  editingEvent?: AdminUpcomingEvent | null;
   onClose: () => void;
   // Affiche la ou les occurrences créées sur le calendrier dès la
   // validation, sans attendre le rafraîchissement temps réel (débounce
@@ -74,16 +99,34 @@ export default function CreateEventForm({
   // de bord) — retour de Cindy du 2026-08-21 : "7-8 secondes... c'est
   // long". Même correctif que les panneaux Organisation.
   onCreated?: (events: AdminUpcomingEvent[]) => void;
+  onUpdated?: (event: AdminUpcomingEvent) => void;
 }) {
-  const [teamId, setTeamId] = useState(teams[0]?.id ?? "");
-  const [title, setTitle] = useState("");
-  const [eventType, setEventType] = useState<EventType>("TRAINING");
-  const [isHome, setIsHome] = useState<"" | "true" | "false">("");
-  const [location, setLocation] = useState("");
-  const [salle, setSalle] = useState("");
-  const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
-  const [notes, setNotes] = useState("");
+  const isEditing = Boolean(editingEvent);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // Préremplissage en mode édition : initialiseurs paresseux plutôt qu'un
+  // useEffect qui viendrait setState après coup (retour de lint
+  // react-hooks/set-state-in-effect — et surtout, l'appelant remonte ce
+  // composant à chaque changement d'événement édité via key={editingEvent
+  // ?.id ?? "create"} sur <CreateEventForm>, voir calendar-view.tsx, donc
+  // ces initialiseurs se rejouent bien à chaque nouvelle édition).
+  const [teamId, setTeamId] = useState(() => editingEvent?.teamId ?? teams[0]?.id ?? "");
+  const [title, setTitle] = useState(() => editingEvent?.title ?? "");
+  const [eventType, setEventType] = useState<EventType>(
+    () => (editingEvent?.event_type as EventType) ?? "TRAINING"
+  );
+  const [isHome, setIsHome] = useState<"" | "true" | "false">(() =>
+    !editingEvent || editingEvent.isHome === null ? "" : editingEvent.isHome ? "true" : "false"
+  );
+  const [location, setLocation] = useState(() => editingEvent?.location ?? "");
+  const [salle, setSalle] = useState(() => editingEvent?.salle ?? "");
+  const [startTime, setStartTime] = useState(() =>
+    editingEvent ? toDatetimeLocal(editingEvent.start_time) : ""
+  );
+  const [endTime, setEndTime] = useState(() =>
+    editingEvent?.end_time ? toTimeLocal(editingEvent.end_time) : ""
+  );
+  const [notes, setNotes] = useState(() => editingEvent?.notes ?? "");
   // Retour de Cindy du 2026-08-25 : remplace "Répéter chaque semaine" (voir
   // git history pour l'ancienne version) — un événement payant crée
   // automatiquement sa collecte de suivi (Cotisations -> Événements
@@ -91,29 +134,70 @@ export default function CreateEventForm({
   // ci-dessus (équipe/équipes/tout le club), et un lien de paiement externe
   // (HelloAsso...) affiché directement sur la carte de l'événement pour que
   // chaque famille paie elle-même.
-  const [isPaid, setIsPaid] = useState(false);
-  const [paidAmount, setPaidAmount] = useState("");
-  const [paidLink, setPaidLink] = useState("");
+  const [isPaid, setIsPaid] = useState(() => editingEvent?.isPaid ?? false);
+  const [paidAmount, setPaidAmount] = useState(() =>
+    editingEvent?.paidAmount != null ? String(editingEvent.paidAmount) : ""
+  );
+  const [paidLink, setPaidLink] = useState(() => editingEvent?.paymentLink ?? "");
   // Portée de l'événement : un choix à plat, direct, plutôt que de faire
   // passer "équipes spécifiques" par un détour via "Tous les groupes" —
   // c'est ce détour qui donnait l'impression qu'on ne pouvait choisir
   // qu'une seule équipe (retour de Cindy du 2026-08-20 : "à l'heure
   // actuelle, quand je créer un evenement, je ne peux choisir qu'une
   // equipe"). "specific"/"club" n'ont de sens que si allowClubWide.
-  const [scopeMode, setScopeMode] = useState<"single" | "specific" | "club">("single");
-  const [targetTeamIds, setTargetTeamIds] = useState<string[]>([]);
+  const [scopeMode, setScopeMode] = useState<"single" | "specific" | "club">(() =>
+    editingEvent?.teamId
+      ? "single"
+      : editingEvent?.targetTeamIds && editingEvent.targetTeamIds.length > 0
+        ? "specific"
+        : editingEvent
+          ? "club"
+          : "single"
+  );
+  const [targetTeamIds, setTargetTeamIds] = useState<string[]>(() => editingEvent?.targetTeamIds ?? []);
   // Besoins d'organisation définis dès la création (buvette, table de
   // marque...) : une liste libre de lignes rôle + effectif, comme dans le
-  // formulaire "+ Ajouter un besoin" de la carte événement — rattachés à
-  // la première occurrence seulement si "Répéter chaque semaine" est
-  // coché, un besoin par séance n'aurait pas le même sens (voir retour de
-  // Cindy du 2026-08-19 : elle veut pouvoir chiffrer sa demande dès la
-  // création, pas seulement après coup, mais sans catalogue à gérer).
+  // formulaire "+ Ajouter un besoin" de la carte événement. Non proposé en
+  // mode édition : ce champ ne sait qu'ajouter, jamais éditer/retirer un
+  // besoin déjà existant — VolunteerNeedsPanel, sur la carte de
+  // l'événement, reste le seul endroit fiable pour ça une fois l'événement
+  // créé.
   const [draftNeeds, setDraftNeeds] = useState<
     { key: number; roleCode: string; customLabel: string; count: string }[]
   >([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  function resetFields() {
+    setTeamId(teams[0]?.id ?? "");
+    setTitle("");
+    setEventType("TRAINING");
+    setIsHome("");
+    setLocation("");
+    setSalle("");
+    setStartTime("");
+    setEndTime("");
+    setNotes("");
+    setIsPaid(false);
+    setPaidAmount("");
+    setPaidLink("");
+    setScopeMode("single");
+    setTargetTeamIds([]);
+    setDraftNeeds([]);
+    setError(null);
+  }
+
+  // Réaffiche le formulaire à l'écran dès qu'une édition démarre : le
+  // crayon peut être cliqué sur une carte loin en bas de la liste, alors
+  // que le formulaire, lui, s'affiche toujours en haut (retour de Cindy :
+  // "il faudrait qu'il se réouvre comme lors d'une création, meme
+  // visuel"). Pas de setState ici, seulement un défilement — aucun conflit
+  // avec le remontage par key ci-dessus.
+  useEffect(() => {
+    if (editingEvent) {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [editingEvent]);
 
   function addDraftNeed() {
     setDraftNeeds((rows) => [
@@ -135,6 +219,32 @@ export default function CreateEventForm({
   }
 
   const isMatch = eventType === "MATCH" || eventType === "FRIENDLY";
+
+  async function computePaidParticipantIds(
+    supabase: ReturnType<typeof createClient>,
+    effectiveTeamId: string,
+    effectiveTargetTeamIds: string[] | null
+  ): Promise<string[]> {
+    if (effectiveTeamId) {
+      const { data: rosterRows } = await supabase
+        .from("team_players")
+        .select("player_id")
+        .eq("team_id", effectiveTeamId);
+      return (rosterRows ?? []).map((r) => r.player_id);
+    }
+    if (effectiveTargetTeamIds && effectiveTargetTeamIds.length > 0) {
+      const { data: rosterRows } = await supabase
+        .from("team_players")
+        .select("player_id")
+        .in("team_id", effectiveTargetTeamIds);
+      return Array.from(new Set((rosterRows ?? []).map((r) => r.player_id)));
+    }
+    // "Tout le club" : tous les membres actifs (retour de Cindy — un
+    // événement payant sans équipe précise, ex. une AG ou un loto, concerne
+    // tout le monde).
+    const { data: allPlayers } = await supabase.from("players").select("id").is("archived_at", null);
+    return (allPlayers ?? []).map((p) => p.id);
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -176,20 +286,40 @@ export default function CreateEventForm({
 
     const supabase = createClient();
     const eventName = title || defaultTitles[eventType];
-    const { data: inserted, error } = await supabase
-      .from("events")
-      .insert({
-        team_id: effectiveTeamId || null,
-        target_team_ids: effectiveTargetTeamIds,
-        title: eventName,
-        event_type: eventType,
-        is_home: isMatch && isHome !== "" ? isHome === "true" : null,
-        location: location || null,
-        salle: salle || null,
-        start_time: new Date(startTime).toISOString(),
-        end_time: endTime ? new Date(`${startTime.slice(0, 10)}T${endTime}`).toISOString() : null,
-        notes: notes || null,
-      })
+    const eventPayload: {
+      title: string;
+      event_type: EventType;
+      is_home: boolean | null;
+      location: string | null;
+      salle: string | null;
+      start_time: string;
+      end_time: string | null;
+      notes: string | null;
+      team_id?: string | null;
+      target_team_ids?: string[] | null;
+    } = {
+      title: eventName,
+      event_type: eventType,
+      is_home: isMatch && isHome !== "" ? isHome === "true" : null,
+      location: location || null,
+      salle: salle || null,
+      start_time: new Date(startTime).toISOString(),
+      end_time: endTime ? new Date(`${startTime.slice(0, 10)}T${endTime}`).toISOString() : null,
+      notes: notes || null,
+    };
+    // La portée (équipe/équipes/tout le club) n'est modifiable que par qui
+    // peut créer un événement club (allowClubWide) — un coach qui édite un
+    // événement d'une portée qu'il ne maîtrise pas ne doit jamais l'écraser
+    // silencieusement (même garde-fou que l'ancienne modale de modification).
+    if (!isEditing || allowClubWide) {
+      eventPayload.team_id = effectiveTeamId || null;
+      eventPayload.target_team_ids = effectiveTargetTeamIds;
+    }
+
+    const query = isEditing
+      ? supabase.from("events").update(eventPayload).eq("id", editingEvent!.id)
+      : supabase.from("events").insert(eventPayload);
+    const { data: inserted, error } = await query
       .select(
         "id, title, event_type, is_home, location, salle, start_time, end_time, notes, team_id, target_team_ids"
       )
@@ -197,120 +327,111 @@ export default function CreateEventForm({
 
     if (error || !inserted) {
       setLoading(false);
-      setError(error?.message ?? "La création a échoué.");
+      setError(error?.message ?? (isEditing ? "La modification a échoué." : "La création a échoué."));
       return;
     }
 
-    // Événement payant (retour de Cindy du 2026-08-25) : crée la collecte
-    // de suivi (Cotisations -> Événements payants), rattachée à cet
-    // événement, puis pré-remplit ses participants d'après la portée
-    // choisie plus haut (équipe/équipes/tout le club) — même geste que
-    // "Ajouter des participants" dans cotisations-manager.tsx, mais
-    // automatique. Best-effort après coup : une erreur ici ne doit pas
-    // faire croire que l'événement lui-même n'a pas été créé.
+    // Événement payant (retour de Cindy du 2026-08-25) : crée ou met à jour
+    // la collecte de suivi (Cotisations -> Événements payants) rattachée à
+    // cet événement. En modification, si l'événement était déjà payant, on
+    // ne touche qu'au tarif/lien — jamais aux participants déjà ajoutés
+    // (gérés depuis Cotisations). Si "Événement payant" vient d'être
+    // décoché, la collecte est détachée (event_id -> null) plutôt que
+    // supprimée : l'historique des paiements déjà enregistrés reste intact.
     let paymentLink: string | null = null;
+    let collecteId: string | null = editingEvent?.collecteId ?? null;
+    let paidParticipants = editingEvent?.paidParticipants ?? [];
     if (isPaid) {
       paymentLink = paidLink.trim() || null;
-      const { data: collecte, error: collecteError } = await supabase
-        .from("collectes")
-        .insert({
-          name: eventName,
-          type: "EVENEMENT",
-          prix: amountNum,
-          event_id: inserted.id,
-          payment_link: paymentLink,
-        })
-        .select("id")
-        .single();
-
-      if (collecteError || !collecte) {
-        setLoading(false);
-        setError(
-          `Événement créé, mais la création du suivi de paiement a échoué : ${collecteError?.message ?? "erreur inconnue"}`
-        );
-        return;
-      }
-
-      let participantIds: string[] = [];
-      if (effectiveTeamId) {
-        const { data: rosterRows } = await supabase
-          .from("team_players")
-          .select("player_id")
-          .eq("team_id", effectiveTeamId);
-        participantIds = (rosterRows ?? []).map((r) => r.player_id);
-      } else if (effectiveTargetTeamIds && effectiveTargetTeamIds.length > 0) {
-        const { data: rosterRows } = await supabase
-          .from("team_players")
-          .select("player_id")
-          .in("team_id", effectiveTargetTeamIds);
-        participantIds = Array.from(new Set((rosterRows ?? []).map((r) => r.player_id)));
-      } else {
-        // "Tout le club" : tous les membres actifs (retour de Cindy — un
-        // événement payant sans équipe précise, ex. une AG ou un loto,
-        // concerne tout le monde).
-        const { data: allPlayers } = await supabase
-          .from("players")
-          .select("id")
-          .is("archived_at", null);
-        participantIds = (allPlayers ?? []).map((p) => p.id);
-      }
-
-      if (participantIds.length > 0) {
-        const { error: cotisationsError } = await supabase.from("cotisations").insert(
-          participantIds.map((playerId) => ({
-            player_id: playerId,
-            collecte_id: collecte.id,
-            saison: eventName,
-            prix: amountNum,
-            remise: 0,
-            paiement: 0,
-            statut: null,
-          }))
-        );
-        if (cotisationsError) {
+      if (collecteId) {
+        const { error: updateError } = await supabase
+          .from("collectes")
+          .update({ name: eventName, prix: amountNum, payment_link: paymentLink })
+          .eq("id", collecteId);
+        if (updateError) {
           setLoading(false);
           setError(
-            `Événement payant créé, mais l'ajout des participants a échoué : ${cotisationsError.message}`
+            `Événement enregistré, mais la mise à jour du suivi de paiement a échoué : ${updateError.message}`
           );
           return;
         }
+        // Participants inchangés : cette collecte existait déjà, on ne
+        // touche qu'à son tarif/lien.
+      } else {
+        const { data: collecte, error: collecteError } = await supabase
+          .from("collectes")
+          .insert({
+            name: eventName,
+            type: "EVENEMENT",
+            prix: amountNum,
+            event_id: inserted.id,
+            payment_link: paymentLink,
+          })
+          .select("id")
+          .single();
+
+        if (collecteError || !collecte) {
+          setLoading(false);
+          setError(
+            `Événement enregistré, mais la création du suivi de paiement a échoué : ${collecteError?.message ?? "erreur inconnue"}`
+          );
+          return;
+        }
+        collecteId = collecte.id;
+
+        const participantIds = await computePaidParticipantIds(
+          supabase,
+          effectiveTeamId,
+          effectiveTargetTeamIds
+        );
+        if (participantIds.length > 0) {
+          const { error: cotisationsError } = await supabase.from("cotisations").insert(
+            participantIds.map((playerId) => ({
+              player_id: playerId,
+              collecte_id: collecte.id,
+              saison: eventName,
+              prix: amountNum,
+              remise: 0,
+              paiement: 0,
+              statut: null,
+            }))
+          );
+          if (cotisationsError) {
+            setLoading(false);
+            setError(
+              `Événement payant enregistré, mais l'ajout des participants a échoué : ${cotisationsError.message}`
+            );
+            return;
+          }
+        }
+        // Liste vide ici : les noms des participants arrivent au prochain
+        // rafraîchissement temps réel (cotisations/collectes sont
+        // surveillées, voir realtime-sync.tsx).
+        paidParticipants = [];
       }
+    } else if (editingEvent?.collecteId) {
+      const { error: detachError } = await supabase
+        .from("collectes")
+        .update({ event_id: null })
+        .eq("id", editingEvent.collecteId);
+      if (detachError) {
+        setLoading(false);
+        setError(
+          `Événement enregistré, mais le détachement du suivi de paiement a échoué : ${detachError.message}`
+        );
+        return;
+      }
+      collecteId = null;
+      paidParticipants = [];
     }
 
     setLoading(false);
 
-    // Affichage immédiat sur le calendrier (voir le commentaire sur
-    // onCreated plus haut) : construit ici plutôt qu'attendu du serveur,
-    // avec les compteurs RSVP à zéro (aucune réponse n'existe encore pour
-    // un événement qui vient d'être créé) — corrigé silencieusement par le
-    // prochain rafraîchissement temps réel si besoin.
-    onCreated?.([
-      {
-        id: inserted.id,
-        title: inserted.title,
-        event_type: inserted.event_type,
-        isHome: inserted.is_home,
-        attendanceRequestedAt: null,
-        teamScore: null,
-        opponentScore: null,
-        location: inserted.location,
-        salle: inserted.salle,
-        start_time: inserted.start_time,
-        end_time: inserted.end_time,
-        notes: inserted.notes,
-        isPaid,
-        paymentLink,
-        teamId: inserted.team_id,
-        targetTeamIds: inserted.target_team_ids,
-        teamName: resolveTeamNameClient(inserted.team_id, inserted.target_team_ids, teams),
-        rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
-      },
-    ]);
-
-    // Bonus, pas bloquant : voir event-push.ts. La famille apprend le
-    // nouveau rendez-vous sans avoir à ouvrir l'appli ni passer par
-    // WhatsApp.
-    const team = teams.find((t) => t.id === effectiveTeamId);
+    // Bonus, pas bloquant : voir event-push.ts. En modification, seul un
+    // vrai changement d'horaire ou de lieu justifie de déranger les
+    // familles — pas une note ou un titre corrigé (même règle que
+    // l'ancienne modale). Tolérance d'une minute sur l'heure pour ignorer
+    // un arrondi de saisie sans rapport avec un vrai déplacement.
     const when = new Date(inserted.start_time).toLocaleDateString("fr-FR", {
       weekday: "long",
       day: "numeric",
@@ -321,14 +442,84 @@ export default function CreateEventForm({
       minute: "2-digit",
     });
     const lieu = salle || location;
-    const label = typeChoices.find((c) => c.value === eventType)?.label ?? "Événement";
-    sendEventPush(
-      inserted.id,
-      `UBAC — ${team ? teamLabel(team) : "Tous les groupes"}`,
-      `Nouveau : ${label}, ${when} à ${heure}${lieu ? ` · ${lieu}` : ""}.`
-    );
+    if (isEditing && editingEvent) {
+      const timeMoved =
+        Math.abs(new Date(inserted.start_time).getTime() - new Date(editingEvent.start_time).getTime()) >
+        60000;
+      const placeMoved =
+        (location || "") !== (editingEvent.location ?? "") || (salle || "") !== (editingEvent.salle ?? "");
+      if (timeMoved || placeMoved) {
+        sendEventPush(
+          inserted.id,
+          `UBAC — ${editingEvent.teamName}`,
+          `Changement : ${when} à ${heure}${lieu ? ` · ${lieu}` : ""}.`
+        );
+      }
+    } else {
+      const team = teams.find((t) => t.id === effectiveTeamId);
+      const label = typeChoices.find((c) => c.value === eventType)?.label ?? "Événement";
+      sendEventPush(
+        inserted.id,
+        `UBAC — ${team ? teamLabel(team) : "Tous les groupes"}`,
+        `Nouveau : ${label}, ${when} à ${heure}${lieu ? ` · ${lieu}` : ""}.`
+      );
+    }
 
-    // Besoins d'organisation chiffrés dès la création. Best-effort : une
+    // Affichage immédiat sur le calendrier (voir le commentaire sur
+    // onCreated/onUpdated plus haut) : construit ici plutôt qu'attendu du
+    // serveur — corrigé silencieusement par le prochain rafraîchissement
+    // temps réel si besoin.
+    const teamName = resolveTeamNameClient(inserted.team_id, inserted.target_team_ids, teams);
+    if (isEditing && editingEvent) {
+      onUpdated?.({
+        ...editingEvent,
+        title: inserted.title,
+        event_type: inserted.event_type,
+        isHome: inserted.is_home,
+        location: inserted.location,
+        salle: inserted.salle,
+        start_time: inserted.start_time,
+        end_time: inserted.end_time,
+        notes: inserted.notes,
+        isPaid,
+        collecteId,
+        paidAmount: isPaid ? amountNum : null,
+        paymentLink,
+        paidParticipants,
+        teamId: inserted.team_id,
+        targetTeamIds: inserted.target_team_ids,
+        teamName,
+      });
+    } else {
+      onCreated?.([
+        {
+          id: inserted.id,
+          title: inserted.title,
+          event_type: inserted.event_type,
+          isHome: inserted.is_home,
+          attendanceRequestedAt: null,
+          teamScore: null,
+          opponentScore: null,
+          location: inserted.location,
+          salle: inserted.salle,
+          start_time: inserted.start_time,
+          end_time: inserted.end_time,
+          notes: inserted.notes,
+          isPaid,
+          collecteId,
+          paidAmount: isPaid ? amountNum : null,
+          paymentLink,
+          paidParticipants,
+          teamId: inserted.team_id,
+          targetTeamIds: inserted.target_team_ids,
+          teamName,
+          rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
+        },
+      ]);
+    }
+
+    // Besoins d'organisation chiffrés dès la création (jamais en édition,
+    // voir le commentaire sur draftNeeds plus haut). Best-effort : une
     // erreur ici ne doit pas faire croire que l'événement lui-même n'a pas
     // été créé, il l'a bien été.
     const validNeeds = draftNeeds
@@ -339,7 +530,7 @@ export default function CreateEventForm({
         sortOrder: i,
       }))
       .filter((n) => n.count > 0);
-    if (validNeeds.length > 0) {
+    if (!isEditing && validNeeds.length > 0) {
       const { error: needsError } = await supabase.from("event_volunteer_needs").insert(
         validNeeds.map((n) => ({
           event_id: inserted.id,
@@ -359,35 +550,26 @@ export default function CreateEventForm({
       }
     }
 
-    setTitle("");
-    setIsHome("");
-    setLocation("");
-    setSalle("");
-    setStartTime("");
-    setEndTime("");
-    setNotes("");
-    setIsPaid(false);
-    setPaidAmount("");
-    setPaidLink("");
-    setScopeMode("single");
-    setTargetTeamIds([]);
-    setDraftNeeds([]);
+    resetFields();
     onClose();
-    // Pas de router.refresh() explicite : events/event_volunteer_needs
-    // sont surveillées en temps réel (realtime-sync.tsx) — le garder ici
-    // en plus rechargeait la page deux fois pour une seule création
-    // (retour de Cindy du 2026-08-20, même correctif que partout ailleurs
-    // dans ce chantier).
+    // Pas de router.refresh() explicite : events/event_volunteer_needs/
+    // cotisations/collectes sont surveillées en temps réel
+    // (realtime-sync.tsx) — le garder ici en plus rechargeait la page deux
+    // fois pour une seule création/modification (retour de Cindy du
+    // 2026-08-20, même correctif que partout ailleurs dans ce chantier).
   }
 
   if (!open) return null;
 
   return (
     <form
+      ref={formRef}
       onSubmit={handleSubmit}
       className="flex flex-col gap-3 rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm"
     >
-      <h3 className="font-semibold text-zinc-900">Créer un événement</h3>
+      <h3 className="font-semibold text-zinc-900">
+        {isEditing ? "Modifier l'événement" : "Créer un événement"}
+      </h3>
 
       {/* Portée : un choix à plat, direct, plutôt qu'un détour par "Tous
           les groupes" pour arriver à "équipes spécifiques" (retour de
@@ -407,7 +589,16 @@ export default function CreateEventForm({
             <button
               key={c.value}
               type="button"
-              onClick={() => setScopeMode(c.value)}
+              onClick={() => {
+                setScopeMode(c.value);
+                // Un événement jusque-là "Tout le club" ou "Équipes
+                // spécifiques" n'a pas d'équipe unique en mémoire :
+                // préremplir la première plutôt que de laisser le menu
+                // vide au passage sur "Une équipe".
+                if (c.value === "single" && !teamId) {
+                  setTeamId(teams[0]?.id ?? "");
+                }
+              }}
               className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
                 scopeMode === c.value
                   ? "border-navy bg-navy/10 text-navy"
@@ -595,13 +786,12 @@ export default function CreateEventForm({
               />
             </div>
             <p className="text-[11px] text-zinc-400">
-              Crée automatiquement un suivi de paiement dans Cotisations →
-              Événements payants, avec les familles concernées déjà ajoutées
-              d&apos;après l&apos;équipe (ou les équipes) choisie ci-dessus.
-              Le lien, s&apos;il est renseigné, s&apos;affiche directement sur la
+              {isEditing && editingEvent?.collecteId
+                ? "Le tarif et le lien sont mis à jour sur le suivi de paiement existant (Cotisations → Événements payants) — les participants déjà ajoutés ne sont pas modifiés."
+                : "Crée automatiquement un suivi de paiement dans Cotisations → Événements payants, avec les familles concernées déjà ajoutées d'après l'équipe (ou les équipes) choisie ci-dessus."}
+              {" "}Le lien, s&apos;il est renseigné, s&apos;affiche directement sur la
               carte de l&apos;événement pour que chaque famille paie
-              elle-même — ajoutable ou modifiable après coup depuis
-              Cotisations si tu ne l&apos;as pas encore.
+              elle-même.
             </p>
           </div>
         )}
@@ -619,68 +809,73 @@ export default function CreateEventForm({
           la même liste standard que sur la carte de l'événement une fois
           créé (VolunteerNeedsPanel) — ceci n'est qu'un raccourci pour ne
           pas avoir à y retourner tout de suite ; les besoins restent de
-          toute façon ajoutables/modifiables après coup. */}
-      <div className="flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3">
-        <p className="text-xs font-medium text-zinc-600">
-          Besoins d&apos;organisation (optionnel)
-        </p>
-        {draftNeeds.length > 0 && (
-          <div className="flex flex-col gap-1.5">
-            {draftNeeds.map((n) => (
-              <div key={n.key} className="flex flex-wrap items-center gap-1.5">
-                <RoleIcon icon={volunteerRoleIcon(n.roleCode)} className="h-3.5 w-3.5 shrink-0" />
-                <select
-                  value={n.roleCode}
-                  onChange={(e) => updateDraftNeed(n.key, { roleCode: e.target.value })}
-                  className="rounded-lg border border-zinc-200 px-2 py-1.5 text-xs"
-                >
-                  {STANDARD_VOLUNTEER_ROLES.map((r) => (
-                    <option key={r.code} value={r.code}>
-                      {r.label}
-                    </option>
-                  ))}
-                  <option value={CUSTOM_ROLE_CODE}>Autre...</option>
-                </select>
-                {n.roleCode === CUSTOM_ROLE_CODE && (
-                  <input
-                    type="text"
-                    placeholder="Nom du besoin"
-                    value={n.customLabel}
-                    onChange={(e) => updateDraftNeed(n.key, { customLabel: e.target.value })}
-                    className="min-w-0 flex-1 rounded-lg border border-zinc-200 px-2 py-1.5 text-xs"
-                  />
-                )}
-                <label className="ml-auto flex items-center gap-1.5 text-xs text-zinc-600">
-                  Nombre de personnes requises
-                  <input
-                    type="number"
-                    min={1}
-                    value={n.count}
-                    onChange={(e) => updateDraftNeed(n.key, { count: e.target.value })}
-                    className="w-14 shrink-0 rounded-lg border border-zinc-200 px-2 py-1 text-center"
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={() => removeDraftNeed(n.key)}
-                  title="Retirer ce besoin"
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-zinc-400 hover:bg-white hover:text-red-500"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-        <button
-          type="button"
-          onClick={addDraftNeed}
-          className="flex w-fit items-center gap-1 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Ajouter un besoin
-        </button>
-      </div>
+          toute façon ajoutables/modifiables après coup. Jamais en édition
+          (voir le commentaire sur draftNeeds plus haut) — VolunteerNeedsPanel,
+          sur la carte, reste le seul endroit pour gérer les besoins déjà
+          existants. */}
+      {!isEditing && (
+        <div className="flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3">
+          <p className="text-xs font-medium text-zinc-600">
+            Besoins d&apos;organisation (optionnel)
+          </p>
+          {draftNeeds.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              {draftNeeds.map((n) => (
+                <div key={n.key} className="flex flex-wrap items-center gap-1.5">
+                  <RoleIcon icon={volunteerRoleIcon(n.roleCode)} className="h-3.5 w-3.5 shrink-0" />
+                  <select
+                    value={n.roleCode}
+                    onChange={(e) => updateDraftNeed(n.key, { roleCode: e.target.value })}
+                    className="rounded-lg border border-zinc-200 px-2 py-1.5 text-xs"
+                  >
+                    {STANDARD_VOLUNTEER_ROLES.map((r) => (
+                      <option key={r.code} value={r.code}>
+                        {r.label}
+                      </option>
+                    ))}
+                    <option value={CUSTOM_ROLE_CODE}>Autre...</option>
+                  </select>
+                  {n.roleCode === CUSTOM_ROLE_CODE && (
+                    <input
+                      type="text"
+                      placeholder="Nom du besoin"
+                      value={n.customLabel}
+                      onChange={(e) => updateDraftNeed(n.key, { customLabel: e.target.value })}
+                      className="min-w-0 flex-1 rounded-lg border border-zinc-200 px-2 py-1.5 text-xs"
+                    />
+                  )}
+                  <label className="ml-auto flex items-center gap-1.5 text-xs text-zinc-600">
+                    Nombre de personnes requises
+                    <input
+                      type="number"
+                      min={1}
+                      value={n.count}
+                      onChange={(e) => updateDraftNeed(n.key, { count: e.target.value })}
+                      className="w-14 shrink-0 rounded-lg border border-zinc-200 px-2 py-1 text-center"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => removeDraftNeed(n.key)}
+                    title="Retirer ce besoin"
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-zinc-400 hover:bg-white hover:text-red-500"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={addDraftNeed}
+            className="flex w-fit items-center gap-1 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Ajouter un besoin
+          </button>
+        </div>
+      )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -690,11 +885,20 @@ export default function CreateEventForm({
           disabled={loading}
           className="rounded-full bg-ubac-yellow px-4 py-2 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
         >
-          {loading ? "Création..." : "Créer"}
+          {loading
+            ? isEditing
+              ? "Enregistrement..."
+              : "Création..."
+            : isEditing
+              ? "Enregistrer"
+              : "Créer"}
         </button>
         <button
           type="button"
-          onClick={onClose}
+          onClick={() => {
+            resetFields();
+            onClose();
+          }}
           className="rounded-full border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
         >
           Annuler
