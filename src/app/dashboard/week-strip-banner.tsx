@@ -169,7 +169,16 @@ export default function WeekStripBanner({ events }: { events: WeekStripEvent[] }
   return (
     <div className="flex flex-col gap-2.5">
       <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-        <p className="text-sm font-medium text-white/85">{summary}</p>
+        {/* Retour de Cindy du 2026-08-24 ("même emplacement, plus gros") :
+            même poids typographique que l'ancienne carte séparée
+            (family-week-banner.tsx) — eyebrow "CETTE SEMAINE" + phrase en
+            grand et gras, plutôt qu'une simple ligne discrète. */}
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">
+            Cette semaine
+          </p>
+          <p className="mt-0.5 text-lg font-bold text-white">{summary}</p>
+        </div>
         <div className="grid grid-cols-7 gap-1.5 sm:w-auto sm:shrink-0">
           {days.map((d) => {
             const isToday = isSameDay(d, today);
