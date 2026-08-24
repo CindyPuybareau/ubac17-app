@@ -131,7 +131,12 @@ export default function MembersTable({
   const [actionError, setActionError] = useState<string | null>(null);
   const [showAddMember, setShowAddMember] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<AdminMember | null>(null);
+  // Tableau plutôt que fiche unique (retour de Cindy du 2026-08-24 :
+  // "je n'ai pas la possibilité de les supprimer en groupé") — sert à la
+  // fois au bouton ⋮ "Supprimer définitivement" d'une ligne (tableau à
+  // un seul élément) et au nouveau "Supprimer la sélection" du bandeau
+  // groupé, sans dupliquer confirmDelete/la modale de confirmation.
+  const [deleteTarget, setDeleteTarget] = useState<AdminMember[] | null>(null);
   const [archiveTarget, setArchiveTarget] = useState<string[] | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -486,21 +491,22 @@ export default function MembersTable({
   }
 
   async function confirmDelete() {
-    if (!deleteTarget) return;
+    if (!deleteTarget || deleteTarget.length === 0) return;
+    const ids = deleteTarget.map((m) => m.id);
     setDeleting(true);
     setActionError(null);
     const supabase = createClient();
     const { data, error } = await supabase
       .from("players")
       .delete()
-      .eq("id", deleteTarget.id)
+      .in("id", ids)
       .select("id");
     setDeleting(false);
     if (error) {
       setActionError(`Suppression impossible : ${error.message}`);
       return;
     }
-    if ((data?.length ?? 0) === 0) {
+    if ((data?.length ?? 0) < ids.length) {
       setActionError(
         "Suppression bloquée par les droits d'accès (RLS). Vérifie que la migration 20260826000000_cascade_delete_players.sql a bien été exécutée dans Supabase (SQL Editor), puis réessaie."
       );
@@ -508,14 +514,16 @@ export default function MembersTable({
     }
     // Disparition immédiate plutôt que d'attendre le rafraîchissement
     // temps réel — voir le commentaire sur localMembers plus haut.
-    setLocalMembers((prev) => prev.filter((m) => m.id !== deleteTarget.id));
+    setLocalMembers((prev) => prev.filter((m) => !ids.includes(m.id)));
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      next.delete(deleteTarget.id);
+      ids.forEach((id) => next.delete(id));
       return next;
     });
     setDeleteTarget(null);
-    showToast("Membre supprimé définitivement.");
+    showToast(
+      ids.length > 1 ? `${ids.length} membres supprimés définitivement.` : "Membre supprimé définitivement."
+    );
   }
 
   const selectedMembers = localMembers.filter((m) => selectedIds.has(m.id));
@@ -611,7 +619,7 @@ export default function MembersTable({
                   <button
                     onClick={() => {
                       setOpenMenuId(null);
-                      setDeleteTarget(m);
+                      setDeleteTarget([m]);
                     }}
                     className={`${menuItemClass} text-red-600 hover:bg-red-50`}
                   >
@@ -730,13 +738,37 @@ export default function MembersTable({
               <RefreshCw className="h-3.5 w-3.5" />
               Affecter à une équipe
             </button>
-            <button
-              onClick={() => handleArchive(Array.from(selectedIds))}
-              className="flex items-center gap-1.5 rounded-full border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
-            >
-              <Archive className="h-3.5 w-3.5" />
-              Archiver la sélection
-            </button>
+            {/* Retour de Cindy du 2026-08-24 : "je n'ai pas la possibilité
+                de les supprimer en groupé" — quand toute la sélection est
+                déjà archivée, remplace "Archiver" (qui n'aurait plus de
+                sens ici) par "Réactiver"/"Supprimer", même logique que le
+                menu ⋮ d'une seule fiche archivée. */}
+            {selectedMembers.length > 0 && selectedMembers.every((m) => m.archivedAt) ? (
+              <>
+                <button
+                  onClick={() => handleReactivate(Array.from(selectedIds))}
+                  className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Réactiver la sélection
+                </button>
+                <button
+                  onClick={() => setDeleteTarget(selectedMembers)}
+                  className="flex items-center gap-1.5 rounded-full border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Supprimer la sélection
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => handleArchive(Array.from(selectedIds))}
+                className="flex items-center gap-1.5 rounded-full border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
+              >
+                <Archive className="h-3.5 w-3.5" />
+                Archiver la sélection
+              </button>
+            )}
             <button
               onClick={() => setSelectedIds(new Set())}
               className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-zinc-500 hover:bg-white"
@@ -1168,19 +1200,29 @@ export default function MembersTable({
         />
       )}
 
-      {deleteTarget && (
+      {deleteTarget && deleteTarget.length > 0 && (
         <Modal
-          title="Suppression définitive"
+          title={deleteTarget.length > 1 ? `Suppression définitive (${deleteTarget.length} membres)` : "Suppression définitive"}
           onClose={() => setDeleteTarget(null)}
           widthClassName="max-w-md"
         >
           <div className="flex flex-col gap-3">
             <p className="text-sm text-zinc-700">
-              Êtes-vous sûr de vouloir supprimer définitivement{" "}
-              <span className="font-semibold">
-                {formatPersonName(deleteTarget.firstName, deleteTarget.lastName, "ce membre")}
-              </span>{" "}
-              ? Cette action est irréversible.
+              {deleteTarget.length === 1 ? (
+                <>
+                  Êtes-vous sûr de vouloir supprimer définitivement{" "}
+                  <span className="font-semibold">
+                    {formatPersonName(deleteTarget[0].firstName, deleteTarget[0].lastName, "ce membre")}
+                  </span>{" "}
+                  ? Cette action est irréversible.
+                </>
+              ) : (
+                <>
+                  Êtes-vous sûr de vouloir supprimer définitivement ces{" "}
+                  <span className="font-semibold">{deleteTarget.length} membres</span> ? Cette
+                  action est irréversible.
+                </>
+              )}
             </p>
             <div className="flex items-stretch gap-2">
               <button
