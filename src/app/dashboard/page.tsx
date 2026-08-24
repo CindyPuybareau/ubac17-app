@@ -2393,7 +2393,14 @@ export default async function DashboardPage() {
             côte, ordonnés via sm:order-*). Sur mobile, le wrapper reste un
             vrai bloc (photo + icônes sur la même ligne) et le bandeau
             repasse dessous, comme confirmé "propre" par Cindy. */}
-        <div className="relative mx-auto flex w-full max-w-[1600px] flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        {/* sm:items-start (retour de Cindy du 2026-08-24, "au clic sur le
+            planning... laisser fixe le planning les symbole et la photo") :
+            quand un jour cliqué déplie sa carte événement sous le bandeau,
+            la colonne du milieu grandit — en sm:items-center, photo et
+            icônes se recentraient verticalement sur toute la ligne et
+            semblaient "bouger". Ancrées en haut, elles restent strictement
+            immobiles ; seul l'espace sous le bandeau s'ouvre. */}
+        <div className="relative mx-auto flex w-full max-w-[1600px] flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div className="flex items-center justify-between gap-3 sm:contents">
             <div className="flex min-w-0 items-center gap-3 sm:order-1 sm:shrink-0">
               <AvatarUpload userId={user.id} avatarUrl={profile?.avatar_url ?? null} name={profile?.first_name ?? null} size="lg" />

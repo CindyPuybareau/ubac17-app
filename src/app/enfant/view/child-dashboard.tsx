@@ -282,7 +282,12 @@ export default function ChildDashboard({
             sortir les deux blocs de leur wrapper mobile). Sur mobile, le
             wrapper reste un vrai bloc (photo + icônes ensemble) et le
             bandeau repasse dessous. */}
-        <div className="relative mx-auto flex w-full max-w-[1600px] flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        {/* sm:items-start (retour de Cindy du 2026-08-24, "au clic sur le
+            planning... laisser fixe le planning les symbole et la photo"),
+            même correctif que page.tsx : ancrées en haut, photo et icônes
+            restent strictement immobiles quand la carte événement du jour
+            se déplie sous le bandeau. */}
+        <div className="relative mx-auto flex w-full max-w-[1600px] flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div className="flex items-center justify-between gap-3 sm:contents">
             <div className="flex min-w-0 items-center gap-3 sm:order-1 sm:shrink-0">
               <ChildAvatarUpload avatarUrl={avatarUrl} name={firstName} />
