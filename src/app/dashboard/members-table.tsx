@@ -260,6 +260,14 @@ export default function MembersTable({
       );
     }
     return [...list].sort((a, b) => {
+      // Archivés groupés en tête (retour de Cindy du 2026-08-24, "afficher
+      // les archivés en haut du tableau des membres pour ne pas avoir à
+      // les chercher") — seulement quand "Afficher les archivés" est
+      // coché, sinon `list` n'en contient déjà plus aucun. Toujours en
+      // premier quel que soit le sens du tri, qui ne s'applique qu'à
+      // l'intérieur de chaque groupe (archivés, puis actifs).
+      const archivedDiff = Number(Boolean(b.archivedAt)) - Number(Boolean(a.archivedAt));
+      if (archivedDiff !== 0) return archivedDiff;
       const cmp = fullLastName(a).localeCompare(fullLastName(b), "fr");
       return sortDir === "asc" ? cmp : -cmp;
     });
