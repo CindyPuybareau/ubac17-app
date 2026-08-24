@@ -727,9 +727,27 @@ export default function CalendarView({
         // Deux modes de filtrage par équipe selon resultsTeamSelector :
         // une équipe active à la fois (pills) ou plusieurs cochées à la
         // fois (dropdown) — voir sa définition plus haut.
+        //
+        // Retour de Cindy du 2026-08-25 ("mon evenement payant ne se voit
+        // pas dans événement U13") : ce filtre ne regardait que
+        // event.teamId (portée "Une équipe"), jamais targetTeamIds (portée
+        // "Équipes spécifiques") ni le cas vraiment club-wide (teamId ET
+        // targetTeamIds tous les deux null) — un événement créé avec l'une
+        // de ces deux autres portées disparaissait silencieusement de
+        // "Événements" dès que plus d'une équipe existait, quel que soit
+        // le filtre choisi.
         return resultsTeamSelector === "dropdown"
-          ? Boolean(e.teamId) && selectedResultTeamIds.has(e.teamId as string)
-          : e.teamId === activeResultsTeamIdResolved;
+          ? e.teamId
+            ? selectedResultTeamIds.has(e.teamId)
+            : e.targetTeamIds && e.targetTeamIds.length > 0
+              ? e.targetTeamIds.some((id) => selectedResultTeamIds.has(id))
+              : true
+          : e.teamId
+            ? e.teamId === activeResultsTeamIdResolved
+            : !e.targetTeamIds ||
+              e.targetTeamIds.length === 0 ||
+              (activeResultsTeamIdResolved != null &&
+                e.targetTeamIds.includes(activeResultsTeamIdResolved));
       })
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
     // eslint-disable-next-line react-hooks/exhaustive-deps
