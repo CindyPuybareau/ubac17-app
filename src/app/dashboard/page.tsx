@@ -2449,7 +2449,15 @@ export default async function DashboardPage() {
 
   return (
     <MobileNavProvider>
-    <div className="flex flex-1 flex-col">
+    {/* overflow-x-hidden (retour de Cindy du 2026-08-25, "pas de scroll
+        droite gauche sur grand ecran surtout !... le responsive doit etre
+        nickel") : filet de sécurité au niveau de la page entière — un
+        débordement horizontal ponctuel quelque part à l'intérieur ne doit
+        jamais se répercuter jusqu'à une barre de défilement horizontale
+        sur toute la page. Les zones qui ont vraiment besoin de défiler
+        latéralement (tableaux larges...) gardent leur propre
+        overflow-x-auto local, inchangé. */}
+    <div className="flex flex-1 flex-col overflow-x-hidden">
       <RealtimeSync />
       {/* Retour de Cindy du 2026-08-22 : logo seul (plus de texte "UBAC" à
           côté — la photo de profil ci-dessous porte désormais l'identité
@@ -2497,16 +2505,17 @@ export default async function DashboardPage() {
             côte, ordonnés via sm:order-*). Sur mobile, le wrapper reste un
             vrai bloc (photo + icônes sur la même ligne) et le bandeau
             repasse dessous, comme confirmé "propre" par Cindy. */}
-        {/* sm:items-start (retour de Cindy du 2026-08-24, "au clic sur le
-            planning... laisser fixe le planning les symbole et la photo") :
-            quand un jour cliqué déplie sa carte événement sous le bandeau,
-            la colonne du milieu grandit — en sm:items-center, photo et
-            icônes se recentraient verticalement sur toute la ligne et
-            semblaient "bouger". Ancrées en haut, elles restent strictement
-            immobiles ; seul l'espace sous le bandeau s'ouvre. */}
-        <div className="relative mx-auto flex w-full max-w-[1600px] flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        {/* Retour de Cindy du 2026-08-25 ("le texte et le calendrier de 7
+            jours doit etre centré") : une grille 1fr/auto/photo et icônes
+            avaient des largeurs différentes, donc "centrer dans l'espace
+            restant" (flex-1) ne tombait pas au vrai centre de la ligne.
+            Grille à 3 colonnes 1fr/auto/1fr : les deux colonnes extrêmes
+            étant strictement égales, la colonne du milieu (le bandeau)
+            tombe exactement au centre géométrique de la ligne, quelle que
+            soit la largeur réelle de la photo ou des icônes. */}
+        <div className="relative mx-auto grid w-full max-w-[1600px] grid-cols-1 items-center gap-3 sm:grid-cols-[1fr_minmax(0,auto)_1fr] sm:gap-4">
           <div className="flex items-center justify-between gap-3 sm:contents">
-            <div className="flex min-w-0 items-center gap-3 sm:order-1 sm:shrink-0">
+            <div className="flex min-w-0 items-center gap-3 sm:col-start-1 sm:shrink-0 sm:justify-self-start">
               <AvatarUpload userId={user.id} avatarUrl={profile?.avatar_url ?? null} name={profile?.first_name ?? null} size="lg" />
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">
@@ -2517,7 +2526,7 @@ export default async function DashboardPage() {
                 </h1>
               </div>
             </div>
-            <div className="flex shrink-0 items-center gap-1 sm:order-3">
+            <div className="flex shrink-0 items-center gap-1 sm:col-start-3 sm:justify-self-end">
               <OrgChartButton />
               <NotificationBell />
               <MobileMenuButton />
@@ -2527,7 +2536,7 @@ export default async function DashboardPage() {
               2026-08-24) : jamais pour le Bureau, voir showHeaderWeekBanner
               plus haut. */}
           {showHeaderWeekBanner && (
-            <div className="sm:order-2 sm:flex sm:min-w-0 sm:flex-1 sm:justify-center">
+            <div className="min-w-0 sm:col-start-2 sm:justify-self-center">
               <WeekStripBanner events={headerWeekEvents} />
             </div>
           )}

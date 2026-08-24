@@ -174,17 +174,24 @@ export default function WeekStripBanner({ events }: { events: WeekStripEvent[] }
     // largeur, inchangée. mx-auto + une largeur plafonnée ici, plutôt que
     // de resserrer tout l'en-tête (essayé puis annulé), pour que ce
     // bandeau seul se recentre dans l'en-tête pleine largeur.
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-2.5">
+    <div className="relative mx-auto flex w-full max-w-2xl flex-col gap-2.5">
       {/* "sur pc tout à gauche ça ne va pas, le centrer" (retour précédent,
           toujours valable) : en sm:justify-between, la frise finissait
           collée au bord droit. Centré en groupe (texte + frise) au lieu
           d'étiré — mobile (colonne empilée, non concerné) inchangé. */}
-      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-center sm:gap-8">
+      {/* sm:flex-wrap (retour de Cindy du 2026-08-25, "pas de scroll droite
+          gauche sur grand écran surtout") : sur une largeur serrée, texte
+          et frise refusaient de passer à la ligne (frise en sm:shrink-0),
+          ce qui poussait toute la ligne — puis l'en-tête, puis la page —
+          en débordement horizontal. Le passage à la ligne ici reste propre
+          (les deux restent centrés, voir sm:justify-center) plutôt que de
+          laisser échapper un débordement. */}
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-center sm:gap-8">
         {/* Retour de Cindy du 2026-08-24 ("même emplacement, plus gros") :
             même poids typographique que l'ancienne carte séparée
             (family-week-banner.tsx) — eyebrow "CETTE SEMAINE" + phrase en
             grand et gras, plutôt qu'une simple ligne discrète. */}
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">
             Cette semaine
           </p>
@@ -230,7 +237,16 @@ export default function WeekStripBanner({ events }: { events: WeekStripEvent[] }
       </div>
 
       {selectedDayEvents.length > 0 && (
-        <div className="flex flex-col gap-2 rounded-2xl bg-white/95 p-3 shadow-sm sm:p-3.5">
+        // Retour de Cindy du 2026-08-25 ("centrer les symboles notif et
+        // organigramme... ils devraient apparaitre au milieu") : ce panneau
+        // est maintenant une superposition (absolute), pas un bloc en flux
+        // normal — il ne fait donc plus jamais grandir la ligne de
+        // l'en-tête quand il se déplie, ce qui permet de revenir à
+        // sm:items-center sur la photo/les icônes (voir page.tsx /
+        // child-dashboard.tsx) sans réintroduire le décalage qu'on
+        // corrigeait avant ("laisser fixe le planning les symbole et la
+        // photo").
+        <div className="absolute inset-x-0 top-full z-20 mt-2 flex flex-col gap-2 rounded-2xl bg-white/95 p-3 shadow-lg sm:p-3.5">
           {selectedDayEvents.map((event) => (
             <DayEventCard key={event.id} event={event} />
           ))}

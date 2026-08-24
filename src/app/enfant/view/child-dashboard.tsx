@@ -246,7 +246,10 @@ export default function ChildDashboard({
   ];
 
   return (
-    <div className="flex flex-1 flex-col">
+    // overflow-x-hidden (retour de Cindy du 2026-08-25, "pas de scroll
+    // droite gauche sur grand ecran surtout"), même filet de sécurité que
+    // dashboard/page.tsx.
+    <div className="flex flex-1 flex-col overflow-x-hidden">
       {/* Même traitement que l'en-tête de l'Espace Parent (dashboard/page.tsx,
           retour de Cindy du 2026-08-22) : logo seul agrandi, hauteur fixe +
           items-center pour un vrai centrage vertical (logo et icônes), et
@@ -290,14 +293,16 @@ export default function ChildDashboard({
             sortir les deux blocs de leur wrapper mobile). Sur mobile, le
             wrapper reste un vrai bloc (photo + icônes ensemble) et le
             bandeau repasse dessous. */}
-        {/* sm:items-start (retour de Cindy du 2026-08-24, "au clic sur le
-            planning... laisser fixe le planning les symbole et la photo"),
-            même correctif que page.tsx : ancrées en haut, photo et icônes
-            restent strictement immobiles quand la carte événement du jour
-            se déplie sous le bandeau. */}
-        <div className="relative mx-auto flex w-full max-w-[1600px] flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        {/* Retour de Cindy du 2026-08-25 ("le texte et le calendrier de 7
+            jours doit etre centré"), même correctif que page.tsx : grille
+            1fr/auto/1fr — les deux colonnes extrêmes égales garantissent
+            que le bandeau tombe au vrai centre géométrique de la ligne,
+            quelle que soit la largeur réelle de la photo/des icônes
+            (centrer "dans l'espace restant" via flex-1 ne suffisait pas,
+            cet espace n'étant pas symétrique). */}
+        <div className="relative mx-auto grid w-full max-w-[1600px] grid-cols-1 items-center gap-3 sm:grid-cols-[1fr_minmax(0,auto)_1fr] sm:gap-4">
           <div className="flex items-center justify-between gap-3 sm:contents">
-            <div className="flex min-w-0 items-center gap-3 sm:order-1 sm:shrink-0">
+            <div className="flex min-w-0 items-center gap-3 sm:col-start-1 sm:shrink-0 sm:justify-self-start">
               <ChildAvatarUpload avatarUrl={avatarUrl} name={firstName} />
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">
@@ -308,12 +313,12 @@ export default function ChildDashboard({
                 </h1>
               </div>
             </div>
-            <div className="flex shrink-0 items-center gap-1 sm:order-3">
+            <div className="flex shrink-0 items-center gap-1 sm:col-start-3 sm:justify-self-end">
               <OrgChartButton />
               <ChildNotificationBell initialNotifications={notifications} initialEnabled={notificationsEnabled} />
             </div>
           </div>
-          <div className="sm:order-2 sm:flex sm:min-w-0 sm:flex-1 sm:justify-center">
+          <div className="min-w-0 sm:col-start-2 sm:justify-self-center">
             <WeekStripBanner events={headerWeekEvents} />
           </div>
         </div>

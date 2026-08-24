@@ -324,7 +324,16 @@ export default function AdminSidebar({
         <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setOpen(false)}>
           <div className="absolute inset-0 bg-black/40" />
           <nav
-            className="absolute right-3 top-3 flex max-h-[calc(100vh-1.5rem)] w-64 flex-col gap-1 overflow-y-auto rounded-2xl bg-navy p-3 shadow-xl"
+            // Retour de Cindy du 2026-08-25 ("quand tous mes onglets sont
+            // ouverts, je ne peux pas voir les boutons... je dois pouvoir
+            // scroller plus que ca") : 100vh sur mobile compte la hauteur
+            // totale de la page, y compris la zone que la barre d'adresse
+            // du navigateur peut recouvrir — le panneau se calculait donc
+            // parfois plus grand que la zone réellement visible, coupant
+            // le bas du menu (Déconnexion...) hors de portée du scroll.
+            // 100dvh (hauteur de viewport "dynamique") suit la zone
+            // vraiment visible à tout moment.
+            className="absolute right-3 top-3 flex max-h-[calc(100dvh-1.5rem)] w-64 flex-col gap-1 overflow-y-auto rounded-2xl bg-navy p-3 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-1 flex items-center justify-between px-1">
