@@ -585,8 +585,14 @@ export default function TeamCard({
     // de l'équipe qu'il encadre n'a aucun rapport avec son âge,
     // c'est sa propre fiche qui fait foi (un coach Séniors né en
     // 1986 est "Old Soldier", pas "Sparring Partner" des U13).
-    const statusCategory =
-      m.role === "JOUEUR" ? team.category : (detail?.category ?? team.category);
+    // Repli sur team.category retiré (bug constaté le 2026-08-24,
+    // Christian Devillers) : quand la fiche du coach n'a elle-même
+    // aucune catégorie renseignée, ce repli le faisait évaluer
+    // comme un joueur de l'équipe qu'il encadre, d'où un "Sparring
+    // Partner" U13F absurde pour un adulte. Sans catégorie propre
+    // connue, computePlayerYearStatus renvoie null (PlayerYearBadge
+    // n'affiche alors rien) — préférable à un badge faux.
+    const statusCategory = m.role === "JOUEUR" ? team.category : (detail?.category ?? null);
     const yearStatus = computePlayerYearStatus(birthDate, statusCategory);
     // Belongs to another team as well: he was lent to this one,
     // so the useful action is to send him back — a plain
