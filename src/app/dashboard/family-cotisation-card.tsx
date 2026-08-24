@@ -58,7 +58,7 @@ function Row({ c }: { c: AdminCotisation }) {
           <p className="font-semibold text-zinc-800">{formatAmount(c.paiement)}</p>
         </div>
         <div>
-          <p className="text-zinc-400">Reste à payer</p>
+          <p className="text-zinc-400 sm:whitespace-nowrap">Reste à payer</p>
           <p className={`font-semibold ${solde > 0 ? "text-red-600" : "text-zinc-800"}`}>
             {formatAmount(solde)}
           </p>

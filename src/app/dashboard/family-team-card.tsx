@@ -112,6 +112,49 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
     );
   }
 
+  // Carte mobile (<640px, retour de Cindy du 2026-08-24 : "sur mon profil
+  // parent mon tableau des équipes est toujours en tableau et pas en
+  // cartes") — même contenu que renderRow, juste réagencé verticalement ;
+  // pas d'actions ici (carte Famille en lecture seule, voir plus haut).
+  function renderCard(
+    key: string,
+    person: Person,
+    role: "COACH" | "COACH_PENDING" | "JOUEUR",
+    birthDate: string | null,
+    isStaff: boolean
+  ) {
+    const badge = roleBadge(role);
+    const yearStatus = role === "JOUEUR" ? computePlayerYearStatus(birthDate, card.category) : null;
+    return (
+      <div
+        key={key}
+        className={`rounded-2xl border border-l-4 border-zinc-100 bg-white p-3.5 shadow-sm ${
+          isStaff ? "border-l-navy" : "border-l-emerald-400"
+        }`}
+      >
+        <p className="font-semibold text-zinc-900">
+          {formatLastName(person.last_name) || "—"}{" "}
+          {person.first_name ? formatFirstName(person.first_name) : ""}
+        </p>
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <span
+            className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold leading-none ${badge.className}`}
+          >
+            {badge.label}
+          </span>
+          {yearStatus && <PlayerYearBadge birthDate={birthDate} category={card.category} />}
+          {categoryLabel && (
+            <span
+              className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold leading-none ${theme.badge}`}
+            >
+              {categoryLabel}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-2xl border border-l-4 border-zinc-100 border-l-ubac-yellow bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-center gap-2">
@@ -127,7 +170,12 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
         )}
       </div>
 
-      <div className="mt-3 w-full overflow-x-auto rounded-xl border border-zinc-100">
+      {/* Tableau classique à partir de 640px (sm) ; en dessous, cartes
+          empilées (voir plus bas) — retour de Cindy du 2026-08-24 : "sur
+          mon profil parent mon tableau des équipes est toujours en
+          tableau et pas en cartes" (même correctif que team-card.tsx,
+          appliqué ici aussi). */}
+      <div className="mt-3 hidden w-full overflow-x-auto rounded-xl border border-zinc-100 sm:block">
         <table className="w-full table-auto border-collapse text-sm">
           <thead>
             <tr className="border-b border-zinc-100 bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-400">
@@ -185,6 +233,40 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
               )}
           </tbody>
         </table>
+      </div>
+
+      {/* Cartes empilées en dessous de 640px (sm) — même contenu que le
+          tableau ci-dessus (renderCard réutilise roleBadge/PlayerYearBadge
+          comme renderRow), groupées Coachs/Joueurs à l'identique. */}
+      <div className="mt-3 flex flex-col gap-4 sm:hidden">
+        {coachRows.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <p className="text-xs font-bold uppercase tracking-wide text-navy">
+              Coachs ({coachRows.length})
+            </p>
+            <div className="flex flex-col gap-2">
+              {coachRows.map((r) => renderCard(r.key, r.person, r.role, null, true))}
+            </div>
+          </div>
+        )}
+        {card.coaches.length === 0 && card.pendingCoaches.length === 0 && card.pendingCoachNames && (
+          <p className="rounded-2xl border border-zinc-100 bg-white p-3.5 text-sm text-blue-950 shadow-sm">
+            {card.pendingCoachNames}
+          </p>
+        )}
+        {playerRows.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">
+              Joueurs ({playerRows.length})
+            </p>
+            <div className="flex flex-col gap-2">
+              {playerRows.map((p) => renderCard(p.id, p, "JOUEUR", p.birthDate, false))}
+            </div>
+          </div>
+        )}
+        {coachRows.length === 0 && !card.pendingCoachNames && playerRows.length === 0 && (
+          <p className="px-3 py-4 text-center text-sm text-zinc-400">Aucun membre pour le moment.</p>
+        )}
       </div>
 
       {card.ffbbUrl && (
