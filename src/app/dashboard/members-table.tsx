@@ -26,6 +26,7 @@ import { buildGmailComposeLink } from "@/lib/email";
 import { teamLabel } from "@/lib/teams";
 import AddMemberModal from "./add-member-modal";
 import EmailTemplateModal from "./email-template-modal";
+import EmptyState from "./empty-state";
 import MemberDetailModal from "./member-detail-modal";
 import PlayerYearBadge from "./player-year-badge";
 import WhatsAppButton from "./whatsapp-button";
@@ -910,8 +911,8 @@ export default function MembersTable({
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-2 py-8 text-center text-sm text-zinc-400">
-                  Aucun membre trouvé.
+                <td colSpan={10} className="p-0">
+                  <EmptyState icon={User} message="Aucun membre trouvé." />
                 </td>
               </tr>
             )}

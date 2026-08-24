@@ -21,8 +21,12 @@ export default function DeferredCalendar(props: React.ComponentProps<typeof Cale
   }, []);
 
   if (!ready) {
+    // Skeleton aux couleurs de marque plutôt qu'un gris générique (tâche 8
+    // du topo "Maillot Neuf UBAC", retour de Cindy du 2026-08-24) — un
+    // dégradé navy/or très discret, cohérent avec la pastille de
+    // chargement pleine page (voir dashboard/loading.tsx).
     return (
-      <div className="h-64 animate-pulse rounded-2xl border border-zinc-100 bg-zinc-50" />
+      <div className="h-64 animate-pulse rounded-2xl border border-navy/10 bg-gradient-to-br from-navy/[0.04] via-ubac-yellow/[0.04] to-navy/[0.04]" />
     );
   }
 

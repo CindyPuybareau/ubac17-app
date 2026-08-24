@@ -2,7 +2,9 @@
 
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { Shield } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import EmptyState from "./empty-state";
 import TeamCard from "./team-card";
 import TeamFilterDropdown from "./team-filter-dropdown";
 import type { AdminMemberTeam, AdminUpcomingEvent, MemberDetail } from "./page";
@@ -155,7 +157,7 @@ export default function TeamManager({
           />
         ))}
         {teams.length === 0 && (
-          <p className="text-sm text-zinc-500">Aucune équipe pour le moment.</p>
+          <EmptyState icon={Shield} message="Aucune équipe pour le moment." />
         )}
         {teams.length > 0 && filteredTeams.length === 0 && (
           <p className="text-sm text-zinc-500">

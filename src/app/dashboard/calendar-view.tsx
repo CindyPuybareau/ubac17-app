@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { buildGmailComposeLink } from "@/lib/email";
+import EmptyState from "./empty-state";
 import { formatFirstName, formatLastName, sortByLastName } from "@/lib/names";
 import { parseMatchTitle } from "@/lib/match-display";
 import { sortTeamsByGroup, teamLabel } from "@/lib/teams";
@@ -1457,13 +1458,17 @@ export default function CalendarView({
               </div>
             )}
           {seasonListEvents.length === 0 ? (
-            <p className="text-sm text-zinc-500">
-              {view === "results" &&
-                "Aucun match programmé pour le moment — le calendrier de la saison apparaîtra ici."}
-              {view === "officialMatches" && "Aucun match officiel programmé pour le moment."}
-              {view === "officialResults" && "Aucun résultat pour le moment."}
-              {view === "clubEvents" && "Aucun événement programmé pour le moment."}
-            </p>
+            <EmptyState
+              icon={CalendarDays}
+              message={
+                (view === "results" &&
+                  "Aucun match programmé pour le moment — le calendrier de la saison apparaîtra ici.") ||
+                (view === "officialMatches" && "Aucun match officiel programmé pour le moment.") ||
+                (view === "officialResults" && "Aucun résultat pour le moment.") ||
+                (view === "clubEvents" && "Aucun événement programmé pour le moment.") ||
+                ""
+              }
+            />
           ) : view === "results" || view === "officialMatches" || view === "officialResults" ? (
             seasonListEvents.map((event) => renderResultCard(event))
           ) : (

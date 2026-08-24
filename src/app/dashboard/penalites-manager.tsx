@@ -6,6 +6,7 @@ import { Gavel, Pencil, Plus, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatLocalDateFr } from "@/lib/local-date";
 import { formatAmount } from "./cotisation-shared";
+import EmptyState from "./empty-state";
 import type { AdminMember, AdminPenalite } from "./page";
 
 type PenaliteForm = {
@@ -153,7 +154,7 @@ export default function PenalitesManager({
       </div>
 
       {penalites.length === 0 ? (
-        <p className="text-sm text-zinc-500">Aucune pénalité enregistrée pour le moment.</p>
+        <EmptyState icon={Gavel} message="Aucune pénalité enregistrée pour le moment." />
       ) : (
         <div className="flex flex-col gap-1.5">
           {penalites.map((p) => (

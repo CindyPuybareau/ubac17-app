@@ -23,6 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import EmptyState from "./empty-state";
 import { buildGmailComposeLink, signatureIndex, withSignature } from "@/lib/email";
 import {
   balanceDue,
@@ -1063,8 +1064,8 @@ export default function CotisationParticipantsTable({
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-2 py-8 text-center text-sm text-zinc-400">
-                  {emptyLabel}
+                <td colSpan={10} className="p-0">
+                  <EmptyState icon={CreditCard} message={emptyLabel} />
                 </td>
               </tr>
             )}

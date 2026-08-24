@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Handshake, Pencil, Plus, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatLocalDateFr } from "@/lib/local-date";
+import EmptyState from "./empty-state";
 import type { AdminSponsor } from "./page";
 
 type SponsorForm = {
@@ -120,7 +121,7 @@ export default function SponsorsManager({ sponsors }: { sponsors: AdminSponsor[]
       </div>
 
       {sponsors.length === 0 ? (
-        <p className="text-sm text-zinc-500">Aucun sponsor enregistré pour le moment.</p>
+        <EmptyState icon={Handshake} message="Aucun sponsor enregistré pour le moment." />
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {sponsors.map((sponsor) => {
