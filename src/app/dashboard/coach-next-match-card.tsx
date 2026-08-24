@@ -1,4 +1,4 @@
-import { CalendarDays, Check, Clock, MapPin, StickyNote, X } from "lucide-react";
+import { CalendarDays, Check, Clock, MapPin, Sparkles, StickyNote, X } from "lucide-react";
 import OpponentDisplay from "./opponent-display";
 import NextMatchActions from "./next-match-actions";
 import MatchTasksPanel from "./match-tasks-panel";
@@ -55,13 +55,27 @@ export default function CoachNextMatchCard({
   selfPlayerId?: string | null;
 }) {
   const style = event ? styleFor(event.event_type) : null;
+  // Même différenciation visuelle que calendar-view.tsx (retour de Cindy
+  // du 2026-08-24, item 6 du topo) : un match officiel pèse plus qu'un
+  // entraînement, un tournoi saute aux yeux avant même d'être lu — cette
+  // carte "Prochain rendez-vous" est la première chose vue à l'ouverture
+  // de l'onglet, elle doit suivre la même règle.
+  const isTournament = event?.event_type === "TOURNAMENT";
+  const isOfficialMatch = event?.event_type === "MATCH";
+  const shellClass = isTournament
+    ? "relative rounded-2xl border-2 border-dashed border-ubac-yellow bg-white p-5 shadow-sm"
+    : isOfficialMatch
+      ? `rounded-2xl border border-navy/15 bg-white p-5 shadow-sm border-l-8 ${style!.border}`
+      : `rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm ${style ? `border-l-4 ${style.border}` : ""}`;
 
   return (
-    <div
-      className={`rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm ${
-        style ? `border-l-4 ${style.border}` : ""
-      }`}
-    >
+    <div className={shellClass}>
+      {isTournament && (
+        <span className="absolute -top-2.5 right-4 flex items-center gap-1 rounded-full bg-ubac-yellow px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-navy shadow-sm">
+          <Sparkles className="h-3 w-3" />
+          Spécial
+        </span>
+      )}
       <p className="text-xs font-semibold uppercase tracking-wide text-ubac-blue">
         {teamName}
       </p>
@@ -172,28 +186,31 @@ export default function CoachNextMatchCard({
               2026-08-20) — voir le même correctif dans
               calendar-view.tsx. VolunteerNeedsPanel reste visible même
               sans besoin existant : le coach doit toujours avoir accès à
-              "+ Ajouter un besoin". */}
-          <OrganisationCard>
-            <MatchTasksPanel
-              eventId={event.id}
-              eventDate={event.start_time}
-              roster={roster.map((p) => ({ id: p.id, name: fullName(p) }))}
-              myPlayerIds={selfPlayerId ? [selfPlayerId] : []}
-              canAssignAnyone
-              initialTasks={tasks}
-              initialCarpool={carpool}
-              roles={rolesForEventType(roles, event.event_type)}
-              showCarpool={shouldOfferCarpool(event)}
-              bare
-            />
-            <VolunteerNeedsPanel
-              eventId={event.id}
-              needs={volunteerNeeds}
-              myPlayerIds={[]}
-              canManage
-              bare
-            />
-          </OrganisationCard>
+              "+ Ajouter un besoin". Règle explicite de Cindy du
+              2026-08-24 : jamais sur un entraînement, sur aucun espace. */}
+          {event.event_type !== "TRAINING" && (
+            <OrganisationCard>
+              <MatchTasksPanel
+                eventId={event.id}
+                eventDate={event.start_time}
+                roster={roster.map((p) => ({ id: p.id, name: fullName(p) }))}
+                myPlayerIds={selfPlayerId ? [selfPlayerId] : []}
+                canAssignAnyone
+                initialTasks={tasks}
+                initialCarpool={carpool}
+                roles={rolesForEventType(roles, event.event_type)}
+                showCarpool={shouldOfferCarpool(event)}
+                bare
+              />
+              <VolunteerNeedsPanel
+                eventId={event.id}
+                needs={volunteerNeeds}
+                myPlayerIds={[]}
+                canManage
+                bare
+              />
+            </OrganisationCard>
+          )}
         </>
       ) : (
         <p className="mt-1 text-sm text-zinc-500">Aucun événement à venir.</p>

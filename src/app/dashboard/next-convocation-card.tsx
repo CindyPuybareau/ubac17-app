@@ -1,4 +1,4 @@
-import { CalendarDays, MapPin, StickyNote } from "lucide-react";
+import { CalendarDays, MapPin, Sparkles, StickyNote } from "lucide-react";
 import RsvpButtons from "./rsvp-buttons";
 import OpponentDisplay from "./opponent-display";
 import NextMatchActions from "./next-match-actions";
@@ -43,8 +43,27 @@ export default function NextConvocationCard({
   roles: EventRoleType[];
   volunteerNeeds?: VolunteerNeed[];
 }) {
+  // Même différenciation que calendar-view.tsx/coach-next-match-card.tsx
+  // (retour de Cindy du 2026-08-24, item 6 du topo), adaptée au fond déjà
+  // doré de cette carte : un match officiel gagne juste un liseré plus
+  // épais, un tournoi garde son fanion "Spécial" pour rester cohérent
+  // même ici où tout est déjà en alerte jaune.
+  const isTournament = event.event_type === "TOURNAMENT";
+  const isOfficialMatch = event.event_type === "MATCH";
+  const shellClass = isTournament
+    ? "relative rounded-2xl border-2 border-dashed border-ubac-yellow bg-ubac-yellow/5 p-5 shadow-sm"
+    : isOfficialMatch
+      ? "rounded-2xl border border-navy/15 bg-ubac-yellow/5 p-5 shadow-sm border-l-8 border-l-navy"
+      : "rounded-2xl border border-ubac-yellow/40 bg-ubac-yellow/5 p-5 shadow-sm";
+
   return (
-    <div className="rounded-2xl border border-ubac-yellow/40 bg-ubac-yellow/5 p-5 shadow-sm">
+    <div className={shellClass}>
+      {isTournament && (
+        <span className="absolute -top-2.5 right-4 flex items-center gap-1 rounded-full bg-navy px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm">
+          <Sparkles className="h-3 w-3" />
+          Spécial
+        </span>
+      )}
       <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow-dark">
         Prochaine convocation · {playerName}
       </p>
@@ -86,6 +105,10 @@ export default function NextConvocationCard({
       </div>
       <NextMatchActions venue={venueQuery(event)} />
       {(() => {
+        // Règle explicite de Cindy du 2026-08-24 : jamais d'onglet
+        // Organisation sur un entraînement, sur aucun espace — même
+        // correctif que calendar-view.tsx/coach-next-match-card.tsx.
+        if (event.event_type === "TRAINING") return null;
         const applicableRoles = rolesForEventType(roles, event.event_type);
         const hasTasks = applicableRoles.length > 0 || shouldOfferCarpool(event);
         const hasNeeds = volunteerNeeds.length > 0;

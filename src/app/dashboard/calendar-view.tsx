@@ -18,6 +18,7 @@ import {
   Pencil,
   PartyPopper,
   Plus,
+  Sparkles,
   StickyNote,
   Trash2,
   Users,
@@ -783,13 +784,23 @@ export default function CalendarView({
     const isTournament = event.event_type === "TOURNAMENT";
     const isOfficialMatch = event.event_type === "MATCH";
     const cardShellClass = isTournament
-      ? "rounded-2xl border-2 border-dashed border-ubac-yellow bg-white p-4 shadow-sm"
+      ? "relative rounded-2xl border-2 border-dashed border-ubac-yellow bg-white p-4 shadow-sm"
       : isOfficialMatch
         ? `rounded-2xl border border-navy/15 bg-white p-4 shadow-sm border-l-8 ${style.border}`
         : `rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm border-l-4 ${style.border}`;
 
     return (
       <div key={event.id} className={`flex flex-col gap-2 ${cardShellClass}`}>
+        {/* Fanion "Spécial" (retour de Cindy du 2026-08-24, item 6 du topo :
+            "le tournoi exceptionnel doit sauter aux yeux") — s'ajoute à la
+            bordure pointillée ci-dessus plutôt que de la remplacer, pour
+            que l'effet reste lisible même en survol rapide de la liste. */}
+        {isTournament && (
+          <span className="absolute -top-2.5 right-3 flex items-center gap-1 rounded-full bg-ubac-yellow px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-navy shadow-sm">
+            <Sparkles className="h-3 w-3" />
+            Spécial
+          </span>
+        )}
         <div className="flex items-start justify-between gap-2">
           {/* min-w-0 : même correctif que renderResultCard plus bas — sans
               lui, le nom d'adversaire le plus long forçait toute la carte
@@ -965,9 +976,9 @@ export default function CalendarView({
             dédié que pour les équipes qu'ils gèrent réellement, jamais
             pour celles où ils ne sont que joueur. MatchTasksPanel se
             masque déjà tout seul s'il n'y a ni rôle ni covoiturage
-            applicable (ex. un entraînement) : pas besoin d'un filtre par
-            type d'événement en plus, qui ferait justement disparaître ce
-            bloc sur un "Événement club" pourtant organisé. */}
+            applicable : pas besoin d'un filtre par type d'événement en
+            plus pour un "Événement club" pourtant organisé. L'entraînement
+            reste l'exception explicite ci-dessous. */}
         {/* MatchTasksPanel (Maillots/Table de marque, ancien système) et
             VolunteerNeedsPanel (Besoins d'organisation, nouveau système)
             regroupés sous un seul titre "Organisation" plutôt que deux
@@ -976,8 +987,12 @@ export default function CalendarView({
             (sans cadre ni titre propres) et reste responsable de sa
             propre visibilité (roles/showCarpool pour l'un, needs pour
             l'autre) — la boîte partagée ne s'affiche donc que si l'un des
-            deux a quelque chose à montrer. */}
-        {!canManageEvent && (() => {
+            deux a quelque chose à montrer. Règle explicite de Cindy du
+            2026-08-24 : un entraînement ne montre JAMAIS cet onglet, sur
+            aucun espace, même si un rôle/besoin lui est un jour rattaché
+            en base — la carte entraînement doit rester sobre par
+            construction, pas juste par absence de données. */}
+        {!canManageEvent && event.event_type !== "TRAINING" && (() => {
           const hasTasks =
             rolesForEventType(eventRoles, event.event_type).length > 0 || shouldOfferCarpool(event);
           const needs = volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds;
@@ -1025,8 +1040,10 @@ export default function CalendarView({
             (juste "Besoins d'organisation" nu, sans repli), alors que
             c'est justement la vue Bureau/Coach qui gère l'événement,
             probablement la plus consultée (retour de Cindy du
-            2026-08-21 : "dans le bureau aussi il y en a"). */}
-        {canManageEvent && (
+            2026-08-21 : "dans le bureau aussi il y en a"). Même règle
+            "jamais sur un entraînement" que ci-dessus (retour de Cindy du
+            2026-08-24). */}
+        {canManageEvent && event.event_type !== "TRAINING" && (
           <OrganisationCard>
             <VolunteerNeedsPanel
               eventId={event.id}
