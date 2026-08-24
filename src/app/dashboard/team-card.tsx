@@ -100,8 +100,15 @@ function teamCategoryLabel(t: { name: string | null; category: string | null }) 
 
 function roleBadge(role: "COACH" | "COACH_PENDING" | "JOUEUR") {
   if (role === "COACH") return { label: "Coach", className: "bg-navy/10 text-navy" };
+  // Libellé aligné sur "Coach" tout court (retour de Cindy du 2026-08-24) :
+  // "en attente" faisait croire à la secrétaire du Bureau qu'il fallait
+  // changer un statut à la main quand le coach avait confirmé par SMS,
+  // alors que ça décrit uniquement l'absence de compte confirmé — une
+  // information déjà portée par le repère de connexion du tableau
+  // Membres (members-table.tsx), pas par ce badge-ci. Le fond ambre reste
+  // pour garder le repère visuel utile en interne, sans le mot trompeur.
   if (role === "COACH_PENDING")
-    return { label: "Coach (en attente)", className: "bg-amber-100 text-amber-700" };
+    return { label: "Coach", className: "bg-amber-100 text-amber-700" };
   return { label: "Joueur", className: "bg-emerald-100 text-emerald-700" };
 }
 
@@ -505,7 +512,7 @@ export default function TeamCard({
         </td>
         <td className="whitespace-nowrap px-3 py-2.5">
           <span className="inline-flex items-center justify-center whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold leading-none text-amber-700">
-            Coach (en attente)
+            Coach
           </span>
         </td>
         <td colSpan={5} />
