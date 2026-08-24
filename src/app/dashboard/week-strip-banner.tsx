@@ -167,13 +167,18 @@ export default function WeekStripBanner({ events }: { events: WeekStripEvent[] }
     : [];
 
   return (
-    <div className="flex flex-col gap-2.5">
-      {/* Retour de Cindy du 2026-08-24 ("sur pc tout à gauche ça ne va pas,
-          le centrer") : en sm:justify-between, la frise finissait collée au
-          bord droit de l'en-tête, sous le logo en filigrane et les icônes.
-          Centré en groupe (texte + frise) au lieu d'étiré sur toute la
-          largeur — mobile (colonne empilée, non concerné) inchangé, "c'est
-          propre" confirmé par Cindy. */}
+    // Retour de Cindy du 2026-08-24 : seul CE bandeau doit être centré sur
+    // PC ("non que le nouveau planning de la semaine, le reste photo tout
+    // a gauche et les symboles tout a droite. planing centrer seulement")
+    // — la ligne photo/Bonjour + icônes au-dessus reste sur toute la
+    // largeur, inchangée. mx-auto + une largeur plafonnée ici, plutôt que
+    // de resserrer tout l'en-tête (essayé puis annulé), pour que ce
+    // bandeau seul se recentre dans l'en-tête pleine largeur.
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-2.5">
+      {/* "sur pc tout à gauche ça ne va pas, le centrer" (retour précédent,
+          toujours valable) : en sm:justify-between, la frise finissait
+          collée au bord droit. Centré en groupe (texte + frise) au lieu
+          d'étiré — mobile (colonne empilée, non concerné) inchangé. */}
       <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-center sm:gap-8">
         {/* Retour de Cindy du 2026-08-24 ("même emplacement, plus gros") :
             même poids typographique que l'ancienne carte séparée

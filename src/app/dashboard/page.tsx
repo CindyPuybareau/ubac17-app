@@ -2385,13 +2385,12 @@ export default async function DashboardPage() {
           className="pointer-events-none absolute -right-2 top-1/2 h-28 w-28 -translate-y-1/2 bg-contain bg-right bg-no-repeat opacity-25 sm:h-36 sm:w-36"
           style={{ backgroundImage: "url(/logo.png)" }}
         />
-        {/* Retour de Cindy du 2026-08-24 ("le centrer sur la bande bleue en
-            haut aussi... à hauteur de bonjour") : contenu de l'en-tête
-            recentré sur une largeur plus resserrée que le reste de la page
-            (max-w-[1600px] plus bas, lui, inchangé) — évite que l'avatar et
-            les icônes se retrouvent à des kilomètres l'un de l'autre sur
-            grand écran. */}
-        <div className="relative mx-auto flex w-full max-w-3xl flex-col gap-3">
+        <div className="relative mx-auto flex w-full max-w-[1600px] flex-col gap-3">
+          {/* Retour de Cindy du 2026-08-24 : revient sur le recentrage
+              précédent — seul le bandeau "Cette semaine" en dessous doit
+              être centré ("planing centrer seulement"), cette ligne-ci
+              (photo + Bonjour/prénom à gauche, icônes à droite) reste sur
+              toute la largeur comme avant. */}
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <AvatarUpload userId={user.id} avatarUrl={profile?.avatar_url ?? null} name={profile?.first_name ?? null} size="lg" />
