@@ -819,6 +819,82 @@ export default function CotisationParticipantsTable({
   const menuItemClass =
     "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-zinc-700 hover:bg-zinc-50";
 
+  // Menu ⋮ (Suivi/enregistrer paiement, relance, remise, reçu) partagé
+  // entre la ligne de tableau (≥640px) et la carte mobile (<640px, voir
+  // plus bas) — même correctif que members-table.tsx/renderMemberMenu :
+  // un seul endroit à faire évoluer plutôt que deux copies qui divergent.
+  // Le conteneur appelant doit être positionné (`relative`) pour que le
+  // menu déroulant s'ancre au bon endroit.
+  function renderRowMenu(c: AdminCotisation, contactEmail: string | null) {
+    return (
+      <>
+        <button
+          onClick={() => setOpenMenuId((cur) => (cur === c.id ? null : c.id))}
+          className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+        >
+          <MoreVertical className="h-4 w-4" />
+        </button>
+        {openMenuId === c.id && (
+          <>
+            <div className="fixed inset-0 z-30" onClick={() => setOpenMenuId(null)} />
+            <div className="absolute right-0 z-40 mt-1 w-64 rounded-xl border border-zinc-100 bg-white p-1.5 text-left shadow-lg">
+              <button
+                onClick={() => {
+                  setOpenMenuId(null);
+                  openPayment([c.id]);
+                }}
+                className={menuItemClass}
+              >
+                <CreditCard className="h-3.5 w-3.5" />
+                Suivi/enregistrer paiement
+              </button>
+              {contactEmail ? (
+                <button
+                  onClick={() => {
+                    setOpenMenuId(null);
+                    openRelancePreview([c.id]);
+                  }}
+                  className={menuItemClass}
+                >
+                  <Mail className="h-3.5 w-3.5" />
+                  Envoyer une relance / un mail
+                </button>
+              ) : (
+                <span
+                  title="Aucun contact connu"
+                  className={`${menuItemClass} cursor-not-allowed text-zinc-300 hover:bg-transparent`}
+                >
+                  <Mail className="h-3.5 w-3.5" />
+                  Envoyer une relance / un mail
+                </span>
+              )}
+              <button
+                onClick={() => {
+                  setOpenMenuId(null);
+                  openRemise(c.id);
+                }}
+                className={menuItemClass}
+              >
+                <Percent className="h-3.5 w-3.5" />
+                Appliquer une remise
+              </button>
+              <button
+                onClick={() => {
+                  setOpenMenuId(null);
+                  openReceiptWindow(c, contactEmail);
+                }}
+                className={menuItemClass}
+              >
+                <Receipt className="h-3.5 w-3.5" />
+                Générer reçu / facture
+              </button>
+            </div>
+          </>
+        )}
+      </>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4">
       {actionError && (
@@ -898,7 +974,11 @@ export default function CotisationParticipantsTable({
         </div>
       )}
 
-      <div className="w-full overflow-x-auto rounded-2xl border border-l-4 border-zinc-100 border-l-ubac-yellow bg-white">
+      {/* Tableau classique à partir de 640px (sm) ; en dessous, cartes
+          empilées (même traitement que members-table.tsx, retour de
+          Cindy du 2026-08-24 : "réaliser sur mobile le même visuel que
+          membres"), voir plus bas. */}
+      <div className="hidden w-full overflow-x-auto rounded-2xl border border-l-4 border-zinc-100 border-l-ubac-yellow bg-white sm:block">
         <table className="w-full table-auto border-collapse text-sm">
           <thead>
             <tr className="border-b border-slate-100 bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-400">
@@ -992,72 +1072,7 @@ export default function CotisationParticipantsTable({
                     </span>
                   </td>
                   <td className="relative px-3 py-3" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => setOpenMenuId((cur) => (cur === c.id ? null : c.id))}
-                      className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </button>
-                    {openMenuId === c.id && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-30"
-                          onClick={() => setOpenMenuId(null)}
-                        />
-                        <div className="absolute right-0 z-40 mt-1 w-64 rounded-xl border border-zinc-100 bg-white p-1.5 text-left shadow-lg">
-                          <button
-                            onClick={() => {
-                              setOpenMenuId(null);
-                              openPayment([c.id]);
-                            }}
-                            className={menuItemClass}
-                          >
-                            <CreditCard className="h-3.5 w-3.5" />
-                            Suivi/enregistrer paiement
-                          </button>
-                          {contactEmail ? (
-                            <button
-                              onClick={() => {
-                                setOpenMenuId(null);
-                                openRelancePreview([c.id]);
-                              }}
-                              className={menuItemClass}
-                            >
-                              <Mail className="h-3.5 w-3.5" />
-                              Envoyer une relance / un mail
-                            </button>
-                          ) : (
-                            <span
-                              title="Aucun contact connu"
-                              className={`${menuItemClass} cursor-not-allowed text-zinc-300 hover:bg-transparent`}
-                            >
-                              <Mail className="h-3.5 w-3.5" />
-                              Envoyer une relance / un mail
-                            </span>
-                          )}
-                          <button
-                            onClick={() => {
-                              setOpenMenuId(null);
-                              openRemise(c.id);
-                            }}
-                            className={menuItemClass}
-                          >
-                            <Percent className="h-3.5 w-3.5" />
-                            Appliquer une remise
-                          </button>
-                          <button
-                            onClick={() => {
-                              setOpenMenuId(null);
-                              openReceiptWindow(c, contactEmail);
-                            }}
-                            className={menuItemClass}
-                          >
-                            <Receipt className="h-3.5 w-3.5" />
-                            Générer reçu / facture
-                          </button>
-                        </div>
-                      </>
-                    )}
+                    {renderRowMenu(c, contactEmail)}
                   </td>
                 </tr>
               );
@@ -1071,6 +1086,85 @@ export default function CotisationParticipantsTable({
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Cartes empilées en dessous de 640px (sm) — même contenu que le
+          tableau (nom/prénom, statut, tarif/remise/payé/solde, mode de
+          paiement), même actions (tap = ouvre le suivi de paiement, ⋮ =
+          menu partagé via renderRowMenu) — même traitement que
+          members-table.tsx (retour de Cindy du 2026-08-24). */}
+      <div className="flex flex-col gap-3 sm:hidden">
+        {filtered.length > 0 && (
+          <label className="flex items-center gap-2 self-start text-xs font-medium text-zinc-500">
+            <input
+              type="checkbox"
+              checked={allFilteredSelected}
+              onChange={toggleAll}
+              className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
+            />
+            Tout sélectionner
+          </label>
+        )}
+        {filtered.map((c) => {
+          const status = statusBadge[computeStatus(c)];
+          const contactEmail = contactEmailByPlayerId[c.playerId] ?? null;
+          return (
+            <div
+              key={c.id}
+              onClick={() => openPayment([c.id])}
+              className="rounded-2xl border border-l-4 border-zinc-100 border-l-ubac-yellow bg-white p-3.5 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex min-w-0 items-start gap-2">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(c.id)}
+                    onChange={() => toggleOne(c.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
+                  />
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-zinc-900">
+                      {cotisationLastName(c)} {cotisationFirstName(c)}
+                    </p>
+                    <span
+                      className={`mt-0.5 inline-flex items-center justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold leading-none ${status.className}`}
+                    >
+                      {status.label}
+                    </span>
+                  </div>
+                </div>
+                <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
+                  {renderRowMenu(c, contactEmail)}
+                </div>
+              </div>
+
+              <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 border-t border-zinc-50 pt-2 text-xs text-zinc-600">
+                <span>
+                  Tarif <span className="font-semibold text-zinc-800">{formatAmount(c.prix)}</span>
+                </span>
+                <span>
+                  Remise <span className="font-semibold text-zinc-800">{formatAmount(c.remise)}</span>
+                </span>
+                <span>
+                  Payé <span className="font-semibold text-zinc-800">{formatAmount(c.paiement)}</span>
+                </span>
+                <span>
+                  Solde{" "}
+                  <span className="font-semibold text-zinc-900">{formatAmount(balanceDue(c))}</span>
+                </span>
+                <span className="col-span-2">Mode {c.mode_paiement ?? "—"}</span>
+              </div>
+            </div>
+          );
+        })}
+        {filtered.length === 0 && (
+          <EmptyState
+            icon={CreditCard}
+            message={emptyLabel}
+            className="rounded-2xl border border-zinc-100 bg-white"
+          />
+        )}
       </div>
 
       {paymentIds && (
