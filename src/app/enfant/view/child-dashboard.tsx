@@ -11,12 +11,11 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
-import AdminSidebar, { type AdminSection } from "@/app/dashboard/admin-sidebar";
+import type { AdminSection } from "@/app/dashboard/admin-sidebar";
 import OrgChartButton from "@/app/dashboard/org-chart-button";
 import PenalitesCard from "@/app/dashboard/penalites-card";
 import ChildAvatarUpload from "./child-avatar-upload";
-import { MobileNavProvider } from "@/app/dashboard/mobile-nav-context";
-import MobileMenuButton from "@/app/dashboard/mobile-menu-button";
+import ChildTileMenu from "./child-tile-menu";
 import { formatFirstName } from "@/lib/names";
 import { localDateFromParts } from "@/lib/local-date";
 import ChildCalendarTab from "./child-calendar-tab";
@@ -229,7 +228,6 @@ export default function ChildDashboard({
   ];
 
   return (
-    <MobileNavProvider>
     <div className="flex flex-1 flex-col">
       {/* Même traitement que l'en-tête de l'Espace Parent (dashboard/page.tsx,
           retour de Cindy du 2026-08-22) : logo seul agrandi, hauteur fixe +
@@ -241,13 +239,18 @@ export default function ChildDashboard({
           d'origine (simple padding). Logo ensuite jugé "tout petit" à
           32px — agrandi à 44px, padding vertical resserré à py-2 pour
           absorber la croissance sans faire gonfler le bandeau ni laisser
-          le logo en déborder. Déconnexion déplacée en toute fin du menu
-          (voir admin-sidebar.tsx, logoutAction). */}
+          le logo en déborder. Déconnexion déplacée en tuile dans le menu
+          (voir child-tile-menu.tsx, logoutAction). */}
       {/* Même bandeau unifié que le tableau de bord principal (direction
           artistique du 2026-08-23, confirmée avec Cindy via question
           directe) : avatar + "Bonjour" + prénom à gauche, grand logo en
           filigrane semi-transparent à droite (derrière les icônes,
-          jamais au-dessus), icônes fonctionnelles inchangées par-dessus. */}
+          jamais au-dessus), icônes fonctionnelles inchangées par-dessus.
+          Logo encore plus présent ici que côté Parent/Coach/Bureau
+          (retour de Cindy du 2026-08-24, item 7 du topo : "logo plus
+          présent", propre à l'Espace Enfant) — plus grand et moins
+          transparent, sans empiéter sur les icônes qui restent
+          par-dessus. */}
       <header className="sticky top-0 z-10 relative overflow-hidden bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-4 shadow-md sm:px-6 sm:py-5">
         <div
           aria-hidden
@@ -255,7 +258,7 @@ export default function ChildDashboard({
         />
         <div
           aria-hidden
-          className="pointer-events-none absolute -right-2 top-1/2 h-28 w-28 -translate-y-1/2 bg-contain bg-right bg-no-repeat opacity-25 sm:h-36 sm:w-36"
+          className="pointer-events-none absolute -right-2 top-1/2 h-36 w-36 -translate-y-1/2 bg-contain bg-right bg-no-repeat opacity-40 sm:h-44 sm:w-44"
           style={{ backgroundImage: "url(/logo.png)" }}
         />
         <div className="relative mx-auto flex w-full max-w-[1600px] items-center justify-between gap-3">
@@ -273,7 +276,6 @@ export default function ChildDashboard({
           <div className="flex shrink-0 items-center gap-1">
             <OrgChartButton />
             <ChildNotificationBell initialNotifications={notifications} initialEnabled={notificationsEnabled} />
-            <MobileMenuButton />
           </div>
         </div>
       </header>
@@ -299,10 +301,9 @@ export default function ChildDashboard({
           )}
         </div>
 
-        <AdminSidebar sections={sections} />
+        <ChildTileMenu sections={sections} />
       </div>
     </div>
-    </MobileNavProvider>
   );
 }
 
