@@ -50,6 +50,7 @@ import {
   type BirthdaySource,
 } from "./birthdays";
 import { shouldOfferCarpool, venueQuery } from "./salles";
+import { schoolHolidayFor } from "@/lib/school-holidays";
 import SalleBadge from "./salle-badge";
 import {
   EVENT_TYPE_OPTIONS,
@@ -1311,15 +1312,24 @@ export default function CalendarView({
             const isSelected = key === selectedKey;
             const visible = dayEvents.slice(0, 3);
             const overflow = dayEvents.length - visible.length;
+            // Retour de Cindy du 2026-08-25 : teinte les jours de vacances
+            // scolaires (zone A) sur le grand calendrier — jamais sur le
+            // bandeau "Cette semaine" de l'en-tête (voir week-strip-banner.tsx,
+            // volontairement non touché). Un jour sélectionné garde sa
+            // propre couleur, la sélection prime toujours sur la teinte.
+            const holiday = schoolHolidayFor(d);
 
             return (
               <button
                 key={key}
                 onClick={() => setSelectedDate(d)}
+                title={holiday ?? undefined}
                 className={`flex min-h-[52px] w-full min-w-0 flex-col items-start gap-1 rounded-lg border p-1 text-left transition-colors sm:min-h-[104px] sm:rounded-xl sm:p-2 ${
                   isSelected
                     ? "border-navy bg-navy/5"
-                    : "border-zinc-100 bg-white hover:border-ubac-yellow/50"
+                    : holiday
+                      ? "border-orange-100 bg-orange-50 hover:border-ubac-yellow/50"
+                      : "border-zinc-100 bg-white hover:border-ubac-yellow/50"
                 } ${!isCurrentMonth ? "opacity-40" : ""}`}
               >
                 <span
