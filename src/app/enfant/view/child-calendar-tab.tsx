@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Cake, ChevronLeft, ChevronRight, LayoutGrid, List, MapPin, PartyPopper } from "lucide-react";
+import { Cake, ChevronLeft, ChevronRight, LayoutGrid, List, MapPin, PartyPopper, Sparkles } from "lucide-react";
 import {
   styleFor,
   isMatchType,
@@ -342,13 +342,28 @@ export function EventRow({ event, faded }: { event: ChildEvent; faded?: boolean 
   const parsed = parseMatchTitle(event.title);
   const home = event.isHome ?? parsed.isHome;
   const lieu = event.salle || event.location;
+  // Même différenciation que calendar-view.tsx (retour de Cindy du
+  // 2026-08-24, item 6 du topo, puis "vérifier sur tous les espaces que
+  // les cartes soient les mêmes") : cette carte-ci (Espace Enfant) avait
+  // été oubliée lors du premier passage — un match officiel pèse plus
+  // qu'un entraînement, un tournoi saute aux yeux (bordure pointillée +
+  // fanion "Spécial").
+  const isTournament = event.eventType === "TOURNAMENT";
+  const isOfficialMatch = event.eventType === "MATCH";
+  const shellClass = isTournament
+    ? "relative rounded-2xl border-2 border-dashed border-ubac-yellow bg-white p-3.5 shadow-sm"
+    : isOfficialMatch
+      ? `rounded-2xl border border-navy/15 bg-white p-3.5 shadow-sm border-l-8 ${style.border}`
+      : `rounded-2xl border border-zinc-100 bg-white p-3.5 shadow-sm border-l-4 ${style.border}`;
 
   return (
-    <div
-      className={`rounded-2xl border border-zinc-100 bg-white p-3.5 shadow-sm border-l-4 ${style.border} ${
-        faded ? "opacity-60" : ""
-      }`}
-    >
+    <div className={`${shellClass} ${faded ? "opacity-60" : ""}`}>
+      {isTournament && (
+        <span className="absolute -top-2.5 right-3 flex items-center gap-1 rounded-full bg-ubac-yellow px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-navy shadow-sm">
+          <Sparkles className="h-3 w-3" />
+          Spécial
+        </span>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${style.badge}`}>
           {style.label}
