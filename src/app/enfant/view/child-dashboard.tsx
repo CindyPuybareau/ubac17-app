@@ -275,7 +275,11 @@ export default function ChildDashboard({
           className="pointer-events-none absolute -right-2 top-1/2 h-36 w-36 -translate-y-1/2 bg-contain bg-right bg-no-repeat opacity-40 sm:h-44 sm:w-44"
           style={{ backgroundImage: "url(/logo.png)" }}
         />
-        <div className="relative mx-auto flex w-full max-w-[1600px] flex-col gap-3">
+        {/* Retour de Cindy du 2026-08-24 ("le centrer sur la bande bleue en
+            haut aussi... à hauteur de bonjour"), même correctif que
+            page.tsx : contenu de l'en-tête recentré sur une largeur plus
+            resserrée que le reste de la page. */}
+        <div className="relative mx-auto flex w-full max-w-3xl flex-col gap-3">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <ChildAvatarUpload avatarUrl={avatarUrl} name={firstName} />
