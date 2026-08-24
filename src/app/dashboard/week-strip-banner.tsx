@@ -167,14 +167,16 @@ export default function WeekStripBanner({ events }: { events: WeekStripEvent[] }
     : [];
 
   return (
-    // Retour de Cindy du 2026-08-24 : seul CE bandeau doit être centré sur
-    // PC ("non que le nouveau planning de la semaine, le reste photo tout
-    // a gauche et les symboles tout a droite. planing centrer seulement")
-    // — la ligne photo/Bonjour + icônes au-dessus reste sur toute la
-    // largeur, inchangée. mx-auto + une largeur plafonnée ici, plutôt que
-    // de resserrer tout l'en-tête (essayé puis annulé), pour que ce
-    // bandeau seul se recentre dans l'en-tête pleine largeur.
-    <div className="relative mx-auto flex w-full max-w-2xl flex-col gap-2.5">
+    // Retour de Cindy du 2026-08-25 ("mon espace parents deconne complet") :
+    // pas de w-full ici — le conteneur parent (dashboard/page.tsx /
+    // child-dashboard.tsx) place ce bandeau dans une colonne de grille avec
+    // justify-self-center ; un enfant en w-full à l'intérieur entre en
+    // conflit avec ce centrage (il essaie de remplir toute la largeur de
+    // la colonne au lieu de se dimensionner à son propre contenu, plafonné
+    // par max-w-2xl) et cassait l'alignement. mx-auto seul + max-w-2xl
+    // suffit : la largeur se cale sur le contenu (texte + frise), centrée
+    // par le parent.
+    <div className="relative mx-auto flex max-w-2xl flex-col gap-2.5">
       {/* "sur pc tout à gauche ça ne va pas, le centrer" (retour précédent,
           toujours valable) : en sm:justify-between, la frise finissait
           collée au bord droit. Centré en groupe (texte + frise) au lieu

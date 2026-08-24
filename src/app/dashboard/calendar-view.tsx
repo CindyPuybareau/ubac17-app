@@ -1317,6 +1317,10 @@ export default function CalendarView({
             // bandeau "Cette semaine" de l'en-tête (voir week-strip-banner.tsx,
             // volontairement non touché). Un jour sélectionné garde sa
             // propre couleur, la sélection prime toujours sur la teinte.
+            // orange-200/300 (retour de Cindy, "crème dans crème on y voit
+            // rien") : orange-50/100, essayé d'abord, se fondait dans le
+            // fond crème général de l'appli — teinte nettement plus soutenue
+            // ici pour rester visible au premier coup d'œil.
             const holiday = schoolHolidayFor(d);
 
             return (
@@ -1328,7 +1332,7 @@ export default function CalendarView({
                   isSelected
                     ? "border-navy bg-navy/5"
                     : holiday
-                      ? "border-orange-100 bg-orange-50 hover:border-ubac-yellow/50"
+                      ? "border-orange-300 bg-orange-200 hover:border-ubac-yellow/50"
                       : "border-zinc-100 bg-white hover:border-ubac-yellow/50"
                 } ${!isCurrentMonth ? "opacity-40" : ""}`}
               >
