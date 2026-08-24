@@ -2528,7 +2528,14 @@ export default async function DashboardPage() {
               2026-08-24) : jamais pour le Bureau, voir showHeaderWeekBanner
               plus haut. */}
           {showHeaderWeekBanner && (
-            <div className="sm:absolute sm:left-1/2 sm:top-1/2 sm:max-w-[calc(100%-18rem)] sm:-translate-x-1/2 sm:-translate-y-1/2">
+            // Retour de Cindy du 2026-08-25 : "CETTE SEMAINE" se retrouvait
+            // coupé en haut de l'en-tête — top-1/2 + -translate-y-1/2
+            // centre par rapport au point milieu mathématique du
+            // conteneur, qui peut déborder au-dessus si le bandeau est
+            // plus haut que prévu. inset-y-0 + flex + items-center
+            // centre à l'intérieur de la vraie hauteur du conteneur,
+            // jamais au-delà.
+            <div className="sm:absolute sm:inset-y-0 sm:left-1/2 sm:flex sm:max-w-[calc(100%-18rem)] sm:-translate-x-1/2 sm:items-center">
               <WeekStripBanner events={headerWeekEvents} />
             </div>
           )}
