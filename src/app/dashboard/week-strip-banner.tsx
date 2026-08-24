@@ -190,6 +190,11 @@ export default function WeekStripBanner({ events }: { events: WeekStripEvent[] }
           </p>
           <p className="mt-0.5 text-lg font-bold text-white">{summary}</p>
         </div>
+        {/* Retour de Cindy du 2026-08-24 ("non cliquable quand il n'y a pas
+            d'évènement, on dirait un bug") : tous les jours sont
+            cliquables, même sans point — un jour sans événement referme
+            simplement le panneau (selectedDayEvents reste vide, aucune
+            carte ne s'affiche) plutôt que d'avoir l'air cassé/désactivé. */}
         <div className="grid grid-cols-7 gap-1.5 sm:w-auto sm:shrink-0">
           {days.map((d) => {
             const isToday = isSameDay(d, today);
@@ -200,13 +205,10 @@ export default function WeekStripBanner({ events }: { events: WeekStripEvent[] }
               <button
                 key={key}
                 type="button"
-                disabled={!hasEvents}
                 onClick={() => setSelectedKey(isSelected ? null : key)}
-                className={`flex flex-col items-center gap-1 rounded-xl px-1.5 py-1.5 text-center transition-colors ${
+                className={`flex cursor-pointer flex-col items-center gap-1 rounded-xl px-1.5 py-1.5 text-center transition-colors hover:brightness-110 ${
                   isToday ? "bg-ubac-yellow text-navy-dark" : "bg-white/10 text-white/70"
-                } ${hasEvents ? "cursor-pointer hover:brightness-110" : "cursor-default"} ${
-                  isSelected ? "ring-2 ring-white" : ""
-                }`}
+                } ${isSelected ? "ring-2 ring-white" : ""}`}
               >
                 <span className="text-[10px] font-semibold uppercase">
                   {DAY_LETTERS[(d.getDay() + 6) % 7]}
