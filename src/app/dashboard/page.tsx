@@ -15,6 +15,7 @@ import AdminView from "./admin-view";
 import type { RosterPlayer, TeamWithMembers } from "./team-manager";
 import CoachView from "./coach-view";
 import FamilyView from "./family-view";
+import WeekStripBanner, { type WeekStripEvent } from "./week-strip-banner";
 import type { FamilyTeamCardData } from "./family-team-card";
 import type { BirthdaySource } from "./birthdays";
 import type { AutomationKey } from "./automation-settings";
@@ -2324,6 +2325,33 @@ export default async function DashboardPage() {
     });
   }
 
+  // Bandeau "Cette semaine" de l'en-tête (retour de Cindy/Sandrine Manzelle
+  // du 2026-08-24) : jamais pour le Bureau (identité principale même en
+  // cumul, voir foldFamilyIntoAdmin plus haut) — seulement côté Coach et/ou
+  // Parent. Fusion coachEvents + familyEvents (dédoublonnée par id) pour
+  // que quelqu'un qui cumule les deux casquettes (ex. Sandrine Manzelle)
+  // voie tout d'un coup d'œil sans avoir à choisir un onglet d'abord.
+  const headerWeekEvents: WeekStripEvent[] = isAdmin
+    ? []
+    : Array.from(
+        new Map(
+          [...coachEvents, ...familyEvents].map((e) => [
+            e.id,
+            {
+              id: e.id,
+              title: e.title,
+              eventType: e.event_type,
+              startTime: e.start_time,
+              location: e.location,
+              salle: e.salle,
+              isHome: e.isHome,
+              teamName: e.teamName,
+            },
+          ])
+        ).values()
+      );
+  const showHeaderWeekBanner = !isAdmin && (isCoach || players.length > 0);
+
   return (
     <MobileNavProvider>
     <div className="flex flex-1 flex-col">
@@ -2357,23 +2385,29 @@ export default async function DashboardPage() {
           className="pointer-events-none absolute -right-2 top-1/2 h-28 w-28 -translate-y-1/2 bg-contain bg-right bg-no-repeat opacity-25 sm:h-36 sm:w-36"
           style={{ backgroundImage: "url(/logo.png)" }}
         />
-        <div className="relative mx-auto flex w-full max-w-[1600px] items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <AvatarUpload userId={user.id} avatarUrl={profile?.avatar_url ?? null} name={profile?.first_name ?? null} size="lg" />
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">
-                Bonjour
-              </p>
-              <h1 className="truncate text-xl font-bold text-white sm:text-2xl">
-                {profile?.first_name ? formatFirstName(profile.first_name) : user.email}
-              </h1>
+        <div className="relative mx-auto flex w-full max-w-[1600px] flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <AvatarUpload userId={user.id} avatarUrl={profile?.avatar_url ?? null} name={profile?.first_name ?? null} size="lg" />
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">
+                  Bonjour
+                </p>
+                <h1 className="truncate text-xl font-bold text-white sm:text-2xl">
+                  {profile?.first_name ? formatFirstName(profile.first_name) : user.email}
+                </h1>
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              <OrgChartButton />
+              <NotificationBell />
+              <MobileMenuButton />
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <OrgChartButton />
-            <NotificationBell />
-            <MobileMenuButton />
-          </div>
+          {/* Bandeau "Cette semaine" (retour de Cindy/Sandrine Manzelle du
+              2026-08-24) : jamais pour le Bureau, voir showHeaderWeekBanner
+              plus haut. */}
+          {showHeaderWeekBanner && <WeekStripBanner events={headerWeekEvents} />}
         </div>
       </header>
 

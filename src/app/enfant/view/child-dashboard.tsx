@@ -24,6 +24,7 @@ import ChildEventsTab from "./child-events-tab";
 import ChildResultsTab from "./child-results-tab";
 import ChildPresenceTab from "./child-presence-tab";
 import ChildNotificationBell, { type ChildNotification } from "./child-notification-bell";
+import WeekStripBanner, { type WeekStripEvent } from "@/app/dashboard/week-strip-banner";
 
 export type ChildEvent = {
   id: string;
@@ -104,6 +105,19 @@ export default function ChildDashboard({
   const now = Date.now();
   const nextEvent = events.find((e) => new Date(e.startTime).getTime() >= now) ?? null;
   const teammatesOnly = teammates.filter((t) => !t.isSelf);
+
+  // Même bandeau "Cette semaine" que côté Coach/Parent (retour de Cindy du
+  // 2026-08-24), fondu dans l'en-tête bleu — voir week-strip-banner.tsx.
+  const headerWeekEvents: WeekStripEvent[] = events.map((e) => ({
+    id: e.id,
+    title: e.title,
+    eventType: e.eventType,
+    startTime: e.startTime,
+    location: e.location,
+    salle: e.salle,
+    isHome: e.isHome,
+    teamName: e.teamName,
+  }));
 
   const thisMonth = new Date().getMonth();
   const birthdaysThisMonth = teammatesOnly
@@ -261,22 +275,25 @@ export default function ChildDashboard({
           className="pointer-events-none absolute -right-2 top-1/2 h-36 w-36 -translate-y-1/2 bg-contain bg-right bg-no-repeat opacity-40 sm:h-44 sm:w-44"
           style={{ backgroundImage: "url(/logo.png)" }}
         />
-        <div className="relative mx-auto flex w-full max-w-[1600px] items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <ChildAvatarUpload avatarUrl={avatarUrl} name={firstName} />
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">
-                Bonjour
-              </p>
-              <h1 className="truncate text-xl font-bold text-white sm:text-2xl">
-                {formatFirstName(firstName) || "champion"}
-              </h1>
+        <div className="relative mx-auto flex w-full max-w-[1600px] flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <ChildAvatarUpload avatarUrl={avatarUrl} name={firstName} />
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">
+                  Bonjour
+                </p>
+                <h1 className="truncate text-xl font-bold text-white sm:text-2xl">
+                  {formatFirstName(firstName) || "champion"}
+                </h1>
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              <OrgChartButton />
+              <ChildNotificationBell initialNotifications={notifications} initialEnabled={notificationsEnabled} />
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <OrgChartButton />
-            <ChildNotificationBell initialNotifications={notifications} initialEnabled={notificationsEnabled} />
-          </div>
+          <WeekStripBanner events={headerWeekEvents} />
         </div>
       </header>
 
