@@ -168,7 +168,13 @@ export default function WeekStripBanner({ events }: { events: WeekStripEvent[] }
 
   return (
     <div className="flex flex-col gap-2.5">
-      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+      {/* Retour de Cindy du 2026-08-24 ("sur pc tout à gauche ça ne va pas,
+          le centrer") : en sm:justify-between, la frise finissait collée au
+          bord droit de l'en-tête, sous le logo en filigrane et les icônes.
+          Centré en groupe (texte + frise) au lieu d'étiré sur toute la
+          largeur — mobile (colonne empilée, non concerné) inchangé, "c'est
+          propre" confirmé par Cindy. */}
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-center sm:gap-8">
         {/* Retour de Cindy du 2026-08-24 ("même emplacement, plus gros") :
             même poids typographique que l'ancienne carte séparée
             (family-week-banner.tsx) — eyebrow "CETTE SEMAINE" + phrase en
