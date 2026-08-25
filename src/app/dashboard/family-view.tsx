@@ -7,11 +7,13 @@ import {
   ListOrdered,
   LogOut,
   MessageCircle,
+  ScrollText,
   Shield,
   ShoppingBag,
   Trophy,
   Users,
 } from "lucide-react";
+import DocumentsPanel from "@/components/club-documents";
 import { BOUTIQUE_URL } from "./boutique";
 import { avatarColor } from "@/lib/avatar-color";
 import { sortTeamsByGroup } from "@/lib/teams";
@@ -301,6 +303,17 @@ export default function FamilyView({
           ),
         },
       ],
+    },
+    {
+      // Retour de Cindy du 25/08 : Charte du Joueur + Charte du Parent +
+      // Règlement Intérieur — ce sont les parents qui portent la
+      // responsabilité légale pour un enfant mineur, voir club-documents.tsx.
+      key: "documents",
+      label: "Documents",
+      icon: <ScrollText className={iconClass} />,
+      content: (
+        <DocumentsPanel documentIds={["charte-joueur", "charte-parent", "reglement-interieur"]} />
+      ),
     },
     {
       // Un lien externe, pas un onglet de contenu (voir href sur AdminSection).

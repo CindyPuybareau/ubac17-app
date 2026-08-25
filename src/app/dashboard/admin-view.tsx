@@ -9,6 +9,7 @@ import {
   ListOrdered,
   LogOut,
   MessageCircle,
+  ScrollText,
   Shield,
   ShoppingBag,
   Tag,
@@ -18,6 +19,7 @@ import {
   Wallet,
   RefreshCw,
 } from "lucide-react";
+import DocumentsPanel from "@/components/club-documents";
 import { BOUTIQUE_URL } from "./boutique";
 import TeamManager, { type TeamWithMembers } from "./team-manager";
 import ImportInscriptions from "./import-inscriptions";
@@ -350,6 +352,15 @@ export default function AdminView({
       label: "Groupes WhatsApp",
       icon: <MessageCircle className={iconClass} />,
       content: <WhatsAppGroupsManager groups={whatsappGroups} teams={canonicalTeamRefs} />,
+    },
+    {
+      // Retour de Cindy du 25/08 : Règlement Intérieur pour tous les
+      // espaces — voir club-documents.tsx pour le contenu et la
+      // répartition par rôle.
+      key: "documents",
+      label: "Documents",
+      icon: <ScrollText className={iconClass} />,
+      content: <DocumentsPanel documentIds={["reglement-interieur"]} />,
     },
     {
       // Un lien externe, pas un onglet de contenu (voir href sur AdminSection).

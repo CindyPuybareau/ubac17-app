@@ -7,11 +7,13 @@ import {
   Flag,
   ListOrdered,
   LogOut,
+  ScrollText,
   Shield,
   Trophy,
   Users,
 } from "lucide-react";
 import type { AdminSection } from "@/app/dashboard/admin-sidebar";
+import DocumentsPanel from "@/components/club-documents";
 import OrgChartButton from "@/app/dashboard/org-chart-button";
 import PenalitesCard from "@/app/dashboard/penalites-card";
 import type { PlayerYearStatus } from "@/lib/season";
@@ -267,6 +269,15 @@ export default function ChildDashboard({
           content: <ChildResultsTab events={events} teams={teams} forcedMode="officialResults" />,
         },
       ],
+    },
+    {
+      // Retour de Cindy du 25/08 : Charte du Joueur + Règlement Intérieur
+      // (pas la Charte du Parent, qui ne concerne pas l'enfant directement)
+      // — voir @/components/club-documents.tsx.
+      key: "documents",
+      label: "Documents",
+      icon: <ScrollText className={iconClass} />,
+      content: <DocumentsPanel documentIds={["charte-joueur", "reglement-interieur"]} />,
     },
     {
       // Tout à la fin du menu (retour de Cindy du 2026-08-22) — déplacé

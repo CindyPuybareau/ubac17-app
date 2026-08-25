@@ -177,7 +177,7 @@ export default function Home() {
             aria-hidden="true"
             viewBox="0 0 700 394"
             preserveAspectRatio="xMidYMid slice"
-            className="pointer-events-none absolute inset-0 h-full w-full opacity-20"
+            className="pointer-events-none absolute inset-0 h-full w-full opacity-[0.15]"
           >
             <line x1="350" y1="0" x2="350" y2="394" stroke="#F4C430" strokeWidth="1.5" />
             <circle cx="350" cy="197" r="60" stroke="#F4C430" strokeWidth="1.5" fill="none" />
@@ -192,8 +192,8 @@ export default function Home() {
               Union Basket Angoulins Châtelaillon Saint-Vivien
             </p>
             <h1 className="mt-3 text-3xl font-bold leading-tight text-white sm:text-5xl">
-              Le basket se joue sur le terrain.
-              <br className="hidden sm:block" /> La gestion, on s&apos;en occupe.
+              Vous jouez collectif sur le terrain.
+              <br className="hidden sm:block" /> On joue collectif en coulisses.
             </h1>
             <p className="mx-auto mt-4 max-w-xl text-base text-white/80 sm:text-lg">
               UBAC, c&apos;est un club familial, ancré sur trois communes, où

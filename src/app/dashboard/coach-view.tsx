@@ -5,11 +5,13 @@ import {
   ListOrdered,
   LogOut,
   RefreshCw,
+  ScrollText,
   Shield,
   ShoppingBag,
   Trophy,
   Users,
 } from "lucide-react";
+import DocumentsPanel from "@/components/club-documents";
 import { BOUTIQUE_URL } from "./boutique";
 import CalendarView from "./calendar-view";
 import CalendarSubscribe from "./calendar-subscribe";
@@ -360,6 +362,15 @@ export default function CoachView({
       label: "FFBB",
       icon: <RefreshCw className={iconClass} />,
       content: <CoachFfbb teams={teams} teamRoleByTeamId={teamRoleByTeamId} />,
+    },
+    {
+      // Retour de Cindy du 25/08 : Règlement Intérieur pour tous les
+      // espaces — voir club-documents.tsx pour le contenu et la
+      // répartition par rôle.
+      key: "documents",
+      label: "Documents",
+      icon: <ScrollText className={iconClass} />,
+      content: <DocumentsPanel documentIds={["reglement-interieur"]} />,
     },
     {
       // Un lien externe, pas un onglet de contenu (voir href sur AdminSection).
