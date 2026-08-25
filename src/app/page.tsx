@@ -9,8 +9,11 @@ import {
   ShieldCheck,
   MapPin,
   Trophy,
+  Users,
+  LayoutGrid,
 } from "lucide-react";
 import { FacebookIcon, InstagramIcon } from "@/components/social-icons";
+import RevealOnScroll from "@/components/reveal-on-scroll";
 
 // Réseaux sociaux du club — header (menu) et footer (point 6) partagent la
 // même source plutôt que de dupliquer les URLs à deux endroits.
@@ -68,9 +71,10 @@ const roles = [
 ];
 
 const clubStats = [
-  { value: "200", label: "licenciés" },
-  { value: "10", label: "catégories, du baby basket aux seniors" },
-  { value: "3", label: "communes partenaires" },
+  { icon: Users, value: "200", label: "licenciés" },
+  { icon: LayoutGrid, value: "10", label: "catégories, du baby basket aux seniors" },
+  // MapPin, comme "Nos gymnases" plus bas : trois communes, trois lieux.
+  { icon: MapPin, value: "3", label: "communes partenaires" },
 ];
 
 const gyms = [
@@ -181,11 +185,18 @@ export default function Home() {
 
         <section className="border-b border-zinc-100 bg-zinc-50">
           <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 px-4 py-10 sm:grid-cols-3 sm:px-6">
-            {clubStats.map(({ value, label }) => (
-              <div key={label} className="text-center">
-                <p className="text-3xl font-bold text-ubac-blue">{value}</p>
+            {clubStats.map(({ icon: Icon, value, label }, i) => (
+              <RevealOnScroll
+                key={label}
+                delayMs={i * 120}
+                className="flex flex-col items-center text-center"
+              >
+                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-ubac-blue/10 text-ubac-blue">
+                  <Icon className="h-6 w-6" />
+                </span>
+                <p className="font-numeric mt-3 text-3xl font-bold text-ubac-blue">{value}</p>
                 <p className="mt-1 text-sm text-zinc-500">{label}</p>
-              </div>
+              </RevealOnScroll>
             ))}
           </div>
         </section>
