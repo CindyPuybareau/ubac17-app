@@ -4,8 +4,8 @@ import {
   Building2,
   ClipboardList,
   HeartHandshake,
+  HandHeart,
   KeyRound,
-  CheckCircle2,
   MapPin,
   Users,
   LayoutGrid,
@@ -33,39 +33,45 @@ const navLinks = [
   { href: "#contact", label: "Contact" },
 ];
 
+// Retour de Cindy du 25/08 : copy en prose (une phrase d'accroche + une
+// phrase de contenu) plutôt qu'une liste à puces — rendu en <p>, pas en
+// <ul>/<CheckCircle2>. 5 cartes désormais (ajout "Pour les Bénévoles",
+// même traitement "Nouveau" que "Pour les Enfants").
 const roles = [
   {
     icon: Building2,
     title: "Pour le Bureau",
-    points: [
-      "Vision globale à 360° sur le club",
-      "Membres, cotisations, synchronisation FFBB et hub WhatsApp",
-    ],
+    description:
+      "Une vision globale du club, en un coup d'œil. Membres, cotisations, synchronisation FFBB et hub WhatsApp centralisé.",
   },
   {
     icon: ClipboardList,
     title: "Pour les Coachs",
-    points: [
-      "Gestion des équipes, mères et sous-équipes",
-      "Suivi des présences, convocations et retours de match",
-    ],
+    description:
+      "Vos équipes et sous-groupes gérés simplement. Présences, convocations et retours de match, sans échange de mails interminable.",
   },
   {
     icon: HeartHandshake,
     title: "Pour les Parents",
-    points: [
-      "Gestion des profils enfants et réponses aux convocations",
-      "Organisation simplifiée : covoiturage, goûter, maillots",
-    ],
+    description:
+      "Le profil de votre enfant et ses convocations à portée de main. Covoiturage, goûters, maillots : tout s'organise ici.",
   },
   {
     icon: KeyRound,
     title: "Pour les Enfants",
     badge: "Nouveau",
-    points: [
-      "Connexion autonome avec un simple code PIN à 4 chiffres, sans email ni téléphone",
-      "Planning, équipe, résultats et consignes du coach en lecture seule",
-    ],
+    description:
+      "Une connexion simple avec un code à 4 chiffres, sans email ni téléphone. Planning, équipe et consignes du coach, en un clin d'œil.",
+  },
+  {
+    // HandHeart plutôt que HeartHandshake (déjà pris par "Pour les
+    // Parents") — même icône que la section Bénévoles du tableau de bord
+    // (admin-view.tsx), pour une cohérence entre l'app et la page publique.
+    icon: HandHeart,
+    title: "Pour les Bénévoles",
+    badge: "Nouveau",
+    description:
+      "Un club qui vit grâce à vous. Inscrivez-vous aux créneaux qui vous conviennent — buvette, table de marque, tournois — et suivez votre engagement sur la saison.",
   },
 ];
 
@@ -158,19 +164,42 @@ export default function Home() {
       </header>
 
       <main className="flex-1">
-        <section className="bg-ubac-blue">
-          <div className="mx-auto max-w-5xl px-4 py-16 text-center sm:px-6 sm:py-24">
+        <section className="relative overflow-hidden bg-ubac-blue">
+          {/* Point 7 (retour de Cindy) : emplacement pour 1-2 vraies photos
+              du club, en attendant un motif vectoriel de terrain de basket
+              à la place — zéro risque d'image cassée, cohérent avec la
+              charte. Le jour où Cindy fournit une vraie photo : remplacer
+              ce <svg> par <Image src="/club-photos/hero.jpg" fill
+              className="object-cover" alt="..." /> + un dégradé navy
+              par-dessus (from-navy/90 via-navy/70 to-navy-dark/90) pour
+              garder le texte lisible quelle que soit la photo. */}
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 700 394"
+            preserveAspectRatio="xMidYMid slice"
+            className="pointer-events-none absolute inset-0 h-full w-full opacity-20"
+          >
+            <line x1="350" y1="0" x2="350" y2="394" stroke="#F4C430" strokeWidth="1.5" />
+            <circle cx="350" cy="197" r="60" stroke="#F4C430" strokeWidth="1.5" fill="none" />
+            <circle cx="350" cy="197" r="3" fill="#F4C430" />
+            <path d="M 0 47 A 130 130 0 0 1 0 347" stroke="#F4C430" strokeWidth="1.5" fill="none" />
+            <path d="M 700 47 A 130 130 0 0 0 700 347" stroke="#F4C430" strokeWidth="1.5" fill="none" />
+            <rect x="0" y="122" width="190" height="150" stroke="#F4C430" strokeWidth="1.5" fill="none" />
+            <rect x="510" y="122" width="190" height="150" stroke="#F4C430" strokeWidth="1.5" fill="none" />
+          </svg>
+          <div className="relative mx-auto max-w-5xl px-4 py-16 text-center sm:px-6 sm:py-24">
             <p className="text-sm font-semibold uppercase tracking-wider text-ubac-yellow">
               Union Basket Angoulins Châtelaillon Saint-Vivien
             </p>
             <h1 className="mt-3 text-3xl font-bold leading-tight text-white sm:text-5xl">
-              La gestion du club,
-              <br className="hidden sm:block" /> simple pour tout le monde.
+              Le basket se joue sur le terrain.
+              <br className="hidden sm:block" /> La gestion, on s&apos;en occupe.
             </h1>
             <p className="mx-auto mt-4 max-w-xl text-base text-white/80 sm:text-lg">
-              Un club familial et à taille humaine : membres, calendrier,
-              convocations et réponses en temps réel, dans une seule
-              application.
+              UBAC, c&apos;est un club familial, ancré sur trois communes, où
+              chacun — bureau, coachs, parents, enfants et bénévoles — a
+              enfin un espace pensé pour lui. Une seule application, zéro
+              prise de tête.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link
@@ -194,7 +223,7 @@ export default function Home() {
             <p className="mt-4 text-xs text-white/60">
               Pas encore adhérent·e ?{" "}
               <a href="#fonctionnalites" className="underline underline-offset-2 hover:text-white">
-                Découvrir le club et nous rejoindre
+                Découvrez le club et venez nous rejoindre.
               </a>
             </p>
           </div>
@@ -226,12 +255,14 @@ export default function Home() {
             Une application pensée pour chaque membre du club
           </h2>
           <p className="mx-auto mt-2 max-w-xl text-center text-sm text-zinc-500">
-            Bureau, coachs, parents et enfants : à chacun son espace, simple
-            et clair.
+            Bureau, coachs, parents, enfants et bénévoles : à chacun son
+            espace, simple et clair.
           </p>
 
-          <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {roles.map(({ icon: Icon, title, points, badge }) => (
+          {/* 5 cartes : 3 colonnes plutôt que 4 (mieux réparties en 3+2
+              qu'en 4+1 sur une ligne incomplète). */}
+          <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {roles.map(({ icon: Icon, title, description, badge }) => (
               <div
                 key={title}
                 className="flex flex-col gap-4 rounded-2xl border border-zinc-100 bg-white p-6 shadow-sm"
@@ -247,17 +278,7 @@ export default function Home() {
                   )}
                 </div>
                 <h3 className="font-semibold text-zinc-900">{title}</h3>
-                <ul className="flex flex-col gap-2.5">
-                  {points.map((point) => (
-                    <li
-                      key={point}
-                      className="flex items-start gap-2 text-sm text-zinc-600"
-                    >
-                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-ubac-yellow-dark" />
-                      {point}
-                    </li>
-                  ))}
-                </ul>
+                <p className="text-sm text-zinc-600">{description}</p>
               </div>
             ))}
           </div>
@@ -292,11 +313,12 @@ export default function Home() {
           <div className="flex items-center justify-center gap-2 text-ubac-blue">
             <Handshake className="h-5 w-5" />
             <h2 className="text-center text-2xl font-bold text-zinc-900">
-              Nos sponsors
+              Nos partenaires
             </h2>
           </div>
           <p className="mx-auto mt-2 max-w-xl text-center text-sm text-zinc-500">
-            Merci à nos partenaires qui soutiennent le club au quotidien.
+            Merci à celles et ceux qui soutiennent le club, saison après
+            saison.
           </p>
           <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
             {sponsors.map(({ name, logo, url }, i) => (
