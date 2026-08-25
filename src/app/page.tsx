@@ -166,6 +166,16 @@ export default function Home() {
               <ShieldCheck className="h-4 w-4" />
               Accès réservé aux membres du club
             </p>
+            {/* Retour de Cindy : lien discret pour les non-membres, sous
+                la mention d'accès réservé, sans concurrencer visuellement
+                les 2 CTA principaux — vers #fonctionnalites pour l'instant
+                (simple ancre sur la même page, pas de page dédiée). */}
+            <p className="mt-2 text-xs text-white/60">
+              Pas encore adhérent·e ?{" "}
+              <a href="#fonctionnalites" className="underline underline-offset-2 hover:text-white">
+                Découvrir le club et nous rejoindre
+              </a>
+            </p>
           </div>
         </section>
 
