@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   ShieldCheck,
   MapPin,
-  Trophy,
   Users,
   LayoutGrid,
 } from "lucide-react";
@@ -246,7 +245,7 @@ export default function Home() {
         <section id="gymnases" className="scroll-mt-20 border-t border-zinc-100 bg-zinc-50">
           <div className="mx-auto max-w-5xl px-4 py-14 sm:px-6">
             <div className="flex items-center justify-center gap-2 text-ubac-blue">
-              <Trophy className="h-5 w-5" />
+              <MapPin className="h-5 w-5" />
               <h2 className="text-center text-2xl font-bold text-zinc-900">
                 Nos gymnases
               </h2>
