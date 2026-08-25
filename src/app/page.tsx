@@ -211,7 +211,10 @@ export default function Home() {
                 <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-ubac-blue/10 text-ubac-blue">
                   <Icon className="h-6 w-6" />
                 </span>
-                <p className="font-numeric mt-3 text-3xl font-bold text-ubac-blue">{value}</p>
+                {/* Retour de Cindy : le "1" de Space Grotesk (.font-numeric)
+                    ne lui plaît pas sur ce chiffre — police par défaut ici,
+                    match-score.tsx (scores de match) n'est pas concerné. */}
+                <p className="mt-3 text-3xl font-bold text-ubac-blue">{value}</p>
                 <p className="mt-1 text-sm text-zinc-500">{label}</p>
               </RevealOnScroll>
             ))}
