@@ -2571,10 +2571,23 @@ export default async function DashboardPage() {
               </h1>
             </div>
           </div>
+          {/* Retour de Cindy du 2026-08-25 : organigramme et notifications
+              restent à gauche (inchangé), seul le menu ⋮ doit rejoindre le
+              bord droit sur mobile — ml-auto uniquement sur son propre
+              conteneur, pas sur toute la ligne. Cette ligne d'icônes
+              elle-même s'étire déjà sur toute la largeur sous sm (le
+              parent est en flex-col, donc en align-items: stretch par
+              défaut), ml-auto pousse donc le menu vers la droite de cette
+              largeur sans déplacer les deux autres icônes. Neutralisé dès
+              sm (ml-0) : la ligne entière se retrouve alors déjà au bord
+              droit du header (sm:justify-between sur le parent), le menu
+              n'a plus besoin d'être poussé à l'intérieur d'elle. */}
           <div className="flex shrink-0 items-center gap-1">
             <OrgChartButton />
             <NotificationBell />
-            <MobileMenuButton />
+            <span className="ml-auto sm:ml-0">
+              <MobileMenuButton />
+            </span>
           </div>
           {/* Bandeau "Cette semaine" (retour de Cindy/Sandrine Manzelle du
               2026-08-24) : jamais pour le Bureau, voir showHeaderWeekBanner

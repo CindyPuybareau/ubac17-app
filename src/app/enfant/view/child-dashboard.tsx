@@ -340,6 +340,10 @@ export default function ChildDashboard({
               </h1>
             </div>
           </div>
+          {/* Retour de Cindy du 2026-08-25 : organigramme et notifications
+              restent à gauche — pas de bouton menu ici (le menu de
+              l'Espace Enfant est ChildTileMenu, ailleurs sur la page),
+              donc rien à pousser à droite dans cette en-tête. */}
           <div className="flex shrink-0 items-center gap-1">
             <OrgChartButton />
             <ChildNotificationBell initialNotifications={notifications} initialEnabled={notificationsEnabled} />

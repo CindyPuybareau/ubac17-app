@@ -180,7 +180,10 @@ export default function ChildCalendarTab({
               Aujourd&apos;hui
             </button>
           )}
-          <div className="flex items-center gap-0.5 rounded-full border border-zinc-200 p-0.5">
+          {/* bg-white (retour de Cindy du 2026-08-25) : même correctif que
+              calendar-view.tsx — sans fond propre, "Liste" (non actif)
+              devenait quasi invisible sur le fond pâle de la page. */}
+          <div className="flex items-center gap-0.5 rounded-full border border-zinc-200 bg-white p-0.5">
             <button
               onClick={() => setView("list")}
               className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${

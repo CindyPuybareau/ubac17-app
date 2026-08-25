@@ -1229,7 +1229,12 @@ export default function CalendarView({
               n'y aurait pas de sens, l'onglet Calendrier existe déjà pour
               ça. */}
           {!forcedView && (
-            <div className="flex items-center gap-0.5 rounded-full border border-zinc-200 p-0.5">
+            // bg-white (retour de Cindy du 2026-08-25, "le bouton liste doit
+            // etre blanc on ne le voit pas") : sans fond propre, ce groupe
+            // laissait transparaître le fond pâle de la page — seul "Mois"
+            // (actif, fond bleu marine) ressortait, "Liste" (texte gris pâle
+            // sans fond) devenait quasi invisible sur un fond du même ton.
+            <div className="flex items-center gap-0.5 rounded-full border border-zinc-200 bg-white p-0.5">
               <button
                 onClick={() => setView("list")}
                 className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
