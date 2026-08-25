@@ -28,11 +28,25 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [marking, setMarking] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Garde-fou contre un appel concurrent (retour d'audit du 2026-08-25,
+  // "notifications_for_me appelée deux fois au chargement") : sans lui, un
+  // second load() qui démarre pendant que le premier attend encore sa
+  // réponse (montage/démontage/remontage du composant en dev sous Strict
+  // Mode, ou tout simplement deux appels rapprochés) partait aussi sur le
+  // réseau. Ce ref se positionne avant même le premier "await", donc un
+  // second load() qui démarre entre-temps le voit déjà et s'arrête net.
+  const loadingRef = useRef(false);
 
   async function load() {
-    const supabase = createClient();
-    const { data } = await supabase.rpc("notifications_for_me", { p_limit: 30 });
-    setNotifications((data as NotificationRow[] | null) ?? []);
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    try {
+      const supabase = createClient();
+      const { data } = await supabase.rpc("notifications_for_me", { p_limit: 30 });
+      setNotifications((data as NotificationRow[] | null) ?? []);
+    } finally {
+      loadingRef.current = false;
+    }
   }
 
   useEffect(() => {
