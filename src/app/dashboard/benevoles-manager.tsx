@@ -114,11 +114,19 @@ export default function BenevolesManager({ benevoles }: { benevoles: AdminBenevo
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Action principale à gauche, avant le reste (retour de Cindy du
+          2026-08-22 sur "Créer un événement" — même convention reprise
+          ici : le bouton d'ajout passe avant les filtres/compteur, pas
+          après). */}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-          <HeartHandshake className="h-3.5 w-3.5" />
-          {visible.length} bénévole{visible.length > 1 ? "s" : ""}
-        </p>
+        <button
+          type="button"
+          onClick={openNew}
+          className="flex items-center gap-1.5 rounded-full bg-ubac-yellow px-3.5 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark"
+        >
+          <HeartHandshake className="h-4 w-4" />
+          Ajouter un bénévole
+        </button>
         <div className="flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-1.5 text-xs font-medium text-zinc-500">
             <input
@@ -129,14 +137,10 @@ export default function BenevolesManager({ benevoles }: { benevoles: AdminBenevo
             />
             Afficher les retirés
           </label>
-          <button
-            type="button"
-            onClick={openNew}
-            className="flex items-center gap-1.5 rounded-full bg-ubac-yellow px-3.5 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark"
-          >
-            <HeartHandshake className="h-4 w-4" />
-            Ajouter un bénévole
-          </button>
+          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+            <HeartHandshake className="h-3.5 w-3.5" />
+            {visible.length} bénévole{visible.length > 1 ? "s" : ""}
+          </p>
         </div>
       </div>
 
