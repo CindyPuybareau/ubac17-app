@@ -6,7 +6,6 @@ import {
   HeartHandshake,
   KeyRound,
   CheckCircle2,
-  ShieldCheck,
   MapPin,
   Users,
   LayoutGrid,
@@ -124,9 +123,6 @@ export default function Home() {
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <div className="flex shrink-0 items-center gap-2">
             <Image src="/logo.png" alt="UBAC" width={36} height={36} className="h-9 w-9 object-contain" priority />
-            <span className="text-lg font-semibold text-ubac-blue">
-              UBAC
-            </span>
           </div>
 
           {/* Masqué avant md (768px) : avec le logo et les icônes sociales,
@@ -152,7 +148,7 @@ export default function Home() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={`UBAC sur ${label}`}
-                className="text-zinc-400 transition-colors hover:text-ubac-blue"
+                className="opacity-80 transition-opacity hover:opacity-100"
               >
                 <Icon className="h-5 w-5" />
               </a>
@@ -188,18 +184,14 @@ export default function Home() {
                 className="flex w-full items-center justify-center gap-1.5 rounded-full border border-white/30 px-5 py-3 text-center text-sm font-medium text-white/90 transition-colors hover:bg-white/10 sm:w-auto"
               >
                 <KeyRound className="h-4 w-4" />
-                Accès Espace Enfant (Code PIN)
+                Accès Espace Enfant
               </Link>
             </div>
-            <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-white/70">
-              <ShieldCheck className="h-4 w-4" />
-              Accès réservé aux membres du club
-            </p>
             {/* Retour de Cindy : lien discret pour les non-membres, sous
-                la mention d'accès réservé, sans concurrencer visuellement
-                les 2 CTA principaux — vers #fonctionnalites pour l'instant
-                (simple ancre sur la même page, pas de page dédiée). */}
-            <p className="mt-2 text-xs text-white/60">
+                les 2 CTA principaux sans les concurrencer visuellement —
+                vers #fonctionnalites pour l'instant (simple ancre sur la
+                même page, pas de page dédiée). */}
+            <p className="mt-4 text-xs text-white/60">
               Pas encore adhérent·e ?{" "}
               <a href="#fonctionnalites" className="underline underline-offset-2 hover:text-white">
                 Découvrir le club et nous rejoindre
@@ -314,15 +306,14 @@ export default function Home() {
                   title={name}
                   className="flex h-24 items-center justify-center rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
                 >
-                  {/* Grisé au repos, en couleur au survol : évite que 6
-                      chartes graphiques différentes ne se battent
-                      visuellement entre elles sur une même bande. */}
+                  {/* Retour de Cindy : logos en couleurs, pas de
+                      niveaux de gris. */}
                   <Image
                     src={logo}
                     alt={name}
                     width={200}
                     height={100}
-                    className="h-12 w-auto object-contain grayscale transition-[filter] duration-300 hover:grayscale-0 sm:h-14"
+                    className="h-12 w-auto object-contain sm:h-14"
                   />
                 </a>
               </RevealOnScroll>
