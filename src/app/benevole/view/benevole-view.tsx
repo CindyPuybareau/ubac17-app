@@ -11,6 +11,7 @@ import {
   type VolunteerNeed,
 } from "@/app/dashboard/event-volunteer-needs";
 import { formatFirstName } from "@/lib/names";
+import DocumentsPanel from "@/components/club-documents";
 
 // Événement tel que vu par un bénévole : uniquement date/heure/lieu et les
 // besoins d'organisation (retour de Cindy du 2026-08-25, "pour le reste
@@ -222,6 +223,13 @@ export default function BenevoleView({
             />
           ))
         )}
+
+        {/* Retour de Cindy du 25/08 : "penser en 360° avec les bénévoles,
+            ils font partie de la boucle" — mêmes règles de respect/fair-play
+            que sur le terrain les concernent aussi. Règlement Intérieur
+            uniquement (pas les deux chartes, propres aux licenciés/parents
+            d'un licencié). */}
+        <DocumentsPanel documentIds={["reglement-interieur"]} />
       </main>
     </div>
   );

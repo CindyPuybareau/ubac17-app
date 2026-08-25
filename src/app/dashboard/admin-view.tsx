@@ -354,13 +354,15 @@ export default function AdminView({
       content: <WhatsAppGroupsManager groups={whatsappGroups} teams={canonicalTeamRefs} />,
     },
     {
-      // Retour de Cindy du 25/08 : Règlement Intérieur pour tous les
-      // espaces — voir club-documents.tsx pour le contenu et la
-      // répartition par rôle.
+      // Retour de Cindy du 25/08 : le Bureau voit les 3 documents (comme
+      // partout ailleurs dans l'app, le Bureau a une vision à 100%) — voir
+      // club-documents.tsx pour le contenu et la répartition par rôle.
       key: "documents",
       label: "Documents",
       icon: <ScrollText className={iconClass} />,
-      content: <DocumentsPanel documentIds={["reglement-interieur"]} />,
+      content: (
+        <DocumentsPanel documentIds={["charte-joueur", "charte-parent", "reglement-interieur"]} />
+      ),
     },
     {
       // Un lien externe, pas un onglet de contenu (voir href sur AdminSection).
