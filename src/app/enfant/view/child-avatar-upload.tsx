@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Camera } from "lucide-react";
+import { resizeImageForAvatar } from "@/lib/image-resize";
 
 // Même rendu que dashboard/avatar-upload.tsx (rond + icône appareil photo),
 // mais un mécanisme d'envoi différent : pas de session Supabase côté
@@ -39,8 +40,12 @@ export default function ChildAvatarUpload({
     }
     setUploading(true);
     setError(null);
+    // Recadré en carré et réencodé en WebP (retour d'audit du 2026-08-25,
+    // "format .gif non optimisé") — même traitement que
+    // dashboard/avatar-upload.tsx, voir lib/image-resize.ts.
+    const { blob, ext } = await resizeImageForAvatar(file);
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append("file", blob, `avatar.${ext}`);
     try {
       const res = await fetch("/api/child-avatar", { method: "POST", body: formData });
       const body = (await res.json().catch(() => null)) as { url?: string; error?: string } | null;

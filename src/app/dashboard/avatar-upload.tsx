@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Camera } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { resizeImageForAvatar } from "@/lib/image-resize";
 
 // Photo de profil façon Facebook (retour de Cindy du 2026-08-22) : un rond
 // avec la photo (ou les initiales, tant qu'aucune n'est envoyée), une
@@ -54,14 +55,17 @@ export default function AvatarUpload({
     setUploading(true);
     setError(null);
     const supabase = createClient();
-    const ext = file.name.split(".").pop() || "jpg";
+    // Recadré en carré et réencodé en WebP (retour d'audit du 2026-08-25,
+    // "format .gif non optimisé") : jamais affiché à plus de 96px, pas
+    // besoin d'envoyer le fichier d'origine tel quel — voir image-resize.ts.
+    const { blob, ext } = await resizeImageForAvatar(file);
     // Toujours le même nom par utilisateur (upsert) : une nouvelle photo
     // remplace l'ancienne au lieu d'accumuler des fichiers orphelins dans
     // le bucket.
     const path = `${userId}/avatar.${ext}`;
     const { error: uploadError } = await supabase.storage
       .from("avatars")
-      .upload(path, file, { upsert: true, cacheControl: "3600" });
+      .upload(path, blob, { upsert: true, cacheControl: "3600", contentType: blob.type || file.type });
     if (uploadError) {
       setUploading(false);
       setError("Envoi impossible, réessaie.");
