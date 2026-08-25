@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { runBatched } from "@/lib/batch";
 import { formatFirstName, formatPersonName } from "@/lib/names";
 import { EMAIL_REPLY_TO } from "@/lib/email";
 import { localDateFromParts } from "@/lib/local-date";
@@ -818,70 +819,89 @@ export default async function DashboardPage() {
       clubSettingsRes,
       sponsorsRes,
       penalitesRes,
-    ] = await Promise.all([
-      supabase
-        .from("teams")
-        .select(
-          "id, name, category, ffbb_url, ffbb_last_synced_at, pending_coach_names, sort_order"
-        )
-        .order("sort_order", { ascending: true, nullsFirst: false })
-        .order("category"),
-      supabase
-        .from("players")
-        .select(
-          "id, first_name, last_name, profile_id, pending_parent_email, birth_date, category, sex, registration_email, registration_phone, address, postal_code, city, secondary_email, mother_phone, father_phone, other_phones, secondary_address, license_type, membership_type, fbi_status, medical_notes, other_notes, image_rights, player_charter_accepted, parent_charter_accepted, license_number, license_expires_at, medical_certificate_expires_at, archived_at, last_child_login_at"
-        )
-        .order("first_name"),
-      supabase
-        .from("profiles")
-        .select("id, first_name, last_name, phone, email, last_login_at")
-        .order("first_name"),
-      supabase
-        .from("team_players")
-        .select("team_id, player_id, jersey_number, position"),
-      supabase.from("team_coaches").select("team_id, coach_id"),
-      supabase
-        .from("cotisations")
-        .select(
-          "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, collecte_id, players(first_name, last_name, category, membership_type, fbi_status), collectes(id, name, type)"
-        )
-        .order("saison", { ascending: false }),
-      supabase
-        .from("collectes")
-        .select("id, name, type, prix, event_id, payment_link, events(start_time)")
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("events")
-        .select(
-          "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
-        )
-        .order("start_time", { ascending: true }),
-      supabase.from("parent_player").select("parent_id, player_id"),
-      supabase.from("club_administrators").select("email, club_function"),
-      supabase.from("team_pending_coaches").select("team_id, player_id"),
-      supabase
-        .from("cotisation_payments")
-        .select("id, cotisation_id, amount, mode, detail, expected_cash_date, paid_at")
-        .order("paid_at", { ascending: false }),
-      supabase.from("category_tariffs").select("category, prix").order("category"),
-      supabase
-        .from("club_settings")
-        .select("match_reminder_enabled, expiry_alert_enabled, cotisation_relance_enabled")
-        .eq("id", true)
-        .maybeSingle(),
-      // Réservé au Bureau (voir policy "admin manage sponsors") : aucun
-      // lien avec une équipe ou un joueur, pas besoin côté Coach/Famille.
-      supabase
-        .from("sponsors")
-        .select("id, name, contact_name, contact_email, contact_phone, renewal_date, notes")
-        .order("renewal_date", { ascending: true, nullsFirst: false }),
-      // Toutes les pénalités du club — le Bureau les gère toutes (onglet
-      // Pénalités, à côté de Stages & Événements Payants).
-      supabase
-        .from("penalites")
-        .select("id, player_id, amount, notes, penalite_date, statut, paid_at, players(first_name, last_name)")
-        .order("penalite_date", { ascending: false }),
-    ]);
+    ] = await runBatched(
+      [
+        () =>
+          supabase
+            .from("teams")
+            .select(
+              "id, name, category, ffbb_url, ffbb_last_synced_at, pending_coach_names, sort_order"
+            )
+            .order("sort_order", { ascending: true, nullsFirst: false })
+            .order("category"),
+        () =>
+          supabase
+            .from("players")
+            .select(
+              "id, first_name, last_name, profile_id, pending_parent_email, birth_date, category, sex, registration_email, registration_phone, address, postal_code, city, secondary_email, mother_phone, father_phone, other_phones, secondary_address, license_type, membership_type, fbi_status, medical_notes, other_notes, image_rights, player_charter_accepted, parent_charter_accepted, license_number, license_expires_at, medical_certificate_expires_at, archived_at, last_child_login_at"
+            )
+            .order("first_name"),
+        () =>
+          supabase
+            .from("profiles")
+            .select("id, first_name, last_name, phone, email, last_login_at")
+            .order("first_name"),
+        () =>
+          supabase
+            .from("team_players")
+            .select("team_id, player_id, jersey_number, position"),
+        () => supabase.from("team_coaches").select("team_id, coach_id"),
+        () =>
+          supabase
+            .from("cotisations")
+            .select(
+              "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, collecte_id, players(first_name, last_name, category, membership_type, fbi_status), collectes(id, name, type)"
+            )
+            .order("saison", { ascending: false }),
+        () =>
+          supabase
+            .from("collectes")
+            .select("id, name, type, prix, event_id, payment_link, events(start_time)")
+            .order("created_at", { ascending: false }),
+        () =>
+          supabase
+            .from("events")
+            .select(
+              "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
+            )
+            .order("start_time", { ascending: true }),
+        () => supabase.from("parent_player").select("parent_id, player_id"),
+        () => supabase.from("club_administrators").select("email, club_function"),
+        () => supabase.from("team_pending_coaches").select("team_id, player_id"),
+        () =>
+          supabase
+            .from("cotisation_payments")
+            .select("id, cotisation_id, amount, mode, detail, expected_cash_date, paid_at")
+            .order("paid_at", { ascending: false }),
+        () => supabase.from("category_tariffs").select("category, prix").order("category"),
+        () =>
+          supabase
+            .from("club_settings")
+            .select("match_reminder_enabled, expiry_alert_enabled, cotisation_relance_enabled")
+            .eq("id", true)
+            .maybeSingle(),
+        // Réservé au Bureau (voir policy "admin manage sponsors") : aucun
+        // lien avec une équipe ou un joueur, pas besoin côté Coach/Famille.
+        () =>
+          supabase
+            .from("sponsors")
+            .select("id, name, contact_name, contact_email, contact_phone, renewal_date, notes")
+            .order("renewal_date", { ascending: true, nullsFirst: false }),
+        // Toutes les pénalités du club — le Bureau les gère toutes (onglet
+        // Pénalités, à côté de Stages & Événements Payants).
+        () =>
+          supabase
+            .from("penalites")
+            .select("id, player_id, amount, notes, penalite_date, statut, paid_at, players(first_name, last_name)")
+            .order("penalite_date", { ascending: false }),
+      ],
+      // Plafond de requêtes simultanées pour ce bloc (voir lib/batch.ts) :
+      // le projet Supabase n'autorise que 15 connexions réelles au total,
+      // partagées avec les blocs Coach/Famille lancés en parallèle (voir
+      // adminPromise/coachPromise/familyPromise plus bas) et les autres
+      // utilisateurs connectés en même temps.
+      5
+    );
 
     const clubSettingsRow = clubSettingsRes.data as Record<AutomationKey, boolean> | null;
     // Le compilateur React signale la réaffectation d'une variable de portée
@@ -1379,41 +1399,51 @@ export default async function DashboardPage() {
       eventsRes,
       ownTeamsRes,
       allClubTeamsRes,
-    ] = await Promise.all([
-        supabase
-          .from("team_players")
-          .select("team_id, player_id, jersey_number, position")
-          .in("team_id", coachCalendarTeamIds),
-        supabase
-          .from("team_coaches")
-          .select("team_id, coach_id")
-          .in("team_id", coachCalendarTeamIds),
-        supabase
-          .from("team_pending_coaches")
-          .select("team_id, player_id")
-          .in("team_id", coachCalendarTeamIds),
-        supabase
-          .from("events")
-          .select(
-            "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
-          )
-          .or(teamOrClubWideFilter(coachCalendarTeamIds))
-          .order("start_time", { ascending: true }),
-        ownOnlyTeamIds.length > 0
-          ? supabase
-              .from("teams")
-              .select("id, name, category, ffbb_url, sort_order, pending_coach_names")
-              .in("id", ownOnlyTeamIds)
-          : Promise.resolve({ data: [] as CoachedTeam[] }),
+    ] = await runBatched(
+      [
+        () =>
+          supabase
+            .from("team_players")
+            .select("team_id, player_id, jersey_number, position")
+            .in("team_id", coachCalendarTeamIds),
+        () =>
+          supabase
+            .from("team_coaches")
+            .select("team_id, coach_id")
+            .in("team_id", coachCalendarTeamIds),
+        () =>
+          supabase
+            .from("team_pending_coaches")
+            .select("team_id, player_id")
+            .in("team_id", coachCalendarTeamIds),
+        () =>
+          supabase
+            .from("events")
+            .select(
+              "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
+            )
+            .or(teamOrClubWideFilter(coachCalendarTeamIds))
+            .order("start_time", { ascending: true }),
+        () =>
+          ownOnlyTeamIds.length > 0
+            ? supabase
+                .from("teams")
+                .select("id, name, category, ffbb_url, sort_order, pending_coach_names")
+                .in("id", ownOnlyTeamIds)
+            : Promise.resolve({ data: [] as CoachedTeam[] }),
         // Every club team, for the "Changer d'équipe" picker — teams is
         // readable by anyone (policy `using (true)`), and legacy rows
         // without a sort_order are filtered out like everywhere else.
-        supabase
-          .from("teams")
-          .select("id, name, category, sort_order")
-          .not("sort_order", "is", null)
-          .order("sort_order"),
-      ]);
+        () =>
+          supabase
+            .from("teams")
+            .select("id, name, category, sort_order")
+            .not("sort_order", "is", null)
+            .order("sort_order"),
+      ],
+      // Voir lib/batch.ts / le bloc Bureau plus haut pour le contexte.
+      5
+    );
 
     // Coached teams first, then the ones they only play in — each keeps
     // the club's canonical order within its own group.
@@ -1545,30 +1575,38 @@ export default async function DashboardPage() {
     const coachVolunteerNeedsPromise = getVolunteerNeedsByEventId(supabase, coachEventIds);
 
     const [playersRes, coachProfilesRes, parentPlayerRes, coachFichesRes] =
-      await Promise.all([
-        playerIds.length > 0
-          ? supabase.from("players").select(playerColumns).in("id", playerIds)
-          : Promise.resolve({ data: [] as Person[] }),
-        coachIds.length > 0
-          ? supabase
-              .from("profiles")
-              .select("id, first_name, last_name, phone, email")
-              .in("id", coachIds)
-          : Promise.resolve({ data: [] as Person[] }),
-        playerIds.length > 0
-          ? supabase
-              .from("parent_player")
-              .select("parent_id, player_id")
-              .in("player_id", playerIds)
-          : Promise.resolve({ data: [] as { parent_id: string; player_id: string }[] }),
-        // A coach row comes from profiles, not players, so it carries no
-        // contact nor birth date on its own. Their member fiche is the one
-        // whose profile_id points at their account — same record the Bureau
-        // shows in Membres.
-        coachIds.length > 0
-          ? supabase.from("players").select(playerColumns).in("profile_id", coachIds)
-          : Promise.resolve({ data: [] as Person[] }),
-      ]);
+      await runBatched(
+        [
+          () =>
+            playerIds.length > 0
+              ? supabase.from("players").select(playerColumns).in("id", playerIds)
+              : Promise.resolve({ data: [] as Person[] }),
+          () =>
+            coachIds.length > 0
+              ? supabase
+                  .from("profiles")
+                  .select("id, first_name, last_name, phone, email")
+                  .in("id", coachIds)
+              : Promise.resolve({ data: [] as Person[] }),
+          () =>
+            playerIds.length > 0
+              ? supabase
+                  .from("parent_player")
+                  .select("parent_id, player_id")
+                  .in("player_id", playerIds)
+              : Promise.resolve({ data: [] as { parent_id: string; player_id: string }[] }),
+          // A coach row comes from profiles, not players, so it carries no
+          // contact nor birth date on its own. Their member fiche is the one
+          // whose profile_id points at their account — same record the Bureau
+          // shows in Membres.
+          () =>
+            coachIds.length > 0
+              ? supabase.from("players").select(playerColumns).in("profile_id", coachIds)
+              : Promise.resolve({ data: [] as Person[] }),
+        ],
+        // Voir lib/batch.ts / le bloc Bureau plus haut pour le contexte.
+        4
+      );
 
     const playersById = new Map(
       (playersRes.data ?? []).map((p) => [
@@ -1933,24 +1971,32 @@ export default async function DashboardPage() {
     // donc partis ensemble plutôt qu'à la queue leu leu.
     const [teamsQueryResults, eventsRes, familyCotisationRes, familyPenaliteRes] = await Promise.all([
       allTeamIds.length > 0
-        ? Promise.all([
-            supabase
-              .from("teams")
-              .select("id, name, category, ffbb_url, sort_order, pending_coach_names")
-              .in("id", allTeamIds),
-            supabase
-              .from("team_players")
-              .select("team_id, players(id, first_name, last_name, birth_date, category)")
-              .in("team_id", allTeamIds),
-            supabase
-              .from("team_coaches")
-              .select("team_id, profiles(id, first_name, last_name, phone)")
-              .in("team_id", allTeamIds),
-            supabase
-              .from("team_pending_coaches")
-              .select("team_id, players(id, first_name, last_name)")
-              .in("team_id", allTeamIds),
-          ])
+        ? runBatched(
+            [
+              () =>
+                supabase
+                  .from("teams")
+                  .select("id, name, category, ffbb_url, sort_order, pending_coach_names")
+                  .in("id", allTeamIds),
+              () =>
+                supabase
+                  .from("team_players")
+                  .select("team_id, players(id, first_name, last_name, birth_date, category)")
+                  .in("team_id", allTeamIds),
+              () =>
+                supabase
+                  .from("team_coaches")
+                  .select("team_id, profiles(id, first_name, last_name, phone)")
+                  .in("team_id", allTeamIds),
+              () =>
+                supabase
+                  .from("team_pending_coaches")
+                  .select("team_id, players(id, first_name, last_name)")
+                  .in("team_id", allTeamIds),
+            ],
+            // Voir lib/batch.ts / le bloc Bureau plus haut pour le contexte.
+            4
+          )
         : null,
       supabase
         .from("events")
@@ -2183,24 +2229,30 @@ export default async function DashboardPage() {
     // même Promise.all au lieu d'un aller-retour séquentiel à part après
     // coup — même correctif que adminPromise/coachPromise plus haut.
     const [rsvpRowsRes, familyPaymentRes, extraFamilyTasks, familyVolunteerNeedsData] =
-      await Promise.all([
-        eventIds.length > 0 && allRosterPlayerIds.length > 0
-          ? supabase
-              .from("rsvps")
-              .select("event_id, player_id, status")
-              .in("event_id", eventIds)
-              .in("player_id", allRosterPlayerIds)
-          : null,
-        familyCotisationIds.length > 0
-          ? supabase
-              .from("cotisation_payments")
-              .select("id, cotisation_id, amount, mode, detail, expected_cash_date, paid_at")
-              .in("cotisation_id", familyCotisationIds)
-              .order("paid_at", { ascending: false })
-          : null,
-        getEventTasksByEventId(supabase, upcomingFamilyEventIds),
-        getVolunteerNeedsByEventId(supabase, eventIds),
-      ]);
+      await runBatched(
+        [
+          () =>
+            eventIds.length > 0 && allRosterPlayerIds.length > 0
+              ? supabase
+                  .from("rsvps")
+                  .select("event_id, player_id, status")
+                  .in("event_id", eventIds)
+                  .in("player_id", allRosterPlayerIds)
+              : Promise.resolve(null),
+          () =>
+            familyCotisationIds.length > 0
+              ? supabase
+                  .from("cotisation_payments")
+                  .select("id, cotisation_id, amount, mode, detail, expected_cash_date, paid_at")
+                  .in("cotisation_id", familyCotisationIds)
+                  .order("paid_at", { ascending: false })
+              : Promise.resolve(null),
+          () => getEventTasksByEventId(supabase, upcomingFamilyEventIds),
+          () => getVolunteerNeedsByEventId(supabase, eventIds),
+        ],
+        // Voir lib/batch.ts / le bloc Bureau plus haut pour le contexte.
+        4
+      );
     familyVolunteerNeedsByEventId = familyVolunteerNeedsData;
 
     // Statuts par équipe/événement, pour construire à la fois
