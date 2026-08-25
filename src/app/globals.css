@@ -80,6 +80,18 @@ body {
   font-family: var(--font-body), Arial, Helvetica, sans-serif;
 }
 
+/* Défilement doux vers les ancres du menu de la page d'accueil
+   (#fonctionnalites, #gymnases...) — désactivé pour qui a demandé moins
+   d'animations au niveau système. */
+html {
+  scroll-behavior: smooth;
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
 /* Titres partout dans l'appli : un seul point de bascule plutôt que de
    retoucher chaque composant un par un. Les poids déjà posés par chaque
    composant (font-bold, font-semibold...) restent inchangés, seule la

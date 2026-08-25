@@ -10,6 +10,26 @@ import {
   MapPin,
   Trophy,
 } from "lucide-react";
+import { FacebookIcon, InstagramIcon } from "@/components/social-icons";
+
+// Réseaux sociaux du club — header (menu) et footer (point 6) partagent la
+// même source plutôt que de dupliquer les URLs à deux endroits.
+const socialLinks = [
+  { href: "https://www.facebook.com/ubac17/", label: "Facebook", icon: FacebookIcon },
+  { href: "https://www.instagram.com/ubac17", label: "Instagram", icon: InstagramIcon },
+];
+
+// Ancres du menu — pointent vers les sections existantes (#fonctionnalites,
+// #gymnases) et vers deux sections à venir dans ce même chantier
+// (#sponsors : point 5, #contact : le footer enrichi au point 6). Les liens
+// vers ces deux dernières ne feront rien tant que ces sections n'existent
+// pas encore, le temps de les construire dans les prochaines étapes.
+const navLinks = [
+  { href: "#fonctionnalites", label: "Fonctionnalités" },
+  { href: "#gymnases", label: "Gymnases" },
+  { href: "#sponsors", label: "Sponsors" },
+  { href: "#contact", label: "Contact" },
+];
 
 const roles = [
   {
@@ -72,12 +92,42 @@ export default function Home() {
   return (
     <div className="flex min-h-full flex-1 flex-col bg-white">
       <header className="sticky top-0 z-10 border-b border-black/5 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
-          <div className="flex items-center gap-2">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
+          <div className="flex shrink-0 items-center gap-2">
             <Image src="/logo.png" alt="UBAC" width={36} height={36} className="h-9 w-9 object-contain" priority />
             <span className="text-lg font-semibold text-ubac-blue">
               UBAC
             </span>
+          </div>
+
+          {/* Masqué avant md (768px) : avec le logo et les icônes sociales,
+              4 liens texte n'ont pas la place de respirer en dessous —
+              repris intégralement dans le footer enrichi (point 6). */}
+          <nav className="hidden items-center gap-6 md:flex">
+            {navLinks.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                className="text-sm font-medium text-zinc-600 transition-colors hover:text-ubac-blue"
+              >
+                {link.label}
+              </a>
+            ))}
+          </nav>
+
+          <div className="flex shrink-0 items-center gap-3">
+            {socialLinks.map(({ href, label, icon: Icon }) => (
+              <a
+                key={href}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`UBAC sur ${label}`}
+                className="text-zinc-400 transition-colors hover:text-ubac-blue"
+              >
+                <Icon className="h-5 w-5" />
+              </a>
+            ))}
           </div>
         </div>
       </header>
@@ -130,7 +180,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-5xl px-4 py-14 sm:px-6">
+        <section id="fonctionnalites" className="mx-auto max-w-5xl scroll-mt-20 px-4 py-14 sm:px-6">
           <h2 className="text-center text-2xl font-bold text-zinc-900">
             Une application pensée pour chaque membre du club
           </h2>
@@ -172,7 +222,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="border-t border-zinc-100 bg-zinc-50">
+        <section id="gymnases" className="scroll-mt-20 border-t border-zinc-100 bg-zinc-50">
           <div className="mx-auto max-w-5xl px-4 py-14 sm:px-6">
             <div className="flex items-center justify-center gap-2 text-ubac-blue">
               <Trophy className="h-5 w-5" />
@@ -198,7 +248,7 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="border-t border-black/5 py-6 text-center text-xs text-zinc-400">
+      <footer id="contact" className="scroll-mt-20 border-t border-black/5 py-6 text-center text-xs text-zinc-400">
         UBAC — Union Basket Angoulins Châtelaillon Saint-Vivien
       </footer>
     </div>
