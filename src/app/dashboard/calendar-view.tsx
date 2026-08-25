@@ -1387,7 +1387,12 @@ export default function CalendarView({
       )}
 
       {view === "list" && (
-        <div className="flex flex-col gap-2">
+        // gap-4 (retour de Cindy du 2026-08-25, "pas assez de marges entre
+        // elles") : gap-2 laissait à peine 8px entre deux cartes, alors
+        // que le fanion "Spécial" d'un tournoi déborde de -10px au-dessus
+        // de sa propre carte (absolute -top-2.5) — la carte suivante s'en
+        // trouvait quasiment collée dessus.
+        <div className="flex flex-col gap-4">
           {upcomingListItems.length === 0 ? (
             <p className="text-sm text-zinc-500">Aucun événement à venir.</p>
           ) : (
@@ -1478,9 +1483,15 @@ export default function CalendarView({
               }
             />
           ) : view === "results" || view === "officialMatches" || view === "officialResults" ? (
-            seasonListEvents.map((event) => renderResultCard(event))
+            // gap-4 (voir plus haut, vue "list") : même filet contre le
+            // fanion "Spécial" qui déborde au-dessus de sa carte.
+            <div className="flex flex-col gap-4">
+              {seasonListEvents.map((event) => renderResultCard(event))}
+            </div>
           ) : (
-            seasonListEvents.map((event) => renderEventCard(event))
+            <div className="flex flex-col gap-4">
+              {seasonListEvents.map((event) => renderEventCard(event))}
+            </div>
           )}
         </div>
       )}
@@ -1500,10 +1511,10 @@ export default function CalendarView({
         {detailEvents.length === 0 && detailBirthdays.length === 0 ? (
           <p className="text-sm text-zinc-500">Aucun événement ce jour-là.</p>
         ) : (
-          <>
+          <div className="flex flex-col gap-4">
             {detailBirthdays.map((m) => renderBirthdayCard(m))}
             {detailEvents.map((event) => renderEventCard(event))}
-          </>
+          </div>
         )}
       </div>
       )}

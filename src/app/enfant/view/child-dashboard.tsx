@@ -180,6 +180,8 @@ export default function ChildDashboard({
       content: (
         <ChildTeamTab
           coaches={coaches}
+          teammates={teammates}
+          category={category}
           nextEvent={nextEvent}
           nextEventAttendance={nextEventAttendance}
         />

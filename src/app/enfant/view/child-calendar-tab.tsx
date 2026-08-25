@@ -280,14 +280,19 @@ export default function ChildCalendarTab({
               Aucun événement ce jour-là.
             </p>
           ) : (
-            <>
+            // gap-4 (retour de Cindy du 2026-08-25, "pas assez de marges
+            // entre elles") : gap-2 laissait à peine 8px entre deux
+            // cartes, alors que le fanion "Spécial" d'un tournoi déborde
+            // de -10px au-dessus de sa propre carte (absolute -top-2.5) —
+            // la carte suivante s'en trouvait quasiment collée dessus.
+            <div className="flex flex-col gap-4">
               {detailBirthdays.map((m) => (
                 <BirthdayRow key={`bday-${m.id}`} name={m.firstName} />
               ))}
               {detailEvents.map((e) => (
                 <EventRow key={e.id} event={e} />
               ))}
-            </>
+            </div>
           )}
         </div>
       )}
@@ -302,17 +307,21 @@ export default function ChildCalendarTab({
           {upcoming.length > 0 && (
             <div className="flex flex-col gap-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">À venir</p>
-              {upcoming.map((e) => (
-                <EventRow key={e.id} event={e} />
-              ))}
+              <div className="flex flex-col gap-4">
+                {upcoming.map((e) => (
+                  <EventRow key={e.id} event={e} />
+                ))}
+              </div>
             </div>
           )}
           {past.length > 0 && (
             <div className="flex flex-col gap-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Passés</p>
-              {past.map((e) => (
-                <EventRow key={e.id} event={e} faded />
-              ))}
+              <div className="flex flex-col gap-4">
+                {past.map((e) => (
+                  <EventRow key={e.id} event={e} faded />
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -335,13 +344,35 @@ function BirthdayRow({ name }: { name: string | null }) {
   );
 }
 
+const ATTENDANCE_STATUS_LABELS: Record<string, { label: string; className: string }> = {
+  PRESENT: { label: "Présent", className: "bg-emerald-100 text-emerald-700" },
+  LATE: { label: "En retard", className: "bg-amber-100 text-amber-700" },
+  ABSENT: { label: "Absent", className: "bg-red-100 text-red-700" },
+  PENDING: { label: "En attente", className: "bg-zinc-100 text-zinc-500" },
+};
+
 // Exporté : réutilisé tel quel par l'onglet "Événements" (voir
 // child-events-tab.tsx) plutôt que de dupliquer ce même gabarit de carte.
-export function EventRow({ event, faded }: { event: ChildEvent; faded?: boolean }) {
+// `attendance` optionnel (retour de Cindy du 2026-08-25, onglet "Mon
+// Équipe") : quand fourni, la carte affiche aussi qui est présent/absent
+// pour CET événement précis, directement sous ses infos — plutôt qu'une
+// liste de présences séparée qui ne précisait jamais de quel rendez-vous il
+// s'agissait. Lecture seule, comme le reste de cette carte : aucun bouton
+// pour changer un statut.
+export function EventRow({
+  event,
+  faded,
+  attendance,
+}: {
+  event: ChildEvent;
+  faded?: boolean;
+  attendance?: { name: string | null; status: string }[];
+}) {
   const style = styleFor(event.eventType);
   const parsed = parseMatchTitle(event.title);
   const home = event.isHome ?? parsed.isHome;
   const lieu = event.salle || event.location;
+  const presentCount = attendance?.filter((a) => a.status === "PRESENT" || a.status === "LATE").length ?? 0;
   // Même différenciation que calendar-view.tsx (retour de Cindy du
   // 2026-08-24, item 6 du topo, puis "vérifier sur tous les espaces que
   // les cartes soient les mêmes") : cette carte-ci (Espace Enfant) avait
@@ -400,6 +431,29 @@ export function EventRow({ event, faded }: { event: ChildEvent; faded?: boolean 
           </span>
         )}
       </div>
+      {attendance && attendance.length > 0 && (
+        <div className="mt-3 border-t border-zinc-100 pt-3">
+          <p className="mb-2 text-xs text-zinc-500">
+            <span className="font-bold text-navy">{presentCount}</span> présent
+            {presentCount > 1 ? "s" : ""} sur {attendance.length}
+          </p>
+          <div className="flex flex-col gap-1.5">
+            {[...attendance]
+              .sort((a, b) => formatFirstName(a.name).localeCompare(formatFirstName(b.name), "fr"))
+              .map((a, i) => {
+                const status = ATTENDANCE_STATUS_LABELS[a.status] ?? ATTENDANCE_STATUS_LABELS.PENDING;
+                return (
+                  <div key={i} className="flex items-center justify-between gap-2 text-sm">
+                    <span className="text-zinc-700">{formatFirstName(a.name)}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${status.className}`}>
+                      {status.label}
+                    </span>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

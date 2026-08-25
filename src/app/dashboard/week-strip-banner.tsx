@@ -251,7 +251,7 @@ export default function WeekStripBanner({ events }: { events: WeekStripEvent[] }
         // child-dashboard.tsx) sans réintroduire le décalage qu'on
         // corrigeait avant ("laisser fixe le planning les symbole et la
         // photo").
-        <div className="absolute inset-x-0 top-full z-20 mt-2 flex flex-col gap-2 rounded-2xl bg-white/95 p-3 shadow-lg sm:p-3.5">
+        <div className="absolute inset-x-0 top-full z-20 mt-2 flex flex-col gap-4 rounded-2xl bg-white/95 p-3 shadow-lg sm:p-3.5">
           {selectedDayEvents.map((event) => (
             <DayEventCard key={event.id} event={event} />
           ))}
