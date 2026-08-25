@@ -264,6 +264,7 @@ export default function AdminView({
           forcedView="clubEvents"
           resultsTeams={teamRefs}
           resultsTeamSelector="dropdown"
+          volunteerNeedsByEventId={volunteerNeedsByEventId}
         />
       ),
     },
@@ -289,6 +290,7 @@ export default function AdminView({
               forcedView="officialMatches"
               resultsTeams={teamRefs}
               resultsTeamSelector="dropdown"
+              volunteerNeedsByEventId={volunteerNeedsByEventId}
             />
           ),
         },
@@ -305,6 +307,7 @@ export default function AdminView({
               forcedView="officialResults"
               resultsTeams={teamRefs}
               resultsTeamSelector="dropdown"
+              volunteerNeedsByEventId={volunteerNeedsByEventId}
             />
           ),
         },

@@ -307,6 +307,7 @@ export default function CoachView({
           // "Équipe" — sinon tous les événements de toutes ses équipes se
           // mélangent dans un seul fil.
           resultsTeams={resultsTeamsForCalendar}
+          volunteerNeedsByEventId={volunteerNeedsByEventId}
         />
       ),
     },
@@ -332,6 +333,7 @@ export default function CoachView({
               scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
               forcedView="officialMatches"
               resultsTeams={resultsTeamsForCalendar}
+              volunteerNeedsByEventId={volunteerNeedsByEventId}
             />
           ),
         },
@@ -347,6 +349,7 @@ export default function CoachView({
               scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
               forcedView="officialResults"
               resultsTeams={resultsTeamsForCalendar}
+              volunteerNeedsByEventId={volunteerNeedsByEventId}
             />
           ),
         },
