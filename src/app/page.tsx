@@ -10,6 +10,7 @@ import {
   MapPin,
   Users,
   LayoutGrid,
+  Handshake,
 } from "lucide-react";
 import { FacebookIcon, InstagramIcon } from "@/components/social-icons";
 import RevealOnScroll from "@/components/reveal-on-scroll";
@@ -74,6 +75,31 @@ const clubStats = [
   { icon: LayoutGrid, value: "10", label: "catégories, du baby basket aux seniors" },
   // MapPin, comme "Nos gymnases" plus bas : trois communes, trois lieux.
   { icon: MapPin, value: "3", label: "communes partenaires" },
+];
+
+// Logos + lien vers le site de chaque partenaire — récupérés depuis la
+// page officielle du club (ubac17.fr/dossier-dinscription/, section "Nos
+// partenaires"), fichiers rapatriés dans public/sponsors/. À tenir à jour
+// à la main si un partenariat change (pas de source dynamique ici).
+const sponsors = [
+  { name: "O2", logo: "/sponsors/o2.png", url: "https://www.o2.fr/demander-un-devis#/1-services" },
+  {
+    name: "L'Équipe by Steal",
+    logo: "/sponsors/lequipe-by-steal.jpg",
+    url: "https://www.planity.com/lequipe-by-steal-17340-chatelaillon-plage",
+  },
+  { name: "Opticéo", logo: "/sponsors/opticeo.png", url: "https://www.opticeo.fr/boutiques/la-rochelle" },
+  {
+    name: "Areas",
+    logo: "/sponsors/areas.jpg",
+    url: "https://www.areas.fr/agence-assurance/17088/m.damien-la-rochelle",
+  },
+  {
+    name: "Burgeot Stores",
+    logo: "/sponsors/burgeot-stores.jpg",
+    url: "https://www.komilfo.fr/magasins/burgeot-stores-rochelle-17",
+  },
+  { name: "DIN", logo: "/sponsors/din.png", url: "https://www.d-i-n.fr/" },
 ];
 
 const gyms = [
@@ -264,6 +290,43 @@ export default function Home() {
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+
+        <section id="sponsors" className="scroll-mt-20 mx-auto max-w-5xl px-4 py-14 sm:px-6">
+          <div className="flex items-center justify-center gap-2 text-ubac-blue">
+            <Handshake className="h-5 w-5" />
+            <h2 className="text-center text-2xl font-bold text-zinc-900">
+              Nos sponsors
+            </h2>
+          </div>
+          <p className="mx-auto mt-2 max-w-xl text-center text-sm text-zinc-500">
+            Merci à nos partenaires qui soutiennent le club au quotidien.
+          </p>
+          <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+            {sponsors.map(({ name, logo, url }, i) => (
+              <RevealOnScroll key={name} delayMs={i * 80}>
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Site de ${name}`}
+                  title={name}
+                  className="flex h-24 items-center justify-center rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+                >
+                  {/* Grisé au repos, en couleur au survol : évite que 6
+                      chartes graphiques différentes ne se battent
+                      visuellement entre elles sur une même bande. */}
+                  <Image
+                    src={logo}
+                    alt={name}
+                    width={200}
+                    height={100}
+                    className="h-12 w-auto object-contain grayscale transition-[filter] duration-300 hover:grayscale-0 sm:h-14"
+                  />
+                </a>
+              </RevealOnScroll>
+            ))}
           </div>
         </section>
       </main>
