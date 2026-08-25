@@ -325,8 +325,62 @@ export default function Home() {
         </section>
       </main>
 
-      <footer id="contact" className="scroll-mt-20 border-t border-black/5 py-6 text-center text-xs text-zinc-400">
-        UBAC — Union Basket Angoulins Châtelaillon Saint-Vivien
+      <footer id="contact" className="scroll-mt-20 border-t border-black/5 bg-zinc-50">
+        <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
+          <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
+            <div className="flex items-center gap-2">
+              <Image src="/logo.png" alt="UBAC" width={32} height={32} className="h-8 w-8 object-contain" />
+              <span className="text-sm font-semibold text-ubac-blue">
+                Union Basket Angoulins Châtelaillon
+              </span>
+            </div>
+            <div className="flex items-center gap-4">
+              {socialLinks.map(({ href, label, icon: Icon }) => (
+                <a
+                  key={href}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`UBAC sur ${label}`}
+                  className="opacity-80 transition-opacity hover:opacity-100"
+                >
+                  <Icon className="h-5 w-5" />
+                </a>
+              ))}
+            </div>
+          </div>
+
+          {/* Logos FFBB / communes partenaires : pas encore reçus de
+              Cindy — section volontairement omise pour l'instant plutôt
+              que des cadres vides, à ajouter dès qu'elle les fournit. */}
+
+          <div className="mt-6 flex flex-col flex-wrap items-center justify-center gap-x-4 gap-y-2 border-t border-zinc-200 pt-6 text-xs text-zinc-500 sm:flex-row">
+            <a
+              href="https://ubac17.fr"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="transition-colors hover:text-ubac-blue"
+            >
+              ubac17.fr
+            </a>
+            <span className="hidden text-zinc-300 sm:inline">·</span>
+            <a href="mailto:ubac17.basket@gmail.com" className="transition-colors hover:text-ubac-blue">
+              ubac17.basket@gmail.com
+            </a>
+            <span className="hidden text-zinc-300 sm:inline">·</span>
+            <Link href="/mentions-legales" className="transition-colors hover:text-ubac-blue">
+              Mentions légales
+            </Link>
+            <span className="hidden text-zinc-300 sm:inline">·</span>
+            <Link href="/confidentialite" className="transition-colors hover:text-ubac-blue">
+              Politique de confidentialité
+            </Link>
+          </div>
+
+          <p className="mt-6 text-center text-xs text-zinc-400">
+            UBAC — Union Basket Angoulins Châtelaillon Saint-Vivien
+          </p>
+        </div>
       </footer>
     </div>
   );
