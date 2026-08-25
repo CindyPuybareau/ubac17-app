@@ -785,7 +785,19 @@ export default function MembersTable({
           forçaient un défilement horizontal sur l'écran le plus consulté
           au quotidien — remplacé par des cartes empilées, voir plus bas
           (item 10 du topo, retour de Cindy du 2026-08-24). */}
-      <div className="hidden w-full overflow-x-auto rounded-2xl border border-l-4 border-zinc-100 border-l-ubac-yellow bg-white sm:block">
+      {/* Retour d'audit du 2026-08-25 ("dès 1438px de large, la colonne
+          EMAIL est coupée sans indicateur de scroll") : ce tableau a 10
+          colonnes en whitespace-nowrap (nom/prénom/coach de/catégorie/
+          statut/email/téléphone...), il ne tient confortablement qu'à
+          partir d'un très grand écran — le seuil vers la version carte
+          passe donc de sm (640px) à xl (1280px), pour couvrir aussi les
+          laptops 13"/tablettes. overflow-x-auto était déjà là (le
+          tableau scrollait déjà techniquement), mais sans indice visuel :
+          la scrollbar de l'OS reste souvent invisible tant qu'on ne
+          scrolle pas encore. Scrollbar forcée visible (via les classes
+          [&::-webkit-scrollbar]) pour les écrans encore plus larges où
+          le tableau resterait malgré tout plus large que l'écran. */}
+      <div className="hidden w-full overflow-x-auto rounded-2xl border border-l-4 border-zinc-100 border-l-ubac-yellow bg-white [&::-webkit-scrollbar]:h-2.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-300 [&::-webkit-scrollbar-track]:bg-zinc-100 xl:block">
         <table className="w-full table-auto border-collapse text-sm">
           <thead>
             <tr className="border-b border-slate-100 bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-400">
@@ -974,14 +986,15 @@ export default function MembersTable({
         </table>
       </div>
 
-      {/* Cartes empilées en dessous de 640px (sm) — même contenu que le
-          tableau (nom/prénom, indicateur de connexion, rôle Bureau,
-          équipes jouées/coachées, année/statut, email, téléphone), même
-          actions (tap = fiche, ⋮ = menu partagé via renderMemberMenu),
-          juste sans les colonnes qui n'ont plus de sens en carte (# et
-          case à cocher "tout sélectionner" restent, la sélection groupée
-          garde son utilité même sur mobile). */}
-      <div className="flex flex-col gap-3 sm:hidden">
+      {/* Cartes empilées en dessous de 1280px (xl, voir le commentaire sur
+          le tableau juste au-dessus) — même contenu que le tableau
+          (nom/prénom, indicateur de connexion, rôle Bureau, équipes
+          jouées/coachées, année/statut, email, téléphone), même actions
+          (tap = fiche, ⋮ = menu partagé via renderMemberMenu), juste sans
+          les colonnes qui n'ont plus de sens en carte (# et case à cocher
+          "tout sélectionner" restent, la sélection groupée garde son
+          utilité même sur mobile/tablette/laptop). */}
+      <div className="flex flex-col gap-3 xl:hidden">
         {filtered.length > 0 && (
           <label className="flex items-center gap-2 self-start text-xs font-medium text-zinc-500">
             <input
