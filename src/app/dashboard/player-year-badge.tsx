@@ -1,4 +1,4 @@
-import { computePlayerYearStatus } from "@/lib/season";
+import { computePlayerYearStatus, type PlayerYearStatus } from "@/lib/season";
 
 // Shared across the Bureau's Membres table, the Coach/Bureau roster
 // table, and the family's team roster — same computation, same visual
@@ -10,14 +10,15 @@ import { computePlayerYearStatus } from "@/lib/season";
 const BADGE_BASE =
   "inline-flex w-fit items-center justify-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-medium leading-none";
 
-export default function PlayerYearBadge({
-  birthDate,
-  category,
-}: {
-  birthDate: string | null;
-  category: string | null;
-}) {
-  const status = computePlayerYearStatus(birthDate, category);
+// Rendu pur, séparé du calcul (retour de Cindy du 2026-08-25, bug
+// "Sparring Partner" sur tous les joueurs de l'Espace Enfant) : la vraie
+// date de naissance n'est jamais envoyée au navigateur d'un enfant (voir
+// enfant/view/page.tsx, birthDate volontairement neutralisée à l'année
+// 2000 pour la confidentialité) — computePlayerYearStatus() y donnait donc
+// systématiquement le même résultat faux pour tout le monde. Le statut y
+// est maintenant calculé côté serveur, avec la vraie date, puis seul ce
+// composant de rendu (sans aucune date) est utilisé côté client.
+export function PlayerYearStatusBadge({ status }: { status: PlayerYearStatus | null }) {
   if (!status) return null;
 
   if (status.kind === "ROOKIE") {
@@ -52,4 +53,15 @@ export default function PlayerYearBadge({
       {status.label}
     </span>
   );
+}
+
+export default function PlayerYearBadge({
+  birthDate,
+  category,
+}: {
+  birthDate: string | null;
+  category: string | null;
+}) {
+  const status = computePlayerYearStatus(birthDate, category);
+  return <PlayerYearStatusBadge status={status} />;
 }

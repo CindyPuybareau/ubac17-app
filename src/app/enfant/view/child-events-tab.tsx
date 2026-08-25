@@ -14,12 +14,20 @@ import type { ChildEvent } from "./child-dashboard";
 export default function ChildEventsTab({
   events,
   teams,
+  nextEventId,
+  nextEventAttendance,
 }: {
   events: ChildEvent[];
   // Un enfant qui joue dans deux équipes voyait tous les événements des
   // deux équipes mélangés sans distinction — même sélecteur que côté
   // Bureau/Coach/Parent.
   teams: { id: string; name: string | null; category: string | null }[];
+  // Retour de Cindy du 2026-08-25 : les présences au prochain rendez-vous
+  // vivent désormais sur la carte de CET événement précis, ici ou dans
+  // "Matchs officiels" (child-results-tab.tsx) selon son type — plus dans
+  // l'onglet "Mon Équipe", "rien à voir avec l'équipe".
+  nextEventId?: string | null;
+  nextEventAttendance?: { name: string | null; status: string }[];
 }) {
   const sortedTeams = useMemo(() => sortTeamsByGroup(teams), [teams]);
   const [activeTeamId, setActiveTeamId] = useState<string | undefined>(undefined);
@@ -63,7 +71,13 @@ export default function ChildEventsTab({
           Aucun événement programmé pour le moment.
         </p>
       ) : (
-        clubEvents.map((e) => <EventRow key={e.id} event={e} />)
+        clubEvents.map((e) => (
+          <EventRow
+            key={e.id}
+            event={e}
+            attendance={e.id === nextEventId ? nextEventAttendance : undefined}
+          />
+        ))
       )}
     </div>
   );

@@ -3,6 +3,7 @@ import { Clock, ListOrdered, Shield } from "lucide-react";
 import { formatEventTime, homeAwayLabel } from "@/app/dashboard/event-style";
 import { parseMatchTitle } from "@/lib/match-display";
 import { sortTeamsByGroup, teamLabel } from "@/lib/teams";
+import { EventRow } from "./child-calendar-tab";
 import type { ChildEvent } from "./child-dashboard";
 
 // Même code couleur que MatchScore côté Bureau/Coach (victoire/défaite/nul)
@@ -66,6 +67,8 @@ export default function ChildResultsTab({
   events,
   teams,
   forcedMode,
+  nextEventId,
+  nextEventAttendance,
 }: {
   events: ChildEvent[];
   // Un enfant qui joue dans deux équipes (ex. "monte" ponctuellement dans
@@ -74,6 +77,11 @@ export default function ChildResultsTab({
   // Bureau/Coach/Parent (calendar-view.tsx) pour s'y retrouver.
   teams: { id: string; name: string | null; category: string | null }[];
   forcedMode?: "officialMatches" | "officialResults";
+  // Retour de Cindy du 2026-08-25 : si le prochain rendez-vous est un
+  // match officiel, sa carte de présences vit ici plutôt que dans
+  // "Événements" — voir child-events-tab.tsx pour le cas symétrique.
+  nextEventId?: string | null;
+  nextEventAttendance?: { name: string | null; status: string }[];
 }) {
   const [mode, setMode] = useState<"officialMatches" | "officialResults">(
     forcedMode ?? "officialMatches"
@@ -97,6 +105,17 @@ export default function ChildResultsTab({
         .sort((a, b) => a.startTime.localeCompare(b.startTime)),
     [events, shownMode, sortedTeams, activeTeamIdResolved]
   );
+
+  // Carte détaillée du prochain match, avec ses présences (retour de
+  // Cindy du 2026-08-25) : uniquement en mode "Matchs officiels" (un match
+  // déjà joué dans "Résultats" n'a plus de présences à afficher) et
+  // seulement s'il fait partie des matchs visibles ici — sinon c'est
+  // child-events-tab.tsx qui s'en charge (prochain rendez-vous = un
+  // entraînement/tournoi, pas un match officiel). Retiré de la liste
+  // compacte ci-dessous pour ne pas l'y montrer deux fois.
+  const nextMatch =
+    shownMode === "officialMatches" ? visibleMatches.find((e) => e.id === nextEventId) ?? null : null;
+  const listedMatches = nextMatch ? visibleMatches.filter((e) => e.id !== nextMatch.id) : visibleMatches;
 
   return (
     <div className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
@@ -146,6 +165,11 @@ export default function ChildResultsTab({
           })}
         </div>
       )}
+      {nextMatch && (
+        <div className="mb-3">
+          <EventRow event={nextMatch} attendance={nextEventAttendance} />
+        </div>
+      )}
       <div className="flex flex-col gap-1.5">
         {visibleMatches.length === 0 ? (
           <p className="text-sm text-zinc-500">
@@ -154,7 +178,7 @@ export default function ChildResultsTab({
               : "Aucun résultat pour le moment."}
           </p>
         ) : (
-          visibleMatches.map((e) => <ResultRow key={e.id} event={e} />)
+          listedMatches.map((e) => <ResultRow key={e.id} event={e} />)
         )}
       </div>
     </div>

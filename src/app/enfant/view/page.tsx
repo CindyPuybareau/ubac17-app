@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { createServiceClient } from "@/lib/supabase/service";
 import { CHILD_SESSION_COOKIE, verifyChildSession } from "@/lib/child-session";
+import { computePlayerYearStatus } from "@/lib/season";
 import ChildDashboard, {
   type ChildAttendanceStats,
   type ChildCoach,
@@ -66,7 +67,7 @@ export default async function ChildViewPage() {
     teamIds.length > 0
       ? supabase
           .from("team_players")
-          .select("team_id, jersey_number, position, players(id, first_name, birth_date)")
+          .select("team_id, jersey_number, position, players(id, first_name, last_name, birth_date)")
           .in("team_id", teamIds)
       : Promise.resolve({ data: [] as never[] }),
     teamIds.length > 0
@@ -84,12 +85,19 @@ export default async function ChildViewPage() {
   ]);
 
   const teams = (teamsRes.data ?? []) as { id: string; name: string | null; category: string | null }[];
+  // Catégorie propre à l'équipe de chaque ligne (retour de Cindy du
+  // 2026-08-25, colonne "Catégorie" du tableau Mon Équipe) : nécessaire
+  // aussi bien pour l'affichage que pour le calcul du statut ci-dessous —
+  // même règle que team-card.tsx côté Bureau/Coach ("un joueur s'évalue
+  // avec la catégorie de l'équipe où il joue, pas avec sa propre fiche,
+  // parfois obsolète").
+  const teamCategoryById = new Map(teams.map((t) => [t.id, t.category]));
 
   const teammateRows = (teammatesRes.data ?? []) as unknown as {
     team_id: string;
     jersey_number: number | null;
     position: string | null;
-    players: { id: string; first_name: string | null; birth_date: string | null } | null;
+    players: { id: string; first_name: string | null; last_name: string | null; birth_date: string | null } | null;
   }[];
   const teammatesByPlayerId = new Map<string, ChildTeammate>();
   for (const row of teammateRows) {
@@ -98,6 +106,7 @@ export default async function ChildViewPage() {
       teammatesByPlayerId.set(row.players.id, {
         id: row.players.id,
         firstName: row.players.first_name,
+        lastName: row.players.last_name,
         // Année neutralisée : l'UI (calendrier, pastille "Anniversaires")
         // n'affiche jamais que le jour/mois, mais la vraie date de
         // naissance complète — donc l'âge exact — partait quand même dans
@@ -108,6 +117,13 @@ export default async function ChildViewPage() {
         jerseyNumber: row.jersey_number,
         position: row.position,
         isSelf: row.players.id === playerId,
+        teamCategory: teamCategoryById.get(row.team_id) ?? null,
+        // Statut année/rookie/sparring calculé ICI, avec la vraie date de
+        // naissance (jamais envoyée telle quelle au client, voir
+        // birthDate ci-dessus) — bug du 2026-08-25 : recalculer ce statut
+        // côté client à partir de la date neutralisée donnait "Sparring
+        // Partner" à tout le monde (année fixée à 2000 pour tous).
+        yearStatus: computePlayerYearStatus(row.players.birth_date, teamCategoryById.get(row.team_id) ?? null),
       });
     }
   }
@@ -125,6 +141,7 @@ export default async function ChildViewPage() {
         id: row.profiles.id,
         firstName: row.profiles.first_name,
         lastName: row.profiles.last_name,
+        teamCategory: teamCategoryById.get(row.team_id) ?? null,
       });
     }
   }
@@ -298,6 +315,7 @@ export default async function ChildViewPage() {
       teammates={teammates}
       coaches={coaches}
       presence={presence}
+      nextEvent={nextEvent}
       nextEventAttendance={nextEventAttendance}
       notifications={notifications}
       notificationsEnabled={notificationsEnabled}

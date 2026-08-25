@@ -14,6 +14,7 @@ import {
 import type { AdminSection } from "@/app/dashboard/admin-sidebar";
 import OrgChartButton from "@/app/dashboard/org-chart-button";
 import PenalitesCard from "@/app/dashboard/penalites-card";
+import type { PlayerYearStatus } from "@/lib/season";
 import ChildAvatarUpload from "./child-avatar-upload";
 import ChildTileMenu from "./child-tile-menu";
 import { formatFirstName } from "@/lib/names";
@@ -48,13 +49,31 @@ export type ChildEvent = {
 export type ChildTeammate = {
   id: string;
   firstName: string | null;
+  // Retour de Cindy du 2026-08-25 : le nom de famille des coéquipiers est
+  // désormais affiché dans l'onglet "Mon Équipe" (confirmé explicitement,
+  // question posée vu que c'était jusqu'ici délibérément masqué). La date
+  // de naissance, elle, reste neutralisée (voir birthDate) — décision
+  // distincte, non remise en cause.
+  lastName: string | null;
   birthDate: string | null;
   jerseyNumber: number | null;
   position: string | null;
   isSelf: boolean;
+  // Catégorie de L'ÉQUIPE de cette ligne (pas la fiche joueur, parfois
+  // obsolète — même règle que team-card.tsx côté Bureau/Coach).
+  teamCategory: string | null;
+  // Calculé côté serveur avec la vraie date de naissance (voir
+  // enfant/view/page.tsx) — jamais recalculé côté client à partir de
+  // birthDate, volontairement neutralisée ci-dessus.
+  yearStatus: PlayerYearStatus | null;
 };
 
-export type ChildCoach = { id: string; firstName: string | null; lastName: string | null };
+export type ChildCoach = {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  teamCategory: string | null;
+};
 
 export type ChildAttendanceStats = { present: number; total: number };
 
@@ -85,6 +104,7 @@ export default function ChildDashboard({
   teammates,
   coaches,
   presence,
+  nextEvent,
   nextEventAttendance,
   notifications,
   notificationsEnabled,
@@ -99,6 +119,11 @@ export default function ChildDashboard({
   teammates: ChildTeammate[];
   coaches: ChildCoach[];
   presence: { trainings: ChildAttendanceStats; matches: ChildAttendanceStats };
+  // Calculé côté serveur (page.tsx), source unique — plus recalculé ici
+  // en double (retour de Cindy du 2026-08-25 : les présences quittent
+  // l'onglet "Mon Équipe" pour rejoindre "Événements"/"Matchs officiels",
+  // les deux ont donc besoin de savoir lequel est LE prochain rendez-vous).
+  nextEvent: ChildEvent | null;
   nextEventAttendance: { name: string | null; status: string }[];
   notifications: ChildNotification[];
   notificationsEnabled: boolean;
@@ -106,8 +131,6 @@ export default function ChildDashboard({
   // présence") : saisies par le Bureau, jamais modifiables ici.
   penalites: ChildPenalite[];
 }) {
-  const now = Date.now();
-  const nextEvent = events.find((e) => new Date(e.startTime).getTime() >= now) ?? null;
   const teammatesOnly = teammates.filter((t) => !t.isSelf);
 
   // Même bandeau "Cette semaine" que côté Coach/Parent (retour de Cindy du
@@ -178,13 +201,7 @@ export default function ChildDashboard({
       label: "Mon Équipe",
       icon: <Users className={iconClass} />,
       content: (
-        <ChildTeamTab
-          coaches={coaches}
-          teammates={teammates}
-          category={category}
-          nextEvent={nextEvent}
-          nextEventAttendance={nextEventAttendance}
-        />
+        <ChildTeamTab coaches={coaches} teammates={teammates} />
       ),
     },
     {
@@ -211,7 +228,14 @@ export default function ChildDashboard({
       key: "events",
       label: "Événements",
       icon: <Flag className={iconClass} />,
-      content: <ChildEventsTab events={events} teams={teams} />,
+      content: (
+        <ChildEventsTab
+          events={events}
+          teams={teams}
+          nextEventId={nextEvent?.id ?? null}
+          nextEventAttendance={nextEventAttendance}
+        />
+      ),
     },
     {
       // Retour de Cindy du 2026-08-22 : "Matchs officiels" / "Résultats"
@@ -226,7 +250,15 @@ export default function ChildDashboard({
           key: "matches-official",
           label: "Matchs officiels",
           icon: <Shield className={iconClass} />,
-          content: <ChildResultsTab events={events} teams={teams} forcedMode="officialMatches" />,
+          content: (
+            <ChildResultsTab
+              events={events}
+              teams={teams}
+              forcedMode="officialMatches"
+              nextEventId={nextEvent?.id ?? null}
+              nextEventAttendance={nextEventAttendance}
+            />
+          ),
         },
         {
           key: "matches-results",

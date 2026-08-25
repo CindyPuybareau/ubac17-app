@@ -1,7 +1,23 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Cake, ChevronLeft, ChevronRight, Euro, LayoutGrid, List, MapPin, PartyPopper, Sparkles } from "lucide-react";
+import {
+  Cake,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  Clock,
+  Euro,
+  LayoutGrid,
+  List,
+  MapPin,
+  PartyPopper,
+  Sparkles,
+  Users,
+  X,
+} from "lucide-react";
 import {
   styleFor,
   isMatchType,
@@ -344,12 +360,73 @@ function BirthdayRow({ name }: { name: string | null }) {
   );
 }
 
-const ATTENDANCE_STATUS_LABELS: Record<string, { label: string; className: string }> = {
-  PRESENT: { label: "Présent", className: "bg-emerald-100 text-emerald-700" },
-  LATE: { label: "En retard", className: "bg-amber-100 text-amber-700" },
-  ABSENT: { label: "Absent", className: "bg-red-100 text-red-700" },
-  PENDING: { label: "En attente", className: "bg-zinc-100 text-zinc-500" },
-};
+// Même principe que PresentPlayersList côté Bureau/Coach/Parent
+// (dashboard/calendar-view.tsx, retour de Cindy du 2026-08-25 : "je veux
+// les mêmes cartes de présences déjà existantes côté parents ou coachs") :
+// compte replié par défaut, un tap déplie la liste nominative. Prénom
+// seul (pas de nom de famille dans une liste de présences — l'onglet Mon
+// Équipe montre déjà qui est qui, voir child-team-tab.tsx).
+function AttendanceSummary({ attendance }: { attendance: { name: string | null; status: string }[] }) {
+  const [open, setOpen] = useState(false);
+  const present = attendance.filter((a) => a.status === "PRESENT");
+  const late = attendance.filter((a) => a.status === "LATE");
+  const absent = attendance.filter((a) => a.status === "ABSENT");
+  const pending = attendance.filter((a) => a.status === "PENDING" || (a.status !== "PRESENT" && a.status !== "LATE" && a.status !== "ABSENT"));
+  const presentAndLate = [...present, ...late];
+
+  return (
+    <div className="mt-3 flex flex-col gap-1.5 border-t border-zinc-100 pt-3">
+      <div className="flex flex-wrap gap-1.5">
+        <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold leading-none text-green-700">
+          <Check className="h-3 w-3" />
+          {present.length} présent{present.length > 1 ? "s" : ""}
+        </span>
+        {late.length > 0 && (
+          <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold leading-none text-amber-700">
+            <Clock className="h-3 w-3" />
+            {late.length} en retard
+          </span>
+        )}
+        <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold leading-none text-red-700">
+          <X className="h-3 w-3" />
+          {absent.length} absent{absent.length > 1 ? "s" : ""}
+        </span>
+        <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold leading-none text-zinc-600">
+          <Clock className="h-3 w-3" />
+          {pending.length} en attente
+        </span>
+      </div>
+      {presentAndLate.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:text-zinc-900"
+          >
+            <Users className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+            {presentAndLate.length}{" "}
+            {presentAndLate.length > 1 ? "joueurs/joueuses présent(e)s" : "joueur/joueuse présent(e)"}
+            {open ? <ChevronUp className="h-3.5 w-3.5 shrink-0" /> : <ChevronDown className="h-3.5 w-3.5 shrink-0" />}
+          </button>
+          {open && (
+            <div className="flex flex-wrap gap-1.5">
+              {[...presentAndLate]
+                .sort((a, b) => formatFirstName(a.name).localeCompare(formatFirstName(b.name), "fr"))
+                .map((a, i) => (
+                  <span
+                    key={i}
+                    className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700"
+                  >
+                    {formatFirstName(a.name)}
+                  </span>
+                ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // Exporté : réutilisé tel quel par l'onglet "Événements" (voir
 // child-events-tab.tsx) plutôt que de dupliquer ce même gabarit de carte.
@@ -372,7 +449,6 @@ export function EventRow({
   const parsed = parseMatchTitle(event.title);
   const home = event.isHome ?? parsed.isHome;
   const lieu = event.salle || event.location;
-  const presentCount = attendance?.filter((a) => a.status === "PRESENT" || a.status === "LATE").length ?? 0;
   // Même différenciation que calendar-view.tsx (retour de Cindy du
   // 2026-08-24, item 6 du topo, puis "vérifier sur tous les espaces que
   // les cartes soient les mêmes") : cette carte-ci (Espace Enfant) avait
@@ -431,29 +507,7 @@ export function EventRow({
           </span>
         )}
       </div>
-      {attendance && attendance.length > 0 && (
-        <div className="mt-3 border-t border-zinc-100 pt-3">
-          <p className="mb-2 text-xs text-zinc-500">
-            <span className="font-bold text-navy">{presentCount}</span> présent
-            {presentCount > 1 ? "s" : ""} sur {attendance.length}
-          </p>
-          <div className="flex flex-col gap-1.5">
-            {[...attendance]
-              .sort((a, b) => formatFirstName(a.name).localeCompare(formatFirstName(b.name), "fr"))
-              .map((a, i) => {
-                const status = ATTENDANCE_STATUS_LABELS[a.status] ?? ATTENDANCE_STATUS_LABELS.PENDING;
-                return (
-                  <div key={i} className="flex items-center justify-between gap-2 text-sm">
-                    <span className="text-zinc-700">{formatFirstName(a.name)}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${status.className}`}>
-                      {status.label}
-                    </span>
-                  </div>
-                );
-              })}
-          </div>
-        </div>
-      )}
+      {attendance && attendance.length > 0 && <AttendanceSummary attendance={attendance} />}
     </div>
   );
 }
