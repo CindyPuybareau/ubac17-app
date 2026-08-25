@@ -251,6 +251,15 @@ export default function AdminSidebar({
         <li key={section.key}>
           <button
             onClick={() => toggleExpanded(section.key)}
+            aria-expanded={isExpanded}
+            // Retour d'audit du 2026-08-25 (P2, accessibilité) : le texte
+            // visible du bouton ("Cotisations", "Matchs & Résultats") ne dit
+            // pas à un lecteur d'écran qu'il s'agit d'un sous-menu à
+            // déplier/replier — aria-expanded porte l'état, aria-label
+            // explicite l'action. Chevron ignoré par l'accessibilité
+            // (aria-hidden) : il ne fait que doubler visuellement ce
+            // qu'aria-expanded annonce déjà.
+            aria-label={`${isExpanded ? "Replier" : "Déplier"} le sous-menu ${section.label}`}
             className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-colors ${
               hasActiveDescendant && !isExpanded
                 ? "text-ubac-yellow"
@@ -260,9 +269,9 @@ export default function AdminSidebar({
             {section.icon}
             <span className="flex-1">{section.label}</span>
             {isExpanded ? (
-              <ChevronDown className="h-4 w-4 shrink-0" />
+              <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0" />
             ) : (
-              <ChevronRight className="h-4 w-4 shrink-0" />
+              <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0" />
             )}
           </button>
           {isExpanded && (

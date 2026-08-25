@@ -802,10 +802,16 @@ export default function MembersTable({
           <thead>
             <tr className="border-b border-slate-100 bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-400">
               <th className="whitespace-nowrap px-2 py-3">
+                {/* Retour d'audit du 2026-08-25 (P2, accessibilité) : aucun
+                    texte visible sur cette case (contrairement à celle du
+                    "Tout sélectionner" mobile, dans un <label> avec son
+                    texte) — un lecteur d'écran l'annonçait juste "coché"/
+                    "non coché" sans dire de quoi il s'agit. */}
                 <input
                   type="checkbox"
                   checked={allFilteredSelected}
                   onChange={toggleAll}
+                  aria-label="Tout sélectionner"
                   className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
                 />
               </th>
@@ -860,6 +866,7 @@ export default function MembersTable({
                     type="checkbox"
                     checked={selectedIds.has(m.id)}
                     onChange={() => toggleOne(m.id)}
+                    aria-label={`Sélectionner ${formatPersonName(m.firstName, m.lastName, "ce membre")}`}
                     className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
                   />
                 </td>
@@ -1021,6 +1028,7 @@ export default function MembersTable({
                   checked={selectedIds.has(m.id)}
                   onChange={() => toggleOne(m.id)}
                   onClick={(e) => e.stopPropagation()}
+                  aria-label={`Sélectionner ${formatPersonName(m.firstName, m.lastName, "ce membre")}`}
                   className="mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
                 />
                 <div className="min-w-0">
