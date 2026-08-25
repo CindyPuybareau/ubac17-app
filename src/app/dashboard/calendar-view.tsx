@@ -43,7 +43,7 @@ import MatchScore from "./match-score";
 import TeamSelectorPills from "./team-selector-pills";
 import TeamFilterDropdown from "./team-filter-dropdown";
 import { sendEventPush } from "./event-push";
-import type { AdminUpcomingEvent } from "./page";
+import type { AdminBenevole, AdminUpcomingEvent } from "./page";
 import {
   groupBirthdaysByMonthDay,
   upcomingBirthdays,
@@ -263,6 +263,7 @@ export default function CalendarView({
   forcedView,
   resultsTeamSelector = "pills",
   resultsTeams,
+  benevoles = [],
 }: {
   events: AdminUpcomingEvent[];
   createTeams?: CalendarTeamRef[];
@@ -327,6 +328,9 @@ export default function CalendarView({
   // équipes à la fois dans le même fil — réutilise TeamFilterDropdown,
   // déjà utilisé par team-manager.tsx (Bureau).
   resultsTeamSelector?: "pills" | "dropdown";
+  // Liste des bénévoles du club, transmise telle quelle à CreateEventForm
+  // (section "Bénévoles invités") — vide partout sauf côté Bureau.
+  benevoles?: AdminBenevole[];
 }) {
   // Recalculés à chaque rendu (pas au chargement du module) : un onglet
   // Bureau laissé ouvert toute la nuit gardait sinon la pastille "jour
@@ -1273,6 +1277,7 @@ export default function CalendarView({
           // ferait setState après coup (voir create-event-form.tsx).
           key={editingEvent?.id ?? "create"}
           teams={createTeams}
+          benevoles={benevoles}
           allowClubWide={allowClubWide}
           open={createOpen || Boolean(editingEvent)}
           editingEvent={editingEvent}

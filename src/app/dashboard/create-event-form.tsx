@@ -13,7 +13,7 @@ import {
   STANDARD_VOLUNTEER_ROLES,
   volunteerRoleIcon,
 } from "./event-volunteer-needs";
-import type { AdminUpcomingEvent } from "./page";
+import type { AdminBenevole, AdminUpcomingEvent } from "./page";
 
 type Team = { id: string; name: string | null; category: string | null };
 type EventType = "MATCH" | "FRIENDLY" | "TRAINING" | "OTHER" | "TOURNAMENT";
@@ -73,6 +73,7 @@ const typeChoices: { value: EventType; label: string; active: string }[] = [
 
 export default function CreateEventForm({
   teams,
+  benevoles = [],
   allowClubWide = false,
   open,
   editingEvent,
@@ -81,6 +82,9 @@ export default function CreateEventForm({
   onUpdated,
 }: {
   teams: Team[];
+  // Uniquement rempli côté Bureau (allowClubWide) — voir le commentaire sur
+  // la section "Bénévoles invités" plus bas.
+  benevoles?: AdminBenevole[];
   allowClubWide?: boolean;
   // Ouverture pilotee par l appelant : le bouton "+ Creer un evenement"
   // vit dans l en-tete du calendrier, a cote de la navigation de date,
@@ -165,6 +169,14 @@ export default function CreateEventForm({
   const [draftNeeds, setDraftNeeds] = useState<
     { key: number; roleCode: string; customLabel: string; count: string }[]
   >([]);
+  // Bénévoles invités à cet événement (retour de Cindy du 2026-08-25) :
+  // contrairement à draftNeeds, modifiable en édition comme à la création —
+  // le Bureau doit pouvoir ajouter/retirer un bénévole après coup. Diff
+  // calculé contre editingEvent?.benevoleIds au moment de l'enregistrement,
+  // voir handleSubmit plus bas.
+  const [selectedBenevoleIds, setSelectedBenevoleIds] = useState<string[]>(
+    () => editingEvent?.benevoleIds ?? []
+  );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -184,6 +196,7 @@ export default function CreateEventForm({
     setScopeMode("single");
     setTargetTeamIds([]);
     setDraftNeeds([]);
+    setSelectedBenevoleIds([]);
     setError(null);
   }
 
@@ -216,6 +229,10 @@ export default function CreateEventForm({
 
   function toggleTargetTeam(id: string) {
     setTargetTeamIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+  }
+
+  function toggleBenevole(id: string) {
+    setSelectedBenevoleIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
   }
 
   const isMatch = eventType === "MATCH" || eventType === "FRIENDLY";
@@ -489,6 +506,7 @@ export default function CreateEventForm({
         teamId: inserted.team_id,
         targetTeamIds: inserted.target_team_ids,
         teamName,
+        benevoleIds: allowClubWide ? selectedBenevoleIds : editingEvent.benevoleIds,
       });
     } else {
       onCreated?.([
@@ -514,6 +532,7 @@ export default function CreateEventForm({
           targetTeamIds: inserted.target_team_ids,
           teamName,
           rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
+          benevoleIds: selectedBenevoleIds,
         },
       ]);
     }
@@ -547,6 +566,43 @@ export default function CreateEventForm({
           `Événement créé, mais l'ajout des besoins d'organisation a échoué : ${needsError.message}`
         );
         return;
+      }
+    }
+
+    // Bénévoles invités : modifiable en édition (contrairement à
+    // draftNeeds ci-dessus), donc calculé en diff contre la liste déjà
+    // invitée plutôt qu'en simple insert — même garde allowClubWide que la
+    // portée (team_id/target_team_ids) plus haut, un coach n'a jamais cette
+    // section à l'écran (voir plus bas). Best-effort, comme les besoins
+    // d'organisation : une erreur ici ne doit pas laisser croire que
+    // l'événement n'a pas été créé/modifié.
+    if (!isEditing || allowClubWide) {
+      const previousBenevoleIds = editingEvent?.benevoleIds ?? [];
+      const toAdd = selectedBenevoleIds.filter((id) => !previousBenevoleIds.includes(id));
+      const toRemove = previousBenevoleIds.filter((id) => !selectedBenevoleIds.includes(id));
+      if (toAdd.length > 0) {
+        const { error: inviteError } = await supabase
+          .from("event_benevole_invites")
+          .insert(toAdd.map((benevoleId) => ({ event_id: inserted.id, benevole_id: benevoleId })));
+        if (inviteError) {
+          setError(
+            `Événement enregistré, mais l'invitation des bénévoles a échoué : ${inviteError.message}`
+          );
+          return;
+        }
+      }
+      if (toRemove.length > 0) {
+        const { error: uninviteError } = await supabase
+          .from("event_benevole_invites")
+          .delete()
+          .eq("event_id", inserted.id)
+          .in("benevole_id", toRemove);
+        if (uninviteError) {
+          setError(
+            `Événement enregistré, mais le retrait de certains bénévoles a échoué : ${uninviteError.message}`
+          );
+          return;
+        }
       }
     }
 
@@ -874,6 +930,38 @@ export default function CreateEventForm({
             <Plus className="h-3.5 w-3.5" />
             Ajouter un besoin
           </button>
+        </div>
+      )}
+
+      {/* Bénévoles invités (retour de Cindy du 2026-08-25 : "le bureau
+          devrait... pouvoir selectionner ses membres, pour que ces meme
+          membres voient l'evenement avec les besoins") — Bureau uniquement,
+          et seulement s'il existe des bénévoles enregistrés. Modifiable en
+          édition, contrairement aux besoins d'organisation ci-dessus. */}
+      {allowClubWide && benevoles.length > 0 && (
+        <div className="flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3">
+          <p className="text-xs font-medium text-zinc-600">Bénévoles invités (optionnel)</p>
+          <div className="flex flex-wrap gap-1.5">
+            {benevoles
+              .filter((b) => !b.archivedAt || selectedBenevoleIds.includes(b.id))
+              .map((b) => {
+                const checked = selectedBenevoleIds.includes(b.id);
+                return (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => toggleBenevole(b.id)}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                      checked
+                        ? "border-navy bg-navy text-white"
+                        : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-100"
+                    }`}
+                  >
+                    {b.firstName} {b.lastName}
+                  </button>
+                );
+              })}
+          </div>
         </div>
       )}
 

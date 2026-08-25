@@ -40,9 +40,17 @@ export function volunteerRoleIcon(roleCode: string): RoleIconName {
 
 export type VolunteerSignupSource = "VOLUNTEER" | "ADMIN";
 
+// playerId/benevoleId : exactement l'un des deux est renseigné, jamais les
+// deux (retour de Cindy du 2026-08-25, "besoin en bénévoles hors club") —
+// voir la contrainte event_volunteer_signups_signer_check en base.
 export type VolunteerSignup = {
   id: string;
-  playerId: string;
+  playerId: string | null;
+  benevoleId: string | null;
+  // Nom affiché, joueur ou bénévole selon lequel des deux ids ci-dessus
+  // est renseigné — gardé "playerName" (pas renommé) pour ne pas casser
+  // tous les usages existants (volunteer-needs-panel.tsx...), c'était déjà
+  // le seul nom affiché dans ce composant avant l'ajout des bénévoles.
   playerName: string;
   source: VolunteerSignupSource;
 };
@@ -95,7 +103,7 @@ export async function getVolunteerNeedsByEventId(
   if (needIds.length > 0) {
     const { data: signupRows } = await supabase
       .from("event_volunteer_signups")
-      .select("id, need_id, player_id, source")
+      .select("id, need_id, player_id, benevole_id, source")
       .in("need_id", needIds);
 
     // Noms résolus via club_member_names plutôt qu'une jointure
@@ -106,7 +114,13 @@ export async function getVolunteerNeedsByEventId(
     // 2026-08-21 (retour de Cindy : "Bénévole" persistait pour un
     // bénévole hors de l'équipe de qui consulte — capture d'écran espace
     // Parent).
-    const signupPlayerIds = [...new Set((signupRows ?? []).map((row) => row.player_id as string))];
+    const signupPlayerIds = [
+      ...new Set(
+        (signupRows ?? [])
+          .map((row) => row.player_id as string | null)
+          .filter((id): id is string => Boolean(id))
+      ),
+    ];
     const nameByPlayerId = new Map<string, string>();
     if (signupPlayerIds.length > 0) {
       const { data: nameRows } = await supabase
@@ -118,13 +132,41 @@ export async function getVolunteerNeedsByEventId(
       });
     }
 
+    // Même principe côté bénévoles (retour de Cindy du 2026-08-25) : la
+    // table benevoles elle-même n'est lisible que par le Bureau (RLS), un
+    // nom résolu ici passe donc par la même logique service_role que
+    // club_member_names contourne déjà pour les joueurs.
+    const signupBenevoleIds = [
+      ...new Set(
+        (signupRows ?? [])
+          .map((row) => row.benevole_id as string | null)
+          .filter((id): id is string => Boolean(id))
+      ),
+    ];
+    const nameByBenevoleId = new Map<string, string>();
+    if (signupBenevoleIds.length > 0) {
+      const { data: benevoleRows } = await supabase
+        .from("benevoles")
+        .select("id, first_name, last_name")
+        .in("id", signupBenevoleIds);
+      (benevoleRows ?? []).forEach((row) => {
+        nameByBenevoleId.set(row.id as string, formatPersonName(row.first_name, row.last_name));
+      });
+    }
+
     (signupRows ?? []).forEach((row) => {
       const needId = row.need_id as string;
       const list = signupsByNeedId.get(needId) ?? [];
+      const playerId = row.player_id as string | null;
+      const benevoleId = row.benevole_id as string | null;
       list.push({
         id: row.id as string,
-        playerId: row.player_id as string,
-        playerName: nameByPlayerId.get(row.player_id as string) ?? "Bénévole",
+        playerId,
+        benevoleId,
+        playerName:
+          (playerId ? nameByPlayerId.get(playerId) : null) ??
+          (benevoleId ? nameByBenevoleId.get(benevoleId) : null) ??
+          "Bénévole",
         source: (row.source as VolunteerSignupSource | null) ?? "VOLUNTEER",
       });
       signupsByNeedId.set(needId, list);

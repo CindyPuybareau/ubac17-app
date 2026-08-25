@@ -3,6 +3,7 @@ import {
   Contact,
   Flag,
   Gavel,
+  HandHeart,
   Handshake,
   Heart,
   ListOrdered,
@@ -29,9 +30,11 @@ import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import FfbbManager from "./ffbb-manager";
 import WhatsAppGroupsManager from "./whatsapp-groups-manager";
 import SponsorsManager from "./sponsors-manager";
+import BenevolesManager from "./benevoles-manager";
 import BureauDashboard from "./bureau-dashboard";
 import type { AutomationKey } from "./automation-settings";
 import type {
+  AdminBenevole,
   AdminCategoryTariff,
   AdminCollecte,
   AdminCotisation,
@@ -62,6 +65,7 @@ export default function AdminView({
   canonicalTeamRefs,
   whatsappGroups,
   sponsors,
+  benevoles,
   penalites,
   automationSettings,
   eventRoles,
@@ -81,6 +85,7 @@ export default function AdminView({
   canonicalTeamRefs: { id: string; name: string | null; category: string | null }[];
   whatsappGroups: WhatsAppGroup[];
   sponsors: AdminSponsor[];
+  benevoles: AdminBenevole[];
   penalites: AdminPenalite[];
   automationSettings: Record<AutomationKey, boolean>;
   // Catalogue des rôles d'organisation (buvette, table de marque...) et
@@ -254,6 +259,7 @@ export default function AdminView({
         <CalendarView
           events={upcomingEvents}
           createTeams={teamRefs}
+          benevoles={benevoles}
           allowClubWide
           forcedView="clubEvents"
           resultsTeams={teamRefs}
@@ -278,6 +284,7 @@ export default function AdminView({
             <CalendarView
               events={upcomingEvents}
               createTeams={teamRefs}
+              benevoles={benevoles}
               allowClubWide
               forcedView="officialMatches"
               resultsTeams={teamRefs}
@@ -293,6 +300,7 @@ export default function AdminView({
             <CalendarView
               events={upcomingEvents}
               createTeams={teamRefs}
+              benevoles={benevoles}
               allowClubWide
               forcedView="officialResults"
               resultsTeams={teamRefs}
@@ -307,6 +315,17 @@ export default function AdminView({
       label: "Sponsors",
       icon: <Handshake className={iconClass} />,
       content: <SponsorsManager sponsors={sponsors} />,
+    },
+    {
+      // Retour de Cindy du 2026-08-25 : membres non-joueurs mobilisables
+      // pour les besoins d'organisation (buvette, table de marque...) d'un
+      // événement, sans être ni joueur ni forcément parent — voir
+      // benevoles-manager.tsx et la section "Bénévoles invités" sur
+      // CreateEventForm.
+      key: "benevoles",
+      label: "Bénévoles",
+      icon: <HandHeart className={iconClass} />,
+      content: <BenevolesManager benevoles={benevoles} />,
     },
     {
       key: "ffbb",

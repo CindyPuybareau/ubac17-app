@@ -76,6 +76,21 @@ export type AdminSponsor = {
   notes: string | null;
 };
 
+// Bénévoles hors club (retour de Cindy du 2026-08-25) : ni joueur, ni
+// Bureau, parfois parent d'un joueur, parfois pas du tout — voir la
+// migration 20261027000000_benevoles.sql. Jamais de lien avec les
+// cotisations ni l'effectif d'une équipe.
+export type AdminBenevole = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  phone: string | null;
+  email: string | null;
+  notes: string | null;
+  accessToken: string;
+  archivedAt: string | null;
+};
+
 export type WhatsAppGroup = {
   id: string;
   name: string;
@@ -331,6 +346,11 @@ export type AdminUpcomingEvent = {
   // sache distinguer "personne n'a encore répondu" de "pas concerné par
   // ce module".
   presentPlayers?: { id: string; firstName: string | null; lastName: string | null }[];
+  // Bénévoles déjà invités à cet événement (retour de Cindy du 2026-08-25)
+  // — préremplit la case "Bénévoles invités" en édition, voir
+  // create-event-form.tsx. Bureau uniquement (allowClubWide) : []
+  // ailleurs, jamais rempli côté Coach/Famille/Enfant.
+  benevoleIds: string[];
 };
 
 // Un mineur ne peut jamais afficher le badge Bureau (voir bureauRole
@@ -769,6 +789,7 @@ export default async function DashboardPage() {
   let adminVolunteerNeedsByEventId: Record<string, VolunteerNeed[]> = {};
   let adminMembers: AdminMember[] = [];
   let adminSponsors: AdminSponsor[] = [];
+  let adminBenevoles: AdminBenevole[] = [];
   let adminPenalites: AdminPenalite[] = [];
   // The Membres table's team pickers (filter + "Modifier le profil") only
   // offer teams with a sort_order set — any future leftover/legacy import
@@ -819,6 +840,8 @@ export default async function DashboardPage() {
       clubSettingsRes,
       sponsorsRes,
       penalitesRes,
+      benevolesRes,
+      eventBenevoleInvitesRes,
     ] = await runBatched(
       [
         () =>
@@ -894,6 +917,15 @@ export default async function DashboardPage() {
             .from("penalites")
             .select("id, player_id, amount, notes, penalite_date, statut, paid_at, players(first_name, last_name)")
             .order("penalite_date", { ascending: false }),
+        // Bénévoles hors club (retour de Cindy du 2026-08-25) : réservé au
+        // Bureau (voir policy "admin manage benevoles"), même périmètre
+        // que sponsors ci-dessus.
+        () =>
+          supabase
+            .from("benevoles")
+            .select("id, first_name, last_name, phone, email, notes, access_token, archived_at")
+            .order("last_name"),
+        () => supabase.from("event_benevole_invites").select("event_id, benevole_id"),
       ],
       // Plafond de requêtes simultanées pour ce bloc (voir lib/batch.ts) :
       // le projet Supabase n'autorise que 15 connexions réelles au total,
@@ -1294,6 +1326,27 @@ export default async function DashboardPage() {
       notes: s.notes,
     }));
 
+    adminBenevoles = (benevolesRes.data ?? []).map((b) => ({
+      id: b.id,
+      firstName: b.first_name,
+      lastName: b.last_name,
+      phone: b.phone,
+      email: b.email,
+      notes: b.notes,
+      accessToken: b.access_token,
+      archivedAt: b.archived_at,
+    }));
+
+    // Quels bénévoles ont déjà été invités à chaque événement (retour de
+    // Cindy du 2026-08-25) — préremplit la case "Bénévoles invités" en
+    // édition, voir create-event-form.tsx.
+    const benevoleIdsByEventId = new Map<string, string[]>();
+    (eventBenevoleInvitesRes.data ?? []).forEach((row) => {
+      const list = benevoleIdsByEventId.get(row.event_id) ?? [];
+      list.push(row.benevole_id);
+      benevoleIdsByEventId.set(row.event_id, list);
+    });
+
     adminPenalites = (penalitesRes.data ?? []).map((p) => {
       const player = p.players as unknown as {
         first_name: string | null;
@@ -1341,6 +1394,7 @@ export default async function DashboardPage() {
         targetTeamIds: e.target_team_ids ?? null,
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, teamsById),
         rsvpCounts: buildRsvpCounts(rsvpsByEvent, e.id, rosterSize),
+        benevoleIds: benevoleIdsByEventId.get(e.id) ?? [],
       };
     });
 
@@ -1891,6 +1945,7 @@ export default async function DashboardPage() {
         targetTeamIds: e.target_team_ids ?? null,
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, clubTeamById),
         rsvpCounts: buildRsvpCounts(rsvpsByEvent, e.id, rosterSize),
+        benevoleIds: [],
       };
     });
 
@@ -2198,6 +2253,7 @@ export default async function DashboardPage() {
         targetTeamIds: e.target_team_ids ?? null,
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, teamsById),
         rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
+        benevoleIds: [],
       };
     });
 
@@ -2414,6 +2470,7 @@ export default async function DashboardPage() {
           canonicalTeamRefs={canonicalTeamRefs}
           whatsappGroups={whatsappGroups}
           sponsors={adminSponsors}
+          benevoles={adminBenevoles}
           penalites={adminPenalites}
           automationSettings={adminAutomationSettings}
           eventRoles={eventRoleTypes}

@@ -102,7 +102,13 @@ export default function VolunteerNeedsPanel({
               ...n,
               signups: [
                 ...n.signups,
-                { id: data.id, playerId: myPlayerIds[0], playerName: "", source: "VOLUNTEER" },
+                {
+                  id: data.id,
+                  playerId: myPlayerIds[0],
+                  benevoleId: null,
+                  playerName: "",
+                  source: "VOLUNTEER",
+                },
               ],
             }
           : n
@@ -220,7 +226,7 @@ export default function VolunteerNeedsPanel({
           const label = volunteerRoleLabel(need.roleCode, need.customLabel);
           const icon = volunteerRoleIcon(need.roleCode);
           const remaining = remainingSlots(need);
-          const mySignup = need.signups.find((s) => myPlayerIds.includes(s.playerId));
+          const mySignup = need.signups.find((s) => s.playerId != null && myPlayerIds.includes(s.playerId));
 
           return (
             <div key={need.id} className="flex flex-col gap-2 rounded-lg bg-white px-3 py-2.5">
