@@ -3,8 +3,24 @@ import { Clock, ListOrdered, Shield } from "lucide-react";
 import { formatEventTime, homeAwayLabel } from "@/app/dashboard/event-style";
 import { parseMatchTitle } from "@/lib/match-display";
 import { sortTeamsByGroup, teamLabel } from "@/lib/teams";
+import MatchResultCelebration from "@/components/match-result-celebration";
 import { EventRow } from "./child-calendar-tab";
 import type { ChildEvent } from "./child-dashboard";
+
+// Même règle que côté Bureau/Coach/Famille (calendar-view.tsx) : victoire
+// dans les 5 derniers jours -> confettis. Ici, contrairement au Bureau,
+// tout ce qui s'affiche dans l'espace Enfant est déjà l'équipe de l'enfant
+// — pas besoin d'un flag "celebrateWins" par appelant, c'est toujours
+// activé. Extrait au niveau du module (pas dans le corps du composant)
+// pour respecter react-hooks/purity (Date.now() n'est pas pur).
+function isRecentWin(event: { teamScore: number | null; opponentScore: number | null; startTime: string }) {
+  return (
+    event.teamScore !== null &&
+    event.opponentScore !== null &&
+    event.teamScore > event.opponentScore &&
+    Date.now() - new Date(event.startTime).getTime() < 5 * 24 * 60 * 60 * 1000
+  );
+}
 
 // Même code couleur que MatchScore côté Bureau/Coach (victoire/défaite/nul)
 // mais en lecture seule : aucun enfant ne peut jamais modifier un score.
@@ -26,7 +42,10 @@ function ResultRow({ event }: { event: ChildEvent }) {
         : "bg-zinc-100 text-zinc-600";
 
   return (
-    <div className="flex items-center justify-between gap-2 rounded-xl bg-zinc-50 px-3 py-2">
+    <div className="relative flex items-center justify-between gap-2 overflow-hidden rounded-xl bg-zinc-50 px-3 py-2">
+      {alreadyPlayed && (
+        <MatchResultCelebration eventId={event.id} isWin={isRecentWin(event)} enabled />
+      )}
       <div className="flex min-w-0 flex-col">
         <span className="truncate text-sm font-medium text-zinc-800">{opponent}</span>
         {/* Retour de Cindy du 2026-08-22 : côté Joueur, l'heure du match

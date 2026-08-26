@@ -193,6 +193,7 @@ export default function FamilyView({
             carpoolByEventId={carpoolByEventId}
             eventRoles={eventRoles}
             volunteerNeedsByEventId={volunteerNeedsByEventId}
+            celebrateWins
           />
           <CalendarSubscribe />
           <ChildAccessManager />
@@ -262,6 +263,7 @@ export default function FamilyView({
           forcedView="clubEvents"
           resultsTeams={visibleResultsTeams.map((t) => ({ ...t, role: "PLAYER" as const }))}
           volunteerNeedsByEventId={volunteerNeedsByEventId}
+          celebrateWins
         />
       ),
     },
@@ -285,6 +287,7 @@ export default function FamilyView({
               forcedView="officialMatches"
               resultsTeams={visibleResultsTeams.map((t) => ({ ...t, role: "PLAYER" as const }))}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
+              celebrateWins
             />
           ),
         },
@@ -299,6 +302,7 @@ export default function FamilyView({
               forcedView="officialResults"
               resultsTeams={visibleResultsTeams.map((t) => ({ ...t, role: "PLAYER" as const }))}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
+              celebrateWins
             />
           ),
         },

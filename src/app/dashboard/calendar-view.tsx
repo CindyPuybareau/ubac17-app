@@ -69,6 +69,7 @@ import VolunteerNeedsPanel from "./volunteer-needs-panel";
 import type { VolunteerNeed } from "./event-volunteer-needs";
 import ConfirmDialog from "./confirm-dialog";
 import OrganisationCard from "./organisation-card";
+import MatchResultCelebration from "@/components/match-result-celebration";
 
 const emptyEventTasks: EventTasksState = {};
 const emptyVolunteerNeeds: VolunteerNeed[] = [];
@@ -89,6 +90,21 @@ function pillLabel(event: AdminUpcomingEvent) {
 function startOfTodayMs() {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+}
+
+// Fonction ordinaire, hors du corps d'un composant, même raison que
+// startOfTodayMs ci-dessus (react-hooks/purity : Date.now() appelé en
+// plein rendu est signalé, pas quand il vit dans un simple helper de
+// module). Une victoire "fraîche" seulement (retour de Cindy du 26/08,
+// confettis) — 5 jours couvre large une saisie de score en retard sans
+// rester "périmé" jusqu'au week-end suivant.
+function isRecentWin(event: { teamScore: number | null; opponentScore: number | null; start_time: string }) {
+  return (
+    event.teamScore !== null &&
+    event.opponentScore !== null &&
+    event.teamScore > event.opponentScore &&
+    Date.now() - new Date(event.start_time).getTime() < 5 * 24 * 60 * 60 * 1000
+  );
 }
 
 function toKey(d: Date) {
@@ -264,6 +280,7 @@ export default function CalendarView({
   resultsTeamSelector = "pills",
   resultsTeams,
   benevoles = [],
+  celebrateWins = false,
 }: {
   events: AdminUpcomingEvent[];
   createTeams?: CalendarTeamRef[];
@@ -331,6 +348,14 @@ export default function CalendarView({
   // Liste des bénévoles du club, transmise telle quelle à CreateEventForm
   // (section "Bénévoles invités") — vide partout sauf côté Bureau.
   benevoles?: AdminBenevole[];
+  // Confettis sur un match gagné (retour de Cindy du 26/08) — réservé à
+  // l'équipe gagnante (Coach de cette équipe, Famille/Enfant des joueurs
+  // concernés) : jamais côté Bureau, qui voit tous les matchs de toutes
+  // les équipes et perdrait le côté personnel de la célébration. Ce
+  // composant ne sait pas lui-même qui regarde — c'est à l'appelant
+  // (coach-view.tsx, family-view.tsx : true ; admin-view.tsx : jamais
+  // passé, donc false) de trancher.
+  celebrateWins?: boolean;
 }) {
   // Recalculés à chaque rendu (pas au chargement du module) : un onglet
   // Bureau laissé ouvert toute la nuit gardait sinon la pastille "jour
@@ -1040,14 +1065,20 @@ export default function CalendarView({
     // match selon l'onglet où on le regarde.
     const isTournament = event.event_type === "TOURNAMENT";
     const isOfficialMatch = event.event_type === "MATCH";
+    // relative overflow-hidden ajoutés (retour de Cindy du 26/08, confettis
+    // sur un match gagné) : contient le canvas de ConfettiBurst, posé en
+    // absolute inset-0, dans les coins arrondis de la carte plutôt que de
+    // déborder par-dessus les cartes voisines.
     const cardShellClass = isTournament
-      ? "rounded-2xl border-2 border-dashed border-ubac-yellow bg-white p-4 shadow-sm"
+      ? "relative overflow-hidden rounded-2xl border-2 border-dashed border-ubac-yellow bg-white p-4 shadow-sm"
       : isOfficialMatch
-        ? `rounded-2xl border border-navy/15 bg-white p-4 shadow-sm border-l-8 ${style.border}`
-        : `rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm border-l-4 ${style.border}`;
-
+        ? `relative overflow-hidden rounded-2xl border border-navy/15 bg-white p-4 shadow-sm border-l-8 ${style.border}`
+        : `relative overflow-hidden rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm border-l-4 ${style.border}`;
     return (
       <div key={event.id} className={`flex flex-col gap-1.5 ${cardShellClass}`}>
+        {alreadyPlayed && (
+          <MatchResultCelebration eventId={event.id} isWin={isRecentWin(event)} enabled={celebrateWins} />
+        )}
         {/* Retour de Cindy du 2026-08-22 : reprend le visuel déjà en place
             pour "Prochains événements" (team-card.tsx) plutôt qu'un
             nouveau traitement — date en badge bleu bien visible en haut à

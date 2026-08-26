@@ -168,6 +168,7 @@ export default function CoachView({
             selfPlayerId={ownPlayerId}
             eventRoles={eventRoles}
             volunteerNeedsByEventId={volunteerNeedsByEventId}
+            celebrateWins
           />
           {/* Même bloc que l'espace parent : un coach a lui aussi son
               propre agenda, et être coach ne devrait pas le priver de cet
@@ -310,6 +311,7 @@ export default function CoachView({
           // mélangent dans un seul fil.
           resultsTeams={resultsTeamsForCalendar}
           volunteerNeedsByEventId={volunteerNeedsByEventId}
+          celebrateWins
         />
       ),
     },
@@ -336,6 +338,7 @@ export default function CoachView({
               forcedView="officialMatches"
               resultsTeams={resultsTeamsForCalendar}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
+              celebrateWins
             />
           ),
         },
@@ -352,6 +355,7 @@ export default function CoachView({
               forcedView="officialResults"
               resultsTeams={resultsTeamsForCalendar}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
+              celebrateWins
             />
           ),
         },
