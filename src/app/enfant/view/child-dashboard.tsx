@@ -271,13 +271,15 @@ export default function ChildDashboard({
       ],
     },
     {
-      // Retour de Cindy du 25/08 : Charte du Joueur + Règlement Intérieur
-      // (pas la Charte du Parent, qui ne concerne pas l'enfant directement)
-      // — voir @/components/club-documents.tsx.
+      // Retour de Cindy du 26/08 : les 3 documents sur tous les espaces
+      // sauf Bénévoles (Règlement Intérieur seul là-bas) — voir
+      // @/components/club-documents.tsx.
       key: "documents",
       label: "Documents",
       icon: <ScrollText className={iconClass} />,
-      content: <DocumentsPanel documentIds={["charte-joueur", "reglement-interieur"]} />,
+      content: (
+        <DocumentsPanel documentIds={["charte-joueur", "charte-parent", "reglement-interieur"]} />
+      ),
     },
     {
       // Tout à la fin du menu (retour de Cindy du 2026-08-22) — déplacé

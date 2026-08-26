@@ -364,13 +364,15 @@ export default function CoachView({
       content: <CoachFfbb teams={teams} teamRoleByTeamId={teamRoleByTeamId} />,
     },
     {
-      // Retour de Cindy du 25/08 : Règlement Intérieur pour tous les
-      // espaces — voir club-documents.tsx pour le contenu et la
-      // répartition par rôle.
+      // Retour de Cindy du 26/08 : les 3 documents sur tous les espaces
+      // sauf Bénévoles (Règlement Intérieur seul là-bas) — voir
+      // club-documents.tsx.
       key: "documents",
       label: "Documents",
       icon: <ScrollText className={iconClass} />,
-      content: <DocumentsPanel documentIds={["reglement-interieur"]} />,
+      content: (
+        <DocumentsPanel documentIds={["charte-joueur", "charte-parent", "reglement-interieur"]} />
+      ),
     },
     {
       // Un lien externe, pas un onglet de contenu (voir href sur AdminSection).
