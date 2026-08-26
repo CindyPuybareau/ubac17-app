@@ -2623,8 +2623,15 @@ export default async function DashboardPage() {
               <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">
                 Bonjour
               </p>
+              {/* Retour de Cindy du 26/08 ("je vois son adresse mail à la
+                  place de son prénom") : profile.first_name vide (fiche
+                  Basile incomplète) affichait l'e-mail brut en toutes
+                  lettres dans la bannière — pas juste moche, une vraie
+                  fuite d'info dans un encart bien visible. Repli générique
+                  plutôt que l'e-mail ; le vrai correctif reste de
+                  compléter le prénom sur la fiche du membre (Membres). */}
               <h1 className="truncate text-xl font-bold text-white sm:text-2xl">
-                {profile?.first_name ? formatFirstName(profile.first_name) : user.email}
+                {profile?.first_name ? formatFirstName(profile.first_name) : "adhérent·e"}
               </h1>
             </div>
           </div>
