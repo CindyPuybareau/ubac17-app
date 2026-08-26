@@ -627,6 +627,12 @@ export default async function DashboardPage() {
   // équipe coachée ni accès Bureau, donc zéro onglet — voir le
   // commentaire sur ownPlayerRowResult plus haut.
   const ownPlayerRow = ownPlayerRowResult.data as PlayerRow | null;
+  // Prénom affiché dans le bandeau "Bonjour" (retour de Cindy du 26/08) :
+  // profile.first_name (compte de connexion) d'abord, puis la propre fiche
+  // joueur si elle existe (ownPlayerRow, cas Basile : coach dont le compte
+  // n'a jamais eu de prénom renseigné, mais dont la fiche joueur si) —
+  // jamais l'e-mail au bout de cette chaîne.
+  const displayFirstName = profile?.first_name ?? ownPlayerRow?.first_name ?? null;
   const playerRows =
     ownPlayerRow && !childPlayerRows.some((p) => p.id === ownPlayerRow.id)
       ? [...childPlayerRows, ownPlayerRow]
@@ -2618,20 +2624,22 @@ export default async function DashboardPage() {
             grille/flex fragile. */}
         <div className="relative mx-auto flex w-full max-w-[1600px] flex-col gap-3 sm:min-h-[3.5rem] sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-3">
-            <AvatarUpload userId={user.id} avatarUrl={profile?.avatar_url ?? null} name={profile?.first_name ?? null} size="lg" />
+            <AvatarUpload userId={user.id} avatarUrl={profile?.avatar_url ?? null} name={displayFirstName} size="lg" />
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">
                 Bonjour
               </p>
               {/* Retour de Cindy du 26/08 ("je vois son adresse mail à la
-                  place de son prénom") : profile.first_name vide (fiche
-                  Basile incomplète) affichait l'e-mail brut en toutes
-                  lettres dans la bannière — pas juste moche, une vraie
-                  fuite d'info dans un encart bien visible. Repli générique
-                  plutôt que l'e-mail ; le vrai correctif reste de
-                  compléter le prénom sur la fiche du membre (Membres). */}
+                  place de son prénom") : profile.first_name (le COMPTE de
+                  connexion) était vide pour Basile, alors que sa FICHE
+                  joueur (players, vérifié par Cindy — "basile a bien son
+                  prenom") l'avait bien. Deux tables distinctes : ownPlayerRow
+                  (players où profile_id = user.id, déjà chargé plus haut
+                  pour "Mon espace") sert désormais de repli avant le
+                  générique "adhérent·e" — jamais l'e-mail, qui n'a plus sa
+                  place ici. Voir displayFirstName, calculé plus haut. */}
               <h1 className="truncate text-xl font-bold text-white sm:text-2xl">
-                {profile?.first_name ? formatFirstName(profile.first_name) : "adhérent·e"}
+                {displayFirstName ? formatFirstName(displayFirstName) : "adhérent·e"}
               </h1>
             </div>
           </div>
