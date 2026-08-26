@@ -656,8 +656,21 @@ export default function CalendarView({
     const rsvpCounts = event.rsvpCounts;
     const hasRoster =
       rsvpCounts.present + rsvpCounts.absent + rsvpCounts.late + rsvpCounts.pending > 0;
+    // Bug trouvé le 26/08 (retour de Cindy : "je ne peux pas me porter
+    // volontaire pour l'arbitrage" sur un stage ciblant U13M via
+    // "Équipes spécifiques") : cette liste ne regardait QUE event.teamId,
+    // l'équipe unique d'un match classique — vide pour un événement à
+    // équipes spécifiques (event.targetTeamIds, une liste), donc AUCUN
+    // enfant n'y apparaissait jamais comme "concerné", même membre d'une
+    // des équipes ciblées. Touchait RSVP, tâches et besoins d'organisation
+    // à la fois, pour toutes les familles, sur tout événement à équipes
+    // spécifiques.
     const respondingPlayers = rsvp
-      ? rsvp.players.filter((p) => event.teamId && p.teamIds.includes(event.teamId))
+      ? rsvp.players.filter(
+          (p) =>
+            (event.teamId && p.teamIds.includes(event.teamId)) ||
+            (event.targetTeamIds?.some((id) => p.teamIds.includes(id)) ?? false)
+        )
       : [];
     const mailto = relanceMailto(event);
     const homeAway = isMatchType(event.event_type) ? homeAwayLabel(event.isHome) : null;
