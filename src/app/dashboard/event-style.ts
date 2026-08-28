@@ -24,37 +24,47 @@ export const EVENT_TYPE_OPTIONS: { value: string; label: string }[] = [
 // événement club (fourre-tout chaleureux).
 const typeStyles: Record<
   string,
-  { pill: string; border: string; badge: string; label: string }
+  { pill: string; border: string; badge: string; label: string; dot: string }
 > = {
   MATCH: {
     pill: "bg-navy/10 text-navy",
     border: "border-l-navy",
     badge: "bg-navy/10 text-navy",
     label: "Match officiel",
+    // Couleur pleine, jamais la teinte pastel du pill (retour de Cindy du
+    // 28/08, "on ne voit pas assez les petits points du calendrier") : une
+    // pastille de 6px en bg-navy/10 est quasi invisible sur fond blanc —
+    // ce que pill doit rester pour porter du texte devient illisible seul.
+    // Même teinte que border (déjà pleine, jamais transparente).
+    dot: "bg-navy",
   },
   FRIENDLY: {
     pill: "bg-sky-100 text-sky-700",
     border: "border-l-sky-400",
     badge: "bg-sky-100 text-sky-700",
     label: "Match amical",
+    dot: "bg-sky-400",
   },
   TOURNAMENT: {
     pill: "bg-ubac-yellow/15 text-ubac-yellow-dark",
     border: "border-l-ubac-yellow",
     badge: "bg-ubac-yellow/15 text-ubac-yellow-dark",
     label: "Tournoi / Plateau",
+    dot: "bg-ubac-yellow",
   },
   OTHER: {
     pill: "bg-parquet/15 text-parquet-dark",
     border: "border-l-parquet",
     badge: "bg-parquet/15 text-parquet-dark",
     label: "Événement club",
+    dot: "bg-parquet",
   },
   TRAINING: {
     pill: "bg-court-green/10 text-court-green",
     border: "border-l-court-green",
     badge: "bg-court-green/10 text-court-green",
     label: "Entraînement",
+    dot: "bg-court-green",
   },
 };
 

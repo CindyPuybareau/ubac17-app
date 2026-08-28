@@ -2698,44 +2698,44 @@ export default async function DashboardPage() {
             -translate-x-1/2) centrée sur ce conteneur relatif lui-même :
             un centrage géométrique garanti, indépendant de tout calcul de
             grille/flex fragile. */}
-        <div className="relative mx-auto flex w-full max-w-[1600px] flex-col gap-3 sm:min-h-[3.5rem] sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 items-center gap-3">
-            <AvatarUpload userId={user.id} avatarUrl={profile?.avatar_url ?? null} name={displayFirstName} size="lg" />
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">
-                Bonjour
-              </p>
-              {/* Retour de Cindy du 26/08 ("je vois son adresse mail à la
-                  place de son prénom") : profile.first_name (le COMPTE de
-                  connexion) était vide pour Basile, alors que sa FICHE
-                  joueur (players, vérifié par Cindy — "basile a bien son
-                  prenom") l'avait bien. Deux tables distinctes : ownPlayerRow
-                  (players où profile_id = user.id, déjà chargé plus haut
-                  pour "Mon espace") sert désormais de repli avant le
-                  générique "adhérent·e" — jamais l'e-mail, qui n'a plus sa
-                  place ici. Voir displayFirstName, calculé plus haut. */}
-              <h1 className="truncate text-xl font-bold text-white sm:text-2xl">
-                {displayFirstName ? formatFirstName(displayFirstName) : "adhérent·e"}
-              </h1>
+        <div className="relative mx-auto flex w-full max-w-[1600px] flex-col gap-3 sm:min-h-[3.5rem]">
+          {/* Retour de Cindy du 28/08 ("le menu hamburger doit se trouver
+              en haut à droite de l'écran sur smartphone") : ce duo
+              photo/icônes vivait auparavant à même le conteneur externe,
+              lequel passait en flex-col sous le seuil sm — le menu se
+              retrouvait alors sur sa PROPRE ligne, empilé sous la
+              photo/le prénom, au milieu de l'en-tête plutôt qu'à son coin
+              supérieur droit. Sorti dans sa propre ligne toujours en
+              flex-row (quelle que soit la largeur d'écran) : le menu est
+              au bord droit de l'écran dès le premier rendu. Le conteneur
+              externe reste en flex-col — c'est lui qui empile cette ligne
+              et le bandeau "Cette semaine" en dessous sur mobile. */}
+          <div className="flex w-full flex-row items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <AvatarUpload userId={user.id} avatarUrl={profile?.avatar_url ?? null} name={displayFirstName} size="lg" />
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">
+                  Bonjour
+                </p>
+                {/* Retour de Cindy du 26/08 ("je vois son adresse mail à la
+                    place de son prénom") : profile.first_name (le COMPTE de
+                    connexion) était vide pour Basile, alors que sa FICHE
+                    joueur (players, vérifié par Cindy — "basile a bien son
+                    prenom") l'avait bien. Deux tables distinctes : ownPlayerRow
+                    (players où profile_id = user.id, déjà chargé plus haut
+                    pour "Mon espace") sert désormais de repli avant le
+                    générique "adhérent·e" — jamais l'e-mail, qui n'a plus sa
+                    place ici. Voir displayFirstName, calculé plus haut. */}
+                <h1 className="truncate text-xl font-bold text-white sm:text-2xl">
+                  {displayFirstName ? formatFirstName(displayFirstName) : "adhérent·e"}
+                </h1>
+              </div>
             </div>
-          </div>
-          {/* Retour de Cindy du 2026-08-25 : organigramme et notifications
-              restent à gauche (inchangé), seul le menu ⋮ doit rejoindre le
-              bord droit sur mobile — ml-auto uniquement sur son propre
-              conteneur, pas sur toute la ligne. Cette ligne d'icônes
-              elle-même s'étire déjà sur toute la largeur sous sm (le
-              parent est en flex-col, donc en align-items: stretch par
-              défaut), ml-auto pousse donc le menu vers la droite de cette
-              largeur sans déplacer les deux autres icônes. Neutralisé dès
-              sm (ml-0) : la ligne entière se retrouve alors déjà au bord
-              droit du header (sm:justify-between sur le parent), le menu
-              n'a plus besoin d'être poussé à l'intérieur d'elle. */}
-          <div className="flex shrink-0 items-center gap-1">
-            <OrgChartButton />
-            <NotificationBell />
-            <span className="ml-auto sm:ml-0">
+            <div className="flex shrink-0 items-center gap-1">
+              <OrgChartButton />
+              <NotificationBell />
               <MobileMenuButton />
-            </span>
+            </div>
           </div>
           {/* Bandeau "Cette semaine" (retour de Cindy/Sandrine Manzelle du
               2026-08-24) : jamais pour le Bureau, voir showHeaderWeekBanner

@@ -1414,7 +1414,7 @@ export default function CalendarView({
                     {visible.map((e) => (
                       <span
                         key={e.id}
-                        className={`h-1.5 w-1.5 shrink-0 rounded-full ${styleFor(e.event_type).pill.split(" ")[0]}`}
+                        className={`h-1.5 w-1.5 shrink-0 rounded-full ${styleFor(e.event_type).dot}`}
                       />
                     ))}
                     {dayBirthdays.length > 0 && (

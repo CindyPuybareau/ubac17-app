@@ -37,6 +37,15 @@ export default function RsvpButtons({
   }, [eventId, currentStatus]);
 
   async function respond(newStatus: "PRESENT" | "ABSENT") {
+    // Affichage optimiste (retour de Cindy du 28/08, "l'affichage au clic
+    // est trop long") : le bouton changeait d'apparence seulement une fois
+    // l'aller-retour serveur terminé, ressenti comme un bouton qui traîne
+    // sur un réseau mobile capricieux — même correctif déjà en place
+    // ailleurs dans l'appli (volunteer-needs-panel.tsx, match-tasks-
+    // panel.tsx). Le statut précédent revient si l'écriture échoue
+    // réellement (voir le rollback dans le if plus bas).
+    const previousStatus = status;
+    setStatus(newStatus);
     setLoading(true);
     setError(null);
     const supabase = createClient();
@@ -58,18 +67,15 @@ export default function RsvpButtons({
       // Cindy du 2026-08-20 (même famille de bug que event_tasks/
       // volunteer_needs, un refus RLS non couvert affiché comme une panne
       // générique impossible à diagnostiquer depuis l'appli).
+      setStatus(previousStatus);
       setError(writeError.message);
-      return;
     }
 
-    // Le bouton lui-même se met déjà à jour ci-dessus (setStatus) : pas
-    // besoin d'un router.refresh() ici pour SON propre affichage. rsvps
-    // est surveillée en temps réel (realtime-sync.tsx) — la garder en plus
-    // rechargeait toute la page une deuxième fois pour un seul clic,
-    // ressenti comme un délai (retour de Cindy du 2026-08-20, même
-    // correctif que volunteer-needs-panel.tsx). Le temps réel se charge de
-    // répercuter le changement sur le reste de la page (compteurs...).
-    setStatus(newStatus);
+    // Pas de router.refresh() ici : rsvps est surveillée en temps réel
+    // (realtime-sync.tsx) — la garder en plus rechargeait toute la page
+    // une deuxième fois pour un seul clic, ressenti comme un délai (retour
+    // de Cindy du 2026-08-20). Le temps réel se charge de répercuter le
+    // changement sur le reste de la page (compteurs...).
   }
 
   return (

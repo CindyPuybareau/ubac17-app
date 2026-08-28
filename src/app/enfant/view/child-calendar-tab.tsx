@@ -251,7 +251,7 @@ export default function ChildCalendarTab({
                       {visible.map((e) => (
                         <span
                           key={e.id}
-                          className={`h-1.5 w-1.5 shrink-0 rounded-full ${styleFor(e.eventType).pill.split(" ")[0]}`}
+                          className={`h-1.5 w-1.5 shrink-0 rounded-full ${styleFor(e.eventType).dot}`}
                         />
                       ))}
                       {dayBirthdays.length > 0 && (
