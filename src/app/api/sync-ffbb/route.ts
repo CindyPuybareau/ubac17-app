@@ -23,7 +23,11 @@ export async function POST(request: Request) {
   // compteurs à 0, indistinguable d'une synchro qui n'a simplement rien
   // trouvé de neuf. Vérifié explicitement ici pour renvoyer un vrai 403.
   const [{ data: coachRow }, { data: adminRow }] = await Promise.all([
-    supabase.from("team_coaches").select("team_id").eq("team_id", teamId).eq("profile_id", user.id).maybeSingle(),
+    // Retour d'audit du 28/08 : team_coaches n'a pas de colonne
+    // "profile_id" (c'est "coach_id" partout ailleurs dans le code) —
+    // PostgREST rejetait cette requête pour TOUS les coachs, qui
+    // tombaient donc systématiquement sur le 403 juste en dessous.
+    supabase.from("team_coaches").select("team_id").eq("team_id", teamId).eq("coach_id", user.id).maybeSingle(),
     supabase.from("club_administrators").select("email").eq("email", (user.email ?? "").toLowerCase()).maybeSingle(),
   ]);
   if (!coachRow && !adminRow) {

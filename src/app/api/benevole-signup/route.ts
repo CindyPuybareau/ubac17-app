@@ -34,6 +34,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
 
+  // Retour d'audit du 28/08 : contrairement aux deux autres portes du même
+  // flux (benevole/[token]/route.ts, benevole/view/page.tsx), cette route
+  // ne revérifiait jamais l'archivage — un bénévole retiré par le Bureau
+  // gardait, tant que son cookie restait valide (jusqu'à 400 jours), le
+  // droit de s'inscrire/se désinscrire des besoins.
+  const { data: benevoleRow } = await supabase
+    .from("benevoles")
+    .select("archived_at")
+    .eq("id", benevoleId)
+    .maybeSingle();
+  if (!benevoleRow || benevoleRow.archived_at) {
+    return NextResponse.json({ error: "Session invalide." }, { status: 401 });
+  }
+
   // Le bénévole ne doit voir/agir que sur un besoin d'un événement où il a
   // été explicitement invité — même garde-fou que la vérification faite
   // pour construire la liste affichée (benevole-view.tsx), refait ici

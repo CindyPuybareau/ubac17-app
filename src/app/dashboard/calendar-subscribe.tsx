@@ -35,12 +35,13 @@ export default function CalendarSubscribe() {
           if (!cancelled) setToken(null);
           return;
         }
-        const { data } = await supabase
-          .from("profiles")
-          .select("calendar_token")
-          .eq("id", userData.user.id)
-          .maybeSingle();
-        if (!cancelled) setToken((data?.calendar_token as string | null) ?? null);
+        // Passe par my_calendar_token() plutôt qu'une lecture directe de
+        // profiles.calendar_token (retour d'audit du 28/08) : la colonne
+        // n'est plus lisible par personne, même son propre titulaire, en
+        // dehors de cette fonction (voir la migration
+        // 20261028010000_lock_down_profile_secrets.sql).
+        const { data } = await supabase.rpc("my_calendar_token");
+        if (!cancelled) setToken((data as string | null) ?? null);
       } catch {
         // Un raté réseau ne doit jamais laisser le bloc bloqué en
         // "chargement" pour toujours : mieux vaut proposer de générer le

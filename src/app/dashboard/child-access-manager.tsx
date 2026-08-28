@@ -41,15 +41,20 @@ export default function ChildAccessManager() {
       return;
     }
 
-    const [profileRes, linksRes] = await Promise.all([
-      supabase.from("profiles").select("family_access_code").eq("id", user.id).maybeSingle(),
+    // Passe par my_family_access_code() plutôt qu'une lecture directe de
+    // profiles.family_access_code (retour d'audit du 28/08) : la colonne
+    // n'est plus lisible par personne, même son propre titulaire, en
+    // dehors de cette fonction (voir la migration
+    // 20261028010000_lock_down_profile_secrets.sql).
+    const [codeRes, linksRes] = await Promise.all([
+      supabase.rpc("my_family_access_code"),
       supabase
         .from("parent_player")
         .select("players(id, first_name, profile_id, pin_set_at)")
         .eq("parent_id", user.id),
     ]);
 
-    setCode((profileRes.data?.family_access_code as string | null) ?? null);
+    setCode((codeRes.data as string | null) ?? null);
 
     const kids = (linksRes.data ?? [])
       .map((l) => l.players as unknown as { id: string; first_name: string | null; profile_id: string | null; pin_set_at: string | null } | null)
