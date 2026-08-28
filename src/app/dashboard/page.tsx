@@ -2059,11 +2059,54 @@ export default async function DashboardPage() {
                   .from("teams")
                   .select("id, name, category, ffbb_url, sort_order, pending_coach_names")
                   .in("id", allTeamIds),
-              () =>
-                supabase
+              // Retour d'audit du 28/08 : un embed direct sur players()
+              // ouvrait, via la policy RLS "parent select teammates of own
+              // child teams", toute la fiche du coéquipier (notes
+              // médicales, adresse, téléphones des parents) à qui
+              // interrogeait l'API directement — la RLS filtre des lignes,
+              // jamais des colonnes. Ce embed passe maintenant par
+              // family_teammate_roster, une vue qui n'expose que les
+              // colonnes déjà utilisées ici (id/prénom/nom/naissance/
+              // catégorie), même principe que teammate_names ailleurs
+              // dans ce fichier. La policy RLS d'origine a été supprimée
+              // (voir 20261029000000_family_teammate_roster_view.sql).
+              async () => {
+                const linksRes = await supabase
                   .from("team_players")
-                  .select("team_id, players(id, first_name, last_name, birth_date, category)")
-                  .in("team_id", allTeamIds),
+                  .select("team_id, player_id")
+                  .in("team_id", allTeamIds);
+                const uniquePlayerIds = Array.from(
+                  new Set((linksRes.data ?? []).map((r) => r.player_id))
+                );
+                const rosterRes =
+                  uniquePlayerIds.length > 0
+                    ? await supabase
+                        .from("family_teammate_roster")
+                        .select("id, first_name, last_name, birth_date, category")
+                        .in("id", uniquePlayerIds)
+                    : { data: [] as {
+                        id: string;
+                        first_name: string | null;
+                        last_name: string | null;
+                        birth_date: string | null;
+                        category: string | null;
+                      }[] };
+                const rosterById = new Map(
+                  (rosterRes.data ?? []).map((p) => [p.id, p])
+                );
+                return {
+                  data: (linksRes.data ?? [])
+                    .map((r) => ({
+                      team_id: r.team_id,
+                      players: rosterById.get(r.player_id) ?? null,
+                    }))
+                    // Une fiche que family_teammate_roster ne renvoie pas
+                    // (cas normalement impossible ici, tous ces joueurs
+                    // sont bien coéquipiers d'un enfant du foyer) ne doit
+                    // pas produire une ligne fantôme sans nom.
+                    .filter((r) => r.players !== null),
+                };
+              },
               () =>
                 supabase
                   .from("team_coaches")
