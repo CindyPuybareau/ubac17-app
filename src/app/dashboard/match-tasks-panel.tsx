@@ -139,15 +139,27 @@ export default function MatchTasksPanel({
     // fonctions d'écriture de ce fichier.
   }
 
-  async function withdraw(taskType: TaskType) {
+  // expectedPlayerId (retour d'audit du 28/08) : sans lui, un retrait ne
+  // filtrait que sur (event_id, task_type) — si le coach venait de
+  // réattribuer ce rôle à quelqu'un d'autre juste avant qu'un clic parti
+  // avec des props un peu périmées n'arrive, ce clic effaçait la
+  // NOUVELLE attribution du coach au lieu de ne rien faire. En le
+  // filtrant aussi sur le joueur attendu, une réattribution entre-temps
+  // fait échouer silencieusement le retrait plutôt que d'effacer la
+  // mauvaise ligne.
+  async function withdraw(taskType: TaskType, expectedPlayerId?: string) {
     setPending(taskType);
     setLocalTasks((prev) => ({ ...prev, [taskType]: null }));
     const supabase = createClient();
-    await supabase
+    let query = supabase
       .from("event_tasks")
       .delete()
       .eq("event_id", eventId)
       .eq("task_type", taskType);
+    if (expectedPlayerId) {
+      query = query.eq("player_id", expectedPlayerId);
+    }
+    await query;
     setPending(null);
   }
 
@@ -386,12 +398,24 @@ export default function MatchTasksPanel({
                 // déroulant lui-même, un décalage visuel trompeur.
                 value={assignment?.playerId ?? ""}
                 disabled={pending === taskType}
-                onChange={(e) => assign(taskType, e.target.value)}
+                onChange={(e) => {
+                  // Retour d'audit du 28/08 : la seule option vide était
+                  // désactivée, donc un rôle attribué par erreur ne
+                  // pouvait être QUE réattribué à quelqu'un d'autre —
+                  // jamais remis à "Non attribué". assign() ignorait de
+                  // toute façon une valeur vide (voir son garde-fou
+                  // `if (!playerId) return;`), donc ce choix ne faisait
+                  // jusqu'ici rien du tout.
+                  const value = e.target.value;
+                  if (value) {
+                    assign(taskType, value);
+                  } else {
+                    withdraw(taskType, assignment?.playerId);
+                  }
+                }}
                 className="w-full rounded-full border border-zinc-200 bg-white px-2.5 py-2 text-xs disabled:opacity-60 sm:w-auto"
               >
-                <option value="" disabled>
-                  Choisir...
-                </option>
+                <option value="">Non attribué</option>
                 {roster.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
@@ -416,7 +440,7 @@ export default function MatchTasksPanel({
               <button
                 type="button"
                 disabled={pending === taskType}
-                onClick={() => withdraw(taskType)}
+                onClick={() => withdraw(taskType, assignment?.playerId)}
                 className="flex w-fit shrink-0 items-center justify-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-60"
               >
                 <X className="h-3 w-3" />
