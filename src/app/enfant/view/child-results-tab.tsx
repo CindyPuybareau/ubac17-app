@@ -44,7 +44,11 @@ function ResultRow({ event }: { event: ChildEvent }) {
   return (
     <div className="relative flex items-center justify-between gap-2 overflow-hidden rounded-xl bg-zinc-50 px-3 py-2">
       {alreadyPlayed && (
-        <MatchResultCelebration eventId={event.id} isWin={isRecentWin(event)} enabled />
+        <MatchResultCelebration
+          resultKey={`${event.id}:${event.teamScore}-${event.opponentScore}`}
+          isWin={isRecentWin(event)}
+          enabled
+        />
       )}
       <div className="flex min-w-0 flex-col">
         <span className="truncate text-sm font-medium text-zinc-800">{opponent}</span>

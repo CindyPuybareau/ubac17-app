@@ -1073,9 +1073,10 @@ export default function CalendarView({
     const isTournament = event.event_type === "TOURNAMENT";
     const isOfficialMatch = event.event_type === "MATCH";
     // relative overflow-hidden ajoutés (retour de Cindy du 26/08, confettis
-    // sur un match gagné) : contient le canvas de ConfettiBurst, posé en
-    // absolute inset-0, dans les coins arrondis de la carte plutôt que de
-    // déborder par-dessus les cartes voisines.
+    // sur un match gagné). Corrigé le 28/08 (retour "quelque chose de
+    // wahou") : ConfettiBurst se pose en position:fixed plein écran, pas
+    // dans les coins de cette carte — ces classes n'ont donc plus d'effet
+    // sur son affichage, seulement sur le reste du contenu de la carte.
     const cardShellClass = isTournament
       ? "relative overflow-hidden rounded-2xl border-2 border-dashed border-ubac-yellow bg-white p-4 shadow-sm"
       : isOfficialMatch
@@ -1084,7 +1085,11 @@ export default function CalendarView({
     return (
       <div key={event.id} className={`flex flex-col gap-1.5 ${cardShellClass}`}>
         {alreadyPlayed && (
-          <MatchResultCelebration eventId={event.id} isWin={isRecentWin(event)} enabled={celebrateWins} />
+          <MatchResultCelebration
+            resultKey={`${event.id}:${event.teamScore}-${event.opponentScore}`}
+            isWin={isRecentWin(event)}
+            enabled={celebrateWins}
+          />
         )}
         {/* Retour de Cindy du 2026-08-22 : reprend le visuel déjà en place
             pour "Prochains événements" (team-card.tsx) plutôt qu'un
