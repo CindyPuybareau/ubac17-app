@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { CHILD_SESSION_COOKIE, verifyChildSession } from "@/lib/child-session";
+import { teamOrClubWideFilter } from "@/app/dashboard/family-data";
 
 // Seule écriture possible depuis l'Espace Enfant, volontairement réduite
 // au strict minimum : un accusé de lecture ("cet enfant a vu cette
@@ -23,9 +24,17 @@ export async function POST() {
     .eq("player_id", playerId);
   const teamIds = (ownTeamLinks ?? []).map((t) => t.team_id);
 
-  const query = supabase.from("notifications").select("id").order("created_at", { ascending: false }).limit(200);
-  const { data: notifRows } =
-    teamIds.length > 0 ? await query.or(`team_id.is.null,team_id.in.(${teamIds.join(",")})`) : await query.is("team_id", null);
+  // Retour d'audit du 28/08 : team_id.is.null seul traitait à tort une
+  // notification ciblant plusieurs équipes précises (target_team_ids)
+  // comme "tout le club" — cette route marquait comme lues des alertes
+  // hors des équipes de l'enfant, en plus de celles réellement affichées
+  // (même correctif que enfant/view/page.tsx et notifications_for_me).
+  const { data: notifRows } = await supabase
+    .from("notifications")
+    .select("id")
+    .order("created_at", { ascending: false })
+    .limit(200)
+    .or(teamOrClubWideFilter(teamIds));
 
   const notifIds = (notifRows ?? []).map((n) => n.id);
   if (notifIds.length === 0) {
