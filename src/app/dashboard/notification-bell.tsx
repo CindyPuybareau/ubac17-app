@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Bell, CalendarDays } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { teamLabel } from "@/lib/teams";
@@ -36,18 +36,41 @@ export default function NotificationBell() {
   // réseau. Ce ref se positionne avant même le premier "await", donc un
   // second load() qui démarre entre-temps le voit déjà et s'arrête net.
   const loadingRef = useRef(false);
+  // File d'un seul rafraîchissement (retour d'audit du 28/08) : le garde-
+  // fou ci-dessus avalait purement et simplement un load() qui arrivait
+  // pendant qu'un autre était déjà en vol — si le tick des 60s partait une
+  // fraction de seconde avant le load() de toggleOpen() (juste après
+  // mark_all_notifications_read), ce dernier ne faisait plus rien, et le
+  // badge non-lu restait affiché jusqu'au tick suivant alors que tout
+  // venait d'être marqué lu. refreshQueuedRef mémorise qu'un rafraîchissement
+  // supplémentaire est dû et le relance une fois le premier terminé, sans
+  // empiler plusieurs appels au-delà de celui-là.
+  const refreshQueuedRef = useRef(false);
 
-  async function load() {
-    if (loadingRef.current) return;
+  // useCallback + boucle plutôt qu'un rappel récursif de load() elle-même
+  // (retour d'audit du 28/08, ajusté pour le React Compiler qui refuse de
+  // mémoïser une fonction qui s'auto-référence) : tant qu'un rafraîchissement
+  // supplémentaire a été demandé pendant l'appel en cours (refreshQueuedRef),
+  // on relance immédiatement l'appel réseau avant de relâcher loadingRef —
+  // même résultat que la récursion, sans que load() ait besoin de se
+  // connaître elle-même.
+  const load = useCallback(async () => {
+    if (loadingRef.current) {
+      refreshQueuedRef.current = true;
+      return;
+    }
     loadingRef.current = true;
     try {
-      const supabase = createClient();
-      const { data } = await supabase.rpc("notifications_for_me", { p_limit: 30 });
-      setNotifications((data as NotificationRow[] | null) ?? []);
+      do {
+        refreshQueuedRef.current = false;
+        const supabase = createClient();
+        const { data } = await supabase.rpc("notifications_for_me", { p_limit: 30 });
+        setNotifications((data as NotificationRow[] | null) ?? []);
+      } while (refreshQueuedRef.current);
     } finally {
       loadingRef.current = false;
     }
-  }
+  }, []);
 
   useEffect(() => {
     load();
@@ -56,7 +79,7 @@ export default function NotificationBell() {
     // le compteur non-lu est sans conséquence pour ce genre d'alerte.
     const interval = setInterval(load, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [load]);
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {

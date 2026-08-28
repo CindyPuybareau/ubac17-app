@@ -721,11 +721,17 @@ export default async function DashboardPage() {
   // besoin d'une requête de plus, juste retrouver sa propre entrée. Rien
   // à afficher si son équipe est déjà une équipe coachée (déjà couverte
   // par sa propre carte juste au-dessus, pas de doublon).
+  // Retour d'audit du 28/08 : un événement ciblant plusieurs équipes
+  // précises (target_team_ids) n'a pas de team_id — la déduplication ne
+  // jouait donc jamais pour ce genre d'événement, et un coach dont une
+  // équipe coachée est ciblée voyait sa propre carte deux fois (sa carte
+  // joueur ci-dessous + la carte de son équipe coachée juste au-dessus).
   const ownPlayerNextEvent =
     convocationCards.find(
       (c) =>
         c.player.id === ownPlayerId &&
-        !(c.event.team_id && coachedTeamIds.has(c.event.team_id))
+        !(c.event.team_id && coachedTeamIds.has(c.event.team_id)) &&
+        !c.event.target_team_ids?.some((id) => coachedTeamIds.has(id))
     ) ?? null;
 
   type WhatsAppGroupRow = {
