@@ -106,7 +106,18 @@ export default function PenalitesManager({
       penalite_date: form.penaliteDate || todayIso(),
       notes: form.notes.trim() || null,
       statut: form.statut,
-      paid_at: form.statut === "PAYE" ? new Date().toISOString() : null,
+      // Retour d'audit du 28/08 : new Date() inconditionnel réécrivait la
+      // date de paiement à chaque modification, même pour corriger juste
+      // les notes d'une pénalité déjà payée — l'historique de paiement
+      // était perdu sans avertissement. Ne se déclenche plus que lors du
+      // vrai passage à "Payée" ; une pénalité qui reste "Payée" garde sa
+      // date d'origine.
+      paid_at:
+        form.statut !== "PAYE"
+          ? null
+          : editing !== "new" && editing && editing.statut === "PAYE"
+            ? editing.paidAt
+            : new Date().toISOString(),
     };
     const { error: writeError } =
       editing !== "new" && editing

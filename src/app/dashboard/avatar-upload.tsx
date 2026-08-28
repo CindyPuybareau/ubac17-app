@@ -55,41 +55,50 @@ export default function AvatarUpload({
     setUploading(true);
     setError(null);
     const supabase = createClient();
-    // Recadré en carré et réencodé en WebP (retour d'audit du 2026-08-25,
-    // "format .gif non optimisé") : jamais affiché à plus de 96px, pas
-    // besoin d'envoyer le fichier d'origine tel quel — voir image-resize.ts.
-    const { blob, ext } = await resizeImageForAvatar(file);
-    // Toujours le même nom par utilisateur (upsert) : une nouvelle photo
-    // remplace l'ancienne au lieu d'accumuler des fichiers orphelins dans
-    // le bucket.
-    const path = `${userId}/avatar.${ext}`;
-    const { error: uploadError } = await supabase.storage
-      .from("avatars")
-      .upload(path, blob, { upsert: true, cacheControl: "3600", contentType: blob.type || file.type });
-    if (uploadError) {
+    // try/finally (retour d'audit du 28/08, même motif que le bouton de
+    // connexion bloqué du 18/08) : resizeImageForAvatar n'était couvert
+    // par aucun filet — un fichier corrompu ou trop volumineux pour le
+    // canvas laissait "uploading" à true pour toujours, bouton figé
+    // jusqu'au rechargement complet, sans aucun message.
+    try {
+      // Recadré en carré et réencodé en WebP (retour d'audit du 2026-08-25,
+      // "format .gif non optimisé") : jamais affiché à plus de 96px, pas
+      // besoin d'envoyer le fichier d'origine tel quel — voir image-resize.ts.
+      const { blob, ext } = await resizeImageForAvatar(file);
+      // Toujours le même nom par utilisateur (upsert) : une nouvelle photo
+      // remplace l'ancienne au lieu d'accumuler des fichiers orphelins dans
+      // le bucket.
+      const path = `${userId}/avatar.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(path, blob, { upsert: true, cacheControl: "3600", contentType: blob.type || file.type });
+      if (uploadError) {
+        setError("Envoi impossible, réessaie.");
+        return;
+      }
+      const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+      // Casse le cache navigateur : même chemin de fichier qu'avant (upsert),
+      // sans ce paramètre l'ancienne photo resterait affichée après un
+      // remplacement.
+      const bustedUrl = `${data.publicUrl}?t=${Date.now()}`;
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ avatar_url: bustedUrl })
+        .eq("id", userId);
+      if (updateError) {
+        setError("Enregistrement impossible, réessaie.");
+        return;
+      }
+      // Affiché tout de suite, sans attendre router.refresh() ci-dessous
+      // (voir commentaire plus haut) — c'est ce qui rendait le changement de
+      // photo si lent à se voir.
+      setLocalAvatarUrl(bustedUrl);
+      router.refresh();
+    } catch {
+      setError("Image illisible, réessaie avec une autre photo.");
+    } finally {
       setUploading(false);
-      setError("Envoi impossible, réessaie.");
-      return;
     }
-    const { data } = supabase.storage.from("avatars").getPublicUrl(path);
-    // Casse le cache navigateur : même chemin de fichier qu'avant (upsert),
-    // sans ce paramètre l'ancienne photo resterait affichée après un
-    // remplacement.
-    const bustedUrl = `${data.publicUrl}?t=${Date.now()}`;
-    const { error: updateError } = await supabase
-      .from("profiles")
-      .update({ avatar_url: bustedUrl })
-      .eq("id", userId);
-    setUploading(false);
-    if (updateError) {
-      setError("Enregistrement impossible, réessaie.");
-      return;
-    }
-    // Affiché tout de suite, sans attendre router.refresh() ci-dessous
-    // (voir commentaire plus haut) — c'est ce qui rendait le changement de
-    // photo si lent à se voir.
-    setLocalAvatarUrl(bustedUrl);
-    router.refresh();
   }
 
   const initial = name?.trim()?.[0]?.toUpperCase() ?? "?";

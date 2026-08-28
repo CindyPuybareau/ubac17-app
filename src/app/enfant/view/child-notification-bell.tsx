@@ -52,7 +52,12 @@ export default function ChildNotificationBell({
   async function toggleOpen() {
     const next = !open;
     setOpen(next);
-    if (next && unreadCount > 0) {
+    // Retour d'audit du 28/08 : sans `enabled`, ouvrir la cloche par
+    // curiosité pendant que les notifications sont désactivées (l'écran
+    // n'affiche alors que "Notifications désactivées.") marquait quand
+    // même tout comme lu — les alertes étaient consommées sans jamais
+    // avoir été vues, aucune pastille au moment de la réactivation.
+    if (next && unreadCount > 0 && enabled) {
       setMarking(true);
       try {
         const res = await fetch("/api/child-notifications/read-all", { method: "POST", credentials: "same-origin" });

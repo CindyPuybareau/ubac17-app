@@ -73,6 +73,13 @@ import MatchResultCelebration from "@/components/match-result-celebration";
 
 const emptyEventTasks: EventTasksState = {};
 const emptyVolunteerNeeds: VolunteerNeed[] = [];
+// Constante de module, comme les deux ci-dessus — retour d'audit du 28/08 :
+// `carpoolByEventId[event.id] ?? []` recréait un tableau neuf à chaque
+// rendu de CalendarView, ce qui redéclenchait l'effet de synchronisation
+// de MatchTasksPanel (dépendance [initialCarpool]) et effaçait la
+// proposition de covoiturage affichée de façon optimiste jusqu'au retour
+// serveur suivant.
+const emptyCarpool: CarpoolOffer[] = [];
 
 // Ré-exportés : beaucoup d'écrans les importent historiquement d'ici, et
 // ce fichier reste le point d'entrée naturel du calendrier.
@@ -999,7 +1006,7 @@ export default function CalendarView({
                   myPlayerIds={rsvpVisiblePlayers.map((p) => p.id)}
                   canAssignAnyone={false}
                   initialTasks={tasksByEventId[event.id] ?? emptyEventTasks}
-                  initialCarpool={carpoolByEventId[event.id] ?? []}
+                  initialCarpool={carpoolByEventId[event.id] ?? emptyCarpool}
                   roles={rolesForEventType(eventRoles, event.event_type)}
                   showCarpool={shouldOfferCarpool(event)}
                   bare

@@ -199,12 +199,18 @@ export default function MatchTasksPanel({
     const supabase = createClient();
     const departureTime = timeInput ? combineDateAndTime(eventDate, timeInput) : null;
     const meetingPoint = meetingPointInput.trim() || null;
+    // Retour d'audit du 28/08 : lorsqu'on MODIFIE une offre existante (myOffer
+    // déjà présent), écrire toujours sur myPlayerIds[0] pouvait cibler un
+    // autre enfant du foyer que celui qui a réellement proposé le trajet —
+    // deux offres au lieu d'une seule mise à jour. Seule une NOUVELLE offre
+    // (myOffer absent) retombe sur le premier enfant, faute d'un autre choix.
+    const offerPlayerId = myOffer?.playerId ?? myPlayerIds[0];
     const { data, error: writeError } = await supabase
       .from("event_carpool_offers")
       .upsert(
         {
           event_id: eventId,
-          player_id: myPlayerIds[0],
+          player_id: offerPlayerId,
           seats,
           departure_time: departureTime,
           meeting_point: meetingPoint,
@@ -227,8 +233,8 @@ export default function MatchTasksPanel({
       const existing = prev.find((o) => o.id === data.id);
       const patched: CarpoolOffer = {
         id: data.id,
-        playerId: myPlayerIds[0],
-        playerName: rosterName(myPlayerIds[0]),
+        playerId: offerPlayerId,
+        playerName: rosterName(offerPlayerId),
         seats,
         departureTime,
         meetingPoint,
@@ -243,11 +249,15 @@ export default function MatchTasksPanel({
     setPending("carpool");
     setLocalCarpool((prev) => prev.filter((o) => !myPlayerIds.includes(o.playerId)));
     const supabase = createClient();
+    // Retour d'audit du 28/08 : supprimait toujours l'offre de
+    // myPlayerIds[0], même quand le trajet avait été enregistré sous un
+    // AUTRE enfant du foyer (myOffer) — le delete ne correspondait à rien
+    // et l'offre revenait au rafraîchissement suivant.
     await supabase
       .from("event_carpool_offers")
       .delete()
       .eq("event_id", eventId)
-      .eq("player_id", myPlayerIds[0]);
+      .eq("player_id", myOffer?.playerId ?? myPlayerIds[0]);
     setPending(null);
   }
 
@@ -291,12 +301,18 @@ export default function MatchTasksPanel({
     );
   }
 
-  async function cancelReservation(offerId: string) {
+  // Retour d'audit du 28/08 : prenait toujours myPlayerIds[0], alors que la
+  // réservation à annuler peut appartenir à N'IMPORTE LEQUEL des enfants du
+  // foyer sur CET événement précis — le bouton "Annuler" ne supprimait
+  // souvent rien (ligne disparue à l'écran, revenue au rafraîchissement).
+  // playerId vient maintenant de myReservation, déjà calculé au bon endroit
+  // (par offre) dans le rendu ci-dessous.
+  async function cancelReservation(offerId: string, playerId: string) {
     setPending(`cancel:${offerId}`);
     setLocalCarpool((prev) =>
       prev.map((o) =>
         o.id === offerId
-          ? { ...o, reservations: o.reservations.filter((r) => r.playerId !== myPlayerIds[0]) }
+          ? { ...o, reservations: o.reservations.filter((r) => r.playerId !== playerId) }
           : o
       )
     );
@@ -305,7 +321,7 @@ export default function MatchTasksPanel({
       .from("event_carpool_reservations")
       .delete()
       .eq("offer_id", offerId)
-      .eq("player_id", myPlayerIds[0]);
+      .eq("player_id", playerId);
     setPending(null);
   }
 
@@ -585,7 +601,7 @@ export default function MatchTasksPanel({
                           <button
                             type="button"
                             disabled={pending === `cancel:${offer.id}`}
-                            onClick={() => cancelReservation(offer.id)}
+                            onClick={() => cancelReservation(offer.id, myReservation.playerId)}
                             className="rounded-full border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-500 hover:bg-zinc-50 disabled:opacity-60"
                           >
                             Annuler

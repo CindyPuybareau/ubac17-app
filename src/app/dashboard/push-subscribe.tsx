@@ -39,6 +39,12 @@ export default function PushSubscribe() {
       typeof window === "undefined" ||
       !("serviceWorker" in navigator) ||
       !("PushManager" in window) ||
+      // Retour d'audit du 28/08 : Notification.permission était lu juste
+      // en dessous sans que l'API Notification elle-même ait été vérifiée
+      // — sur un navigateur qui a serviceWorker/PushManager mais pas
+      // Notification, l'effet levait et le composant restait bloqué en
+      // "checking" (aucun rendu, ligne 121), sans explication.
+      !("Notification" in window) ||
       !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
     ) {
       setState(isIosNotInstalled() ? "ios-not-installed" : "unsupported");

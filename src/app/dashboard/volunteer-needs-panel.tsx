@@ -123,14 +123,29 @@ export default function VolunteerNeedsPanel({
     // rafraîchissement, légèrement différé, reste plus rapide que deux.
   }
 
+  // Retour d'audit du 28/08 : contrairement à volunteer()/addNeed(),
+  // withdraw/removeNeed/updateRequiredCount ignoraient le retour de
+  // Supabase — un refus RLS effaçait quand même la ligne à l'écran, sans
+  // message, avant qu'elle ne revienne silencieusement au rafraîchissement
+  // temps réel suivant. Rollback explicite de la copie locale en cas
+  // d'échec, comme le reste du fichier.
   async function withdraw(signupId: string) {
     setPending(signupId);
+    setError(null);
+    const previous = localNeeds;
     setLocalNeeds((prev) =>
       prev.map((n) => ({ ...n, signups: n.signups.filter((s) => s.id !== signupId) }))
     );
     const supabase = createClient();
-    await supabase.from("event_volunteer_signups").delete().eq("id", signupId);
+    const { error: deleteError } = await supabase
+      .from("event_volunteer_signups")
+      .delete()
+      .eq("id", signupId);
     setPending(null);
+    if (deleteError) {
+      setLocalNeeds(previous);
+      setError("Désinscription impossible, réessaie.");
+    }
   }
 
   // Confirmation déplacée dans removeNeedTarget + le <ConfirmDialog> rendu
@@ -140,23 +155,44 @@ export default function VolunteerNeedsPanel({
   async function removeNeed(needId: string) {
     setRemoveNeedTarget(null);
     setPending(needId);
+    setError(null);
+    const previous = localNeeds;
     setLocalNeeds((prev) => prev.filter((n) => n.id !== needId));
     const supabase = createClient();
-    await supabase.from("event_volunteer_needs").delete().eq("id", needId);
+    const { error: deleteError } = await supabase.from("event_volunteer_needs").delete().eq("id", needId);
     setPending(null);
+    if (deleteError) {
+      setLocalNeeds(previous);
+      setError("Suppression impossible, réessaie.");
+    }
   }
 
   async function updateRequiredCount(needId: string, count: number) {
     if (count < 1) return;
+    setError(null);
+    const previous = localNeeds;
     setLocalNeeds((prev) =>
       prev.map((n) => (n.id === needId ? { ...n, requiredCount: count } : n))
     );
     const supabase = createClient();
-    await supabase.from("event_volunteer_needs").update({ required_count: count }).eq("id", needId);
+    const { error: updateError } = await supabase
+      .from("event_volunteer_needs")
+      .update({ required_count: count })
+      .eq("id", needId);
+    if (updateError) {
+      setLocalNeeds(previous);
+      setError("Modification impossible, réessaie.");
+    }
   }
 
   async function addNeed() {
-    const count = Number(newCount) || 1;
+    // Retour d'audit du 28/08 : `Number("-3") || 1` vaut -3 (un nombre
+    // négatif est "truthy"), envoyé tel quel vers l'insert et rejeté
+    // seulement par la contrainte `check (required_count > 0)` en base,
+    // avec le message Postgres brut affiché tel quel — même correctif que
+    // match-tasks-panel.tsx (proposeOffer) pour le covoiturage.
+    const rawCount = Number(newCount);
+    const count = Number.isFinite(rawCount) && rawCount > 0 ? rawCount : 1;
     const trimmedCustom = newCustomLabel.trim();
     if (newRoleCode === CUSTOM_ROLE_CODE && !trimmedCustom) {
       setError("Précise le nom de ce besoin.");
