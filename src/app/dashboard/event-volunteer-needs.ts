@@ -132,10 +132,13 @@ export async function getVolunteerNeedsByEventId(
       });
     }
 
-    // Même principe côté bénévoles (retour de Cindy du 2026-08-25) : la
-    // table benevoles elle-même n'est lisible que par le Bureau (RLS), un
-    // nom résolu ici passe donc par la même logique service_role que
-    // club_member_names contourne déjà pour les joueurs.
+    // Même principe côté bénévoles (retour d'audit du 28/08, même bug déjà
+    // corrigé côté joueurs le 21/08 via club_member_names) : la table
+    // benevoles elle-même n'est lisible que par le Bureau (RLS) — pour un
+    // Coach ou une Famille, une lecture directe renvoie 0 ligne (refus
+    // silencieux) et le nom retombait sur "Bénévole". club_benevole_names
+    // est une vue club-wide, prénom/nom seulement, lisible par tous les
+    // comptes connectés.
     const signupBenevoleIds = [
       ...new Set(
         (signupRows ?? [])
@@ -146,7 +149,7 @@ export async function getVolunteerNeedsByEventId(
     const nameByBenevoleId = new Map<string, string>();
     if (signupBenevoleIds.length > 0) {
       const { data: benevoleRows } = await supabase
-        .from("benevoles")
+        .from("club_benevole_names")
         .select("id, first_name, last_name")
         .in("id", signupBenevoleIds);
       (benevoleRows ?? []).forEach((row) => {
