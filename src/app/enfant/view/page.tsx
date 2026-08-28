@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { createServiceClient } from "@/lib/supabase/service";
 import { CHILD_SESSION_COOKIE, verifyChildSession } from "@/lib/child-session";
 import { computePlayerYearStatus } from "@/lib/season";
+import { teamOrClubWideFilter } from "@/app/dashboard/family-data";
 import ChildDashboard, {
   type ChildAttendanceStats,
   type ChildCoach,
@@ -77,9 +78,14 @@ export default async function ChildViewPage() {
       ? supabase
           .from("events")
           .select(
-            "id, title, event_type, is_home, location, salle, start_time, end_time, team_id, team_score, opponent_score, teams(name), collectes(id)"
+            "id, title, event_type, is_home, location, salle, start_time, end_time, team_id, target_team_ids, team_score, opponent_score, teams(name), collectes(id)"
           )
-          .in("team_id", teamIds)
+          // Retour d'audit du 28/08 : un événement club ciblant plusieurs
+          // équipes précises (target_team_ids) n'a pas de team_id — un
+          // simple .in("team_id", teamIds) le rendait invisible ici, alors
+          // qu'il apparaît normalement côté Famille/Coach (voir
+          // teamOrClubWideFilter, déjà utilisé là-bas).
+          .or(teamOrClubWideFilter(teamIds))
           .order("start_time", { ascending: true })
       : Promise.resolve({ data: [] as never[] }),
   ]);
@@ -157,6 +163,7 @@ export default async function ChildViewPage() {
     start_time: string;
     end_time: string | null;
     team_id: string | null;
+    target_team_ids: string[] | null;
     team_score: number | null;
     opponent_score: number | null;
     teams: { name: string | null } | null;
@@ -172,6 +179,7 @@ export default async function ChildViewPage() {
     startTime: e.start_time,
     endTime: e.end_time,
     teamId: e.team_id,
+    targetTeamIds: e.target_team_ids,
     teamName: e.teams?.name ?? null,
     teamScore: e.team_score,
     opponentScore: e.opponent_score,
@@ -227,7 +235,14 @@ export default async function ChildViewPage() {
   // mélangés ici, même ceux jamais convoqués à ce rendez-vous précis.
   const nextEventTeammateIds = nextEvent
     ? new Set(
-        teammateRows.filter((r) => r.team_id === nextEvent.teamId).map((r) => r.players?.id).filter(Boolean)
+        teammateRows
+          .filter(
+            (r) =>
+              r.team_id === nextEvent.teamId ||
+              (nextEvent.targetTeamIds?.includes(r.team_id) ?? false)
+          )
+          .map((r) => r.players?.id)
+          .filter(Boolean)
       )
     : new Set<string | undefined>();
   const nextEventAttendance = nextEvent
@@ -259,10 +274,12 @@ export default async function ChildViewPage() {
       .select("id, team_id, title, body, created_at, teams(name)")
       .order("created_at", { ascending: false })
       .limit(30);
-    const { data: notifRows } =
-      teamIds.length > 0
-        ? await notifQuery.or(`team_id.is.null,team_id.in.(${teamIds.join(",")})`)
-        : await notifQuery.is("team_id", null);
+    // Retour d'audit du 28/08 : team_id.is.null seul traitait à tort une
+    // notification ciblant plusieurs équipes précises (target_team_ids)
+    // comme "tout le club" — tous les enfants la recevaient, y compris
+    // hors cible. Même filtre que côté Famille/Coach (notifications_for_me)
+    // et que la requête events ci-dessus.
+    const { data: notifRows } = await notifQuery.or(teamOrClubWideFilter(teamIds));
 
     const notifIds = (notifRows ?? []).map((n) => n.id);
     const { data: readRows } =

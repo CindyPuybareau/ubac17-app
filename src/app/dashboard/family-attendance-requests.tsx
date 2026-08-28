@@ -20,10 +20,19 @@ function pendingRequests(
     .filter((e) => new Date(e.start_time).getTime() >= now)
     .sort((a, b) => a.start_time.localeCompare(b.start_time))
     .map((event) => {
-      // Un événement club (teamId null) concerne toute la famille.
-      const concerned = event.teamId
-        ? players.filter((p) => p.teamIds.includes(event.teamId as string))
-        : players;
+      // Un événement club (teamId et targetTeamIds null) concerne toute la
+      // famille ; un événement ciblant des équipes précises via
+      // targetTeamIds (retour d'audit du 28/08, même bug que
+      // respondingPlayers de calendar-view.tsx) ne doit concerner que les
+      // enfants de CES équipes-là, pas toute la famille.
+      const concerned =
+        event.teamId || event.targetTeamIds
+          ? players.filter(
+              (p) =>
+                (event.teamId && p.teamIds.includes(event.teamId)) ||
+                (event.targetTeamIds?.some((id) => p.teamIds.includes(id)) ?? false)
+            )
+          : players;
       // Seuls les enfants sans réponse : une fois répondu, la demande est
       // satisfaite et le bandeau n'a plus lieu d'insister.
       const waiting = concerned.filter((p) => {

@@ -25,6 +25,12 @@ import type { VolunteerNeed } from "./event-volunteer-needs";
 import type { AdminUpcomingEvent } from "./page";
 
 const emptyEventTasks: EventTasksState = {};
+// Retour d'audit du 28/08 : `?? []` recréait un tableau neuf à chaque
+// rendu, ce qui redéclenchait l'effet de synchronisation de
+// MatchTasksPanel (dépendance [initialCarpool]) et effaçait la
+// proposition de covoiturage affichée de façon optimiste — même
+// correctif que calendar-view.tsx (emptyCarpool).
+const emptyCarpool: CarpoolOffer[] = [];
 
 export type CoachTeamMatchCard = {
   team: { id: string; name: string | null; category: string | null };
@@ -128,7 +134,7 @@ function PlanningTab({
             counts={item.card.counts}
             roster={item.card.roster}
             tasks={item.card.event ? (tasksByEventId[item.card.event.id] ?? emptyEventTasks) : emptyEventTasks}
-            carpool={item.card.event ? (carpoolByEventId[item.card.event.id] ?? []) : []}
+            carpool={item.card.event ? (carpoolByEventId[item.card.event.id] ?? emptyCarpool) : emptyCarpool}
             volunteerNeeds={item.card.event ? (volunteerNeedsByEventId[item.card.event.id] ?? []) : []}
             rsvpStatusByKey={rsvpStatusByKey}
             rsvpReasonByKey={rsvpReasonByKey}
@@ -152,7 +158,7 @@ function PlanningTab({
             // qu'il ne verra jamais.
             roster={[]}
             tasks={tasksByEventId[item.card.event.id] ?? emptyEventTasks}
-            carpool={carpoolByEventId[item.card.event.id] ?? []}
+            carpool={carpoolByEventId[item.card.event.id] ?? emptyCarpool}
             roles={roles}
             volunteerNeeds={volunteerNeedsByEventId[item.card.event.id] ?? []}
           />
@@ -282,8 +288,13 @@ function BilanTeamTable({
   // seule une réponse donnée dit quelque chose sur l'assiduité réelle.
   const pastEvents = useMemo(() => {
     const nowMs = Date.now();
+    // Retour d'audit du 28/08 : un événement ciblant cette équipe via
+    // targetTeamIds (pas teamId) était ignoré ici, sous-évaluant le bilan
+    // d'assiduité des joueurs sur ce genre d'événement.
     return events.filter(
-      (e) => e.teamId === team.id && new Date(e.start_time).getTime() < nowMs
+      (e) =>
+        (e.teamId === team.id || (e.targetTeamIds?.includes(team.id) ?? false)) &&
+        new Date(e.start_time).getTime() < nowMs
     );
   }, [events, team.id]);
 
@@ -498,9 +509,16 @@ export default function CoachOrganisation({
     : sortedTeams[0]?.id;
   const visibleCards =
     sortedTeams.length > 1 ? cards.filter((c) => c.team.id === activeTeamIdResolved) : cards;
+  // Retour d'audit du 28/08 : un coach à plusieurs équipes (ex. Basile)
+  // perdait de vue, quelle que soit la pastille d'équipe sélectionnée, un
+  // événement ciblant plusieurs équipes précises via targetTeamIds.
   const visibleUpcomingEvents =
-    sortedTeams.length > 1
-      ? upcomingEvents.filter((e) => e.teamId === activeTeamIdResolved)
+    sortedTeams.length > 1 && activeTeamIdResolved
+      ? upcomingEvents.filter(
+          (e) =>
+            e.teamId === activeTeamIdResolved ||
+            (e.targetTeamIds?.includes(activeTeamIdResolved) ?? false)
+        )
       : upcomingEvents;
 
   if (cards.length === 0) {

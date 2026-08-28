@@ -120,7 +120,12 @@ export default function ChildResultsTab({
           (e) =>
             shownMode === "officialMatches" || new Date(e.startTime).getTime() < new Date().getTime()
         )
-        .filter((e) => sortedTeams.length <= 1 || e.teamId === activeTeamIdResolved)
+        .filter(
+          (e) =>
+            sortedTeams.length <= 1 ||
+            e.teamId === activeTeamIdResolved ||
+            (activeTeamIdResolved ? (e.targetTeamIds?.includes(activeTeamIdResolved) ?? false) : false)
+        )
         .sort((a, b) => a.startTime.localeCompare(b.startTime)),
     [events, shownMode, sortedTeams, activeTeamIdResolved]
   );

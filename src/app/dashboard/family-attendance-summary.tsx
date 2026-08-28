@@ -19,10 +19,18 @@ export default function FamilyAttendanceSummary({
   const now = Date.now();
 
   const stats = players.map((p) => {
+    // Retour d'audit du 28/08 : !e.teamId seul traitait à tort un
+    // événement ciblant des équipes précises (targetTeamIds) comme
+    // "toute la famille" — le bilan comptait des rendez-vous hors des
+    // équipes réelles de l'enfant.
     const past = events.filter(
       (e) =>
         new Date(e.start_time).getTime() < now &&
-        (!e.teamId || p.teamIds.includes(e.teamId))
+        (e.teamId
+          ? p.teamIds.includes(e.teamId)
+          : e.targetTeamIds
+            ? e.targetTeamIds.some((id) => p.teamIds.includes(id))
+            : true)
     );
     let present = 0;
     let total = 0;

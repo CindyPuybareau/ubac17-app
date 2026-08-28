@@ -1376,7 +1376,18 @@ export default async function DashboardPage() {
         name: string | null;
         category: string | null;
       } | null;
-      const rosterSize = team ? rosterByTeam.get(team.id)?.length ?? 0 : 0;
+      // Retour d'audit du 28/08 : un événement ciblant plusieurs équipes
+      // précises (target_team_ids) n'a pas de teamId — rosterSize tombait
+      // à 0, "pending" affichait 0 et le bandeau "Demander les présences"
+      // croyait à tort que tout le monde avait répondu. Effectif = union
+      // (dédupliquée) des rosters de toutes les équipes ciblées.
+      const rosterSize = team
+        ? rosterByTeam.get(team.id)?.length ?? 0
+        : e.target_team_ids
+          ? new Set(
+              e.target_team_ids.flatMap((id: string) => (rosterByTeam.get(id) ?? []).map((p) => p.id))
+            ).size
+          : 0;
       const paidInfo = resolvePaidInfo(e.collectes);
       return {
         id: e.id,
@@ -1927,7 +1938,16 @@ export default async function DashboardPage() {
         name: string | null;
         category: string | null;
       } | null;
-      const rosterSize = team ? rosterByTeam.get(team.id)?.length ?? 0 : 0;
+      // Même correctif que le bloc Bureau ci-dessus (retour d'audit du
+      // 28/08) : effectif = union dédupliquée des rosters des équipes
+      // ciblées pour un événement multi-équipes (teamId null).
+      const rosterSize = team
+        ? rosterByTeam.get(team.id)?.length ?? 0
+        : e.target_team_ids
+          ? new Set(
+              e.target_team_ids.flatMap((id: string) => (rosterByTeam.get(id) ?? []).map((p) => p.id))
+            ).size
+          : 0;
       const paidInfo = resolvePaidInfo(e.collectes);
       return {
         id: e.id,
@@ -2331,11 +2351,24 @@ export default async function DashboardPage() {
 
     // Compteurs (déjà affichés en pastilles) ET liste nominative des
     // présents (nouveau) : les deux se lisent dans la même donnée, pas la
-    // peine de les calculer séparément. Un événement club-wide (teamId
-    // null, ex. stage d'été) n'a pas d'effectif d'équipe : ni pastille ni
-    // liste, comme avant ce correctif.
+    // peine de les calculer séparément. Un événement club-wide (teamId ET
+    // targetTeamIds null, ex. stage d'été) n'a pas d'effectif d'équipe :
+    // ni pastille ni liste, comme avant ce correctif. Un événement ciblant
+    // des équipes précises (targetTeamIds, retour d'audit du 28/08) prend
+    // l'union dédupliquée de leurs rosters, même principe que rosterSize
+    // plus haut dans ce fichier.
     familyEvents.forEach((e) => {
-      const roster = e.teamId ? (rosterByTeamId.get(e.teamId) ?? []) : [];
+      const roster = e.teamId
+        ? rosterByTeamId.get(e.teamId) ?? []
+        : e.targetTeamIds
+          ? Array.from(
+              new Map(
+                e.targetTeamIds
+                  .flatMap((id) => rosterByTeamId.get(id) ?? [])
+                  .map((p) => [p.id, p] as const)
+              ).values()
+            )
+          : [];
       const statuses = teammateStatusByEvent.get(e.id);
       let present = 0;
       let absent = 0;

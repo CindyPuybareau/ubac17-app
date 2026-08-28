@@ -39,6 +39,11 @@ export type ChildEvent = {
   startTime: string;
   endTime: string | null;
   teamId: string | null;
+  // Retour d'audit du 28/08 : un événement club peut aussi cibler
+  // plusieurs équipes précises sans passer par teamId (voir
+  // teamOrClubWideFilter, family-data.ts) — jusqu'ici totalement ignoré
+  // côté Enfant, qui ne connaissait que teamId.
+  targetTeamIds: string[] | null;
   teamName: string | null;
   teamScore: number | null;
   opponentScore: number | null;

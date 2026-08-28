@@ -130,10 +130,19 @@ export default function CoachView({
       category: t.category,
     }));
 
+  // Retour d'audit du 28/08 : un événement ciblant plusieurs équipes
+  // précises (targetTeamIds) n'a pas de teamId — il n'apparaissait dans
+  // "Prochains rendez-vous" d'AUCUNE des équipes qu'il vise pourtant
+  // nommément.
   const eventsByTeamId: Record<string, AdminUpcomingEvent[]> = {};
   events.forEach((e) => {
-    if (!e.teamId) return;
-    (eventsByTeamId[e.teamId] ??= []).push(e);
+    if (e.teamId) {
+      (eventsByTeamId[e.teamId] ??= []).push(e);
+    } else {
+      e.targetTeamIds?.forEach((id) => {
+        (eventsByTeamId[id] ??= []).push(e);
+      });
+    }
   });
 
   const resultsTeamsForCalendar = teams.map((t) => ({

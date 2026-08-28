@@ -39,7 +39,12 @@ export default function ChildEventsTab({
     () =>
       events
         .filter((e) => e.eventType !== "MATCH")
-        .filter((e) => sortedTeams.length <= 1 || e.teamId === activeTeamIdResolved)
+        .filter(
+          (e) =>
+            sortedTeams.length <= 1 ||
+            e.teamId === activeTeamIdResolved ||
+            (activeTeamIdResolved ? (e.targetTeamIds?.includes(activeTeamIdResolved) ?? false) : false)
+        )
         .sort((a, b) => a.startTime.localeCompare(b.startTime)),
     [events, sortedTeams, activeTeamIdResolved]
   );
