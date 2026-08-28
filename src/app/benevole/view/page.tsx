@@ -2,7 +2,6 @@ import { cookies } from "next/headers";
 import { createServiceClient } from "@/lib/supabase/service";
 import { BENEVOLE_SESSION_COOKIE, verifyBenevoleSession } from "@/lib/benevole-session";
 import { getVolunteerNeedsByEventId, type VolunteerNeed } from "@/app/dashboard/event-volunteer-needs";
-import { formatFirstName } from "@/lib/names";
 import BenevoleView, { type BenevoleEvent } from "./benevole-view";
 
 // Toute la lecture de données vit ici, côté serveur, avec service_role
@@ -54,12 +53,19 @@ export default async function BenevoleViewPage() {
   let volunteerNeedsByEventId: Record<string, VolunteerNeed[]> = {};
 
   if (eventIds.length > 0) {
+    // Retour d'audit du 28/08 : sans filtre de date, un bénévole invité en
+    // octobre qui ouvre son lien en mars retombait d'abord sur ces
+    // rendez-vous passés (tri chronologique croissant, sans borne basse),
+    // avec des boutons "Je m'en occupe" actifs pour des besoins qui n'ont
+    // plus lieu d'être. Cette page n'a aucun historique à montrer (voir
+    // benevole-view.tsx) : ne garder que ce qui reste à venir.
     const { data: eventRows } = await supabase
       .from("events")
       .select(
         "id, title, event_type, location, salle, start_time, end_time, teams(name)"
       )
       .in("id", eventIds)
+      .gte("start_time", new Date().toISOString())
       .order("start_time", { ascending: true });
 
     events = (eventRows ?? []).map((e) => ({

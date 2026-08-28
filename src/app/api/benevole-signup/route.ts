@@ -55,7 +55,7 @@ export async function POST(request: Request) {
   // envoie.
   const { data: needRow } = await supabase
     .from("event_volunteer_needs")
-    .select("id, event_id")
+    .select("id, event_id, events(start_time)")
     .eq("id", needId)
     .maybeSingle();
   if (!needRow) {
@@ -69,6 +69,16 @@ export async function POST(request: Request) {
     .maybeSingle();
   if (!inviteRow) {
     return NextResponse.json({ error: "Non autorisé pour cet événement." }, { status: 403 });
+  }
+
+  // Retour d'audit du 28/08 : rien n'empêchait de s'inscrire à un besoin
+  // d'un événement déjà passé (benevole-view.tsx ne les affiche plus
+  // depuis ce même correctif, mais l'API elle-même doit se protéger
+  // indépendamment de ce que montre l'écran). Se désinscrire reste permis
+  // sans condition — annuler ne devrait jamais échouer.
+  const eventStartTime = (needRow.events as unknown as { start_time: string } | null)?.start_time;
+  if (action === "join" && eventStartTime && new Date(eventStartTime).getTime() < Date.now()) {
+    return NextResponse.json({ error: "Cet événement est déjà passé." }, { status: 400 });
   }
 
   if (action === "join") {

@@ -71,22 +71,6 @@ export async function getNextEventForTeams(
   return data;
 }
 
-export async function getUpcomingEventsForTeam(
-  supabase: SupabaseClient,
-  teamId: string,
-  limit = 5
-): Promise<UpcomingEvent[]> {
-  const { data } = await supabase
-    .from("events")
-    .select("id, title, event_type, location, salle, start_time, team_id, target_team_ids, attendance_requested_at, notes")
-    .eq("team_id", teamId)
-    .gte("start_time", new Date().toISOString())
-    .order("start_time", { ascending: true })
-    .limit(limit);
-
-  return data ?? [];
-}
-
 export async function getPlayerTeamIds(
   supabase: SupabaseClient,
   playerId: string
