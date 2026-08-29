@@ -4,6 +4,7 @@ import { ExternalLink } from "lucide-react";
 import { formatFirstName, formatLastName, sortByLastName } from "@/lib/names";
 import { computePlayerYearStatus } from "@/lib/season";
 import PlayerYearBadge from "./player-year-badge";
+import WhatsAppDirectButton from "./whatsapp-direct-button";
 import { categoryTheme } from "./team-card";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
@@ -30,11 +31,14 @@ export type FamilyTeamCardData = {
 // Même tableau que team-card.tsx (Nom/Prénom/Rôle/Statut/Catégorie, lignes
 // d'en-tête de groupe COACHS/JOUEURS) — retour de Cindy du 2026-08-24,
 // "mon équipe doit avoir les cartes ressemblante à celle des coachs et
-// bureau au niveau du visuel". Volontairement plus léger que la version
-// Coach/Bureau : ni colonnes Téléphone/E-mail (le contact d'un coach reste
-// accessible par son propre canal, WhatsApp, pas exposé ligne par ligne
-// dans un tableau vu par toutes les familles), ni actions de gestion
+// bureau au niveau du visuel". Plus léger que la version Coach/Bureau :
+// ni colonnes Téléphone/E-mail affichées en clair, ni actions de gestion
 // (Retirer/Affecter, réservées au Bureau) — seulement l'habillage visuel.
+// Retour de Cindy du 29/08 ("comme déjà vu côté coach, un icône whatsapp
+// près des coachs pour leur écrire personnellement") : un coach garde
+// quand même une icône WhatsApp directe à côté de son nom, comme côté
+// Coach/Bureau (team-card.tsx) — jamais pour un coéquipier/une famille de
+// l'équipe, dont le numéro reste non exposé ici.
 function roleBadge(role: "COACH" | "COACH_PENDING" | "JOUEUR") {
   if (role === "COACH") return { label: "Coach", className: "bg-navy/10 text-navy" };
   // Libellé aligné sur "Coach" tout court (retour de Cindy du 2026-08-24) :
@@ -57,11 +61,13 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
     ...sortByLastName(card.coaches, (c) => c.last_name).map((c) => ({
       key: c.id,
       person: c as Person,
+      phone: c.phone,
       role: "COACH" as const,
     })),
     ...sortByLastName(card.pendingCoaches, (c) => c.last_name).map((c) => ({
       key: `pending-${c.id}`,
       person: c,
+      phone: null,
       role: "COACH_PENDING" as const,
     })),
   ];
@@ -71,7 +77,8 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
     key: string,
     person: Person,
     role: "COACH" | "COACH_PENDING" | "JOUEUR",
-    birthDate: string | null
+    birthDate: string | null,
+    phone: string | null = null
   ) {
     const badge = roleBadge(role);
     const yearStatus = role === "JOUEUR" ? computePlayerYearStatus(birthDate, card.category) : null;
@@ -81,7 +88,15 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
           {formatLastName(person.last_name) || "—"}
         </td>
         <td className="whitespace-nowrap px-3 py-2.5 text-zinc-700">
-          {person.first_name ? formatFirstName(person.first_name) : "—"}
+          <span className="flex items-center gap-1.5">
+            {person.first_name ? formatFirstName(person.first_name) : "—"}
+            {role === "COACH" && phone && (
+              <WhatsAppDirectButton
+                phone={phone}
+                message={`Bonjour, ici ${card.playerName}, de l'équipe ${categoryLabel ?? ""}.`}
+              />
+            )}
+          </span>
         </td>
         <td className="whitespace-nowrap px-3 py-2.5">
           <span
@@ -121,7 +136,8 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
     person: Person,
     role: "COACH" | "COACH_PENDING" | "JOUEUR",
     birthDate: string | null,
-    isStaff: boolean
+    isStaff: boolean,
+    phone: string | null = null
   ) {
     const badge = roleBadge(role);
     const yearStatus = role === "JOUEUR" ? computePlayerYearStatus(birthDate, card.category) : null;
@@ -132,9 +148,15 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
           isStaff ? "border-l-navy" : "border-l-emerald-400"
         }`}
       >
-        <p className="font-semibold text-zinc-900">
+        <p className="flex flex-wrap items-center gap-1.5 font-semibold text-zinc-900">
           {formatLastName(person.last_name) || "—"}{" "}
           {person.first_name ? formatFirstName(person.first_name) : ""}
+          {role === "COACH" && phone && (
+            <WhatsAppDirectButton
+              phone={phone}
+              message={`Bonjour, ici ${card.playerName}, de l'équipe ${categoryLabel ?? ""}.`}
+            />
+          )}
         </p>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           <span
@@ -197,7 +219,7 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
                     Coachs ({coachRows.length})
                   </td>
                 </tr>
-                {coachRows.map((r) => renderRow(r.key, r.person, r.role, null))}
+                {coachRows.map((r) => renderRow(r.key, r.person, r.role, null, r.phone))}
               </>
             )}
             {card.coaches.length === 0 &&
@@ -245,7 +267,7 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
               Coachs ({coachRows.length})
             </p>
             <div className="flex flex-col gap-2">
-              {coachRows.map((r) => renderCard(r.key, r.person, r.role, null, true))}
+              {coachRows.map((r) => renderCard(r.key, r.person, r.role, null, true, r.phone))}
             </div>
           </div>
         )}
