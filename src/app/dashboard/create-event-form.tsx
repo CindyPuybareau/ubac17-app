@@ -272,10 +272,6 @@ export default function CreateEventForm({
       setError("La date et l'heure de début sont requises.");
       return;
     }
-    if (eventType === "TRAINING" && !endTime) {
-      setError("L'heure de fin est obligatoire pour un entraînement.");
-      return;
-    }
     if (scopeMode === "specific" && targetTeamIds.length === 0) {
       setError("Choisis au moins une équipe pour un événement réservé.");
       return;
@@ -789,11 +785,10 @@ export default function CreateEventForm({
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-zinc-600">
-            Heure de fin{eventType === "TRAINING" ? " *" : " (optionnel)"}
+            Heure de fin (optionnel)
           </label>
           <input
             type="time"
-            required={eventType === "TRAINING"}
             value={endTime}
             onChange={(e) => setEndTime(e.target.value)}
             className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
