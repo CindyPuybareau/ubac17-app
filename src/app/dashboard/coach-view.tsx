@@ -4,6 +4,7 @@ import {
   Flag,
   ListOrdered,
   LogOut,
+  MessageCircle,
   RefreshCw,
   ScrollText,
   Shield,
@@ -15,9 +16,10 @@ import DocumentsPanel from "@/components/club-documents";
 import { BOUTIQUE_URL } from "./boutique";
 import CalendarView from "./calendar-view";
 import CalendarSubscribe from "./calendar-subscribe";
-import CoachTeams, { CoachCommissionGroups } from "./coach-teams";
+import CoachTeams from "./coach-teams";
 import CoachFfbb from "./coach-ffbb";
 import CoachOrganisation, { type CoachTeamMatchCard } from "./coach-organisation";
+import WhatsAppGroupsManager from "./whatsapp-groups-manager";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import type { TeamWithMembers } from "./team-manager";
 import type {
@@ -202,10 +204,6 @@ export default function CoachView({
             whatsappGroups={whatsappGroups}
             penalites={penalites}
           />
-          {/* Groupes "Commission" (Bureau, Coachs UBAC...), ni liés à une
-              équipe ni propres à celle sélectionnée ci-dessus — vivait
-              déjà ici, hors de CoachTeams, avant l'essai de sous-menu. */}
-          <CoachCommissionGroups whatsappGroups={whatsappGroups} />
         </div>
       ),
     },
@@ -339,6 +337,22 @@ export default function CoachView({
       label: "FFBB",
       icon: <RefreshCw className={iconClass} />,
       content: <CoachFfbb teams={teams} teamRoleByTeamId={teamRoleByTeamId} />,
+    },
+    {
+      // Retour de Cindy du 29/08 : "Commissions & Admin" (Bureau, Coachs
+      // UBAC, Buvette...) vivait uniquement comme un bloc attaché à l'onglet
+      // Équipe, redondant pour qui cumule aussi le Bureau (même liste que
+      // "Vie du club" -> "Groupes WhatsApp" là-bas) — mais c'était le SEUL
+      // accès pour un coach sans accès Bureau (ex. à son propre groupe
+      // "Coachs UBAC"). Un vrai onglet dédié ici plutôt qu'une suppression
+      // pure et simple. WhatsAppGroupsManager gère déjà canManage par
+      // groupe (RLS), donc un coach ne voit le crayon d'édition que sur les
+      // groupes qu'il gère réellement (sa propre équipe) — rien de plus
+      // exposé qu'avant.
+      key: "whatsapp",
+      label: "Groupes WhatsApp",
+      icon: <MessageCircle className={iconClass} />,
+      content: <WhatsAppGroupsManager groups={whatsappGroups} teams={clubTeams} />,
     },
     {
       // Retour de Cindy du 26/08 : les 3 documents sur tous les espaces

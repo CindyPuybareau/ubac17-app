@@ -5,8 +5,6 @@ import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
 import {
   AlertTriangle,
   Copy,
-  MessageCircle,
-  Send,
   Shield,
   Trash2,
   User,
@@ -17,8 +15,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatPersonName } from "@/lib/names";
 import { formatLocalDateFr } from "@/lib/local-date";
 import { teamLabel } from "@/lib/teams";
-import { buildAppDeepLink, buildWhatsAppLink } from "@/lib/whatsapp";
-import DateTimePicker from "./date-time-picker";
+import { buildAppDeepLink } from "@/lib/whatsapp";
 import ConfirmDialog from "./confirm-dialog";
 import ParentLinkManager from "./parent-link-manager";
 import type { AdminMember, AdminMemberTeam, MemberDetail } from "./page";
@@ -36,171 +33,7 @@ const TABS = [
   { key: "license", label: "Licence & Équipe", icon: Shield },
   { key: "family", label: "Parents & Urgence", icon: Users },
   { key: "medical", label: "Santé & Chartes", icon: AlertTriangle },
-  { key: "whatsapp", label: "Historique WhatsApp", icon: MessageCircle },
 ] as const;
-
-type WhatsAppMessage = {
-  id: string;
-  direction: "ENVOYE" | "RECU";
-  source: "APP" | "MANUEL";
-  content: string;
-  sent_at: string;
-};
-
-function formatDateTime(iso: string) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString("fr-FR", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-// Self-contained: fetches/writes its own data directly rather than
-// threading it through page.tsx -> members-table/team-card -> here, since
-// nothing else in the app needs a member's WhatsApp history. RLS (Bureau,
-// or the player's own coach) already scopes what comes back.
-function WhatsAppHistoryTab({ playerId, phone }: { playerId: string; phone: string | null }) {
-  const [messages, setMessages] = useState<WhatsAppMessage[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [direction, setDirection] = useState<"ENVOYE" | "RECU">("RECU");
-  const [content, setContent] = useState("");
-  const [sentAt, setSentAt] = useState(() => {
-    const now = new Date();
-    now.setSeconds(0, 0);
-    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-    return now.toISOString().slice(0, 16);
-  });
-  const [saving, setSaving] = useState(false);
-
-  async function load() {
-    const supabase = createClient();
-    const { data, error: fetchError } = await supabase
-      .from("whatsapp_messages")
-      .select("id, direction, source, content, sent_at")
-      .eq("player_id", playerId)
-      .order("sent_at", { ascending: false });
-    if (fetchError) {
-      setError(fetchError.message);
-      return;
-    }
-    setMessages((data as WhatsAppMessage[] | null) ?? []);
-  }
-
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playerId]);
-
-  async function addManualEntry() {
-    if (!content.trim()) return;
-    setSaving(true);
-    setError(null);
-    const supabase = createClient();
-    const { error: insertError } = await supabase.from("whatsapp_messages").insert({
-      player_id: playerId,
-      direction,
-      source: "MANUEL",
-      content: content.trim(),
-      sent_at: new Date(sentAt).toISOString(),
-    });
-    setSaving(false);
-    if (insertError) {
-      setError(insertError.message);
-      return;
-    }
-    setContent("");
-    load();
-  }
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2 rounded-xl border border-zinc-100 bg-zinc-50 p-3">
-        <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-          Ajouter un échange (message envoyé/reçu hors application)
-        </span>
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={direction}
-            onChange={(e) => setDirection(e.target.value as "ENVOYE" | "RECU")}
-            className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-sm"
-          >
-            <option value="RECU">Reçu du membre</option>
-            <option value="ENVOYE">Envoyé au membre</option>
-          </select>
-          <div className="w-48">
-            <DateTimePicker value={sentAt} onChange={setSentAt} />
-          </div>
-        </div>
-        <textarea
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          rows={2}
-          placeholder="Contenu du message..."
-          className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-sm"
-        />
-        <button
-          type="button"
-          onClick={addManualEntry}
-          disabled={saving || !content.trim()}
-          className="w-fit rounded-full bg-navy px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-navy/90 disabled:opacity-50"
-        >
-          {saving ? "Enregistrement..." : "Enregistrer dans l'historique"}
-        </button>
-        {phone && (
-          <a
-            href={buildWhatsAppLink(phone, "") ?? "#"}
-            target="_blank"
-            rel="noreferrer"
-            className="flex w-fit items-center gap-1.5 text-xs font-medium text-emerald-700 hover:underline"
-          >
-            <Send className="h-3 w-3" />
-            Ouvrir WhatsApp avec ce membre
-          </a>
-        )}
-      </div>
-
-      {error && <p className="text-sm text-red-600">{error}</p>}
-
-      <div className="flex flex-col gap-2">
-        {messages === null && !error && (
-          <p className="text-sm text-zinc-400">Chargement...</p>
-        )}
-        {messages?.length === 0 && (
-          <p className="text-sm text-zinc-400">
-            Aucun échange WhatsApp enregistré pour ce membre.
-          </p>
-        )}
-        {messages?.map((m) => (
-          <div
-            key={m.id}
-            className="flex flex-col gap-1 rounded-xl border border-zinc-100 px-3 py-2"
-          >
-            <div className="flex items-center justify-between gap-2">
-              <span
-                className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
-                  m.direction === "ENVOYE"
-                    ? "bg-navy/10 text-navy"
-                    : "bg-emerald-50 text-emerald-700"
-                }`}
-              >
-                {m.direction === "ENVOYE" ? "Envoyé" : "Reçu"}
-              </span>
-              <span className="text-xs text-zinc-400">
-                {formatDateTime(m.sent_at)}
-                {m.source === "MANUEL" ? " · saisie manuelle" : " · via l'app"}
-              </span>
-            </div>
-            <p className="whitespace-pre-wrap text-sm text-zinc-800">{m.content}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -1176,12 +1009,6 @@ export default function MemberDetailModal({
             </div>
           )}
 
-          {tab === "whatsapp" && (
-            <WhatsAppHistoryTab
-              playerId={member.id}
-              phone={member.registrationPhone}
-            />
-          )}
         </div>
 
         {editable && (

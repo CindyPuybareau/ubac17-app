@@ -1,13 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { MessageCircle } from "lucide-react";
 import { sortTeamsByGroup } from "@/lib/teams";
 import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
 import PenalitesCard from "./penalites-card";
 import TeamCard from "./team-card";
 import TeamSelectorPills from "./team-selector-pills";
-import WhatsAppGroupButton from "./whatsapp-group-button";
 import type { TeamWithMembers } from "./team-manager";
 import type {
   AdminMemberTeam,
@@ -141,42 +139,6 @@ export default function CoachTeams({
         showPlayerName
         emptyLabel="Aucune pénalité pour tes joueurs."
       />
-    </div>
-  );
-}
-
-// Groupes "Commission" (Bureau, Coachs UBAC, Buvette...) : jamais liés à
-// une équipe, donc jamais gérables par un coach (seul le Bureau le peut),
-// mais toujours affichés si RLS les a renvoyés — c'est-à-dire seulement
-// ceux dont il est déjà membre. Vivait à l'intérieur de CoachTeams,
-// accroché à l'équipe active ; extrait en composant à part (retour de
-// Cindy du 2026-08-22, sous-menus "Équipe") puisque ce bloc n'a lui-même
-// rien à voir avec une équipe précise — il a maintenant son propre
-// sous-onglet "Commissions & Admin" plutôt que d'apparaître accroché à
-// une équipe au hasard.
-export function CoachCommissionGroups({ whatsappGroups }: { whatsappGroups: WhatsAppGroup[] }) {
-  const commissionGroups = whatsappGroups.filter((g) => g.category === "COMMISSION");
-
-  if (commissionGroups.length === 0) {
-    return <p className="text-sm text-zinc-500">Aucune commission à te proposer pour le moment.</p>;
-  }
-
-  return (
-    <div className="flex flex-col gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
-      <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-        <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
-        Commissions &amp; Admin
-      </p>
-      <div className="flex flex-wrap gap-2">
-        {commissionGroups.map((g) => (
-          <WhatsAppGroupButton
-            key={g.id}
-            teamName={g.name}
-            defaultMessage="Bonjour à tous,"
-            className="flex items-center gap-1.5 rounded-full border border-emerald-200 px-3 py-1.5 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
-          />
-        ))}
-      </div>
     </div>
   );
 }
