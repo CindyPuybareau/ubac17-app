@@ -5,6 +5,13 @@ import { sortTeamsByGroup, teamLabel } from "@/lib/teams";
 import { EventRow } from "./child-calendar-tab";
 import type { ChildEvent } from "./child-dashboard";
 
+// Fonction ordinaire et non calcul en plein rendu (comme startOfTodayMs
+// dans calendar-view.tsx, dont ce fichier reprend le même seuil).
+function startOfTodayMs() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+}
+
 // Onglet "Événements" (retour de Cindy du 2026-08-22) : tout le calendrier
 // du club sauf les matchs officiels — entraînements, amicaux, tournois,
 // événements club — en un seul fil chronologique, même principe que côté
@@ -35,19 +42,23 @@ export default function ChildEventsTab({
     ? activeTeamId
     : sortedTeams[0]?.id;
 
-  const clubEvents = useMemo(
-    () =>
-      events
-        .filter((e) => e.eventType !== "MATCH")
-        .filter(
-          (e) =>
-            sortedTeams.length <= 1 ||
-            e.teamId === activeTeamIdResolved ||
-            (activeTeamIdResolved ? (e.targetTeamIds?.includes(activeTeamIdResolved) ?? false) : false)
-        )
-        .sort((a, b) => a.startTime.localeCompare(b.startTime)),
-    [events, sortedTeams, activeTeamIdResolved]
-  );
+  const clubEvents = useMemo(() => {
+    // Retour de Cindy du 29/08 : un événement passé disparaît de cet
+    // onglet le lendemain (même seuil que côté Bureau/Coach/Parent,
+    // calendar-view.tsx) — pas avant, pour qu'un événement du matin
+    // reste visible tout le jour même.
+    const from = startOfTodayMs();
+    return events
+      .filter((e) => e.eventType !== "MATCH")
+      .filter((e) => new Date(e.startTime).getTime() >= from)
+      .filter(
+        (e) =>
+          sortedTeams.length <= 1 ||
+          e.teamId === activeTeamIdResolved ||
+          (activeTeamIdResolved ? (e.targetTeamIds?.includes(activeTeamIdResolved) ?? false) : false)
+      )
+      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+  }, [events, sortedTeams, activeTeamIdResolved]);
 
   return (
     <div className="flex flex-col gap-3">

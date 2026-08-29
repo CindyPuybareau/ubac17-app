@@ -622,6 +622,15 @@ export default function CalendarView({
         if (view === "officialResults" && new Date(e.start_time).getTime() >= new Date().getTime()) {
           return false;
         }
+        // Retour de Cindy du 29/08 : "Événements" (clubEvents) ne doit plus
+        // montrer un entraînement/événement passé dès le lendemain — seuil
+        // sur le début de journée (comme upcomingEvents plus haut) pour
+        // qu'un événement du matin reste visible tout le jour même, et ne
+        // disparaisse que le jour suivant. "Matchs officiels"/"Résultats"
+        // gardent leur logique saison complète, inchangée.
+        if (view === "clubEvents" && new Date(e.start_time).getTime() < startOfTodayMs()) {
+          return false;
+        }
         if (!resultsTeams || resultsTeams.length <= 1) return true;
         // Deux modes de filtrage par équipe selon resultsTeamSelector :
         // une équipe active à la fois (pills) ou plusieurs cochées à la
