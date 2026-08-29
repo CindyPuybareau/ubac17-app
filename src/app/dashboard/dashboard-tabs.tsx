@@ -28,7 +28,13 @@ export default function DashboardTabs({ tabs }: { tabs: DashboardTab[] }) {
               className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
                 current.key === tab.key
                   ? "border-ubac-yellow bg-ubac-yellow/10 text-ubac-yellow-dark"
-                  : "border-zinc-200 text-zinc-600"
+                  : // Retour de Cindy du 29/08 ("les onglets se fondent dans le
+                    // fond") : sans fond propre, un onglet non actif (bordure
+                    // grise très claire, aucun remplissage) se distinguait à
+                    // peine du fond crème général de l'appli (--background,
+                    // globals.css) — même correctif déjà en place ailleurs
+                    // pour ce genre de pastille (team-selector-pills.tsx).
+                    "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
               }`}
             >
               {tab.label}
