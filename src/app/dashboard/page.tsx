@@ -2145,7 +2145,7 @@ export default async function DashboardPage() {
               () =>
                 supabase
                   .from("team_coaches")
-                  .select("team_id, profiles(id, first_name, last_name, phone)")
+                  .select("team_id, profiles(id, first_name, last_name, phone, email)")
                   .in("team_id", allTeamIds),
               () =>
                 supabase
@@ -2270,11 +2270,11 @@ export default async function DashboardPage() {
 
       const coachesByTeamId = new Map<
         string,
-        (Person & { phone: string | null })[]
+        (Person & { phone: string | null; email: string | null })[]
       >();
       (teamCoachesRes.data ?? []).forEach((row) => {
         const p = row.profiles as unknown as
-          | (Person & { phone: string | null })
+          | (Person & { phone: string | null; email: string | null })
           | null;
         if (!p) return;
         const list = coachesByTeamId.get(row.team_id) ?? [];

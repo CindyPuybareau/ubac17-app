@@ -702,11 +702,17 @@ export default function TeamCard({
                 </span>
               </td>
               <td className="whitespace-nowrap px-3 py-2.5">
-                {yearStatus ? (
-                  <PlayerYearBadge birthDate={birthDate} category={statusCategory} />
-                ) : (
-                  <span className="text-zinc-300">—</span>
-                )}
+                {/* Retour de Cindy du 29/08 ("on peut enlever le statut des
+                    coach") : rien du tout pour un coach, même pas un tiret —
+                    ce badge (Old Soldier, 2ème année...) ne parle qu'aux
+                    joueurs. */}
+                {m.role === "JOUEUR" ? (
+                  yearStatus ? (
+                    <PlayerYearBadge birthDate={birthDate} category={statusCategory} />
+                  ) : (
+                    <span className="text-zinc-300">—</span>
+                  )
+                ) : null}
               </td>
               <td className="whitespace-nowrap px-3 py-2.5">
                 {category ? (
@@ -813,11 +819,14 @@ export default function TeamCard({
         </div>
 
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          {yearStatus ? (
-            <PlayerYearBadge birthDate={birthDate} category={statusCategory} />
-          ) : (
-            <span className="text-xs text-zinc-300">—</span>
-          )}
+          {/* Retour de Cindy du 29/08 : rien pour un coach, même version
+              mobile — voir le commentaire équivalent sur renderMemberRow. */}
+          {m.role === "JOUEUR" &&
+            (yearStatus ? (
+              <PlayerYearBadge birthDate={birthDate} category={statusCategory} />
+            ) : (
+              <span className="text-xs text-zinc-300">—</span>
+            ))}
           {category && (
             <span
               className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold leading-none ${theme.badge}`}
