@@ -27,6 +27,7 @@ import PenalitesCard from "./penalites-card";
 import ChildAccessManager from "./child-access-manager";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import WhatsAppGroupsFamily from "./whatsapp-groups-family";
+import WhatsAppGroupsManager from "./whatsapp-groups-manager";
 import type { AdminCotisation, AdminPenalite, AdminUpcomingEvent, WhatsAppGroup } from "./page";
 import type { BirthdaySource } from "./birthdays";
 import type { CarpoolOffer, EventRoleType, EventTasksState } from "./event-tasks";
@@ -142,15 +143,14 @@ export default function FamilyView({
   );
   // Un groupe "Équipe" ne concerne qu'une seule équipe : il ne s'affiche
   // que si cette équipe fait partie de l'enfant/des enfants actuellement
-  // sélectionnés. Les groupes "Commission" (Buvette...) ne sont rattachés
-  // à aucune équipe — ils restent visibles quel que soit l'enfant choisi,
-  // sans quoi sélectionner un enfant en particulier ferait perdre l'accès
-  // à un groupe où le parent est membre pour une tout autre raison.
+  // sélectionnés. Retour de Cindy du 29/08 ("je ne veux que le groupe
+  // whatsapp de l'équipe concerné") : les groupes "Commission"
+  // (Buvette...) ne s'affichent plus mêlés ici, quel que soit l'enfant
+  // choisi — ils vivent maintenant dans leur propre onglet "Groupes
+  // WhatsApp" plus bas, pour ne jamais perdre l'accès à un groupe où l'on
+  // est membre pour une tout autre raison que l'équipe affichée ici.
   const visibleWhatsappGroups = useMemo(
-    () =>
-      whatsappGroups.filter(
-        (g) => g.category === "COMMISSION" || (g.teamId !== null && visibleTeamIds.has(g.teamId))
-      ),
+    () => whatsappGroups.filter((g) => g.teamId !== null && visibleTeamIds.has(g.teamId)),
     [whatsappGroups, visibleTeamIds]
   );
 
@@ -307,6 +307,20 @@ export default function FamilyView({
           ),
         },
       ],
+    },
+    {
+      // Retour de Cindy du 29/08 : les groupes "Commission" (Buvette,
+      // Coachs UBAC...) ne sont plus mêlés à "Mon équipe"/"Mon enfant"
+      // (voir visibleWhatsappGroups plus haut) — un parent/joueur membre
+      // d'une commission sans être aussi au Bureau (seul espace avec
+      // l'équivalent "Vie du club") a donc besoin de son propre accès.
+      // showTeamGroups=false : la grille "Équipes du Club" resterait vide
+      // de sens ici, chaque équipe a déjà son groupe sur sa propre carte
+      // plus haut.
+      key: "whatsapp",
+      label: "Groupes WhatsApp",
+      icon: <MessageCircle className={iconClass} />,
+      content: <WhatsAppGroupsManager groups={whatsappGroups} showTeamGroups={false} />,
     },
     {
       // Retour de Cindy du 25/08 : Charte du Joueur + Charte du Parent +

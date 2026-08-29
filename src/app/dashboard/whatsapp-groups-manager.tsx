@@ -158,24 +158,33 @@ function GroupCard({ title, group }: { title: string; group: WhatsAppGroup }) {
 export default function WhatsAppGroupsManager({
   groups,
   teams,
+  // Retour de Cindy du 29/08 : côté Famille, "Mon équipe"/"Mon enfant"
+  // affiche déjà LE groupe de l'équipe concernée — pas besoin d'y
+  // remontrer tous les groupes de toutes les équipes du club en plus des
+  // commissions ici. Désactivé uniquement pour cet appelant-là ;
+  // Bureau/Coach gardent les deux sections.
+  showTeamGroups = true,
 }: {
   groups: WhatsAppGroup[];
-  teams: TeamRef[];
+  teams?: TeamRef[];
+  showTeamGroups?: boolean;
 }) {
-  const teamById = new Map(teams.map((t) => [t.id, t]));
+  const teamById = new Map((teams ?? []).map((t) => [t.id, t]));
 
-  const equipeCards = groups
-    .filter((g) => g.category === "EQUIPE")
-    .map((g) => {
-      const team = g.teamId ? teamById.get(g.teamId) : undefined;
-      const rank = team?.name ? TEAM_ORDER.indexOf(team.name) : -1;
-      return {
-        group: g,
-        title: team ? teamLabel(team) : g.name,
-        rank: rank === -1 ? TEAM_ORDER.length : rank,
-      };
-    })
-    .sort((a, b) => a.rank - b.rank);
+  const equipeCards = showTeamGroups
+    ? groups
+        .filter((g) => g.category === "EQUIPE")
+        .map((g) => {
+          const team = g.teamId ? teamById.get(g.teamId) : undefined;
+          const rank = team?.name ? TEAM_ORDER.indexOf(team.name) : -1;
+          return {
+            group: g,
+            title: team ? teamLabel(team) : g.name,
+            rank: rank === -1 ? TEAM_ORDER.length : rank,
+          };
+        })
+        .sort((a, b) => a.rank - b.rank)
+    : [];
 
   const commissionCards = groups
     .filter((g) => g.category === "COMMISSION")
@@ -202,18 +211,20 @@ export default function WhatsAppGroupsManager({
         </div>
       </div>
 
-      <div className="flex flex-col gap-3">
-        <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-          <Shirt className="h-3.5 w-3.5" />
-          Équipes du Club
-        </h3>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {equipeCards.map(({ group, title }) => (
-            <GroupCard key={group.id} title={title} group={group} />
-          ))}
-          {equipeCards.length === 0 && <p className="text-sm text-zinc-400">Aucun groupe.</p>}
+      {showTeamGroups && (
+        <div className="flex flex-col gap-3">
+          <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+            <Shirt className="h-3.5 w-3.5" />
+            Équipes du Club
+          </h3>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {equipeCards.map(({ group, title }) => (
+              <GroupCard key={group.id} title={title} group={group} />
+            ))}
+            {equipeCards.length === 0 && <p className="text-sm text-zinc-400">Aucun groupe.</p>}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
