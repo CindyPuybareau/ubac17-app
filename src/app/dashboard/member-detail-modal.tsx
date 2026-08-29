@@ -301,6 +301,14 @@ export default function MemberDetailModal({
   // d'équipe ci-dessous supprime TOUS les rattachements du joueur, ce qui
   // effacerait au passage un prêt à une autre équipe.
   canManageTeamAndRoles = true,
+  // Droit dédié plutôt que canManageTeamAndRoles (retour de Cindy du 29/08 :
+  // le bloc "Compte(s) parent relié(s)" restait invisible depuis l'onglet
+  // Équipes, où team-card.tsx coupe canManageTeamAndRoles pour TOUT appelant
+  // — Bureau inclus — car la réaffectation d'équipe/rôles a sa propre UI là-
+  // bas. Le rattachement parent n'a aucun équivalent ailleurs : il doit donc
+  // rester ouvert au Bureau quel que soit l'onglet d'où la fiche est ouverte,
+  // et seulement fermé pour un Coach.
+  canManageParentLinks = true,
 }: {
   member: MemberDetail;
   readOnly: boolean;
@@ -325,6 +333,7 @@ export default function MemberDetailModal({
   coachTeams?: AdminMemberTeam[];
   pendingCoachTeams?: AdminMemberTeam[];
   canManageTeamAndRoles?: boolean;
+  canManageParentLinks?: boolean;
 }) {
   const [tab, setTab] = useState<TabKey>("identity");
   const [linkCopied, setLinkCopied] = useState(false);
@@ -890,7 +899,7 @@ export default function MemberDetailModal({
                   téléphone/email secondaire en aide, jamais appliquée
                   seule. Bureau uniquement, comme le reste des actions
                   d'affectation sur cette fiche. */}
-              {editable && canManageTeamAndRoles && (
+              {editable && canManageParentLinks && (
                 <ParentLinkManager
                   playerId={member.id}
                   candidatePhones={[

@@ -116,6 +116,8 @@ export default function CoachTeams({
         allowCreatePlayer={false}
         allowAssignCoach={false}
         canRemoveMembers={false}
+        // Relier un compte parent à un enfant reste un geste du Bureau.
+        canManageParentLinks={false}
         whatsappGroup={activeWhatsappGroup}
       />
     </div>

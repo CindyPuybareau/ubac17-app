@@ -156,6 +156,11 @@ export default function TeamCard({
   // (readOnly true), un simple bouton d'envoi comme côté parent : pas
   // besoin de tout gérer, juste écrire au groupe.
   whatsappGroup,
+  // Vrai droit dédié (même logique que canRemoveMembers ci-dessus) : le
+  // rattachement parent-enfant n'a aucune UI équivalente ailleurs, donc il
+  // reste ouvert au Bureau même depuis cet onglet Équipes — seul un Coach
+  // (coach-teams.tsx) le coupe explicitement.
+  canManageParentLinks = true,
 }: {
   team: TeamWithMembers;
   allProfiles: Person[];
@@ -171,6 +176,7 @@ export default function TeamCard({
   clubTeams?: AdminMemberTeam[];
   whatsappGroup?: WhatsAppGroup | null;
   canRemoveMembers?: boolean;
+  canManageParentLinks?: boolean;
 }) {
   const router = useRouter();
   const [detailPlayerId, setDetailPlayerId] = useState<string | null>(null);
@@ -1238,6 +1244,7 @@ export default function TeamCard({
               // mais l'affectation d'équipe et les rôles Coach/Bureau
               // restent la main du Bureau.
               canManageTeamAndRoles={false}
+              canManageParentLinks={canManageParentLinks}
               onClose={() => setDetailPlayerId(null)}
             />
           );
