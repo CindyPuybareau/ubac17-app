@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
+  CalendarDays,
   CheckCircle2,
   Clock,
   ExternalLink,
@@ -16,6 +17,7 @@ import {
   Tag,
   Target,
   Ticket,
+  Trash2,
   TrendingUp,
   Wallet,
   X,
@@ -24,6 +26,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
 import { formatPersonName } from "@/lib/names";
 import CategoryTariffsEditor from "./category-tariffs-editor";
+import ConfirmDialog from "./confirm-dialog";
 import CotisationParticipantsTable, {
   computeStatus,
   formatAmount,
@@ -219,6 +222,17 @@ export default function CotisationsManager({
   const [linkDraft, setLinkDraft] = useState("");
   const [savingLink, setSavingLink] = useState(false);
 
+  // Retour de Cindy du 29/08 ("je ne comprend pas comment supprimer
+  // l'évenement") : aucune collecte ne pouvait être supprimée depuis
+  // l'appli, quel que soit son état — un test oublié restait donc pour
+  // toujours. deleteTarget porte la collecte visée (state à part plutôt
+  // que confondu avec selectedCollecte : on peut vouloir supprimer une
+  // collecte différente de celle actuellement affichée dans le détail,
+  // directement depuis sa carte).
+  const [deleteTarget, setDeleteTarget] = useState<AdminCollecte | null>(null);
+  const [deletingCollecte, setDeletingCollecte] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   const contactEmailByPlayerId = useMemo(() => {
     const map: Record<string, string> = {};
     members.forEach((m) => {
@@ -237,6 +251,18 @@ export default function CotisationsManager({
     () => cotisations.filter((c) => c.collecteId === selectedCollecteId),
     [cotisations, selectedCollecteId]
   );
+
+  // Un mini-résumé (collecté/attendu) par carte, pour qu'on voie d'un coup
+  // d'œil laquelle mérite d'être ouverte — plutôt qu'une simple pastille de
+  // nom sans autre information (retour de Cindy du 29/08, "on ne s'y
+  // retrouve pas").
+  const kpisByCollecteId = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof computeKpis>>();
+    collectes.forEach((c) => {
+      map.set(c.id, computeKpis(cotisations.filter((co) => co.collecteId === c.id)));
+    });
+    return map;
+  }, [collectes, cotisations]);
 
   const availableMembers = useMemo(() => {
     const existingIds = new Set(collecteCotisations.map((c) => c.playerId));
@@ -327,6 +353,30 @@ export default function CotisationsManager({
     router.refresh();
   }
 
+  async function deleteCollecte() {
+    if (!deleteTarget) return;
+    setDeletingCollecte(true);
+    setDeleteError(null);
+    const supabase = createClient();
+    // cotisations.collecte_id est en "on delete cascade" (migration
+    // 20260802000000) : ses participants et paiements enregistrés
+    // disparaissent avec elle, pas besoin d'un second appel.
+    const { error: deleteErr } = await supabase
+      .from("collectes")
+      .delete()
+      .eq("id", deleteTarget.id);
+    setDeletingCollecte(false);
+    if (deleteErr) {
+      setDeleteError(deleteErr.message);
+      return;
+    }
+    if (selectedCollecteId === deleteTarget.id) {
+      setSelectedCollecteId(collectes.find((c) => c.id !== deleteTarget.id)?.id ?? null);
+    }
+    setDeleteTarget(null);
+    router.refresh();
+  }
+
   const tabButtonClass = (active: boolean) =>
     `flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${
       // Inactive keeps the club navy (icon + label) instead of grey: on a
@@ -385,31 +435,78 @@ export default function CotisationsManager({
 
       {shownTab === "collectes" && (
         <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center gap-2">
-            {collectes.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => setSelectedCollecteId(c.id)}
-                className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
-                  selectedCollecteId === c.id
-                    ? "border-navy bg-navy text-white"
-                    : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
-                }`}
-              >
-                {c.name}
-                <span className="ml-1.5 text-xs opacity-70">
-                  · {collecteTypeLabels[c.type]}
-                  {/* Retour de Cindy du 2026-08-25 : la date de l'événement
-                      rattaché aide à retrouver la bonne collecte quand
-                      plusieurs événements payants portent un nom proche. */}
-                  {c.eventStartTime &&
-                    ` · ${new Date(c.eventStartTime).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}`}
-                </span>
-              </button>
-            ))}
+          {/* Retour de Cindy du 29/08 ("un truc ne va pas niveau visibilité
+              et clarté") : de simples pastilles de nom ne montraient ni le
+              lien vers l'événement du calendrier, ni un moyen de supprimer
+              la collecte — remplacées par de vraies cartes : montant
+              collecté/attendu en un coup d'œil, date de l'événement rattaché
+              ou repère "Événement supprimé" pour une collecte orpheline
+              (event_id passé à null par la suppression de l'événement,
+              volontairement conservée pour ne jamais perdre un historique de
+              paiements réels — voir deleteCollecte plus haut), et une
+              corbeille directe. */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {collectes.map((c) => {
+              const kpis = kpisByCollecteId.get(c.id);
+              const isOrphaned = c.type === "EVENEMENT" && !c.eventId;
+              return (
+                <div
+                  key={c.id}
+                  onClick={() => setSelectedCollecteId(c.id)}
+                  className={`flex cursor-pointer flex-col gap-2 rounded-2xl border p-4 text-left shadow-sm transition-colors ${
+                    selectedCollecteId === c.id
+                      ? "border-navy bg-blue-50/40"
+                      : "border-zinc-200 bg-white hover:bg-zinc-50"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex min-w-0 flex-col">
+                      <span className="truncate font-semibold text-zinc-900">{c.name}</span>
+                      <span className="text-xs text-zinc-500">{collecteTypeLabels[c.type]}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteTarget(c);
+                      }}
+                      title="Supprimer cette collecte"
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                  {c.eventStartTime ? (
+                    <span className="flex items-center gap-1 text-xs text-zinc-500">
+                      <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+                      {new Date(c.eventStartTime).toLocaleDateString("fr-FR", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </span>
+                  ) : isOrphaned ? (
+                    <span className="flex items-center gap-1 text-xs font-medium text-amber-700">
+                      <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                      Événement supprimé
+                    </span>
+                  ) : null}
+                  {kpis && kpis.total > 0 && (
+                    <div className="flex items-baseline justify-between text-sm">
+                      <span className="font-semibold text-zinc-900">
+                        {formatAmount(kpis.totalCollected)}
+                      </span>
+                      <span className="text-xs text-zinc-500">
+                        sur {formatAmount(kpis.totalDue)} attendu
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
             <button
               onClick={() => setCreatingCollecte((v) => !v)}
-              className="flex items-center gap-1.5 rounded-full bg-ubac-yellow px-3 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark"
+              className="flex items-center justify-center gap-1.5 rounded-2xl border border-dashed border-zinc-300 p-4 text-sm font-semibold text-navy transition-colors hover:bg-blue-50/40"
             >
               <Plus className="h-3.5 w-3.5" />
               Nouvelle collecte
@@ -603,6 +700,35 @@ export default function CotisationsManager({
           )}
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Supprimer cette collecte ?"
+        message={
+          deleteTarget && (kpisByCollecteId.get(deleteTarget.id)?.totalCollected ?? 0) > 0 ? (
+            <>
+              Des paiements sont déjà enregistrés dessus (
+              {formatAmount(kpisByCollecteId.get(deleteTarget.id)!.totalCollected)} collectés).
+              Supprimer &laquo;&nbsp;{deleteTarget.name}&nbsp;&raquo; effacera aussi ces
+              paiements et tous ses participants, définitivement.
+            </>
+          ) : (
+            <>
+              Supprimer &laquo;&nbsp;{deleteTarget?.name}&nbsp;&raquo; et tous ses
+              participants, définitivement ?
+            </>
+          )
+        }
+        confirmLabel="Supprimer"
+        pending={deletingCollecte}
+        pendingLabel="Suppression..."
+        error={deleteError}
+        onConfirm={deleteCollecte}
+        onCancel={() => {
+          setDeleteTarget(null);
+          setDeleteError(null);
+        }}
+      />
     </div>
   );
 }

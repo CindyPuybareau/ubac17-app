@@ -16,8 +16,15 @@ import { useEffect, useRef } from "react";
 const COLORS = ["#F4C430", "#203090", "#4a5cba", "#f7d466", "#ffffff", "#22c55e"];
 const RAIN_COUNT = 140;
 const BURST_COUNT_PER_SIDE = 30;
-const DURATION_MS = 3200;
 const GRAVITY = 0.12;
+// Retour de Cindy du 29/08 ("l'animation 3 fois au moins pour le moment") :
+// un seul jet de chaque coin se lisait comme un simple sursaut plutôt
+// qu'une vraie célébration — trois vagues espacées de 900ms, façon salves
+// successives d'un vrai canon à confettis. DURATION_MS s'étend d'autant
+// pour laisser la dernière vague retomber avant que le canvas s'efface.
+const BURST_WAVES = 3;
+const BURST_INTERVAL_MS = 900;
+const DURATION_MS = 3200 + (BURST_WAVES - 1) * BURST_INTERVAL_MS;
 
 type Particle = {
   x: number;
@@ -80,12 +87,20 @@ export default function ConfettiBurst() {
     }
 
     const particles = [...rain, ...burstFrom(0, 1), ...burstFrom(width, -1)];
+    // Vague 0 déjà tirée juste au-dessus — les suivantes s'ajoutent
+    // pendant la boucle, une fois leur tour venu.
+    let nextWave = 1;
 
     const start = performance.now();
     let raf = 0;
 
     function draw(now: number) {
       if (!ctx) return;
+      const elapsed = now - start;
+      while (nextWave < BURST_WAVES && elapsed >= nextWave * BURST_INTERVAL_MS) {
+        particles.push(...burstFrom(0, 1), ...burstFrom(width, -1));
+        nextWave += 1;
+      }
       ctx.clearRect(0, 0, width, height);
       particles.forEach((p) => {
         p.vy += GRAVITY;

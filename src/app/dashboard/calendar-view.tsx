@@ -427,6 +427,16 @@ export default function CalendarView({
     );
   }
 
+  // Même geste optimiste que updateLocalRsvpStatus ci-dessus, pour la
+  // saisie du score (match-score.tsx) : sans lui, l'affichage du score ET
+  // les confettis (qui lisent event.teamScore/opponentScore du même
+  // localEvents) attendaient tous les deux le rafraîchissement temps réel.
+  function updateLocalEventScore(eventId: string, teamScore: number, opponentScore: number) {
+    setLocalEvents((prev) =>
+      prev.map((e) => (e.id === eventId ? { ...e, teamScore, opponentScore } : e))
+    );
+  }
+
   const today = new Date();
   const todayKey = toKey(today);
   const [viewMonth, setViewMonth] = useState<Date>(today);
@@ -505,13 +515,24 @@ export default function CalendarView({
   // "Événement payant", jamais en reste par rapport à la création.
   const [editingEvent, setEditingEvent] = useState<AdminUpcomingEvent | null>(null);
   const [deleteEventTarget, setDeleteEventTarget] = useState<AdminUpcomingEvent | null>(null);
+  // Retour de Cindy du 29/08 ("Test vue bénévoles" resté sans qu'on
+  // comprenne comment supprimer l'événement) : supprimer un événement ne
+  // supprime jamais sa collecte de suivi (event_id passé à null plutôt que
+  // supprimée en cascade, exprès — voir 20260825000000_paid_events.sql,
+  // pour ne jamais perdre un historique de paiements réels). Sans
+  // avertissement, une collecte de test/événement payant supprimé restait
+  // orpheline sans que rien ne le signale ici. Décoché par défaut : garde
+  // le même filet de sécurité qu'avant pour un vrai stage déjà payé par des
+  // familles — supprimer les paiements reste un choix explicite, jamais
+  // la conséquence machinale d'un clic sur "Supprimer l'événement".
+  const [deleteCollecteToo, setDeleteCollecteToo] = useState(false);
 
   // Déclenché par le bouton "Supprimer" ; la confirmation elle-même vit
   // dans deleteEventTarget + le <ConfirmDialog> rendu plus bas (retour de
   // Cindy du 2026-08-21 : la popup native window.confirm() ne ressemble
   // pas à l'appli et affiche son propre chrome de navigateur, impossible
   // à styler ou à retirer).
-  async function confirmDeleteEvent(event: AdminUpcomingEvent) {
+  async function confirmDeleteEvent(event: AdminUpcomingEvent, alsoDeleteCollecte: boolean) {
     setDeleteEventTarget(null);
     // Disparition immédiate plutôt que d'attendre le rafraîchissement
     // temps réel — retour de Cindy du 2026-08-21, même correctif que la
@@ -547,6 +568,12 @@ export default function CalendarView({
 
     const supabase = createClient();
     await supabase.from("events").delete().eq("id", event.id);
+    if (alsoDeleteCollecte && event.collecteId) {
+      // cotisations.collecte_id est en "on delete cascade" (migration
+      // 20260802000000) : ses participants et paiements enregistrés
+      // disparaissent avec elle, pas besoin d'un second appel.
+      await supabase.from("collectes").delete().eq("id", event.collecteId);
+    }
   }
 
   function relanceMailto(event: AdminUpcomingEvent) {
@@ -866,6 +893,9 @@ export default function CalendarView({
                   teamScore={event.teamScore}
                   opponentScore={event.opponentScore}
                   canEdit={canManageEvent}
+                  onSaved={(teamScore, opponentScore) =>
+                    updateLocalEventScore(event.id, teamScore, opponentScore)
+                  }
                 />
               </>
             ) : (
@@ -895,7 +925,10 @@ export default function CalendarView({
                 <Pencil className="h-4 w-4" />
               </button>
               <button
-                onClick={() => setDeleteEventTarget(event)}
+                onClick={() => {
+                  setDeleteEventTarget(event);
+                  setDeleteCollecteToo(false);
+                }}
                 title="Supprimer"
                 className="flex h-8 w-8 items-center justify-center rounded-full text-red-400 hover:bg-red-50 hover:text-red-600"
               >
@@ -1195,7 +1228,10 @@ export default function CalendarView({
                   <Pencil className="h-4 w-4" />
                 </button>
                 <button
-                  onClick={() => setDeleteEventTarget(event)}
+                  onClick={() => {
+                    setDeleteEventTarget(event);
+                    setDeleteCollecteToo(false);
+                  }}
                   title="Supprimer"
                   className="flex h-8 w-8 items-center justify-center rounded-full text-red-400 hover:bg-red-50 hover:text-red-600"
                 >
@@ -1240,6 +1276,9 @@ export default function CalendarView({
             teamScore={event.teamScore}
             opponentScore={event.opponentScore}
             canEdit={canManageEvent}
+            onSaved={(teamScore, opponentScore) =>
+              updateLocalEventScore(event.id, teamScore, opponentScore)
+            }
           />
         ) : (
           <span className="w-fit rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-semibold text-zinc-400">
@@ -1661,9 +1700,33 @@ export default function CalendarView({
       <ConfirmDialog
         open={Boolean(deleteEventTarget)}
         title="Supprimer l'événement ?"
-        message="Êtes-vous sûr de vouloir supprimer définitivement cet événement ?"
+        message={
+          deleteEventTarget?.collecteId ? (
+            <>
+              <p>Êtes-vous sûr de vouloir supprimer définitivement cet événement ?</p>
+              <label className="mt-3 flex items-start gap-2 text-sm text-zinc-700">
+                <input
+                  type="checkbox"
+                  checked={deleteCollecteToo}
+                  onChange={(e) => setDeleteCollecteToo(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-300 text-red-600 focus:ring-red-500"
+                />
+                <span>
+                  Cet événement a une collecte de suivi dans Cotisations → Événements
+                  payants ({deleteEventTarget.paidParticipants.length} participant
+                  {deleteEventTarget.paidParticipants.length > 1 ? "s" : ""}). Supprimer
+                  aussi cette collecte et les paiements déjà enregistrés dessus ?
+                </span>
+              </label>
+            </>
+          ) : (
+            "Êtes-vous sûr de vouloir supprimer définitivement cet événement ?"
+          )
+        }
         confirmLabel="Supprimer"
-        onConfirm={() => deleteEventTarget && confirmDeleteEvent(deleteEventTarget)}
+        onConfirm={() =>
+          deleteEventTarget && confirmDeleteEvent(deleteEventTarget, deleteCollecteToo)
+        }
         onCancel={() => setDeleteEventTarget(null)}
       />
     </div>

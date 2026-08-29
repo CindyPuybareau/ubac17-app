@@ -15,11 +15,19 @@ export default function MatchScore({
   teamScore,
   opponentScore,
   canEdit,
+  onSaved,
 }: {
   eventId: string;
   teamScore: number | null;
   opponentScore: number | null;
   canEdit: boolean;
+  // Retour de Cindy du 29/08 ("ça met longtemps avant d'afficher le
+  // score") : teamScore/opponentScore sont des props calculées côté
+  // serveur — sans ce callback, l'affichage (et les confettis, qui lisent
+  // le même event.teamScore côté calendar-view.tsx) attendaient le
+  // rafraîchissement temps réel (realtime-sync.tsx, débounce ~0,8s + un
+  // aller-retour serveur complet) après une saisie pourtant déjà réussie.
+  onSaved?: (teamScore: number, opponentScore: number) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [team, setTeam] = useState("");
@@ -61,6 +69,7 @@ export default function MatchScore({
       return;
     }
     setEditing(false);
+    onSaved?.(t, o);
     // Pas de router.refresh() explicite : events est surveillée en temps
     // réel (realtime-sync.tsx) — le garder ici en plus rechargeait la page
     // deux fois pour une seule saisie (retour de Cindy du 2026-08-20).
