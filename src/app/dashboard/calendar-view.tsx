@@ -380,6 +380,53 @@ export default function CalendarView({
     setLocalEvents(events);
   }, [events]);
 
+  // Retour de Cindy du 29/08 ("le délai pour afficher '1 présent' est trop
+  // long") : rsvpCounts/presentPlayers sont des champs calculés côté
+  // serveur, embarqués dans `event` — jusqu'ici seul le rafraîchissement
+  // temps réel (realtime-sync.tsx, débounce ~0,8s + un aller-retour serveur
+  // complet) les mettait à jour, alors que le bouton Présent/Absent
+  // lui-même répond déjà instantanément (affichage optimiste, voir
+  // rsvp-buttons.tsx). Répercute ici, dans la même copie locale que
+  // localEvents, le même geste optimiste pour ces deux compteurs — le
+  // prochain rafraîchissement temps réel écrasera cette approximation par
+  // la vraie valeur serveur de toute façon.
+  function updateLocalRsvpStatus(
+    eventId: string,
+    playerId: string,
+    playerName: string,
+    previousStatus: string,
+    newStatus: string
+  ) {
+    if (previousStatus === newStatus) return;
+    const bucketFor = (status: string) =>
+      status === "PRESENT" || status === "ABSENT" || status === "LATE"
+        ? (status.toLowerCase() as "present" | "absent" | "late")
+        : "pending";
+    setLocalEvents((prev) =>
+      prev.map((e) => {
+        if (e.id !== eventId) return e;
+        const rsvpCounts = { ...e.rsvpCounts };
+        rsvpCounts[bucketFor(previousStatus)] = Math.max(
+          0,
+          rsvpCounts[bucketFor(previousStatus)] - 1
+        );
+        rsvpCounts[bucketFor(newStatus)] += 1;
+        let presentPlayers = e.presentPlayers;
+        if (presentPlayers) {
+          if (newStatus === "PRESENT" && !presentPlayers.some((p) => p.id === playerId)) {
+            presentPlayers = [
+              ...presentPlayers,
+              { id: playerId, firstName: playerName, lastName: null },
+            ];
+          } else if (previousStatus === "PRESENT" && newStatus !== "PRESENT") {
+            presentPlayers = presentPlayers.filter((p) => p.id !== playerId);
+          }
+        }
+        return { ...e, rsvpCounts, presentPlayers };
+      })
+    );
+  }
+
   const today = new Date();
   const todayKey = toKey(today);
   const [viewMonth, setViewMonth] = useState<Date>(today);
@@ -956,6 +1003,9 @@ export default function CalendarView({
                     eventId={event.id}
                     playerId={p.id}
                     currentStatus={playerStatus}
+                    onStatusChange={(previousStatus, newStatus) =>
+                      updateLocalRsvpStatus(event.id, p.id, p.name, previousStatus, newStatus)
+                    }
                   />
                 </div>
               );

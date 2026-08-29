@@ -15,10 +15,19 @@ export default function RsvpButtons({
   eventId,
   playerId,
   currentStatus,
+  onStatusChange,
 }: {
   eventId: string;
   playerId: string;
   currentStatus: string;
+  // Retour de Cindy du 29/08 : les compteurs agrégés ("1 présent", "1
+  // joueur/joueuse présent(e)s") vivaient uniquement du rafraîchissement
+  // temps réel (realtime-sync.tsx), perçu comme trop lent alors que ce
+  // bouton répond déjà à l'instant — permet à un parent (calendar-view.tsx)
+  // de répercuter le même geste optimiste sur ces compteurs. Appelé une
+  // fois pour le changement optimiste, une seconde fois (arguments inversés)
+  // si l'écriture échoue et que le rollback ci-dessous s'applique.
+  onStatusChange?: (previousStatus: string, newStatus: string) => void;
 }) {
   const [status, setStatus] = useState(currentStatus);
   const [loading, setLoading] = useState(false);
@@ -46,6 +55,7 @@ export default function RsvpButtons({
     // réellement (voir le rollback dans le if plus bas).
     const previousStatus = status;
     setStatus(newStatus);
+    onStatusChange?.(previousStatus, newStatus);
     setLoading(true);
     setError(null);
     const supabase = createClient();
@@ -68,6 +78,7 @@ export default function RsvpButtons({
       // volunteer_needs, un refus RLS non couvert affiché comme une panne
       // générique impossible à diagnostiquer depuis l'appli).
       setStatus(previousStatus);
+      onStatusChange?.(newStatus, previousStatus);
       setError(writeError.message);
     }
 

@@ -4,11 +4,18 @@ import { useMemo, useState } from "react";
 import { MessageCircle } from "lucide-react";
 import { sortTeamsByGroup } from "@/lib/teams";
 import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
+import PenalitesCard from "./penalites-card";
 import TeamCard from "./team-card";
 import TeamSelectorPills from "./team-selector-pills";
 import WhatsAppGroupButton from "./whatsapp-group-button";
 import type { TeamWithMembers } from "./team-manager";
-import type { AdminMemberTeam, AdminUpcomingEvent, MemberDetail, WhatsAppGroup } from "./page";
+import type {
+  AdminMemberTeam,
+  AdminPenalite,
+  AdminUpcomingEvent,
+  MemberDetail,
+  WhatsAppGroup,
+} from "./page";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 
@@ -23,6 +30,7 @@ export default function CoachTeams({
   clubTeams,
   whatsappGroups,
   forcedTeamId,
+  penalites = [],
 }: {
   teams: TeamWithMembers[];
   allProfiles: Person[];
@@ -33,6 +41,11 @@ export default function CoachTeams({
   teamRoleByTeamId: Record<string, "COACH" | "PLAYER">;
   clubTeams: AdminMemberTeam[];
   whatsappGroups: WhatsAppGroup[];
+  // Retour de Cindy du 29/08 : "Pénalités de l'équipe" mélangeait les
+  // pénalités de TOUTES les équipes coachées (ex. U13F + U13M pour Basile)
+  // dans une seule liste, quelle que soit l'équipe sélectionnée ci-dessus —
+  // désormais filtrée sur l'effectif de l'équipe active uniquement.
+  penalites?: AdminPenalite[];
   // Utilisé par les sous-onglets "Équipe" dédiés (un par équipe+rôle,
   // sidebar Coach) : verrouille la carte sur cette équipe précise, cette
   // page n'ayant plus besoin de son propre sélecteur — la navigation vit
@@ -70,6 +83,8 @@ export default function CoachTeams({
   const activeRole = teamRoleByTeamId[active.id] ?? "COACH";
   const isPlayerTeam = activeRole === "PLAYER";
   const activeWhatsappGroup = whatsappGroups.find((g) => g.teamId === active.id) ?? null;
+  const activeRosterIds = new Set(active.players.map((p) => p.id));
+  const activeTeamPenalites = penalites.filter((p) => activeRosterIds.has(p.playerId));
 
   return (
     <div className="flex flex-col gap-4">
@@ -119,6 +134,12 @@ export default function CoachTeams({
         // Relier un compte parent à un enfant reste un geste du Bureau.
         canManageParentLinks={false}
         whatsappGroup={activeWhatsappGroup}
+      />
+      <PenalitesCard
+        title="Pénalités de l'équipe"
+        penalites={activeTeamPenalites}
+        showPlayerName
+        emptyLabel="Aucune pénalité pour tes joueurs."
       />
     </div>
   );

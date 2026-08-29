@@ -18,7 +18,6 @@ import CalendarSubscribe from "./calendar-subscribe";
 import CoachTeams, { CoachCommissionGroups } from "./coach-teams";
 import CoachFfbb from "./coach-ffbb";
 import CoachOrganisation, { type CoachTeamMatchCard } from "./coach-organisation";
-import PenalitesCard from "./penalites-card";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import type { TeamWithMembers } from "./team-manager";
 import type {
@@ -181,6 +180,16 @@ export default function CoachView({
       icon: <Users className={iconClass} />,
       content: (
         <div className="flex flex-col gap-4">
+          {/* Retour de Cindy du 29/08 : la cotisation/présence personnelles
+              d'un coach qui joue aussi lui-même vivent désormais dans
+              l'onglet "Mon équipe" à part entière (page.tsx), plus ici en
+              repli — ça évite de les montrer en double. "Pénalités de
+              l'équipe" vit maintenant DANS CoachTeams (même retour du
+              29/08) : elle doit être filtrée sur l'équipe actuellement
+              sélectionnée dans son pill switcher, pas mélanger toutes les
+              équipes coachées (ex. U13F + U13M pour Basile) dans une seule
+              liste — impossible à faire correctement depuis ici, en dehors
+              du composant qui connaît l'équipe active. */}
           <CoachTeams
             teams={teams}
             allProfiles={[]}
@@ -191,16 +200,7 @@ export default function CoachView({
             teamRoleByTeamId={teamRoleByTeamId}
             clubTeams={clubTeams}
             whatsappGroups={whatsappGroups}
-          />
-          {/* Retour de Cindy du 29/08 : la cotisation/présence/pénalités
-              personnelles d'un coach qui joue aussi lui-même vivent
-              désormais dans l'onglet "Mon équipe" à part entière (page.tsx),
-              plus ici en repli — ça évite de les montrer en double. */}
-          <PenalitesCard
-            title="Pénalités de l'équipe"
             penalites={penalites}
-            showPlayerName
-            emptyLabel="Aucune pénalité pour tes joueurs."
           />
           {/* Groupes "Commission" (Bureau, Coachs UBAC...), ni liés à une
               équipe ni propres à celle sélectionnée ci-dessus — vivait
