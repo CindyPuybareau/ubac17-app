@@ -20,6 +20,7 @@ import { teamLabel } from "@/lib/teams";
 import { buildAppDeepLink, buildWhatsAppLink } from "@/lib/whatsapp";
 import DateTimePicker from "./date-time-picker";
 import ConfirmDialog from "./confirm-dialog";
+import ParentLinkManager from "./parent-link-manager";
 import type { AdminMember, AdminMemberTeam, MemberDetail } from "./page";
 
 const BUREAU_ROLE_OPTIONS = [
@@ -881,6 +882,28 @@ export default function MemberDetailModal({
 
           {tab === "family" && (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {/* Retour de Cindy du 29/08 (cas de Basile LAMOURET, dont les
+                  enfants ont l'email d'un tiers comme contact) : le
+                  rattachement automatique par email (handle_new_user) ne
+                  suffit pas toujours — ce bloc permet au Bureau de relier
+                  manuellement un compte existant, avec une suggestion par
+                  téléphone/email secondaire en aide, jamais appliquée
+                  seule. Bureau uniquement, comme le reste des actions
+                  d'affectation sur cette fiche. */}
+              {editable && canManageTeamAndRoles && (
+                <ParentLinkManager
+                  playerId={member.id}
+                  candidatePhones={[
+                    form.motherPhone,
+                    form.fatherPhone,
+                    form.registrationPhone,
+                    // otherPhones est un champ libre multiligne (plusieurs
+                    // numéros possibles) : découpé sur tout séparateur usuel.
+                    ...form.otherPhones.split(/[\n,;/]+/),
+                  ]}
+                  candidateSecondaryEmail={form.secondaryEmail || null}
+                />
+              )}
               <Field
                 label="Email secondaire"
                 type="email"
