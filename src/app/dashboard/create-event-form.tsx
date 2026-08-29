@@ -363,7 +363,16 @@ export default function CreateEventForm({
       if (collecteId) {
         const { error: updateError } = await supabase
           .from("collectes")
-          .update({ name: eventName, prix: amountNum, payment_link: paymentLink })
+          .update({
+            name: eventName,
+            prix: amountNum,
+            payment_link: paymentLink,
+            // Tenu à jour tant que l'événement existe encore (ex. date
+            // déplacée) — voir event_date plus bas pour pourquoi il ne
+            // faut jamais lire cette date uniquement via la jointure vers
+            // events.
+            event_date: inserted.start_time,
+          })
           .eq("id", collecteId);
         if (updateError) {
           setLoading(false);
@@ -383,6 +392,15 @@ export default function CreateEventForm({
             prix: amountNum,
             event_id: inserted.id,
             payment_link: paymentLink,
+            // Instantané indépendant de la jointure collecte -> événement
+            // (retour de Cindy du 29/08, "j'aimerai voir la date... quand
+            // a til lieu ?") : event_id passe à null si l'événement est
+            // supprimé ou "Événement payant" décoché en modification (voir
+            // plus bas), sans jamais supprimer la collecte elle-même — sans
+            // cet instantané, la date de l'événement devenait irrécupérable
+            // pile au moment où elle devient utile (une collecte orpheline
+            // qu'on essaie de retrouver/comprendre).
+            event_date: inserted.start_time,
           })
           .select("id")
           .single();

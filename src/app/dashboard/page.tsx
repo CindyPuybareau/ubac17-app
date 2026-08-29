@@ -194,6 +194,13 @@ export type AdminCollecte = {
   // carte — voir aussi AdminUpcomingEvent.paymentLink plus bas.
   eventId: string | null;
   eventStartTime: string | null;
+  // Retour de Cindy du 29/08 ("j'aimerai voir la date de l'evenement
+  // payant, quand a til lieu ?") : instantané pris à la création de la
+  // collecte (create-event-form.tsx), jamais effacé si l'événement est
+  // ensuite supprimé (event_id -> null) ou "Événement payant" décoché —
+  // contrairement à eventStartTime ci-dessus qui dépend d'une jointure en
+  // direct vers events et redevient donc null dans ces deux cas.
+  eventDate: string | null;
   paymentLink: string | null;
 };
 
@@ -895,7 +902,9 @@ export default async function DashboardPage() {
         () =>
           supabase
             .from("collectes")
-            .select("id, name, type, prix, event_id, payment_link, events(start_time)")
+            .select(
+              "id, name, type, prix, event_id, event_date, payment_link, events(start_time)"
+            )
             .order("created_at", { ascending: false }),
         () =>
           supabase
@@ -1323,6 +1332,7 @@ export default async function DashboardPage() {
         prix: c.prix,
         eventId: c.event_id ?? null,
         eventStartTime: event?.start_time ?? null,
+        eventDate: c.event_date ?? null,
         paymentLink: c.payment_link ?? null,
       };
     });

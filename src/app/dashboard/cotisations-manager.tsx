@@ -476,21 +476,29 @@ export default function CotisationsManager({
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
-                  {c.eventStartTime ? (
+                  {/* Retour de Cindy du 29/08 ("j'aimerai voir la date de
+                      l'evenement payant, quand a til lieu ?") : eventDate
+                      est un instantané pris à la création de la collecte,
+                      jamais effacé même une fois l'événement supprimé —
+                      contrairement à eventStartTime (jointure en direct,
+                      redevient null dans ce cas). Les deux peuvent donc
+                      s'afficher ensemble : la date d'origine ET le repère
+                      "Événement supprimé". */}
+                  {(c.eventStartTime || c.eventDate) && (
                     <span className="flex items-center gap-1 text-xs text-zinc-500">
                       <CalendarDays className="h-3.5 w-3.5 shrink-0" />
-                      {new Date(c.eventStartTime).toLocaleDateString("fr-FR", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })}
+                      {new Date(c.eventStartTime ?? c.eventDate ?? "").toLocaleDateString(
+                        "fr-FR",
+                        { day: "numeric", month: "short", year: "numeric" }
+                      )}
                     </span>
-                  ) : isOrphaned ? (
+                  )}
+                  {isOrphaned && (
                     <span className="flex items-center gap-1 text-xs font-medium text-amber-700">
                       <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                       Événement supprimé
                     </span>
-                  ) : null}
+                  )}
                   {kpis && kpis.total > 0 && (
                     <div className="flex items-baseline justify-between text-sm">
                       <span className="font-semibold text-zinc-900">
