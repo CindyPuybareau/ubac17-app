@@ -15,6 +15,9 @@ type PenaliteForm = {
   penaliteDate: string;
   notes: string;
   statut: "EN_ATTENTE" | "PAYE";
+  // Retour de Cindy du 29/08 : lien HelloAsso pour payer CETTE pénalité
+  // précise, affiché côté joueur/parent dès qu'il est renseigné.
+  paymentLink: string;
 };
 
 function todayIso() {
@@ -27,6 +30,7 @@ const EMPTY_FORM: PenaliteForm = {
   penaliteDate: todayIso(),
   notes: "",
   statut: "EN_ATTENTE",
+  paymentLink: "",
 };
 
 function toForm(p: AdminPenalite): PenaliteForm {
@@ -36,6 +40,7 @@ function toForm(p: AdminPenalite): PenaliteForm {
     penaliteDate: p.penaliteDate ?? todayIso(),
     notes: p.notes ?? "",
     statut: p.statut === "PAYE" ? "PAYE" : "EN_ATTENTE",
+    paymentLink: p.paymentLink ?? "",
   };
 }
 
@@ -106,6 +111,7 @@ export default function PenalitesManager({
       penalite_date: form.penaliteDate || todayIso(),
       notes: form.notes.trim() || null,
       statut: form.statut,
+      payment_link: form.paymentLink.trim() || null,
       // Retour d'audit du 28/08 : new Date() inconditionnel réécrivait la
       // date de paiement à chaque modification, même pour corriger juste
       // les notes d'une pénalité déjà payée — l'historique de paiement
@@ -294,6 +300,24 @@ export default function PenalitesManager({
                   <option value="EN_ATTENTE">En attente</option>
                   <option value="PAYE">Payée</option>
                 </select>
+              </div>
+              {/* Retour de Cindy du 29/08 : "pouvoir ajouter un lien HelloAsso,
+                  pour que l'adhérent puisse cliquer sur son espace et payer sa
+                  pénalité" — optionnel, affiché tel quel sur ses cartes
+                  Pénalités (Bureau/Coach/Famille) tant que le statut n'est pas
+                  "Payée". Jamais dans l'Espace Enfant, comme le reste des
+                  liens de paiement du club. */}
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-600">
+                  Lien de paiement HelloAsso (optionnel)
+                </label>
+                <input
+                  type="url"
+                  value={form.paymentLink}
+                  onChange={(e) => setForm((f) => ({ ...f, paymentLink: e.target.value }))}
+                  placeholder="https://www.helloasso.com/..."
+                  className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+                />
               </div>
             </div>
             {error && <p className="mt-2 text-sm text-red-600">{error}</p>}

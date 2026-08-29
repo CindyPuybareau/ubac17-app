@@ -64,6 +64,10 @@ export type AdminPenalite = {
   penaliteDate: string | null;
   statut: string | null;
   paidAt: string | null;
+  // Retour de Cindy du 29/08 : lien HelloAsso pour payer cette pénalité
+  // précise directement depuis son espace, saisi au cas par cas par le
+  // Bureau (pas de collecte générique comme pour les cotisations).
+  paymentLink: string | null;
 };
 
 export type AdminSponsor = {
@@ -927,7 +931,7 @@ export default async function DashboardPage() {
         () =>
           supabase
             .from("penalites")
-            .select("id, player_id, amount, notes, penalite_date, statut, paid_at, players(first_name, last_name)")
+            .select("id, player_id, amount, notes, penalite_date, statut, paid_at, payment_link, players(first_name, last_name)")
             .order("penalite_date", { ascending: false }),
         // Bénévoles hors club (retour de Cindy du 2026-08-25) : réservé au
         // Bureau (voir policy "admin manage benevoles"), même périmètre
@@ -1373,6 +1377,7 @@ export default async function DashboardPage() {
         penaliteDate: p.penalite_date,
         statut: p.statut,
         paidAt: p.paid_at,
+        paymentLink: p.payment_link,
       };
     });
 
@@ -1636,7 +1641,7 @@ export default async function DashboardPage() {
         ? supabase
             .from("penalites")
             .select(
-              "id, player_id, amount, notes, penalite_date, statut, paid_at, players(first_name, last_name)"
+              "id, player_id, amount, notes, penalite_date, statut, paid_at, payment_link, players(first_name, last_name)"
             )
             .in("player_id", coachPenaliteScope)
         : Promise.resolve({ data: [] as unknown[] });
@@ -1904,6 +1909,7 @@ export default async function DashboardPage() {
         penalite_date: string | null;
         statut: string | null;
         paid_at: string | null;
+        payment_link: string | null;
         players: { first_name: string | null; last_name: string | null } | null;
       }[]
     ).map((p) => ({
@@ -1916,6 +1922,7 @@ export default async function DashboardPage() {
       penaliteDate: p.penalite_date,
       statut: p.statut,
       paidAt: p.paid_at,
+      paymentLink: p.payment_link,
     }));
     const coachRsvpRows = coachRsvpRowsRes.data;
     (coachRsvpRows ?? []).forEach((r) => {
@@ -2154,7 +2161,7 @@ export default async function DashboardPage() {
         ? supabase
             .from("penalites")
             .select(
-              "id, player_id, amount, notes, penalite_date, statut, paid_at, players(first_name, last_name)"
+              "id, player_id, amount, notes, penalite_date, statut, paid_at, payment_link, players(first_name, last_name)"
             )
             .in("player_id", familyPlayerIds)
             .order("penalite_date", { ascending: false })
@@ -2170,6 +2177,7 @@ export default async function DashboardPage() {
         penalite_date: string | null;
         statut: string | null;
         paid_at: string | null;
+        payment_link: string | null;
         players: { first_name: string | null; last_name: string | null } | null;
       }[]
     ).map((p) => ({
@@ -2182,6 +2190,7 @@ export default async function DashboardPage() {
       penaliteDate: p.penalite_date,
       statut: p.statut,
       paidAt: p.paid_at,
+      paymentLink: p.payment_link,
     }));
 
     if (teamsQueryResults) {
