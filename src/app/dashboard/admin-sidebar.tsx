@@ -104,6 +104,7 @@ function containsKey(sections: AdminSection[], targetKey: string): boolean {
 export default function AdminSidebar({
   sections,
   contentHeader,
+  standalone = false,
 }: {
   sections: AdminSection[];
   // Bloc rendu au-dessus du contenu de l'onglet actif, dans la colonne de
@@ -112,6 +113,18 @@ export default function AdminSidebar({
   // l'encart entraînement, pas au-dessus du menu"). Visible sur tous les
   // onglets puisqu'il vit ici plutôt que dans un `content` particulier.
   contentHeader?: ReactNode;
+  // Retour de Cindy du 29/08 : "Ma famille" imbriqué dans l'espace Bureau
+  // (ou Coach) rend une DEUXIÈME instance de ce composant sur la même
+  // page — mais useMobileNav() est un contexte PARTAGÉ, avec un seul
+  // bouton hamburger dans la bande bleue pour toute la page. Le menu du
+  // Bureau capte ce bouton en premier ; le sous-menu "Ma famille" n'a
+  // alors plus aucun moyen de s'ouvrir sur mobile (aucun bouton dédié).
+  // `standalone` bascule cette instance sur un état local plutôt que le
+  // contexte partagé, et affiche sa liste de sections en permanence (plus
+  // besoin d'un hamburger séparé) au lieu du panneau qui se déplie —
+  // jamais utilisé pour la navigation de PAGE (Bureau/Coach elle-même),
+  // seulement pour une navigation imbriquée comme celle-ci.
+  standalone?: boolean;
 }) {
   // Deep-link support (see buildAppDeepLink in lib/whatsapp.ts): a shared
   // "?section=…" URL — or an "?openMember=…" / "?openGroup=…" link, which
@@ -166,7 +179,12 @@ export default function AdminSidebar({
   // bas imposait un défilement horizontal dès qu'il y avait beaucoup
   // d'onglets) — ouvert/fermé depuis le bouton hamburger de la bande
   // bleue, via le contexte partagé (voir mobile-nav-context.tsx).
-  const { open, setOpen } = useMobileNav();
+  // Toujours appelé (règle des Hooks), ignoré si `standalone` (voir plus
+  // bas et le commentaire sur la prop).
+  const sharedMobileNav = useMobileNav();
+  const [localOpen, setLocalOpen] = useState(false);
+  const open = standalone ? localOpen : sharedMobileNav.open;
+  const setOpen = standalone ? setLocalOpen : sharedMobileNav.setOpen;
 
   function selectSection(key: string) {
     setActive(key);
@@ -302,8 +320,17 @@ export default function AdminSidebar({
 
   return (
     <div className="lg:flex lg:gap-6">
-      {/* Desktop: fixed-style vertical sidebar, inchangée */}
-      <nav className="hidden h-fit w-56 shrink-0 rounded-2xl bg-navy p-3 lg:sticky lg:top-20 lg:block">
+      {/* Desktop: fixed-style vertical sidebar, inchangée. En `standalone`
+          (retour de Cindy du 29/08, "Ma famille" imbriqué dans le Bureau) :
+          toujours visible, aussi sous le seuil lg — il n'existe alors
+          aucun bouton hamburger externe capable de l'ouvrir autrement, une
+          liste toujours affichée reste le seul moyen fiable d'y naviguer
+          sur mobile. */}
+      <nav
+        className={`h-fit shrink-0 rounded-2xl bg-navy p-3 lg:sticky lg:top-20 lg:w-56 ${
+          standalone ? "w-full" : "hidden lg:block"
+        }`}
+      >
         <ul className="flex flex-col gap-1">
           {sections.map((section) => renderSection(section, setActive))}
         </ul>
@@ -328,8 +355,11 @@ export default function AdminSidebar({
 
       {/* Mobile / tablette : panneau ouvert depuis le bouton hamburger de
           la bande bleue, plus de barre fixe en bas — même liste que la
-          sidebar desktop (libellé complet, plus de coupure à gérer). */}
-      {open && (
+          sidebar desktop (libellé complet, plus de coupure à gérer).
+          Jamais en `standalone` : la liste ci-dessus est déjà visible en
+          permanence dans ce cas, ce panneau ferait doublon (et n'a de
+          toute façon aucun bouton externe pour l'ouvrir). */}
+      {!standalone && open && (
         <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setOpen(false)}>
           <div className="absolute inset-0 bg-black/40" />
           <nav
