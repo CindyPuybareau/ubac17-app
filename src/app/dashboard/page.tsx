@@ -2005,7 +2005,18 @@ export default async function DashboardPage() {
   let familyEvents: AdminUpcomingEvent[] = [];
   let familyOrganisationTasks: Record<string, EventTasksState> = {};
   let familyVolunteerNeedsByEventId: Record<string, VolunteerNeed[]> = {};
-  let familyRsvpPlayers: { id: string; name: string; teamIds: string[]; avatarUrl: string | null }[] = [];
+  let familyRsvpPlayers: {
+    id: string;
+    name: string;
+    teamIds: string[];
+    avatarUrl: string | null;
+    // Retour de Cindy du 29/08 : sépare "Mon équipe" (ce booléen) de "Mes
+    // enfants" — les deux onglets se filtrent chacun sur ce champ plutôt
+    // que de fusionner les deux identités sous un même sélecteur de
+    // pastilles ambigu ("Ma famille" mélangeait sa propre fiche et ses
+    // enfants).
+    isSelf: boolean;
+  }[] = [];
   const familyRsvpStatusByKey: Record<string, string> = {};
   const familyBirthdayMembers: BirthdaySource[] = [];
   const familyTeamCards: FamilyTeamCardData[] = [];
@@ -2028,6 +2039,7 @@ export default async function DashboardPage() {
       name: p.name,
       teamIds: playerTeamIdsList[i],
       avatarUrl: p.avatarUrl,
+      isSelf: p.isSelf,
     }));
 
     const allTeamIds = Array.from(new Set(playerTeamIdsList.flat()));
@@ -2512,28 +2524,27 @@ export default async function DashboardPage() {
 
   const tabs: DashboardTab[] = [];
 
-  // Un coach dont le SEUL "joueur" rattaché est lui-même (aucun enfant) a
-  // désormais tout ce qu'il lui faut dans "Équipe" (calendrier, effectif,
-  // résultats — voir le sélecteur d'équipe de CalendarView) : "Ma famille"
-  // deviendrait un doublon pur qui prête à confusion. Un coach qui a
-  // aussi des enfants garde les deux onglets séparés (gérer SES enfants
-  // n'a rien à voir avec ses propres équipes).
-  const foldFamilyIntoCoach = isCoach && players.length > 0 && players.every((p) => p.isSelf);
-  // Retour de Cindy du 29/08 : "Ma famille" glissé DANS "Bureau" (ancien
-  // foldFamilyIntoAdmin) créait un menu dans un menu — sur mobile, son
-  // propre sous-menu (Calendrier/Mon Équipe/...) partageait le même bouton
-  // hamburger que celui du Bureau, sans aucun moyen de l'ouvrir à part
-  // (voir le cas d'Émilie ROBERT, Trésorière + joueuse Loisirs F + maman).
-  // "Ma famille" redevient un onglet de premier niveau à part entière,
-  // au même titre que "Bureau" et "Équipe" — plus simple, plus fluide,
-  // et ça referme cette classe de bug pour de bon (plus jamais deux
-  // AdminSidebar imbriqués sur la même page).
+  // Retour de Cindy du 29/08, après discussion : plus aucun repli/fusion
+  // entre identités — quatre onglets indépendants (Bureau / Équipe(s)
+  // coachée(s) / Mon équipe / Mon enfant ou Mes enfants), chacun affiché
+  // seulement s'il s'applique. "Mon équipe" et "Mes enfants" sont le MÊME
+  // composant FamilyView, réutilisé deux fois avec un sous-ensemble
+  // différent de familyRsvpPlayers (isSelf true/false) plutôt qu'un seul
+  // onglet "Ma famille" mélangeant sa propre fiche et ses enfants sous un
+  // même sélecteur de pastilles — c'est justement ce mélange qu'Émilie
+  // ROBERT (Trésorière + joueuse Loisirs F + maman) trouvait confus.
+  // Élimine au passage l'ancien cas particulier "coach sans enfant" (sa
+  // fiche perso noyée dans l'onglet Équipe, voir showOwnPlayerSummary
+  // dans coach-view.tsx) : "Mon équipe" s'affiche pareil pour tout le
+  // monde qui a une fiche joueur, qu'il coache ou non par ailleurs.
+  const myTeamRsvpPlayers = familyRsvpPlayers.filter((p) => p.isSelf);
+  const myChildrenRsvpPlayers = familyRsvpPlayers.filter((p) => !p.isSelf);
 
-  const familyViewElement =
-    players.length > 0 ? (
+  function buildFamilyView(rsvpPlayers: typeof familyRsvpPlayers) {
+    return (
       <FamilyView
         events={familyEvents}
-        rsvpPlayers={familyRsvpPlayers}
+        rsvpPlayers={rsvpPlayers}
         rsvpStatusByKey={familyRsvpStatusByKey}
         birthdayMembers={familyBirthdayMembers}
         teamCards={familyTeamCards}
@@ -2545,7 +2556,8 @@ export default async function DashboardPage() {
         cotisations={familyCotisations}
         penalites={familyPenalites}
       />
-    ) : null;
+    );
+  }
 
   if (isAdmin) {
     tabs.push({
@@ -2579,7 +2591,10 @@ export default async function DashboardPage() {
   if (isCoach) {
     tabs.push({
       key: "coach",
-      label: "Équipe",
+      // Retour de Cindy du 29/08 : "Équipe" tout court prêtait à confusion
+      // une fois "Mon équipe" introduit à côté (celui-là, c'est là où on
+      // JOUE soi-même) — "coachée(s)" lève l'ambiguïté d'un coup d'œil.
+      label: coachTeamsWithRoster.length > 1 ? "Équipes coachées" : "Équipe coachée",
       content: (
         <CoachView
           teams={coachTeamsWithRoster}
@@ -2604,23 +2619,32 @@ export default async function DashboardPage() {
           volunteerNeedsByEventId={coachVolunteerNeedsByEventId}
           ownPlayerId={ownPlayerId}
           ownPlayerNextEvent={ownPlayerNextEvent}
-          showOwnPlayerSummary={foldFamilyIntoCoach}
-          ownCotisations={
-            foldFamilyIntoCoach
-              ? familyCotisations.filter((c) => c.playerId === ownPlayerId)
-              : []
-          }
           penalites={coachPenalites}
         />
       ),
     });
   }
 
-  if (players.length > 0 && !foldFamilyIntoCoach) {
+  // "Mon équipe" : la propre fiche joueur de la personne (sa cotisation,
+  // sa présence, ses pénalités, le WhatsApp de SON équipe) — dès qu'elle
+  // en a une, qu'elle coache par ailleurs ou non. Toujours une identité
+  // unique, jamais de sélecteur de pastilles à construire ici.
+  if (myTeamRsvpPlayers.length > 0) {
     tabs.push({
-      key: "family",
-      label: "Ma famille",
-      content: familyViewElement,
+      key: "own-team",
+      label: "Mon équipe",
+      content: buildFamilyView(myTeamRsvpPlayers),
+    });
+  }
+
+  // "Mon enfant"/"Mes enfants" : uniquement les enfants, jamais mélangés
+  // avec sa propre fiche — le sélecteur de pastilles de FamilyView ne sert
+  // plus qu'à choisir entre eux quand il y en a plusieurs.
+  if (myChildrenRsvpPlayers.length > 0) {
+    tabs.push({
+      key: "children",
+      label: myChildrenRsvpPlayers.length > 1 ? "Mes enfants" : "Mon enfant",
+      content: buildFamilyView(myChildrenRsvpPlayers),
     });
   }
 

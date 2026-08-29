@@ -18,14 +18,10 @@ import CalendarSubscribe from "./calendar-subscribe";
 import CoachTeams, { CoachCommissionGroups } from "./coach-teams";
 import CoachFfbb from "./coach-ffbb";
 import CoachOrganisation, { type CoachTeamMatchCard } from "./coach-organisation";
-import FamilyAttendanceRequests from "./family-attendance-requests";
-import FamilyAttendanceSummary from "./family-attendance-summary";
-import FamilyCotisationCard from "./family-cotisation-card";
 import PenalitesCard from "./penalites-card";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import type { TeamWithMembers } from "./team-manager";
 import type {
-  AdminCotisation,
   AdminMemberTeam,
   AdminPenalite,
   AdminUpcomingEvent,
@@ -63,8 +59,6 @@ export default function CoachView({
   volunteerNeedsByEventId = {},
   ownPlayerId,
   ownPlayerNextEvent = null,
-  showOwnPlayerSummary = false,
-  ownCotisations = [],
   penalites = [],
 }: {
   teams: TeamWithMembers[];
@@ -105,15 +99,6 @@ export default function CoachView({
   // Rôles", trié par date avec les cartes des équipes coachées (retour de
   // Cindy du 2026-08-20).
   ownPlayerNextEvent?: ConvocationCard | null;
-  // true seulement quand ce coach n'a aucun enfant rattaché (juste sa
-  // propre fiche joueur) : l'onglet "Mon espace" est alors retiré et cet
-  // espace reprend ses deux derniers morceaux (relance de présence,
-  // cotisation) pour rester le seul endroit à consulter. Un coach qui a
-  // aussi des enfants garde les deux onglets séparés — page.tsx ne
-  // fournit ces informations qu'à ce moment-là (ownCotisations reste
-  // vide sinon), pour ne jamais les faire apparaître en double.
-  showOwnPlayerSummary?: boolean;
-  ownCotisations?: AdminCotisation[];
   // Lecture seule (retour de Cindy du 2026-08-22) : les pénalités des
   // joueurs de TOUTES les équipes de ce coach, saisies par le Bureau
   // (voir penalites-manager.tsx) — jamais de droit de saisie ici.
@@ -207,31 +192,10 @@ export default function CoachView({
             clubTeams={clubTeams}
             whatsappGroups={whatsappGroups}
           />
-          {/* Même emplacement que côté Parent (family-view.tsx, onglet
-              "Mon Équipe") : la cotisation et le bilan d'assiduité vivent
-              avec l'identité de l'équipe, pas en haut de page. Le bilan
-              avait été oublié à la création de cet espace replié — un
-              coach sans enfant n'avait alors aucun moyen de voir son
-              propre taux de présence, contrairement à n'importe quel
-              parent. */}
-          {showOwnPlayerSummary && (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <FamilyCotisationCard cotisations={ownCotisations} />
-              <FamilyAttendanceSummary
-                events={events}
-                players={rsvpPlayers.filter((p) => p.id === ownPlayerId)}
-                rsvpStatusByKey={rsvpStatusByKey}
-              />
-              <PenalitesCard
-                title="Mes pénalités"
-                penalites={penalites.filter((p) => p.playerId === ownPlayerId)}
-              />
-            </div>
-          )}
-          {/* Visible pour tout coach, pas seulement le cas replié
-              ci-dessus (retour de Cindy du 2026-08-22, "dans tous les
-              espaces") : les pénalités des joueurs de ses équipes,
-              lecture seule. */}
+          {/* Retour de Cindy du 29/08 : la cotisation/présence/pénalités
+              personnelles d'un coach qui joue aussi lui-même vivent
+              désormais dans l'onglet "Mon équipe" à part entière (page.tsx),
+              plus ici en repli — ça évite de les montrer en double. */}
           <PenalitesCard
             title="Pénalités de l'équipe"
             penalites={penalites}
@@ -408,18 +372,10 @@ export default function CoachView({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Repris de l'espace Parent (voir family-view.tsx) pour un coach
-          sans enfant, dont "Mon espace" a été retiré : sa propre relance
-          de présence doit se voir en ouvrant l'app, comme côté Parent —
-          la cotisation, elle, vit dans "Mes Équipes" (voir plus bas),
-          même emplacement que côté Parent. */}
-      {showOwnPlayerSummary && ownPlayerId && (
-        <FamilyAttendanceRequests
-          events={events}
-          players={rsvpPlayers.filter((p) => p.id === ownPlayerId)}
-          statusByKey={rsvpStatusByKey}
-        />
-      )}
+      {/* Retour de Cindy du 29/08 : la relance de présence d'un coach qui
+          joue aussi lui-même vit désormais dans l'onglet "Mon équipe" à
+          part entière (FamilyView la rend déjà en tête, voir page.tsx) —
+          plus ici en repli. */}
       <AdminSidebar sections={sections} />
     </div>
   );
