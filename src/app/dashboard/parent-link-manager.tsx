@@ -96,11 +96,14 @@ export default function ParentLinkManager({
         if (!cancelled) setSuggestion(null);
         return;
       }
+      // Pas de filtre sur le téléphone ici : un match peut se faire par
+      // email secondaire seul (cas de Basile, dont le compte n'a peut-être
+      // pas de téléphone renseigné) — le filtrer en amont excluait à tort
+      // ces comptes-là de la comparaison ci-dessous.
       const supabase = createClient();
       const { data } = await supabase
         .from("profiles")
-        .select("id, first_name, last_name, email, phone")
-        .not("phone", "is", null);
+        .select("id, first_name, last_name, email, phone");
       if (cancelled) return;
       const linkedIds = new Set(linked.map((p) => p.id));
       const match = (data ?? []).find((p) => {
