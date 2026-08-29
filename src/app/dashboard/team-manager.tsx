@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import EmptyState from "./empty-state";
 import TeamCard from "./team-card";
 import TeamFilterDropdown from "./team-filter-dropdown";
-import type { AdminMemberTeam, AdminUpcomingEvent, MemberDetail } from "./page";
+import type { AdminMemberTeam, AdminUpcomingEvent, MemberDetail, WhatsAppGroup } from "./page";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 
@@ -49,6 +49,7 @@ export default function TeamManager({
   contactPhoneByPlayerId,
   memberDetailsByPlayerId,
   clubTeams,
+  whatsappGroups,
 }: {
   teams: TeamWithMembers[];
   allProfiles: Person[];
@@ -56,6 +57,10 @@ export default function TeamManager({
   contactPhoneByPlayerId: Record<string, string>;
   memberDetailsByPlayerId: Record<string, MemberDetail>;
   clubTeams: AdminMemberTeam[];
+  // Retour de Cindy du 29/08 : le Bureau n'avait aucun accès au groupe
+  // WhatsApp de chaque équipe depuis cet onglet, contrairement à Coach
+  // (coach-teams.tsx) qui l'a déjà — un vrai oubli, pas un choix.
+  whatsappGroups: WhatsAppGroup[];
 }) {
   const router = useRouter();
   const categoryListId = useId();
@@ -154,6 +159,7 @@ export default function TeamManager({
             // groupes), et un retrait complet du club passe par
             // Archiver/Réactiver dans l'onglet Membres.
             canRemoveMembers={false}
+            whatsappGroup={whatsappGroups.find((g) => g.teamId === team.id) ?? null}
           />
         ))}
         {teams.length === 0 && (

@@ -124,6 +124,16 @@ export default function AdminView({
   const memberDetailsByPlayerId: Record<string, MemberDetail> = Object.fromEntries(
     members.map((m) => [m.id, m])
   );
+  // Retour de Cindy du 29/08 (Basile LAMOURET, coach sans numéro/email/
+  // statut alors que sa fiche membre les a) : team-card.tsx cherche les
+  // coachs par l'id de leur COMPTE (team_coaches.coach_id), jamais par
+  // celui de leur fiche joueur — sans cette deuxième clé, un coach qui a
+  // aussi une fiche Membre (ex. Basile, joueur Séniors 1) ne la retrouvait
+  // jamais depuis sa ligne de coach. Même correctif déjà en place côté
+  // Coach (page.tsx, coachMemberDetailsByPlayerId) — jamais répercuté ici.
+  members.forEach((m) => {
+    if (m.profileId) memberDetailsByPlayerId[m.profileId] = m;
+  });
 
   const iconClass = "h-4 w-4 shrink-0";
   const sections: AdminSection[] = [
@@ -174,6 +184,7 @@ export default function AdminView({
           contactPhoneByPlayerId={contactPhoneByPlayerId}
           memberDetailsByPlayerId={memberDetailsByPlayerId}
           clubTeams={canonicalTeamRefs}
+          whatsappGroups={whatsappGroups}
         />
       ),
     },

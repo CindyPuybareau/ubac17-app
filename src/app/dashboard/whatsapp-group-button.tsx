@@ -1,15 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { MessageCircle, Send, X } from "lucide-react";
+import { ExternalLink, Send, X } from "lucide-react";
 import { buildWhatsAppForwardLink } from "@/lib/whatsapp";
 
+// Retour de Cindy du 29/08 ("tous les boutons whatsapp des équipes... même
+// vert, même icône partout, nommés comme le groupe qu'on a nommé à la
+// base") : même style plein vert + ExternalLink que le bouton "Ouvrir sur
+// WhatsApp" (team-card.tsx, whatsapp-groups-manager.tsx...) — c'était le
+// seul bouton whatsapp d'équipe encore en contour, avec une phrase
+// reconstruite ("Envoyer sur le groupe WhatsApp Séniors M") au lieu du nom
+// réel du groupe. `groupName` (renommé depuis `teamName`) reçoit
+// maintenant whatsappGroup.name directement depuis l'appelant.
 export default function WhatsAppGroupButton({
-  teamName,
+  groupName,
   defaultMessage,
   className,
 }: {
-  teamName: string;
+  groupName: string;
   defaultMessage: string;
   className?: string;
 }) {
@@ -26,11 +34,11 @@ export default function WhatsAppGroupButton({
         }}
         className={
           className ??
-          "flex items-center gap-1.5 rounded-full border border-emerald-200 px-3 py-1.5 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
+          "flex items-center gap-1.5 rounded-full bg-emerald-500 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
         }
       >
-        <MessageCircle className="h-4 w-4" />
-        Envoyer sur le groupe WhatsApp {teamName}
+        <ExternalLink className="h-4 w-4" />
+        Groupe WhatsApp {groupName}
       </button>
 
       {open && (
@@ -44,8 +52,8 @@ export default function WhatsAppGroupButton({
           >
             <div className="mb-3 flex items-center justify-between">
               <h3 className="flex items-center gap-1.5 font-semibold text-zinc-900">
-                <MessageCircle className="h-4 w-4 shrink-0 text-emerald-600" />
-                Groupe WhatsApp {teamName}
+                <ExternalLink className="h-4 w-4 shrink-0 text-emerald-600" />
+                Groupe WhatsApp {groupName}
               </h3>
               <button
                 onClick={() => setOpen(false)}
@@ -62,7 +70,7 @@ export default function WhatsAppGroupButton({
             />
             <p className="mt-2 text-xs text-zinc-400">
               WhatsApp va s&apos;ouvrir avec ce message prêt à envoyer : choisis
-              le groupe {teamName} dans la liste, puis appuie sur envoyer.
+              le groupe {groupName} dans la liste, puis appuie sur envoyer.
             </p>
             <a
               href={buildWhatsAppForwardLink(text)}

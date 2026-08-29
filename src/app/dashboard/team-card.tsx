@@ -1208,9 +1208,9 @@ export default function TeamCard({
       ) : (
         readOnly && (
           <WhatsAppGroupButton
-            teamName={team.name ?? "l'équipe"}
+            groupName={whatsappGroup?.name ?? team.name ?? "l'équipe"}
             defaultMessage={`Bonjour à tous, je suis un joueur de l'équipe ${team.name ?? ""}.`}
-            className="mt-3 flex w-fit items-center gap-1.5 rounded-full border border-emerald-200 px-3 py-1.5 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
+            className="mt-3 flex w-fit items-center gap-1.5 rounded-full bg-emerald-500 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
           />
         )
       )}
