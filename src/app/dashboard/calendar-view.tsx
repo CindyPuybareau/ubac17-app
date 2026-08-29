@@ -804,6 +804,20 @@ export default function CalendarView({
 
     return (
       <div key={event.id} className={`flex flex-col gap-2 ${cardShellClass}`}>
+        {/* Retour de Cindy du 29/08 : les confettis (MatchResultCelebration)
+            ne se déclenchaient que sur "Matchs & Résultats" (renderResultCard
+            plus bas), qui ne montre QUE les matchs officiels (MATCH) — un
+            match amical (FRIENDLY) gagné vit sous "Événements" et n'était
+            donc jamais fêté. isMatchType couvre les deux ; hasCelebratedMatch
+            (via resultKey) empêche un double déclenchement si ce même match
+            apparaît aussi ailleurs. */}
+        {isMatchType(event.event_type) && (
+          <MatchResultCelebration
+            resultKey={`${event.id}:${event.teamScore}-${event.opponentScore}`}
+            isWin={isRecentWin(event)}
+            enabled={celebrateWins}
+          />
+        )}
         {/* Fanion "Spécial" (retour de Cindy du 2026-08-24, item 6 du topo :
             "le tournoi exceptionnel doit sauter aux yeux") — s'ajoute à la
             bordure pointillée ci-dessus plutôt que de la remplacer, pour
