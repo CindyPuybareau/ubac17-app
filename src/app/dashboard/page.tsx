@@ -2514,21 +2514,20 @@ export default async function DashboardPage() {
 
   // Un coach dont le SEUL "joueur" rattaché est lui-même (aucun enfant) a
   // désormais tout ce qu'il lui faut dans "Équipe" (calendrier, effectif,
-  // résultats — voir le sélecteur d'équipe de CalendarView) : "Mon
-  // espace" devient un doublon pur qui prête à confusion. Un coach qui a
+  // résultats — voir le sélecteur d'équipe de CalendarView) : "Ma famille"
+  // deviendrait un doublon pur qui prête à confusion. Un coach qui a
   // aussi des enfants garde les deux onglets séparés (gérer SES enfants
   // n'a rien à voir avec ses propres équipes).
   const foldFamilyIntoCoach = isCoach && players.length > 0 && players.every((p) => p.isSelf);
-  // Même principe que pour Basile (coach sans enfant, voir plus haut),
-  // dans l'autre sens : quelqu'un du Bureau qui a aussi des enfants (ou sa
-  // propre fiche joueur) n'a pas besoin d'un onglet "Mon espace" séparé et
-  // de même poids que "Bureau" — c'est justement la juxtaposition de deux
-  // onglets qui prêtait à confusion (voir l'échange avec Cindy). Sa vie de
-  // parent devient une section DANS "Bureau", pas une deuxième identité
-  // à côté. Contrairement à foldFamilyIntoCoach, on ne restreint pas aux
-  // "isSelf uniquement" : le Bureau reste l'identité principale même avec
-  // de vrais enfants.
-  const foldFamilyIntoAdmin = isAdmin && players.length > 0;
+  // Retour de Cindy du 29/08 : "Ma famille" glissé DANS "Bureau" (ancien
+  // foldFamilyIntoAdmin) créait un menu dans un menu — sur mobile, son
+  // propre sous-menu (Calendrier/Mon Équipe/...) partageait le même bouton
+  // hamburger que celui du Bureau, sans aucun moyen de l'ouvrir à part
+  // (voir le cas d'Émilie ROBERT, Trésorière + joueuse Loisirs F + maman).
+  // "Ma famille" redevient un onglet de premier niveau à part entière,
+  // au même titre que "Bureau" et "Équipe" — plus simple, plus fluide,
+  // et ça referme cette classe de bug pour de bon (plus jamais deux
+  // AdminSidebar imbriqués sur la même page).
 
   const familyViewElement =
     players.length > 0 ? (
@@ -2572,7 +2571,6 @@ export default async function DashboardPage() {
           automationSettings={adminAutomationSettings}
           eventRoles={eventRoleTypes}
           volunteerNeedsByEventId={adminVolunteerNeedsByEventId}
-          familySection={foldFamilyIntoAdmin ? familyViewElement : null}
         />
       ),
     });
@@ -2618,17 +2616,16 @@ export default async function DashboardPage() {
     });
   }
 
-  if (players.length > 0 && !foldFamilyIntoCoach && !foldFamilyIntoAdmin) {
+  if (players.length > 0 && !foldFamilyIntoCoach) {
     tabs.push({
       key: "family",
-      label: "Mon espace",
+      label: "Ma famille",
       content: familyViewElement,
     });
   }
 
   // Bandeau "Cette semaine" de l'en-tête (retour de Cindy/Sandrine Manzelle
-  // du 2026-08-24) : jamais pour le Bureau (identité principale même en
-  // cumul, voir foldFamilyIntoAdmin plus haut) — seulement côté Coach et/ou
+  // du 2026-08-24) : jamais pour le Bureau — seulement côté Coach et/ou
   // Parent. Fusion coachEvents + familyEvents (dédoublonnée par id) pour
   // que quelqu'un qui cumule les deux casquettes (ex. Sandrine Manzelle)
   // voie tout d'un coup d'œil sans avoir à choisir un onglet d'abord.

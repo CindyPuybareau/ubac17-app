@@ -5,7 +5,6 @@ import {
   Gavel,
   HandHeart,
   Handshake,
-  Heart,
   ListOrdered,
   LogOut,
   MessageCircle,
@@ -72,7 +71,6 @@ export default function AdminView({
   automationSettings,
   eventRoles,
   volunteerNeedsByEventId,
-  familySection = null,
 }: {
   clubFunction?: string | null;
   teams: TeamWithMembers[];
@@ -95,12 +93,6 @@ export default function AdminView({
   // bénévoles directement depuis la carte de l'événement.
   eventRoles: EventRoleType[];
   volunteerNeedsByEventId: Record<string, VolunteerNeed[]>;
-  // Repris de l'espace Parent (family-view.tsx) : un membre du Bureau qui
-  // a aussi des enfants (ou sa propre fiche joueur) n'a plus un onglet
-  // "Mon espace" séparé, du même poids que "Bureau" — sa vie de parent
-  // devient une section ici, comme l'a été "Mes Équipes" pour un coach
-  // sans enfant (voir page.tsx, foldFamilyIntoCoach/foldFamilyIntoAdmin).
-  familySection?: React.ReactNode;
 }) {
   const teamRefs = teams.map((t) => ({
     id: t.id,
@@ -161,18 +153,6 @@ export default function AdminView({
         />
       ),
     },
-    ...(familySection
-      ? [
-          {
-            // Juste après le premier onglet : c'est la partie personnelle,
-            // avant les outils de gestion du club qui suivent.
-            key: "family",
-            label: "Ma famille",
-            icon: <Heart className={iconClass} />,
-            content: familySection,
-          },
-        ]
-      : []),
     {
       key: "members",
       label: "Membres",
