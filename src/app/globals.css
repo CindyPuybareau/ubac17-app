@@ -78,6 +78,14 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-body), Arial, Helvetica, sans-serif;
+  /* Retour de Cindy du 29/08 ("sur téléphone je vais de droite à
+     gauche") : sans ce filet, le moindre élément qui dépasse d'un
+     pixel sur un petit écran (un texte trop long, un dégradé décoratif
+     positionné en absolute...) fait défiler TOUTE la page
+     horizontalement plutôt que d'être simplement rogné. Sans danger
+     pour l'en-tête (position: sticky) : il vit dans le flux normal du
+     body, pas dans un conteneur au scroll propre. */
+  overflow-x: hidden;
 }
 
 /* Défilement doux vers les ancres du menu de la page d'accueil
