@@ -157,6 +157,7 @@ export default function AdminView({
           volunteerNeedsByEventId={volunteerNeedsByEventId}
           sponsors={sponsors}
           penalites={penalites}
+          benevoles={benevoles}
         />
       ),
     },
