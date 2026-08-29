@@ -24,7 +24,6 @@ import PlayerYearBadge from "./player-year-badge";
 import SalleBadge from "./salle-badge";
 import WhatsAppDirectButton from "./whatsapp-direct-button";
 import WhatsAppGroupButton from "./whatsapp-group-button";
-import TeamWhatsAppSettings from "./team-whatsapp-settings";
 import type { AdminMemberTeam, AdminUpcomingEvent, MemberDetail, WhatsAppGroup } from "./page";
 import type { RosterPlayer, TeamWithMembers } from "./team-manager";
 
@@ -150,11 +149,11 @@ export default function TeamCard({
   // droit dédié plutôt que readOnly, qui couvre bien plus large (Bureau
   // ET coach sur sa propre équipe valent tous les deux readOnly=false).
   canRemoveMembers = true,
-  // Groupe WhatsApp de CETTE équipe (whatsapp_groups). En coach (readOnly
-  // false), un bouton "Configurer WhatsApp" ouvre le lien d'invitation et
-  // les membres — plus besoin d'un onglet séparé pour ça. En joueur
-  // (readOnly true), un simple bouton d'envoi comme côté parent : pas
-  // besoin de tout gérer, juste écrire au groupe.
+  // Groupe WhatsApp de CETTE équipe (whatsapp_groups) : sert uniquement au
+  // lien "Ouvrir sur WhatsApp" ci-dessous désormais (retour de Cindy du
+  // 29/08 : le bouton "Configurer WhatsApp" de l'en-tête a été retiré,
+  // l'édition du lien se fait maintenant depuis l'onglet dédié "Groupes
+  // WhatsApp").
   whatsappGroup,
   // Vrai droit dédié (même logique que canRemoveMembers ci-dessus) : le
   // rattachement parent-enfant n'a aucune UI équivalente ailleurs, donc il
@@ -879,25 +878,6 @@ export default function TeamCard({
             </span>
           )}
         </div>
-        {/* Coach de cette équipe : un raccourci discret dans l'en-tête
-            plutôt qu'un onglet séparé pour ça — un seul endroit où gérer
-            son équipe. En lecture seule (joueur), le bouton d'envoi plus
-            bas suffit, pas besoin de ce réglage. */}
-        {!readOnly && whatsappGroup && (
-          <TeamWhatsAppSettings
-            groupId={whatsappGroup.id}
-            groupName={team.name ?? "de l'équipe"}
-            inviteLink={whatsappGroup.inviteLink}
-            members={sortByLastName(
-              whatsappGroup.members.map((m) => ({ id: m.id, firstName: m.firstName, lastName: m.lastName })),
-              (m) => m.lastName
-            )}
-            candidates={sortByLastName(
-              team.players.map((p) => ({ id: p.id, firstName: p.first_name, lastName: p.last_name })),
-              (p) => p.lastName
-            )}
-          />
-        )}
       </div>
 
       <div className="mt-3">
@@ -1204,14 +1184,17 @@ export default function TeamCard({
         </div>
       </div>
 
-      {/* Un lien direct dès qu'il existe — coach ou joueur, même bouton :
-          "Configurer WhatsApp" (en-tête, coach uniquement) sert à SAISIR
-          le lien, pas à l'ouvrir. Sans ce bouton-ci, un coach n'avait plus
-          aucun moyen de rejoindre le groupe de sa propre équipe en un
-          clic — régression introduite en retirant l'onglet WhatsApp dédié
-          au profit de la roue crantée. Le bouton "compose un message"
-          (générique, sans vrai lien) ne reste qu'en dernier recours pour
-          un joueur, tant qu'aucun lien n'a encore été renseigné. */}
+      {/* Un lien direct dès qu'il existe — coach ou joueur, même bouton.
+          Retour de Cindy du 29/08 : le bouton "Configurer WhatsApp" de
+          l'en-tête (édition du lien + gestion des membres, voir
+          team-whatsapp-settings.tsx) a été retiré, redondant avec le
+          nouvel onglet dédié "Groupes WhatsApp" (Coach) qui édite déjà le
+          lien de chaque groupe — seule la gestion des membres n'a pas
+          d'équivalent là-bas, mais elle n'était lue nulle part ailleurs
+          dans l'appli (bookkeeping sans effet fonctionnel). Le bouton
+          "compose un message" (générique, sans vrai lien) ne reste qu'en
+          dernier recours pour un joueur, tant qu'aucun lien n'a encore été
+          renseigné. */}
       {whatsappGroup?.inviteLink ? (
         <a
           href={whatsappGroup.inviteLink}
