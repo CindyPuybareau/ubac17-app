@@ -522,44 +522,63 @@ export default function CotisationsManager({
           </div>
 
           {creatingCollecte && (
-            <div className="flex flex-col gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm sm:flex-row sm:items-end sm:gap-3">
-              <div className="flex-1">
-                <label className="mb-1 block text-xs font-medium text-zinc-600">Nom</label>
-                <input
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  placeholder="Stage Toussaint 2026"
-                  className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-600">Type</label>
-                <select
-                  value={newType}
-                  onChange={(e) => setNewType(e.target.value as CollecteType)}
-                  className="rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+            <div className="flex flex-col gap-3 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
+              {/* Retour de Cindy du 29/08 : un "Événement" créé ici (nom +
+                  type + tarif seulement) n'avait ni date ni lien vers le
+                  calendrier, ni participants pré-remplis — indiscernable
+                  d'une collecte orpheline dès sa création. "Événement"
+                  retiré des choix ci-dessous : un seul chemin désormais,
+                  "Créer un événement" + case "Événement payant", qui bascule
+                  automatiquement la collecte ici avec toutes ces
+                  informations. Stage/Boutique n'ont pas cet équivalent
+                  calendrier, ils gardent ce formulaire. */}
+              <p className="flex items-start gap-1.5 text-xs text-zinc-500">
+                <Ticket className="h-3.5 w-3.5 shrink-0 text-navy" />
+                Pour un événement payant (stage, tournoi...), crée-le depuis
+                Calendrier ou Événements avec la case &laquo;&nbsp;Événement
+                payant&nbsp;&raquo; — sa collecte apparaîtra ici automatiquement,
+                déjà reliée et avec ses participants. Ce formulaire sert
+                seulement pour un stage externe ou une boutique, sans
+                événement au calendrier.
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
+                <div className="flex-1">
+                  <label className="mb-1 block text-xs font-medium text-zinc-600">Nom</label>
+                  <input
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="Stage Toussaint 2026"
+                    className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-zinc-600">Type</label>
+                  <select
+                    value={newType}
+                    onChange={(e) => setNewType(e.target.value as CollecteType)}
+                    className="rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+                  >
+                    <option value="STAGE">Stage</option>
+                    <option value="BOUTIQUE">Boutique</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-zinc-600">Tarif (€)</label>
+                  <input
+                    type="number"
+                    value={newPrix}
+                    onChange={(e) => setNewPrix(e.target.value)}
+                    className="w-24 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+                  />
+                </div>
+                <button
+                  onClick={createCollecte}
+                  disabled={creatingSaving || !newName.trim()}
+                  className="rounded-full bg-ubac-yellow px-3.5 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
                 >
-                  <option value="STAGE">Stage</option>
-                  <option value="EVENEMENT">Événement</option>
-                  <option value="BOUTIQUE">Boutique</option>
-                </select>
+                  {creatingSaving ? "Création..." : "Créer"}
+                </button>
               </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-600">Tarif (€)</label>
-                <input
-                  type="number"
-                  value={newPrix}
-                  onChange={(e) => setNewPrix(e.target.value)}
-                  className="w-24 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
-                />
-              </div>
-              <button
-                onClick={createCollecte}
-                disabled={creatingSaving || !newName.trim()}
-                className="rounded-full bg-ubac-yellow px-3.5 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
-              >
-                {creatingSaving ? "Création..." : "Créer"}
-              </button>
             </div>
           )}
 
