@@ -17,6 +17,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { formatFirstName, formatLastName, formatPersonName, sortByLastName } from "@/lib/names";
 import { computePlayerYearStatus, getCurrentSeasonLabel } from "@/lib/season";
+import { teamLabel } from "@/lib/teams";
 import { formatEventTime, isMatchType, styleFor } from "./calendar-view";
 import OpponentDisplay from "./opponent-display";
 import MemberDetailModal from "./member-detail-modal";
@@ -1194,7 +1195,11 @@ export default function TeamCard({
           dans l'appli (bookkeeping sans effet fonctionnel). Le bouton
           "compose un message" (générique, sans vrai lien) ne reste qu'en
           dernier recours pour un joueur, tant qu'aucun lien n'a encore été
-          renseigné. */}
+          renseigné. Retour du 29/08 (suite) : "Ouvrir sur WhatsApp" ne
+          disait pas QUEL groupe — remplacé par teamLabel(team) (ex.
+          "U13F"), pas whatsappGroup.name : ce dernier est le nom brut
+          saisi au seed ("U13F UBAC 2026/27"...), pas pensé pour tenir sur
+          un bouton — même correctif que "trop long" signalé juste après. */}
       {whatsappGroup?.inviteLink ? (
         <a
           href={whatsappGroup.inviteLink}
@@ -1203,12 +1208,12 @@ export default function TeamCard({
           className="mt-3 flex w-fit items-center gap-1.5 rounded-full bg-emerald-500 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
         >
           <ExternalLink className="h-4 w-4" />
-          Ouvrir sur WhatsApp
+          Groupe WhatsApp {teamLabel(team)}
         </a>
       ) : (
         readOnly && (
           <WhatsAppGroupButton
-            groupName={whatsappGroup?.name ?? team.name ?? "l'équipe"}
+            groupName={teamLabel(team)}
             defaultMessage={`Bonjour à tous, je suis un joueur de l'équipe ${team.name ?? ""}.`}
             className="mt-3 flex w-fit items-center gap-1.5 rounded-full bg-emerald-500 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
           />
