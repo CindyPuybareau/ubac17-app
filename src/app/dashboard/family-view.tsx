@@ -51,7 +51,6 @@ export default function FamilyView({
   volunteerNeedsByEventId,
   cotisations,
   penalites,
-  nested = false,
 }: {
   events: AdminUpcomingEvent[];
   rsvpPlayers: CalendarRsvpPlayer[];
@@ -70,11 +69,6 @@ export default function FamilyView({
   // Lecture seule (retour de Cindy du 2026-08-22) : toutes celles de tous
   // les enfants, saisies par le Bureau (voir penalites-manager.tsx).
   penalites: AdminPenalite[];
-  // Retour de Cindy du 29/08 : true quand cette vue vit imbriquée dans
-  // l'onglet "Bureau" (foldFamilyIntoAdmin, voir page.tsx) plutôt que
-  // comme onglet de page à part entière — passé tel quel à AdminSidebar
-  // (prop `standalone`), voir son commentaire pour le pourquoi.
-  nested?: boolean;
 }) {
   const iconClass = "h-4 w-4 shrink-0";
 
@@ -356,7 +350,6 @@ export default function FamilyView({
 
       <AdminSidebar
         sections={sections}
-        standalone={nested}
         // Retour de Cindy du 2026-08-22 : le sélecteur d'enfant doit vivre
         // au-dessus du contenu de l'onglet actif (ex. juste au-dessus de
         // "Prochaine convocation" dans Calendrier), pas au-dessus de toute

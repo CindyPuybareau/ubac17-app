@@ -2545,16 +2545,6 @@ export default async function DashboardPage() {
         volunteerNeedsByEventId={familyVolunteerNeedsByEventId}
         cotisations={familyCotisations}
         penalites={familyPenalites}
-        // Retour de Cindy du 29/08 : "Ma famille" imbriqué dans le Bureau
-        // (foldFamilyIntoAdmin, seul cas qui réutilise ce composant — le
-        // repli côté Coach sans équipe propre passe par un mécanisme
-        // différent, plus simple, voir showOwnPlayerSummary/ownCotisations
-        // plus bas) partage la page avec une autre navigation déjà
-        // pilotée par le hamburger de l'en-tête — son propre sous-menu
-        // (Calendrier/Mon Équipe/...) a besoin de son état de navigation à
-        // lui, jamais du même bouton partagé. Sans risque pour le cas
-        // standalone (Famille seule identité) : false dans ce cas.
-        nested={foldFamilyIntoAdmin}
       />
     ) : null;
 
