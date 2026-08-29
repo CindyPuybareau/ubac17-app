@@ -2538,7 +2538,17 @@ export default async function DashboardPage() {
   // dans coach-view.tsx) : "Mon équipe" s'affiche pareil pour tout le
   // monde qui a une fiche joueur, qu'il coache ou non par ailleurs.
   const myTeamRsvpPlayers = familyRsvpPlayers.filter((p) => p.isSelf);
-  const myChildrenRsvpPlayers = familyRsvpPlayers.filter((p) => !p.isSelf);
+  // Retour de Cindy du 29/08 (cas de Basile, qui coache les deux équipes de
+  // ses filles) : un enfant dont TOUTES les équipes sont déjà coachées par
+  // cette personne fait doublon avec l'onglet "Équipe(s) coachée(s)" (mêmes
+  // matchs/entraînements) — on ne le liste pas dans "Mes enfants". Un enfant
+  // dans une équipe qu'elle ne coache pas (ou sans équipe assignée) reste
+  // affiché normalement.
+  const myChildrenRsvpPlayers = familyRsvpPlayers.filter(
+    (p) =>
+      !p.isSelf &&
+      !(p.teamIds.length > 0 && p.teamIds.every((id) => coachedTeamIds.has(id)))
+  );
 
   function buildFamilyView(rsvpPlayers: typeof familyRsvpPlayers) {
     return (
