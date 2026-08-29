@@ -1,4 +1,5 @@
 import {
+  Building2,
   CalendarDays,
   Contact,
   Flag,
@@ -181,9 +182,14 @@ export default function AdminView({
       // licences" / "évenements payants" / "pénalités". La section
       // parente n'a plus de contenu propre, elle ne fait plus que
       // déplier/replier — chaque enfant verrouille CotisationsManager sur
-      // son propre onglet interne (voir forcedTab).
+      // son propre onglet interne (voir forcedTab). Renommé "Paiements"
+      // (retour de Cindy du 29/08, menu Bureau à simplifier) : "Cotisations"
+      // se répétait avec son propre premier sous-onglet "Cotisations &
+      // Licences", et le groupe couvre plus large (pénalités aussi). key
+      // inchangée pour ne pas casser un lien profond "?section=cotisations"
+      // déjà partagé.
       key: "cotisations",
-      label: "Cotisations",
+      label: "Paiements",
       icon: <Wallet className={iconClass} />,
       content: null,
       children: [
@@ -306,61 +312,81 @@ export default function AdminView({
       ],
     },
     {
-      key: "sponsors",
-      label: "Sponsors",
-      icon: <Handshake className={iconClass} />,
-      content: <SponsorsManager sponsors={sponsors} />,
-    },
-    {
-      // Retour de Cindy du 2026-08-25 : membres non-joueurs mobilisables
-      // pour les besoins d'organisation (buvette, table de marque...) d'un
-      // événement, sans être ni joueur ni forcément parent — voir
-      // benevoles-manager.tsx et la section "Bénévoles invités" sur
-      // CreateEventForm.
-      key: "benevoles",
-      label: "Bénévoles",
-      icon: <HandHeart className={iconClass} />,
-      content: <BenevolesManager benevoles={benevoles} />,
-    },
-    {
-      key: "ffbb",
-      label: "FFBB",
-      icon: <RefreshCw className={iconClass} />,
-      content: (
-        <div className="flex flex-col gap-4">
-          <FfbbManager teams={teams} />
-          <ImportInscriptions />
-          <ImportPlanning existingTeams={teamRefs} />
-          <ImportCoaches existingTeams={teamRefs} />
-        </div>
-      ),
-    },
-    {
-      // Retour de Cindy du 2026-08-22 : renommé et déplacé après FFBB
-      // (était juste après "Événements et Résultats").
-      key: "whatsapp",
-      label: "Groupes WhatsApp",
-      icon: <MessageCircle className={iconClass} />,
-      content: <WhatsAppGroupsManager groups={whatsappGroups} teams={canonicalTeamRefs} />,
-    },
-    {
-      // Retour de Cindy du 25/08 : le Bureau voit les 3 documents (comme
-      // partout ailleurs dans l'app, le Bureau a une vision à 100%) — voir
-      // club-documents.tsx pour le contenu et la répartition par rôle.
-      key: "documents",
-      label: "Documents",
-      icon: <ScrollText className={iconClass} />,
-      content: (
-        <DocumentsPanel documentIds={["charte-joueur", "charte-parent", "reglement-interieur"]} />
-      ),
-    },
-    {
-      // Un lien externe, pas un onglet de contenu (voir href sur AdminSection).
-      key: "boutique",
-      label: "Boutique en ligne",
-      icon: <ShoppingBag className={iconClass} />,
+      // Regroupement (retour de Cindy du 29/08, menu Bureau à simplifier) :
+      // ces 6 onglets sont des ressources/outils annexes consultés
+      // ponctuellement, pas des outils du quotidien comme Membres/Équipes/
+      // Paiements — les sortir du premier niveau fait passer le Bureau de
+      // 12 à 7 entrées. keys inchangées (sponsors/benevoles/ffbb/whatsapp/
+      // documents/boutique) : sectionExists/findSection cherchent
+      // récursivement dans les enfants, donc un lien profond
+      // "?openGroup=…" (implique la section "whatsapp") continue de
+      // fonctionner tel quel une fois nichée ici.
+      key: "club-life",
+      label: "Vie du club",
+      icon: <Building2 className={iconClass} />,
       content: null,
-      href: BOUTIQUE_URL,
+      children: [
+        {
+          key: "sponsors",
+          label: "Sponsors",
+          icon: <Handshake className={iconClass} />,
+          content: <SponsorsManager sponsors={sponsors} />,
+        },
+        {
+          // Retour de Cindy du 2026-08-25 : membres non-joueurs mobilisables
+          // pour les besoins d'organisation (buvette, table de marque...)
+          // d'un événement, sans être ni joueur ni forcément parent — voir
+          // benevoles-manager.tsx et la section "Bénévoles invités" sur
+          // CreateEventForm.
+          key: "benevoles",
+          label: "Bénévoles",
+          icon: <HandHeart className={iconClass} />,
+          content: <BenevolesManager benevoles={benevoles} />,
+        },
+        {
+          key: "ffbb",
+          label: "FFBB",
+          icon: <RefreshCw className={iconClass} />,
+          content: (
+            <div className="flex flex-col gap-4">
+              <FfbbManager teams={teams} />
+              <ImportInscriptions />
+              <ImportPlanning existingTeams={teamRefs} />
+              <ImportCoaches existingTeams={teamRefs} />
+            </div>
+          ),
+        },
+        {
+          // Retour de Cindy du 2026-08-22 : renommé et déplacé après FFBB
+          // (était juste après "Événements et Résultats").
+          key: "whatsapp",
+          label: "Groupes WhatsApp",
+          icon: <MessageCircle className={iconClass} />,
+          content: <WhatsAppGroupsManager groups={whatsappGroups} teams={canonicalTeamRefs} />,
+        },
+        {
+          // Retour de Cindy du 25/08 : le Bureau voit les 3 documents
+          // (comme partout ailleurs dans l'app, le Bureau a une vision à
+          // 100%) — voir club-documents.tsx pour le contenu et la
+          // répartition par rôle.
+          key: "documents",
+          label: "Documents",
+          icon: <ScrollText className={iconClass} />,
+          content: (
+            <DocumentsPanel
+              documentIds={["charte-joueur", "charte-parent", "reglement-interieur"]}
+            />
+          ),
+        },
+        {
+          // Un lien externe, pas un onglet de contenu (voir href sur AdminSection).
+          key: "boutique",
+          label: "Boutique en ligne",
+          icon: <ShoppingBag className={iconClass} />,
+          content: null,
+          href: BOUTIQUE_URL,
+        },
+      ],
     },
     {
       // Tout à la fin du menu (retour de Cindy du 2026-08-22) — déplacé
