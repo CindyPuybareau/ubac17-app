@@ -20,8 +20,10 @@ export type FamilyTeamCardData = {
   coaches: CoachContact[];
   // Named coaches assigned via a member's fiche (team_pending_coaches)
   // before they have a real account yet — same source as the Membres
-  // table's amber "en attente" badge.
-  pendingCoaches: Person[];
+  // table's amber "en attente" badge. Téléphone/e-mail viennent de cette
+  // même fiche (family_pending_coach_contact, retour de Cindy du 30/08 :
+  // ce coach n'a pas de compte, donc pas d'autre source possible).
+  pendingCoaches: CoachContact[];
   roster: RosterMate[];
   ffbbUrl: string | null;
   sortOrder: number | null;
@@ -68,9 +70,9 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
     })),
     ...sortByLastName(card.pendingCoaches, (c) => c.last_name).map((c) => ({
       key: `pending-${c.id}`,
-      person: c,
-      phone: null,
-      email: null,
+      person: c as Person,
+      phone: c.phone,
+      email: c.email,
       role: "COACH_PENDING" as const,
     })),
   ];

@@ -2212,16 +2212,130 @@ export default async function DashboardPage() {
                     .filter((r) => r.players !== null),
                 };
               },
-              () =>
-                supabase
+              // Retour de Cindy du 30/08 : le téléphone/e-mail d'un coach
+              // renseignés dans sa fiche Membre par le Bureau
+              // (registration_phone/email) n'apparaissaient jamais ici s'il
+              // ne s'était pas connecté lui-même pour remplir son propre
+              // compte — l'embed profiles(phone, email) ci-dessous ne lit
+              // que le compte de connexion. Complété par family_coach_
+              // contact (même priorité que contactsFor dans team-card.tsx
+              // côté Bureau/Coach : fiche Membre d'abord, compte de
+              // connexion en repli) — vue dédiée plutôt qu'un embed direct
+              // sur players, même principe que family_teammate_roster.
+              async () => {
+                const teamCoachesRes = await supabase
                   .from("team_coaches")
                   .select("team_id, profiles(id, first_name, last_name, phone, email)")
-                  .in("team_id", allTeamIds),
-              () =>
-                supabase
+                  .in("team_id", allTeamIds);
+                const coachProfileIds = Array.from(
+                  new Set(
+                    (teamCoachesRes.data ?? [])
+                      .map(
+                        (r) =>
+                          (
+                            r.profiles as unknown as { id: string } | null
+                          )?.id
+                      )
+                      .filter((id): id is string => Boolean(id))
+                  )
+                );
+                const contactRes =
+                  coachProfileIds.length > 0
+                    ? await supabase
+                        .from("family_coach_contact")
+                        .select("profile_id, phone, email")
+                        .in("profile_id", coachProfileIds)
+                    : {
+                        data: [] as {
+                          profile_id: string;
+                          phone: string | null;
+                          email: string | null;
+                        }[],
+                      };
+                const contactByProfileId = new Map(
+                  (contactRes.data ?? []).map((c) => [c.profile_id, c])
+                );
+                return {
+                  data: (teamCoachesRes.data ?? []).map((r) => {
+                    const p = r.profiles as unknown as {
+                      id: string;
+                      first_name: string | null;
+                      last_name: string | null;
+                      phone: string | null;
+                      email: string | null;
+                    } | null;
+                    if (!p) return r;
+                    const contact = contactByProfileId.get(p.id);
+                    return {
+                      ...r,
+                      profiles: {
+                        ...p,
+                        phone: contact?.phone ?? p.phone,
+                        email: contact?.email ?? p.email,
+                      },
+                    };
+                  }),
+                };
+              },
+              // Même correctif que team_coaches juste au-dessus, pour un
+              // coach nommé sur sa fiche Membre mais pas encore connecté
+              // (team_pending_coaches) : côté Bureau (team-card.tsx), son
+              // téléphone/e-mail vient directement de sa fiche Membre (il
+              // n'a pas de compte, donc pas d'autre source) — ici, aucune
+              // colonne phone/email n'était même demandée, donc "—" garanti
+              // pour tout coach dans ce cas (Farid BAHRI, Jean BOUYER-
+              // POINOT, retour de Cindy du 30/08).
+              async () => {
+                const teamPendingCoachesRes = await supabase
                   .from("team_pending_coaches")
                   .select("team_id, players(id, first_name, last_name)")
-                  .in("team_id", allTeamIds),
+                  .in("team_id", allTeamIds);
+                const pendingCoachPlayerIds = Array.from(
+                  new Set(
+                    (teamPendingCoachesRes.data ?? [])
+                      .map(
+                        (r) =>
+                          (r.players as unknown as { id: string } | null)?.id
+                      )
+                      .filter((id): id is string => Boolean(id))
+                  )
+                );
+                const contactRes =
+                  pendingCoachPlayerIds.length > 0
+                    ? await supabase
+                        .from("family_pending_coach_contact")
+                        .select("player_id, phone, email")
+                        .in("player_id", pendingCoachPlayerIds)
+                    : {
+                        data: [] as {
+                          player_id: string;
+                          phone: string | null;
+                          email: string | null;
+                        }[],
+                      };
+                const contactByPlayerId = new Map(
+                  (contactRes.data ?? []).map((c) => [c.player_id, c])
+                );
+                return {
+                  data: (teamPendingCoachesRes.data ?? []).map((r) => {
+                    const p = r.players as unknown as {
+                      id: string;
+                      first_name: string | null;
+                      last_name: string | null;
+                    } | null;
+                    if (!p) return r;
+                    const contact = contactByPlayerId.get(p.id);
+                    return {
+                      ...r,
+                      players: {
+                        ...p,
+                        phone: contact?.phone ?? null,
+                        email: contact?.email ?? null,
+                      },
+                    };
+                  }),
+                };
+              },
             ],
             // Voir lib/batch.ts / le bloc Bureau plus haut pour le contexte.
             4
@@ -2356,9 +2470,14 @@ export default async function DashboardPage() {
       // table's amber badge, Équipes tab) — surfaced here too so a parent
       // sees who's coaching even before that coach has signed up for a
       // real account.
-      const pendingCoachesByTeamId = new Map<string, Person[]>();
+      const pendingCoachesByTeamId = new Map<
+        string,
+        (Person & { phone: string | null; email: string | null })[]
+      >();
       (teamPendingCoachesRes.data ?? []).forEach((row) => {
-        const p = row.players as unknown as Person | null;
+        const p = row.players as unknown as
+          | (Person & { phone: string | null; email: string | null })
+          | null;
         if (!p) return;
         const list = pendingCoachesByTeamId.get(row.team_id) ?? [];
         list.push(p);
