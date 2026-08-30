@@ -1018,10 +1018,9 @@ export default function CalendarView({
           </div>
         )}
 
-        {/* "Qui sera là ?" : uniquement renseigné côté Famille (voir
-            presentPlayers sur AdminUpcomingEvent) — ne rend donc jamais
-            rien côté Bureau/Coach, qui ont déjà leur propre vue de
-            l'effectif ailleurs. */}
+        {/* "Qui sera là ?" — retour de Cindy du 30/08 : visible sur tous
+            les espaces (Bureau/Coach/Famille), plus seulement côté Famille
+            comme avant (voir presentPlayers sur AdminUpcomingEvent). */}
         <PresentPlayersList players={event.presentPlayers ?? []} />
 
         {/* Plus d'appel express ici pour une équipe gérée : le coach ne
