@@ -1,4 +1,5 @@
 import {
+  Building2,
   CalendarDays,
   ClipboardList,
   Flag,
@@ -338,45 +339,59 @@ export default function CoachView({
       ],
     },
     {
-      key: "ffbb",
-      label: "FFBB",
-      icon: <RefreshCw className={iconClass} />,
-      content: <CoachFfbb teams={teams} teamRoleByTeamId={teamRoleByTeamId} />,
-    },
-    {
-      // Retour de Cindy du 29/08 : "Commissions & Admin" (Bureau, Coachs
-      // UBAC, Buvette...) vivait uniquement comme un bloc attaché à l'onglet
-      // Équipe, redondant pour qui cumule aussi le Bureau (même liste que
-      // "Vie du club" -> "Groupes WhatsApp" là-bas) — mais c'était le SEUL
-      // accès pour un coach sans accès Bureau (ex. à son propre groupe
-      // "Coachs UBAC"). Un vrai onglet dédié ici plutôt qu'une suppression
-      // pure et simple. WhatsAppGroupsManager gère déjà canManage par
-      // groupe (RLS), donc un coach ne voit le crayon d'édition que sur les
-      // groupes qu'il gère réellement (sa propre équipe) — rien de plus
-      // exposé qu'avant.
-      key: "whatsapp",
-      label: "Groupes WhatsApp",
-      icon: <MessageCircle className={iconClass} />,
-      content: <WhatsAppGroupsManager groups={whatsappGroups} teams={clubTeams} />,
-    },
-    {
-      // Retour de Cindy du 26/08 : les 3 documents sur tous les espaces
-      // sauf Bénévoles (Règlement Intérieur seul là-bas) — voir
-      // club-documents.tsx.
-      key: "documents",
-      label: "Documents",
-      icon: <ScrollText className={iconClass} />,
-      content: (
-        <DocumentsPanel documentIds={["charte-joueur", "charte-parent", "reglement-interieur"]} />
-      ),
-    },
-    {
-      // Un lien externe, pas un onglet de contenu (voir href sur AdminSection).
-      key: "boutique",
-      label: "Boutique en ligne",
-      icon: <ShoppingBag className={iconClass} />,
+      // Retour de Cindy du 30/08 : même sous-menu "Vie du club" que côté
+      // Bureau (admin-view.tsx), réduit aux quatre entrées qui concernent
+      // aussi un coach (pas Sponsors/Bénévoles, réservés au Bureau).
+      key: "club-life",
+      label: "Vie du club",
+      icon: <Building2 className={iconClass} />,
       content: null,
-      href: BOUTIQUE_URL,
+      children: [
+        {
+          key: "ffbb",
+          label: "FFBB",
+          icon: <RefreshCw className={iconClass} />,
+          content: <CoachFfbb teams={teams} teamRoleByTeamId={teamRoleByTeamId} />,
+        },
+        {
+          // Retour de Cindy du 29/08 : "Commissions & Admin" (Bureau,
+          // Coachs UBAC, Buvette...) vivait uniquement comme un bloc
+          // attaché à l'onglet Équipe, redondant pour qui cumule aussi le
+          // Bureau (même liste que "Vie du club" -> "Groupes WhatsApp"
+          // là-bas) — mais c'était le SEUL accès pour un coach sans accès
+          // Bureau (ex. à son propre groupe "Coachs UBAC"). Un vrai onglet
+          // dédié ici plutôt qu'une suppression pure et simple.
+          // WhatsAppGroupsManager gère déjà canManage par groupe (RLS),
+          // donc un coach ne voit le crayon d'édition que sur les groupes
+          // qu'il gère réellement (sa propre équipe) — rien de plus exposé
+          // qu'avant.
+          key: "whatsapp",
+          label: "Groupes WhatsApp",
+          icon: <MessageCircle className={iconClass} />,
+          content: <WhatsAppGroupsManager groups={whatsappGroups} teams={clubTeams} />,
+        },
+        {
+          // Retour de Cindy du 26/08 : les 3 documents sur tous les
+          // espaces sauf Bénévoles (Règlement Intérieur seul là-bas) —
+          // voir club-documents.tsx.
+          key: "documents",
+          label: "Documents",
+          icon: <ScrollText className={iconClass} />,
+          content: (
+            <DocumentsPanel
+              documentIds={["charte-joueur", "charte-parent", "reglement-interieur"]}
+            />
+          ),
+        },
+        {
+          // Un lien externe, pas un onglet de contenu (voir href sur AdminSection).
+          key: "boutique",
+          label: "Boutique en ligne",
+          icon: <ShoppingBag className={iconClass} />,
+          content: null,
+          href: BOUTIQUE_URL,
+        },
+      ],
     },
     {
       // Tout à la fin du menu (retour de Cindy du 2026-08-22) — déplacé
