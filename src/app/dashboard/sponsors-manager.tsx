@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Handshake, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Handshake, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { resizeImageForLogo } from "@/lib/image-resize";
 import { formatLocalDateFr } from "@/lib/local-date";
@@ -77,6 +77,7 @@ export default function SponsorsManager({ sponsors }: { sponsors: AdminSponsor[]
   const [error, setError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminSponsor | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [movingId, setMovingId] = useState<string | null>(null);
 
   function openNew() {
     setForm(EMPTY_FORM);
@@ -152,7 +153,13 @@ export default function SponsorsManager({ sponsors }: { sponsors: AdminSponsor[]
     const { error: writeError } =
       editing !== "new" && editing
         ? await supabase.from("sponsors").update(payload).eq("id", editing.id)
-        : await supabase.from("sponsors").insert(payload);
+        : // Nouveau sponsor : ajouté à la fin de l'ordre d'affichage plutôt
+          // que sort_order par défaut (0), qui l'aurait fait sauter en
+          // première position devant tous les autres.
+          await supabase.from("sponsors").insert({
+            ...payload,
+            sort_order: Math.max(0, ...sponsors.map((s) => s.sortOrder)) + 1,
+          });
     setSaving(false);
     if (writeError) {
       setError("Enregistrement impossible, réessaie.");
@@ -169,6 +176,27 @@ export default function SponsorsManager({ sponsors }: { sponsors: AdminSponsor[]
     await supabase.from("sponsors").delete().eq("id", deleteTarget.id);
     setDeleting(false);
     setDeleteTarget(null);
+    router.refresh();
+  }
+
+  // Retour de Cindy du 29/08 : deux flèches plutôt qu'un glisser-déposer —
+  // plus simple à coder, et surtout fiable sur téléphone (le glisser-
+  // déposer tactile se comporte mal sur mobile). `sponsors` est déjà trié
+  // par sort_order (voir la requête dans page.tsx), donc "voisin" ici veut
+  // dire littéralement l'élément juste avant/après dans ce tableau — un
+  // simple échange de sort_order entre les deux suffit.
+  async function moveSponsor(index: number, direction: -1 | 1) {
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= sponsors.length) return;
+    const current = sponsors[index];
+    const neighbor = sponsors[targetIndex];
+    setMovingId(current.id);
+    const supabase = createClient();
+    await Promise.all([
+      supabase.from("sponsors").update({ sort_order: neighbor.sortOrder }).eq("id", current.id),
+      supabase.from("sponsors").update({ sort_order: current.sortOrder }).eq("id", neighbor.id),
+    ]);
+    setMovingId(null);
     router.refresh();
   }
 
@@ -346,7 +374,7 @@ export default function SponsorsManager({ sponsors }: { sponsors: AdminSponsor[]
         <EmptyState icon={Handshake} message="Aucun sponsor enregistré pour le moment." />
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {sponsors.map((sponsor) => {
+          {sponsors.map((sponsor, index) => {
             const contact = [sponsor.contactName, sponsor.contactEmail, sponsor.contactPhone]
               .filter(Boolean)
               .join(" · ");
@@ -374,6 +402,24 @@ export default function SponsorsManager({ sponsors }: { sponsors: AdminSponsor[]
                     </span>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => moveSponsor(index, -1)}
+                      disabled={index === 0 || movingId !== null}
+                      title="Faire remonter"
+                      className="flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 disabled:opacity-30"
+                    >
+                      <ArrowUp className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveSponsor(index, 1)}
+                      disabled={index === sponsors.length - 1 || movingId !== null}
+                      title="Faire descendre"
+                      className="flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 disabled:opacity-30"
+                    >
+                      <ArrowDown className="h-3.5 w-3.5" />
+                    </button>
                     <button
                       type="button"
                       onClick={() => openEdit(sponsor)}

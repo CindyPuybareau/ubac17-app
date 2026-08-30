@@ -86,6 +86,7 @@ export type AdminSponsor = {
   logoUrl: string | null;
   websiteUrl: string | null;
   contractType: string | null;
+  sortOrder: number;
 };
 
 // Vue publique (sponsor_display) : nom + logo + lien uniquement, jamais le
@@ -740,7 +741,10 @@ export default async function DashboardPage() {
     // la table sponsors elle-même, Bureau uniquement) — vue dédiée
     // (sponsor_display) plutôt qu'une policy RLS plus étroite sur la table
     // complète, même principe que family_teammate_roster.
-    supabase.from("sponsor_display").select("id, name, logo_url, website_url"),
+    supabase
+      .from("sponsor_display")
+      .select("id, name, logo_url, website_url")
+      .order("sort_order", { ascending: true }),
   ]);
 
   const sponsorDisplay: SponsorDisplay[] = (sponsorDisplayRes.data ?? []).map((s) => ({
@@ -970,9 +974,14 @@ export default async function DashboardPage() {
           supabase
             .from("sponsors")
             .select(
-              "id, name, contact_name, contact_email, contact_phone, renewal_date, notes, logo_url, website_url, contract_type"
+              "id, name, contact_name, contact_email, contact_phone, renewal_date, notes, logo_url, website_url, contract_type, sort_order"
             )
-            .order("renewal_date", { ascending: true, nullsFirst: false }),
+            // Retour de Cindy du 29/08 : trié par ordre d'affichage choisi
+            // (flèches monter/descendre, sponsors-manager.tsx) plutôt que
+            // par date de renouvellement — cette liste doit refléter
+            // exactement l'ordre montré partout ailleurs pour que les
+            // flèches aient un sens.
+            .order("sort_order", { ascending: true }),
         // Toutes les pénalités du club — le Bureau les gère toutes (onglet
         // Pénalités, à côté de Stages & Événements Payants).
         () =>
@@ -1391,6 +1400,7 @@ export default async function DashboardPage() {
       logoUrl: s.logo_url,
       websiteUrl: s.website_url,
       contractType: s.contract_type,
+      sortOrder: s.sort_order,
     }));
 
     adminBenevoles = (benevolesRes.data ?? []).map((b) => ({

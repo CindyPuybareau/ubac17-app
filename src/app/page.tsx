@@ -98,7 +98,8 @@ async function getSponsors(): Promise<
   );
   const { data } = await supabase
     .from("sponsor_display")
-    .select("id, name, logo_url, website_url");
+    .select("id, name, logo_url, website_url")
+    .order("sort_order", { ascending: true });
   return data ?? [];
 }
 
