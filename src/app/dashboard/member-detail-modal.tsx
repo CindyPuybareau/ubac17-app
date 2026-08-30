@@ -142,6 +142,14 @@ export default function MemberDetailModal({
   // rester ouvert au Bureau quel que soit l'onglet d'où la fiche est ouverte,
   // et seulement fermé pour un Coach.
   canManageParentLinks = true,
+  // Retour de Cindy du 30/08 : un coach ne doit corriger que les
+  // coordonnées de contact d'un joueur qu'il gère (email, téléphone,
+  // adresse) — jamais son nom, sa catégorie, sa licence ou ses notes
+  // médicales. Voir aussi le déclencheur protect_sensitive_player_fields
+  // côté base, qui applique la même règle même hors de cette interface :
+  // ce prop-ci ne fait qu'aligner l'écran sur ce qui sera de toute façon
+  // accepté ou non à l'enregistrement.
+  canEditFullProfile = true,
 }: {
   member: MemberDetail;
   readOnly: boolean;
@@ -167,6 +175,7 @@ export default function MemberDetailModal({
   pendingCoachTeams?: AdminMemberTeam[];
   canManageTeamAndRoles?: boolean;
   canManageParentLinks?: boolean;
+  canEditFullProfile?: boolean;
 }) {
   const [tab, setTab] = useState<TabKey>("identity");
   const [linkCopied, setLinkCopied] = useState(false);
@@ -254,6 +263,10 @@ export default function MemberDetailModal({
   });
 
   const editable = !readOnly;
+  // Champs hors coordonnées de contact (nom, naissance, catégorie,
+  // licence, notes médicales...) : coupés pour un coach, voir
+  // canEditFullProfile ci-dessus.
+  const fullProfileEditable = editable && canEditFullProfile;
 
   function set<K extends keyof typeof form>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -664,13 +677,13 @@ export default function MemberDetailModal({
               <Field
                 label="Prénom"
                 value={form.firstName}
-                editable={editable}
+                editable={fullProfileEditable}
                 onChange={(v) => set("firstName", v)}
               />
               <Field
                 label="Nom"
                 value={form.lastName}
-                editable={editable}
+                editable={fullProfileEditable}
                 onChange={(v) => set("lastName", v)}
               />
               <Field
@@ -678,13 +691,13 @@ export default function MemberDetailModal({
                 type="date"
                 value={form.birthDate}
                 displayValue={formatBirthDate(member.birthDate)}
-                editable={editable}
+                editable={fullProfileEditable}
                 onChange={(v) => set("birthDate", v)}
               />
               <Field
                 label="Sexe"
                 value={form.sex}
-                editable={editable}
+                editable={fullProfileEditable}
                 onChange={(v) => set("sex", v)}
                 options={["Masculin", "Féminin"]}
               />
@@ -911,7 +924,7 @@ export default function MemberDetailModal({
               <Field
                 label="Type de licence demandée"
                 value={form.licenseType}
-                editable={editable}
+                editable={fullProfileEditable}
                 onChange={(v) => set("licenseType", v)}
                 options={[
                   "Dirigeant",
@@ -923,14 +936,14 @@ export default function MemberDetailModal({
               <Field
                 label="Type d'adhésion"
                 value={form.membershipType}
-                editable={editable}
+                editable={fullProfileEditable}
                 onChange={(v) => set("membershipType", v)}
                 options={["Nouvelle", "Réadhésion", "Mutation"]}
               />
               <Field
                 label="Statut FBI"
                 value={form.fbiStatus}
-                editable={editable}
+                editable={fullProfileEditable}
                 onChange={(v) => set("fbiStatus", v)}
                 options={[
                   "Licence générée",
@@ -960,7 +973,7 @@ export default function MemberDetailModal({
                 type="date"
                 value={form.licenseExpiresAt}
                 displayValue={formatBirthDate(member.licenseExpiresAt)}
-                editable={editable}
+                editable={fullProfileEditable}
                 onChange={(v) => set("licenseExpiresAt", v)}
               />
             </div>
@@ -981,20 +994,20 @@ export default function MemberDetailModal({
                 type="date"
                 value={form.medicalCertificateExpiresAt}
                 displayValue={formatBirthDate(member.medicalCertificateExpiresAt)}
-                editable={editable}
+                editable={fullProfileEditable}
                 onChange={(v) => set("medicalCertificateExpiresAt", v)}
               />
               <Field
                 label="Autres informations utiles"
                 multiline
                 value={form.otherNotes}
-                editable={editable}
+                editable={fullProfileEditable}
                 onChange={(v) => set("otherNotes", v)}
               />
               <Field
                 label="Droit à l'image"
                 value={form.imageRights}
-                editable={editable}
+                editable={fullProfileEditable}
                 onChange={(v) => set("imageRights", v)}
                 options={["Oui", "Non"]}
               />

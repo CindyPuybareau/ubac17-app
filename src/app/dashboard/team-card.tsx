@@ -161,6 +161,13 @@ export default function TeamCard({
   // reste ouvert au Bureau même depuis cet onglet Équipes — seul un Coach
   // (coach-teams.tsx) le coupe explicitement.
   canManageParentLinks = true,
+  // Retour de Cindy du 30/08 : distinct de canManageTeamAndRoles (déjà à
+  // false pour Bureau ET Coach depuis cet onglet Équipes — TeamManager
+  // comme CoachTeams passent tous les deux par ce même TeamCard). Celui-ci
+  // ne coupe QUE les champs hors coordonnées de la fiche membre (nom,
+  // catégorie, licence, notes médicales...) — jamais le Bureau, seulement
+  // un Coach (coach-teams.tsx).
+  canEditFullProfile = true,
 }: {
   team: TeamWithMembers;
   allProfiles: Person[];
@@ -177,6 +184,7 @@ export default function TeamCard({
   whatsappGroup?: WhatsAppGroup | null;
   canRemoveMembers?: boolean;
   canManageParentLinks?: boolean;
+  canEditFullProfile?: boolean;
 }) {
   const router = useRouter();
   const [detailPlayerId, setDetailPlayerId] = useState<string | null>(null);
@@ -1242,6 +1250,7 @@ export default function TeamCard({
               // restent la main du Bureau.
               canManageTeamAndRoles={false}
               canManageParentLinks={canManageParentLinks}
+              canEditFullProfile={canEditFullProfile}
               onClose={() => setDetailPlayerId(null)}
             />
           );
