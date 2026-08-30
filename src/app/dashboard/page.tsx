@@ -539,6 +539,25 @@ function buildPresentPlayers(
     .map((p) => ({ id: p.id, firstName: p.first_name, lastName: p.last_name }));
 }
 
+// Audit du 30/08 : sur les dizaines de requêtes Supabase de ce fichier,
+// une seule vérifiait son erreur avant ce jour-là (fetchRsvpsByEvent,
+// juste au-dessus — à l'origine du bug des présences trouvé le même
+// jour). Plutôt qu'un `if (xxxRes.error) console.error(...)` répété à
+// chaque site d'appel, un seul point de passage après chaque groupe de
+// requêtes parties ensemble (Promise.all/runBatched) — journalise dans
+// les logs Vercel, ne change jamais le comportement pour l'utilisateur
+// (data ?? [] reste le repli), juste rend visible ce qui était muet.
+function logQueryErrors(
+  context: string,
+  results: Record<string, { error: unknown } | null | undefined>
+) {
+  Object.entries(results).forEach(([name, res]) => {
+    if (res?.error) {
+      console.error(`[page.tsx:${context}] ${name} failed:`, res.error);
+    }
+  });
+}
+
 async function fetchRsvpsByEvent(
   supabase: Awaited<ReturnType<typeof createClient>>,
   eventIds: string[]
@@ -644,6 +663,14 @@ export default async function DashboardPage() {
         .eq("profile_id", user.id)
         .maybeSingle(),
     ]);
+
+  logQueryErrors("détection de rôle", {
+    profileResult,
+    adminResult,
+    coachResult,
+    playerLinksResult,
+    ownPlayerRowResult,
+  });
 
   const profile = profileResult.data;
   const isAdmin = Boolean(adminResult.data);
@@ -789,6 +816,8 @@ export default async function DashboardPage() {
       .order("sort_order", { ascending: true }),
   ]);
 
+  logQueryErrors("commun (whatsapp/sponsors)", { whatsappGroupsRes, sponsorDisplayRes });
+
   const sponsorDisplay: SponsorDisplay[] = (sponsorDisplayRes.data ?? []).map((s) => ({
     id: s.id,
     name: s.name,
@@ -900,6 +929,13 @@ export default async function DashboardPage() {
   // way z.Sénior/U18/U13 became Séniors M/U18M/U13M.
   let canonicalTeamRefs: AdminMemberTeam[] = [];
   const adminContactPhoneByPlayerId: Record<string, string> = {};
+  // Retour d'audit du 30/08 : côté Coach, un enfant sans e-mail
+  // d'inscription ni secondaire affiche quand même l'e-mail de son
+  // parent relié en dépannage (coachContactEmailByPlayerId) — jamais
+  // reporté ici, alors que team-card.tsx (utilisé par les deux espaces)
+  // sait déjà s'en servir. Même construction que le téléphone juste
+  // au-dessus.
+  const adminContactEmailByPlayerId: Record<string, string> = {};
   // Défaut prudent : tant que le Bureau n'a pas explicitement activé un
   // envoi automatique (ou tant que la migration club_settings n'est pas
   // encore posée), les crons restent inactifs — voir /api/cron/bureau-
@@ -1049,6 +1085,27 @@ export default async function DashboardPage() {
       5
     );
 
+    logQueryErrors("Bureau", {
+      teamsRes,
+      playersRes,
+      profilesRes,
+      teamPlayersRes,
+      teamCoachesRes,
+      cotisationsRes,
+      collectesRes,
+      upcomingEventsRes,
+      parentPlayerRes,
+      clubAdminsRes,
+      teamPendingCoachesRes,
+      cotisationPaymentsRes,
+      categoryTariffsRes,
+      clubSettingsRes,
+      sponsorsRes,
+      penalitesRes,
+      benevolesRes,
+      eventBenevoleInvitesRes,
+    });
+
     const clubSettingsRow = clubSettingsRes.data as Record<AutomationKey, boolean> | null;
     // Le compilateur React signale la réaffectation d'une variable de portée
     // externe depuis cette IIFE async (pensée pour un composant client qui
@@ -1085,6 +1142,12 @@ export default async function DashboardPage() {
       (profilesRes.data ?? []).map((p) => [
         p.id,
         (p as { phone: string | null }).phone,
+      ])
+    );
+    const emailByProfileId = new Map(
+      (profilesRes.data ?? []).map((p) => [
+        p.id,
+        (p as { email: string | null }).email,
       ])
     );
 
@@ -1126,10 +1189,15 @@ export default async function DashboardPage() {
             .from("rsvps")
             .select("player_id, status, event_id")
             .in("event_id", adminNextEventIds)
-        : Promise.resolve({ data: [] as { player_id: string; status: string; event_id: string }[] });
+        : Promise.resolve({
+            data: [] as { player_id: string; status: string; event_id: string }[],
+            error: null,
+          });
     const rsvpsByEventPromise = fetchRsvpsByEvent(supabase, upcomingEventIds);
     const adminVolunteerNeedsPromise = getVolunteerNeedsByEventId(supabase, upcomingEventIds);
-    const { data: adminNextEventRsvpRows } = await adminNextEventRsvpPromise;
+    const adminNextEventRsvpRes = await adminNextEventRsvpPromise;
+    logQueryErrors("Bureau (prochain événement)", { adminNextEventRsvpRes });
+    const adminNextEventRsvpRows = adminNextEventRsvpRes.data;
     // Clé "event_id:player_id", pas juste player_id : un joueur inscrit
     // dans deux équipes a un "prochain événement" différent pour chacune,
     // donc potentiellement deux statuts différents. Une clé par joueur
@@ -1190,6 +1258,8 @@ export default async function DashboardPage() {
     (parentPlayerRes.data ?? []).forEach((pp) => {
       const phone = phoneByProfileId.get(pp.parent_id);
       if (phone) adminContactPhoneByPlayerId[pp.player_id] = phone;
+      const email = emailByProfileId.get(pp.parent_id);
+      if (email) adminContactEmailByPlayerId[pp.player_id] = email;
     });
 
     const teamsById = new Map(
@@ -1212,12 +1282,6 @@ export default async function DashboardPage() {
       list.push(pp.parent_id);
       parentIdsByPlayerId.set(pp.player_id, list);
     });
-    const emailByProfileId = new Map(
-      (profilesRes.data ?? []).map((p) => [
-        p.id,
-        (p as { email: string | null }).email,
-      ])
-    );
     // Dernière connexion réelle (compte Supabase Auth) de CETTE fiche —
     // jamais celle d'un parent : un enfant sans compte propre (géré par PIN,
     // un mécanisme totalement séparé) n'a donc jamais de valeur ici, ce qui
@@ -1649,7 +1713,7 @@ export default async function DashboardPage() {
                 .from("teams")
                 .select("id, name, category, ffbb_url, sort_order, pending_coach_names")
                 .in("id", ownOnlyTeamIds)
-            : Promise.resolve({ data: [] as CoachedTeam[] }),
+            : Promise.resolve({ data: [] as CoachedTeam[], error: null }),
         // Every club team, for the "Changer d'équipe" picker — teams is
         // readable by anyone (policy `using (true)`), and legacy rows
         // without a sort_order are filtered out like everywhere else.
@@ -1663,6 +1727,15 @@ export default async function DashboardPage() {
       // Voir lib/batch.ts / le bloc Bureau plus haut pour le contexte.
       5
     );
+
+    logQueryErrors("Coach", {
+      teamPlayersRes,
+      teamCoachesRes,
+      teamPendingCoachesRes,
+      eventsRes,
+      ownTeamsRes,
+      allClubTeamsRes,
+    });
 
     // Coached teams first, then the ones they only play in — each keeps
     // the club's canonical order within its own group.
@@ -1760,7 +1833,10 @@ export default async function DashboardPage() {
             .from("rsvps")
             .select("player_id, status, event_id")
             .in("event_id", coachNextEventIds)
-        : Promise.resolve({ data: [] as { player_id: string; status: string; event_id: string }[] });
+        : Promise.resolve({
+            data: [] as { player_id: string; status: string; event_id: string }[],
+            error: null,
+          });
     // EVERY team each of these players belongs to, not just the coach's own
     // — that's what tells a player of the team apart from one lent by
     // another group, and it drives the roster's "Retirer" vs "Affecter"
@@ -1769,7 +1845,7 @@ export default async function DashboardPage() {
     const allMembershipsPromise =
       playerIds.length > 0
         ? supabase.from("team_players").select("team_id, player_id").in("player_id", playerIds)
-        : Promise.resolve({ data: [] as { team_id: string; player_id: string }[] });
+        : Promise.resolve({ data: [] as { team_id: string; player_id: string }[], error: null });
     const rsvpsByEventPromise = fetchRsvpsByEvent(supabase, coachEventIds);
     const coachRsvpRowsPromise =
       coachEventIds.length > 0
@@ -1784,6 +1860,7 @@ export default async function DashboardPage() {
               status: string;
               reason: string | null;
             }[],
+            error: null,
           });
     const coachPenalitePromise =
       coachPenaliteScope.length > 0
@@ -1793,7 +1870,7 @@ export default async function DashboardPage() {
               "id, player_id, amount, notes, penalite_date, statut, paid_at, payment_link, players(first_name, last_name)"
             )
             .in("player_id", coachPenaliteScope)
-        : Promise.resolve({ data: [] as unknown[] });
+        : Promise.resolve({ data: [] as unknown[], error: null });
     // Les rôles (maillots/goûter) de TOUS les événements à venir, pas
     // seulement du prochain match : l'onglet "Planning & Rôles" les liste
     // date par date.
@@ -1811,21 +1888,24 @@ export default async function DashboardPage() {
           () =>
             playerIds.length > 0
               ? supabase.from("players").select(playerColumns).in("id", playerIds)
-              : Promise.resolve({ data: [] as Person[] }),
+              : Promise.resolve({ data: [] as Person[], error: null }),
           () =>
             coachIds.length > 0
               ? supabase
                   .from("profiles")
                   .select("id, first_name, last_name, phone, email")
                   .in("id", coachIds)
-              : Promise.resolve({ data: [] as Person[] }),
+              : Promise.resolve({ data: [] as Person[], error: null }),
           () =>
             playerIds.length > 0
               ? supabase
                   .from("parent_player")
                   .select("parent_id, player_id")
                   .in("player_id", playerIds)
-              : Promise.resolve({ data: [] as { parent_id: string; player_id: string }[] }),
+              : Promise.resolve({
+                  data: [] as { parent_id: string; player_id: string }[],
+                  error: null,
+                }),
           // A coach row comes from profiles, not players, so it carries no
           // contact nor birth date on its own. Their member fiche is the one
           // whose profile_id points at their account — same record the Bureau
@@ -1833,11 +1913,18 @@ export default async function DashboardPage() {
           () =>
             coachIds.length > 0
               ? supabase.from("players").select(playerColumns).in("profile_id", coachIds)
-              : Promise.resolve({ data: [] as Person[] }),
+              : Promise.resolve({ data: [] as Person[], error: null }),
         ],
         // Voir lib/batch.ts / le bloc Bureau plus haut pour le contexte.
         4
       );
+
+    logQueryErrors("Coach (fiches)", {
+      playersRes,
+      coachProfilesRes,
+      parentPlayerRes,
+      coachFichesRes,
+    });
 
     const playersById = new Map(
       (playersRes.data ?? []).map((p) => [
@@ -1881,7 +1968,9 @@ export default async function DashboardPage() {
     // (coachNextEventIdByTeamId/coachNextEventIds calculés plus haut, la
     // requête elle-même déjà lancée en parallèle — voir
     // coachNextEventRsvpPromise.)
-    const { data: coachNextEventRsvpRows } = await coachNextEventRsvpPromise;
+    const coachNextEventRsvpRes = await coachNextEventRsvpPromise;
+    logQueryErrors("Coach (prochain événement)", { coachNextEventRsvpRes });
+    const coachNextEventRsvpRows = coachNextEventRsvpRes.data;
     // Voir le commentaire équivalent côté Bureau plus haut : clé par
     // (event_id, player_id), pas juste player_id, pour ne pas confondre
     // les statuts d'un joueur inscrit dans deux équipes coachées.
@@ -1930,7 +2019,9 @@ export default async function DashboardPage() {
     // — that's what tells a player of the team apart from one lent by
     // another group, et pilote le "Retirer" vs "Affecter" du tableau
     // (requête déjà lancée en parallèle — voir allMembershipsPromise).
-    const { data: allMembershipsData } = await allMembershipsPromise;
+    const allMembershipsRes = await allMembershipsPromise;
+    logQueryErrors("Coach (effectifs)", { allMembershipsRes });
+    const allMembershipsData = allMembershipsRes.data;
     const clubTeamById = new Map(coachClubTeams.map((t) => [t.id, t]));
 
     const coachTeamRefsByPlayerId = new Map<string, AdminMemberTeam[]>();
@@ -2049,6 +2140,7 @@ export default async function DashboardPage() {
       coachRsvpRowsPromise,
       coachPenalitePromise,
     ]);
+    logQueryErrors("Coach (rsvps/pénalités)", { coachRsvpRowsRes, coachPenaliteRes });
     coachPenalites = (
       (coachPenaliteRes.data ?? []) as unknown as {
         id: string;
@@ -2271,7 +2363,8 @@ export default async function DashboardPage() {
                         last_name: string | null;
                         birth_date: string | null;
                         category: string | null;
-                      }[] };
+                      }[], error: null };
+                logQueryErrors("Famille (roster coéquipiers)", { linksRes, rosterRes });
                 const rosterById = new Map(
                   (rosterRes.data ?? []).map((p) => [p.id, p])
                 );
@@ -2327,7 +2420,9 @@ export default async function DashboardPage() {
                           phone: string | null;
                           email: string | null;
                         }[],
+                        error: null,
                       };
+                logQueryErrors("Famille (contact coach)", { teamCoachesRes, contactRes });
                 const contactByProfileId = new Map(
                   (contactRes.data ?? []).map((c) => [c.profile_id, c])
                 );
@@ -2388,7 +2483,12 @@ export default async function DashboardPage() {
                           phone: string | null;
                           email: string | null;
                         }[],
+                        error: null,
                       };
+                logQueryErrors("Famille (contact coach en attente)", {
+                  teamPendingCoachesRes,
+                  contactRes,
+                });
                 const contactByPlayerId = new Map(
                   (contactRes.data ?? []).map((c) => [c.player_id, c])
                 );
@@ -2450,6 +2550,8 @@ export default async function DashboardPage() {
         : null,
     ]);
 
+    logQueryErrors("Famille", { eventsRes, familyCotisationRes, familyPenaliteRes });
+
     familyPenalites = (
       (familyPenaliteRes?.data ?? []) as unknown as {
         id: string;
@@ -2478,6 +2580,8 @@ export default async function DashboardPage() {
     if (teamsQueryResults) {
       const [teamsRes, teammateRowsRes, teamCoachesRes, teamPendingCoachesRes] =
         teamsQueryResults;
+
+      logQueryErrors("Famille (équipes)", { teamsRes });
 
       (teamsRes.data ?? []).forEach((t) => teamsById.set(t.id, t));
       const seenTeammateIds = new Set<string>();
@@ -2680,6 +2784,7 @@ export default async function DashboardPage() {
         // Voir lib/batch.ts / le bloc Bureau plus haut pour le contexte.
         4
       );
+    logQueryErrors("Famille (rsvps/paiements)", { rsvpRowsRes, familyPaymentRes });
     familyVolunteerNeedsByEventId = familyVolunteerNeedsData;
 
     // Statuts par équipe/événement, pour construire à la fois
@@ -2864,6 +2969,7 @@ export default async function DashboardPage() {
           categoryTariffs={adminCategoryTariffs}
           upcomingEvents={adminUpcomingEvents}
           contactPhoneByPlayerId={adminContactPhoneByPlayerId}
+          contactEmailByPlayerId={adminContactEmailByPlayerId}
           members={adminMembers}
           birthdayMembers={adminBirthdayMembers}
           canonicalTeamRefs={canonicalTeamRefs}

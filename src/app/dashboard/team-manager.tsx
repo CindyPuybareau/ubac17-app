@@ -47,6 +47,7 @@ export default function TeamManager({
   allProfiles,
   eventsByTeamId,
   contactPhoneByPlayerId,
+  contactEmailByPlayerId,
   memberDetailsByPlayerId,
   clubTeams,
   whatsappGroups,
@@ -55,6 +56,7 @@ export default function TeamManager({
   allProfiles: Person[];
   eventsByTeamId: Record<string, AdminUpcomingEvent[]>;
   contactPhoneByPlayerId: Record<string, string>;
+  contactEmailByPlayerId: Record<string, string>;
   memberDetailsByPlayerId: Record<string, MemberDetail>;
   clubTeams: AdminMemberTeam[];
   // Retour de Cindy du 29/08 : le Bureau n'avait aucun accès au groupe
@@ -146,6 +148,7 @@ export default function TeamManager({
             allProfiles={allProfiles}
             eventsByTeamId={eventsByTeamId}
             contactPhoneByPlayerId={contactPhoneByPlayerId}
+            contactEmailByPlayerId={contactEmailByPlayerId}
             allowCreatePlayer={false}
             allowAssignCoach={false}
             memberDetailsByPlayerId={memberDetailsByPlayerId}

@@ -64,6 +64,7 @@ export default function AdminView({
   categoryTariffs,
   upcomingEvents,
   contactPhoneByPlayerId,
+  contactEmailByPlayerId,
   members,
   birthdayMembers,
   canonicalTeamRefs,
@@ -84,6 +85,7 @@ export default function AdminView({
   categoryTariffs: AdminCategoryTariff[];
   upcomingEvents: AdminUpcomingEvent[];
   contactPhoneByPlayerId: Record<string, string>;
+  contactEmailByPlayerId: Record<string, string>;
   members: AdminMember[];
   birthdayMembers: BirthdaySource[];
   canonicalTeamRefs: { id: string; name: string | null; category: string | null }[];
@@ -189,6 +191,7 @@ export default function AdminView({
           allProfiles={allProfiles}
           eventsByTeamId={eventsByTeamId}
           contactPhoneByPlayerId={contactPhoneByPlayerId}
+          contactEmailByPlayerId={contactEmailByPlayerId}
           memberDetailsByPlayerId={memberDetailsByPlayerId}
           clubTeams={canonicalTeamRefs}
           whatsappGroups={whatsappGroups}
