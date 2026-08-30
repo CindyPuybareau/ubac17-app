@@ -112,9 +112,13 @@ export default function BureauDashboard({
 
   const activeMembers = members.filter((m) => !m.archivedAt).length;
 
-  const penalitesPendingAmount = penalites
-    .filter((p) => p.statut !== "PAYE")
-    .reduce((sum, p) => sum + p.amount, 0);
+  // Retour de Cindy du 30/08 : "Pénalités" seul ne disait pas si c'était le
+  // total ou juste le restant à encaisser — remplacé par le total de
+  // TOUTES les pénalités du club (réglées ou non), libellé "Total
+  // pénalités" pour lever l'ambiguïté. Le détail réglé/non réglé reste
+  // visible pénalité par pénalité dans l'onglet Pénalités
+  // (penalites-manager.tsx).
+  const penalitesTotalAmount = penalites.reduce((sum, p) => sum + p.amount, 0);
 
   // Même fenêtre "à surveiller" que les licences/certificats médicaux
   // ci-dessous : un sponsor sans date de renouvellement connue n'apparaît
@@ -154,8 +158,8 @@ export default function BureauDashboard({
         <KpiCard
           icon={Gavel}
           iconClass="text-rose-600"
-          value={formatAmount(penalitesPendingAmount)}
-          label="Pénalités"
+          value={formatAmount(penalitesTotalAmount)}
+          label="Total pénalités"
         />
         <KpiCard
           icon={Handshake}
