@@ -529,12 +529,31 @@ async function fetchRsvpsByEvent(
   >();
   if (eventIds.length === 0) return rsvpsByEvent;
 
-  const { data: rsvpRows } = await supabase
+  // Pas de .in("event_id", eventIds) ici : même bug déjà trouvé et corrigé
+  // pour les besoins d'organisation (getVolunteerNeedsByEventId, event-
+  // volunteer-needs.ts, retour de Cindy du 2026-08-20) mais jamais reporté
+  // sur les présences — côté Bureau, eventIds couvre TOUT l'historique du
+  // club (872 événements le 30/08), largement de quoi dépasser la taille
+  // d'URL acceptée par Supabase. La requête échouait alors silencieusement
+  // (erreur jamais vérifiée ci-dessous), laissant la Map vide : "0 présent"
+  // partout côté Bureau, alors que la donnée existait bel et bien en base
+  // (confirmé par Cindy le 29-30/08 — Coach et Famille, qui ne portent que
+  // sur leurs propres équipes/enfants, n'atteignaient jamais cette limite).
+  // La policy RLS "Lecture des rsvps" autorise déjà tout compte connecté à
+  // lire toutes les lignes, donc un fetch sans filtre renvoie exactement le
+  // même ensemble, sans URL géante.
+  const eventIdSet = new Set(eventIds);
+  const { data: allRsvpRows, error: rsvpRowsError } = await supabase
     .from("rsvps")
-    .select("event_id, status")
-    .in("event_id", eventIds);
+    .select("event_id, status");
 
-  (rsvpRows ?? []).forEach((r) => {
+  if (rsvpRowsError) {
+    console.error("[fetchRsvpsByEvent] select rsvps failed:", rsvpRowsError);
+  }
+
+  const rsvpRows = (allRsvpRows ?? []).filter((r) => eventIdSet.has(r.event_id));
+
+  rsvpRows.forEach((r) => {
     const bucket = rsvpsByEvent.get(r.event_id) ?? {
       present: 0,
       absent: 0,

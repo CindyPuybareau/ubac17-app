@@ -126,10 +126,25 @@ export async function getEventTasksByEventId(
   const result: Record<string, EventTasksState> = {};
   if (eventIds.length === 0) return result;
 
-  const { data } = await supabase
+  // Pas de .in("event_id", eventIds) ici : même bug que
+  // getVolunteerNeedsByEventId plus haut dans ce fichier — eventIds peut
+  // couvrir tout l'historique du club (plusieurs centaines d'événements
+  // côté Bureau) et produire une URL trop longue, rejetée par le serveur
+  // (bug confirmé côté présences, event_id similaire, retour de Cindy du
+  // 29-30/08 — jamais déclenché ici jusqu'ici faute d'appel à cette échelle,
+  // mais même fragilité). La policy RLS scope déjà les lignes visibles par
+  // l'utilisateur courant, donc un fetch sans filtre renvoie le même
+  // ensemble, sans URL géante.
+  const eventIdSet = new Set(eventIds);
+  const { data: allData, error: tasksError } = await supabase
     .from("event_tasks")
-    .select("event_id, task_type, player_id, source")
-    .in("event_id", eventIds);
+    .select("event_id, task_type, player_id, source");
+
+  if (tasksError) {
+    console.error("[getEventTasksByEventId] select event_tasks failed:", tasksError);
+  }
+
+  const data = (allData ?? []).filter((row) => eventIdSet.has(row.event_id as string));
 
   // Requête séparée vers club_member_names plutôt qu'une jointure
   // players(...) directe : la fiche players complète d'un autre membre
@@ -176,11 +191,21 @@ export async function getCarpoolOffersByEventId(
   const result: Record<string, CarpoolOffer[]> = {};
   if (eventIds.length === 0) return result;
 
-  const { data: offerRows } = await supabase
+  // Pas de .in("event_id", eventIds) ici : même bug que
+  // getEventTasksByEventId/getVolunteerNeedsByEventId dans ce fichier —
+  // voir leur commentaire pour le détail (URL trop longue dès que eventIds
+  // couvre tout l'historique du club).
+  const eventIdSet = new Set(eventIds);
+  const { data: allOfferRows, error: offersError } = await supabase
     .from("event_carpool_offers")
     .select("id, event_id, player_id, seats, departure_time, meeting_point")
-    .in("event_id", eventIds)
     .gt("seats", 0);
+
+  if (offersError) {
+    console.error("[getCarpoolOffersByEventId] select event_carpool_offers failed:", offersError);
+  }
+
+  const offerRows = (allOfferRows ?? []).filter((row) => eventIdSet.has(row.event_id as string));
 
   const offerIds = (offerRows ?? []).map((row) => row.id as string);
 
