@@ -1528,6 +1528,12 @@ export default async function DashboardPage() {
   // pénalités des joueurs de ses équipes, mais ne peut ni en créer ni en
   // modifier — seul le Bureau saisit une pénalité.
   let coachPenalites: AdminPenalite[] = [];
+  // Joueurs ET coachs des équipes réellement COACHÉES uniquement (jamais
+  // l'équipe où le coach joue lui-même) — même distinction que
+  // coachPenaliteScope plus bas, réutilisée pour le widget anniversaires
+  // (retour de Cindy du 30/08, même cause que le calendrier de "Équipe(s)
+  // coachée(s))".
+  let coachScopedMemberIds = new Set<string>();
   const coachContactPhoneByPlayerId: Record<string, string> = {};
   const coachContactEmailByPlayerId: Record<string, string> = {};
   const coachMemberDetailsByPlayerId: Record<string, MemberDetail> = {};
@@ -1578,13 +1584,27 @@ export default async function DashboardPage() {
             .from("team_pending_coaches")
             .select("team_id, player_id")
             .in("team_id", coachCalendarTeamIds),
+        // Retour de Cindy du 30/08 : Basile (coach U13F/U13M1 ET joueur
+        // Séniors M) voyait le match de SON équipe jouée apparaître dans
+        // le calendrier de "Équipe(s) coachée(s)" — coachCalendarTeamIds
+        // mélange équipes coachées et équipe jouée, un choix qui datait du
+        // calendrier fusionné d'avant le découpage en 4 onglets du 29/08
+        // (voir coachPenaliteScope un peu plus bas : même cause, déjà
+        // corrigée une fois pour les pénalités, jamais reportée ici).
+        // "Mon équipe" (page.tsx, buildFamilyView) affiche déjà ce match
+        // via son propre calcul indépendant (familyEvents) : le montrer
+        // aussi ici serait un doublon hors de propos. Scope strictement
+        // aux équipes réellement coachées ; coachCalendarTeamIds reste
+        // utilisé juste au-dessus pour l'effectif (teamPlayersRes etc.),
+        // nécessaire à l'onglet "Équipes" qui liste volontairement
+        // l'équipe jouée comme un pill "Joueur" à part.
         () =>
           supabase
             .from("events")
             .select(
               "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
             )
-            .or(teamOrClubWideFilter(coachCalendarTeamIds))
+            .or(teamOrClubWideFilter(coachedTeamIds))
             .order("start_time", { ascending: true }),
         () =>
           ownOnlyTeamIds.length > 0
@@ -1678,6 +1698,18 @@ export default async function DashboardPage() {
           .map((tp) => tp.player_id)
       )
     );
+    // Même filtre, étendu aux coachs/coachs en attente d'une équipe
+    // coachée (pas seulement les joueurs) : sert au widget anniversaires
+    // plus bas, qui doit lui aussi ignorer l'équipe jouée par le coach.
+    coachScopedMemberIds = new Set([
+      ...coachPenaliteScope,
+      ...(teamCoachesRes.data ?? [])
+        .filter((tc) => coachedTeamIds.includes(tc.team_id))
+        .map((tc) => tc.coach_id),
+      ...(teamPendingCoachesRes.data ?? [])
+        .filter((tpc) => coachedTeamIds.includes(tpc.team_id))
+        .map((tpc) => tpc.player_id),
+    ]);
     // Mêmes id que coachEvents.map(e => e.id)/le filtre "à venir" plus bas
     // (start_time/id ne changent pas entre la ligne brute et la version
     // enrichie) — inutile d'attendre l'enrichissement pour les calculer.
@@ -2709,9 +2741,14 @@ export default async function DashboardPage() {
       // par m.id, et affichait le même anniversaire deux fois dans le
       // widget. Un membre archivé (parti du club) ne doit plus non plus y
       // figurer — filtre absent jusqu'ici côté Coach, déjà présent côté
-      // Bureau juste au-dessus.
+      // Bureau juste au-dessus. coachScopedMemberIds (retour de Cindy du
+      // 30/08, même cause que le calendrier de "Équipe(s) coachée(s)"
+      // corrigé juste avant) exclut l'équipe où le coach joue lui-même :
+      // sans ça, l'anniversaire d'un coéquipier de Basile à Séniors M
+      // apparaissait dans SON widget de coach, alors que "Mon équipe" a
+      // déjà le sien.
       Array.from(new Map(Object.values(coachMemberDetailsByPlayerId).map((m) => [m.id, m])).values())
-        .filter((m) => !m.archivedAt)
+        .filter((m) => !m.archivedAt && coachScopedMemberIds.has(m.id))
         .map((m) => ({
         id: m.id,
         firstName: m.firstName,
