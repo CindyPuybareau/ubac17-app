@@ -418,6 +418,46 @@ function isMinor(birthDate: string | null): boolean {
   return age < 18;
 }
 
+// Même normalisation que unaccent(lower(trim(...))) côté SQL
+// (handle_new_user, auto-liaison parent/coach) — reprise ici en JS pour la
+// même raison : deux orthographes différentes du même nom (import FFBB
+// sans accent vs saisie clavier avec) ne doivent pas être vues comme deux
+// personnes différentes.
+const DIACRITICS_PATTERN = new RegExp("[\\u0300-\\u036f]", "g");
+
+function normalizeName(value: string | null | undefined): string {
+  return (value ?? "")
+    .normalize("NFD")
+    .replace(DIACRITICS_PATTERN, "")
+    .trim()
+    .toLowerCase();
+}
+
+// Retour de Cindy du 30/08 : décision sur le badge Bureau hérité à tort par
+// un majeur (18-19 ans) partageant l'e-mail d'un parent du Bureau — plutôt
+// que d'exiger player.profile_id (bloqué : aucun membre du Bureau n'a sa
+// fiche reliée à son compte, voir tentative annulée du 17/08), on compare
+// le nom de LA FICHE au nom du COMPTE qui porte cet e-mail. Même
+// raisonnement que l'auto-liaison parent/coach ailleurs dans ce fichier :
+// le nom, pas l'email seul, distingue "c'est bien le titulaire" de "c'est
+// juste un proche qui partage l'adresse". Si aucun compte n'existe encore
+// pour cet e-mail (Bureau pas encore inscrit) ou que la fiche n'a pas de
+// nom, on ne peut pas trancher — le comportement d'avant (email + majeur)
+// reste le repli, pour ne pas retirer le badge à tort à quelqu'un dont on
+// ne peut pas vérifier le nom.
+function bureauFicheMatchesAccountName(
+  player: { first_name: string | null; last_name: string | null },
+  account: { first_name: string | null; last_name: string | null } | undefined
+): boolean {
+  if (!account) return true;
+  const playerFirst = normalizeName(player.first_name);
+  const playerLast = normalizeName(player.last_name);
+  const accountFirst = normalizeName(account.first_name);
+  const accountLast = normalizeName(account.last_name);
+  if (!playerFirst || !playerLast || !accountFirst || !accountLast) return true;
+  return playerFirst === accountFirst && playerLast === accountLast;
+}
+
 // "Tous les groupes" ne veut plus dire "team_id null" à lui seul depuis
 // target_team_ids (20261012000000) : un événement réservé à deux équipes
 // a aussi team_id null, mais concerne précisément CES équipes-là, pas tout
@@ -1128,6 +1168,21 @@ export default async function DashboardPage() {
           ?? []
       ).map((a) => [a.email.trim().toLowerCase(), a.club_function ?? "Membre du Bureau"])
     );
+    // Retour de Cindy du 30/08 : sert à distinguer "cette fiche EST le
+    // membre du Bureau" de "cette fiche partage juste son email" (voir
+    // bureauFicheMatchesAccountName) — le nom du compte qui porte cet
+    // e-mail, pas celui de la fiche players qui pourrait être un proche.
+    const profileNameByEmailLower = new Map(
+      (profilesRes.data ?? [])
+        .filter((p) => (p as { email: string | null }).email)
+        .map((p) => [
+          (p as { email: string }).email.trim().toLowerCase(),
+          {
+            first_name: (p as { first_name: string | null }).first_name,
+            last_name: (p as { last_name: string | null }).last_name,
+          },
+        ])
+    );
 
     const playersById = new Map(
       (playersRes.data ?? []).map((p) => [
@@ -1421,9 +1476,23 @@ export default async function DashboardPage() {
         // suffisait pas comme critère : l'import le remplit pour TOUT le
         // monde, adultes compris, depuis la même colonne "email" du
         // fichier — ça excluait aussi la secrétaire de son propre badge.
-        // L'âge réel (date de naissance) est le seul signal fiable ici.
+        // L'âge réel (date de naissance) est un premier signal, mais ne
+        // couvre pas un majeur (18-19 ans) partageant encore l'email
+        // familial — retour de Cindy du 30/08 : bureauFicheMatchesAccountName
+        // compare en plus le nom de CETTE fiche à celui du compte qui
+        // porte l'email (via profileNameByEmailLower), pour ne montrer le
+        // badge que sur la fiche qui EST réellement le membre du Bureau.
+        // Repli sur le comportement d'avant si aucun compte n'existe
+        // encore pour cet email, ou si un des deux noms manque (voir la
+        // fonction : mieux vaut un badge affiché à tort sur un cas qu'on
+        // ne peut pas trancher que d'en retirer un à quelqu'un de légitime).
         bureauRole:
-          memberEmail && !isMinor(player.birth_date)
+          memberEmail &&
+          !isMinor(player.birth_date) &&
+          bureauFicheMatchesAccountName(
+            player,
+            profileNameByEmailLower.get(memberEmail.trim().toLowerCase())
+          )
             ? (bureauRoleByEmailLower.get(memberEmail.trim().toLowerCase()) ?? null)
             : null,
         pendingCoachTeams: pendingCoachTeamsByPlayerId.get(player.id) ?? [],
