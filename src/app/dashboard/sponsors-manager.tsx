@@ -202,13 +202,10 @@ export default function SponsorsManager({ sponsors }: { sponsors: AdminSponsor[]
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Retour de Cindy du 29/08 : nombre à gauche, bouton d'ajout à
-          droite — même convention que partout ailleurs dans l'appli. */}
+      {/* Retour de Cindy du 29/08 : bouton d'ajout à gauche, nombre à
+          droite — même convention que "Ajouter un membre" (members-
+          table.tsx), pas l'inverse comme précédemment sur cet écran. */}
       <div className="flex items-center justify-between gap-2">
-        <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-          <Handshake className="h-3.5 w-3.5" />
-          {sponsors.length} sponsor{sponsors.length > 1 ? "s" : ""}
-        </p>
         <button
           type="button"
           onClick={() => (editing ? closeForm() : openNew())}
@@ -217,6 +214,10 @@ export default function SponsorsManager({ sponsors }: { sponsors: AdminSponsor[]
           {editing === "new" ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
           {editing === "new" ? "Annuler" : "Ajouter un sponsor"}
         </button>
+        <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+          <Handshake className="h-3.5 w-3.5" />
+          {sponsors.length} sponsor{sponsors.length > 1 ? "s" : ""}
+        </p>
       </div>
 
       {editing && (
