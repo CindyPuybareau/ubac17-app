@@ -82,30 +82,30 @@ const clubStats = [
   { icon: MapPin, value: "3", label: "communes partenaires" },
 ];
 
-// Logos + lien vers le site de chaque partenaire — récupérés depuis la
-// page officielle du club (ubac17.fr/dossier-dinscription/, section "Nos
-// partenaires"), fichiers rapatriés dans public/sponsors/. À tenir à jour
-// à la main si un partenariat change (pas de source dynamique ici).
-const sponsors = [
-  { name: "O2", logo: "/sponsors/o2.png", url: "https://www.o2.fr/demander-un-devis#/1-services" },
-  {
-    name: "L'Équipe by Steal",
-    logo: "/sponsors/lequipe-by-steal.jpg",
-    url: "https://www.planity.com/lequipe-by-steal-17340-chatelaillon-plage",
-  },
-  { name: "Opticéo", logo: "/sponsors/opticeo.png", url: "https://www.opticeo.fr/boutiques/la-rochelle" },
-  {
-    name: "Areas",
-    logo: "/sponsors/areas.jpg",
-    url: "https://www.areas.fr/agence-assurance/17088/m.damien-la-rochelle",
-  },
-  {
-    name: "Burgeot Stores",
-    logo: "/sponsors/burgeot-stores.jpg",
-    url: "https://www.komilfo.fr/magasins/burgeot-stores-rochelle-17",
-  },
-  { name: "DIN", logo: "/sponsors/din.png", url: "https://www.d-i-n.fr/" },
-];
+// Retour de Cindy du 29/08 : la liste vient désormais de la même vue
+// (sponsor_display) que les logos affichés dans les espaces connectés —
+// un seul endroit (l'onglet Sponsors du Bureau) à tenir à jour pour que le
+// site public et l'appli reflètent toujours le même partenariat, au lieu
+// d'un tableau codé en dur ici, invisible du Bureau et donc systématiquement
+// oublié à chaque changement.
+async function getSponsors(): Promise<
+  { id: string; name: string; logo_url: string; website_url: string | null }[]
+> {
+  const { createClient } = await import("@supabase/supabase-js");
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+  const { data } = await supabase
+    .from("sponsor_display")
+    .select("id, name, logo_url, website_url");
+  return data ?? [];
+}
+
+// Revalidé toutes les heures plutôt qu'à chaque requête (page par ailleurs
+// entièrement statique) : un changement de sponsor n'a aucune urgence à la
+// minute près.
+export const revalidate = 3600;
 
 const gyms = [
   {
@@ -122,7 +122,8 @@ const gyms = [
   },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const sponsors = await getSponsors();
   return (
     <div className="flex min-h-full flex-1 flex-col bg-white">
       <header className="sticky top-0 z-10 border-b border-black/5 bg-white/90 backdrop-blur">
@@ -321,28 +322,43 @@ export default function Home() {
             saison.
           </p>
           <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-            {sponsors.map(({ name, logo, url }, i) => (
-              <RevealOnScroll key={name} delayMs={i * 80}>
-                <a
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={`Site de ${name}`}
-                  title={name}
-                  className="flex h-24 items-center justify-center rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
-                >
-                  {/* Retour de Cindy : logos en couleurs, pas de
-                      niveaux de gris. */}
-                  <Image
-                    src={logo}
-                    alt={name}
-                    width={200}
-                    height={100}
-                    className="h-12 w-auto object-contain sm:h-14"
-                  />
-                </a>
-              </RevealOnScroll>
-            ))}
+            {sponsors.map(({ id, name, logo_url, website_url }, i) => {
+              // <img> brut plutôt que next/image : logo_url peut venir du
+              // bucket Storage sponsor-logos (Bureau), domaine non
+              // whitelisté dans next.config — même raison qu'avatar-
+              // upload.tsx pour les photos de profil.
+              const content = (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={logo_url}
+                  alt={name}
+                  className="h-12 w-auto object-contain sm:h-14"
+                />
+              );
+              return (
+                <RevealOnScroll key={id} delayMs={i * 80}>
+                  {website_url ? (
+                    <a
+                      href={website_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`Site de ${name}`}
+                      title={name}
+                      className="flex h-24 items-center justify-center rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+                    >
+                      {content}
+                    </a>
+                  ) : (
+                    <div
+                      title={name}
+                      className="flex h-24 items-center justify-center rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm"
+                    >
+                      {content}
+                    </div>
+                  )}
+                </RevealOnScroll>
+              );
+            })}
           </div>
         </section>
       </main>

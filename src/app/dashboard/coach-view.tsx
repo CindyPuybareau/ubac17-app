@@ -20,6 +20,7 @@ import CoachTeams from "./coach-teams";
 import CoachFfbb from "./coach-ffbb";
 import CoachOrganisation, { type CoachTeamMatchCard } from "./coach-organisation";
 import WhatsAppGroupsManager from "./whatsapp-groups-manager";
+import SponsorsDisplay from "./sponsors-display";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import type { TeamWithMembers } from "./team-manager";
 import type {
@@ -27,6 +28,7 @@ import type {
   AdminPenalite,
   AdminUpcomingEvent,
   MemberDetail,
+  SponsorDisplay,
   WhatsAppGroup,
 } from "./page";
 import type {
@@ -61,6 +63,7 @@ export default function CoachView({
   ownPlayerId,
   ownPlayerNextEvent = null,
   penalites = [],
+  sponsorDisplay = [],
 }: {
   teams: TeamWithMembers[];
   events: AdminUpcomingEvent[];
@@ -104,6 +107,7 @@ export default function CoachView({
   // joueurs de TOUTES les équipes de ce coach, saisies par le Bureau
   // (voir penalites-manager.tsx) — jamais de droit de saisie ici.
   penalites?: AdminPenalite[];
+  sponsorDisplay?: SponsorDisplay[];
 }) {
   // Créer / modifier / supprimer un événement n'est permis que pour les
   // équipes réellement entraînées : proposer celle où l'utilisateur n'est
@@ -169,6 +173,7 @@ export default function CoachView({
               propre agenda, et être coach ne devrait pas le priver de cet
               outil — il fallait juste l'y ajouter aussi. */}
           <CalendarSubscribe />
+          <SponsorsDisplay sponsors={sponsorDisplay} />
         </div>
       ),
     },

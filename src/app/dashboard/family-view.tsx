@@ -28,7 +28,14 @@ import ChildAccessManager from "./child-access-manager";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import WhatsAppGroupsFamily from "./whatsapp-groups-family";
 import WhatsAppGroupsManager from "./whatsapp-groups-manager";
-import type { AdminCotisation, AdminPenalite, AdminUpcomingEvent, WhatsAppGroup } from "./page";
+import SponsorsDisplay from "./sponsors-display";
+import type {
+  AdminCotisation,
+  AdminPenalite,
+  AdminUpcomingEvent,
+  SponsorDisplay,
+  WhatsAppGroup,
+} from "./page";
 import type { BirthdaySource } from "./birthdays";
 import type { CarpoolOffer, EventRoleType, EventTasksState } from "./event-tasks";
 import type { VolunteerNeed } from "./event-volunteer-needs";
@@ -52,6 +59,7 @@ export default function FamilyView({
   volunteerNeedsByEventId,
   cotisations,
   penalites,
+  sponsorDisplay = [],
 }: {
   events: AdminUpcomingEvent[];
   rsvpPlayers: CalendarRsvpPlayer[];
@@ -70,6 +78,7 @@ export default function FamilyView({
   // Lecture seule (retour de Cindy du 2026-08-22) : toutes celles de tous
   // les enfants, saisies par le Bureau (voir penalites-manager.tsx).
   penalites: AdminPenalite[];
+  sponsorDisplay?: SponsorDisplay[];
 }) {
   const iconClass = "h-4 w-4 shrink-0";
 
@@ -197,6 +206,7 @@ export default function FamilyView({
           />
           <CalendarSubscribe />
           <ChildAccessManager />
+          <SponsorsDisplay sponsors={sponsorDisplay} />
         </div>
       ),
     },

@@ -78,6 +78,25 @@ export type AdminSponsor = {
   contactPhone: string | null;
   renewalDate: string | null;
   notes: string | null;
+  // Retour de Cindy du 29/08 : unifie ce suivi (jusqu'ici Bureau seul) avec
+  // le tableau codé en dur qui alimentait la page d'accueil publique — logo/
+  // lien affichés dans tous les espaces (voir SponsorDisplay plus bas), le
+  // contrat reste strictement réservé au Bureau (jamais exposé via
+  // sponsor_display).
+  logoUrl: string | null;
+  websiteUrl: string | null;
+  contractType: string | null;
+};
+
+// Vue publique (sponsor_display) : nom + logo + lien uniquement, jamais le
+// contrat ni les coordonnées de contact — lisible par tous les espaces
+// (Bureau/Coach/Famille) et par la page d'accueil publique non connectée.
+// Jamais montré côté Enfant (retour de Cindy).
+export type SponsorDisplay = {
+  id: string;
+  name: string;
+  logoUrl: string;
+  websiteUrl: string | null;
 };
 
 // Bénévoles hors club (retour de Cindy du 2026-08-25) : ni joueur, ni
@@ -669,6 +688,7 @@ export default async function DashboardPage() {
     convocationCardsRaw,
     coachCards,
     eventRoleTypes,
+    sponsorDisplayRes,
   ] = await Promise.all([
     // A single query, unconditional on role: RLS already narrows the
     // result to exactly what this user may see (everything for Bureau,
@@ -715,7 +735,20 @@ export default async function DashboardPage() {
     // event-tasks.ts) : identique pour tout le monde, pas la peine de la
     // redemander à Supabase à chaque chargement.
     getEventRoleTypesCached(),
+    // Retour de Cindy du 29/08 : logo+nom+lien affichés dans tous les
+    // espaces (jamais le contrat ni les coordonnées de contact, réservés à
+    // la table sponsors elle-même, Bureau uniquement) — vue dédiée
+    // (sponsor_display) plutôt qu'une policy RLS plus étroite sur la table
+    // complète, même principe que family_teammate_roster.
+    supabase.from("sponsor_display").select("id, name, logo_url, website_url"),
   ]);
+
+  const sponsorDisplay: SponsorDisplay[] = (sponsorDisplayRes.data ?? []).map((s) => ({
+    id: s.id,
+    name: s.name,
+    logoUrl: s.logo_url,
+    websiteUrl: s.website_url,
+  }));
 
   const convocationCards = convocationCardsRaw.filter(
     (c): c is NonNullable<typeof c> => Boolean(c)
@@ -928,12 +961,17 @@ export default async function DashboardPage() {
             .select("match_reminder_enabled, expiry_alert_enabled, cotisation_relance_enabled")
             .eq("id", true)
             .maybeSingle(),
-        // Réservé au Bureau (voir policy "admin manage sponsors") : aucun
-        // lien avec une équipe ou un joueur, pas besoin côté Coach/Famille.
+        // Table complète (contrat + coordonnées de contact) réservée au
+        // Bureau (voir policy "admin manage sponsors") — jamais exposée à
+        // Coach/Famille. L'affichage logo+nom dans ces espaces lit une vue
+        // séparée, sponsor_display (voir sponsorDisplayRes plus bas), qui
+        // ne porte aucune de ces deux colonnes.
         () =>
           supabase
             .from("sponsors")
-            .select("id, name, contact_name, contact_email, contact_phone, renewal_date, notes")
+            .select(
+              "id, name, contact_name, contact_email, contact_phone, renewal_date, notes, logo_url, website_url, contract_type"
+            )
             .order("renewal_date", { ascending: true, nullsFirst: false }),
         // Toutes les pénalités du club — le Bureau les gère toutes (onglet
         // Pénalités, à côté de Stages & Événements Payants).
@@ -1350,6 +1388,9 @@ export default async function DashboardPage() {
       contactPhone: s.contact_phone,
       renewalDate: s.renewal_date,
       notes: s.notes,
+      logoUrl: s.logo_url,
+      websiteUrl: s.website_url,
+      contractType: s.contract_type,
     }));
 
     adminBenevoles = (benevolesRes.data ?? []).map((b) => ({
@@ -2575,6 +2616,7 @@ export default async function DashboardPage() {
         volunteerNeedsByEventId={familyVolunteerNeedsByEventId}
         cotisations={familyCotisations}
         penalites={familyPenalites}
+        sponsorDisplay={sponsorDisplay}
       />
     );
   }
@@ -2598,6 +2640,7 @@ export default async function DashboardPage() {
           canonicalTeamRefs={canonicalTeamRefs}
           whatsappGroups={whatsappGroups}
           sponsors={adminSponsors}
+          sponsorDisplay={sponsorDisplay}
           benevoles={adminBenevoles}
           penalites={adminPenalites}
           automationSettings={adminAutomationSettings}
@@ -2640,6 +2683,7 @@ export default async function DashboardPage() {
           ownPlayerId={ownPlayerId}
           ownPlayerNextEvent={ownPlayerNextEvent}
           penalites={coachPenalites}
+          sponsorDisplay={sponsorDisplay}
         />
       ),
     });

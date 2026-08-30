@@ -32,6 +32,7 @@ import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import FfbbManager from "./ffbb-manager";
 import WhatsAppGroupsManager from "./whatsapp-groups-manager";
 import SponsorsManager from "./sponsors-manager";
+import SponsorsDisplay from "./sponsors-display";
 import BenevolesManager from "./benevoles-manager";
 import BureauDashboard from "./bureau-dashboard";
 import type { AutomationKey } from "./automation-settings";
@@ -45,6 +46,7 @@ import type {
   AdminSponsor,
   AdminUpcomingEvent,
   MemberDetail,
+  SponsorDisplay,
   WhatsAppGroup,
 } from "./page";
 import type { BirthdaySource } from "./birthdays";
@@ -67,6 +69,7 @@ export default function AdminView({
   canonicalTeamRefs,
   whatsappGroups,
   sponsors,
+  sponsorDisplay,
   benevoles,
   penalites,
   automationSettings,
@@ -86,6 +89,7 @@ export default function AdminView({
   canonicalTeamRefs: { id: string; name: string | null; category: string | null }[];
   whatsappGroups: WhatsAppGroup[];
   sponsors: AdminSponsor[];
+  sponsorDisplay: SponsorDisplay[];
   benevoles: AdminBenevole[];
   penalites: AdminPenalite[];
   automationSettings: Record<AutomationKey, boolean>;
@@ -149,19 +153,22 @@ export default function AdminView({
       label: "Calendrier",
       icon: <CalendarDays className={iconClass} />,
       content: (
-        <BureauDashboard
-          cotisations={cotisations}
-          members={members}
-          events={upcomingEvents}
-          automationSettings={automationSettings}
-          createTeams={teamRefs}
-          birthdayMembers={birthdayMembers}
-          eventRoles={eventRoles}
-          volunteerNeedsByEventId={volunteerNeedsByEventId}
-          sponsors={sponsors}
-          penalites={penalites}
-          benevoles={benevoles}
-        />
+        <div className="flex flex-col gap-4">
+          <BureauDashboard
+            cotisations={cotisations}
+            members={members}
+            events={upcomingEvents}
+            automationSettings={automationSettings}
+            createTeams={teamRefs}
+            birthdayMembers={birthdayMembers}
+            eventRoles={eventRoles}
+            volunteerNeedsByEventId={volunteerNeedsByEventId}
+            sponsors={sponsors}
+            penalites={penalites}
+            benevoles={benevoles}
+          />
+          <SponsorsDisplay sponsors={sponsorDisplay} />
+        </div>
       ),
     },
     {

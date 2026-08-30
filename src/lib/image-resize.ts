@@ -15,6 +15,14 @@ const QUALITY = 0.85;
 
 export type ResizedImage = { blob: Blob; ext: string };
 
+// Un logo de sponsor est rarement carré (bannières, logos tout en
+// largeur...) — contrairement à resizeImageForAvatar, pas de recadrage :
+// juste une mise à l'échelle si l'image dépasse ces dimensions, en gardant
+// ses proportions d'origine. Affiché au plus à 96px de haut dans l'appli
+// (voir sponsors-display.tsx), cette marge HiDPI/Retina suffit largement.
+const MAX_LOGO_WIDTH = 480;
+const MAX_LOGO_HEIGHT = 240;
+
 // Recadre en carré (centré) et réencode en WebP, avec repli JPEG si le
 // navigateur ne sait pas produire de WebP (rare aujourd'hui, mais
 // canvas.toBlob() retombe silencieusement sur un autre format dans ce
@@ -45,6 +53,50 @@ export async function resizeImageForAvatar(file: File): Promise<ResizedImage> {
     return fallback;
   }
   ctx.drawImage(bitmap, sx, sy, side, side, 0, 0, targetSize, targetSize);
+  bitmap.close();
+
+  const webpBlob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, "image/webp", QUALITY)
+  );
+  if (webpBlob && webpBlob.type === "image/webp") {
+    return { blob: webpBlob, ext: "webp" };
+  }
+
+  const jpegBlob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, "image/jpeg", QUALITY)
+  );
+  if (jpegBlob) {
+    return { blob: jpegBlob, ext: "jpg" };
+  }
+
+  return fallback;
+}
+
+// Même principe que resizeImageForAvatar (WebP avec repli JPEG, fichier
+// d'origine renvoyé tel quel si indécodable) mais sans recadrage carré —
+// voir MAX_LOGO_WIDTH/HEIGHT ci-dessus.
+export async function resizeImageForLogo(file: File): Promise<ResizedImage> {
+  const fallback: ResizedImage = {
+    blob: file,
+    ext: file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg",
+  };
+
+  const bitmap = await createImageBitmap(file).catch(() => null);
+  if (!bitmap) return fallback;
+
+  const scale = Math.min(1, MAX_LOGO_WIDTH / bitmap.width, MAX_LOGO_HEIGHT / bitmap.height);
+  const targetWidth = Math.round(bitmap.width * scale);
+  const targetHeight = Math.round(bitmap.height * scale);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    bitmap.close();
+    return fallback;
+  }
+  ctx.drawImage(bitmap, 0, 0, bitmap.width, bitmap.height, 0, 0, targetWidth, targetHeight);
   bitmap.close();
 
   const webpBlob = await new Promise<Blob | null>((resolve) =>
