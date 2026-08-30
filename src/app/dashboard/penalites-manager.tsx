@@ -150,7 +150,15 @@ export default function PenalitesManager({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={openNew}
+          className="flex shrink-0 items-center gap-1.5 rounded-full bg-ubac-yellow px-3.5 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark"
+        >
+          <Plus className="h-4 w-4" />
+          Ajouter une pénalité
+        </button>
         <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-400">
           <Gavel className="h-3.5 w-3.5" />
           {penalites.length} pénalité{penalites.length > 1 ? "s" : ""}
@@ -160,14 +168,6 @@ export default function PenalitesManager({
             </span>
           )}
         </p>
-        <button
-          type="button"
-          onClick={openNew}
-          className="flex items-center gap-1.5 rounded-full bg-ubac-yellow px-3.5 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark"
-        >
-          <Plus className="h-4 w-4" />
-          Ajouter une pénalité
-        </button>
       </div>
 
       {penalites.length === 0 ? (
