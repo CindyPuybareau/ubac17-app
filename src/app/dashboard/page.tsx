@@ -1349,13 +1349,18 @@ export default async function DashboardPage() {
         hasParent: parentIds.length > 0,
         pendingParentEmail: player.pending_parent_email,
         profileId: player.profile_id,
-        // La plus récente des deux connexions possibles : compte
-        // Supabase Auth classique (Parent/Coach/Bureau) OU code PIN
-        // enfant (Espace Enfant) — mécanismes distincts, aucun des deux
-        // n'exclut l'autre pour une même fiche.
+        // La plus récente parmi trois connexions possibles : compte
+        // Supabase Auth classique de CETTE fiche (Parent/Coach/Bureau), code
+        // PIN enfant (Espace Enfant), ou compte d'UN des parents reliés —
+        // retour de Cindy du 30/08 : un enfant sans compte propre (le cas
+        // le plus courant) restait gris en permanence même quand son parent
+        // utilisait l'appli chaque semaine (repéré sur Eva MARTIN, dont le
+        // père Greg se connecte mais n'a pas de compte joueur à lui).
+        // Aucun des trois ne s'exclut pour une même fiche.
         lastLoginAt: [
           player.profile_id ? lastLoginByProfileId.get(player.profile_id) : null,
           player.last_child_login_at,
+          ...parentIds.map((pid) => lastLoginByProfileId.get(pid)),
         ]
           .filter((d): d is string => Boolean(d))
           .sort()
