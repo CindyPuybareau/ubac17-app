@@ -12,7 +12,6 @@ import type { AdminMemberTeam, AdminUpcomingEvent, MemberDetail, WhatsAppGroup }
 type Person = { id: string; first_name: string | null; last_name: string | null };
 
 export type RosterPlayer = Person & {
-  jerseyNumber: number | null;
   position: string | null;
   // RSVP status for this team's next upcoming event, or null if there
   // isn't one — drives the "Statut Présence" badge in the roster table.

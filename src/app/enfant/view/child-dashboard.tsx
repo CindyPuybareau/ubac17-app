@@ -63,7 +63,6 @@ export type ChildTeammate = {
   // distincte, non remise en cause.
   lastName: string | null;
   birthDate: string | null;
-  jerseyNumber: number | null;
   position: string | null;
   isSelf: boolean;
   // Catégorie de L'ÉQUIPE de cette ligne (pas la fiche joueur, parfois
@@ -106,7 +105,6 @@ export default function ChildDashboard({
   avatarUrl,
   category,
   teams,
-  ownJersey,
   events,
   teammates,
   coaches,
@@ -121,7 +119,6 @@ export default function ChildDashboard({
   avatarUrl: string | null;
   category: string | null;
   teams: { id: string; name: string | null; category: string | null }[];
-  ownJersey: { jersey: number | null; position: string | null } | null;
   events: ChildEvent[];
   teammates: ChildTeammate[];
   coaches: ChildCoach[];
@@ -378,7 +375,7 @@ export default function ChildDashboard({
 
       <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
         <div>
-          {(teams.length > 0 || ownJersey?.jersey != null) && (
+          {teams.length > 0 && (
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               {teams.map((t) => (
                 <span
@@ -388,11 +385,6 @@ export default function ChildDashboard({
                   {t.category ?? t.name}
                 </span>
               ))}
-              {ownJersey?.jersey != null && (
-                <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-500">
-                  N° {ownJersey.jersey}
-                </span>
-              )}
             </div>
           )}
         </div>

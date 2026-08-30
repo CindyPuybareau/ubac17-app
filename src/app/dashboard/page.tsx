@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { runBatched } from "@/lib/batch";
+import { logQueryErrors } from "@/lib/query-errors";
 import { formatFirstName, formatPersonName } from "@/lib/names";
 import { EMAIL_REPLY_TO } from "@/lib/email";
 import { localDateFromParts } from "@/lib/local-date";
@@ -579,25 +580,6 @@ function buildPresentPlayers(
     .map((p) => ({ id: p.id, firstName: p.first_name, lastName: p.last_name }));
 }
 
-// Audit du 30/08 : sur les dizaines de requêtes Supabase de ce fichier,
-// une seule vérifiait son erreur avant ce jour-là (fetchRsvpsByEvent,
-// juste au-dessus — à l'origine du bug des présences trouvé le même
-// jour). Plutôt qu'un `if (xxxRes.error) console.error(...)` répété à
-// chaque site d'appel, un seul point de passage après chaque groupe de
-// requêtes parties ensemble (Promise.all/runBatched) — journalise dans
-// les logs Vercel, ne change jamais le comportement pour l'utilisateur
-// (data ?? [] reste le repli), juste rend visible ce qui était muet.
-function logQueryErrors(
-  context: string,
-  results: Record<string, { error: unknown } | null | undefined>
-) {
-  Object.entries(results).forEach(([name, res]) => {
-    if (res?.error) {
-      console.error(`[page.tsx:${context}] ${name} failed:`, res.error);
-    }
-  });
-}
-
 async function fetchRsvpsByEvent(
   supabase: Awaited<ReturnType<typeof createClient>>,
   eventIds: string[]
@@ -1045,7 +1027,7 @@ export default async function DashboardPage() {
         () =>
           supabase
             .from("team_players")
-            .select("team_id, player_id, jersey_number, position"),
+            .select("team_id, player_id, position"),
         () => supabase.from("team_coaches").select("team_id, coach_id"),
         () =>
           supabase
@@ -1215,7 +1197,6 @@ export default async function DashboardPage() {
         id: player.id,
         first_name: player.first_name,
         last_name: player.last_name,
-        jerseyNumber: tp.jersey_number,
         position: tp.position,
         nextEventStatus: null,
         birthDate: player.birth_date,
@@ -1742,7 +1723,7 @@ export default async function DashboardPage() {
         () =>
           supabase
             .from("team_players")
-            .select("team_id, player_id, jersey_number, position")
+            .select("team_id, player_id, position")
             .in("team_id", coachCalendarTeamIds),
         () =>
           supabase
@@ -2025,7 +2006,6 @@ export default async function DashboardPage() {
         id: player.id,
         first_name: player.first_name,
         last_name: player.last_name,
-        jerseyNumber: tp.jersey_number,
         position: tp.position,
         nextEventStatus: null,
         birthDate: player.birth_date,

@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { createServiceClient } from "@/lib/supabase/service";
 import { CHILD_SESSION_COOKIE, verifyChildSession } from "@/lib/child-session";
+import { logQueryErrors } from "@/lib/query-errors";
 import { computePlayerYearStatus } from "@/lib/season";
 import { teamOrClubWideFilter } from "@/app/dashboard/family-data";
 import ChildDashboard, {
@@ -36,11 +37,13 @@ export default async function ChildViewPage() {
 
   const supabase = createServiceClient();
 
-  const { data: player } = await supabase
+  const playerRes = await supabase
     .from("players")
     .select("id, first_name, category, notifications_enabled, avatar_url")
     .eq("id", playerId)
     .maybeSingle();
+  logQueryErrors("Enfant", { playerRes });
+  const player = playerRes.data;
 
   if (!player) {
     return (
@@ -52,28 +55,30 @@ export default async function ChildViewPage() {
     );
   }
 
-  const { data: ownTeamLinks } = await supabase
+  const ownTeamLinksRes = await supabase
     .from("team_players")
-    .select("team_id, jersey_number, position")
+    .select("team_id")
     .eq("player_id", playerId);
+  logQueryErrors("Enfant", { ownTeamLinksRes });
+  const ownTeamLinks = ownTeamLinksRes.data;
   const teamIds = (ownTeamLinks ?? []).map((t) => t.team_id);
-  const ownJerseyByTeamId = new Map(
-    (ownTeamLinks ?? []).map((t) => [t.team_id, { jersey: t.jersey_number, position: t.position }])
-  );
 
   const [teamsRes, teammatesRes, coachesRes, eventsRes] = await Promise.all([
     teamIds.length > 0
       ? supabase.from("teams").select("id, name, category").in("id", teamIds)
-      : Promise.resolve({ data: [] as { id: string; name: string | null; category: string | null }[] }),
+      : Promise.resolve({
+          data: [] as { id: string; name: string | null; category: string | null }[],
+          error: null,
+        }),
     teamIds.length > 0
       ? supabase
           .from("team_players")
-          .select("team_id, jersey_number, position, players(id, first_name, last_name, birth_date)")
+          .select("team_id, position, players(id, first_name, last_name, birth_date)")
           .in("team_id", teamIds)
-      : Promise.resolve({ data: [] as never[] }),
+      : Promise.resolve({ data: [] as never[], error: null }),
     teamIds.length > 0
       ? supabase.from("team_coaches").select("team_id, profiles(id, first_name, last_name)").in("team_id", teamIds)
-      : Promise.resolve({ data: [] as never[] }),
+      : Promise.resolve({ data: [] as never[], error: null }),
     teamIds.length > 0
       ? supabase
           .from("events")
@@ -87,8 +92,9 @@ export default async function ChildViewPage() {
           // teamOrClubWideFilter, déjà utilisé là-bas).
           .or(teamOrClubWideFilter(teamIds))
           .order("start_time", { ascending: true })
-      : Promise.resolve({ data: [] as never[] }),
+      : Promise.resolve({ data: [] as never[], error: null }),
   ]);
+  logQueryErrors("Enfant", { teamsRes, teammatesRes, coachesRes, eventsRes });
 
   const teams = (teamsRes.data ?? []) as { id: string; name: string | null; category: string | null }[];
   // Catégorie propre à l'équipe de chaque ligne (retour de Cindy du
@@ -101,7 +107,6 @@ export default async function ChildViewPage() {
 
   const teammateRows = (teammatesRes.data ?? []) as unknown as {
     team_id: string;
-    jersey_number: number | null;
     position: string | null;
     players: { id: string; first_name: string | null; last_name: string | null; birth_date: string | null } | null;
   }[];
@@ -120,7 +125,6 @@ export default async function ChildViewPage() {
         // via les DevTools. Une année fixe garde le format "YYYY-MM-DD"
         // que localDateFromParts() attend, sans exposer l'année réelle.
         birthDate: row.players.birth_date ? `2000-${row.players.birth_date.slice(5)}` : null,
-        jerseyNumber: row.jersey_number,
         position: row.position,
         isSelf: row.players.id === playerId,
         teamCategory: teamCategoryById.get(row.team_id) ?? null,
@@ -194,10 +198,12 @@ export default async function ChildViewPage() {
   // (onglet Mon Équipe) et pour le badge d'assiduité de l'enfant (onglet
   // Défis) — jamais pour les modifier, seulement pour les lire.
   const eventIds = events.map((e) => e.id);
-  const { data: rsvpRows } =
+  const rsvpRes =
     eventIds.length > 0
       ? await supabase.from("rsvps").select("event_id, player_id, status").in("event_id", eventIds)
-      : { data: [] as { event_id: string; player_id: string; status: string | null }[] };
+      : { data: [] as { event_id: string; player_id: string; status: string | null }[], error: null };
+  logQueryErrors("Enfant", { rsvpRes });
+  const rsvpRows = rsvpRes.data;
   const rsvpStatusByKey = new Map(
     (rsvpRows ?? []).map((r) => [`${r.event_id}:${r.player_id}`, r.status])
   );
@@ -279,17 +285,20 @@ export default async function ChildViewPage() {
     // comme "tout le club" — tous les enfants la recevaient, y compris
     // hors cible. Même filtre que côté Famille/Coach (notifications_for_me)
     // et que la requête events ci-dessus.
-    const { data: notifRows } = await notifQuery.or(teamOrClubWideFilter(teamIds));
+    const notifRes = await notifQuery.or(teamOrClubWideFilter(teamIds));
+    const notifRows = notifRes.data;
 
     const notifIds = (notifRows ?? []).map((n) => n.id);
-    const { data: readRows } =
+    const readRes =
       notifIds.length > 0
         ? await supabase
             .from("notification_reads")
             .select("notification_id, read_at")
             .eq("player_id", playerId)
             .in("notification_id", notifIds)
-        : { data: [] as { notification_id: string; read_at: string }[] };
+        : { data: [] as { notification_id: string; read_at: string }[], error: null };
+    logQueryErrors("Enfant", { notifRes, readRes });
+    const readRows = readRes.data;
     const readAtByNotifId = new Map((readRows ?? []).map((r) => [r.notification_id, r.read_at]));
 
     notifications = (notifRows ?? []).map((n) => ({
@@ -307,11 +316,13 @@ export default async function ChildViewPage() {
   // sur playerId, même raison que notifications ci-dessus (pas
   // d'auth.uid() côté enfant, la RLS "select own linked penalites" ne
   // s'applique pas à cette session).
-  const { data: penaliteRows } = await supabase
+  const penaliteRes = await supabase
     .from("penalites")
     .select("id, amount, notes, penalite_date, statut, paid_at")
     .eq("player_id", playerId)
     .order("penalite_date", { ascending: false });
+  logQueryErrors("Enfant", { penaliteRes });
+  const penaliteRows = penaliteRes.data;
   const penalites = (penaliteRows ?? []).map((p) => ({
     id: p.id,
     amount: p.amount,
@@ -327,7 +338,6 @@ export default async function ChildViewPage() {
       avatarUrl={player.avatar_url}
       category={player.category}
       teams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
-      ownJersey={teamIds.length > 0 ? ownJerseyByTeamId.get(teamIds[0]) ?? null : null}
       events={events}
       teammates={teammates}
       coaches={coaches}
