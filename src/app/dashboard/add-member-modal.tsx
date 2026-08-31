@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, Shield, User, Users, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { teamLabel } from "@/lib/teams";
+import { notifyBureauNewMemberFromClient, notifyCoachesOfNewTeamMember } from "@/lib/member-notifications";
 import { Field } from "./member-detail-modal";
 import type { AdminMemberTeam } from "./page";
 
@@ -204,7 +205,20 @@ export default function AddMemberModal({
     }
 
     setSaving(false);
-    onCreated(`${firstName} ${lastName}`);
+    // Notifications à l'arrivée (audit du 31/08, retour de Cindy) : le
+    // Bureau par email systématiquement, les coachs de l'équipe choisie
+    // seulement si une équipe a bien été renseignée à la création.
+    const fullName = `${firstName} ${lastName}`;
+    notifyBureauNewMemberFromClient(fullName);
+    if (teamId) {
+      const teamName = teams.find((t) => t.id === teamId);
+      notifyCoachesOfNewTeamMember(
+        supabase,
+        teamId,
+        `${fullName} vient d'être ajouté(e) à ${teamName ? teamLabel(teamName) : "l'équipe"}.`
+      );
+    }
+    onCreated(fullName);
     router.refresh();
     onClose();
   }

@@ -6,6 +6,7 @@ import * as XLSX from "xlsx";
 import { createClient } from "@/lib/supabase/client";
 import { getCurrentSeasonLabel } from "@/lib/season";
 import { suggestTeamCategory } from "@/lib/team-assignment";
+import { notifyCoachesOfNewTeamMember } from "@/lib/member-notifications";
 import { formatFirstName, normalizeNameForMatching } from "@/lib/names";
 import FilePickerButton from "./file-picker-button";
 
@@ -723,7 +724,7 @@ export default function ImportInscriptions() {
         const { error: teamLinksError, data: insertedTeamLinks } = await supabase
           .from("team_players")
           .insert(teamLinksToInsert)
-          .select("player_id");
+          .select("player_id, team_id");
         if (teamLinksError) {
           setLoading(false);
           setError(teamLinksError.message);
@@ -731,6 +732,30 @@ export default function ImportInscriptions() {
         }
         teamAssignedCount = insertedTeamLinks?.length ?? 0;
         blockedTeamAssignments = teamLinksToInsert.length - teamAssignedCount;
+
+        // Une notification groupée par équipe (audit du 31/08), pas une
+        // par joueur — un import peut affecter plusieurs dizaines de
+        // membres d'un coup à la rentrée, jamais souhaitable d'inonder la
+        // cloche d'un coach dans ce cas. Uniquement pour ce qui a
+        // réellement été écrit (insertedTeamLinks), jamais pour une ligne
+        // bloquée par RLS.
+        const categoryByTeamId = new Map<string, string>();
+        allRows.forEach((r) => {
+          if (r.suggestedTeamId && r.suggestedTeamCategory) {
+            categoryByTeamId.set(r.suggestedTeamId, r.suggestedTeamCategory);
+          }
+        });
+        const countByTeam = new Map<string, number>();
+        (insertedTeamLinks ?? []).forEach((l) => {
+          countByTeam.set(l.team_id, (countByTeam.get(l.team_id) ?? 0) + 1);
+        });
+        countByTeam.forEach((count, teamId) => {
+          notifyCoachesOfNewTeamMember(
+            supabase,
+            teamId,
+            `${count} nouveau${count > 1 ? "x" : ""} joueur${count > 1 ? "s" : ""} affecté${count > 1 ? "s" : ""} à ${categoryByTeamId.get(teamId) ?? "cette équipe"} suite à un import.`
+          );
+        });
       }
     }
 

@@ -24,6 +24,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { buildGmailComposeLink } from "@/lib/email";
 import { teamLabel } from "@/lib/teams";
+import { notifyCoachesOfNewTeamMember } from "@/lib/member-notifications";
 import AddMemberModal from "./add-member-modal";
 import EmailTemplateModal from "./email-template-modal";
 import EmptyState from "./empty-state";
@@ -373,6 +374,17 @@ export default function MembersTable({
     // Affichage immédiat plutôt que d'attendre le rafraîchissement temps
     // réel — voir le commentaire sur localMembers plus haut.
     const newTeam = teams.find((t) => t.id === reassignTeamId);
+    if (newTeam && idsToInsert.length > 0) {
+      // Membres déjà existants, jamais de nouvelle fiche ici : seuls les
+      // coachs de la nouvelle équipe sont notifiés (audit du 31/08). Une
+      // seule notification groupée plutôt qu'une par joueur, pour ne pas
+      // inonder la cloche d'un coach lors d'une réaffectation en masse.
+      notifyCoachesOfNewTeamMember(
+        supabase,
+        reassignTeamId,
+        `${memberLabel(idsToInsert)} vient d'être affecté(e) à ${teamLabel(newTeam)}.`
+      );
+    }
     if (newTeam) {
       setLocalMembers((prev) =>
         prev.map((m) =>

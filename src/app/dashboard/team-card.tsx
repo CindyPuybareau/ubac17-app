@@ -18,6 +18,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatFirstName, formatLastName, formatPersonName, sortByLastName } from "@/lib/names";
 import { computePlayerYearStatus, getCurrentSeasonLabel } from "@/lib/season";
 import { teamLabel } from "@/lib/teams";
+import { notifyBureauNewMemberFromClient, notifyCoachesOfNewTeamMember } from "@/lib/member-notifications";
 import { formatEventTime, isMatchType, styleFor } from "./calendar-view";
 import OpponentDisplay from "./opponent-display";
 import MemberDetailModal from "./member-detail-modal";
@@ -282,6 +283,18 @@ export default function TeamCard({
     }
 
     setNewPlayerLoading(false);
+    // Notifications à l'arrivée (audit du 31/08, retour de Cindy) : une
+    // vraie fiche nouvelle vient d'être créée ET affectée à cette équipe
+    // dans le même geste, contrairement à l'onglet Membres où l'équipe est
+    // facultative à la création — donc les deux notifications ici, pas
+    // qu'une.
+    const newPlayerName = `${newPlayerFirstName} ${newPlayerLastName}`;
+    notifyBureauNewMemberFromClient(newPlayerName);
+    notifyCoachesOfNewTeamMember(
+      supabase,
+      team.id,
+      `${newPlayerName} vient d'être ajouté(e) à ${teamLabel(team)}.`
+    );
     closePlayerForm();
     router.refresh();
   }
@@ -440,6 +453,13 @@ export default function TeamCard({
     setSwitchTarget(null);
     showToast(
       `${name} est ajouté à ${destinationLabel} et reste dans ${team.name ?? "son équipe"}.`
+    );
+    // Joueur déjà existant, pas de nouvelle fiche : seuls les coachs de
+    // l'équipe de destination sont notifiés (audit du 31/08).
+    notifyCoachesOfNewTeamMember(
+      supabase,
+      switchTeamId,
+      `${name} vient d'être prêté(e) à ${destinationLabel}.`
     );
     router.refresh();
   }

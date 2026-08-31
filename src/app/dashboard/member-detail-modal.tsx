@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatPersonName } from "@/lib/names";
 import { formatLocalDateFr } from "@/lib/local-date";
 import { teamLabel } from "@/lib/teams";
+import { notifyCoachesOfNewTeamMember } from "@/lib/member-notifications";
 import { buildAppDeepLink } from "@/lib/whatsapp";
 import ConfirmDialog from "./confirm-dialog";
 import ParentLinkManager from "./parent-link-manager";
@@ -424,6 +425,14 @@ export default function MemberDetailModal({
           setError(`Équipe non mise à jour : ${insertError.message}`);
           return;
         }
+        // Fiche déjà existante, jamais de nouvelle création ici : seuls
+        // les coachs de la nouvelle équipe sont notifiés (audit du 31/08).
+        const newTeam = teams.find((t) => t.id === teamId);
+        notifyCoachesOfNewTeamMember(
+          supabase,
+          teamId,
+          `${form.firstName} ${form.lastName} vient d'être affecté(e) à ${newTeam ? teamLabel(newTeam) : "cette équipe"}.`
+        );
       }
     }
 
