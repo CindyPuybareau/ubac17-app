@@ -2983,6 +2983,18 @@ export default async function DashboardPage() {
   );
 
   function buildFamilyView(rsvpPlayers: typeof familyRsvpPlayers) {
+    // Audit du 31/08 : whatsappGroups porte la liste NOMINATIVE des
+    // membres de CHAQUE groupe (y compris ceux des équipes d'autres
+    // familles) — le passer tel quel envoie ces noms au navigateur de
+    // cette famille même si l'écran ne les affiche jamais (showTeamGroups
+    // masque juste visuellement la grille "Équipes du Club", il n'empêche
+    // pas les données d'avoir déjà traversé le réseau). Filtré ici, côté
+    // serveur, aux commissions (ouvertes à tous) + aux seules équipes de
+    // CES joueurs — jamais après coup côté client.
+    const familyTeamIds = new Set(rsvpPlayers.flatMap((p) => p.teamIds));
+    const familyWhatsappGroups = whatsappGroups.filter(
+      (g) => g.category === "COMMISSION" || (g.teamId !== null && familyTeamIds.has(g.teamId))
+    );
     return (
       <FamilyView
         events={familyEvents}
@@ -2992,7 +3004,7 @@ export default async function DashboardPage() {
         teamCards={familyTeamCards}
         tasksByEventId={familyOrganisationTasks}
         carpoolByEventId={carpoolOffersByEventId}
-        whatsappGroups={whatsappGroups}
+        whatsappGroups={familyWhatsappGroups}
         eventRoles={eventRoleTypes}
         volunteerNeedsByEventId={familyVolunteerNeedsByEventId}
         cotisations={familyCotisations}

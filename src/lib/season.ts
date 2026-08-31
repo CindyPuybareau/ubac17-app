@@ -14,8 +14,22 @@ import { parseDateParts } from "./local-date";
 //   Jan-Jun -> started the previous calendar year
 //   Jul-Dec -> started this calendar year
 export function getCurrentSeasonStartYear(referenceDate: Date = new Date()): number {
-  const month = referenceDate.getMonth() + 1; // 1-12
-  return month >= 7 ? referenceDate.getFullYear() : referenceDate.getFullYear() - 1;
+  // Lu en Europe/Paris, jamais dans le fuseau du runtime qui exécute ce
+  // code (audit du 31/08) : getMonth()/getFullYear() bruts lisent le
+  // fuseau LOCAL du process — UTC sur Vercel, où tourne notamment
+  // enfant/view/page.tsx (composant serveur, appelle cette fonction sans
+  // référence explicite). Dans la fenêtre ~22h-23h59 UTC du 30 juin (déjà
+  // le 1er juillet à Paris, CEST = UTC+2), la bascule de saison partait
+  // avec un jour de retard côté serveur. Même idiome que cron/bureau-
+  // alerts et cron/match-reminders pour ce même problème.
+  const parisParts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Paris",
+    year: "numeric",
+    month: "numeric",
+  }).formatToParts(referenceDate);
+  const month = Number(parisParts.find((p) => p.type === "month")?.value);
+  const year = Number(parisParts.find((p) => p.type === "year")?.value);
+  return month >= 7 ? year : year - 1;
 }
 
 export function getCurrentSeasonLabel(referenceDate: Date = new Date()): string {

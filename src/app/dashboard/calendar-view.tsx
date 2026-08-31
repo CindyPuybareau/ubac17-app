@@ -567,12 +567,28 @@ export default function CalendarView({
     );
 
     const supabase = createClient();
-    await supabase.from("events").delete().eq("id", event.id);
+    // Vérifiés (audit du 31/08) : RLS peut bloquer une suppression sans
+    // lever d'erreur (0 ligne affectée) — l'événement resterait alors en
+    // base, prêt à réapparaître au prochain rafraîchissement temps réel,
+    // alors que la notification d'annulation ci-dessus est déjà partie.
+    const { error: deleteEventError } = await supabase
+      .from("events")
+      .delete()
+      .eq("id", event.id);
+    if (deleteEventError) {
+      console.error("[calendar-view] suppression de l'événement échouée:", deleteEventError);
+    }
     if (alsoDeleteCollecte && event.collecteId) {
       // cotisations.collecte_id est en "on delete cascade" (migration
       // 20260802000000) : ses participants et paiements enregistrés
       // disparaissent avec elle, pas besoin d'un second appel.
-      await supabase.from("collectes").delete().eq("id", event.collecteId);
+      const { error: deleteCollecteError } = await supabase
+        .from("collectes")
+        .delete()
+        .eq("id", event.collecteId);
+      if (deleteCollecteError) {
+        console.error("[calendar-view] suppression de la collecte échouée:", deleteCollecteError);
+      }
     }
   }
 
@@ -1098,7 +1114,12 @@ export default function CalendarView({
                 <MatchTasksPanel
                   eventId={event.id}
                   eventDate={event.start_time}
-                  roster={[]}
+                  // rsvpVisiblePlayers plutôt que [] (audit du 31/08) :
+                  // vide, l'affichage optimiste d'un engagement montrait un
+                  // nom blanc jusqu'au prochain rafraîchissement temps réel
+                  // — myPlayerIds ci-dessous vient déjà de ce même tableau,
+                  // donc aucun risque d'exposer plus que "SA propre fiche".
+                  roster={rsvpVisiblePlayers}
                   // rsvpVisiblePlayers, pas respondingPlayers : un coach
                   // qui gère au moins une équipe (canManage) mais pas
                   // celle-ci (!canManageEvent) ne doit voir que SA propre

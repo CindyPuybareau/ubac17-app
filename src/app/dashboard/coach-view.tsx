@@ -287,6 +287,13 @@ export default function CoachView({
           // "Équipe" — sinon tous les événements de toutes ses équipes se
           // mélangent dans un seul fil.
           resultsTeams={resultsTeamsForCalendar}
+          // Audit du 31/08 : manquait sur ces 3 onglets, contrairement à
+          // "Calendrier" ci-dessus — un coach qui joue aussi dans une autre
+          // équipe perdait son propre bouton Présent/Absent en changeant
+          // d'onglet, alors que ce sont les mêmes événements affichés via
+          // le même composant (reliquat de la scission de l'ancien onglet
+          // "Événements et Résultats" du 22/08 en onglets séparés).
+          selfPlayerId={ownPlayerId}
           volunteerNeedsByEventId={volunteerNeedsByEventId}
           celebrateWins
         />
@@ -314,6 +321,7 @@ export default function CoachView({
               scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
               forcedView="officialMatches"
               resultsTeams={resultsTeamsForCalendar}
+              selfPlayerId={ownPlayerId}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
               celebrateWins
             />
@@ -331,6 +339,7 @@ export default function CoachView({
               scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
               forcedView="officialResults"
               resultsTeams={resultsTeamsForCalendar}
+              selfPlayerId={ownPlayerId}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
               celebrateWins
             />

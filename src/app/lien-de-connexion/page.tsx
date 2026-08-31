@@ -23,14 +23,23 @@ export default function LienDeConnexionPage() {
     const supabase = createClient();
     // getSession() attend la fin de l'échange automatique (detectSessionInUrl)
     // avant de répondre — pas besoin de le déclencher nous-mêmes.
-    supabase.auth.getSession().then(({ data }) => {
-      if (cancelled) return;
-      if (data.session) {
-        router.replace("/dashboard");
-      } else {
-        setFailed(true);
-      }
-    });
+    // .catch() (audit du 31/08, même filet que connexion/page.tsx pour un
+    // souci réseau) : sans lui, un rejet laissait la page bloquée sur
+    // "Connexion en cours..." indéfiniment au lieu de proposer de
+    // redemander un lien.
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (cancelled) return;
+        if (data.session) {
+          router.replace("/dashboard");
+        } else {
+          setFailed(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
     return () => {
       cancelled = true;
     };

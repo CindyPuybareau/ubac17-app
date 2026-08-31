@@ -55,11 +55,18 @@ export function teamOrClubWideFilter(teamIds: string[]): string {
   return `and(team_id.is.null,target_team_ids.is.null),team_id.in.(${idList}),target_team_ids.ov.{${idList}}`;
 }
 
+// Audit du 31/08 : malgré son nom, ce fichier ne sert plus l'espace
+// Famille — son propre calcul de présences a été unifié dans page.tsx
+// (buildRsvpStatusByEvent/buildRsvpCounts, voir le commentaire "Retour de
+// Cindy du 31/08" là-bas). Ce qui reste ici n'alimente plus que la carte
+// "prochain match" du Coach en tant que joueur (ownPlayerNextEvent,
+// page.tsx) — getTeamRoster et teamOrClubWideFilter mis à part, toujours
+// utilisés plus largement (Coach, Espace Enfant, notifications).
 export async function getNextEventForTeams(
   supabase: SupabaseClient,
   teamIds: string[]
 ): Promise<UpcomingEvent | null> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("events")
     .select("id, title, event_type, location, salle, start_time, team_id, target_team_ids, attendance_requested_at, notes")
     .or(teamOrClubWideFilter(teamIds))
@@ -68,6 +75,7 @@ export async function getNextEventForTeams(
     .limit(1)
     .maybeSingle();
 
+  if (error) console.error("[getNextEventForTeams] échec:", error);
   return data;
 }
 
@@ -75,11 +83,12 @@ export async function getPlayerTeamIds(
   supabase: SupabaseClient,
   playerId: string
 ): Promise<string[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("team_players")
     .select("team_id")
     .eq("player_id", playerId);
 
+  if (error) console.error("[getPlayerTeamIds] échec:", error);
   return (data ?? []).map((row) => row.team_id as string);
 }
 
@@ -88,13 +97,14 @@ export async function getPlayerRsvpStatus(
   eventId: string,
   playerId: string
 ): Promise<string> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("rsvps")
     .select("status")
     .eq("event_id", eventId)
     .eq("player_id", playerId)
     .maybeSingle();
 
+  if (error) console.error("[getPlayerRsvpStatus] échec:", error);
   return data?.status ?? "PENDING";
 }
 
@@ -102,11 +112,12 @@ export async function getTeamRoster(
   supabase: SupabaseClient,
   teamId: string
 ): Promise<RosterPlayer[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("team_players")
     .select("players(id, first_name, last_name)")
     .eq("team_id", teamId);
 
+  if (error) console.error("[getTeamRoster] échec:", error);
   const roster = (data ?? [])
     .map((row) => row.players as unknown as RosterPlayer | null)
     .filter((p): p is RosterPlayer => Boolean(p));
@@ -122,11 +133,12 @@ export async function getRsvpCounts(
   eventId: string,
   rosterSize: number
 ): Promise<RsvpCounts> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("rsvps")
     .select("status")
     .eq("event_id", eventId);
 
+  if (error) console.error("[getRsvpCounts] échec:", error);
   const counts: RsvpCounts = { present: 0, pending: 0, absent: 0, late: 0 };
   (data ?? []).forEach((row) => {
     if (row.status === "PRESENT") counts.present += 1;

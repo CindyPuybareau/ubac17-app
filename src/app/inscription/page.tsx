@@ -37,47 +37,55 @@ export default function InscriptionPage() {
     setMessage(null);
     setAlreadyRegistered(false);
 
-    const supabase = createClient();
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          first_name: firstName,
-          last_name: lastName,
-          phone,
+    // try/finally : même filet que connexion/page.tsx (audit du 31/08, ce
+    // correctif du 2026-08-18 n'avait jamais été propagé ici) — un souci
+    // réseau fait échouer l'appel lui-même, pas juste renvoyer { error } ;
+    // sans filet, le bouton restait bloqué sur "Création..." indéfiniment.
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+            phone,
+          },
         },
-      },
-    });
+      });
 
-    setLoading(false);
+      if (error) {
+        if (isAlreadyRegistered(error.message)) {
+          setAlreadyRegistered(true);
+          return;
+        }
+        setError(error.message);
+        return;
+      }
 
-    if (error) {
-      if (isAlreadyRegistered(error.message)) {
+      // Comportement anti-énumération de Supabase : un email déjà utilisé
+      // renvoie un "succès" sans erreur, mais data.user.identities est un
+      // tableau vide — aucun email de confirmation ne part réellement.
+      if (data.user && data.user.identities?.length === 0) {
         setAlreadyRegistered(true);
         return;
       }
-      setError(error.message);
-      return;
-    }
 
-    // Comportement anti-énumération de Supabase : un email déjà utilisé
-    // renvoie un "succès" sans erreur, mais data.user.identities est un
-    // tableau vide — aucun email de confirmation ne part réellement.
-    if (data.user && data.user.identities?.length === 0) {
-      setAlreadyRegistered(true);
-      return;
-    }
+      if (data.session) {
+        router.push("/dashboard");
+        router.refresh();
+        return;
+      }
 
-    if (data.session) {
-      router.push("/dashboard");
-      router.refresh();
-      return;
+      setMessage(
+        "Compte créé ! Vérifie tes emails pour confirmer ton inscription."
+      );
+    } catch {
+      setError("Un problème est survenu, réessaie dans quelques instants.");
+    } finally {
+      setLoading(false);
     }
-
-    setMessage(
-      "Compte créé ! Vérifie tes emails pour confirmer ton inscription."
-    );
   }
 
   return (

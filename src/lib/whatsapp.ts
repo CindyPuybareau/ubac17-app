@@ -25,11 +25,18 @@ export function formatPhoneForWhatsApp(phone: string | null | undefined): string
     }
     return rest.length >= 8 ? rest : null;
   }
-  if (digits.startsWith("0") && digits.length === 10) {
-    return `33${digits.slice(1)}`;
+  // Audit du 31/08 : ces deux formats ne vérifiaient la longueur que pour
+  // ACCEPTER le cas correct (10/11 chiffres) — un numéro français mal saisi
+  // (un chiffre en trop ou en moins, ex. "061234567") retombait sur le
+  // repli générique juste en dessous, qui ne retire jamais le "0" de tête
+  // ni n'ajoute "33" : un lien wa.me/061234567 invalide (jamais un format
+  // E.164 valide) partait quand même au lieu d'être rejeté comme les
+  // numéros vraiment trop courts (< 8 chiffres) le sont déjà.
+  if (digits.startsWith("0")) {
+    return digits.length === 10 ? `33${digits.slice(1)}` : null;
   }
-  if (digits.startsWith("33") && digits.length === 11) {
-    return digits;
+  if (digits.startsWith("33")) {
+    return digits.length === 11 ? digits : null;
   }
   return digits.length >= 8 ? digits : null;
 }

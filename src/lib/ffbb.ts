@@ -79,8 +79,18 @@ function parseFrenchMatchDate(text: string): string | null {
   // (août, comme documenté ci-dessus) : un léger désaccord entre celle
   // utilisée pour "maintenant" et celle utilisée pour le mois du match
   // datait un match de juillet consulté en juillet un an trop tard.
-  const now = new Date();
-  const seasonStartYear = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
+  // Lu en Europe/Paris (audit du 31/08), pas dans le fuseau du serveur
+  // (UTC sur Vercel) — même correctif que src/lib/season.ts, seuil de
+  // coupure différent (août ici, propre à ce repli FFBB) donc pas
+  // réutilisable tel quel depuis season.ts.
+  const nowParts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Paris",
+    year: "numeric",
+    month: "numeric",
+  }).formatToParts(new Date());
+  const nowMonth = Number(nowParts.find((p) => p.type === "month")?.value) - 1;
+  const nowYear = Number(nowParts.find((p) => p.type === "year")?.value);
+  const seasonStartYear = nowMonth >= 7 ? nowYear : nowYear - 1;
   const year = monthIndex >= 7 ? seasonStartYear : seasonStartYear + 1;
 
   const date = parisWallTimeToUtc(year, monthIndex, Number(day), Number(hour), Number(minute));
