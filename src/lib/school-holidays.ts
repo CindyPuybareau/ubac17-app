@@ -18,7 +18,9 @@ export const SCHOOL_HOLIDAYS_ZONE_A: { name: string; start: string; end: string 
   { name: "Grandes vacances", start: "2027-07-04", end: "2027-08-31" },
 ];
 
-function toKey(date: Date): string {
+// Exportée (nettoyage du 31/08) : calendar-view.tsx en avait sa propre
+// copie identique plutôt que d'importer celle-ci.
+export function toKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 

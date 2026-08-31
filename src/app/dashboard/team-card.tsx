@@ -96,7 +96,9 @@ function teamCategoryLabel(t: { name: string | null; category: string | null }) 
   return t.name ?? t.category;
 }
 
-function roleBadge(role: "COACH" | "COACH_PENDING" | "JOUEUR") {
+// Exportée (nettoyage du 31/08) : family-team-card.tsx en avait sa propre
+// copie identique plutôt que d'importer celle-ci.
+export function roleBadge(role: "COACH" | "COACH_PENDING" | "JOUEUR") {
   if (role === "COACH") return { label: "Coach", className: "bg-navy/10 text-navy" };
   // Libellé aligné sur "Coach" tout court (retour de Cindy du 2026-08-24) :
   // "en attente" faisait croire à la secrétaire du Bureau qu'il fallait

@@ -50,7 +50,7 @@ import {
   type BirthdaySource,
 } from "./birthdays";
 import { shouldOfferCarpool, venueQuery } from "./salles";
-import { schoolHolidayFor } from "@/lib/school-holidays";
+import { schoolHolidayFor, toKey } from "@/lib/school-holidays";
 import SalleBadge from "./salle-badge";
 import {
   EVENT_TYPE_OPTIONS,
@@ -105,6 +105,12 @@ function startOfTodayMs() {
 // module). Une victoire "fraîche" seulement (retour de Cindy du 26/08,
 // confettis) — 5 jours couvre large une saisie de score en retard sans
 // rester "périmé" jusqu'au week-end suivant.
+// Nettoyage du 31/08 : ce comparateur était réécrit à trois endroits du
+// fichier plutôt que partagé une seule fois.
+function byStartTime(a: { start_time: string }, b: { start_time: string }) {
+  return a.start_time.localeCompare(b.start_time);
+}
+
 function isRecentWin(event: { teamScore: number | null; opponentScore: number | null; start_time: string }) {
   return (
     event.teamScore !== null &&
@@ -112,13 +118,6 @@ function isRecentWin(event: { teamScore: number | null; opponentScore: number | 
     event.teamScore > event.opponentScore &&
     Date.now() - new Date(event.start_time).getTime() < 5 * 24 * 60 * 60 * 1000
   );
-}
-
-function toKey(d: Date) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
 }
 
 // Matches groupBirthdaysByMonthDay's "MM-DD" key format so a Date on the
@@ -507,6 +506,46 @@ export default function CalendarView({
 
   const canManage = Boolean(createTeams && createTeams.length > 0);
 
+  // canManage dit "cet utilisateur gère AU MOINS une équipe" — un coach qui
+  // coache l'U13F et joue en Séniors 1 voit les deux dans la même liste,
+  // mais la policy RLS "coach update own team events" ne matche que
+  // l'équipe réellement coachée. Sans ce calcul par carte, les crayons
+  // Modifier/Supprimer/Ajouter le score apparaissaient aussi sur les
+  // matchs Séniors — un clic dessus échouait sans le moindre message (une
+  // policy RLS en UPDATE filtre la ligne au lieu de rejeter). Partagé
+  // entre renderEventCard et renderResultCard (nettoyage du 31/08, même
+  // formule dupliquée aux deux endroits).
+  function canManageThisEvent(event: { teamId: string | null }) {
+    return canManage && (event.teamId ? Boolean(createTeams?.some((t) => t.id === event.teamId)) : allowClubWide);
+  }
+
+  // Différenciation visuelle par nature d'événement (direction artistique
+  // validée le 2026-08-23), partagée entre renderEventCard et
+  // renderResultCard (nettoyage du 31/08 — même formule dupliquée aux deux
+  // endroits, avec un léger écart préservé ici via `variant` plutôt que de
+  // trancher lequel des deux avait raison) : "upcoming" ne porte "relative"
+  // que pour un tournoi (badge interne positionné dessus) ; "result" porte
+  // en plus "overflow-hidden" sur toutes les cartes depuis les confettis du
+  // 26/08 (retour de Cindy) — ConfettiBurst se pose en position:fixed
+  // plein écran depuis le 28/08 donc ces classes n'ont plus d'effet sur
+  // LUI, mais gardées pour ne rien changer au reste du contenu de la carte.
+  function eventCardShellClass(
+    event: { event_type: string | null },
+    style: { border: string },
+    variant: "upcoming" | "result"
+  ) {
+    const isTournament = event.event_type === "TOURNAMENT";
+    const prefix =
+      variant === "result" ? "relative overflow-hidden " : isTournament ? "relative " : "";
+    if (isTournament) {
+      return `${prefix}rounded-2xl border-2 border-dashed border-ubac-yellow bg-white p-4 shadow-sm`;
+    }
+    if (event.event_type === "MATCH") {
+      return `${prefix}rounded-2xl border border-navy/15 bg-white p-4 shadow-sm border-l-8 ${style.border}`;
+    }
+    return `${prefix}rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm border-l-4 ${style.border}`;
+  }
+
   // Retour de Cindy du 2026-08-25 ("je ne peux pas modifier ce que je veux,
   // il faudrait qu'il se réouvre comme lors d'une création, meme visuel,
   // pas un popup") : le formulaire de modification n'est plus une modale à
@@ -674,7 +713,7 @@ export default function CalendarView({
     const from = startOfTodayMs();
     return visibleEvents
       .filter((e) => new Date(e.start_time).getTime() >= from)
-      .sort((a, b) => a.start_time.localeCompare(b.start_time));
+      .sort(byStartTime);
   }, [visibleEvents]);
 
   // Les vues "saison" (Résultats / Matchs officiels / Résultats officiels /
@@ -747,7 +786,7 @@ export default function CalendarView({
               (activeResultsTeamIdResolved != null &&
                 e.targetTeamIds.includes(activeResultsTeamIdResolved));
       })
-      .sort((a, b) => a.start_time.localeCompare(b.start_time));
+      .sort(byStartTime);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     visibleEvents,
@@ -805,19 +844,7 @@ export default function CalendarView({
       : [];
     const mailto = relanceMailto(event);
     const homeAway = isMatchType(event.event_type) ? homeAwayLabel(event.isHome) : null;
-    // canManage dit "cet utilisateur gère AU MOINS une équipe" — un coach
-    // qui coache l'U13F et joue en Séniors 1 voit les deux dans la même
-    // liste, mais la policy RLS "coach update own team events" ne matche
-    // que l'équipe réellement coachée. Sans ce calcul par carte, les
-    // crayons Modifier/Supprimer/Ajouter le score apparaissaient aussi sur
-    // les matchs Séniors — un clic dessus échouait sans le moindre message
-    // (une policy RLS en UPDATE filtre la ligne au lieu de rejeter, donc
-    // Supabase ne remonte aucune erreur).
-    const canManageEvent =
-      canManage &&
-      (event.teamId
-        ? Boolean(createTeams?.some((t) => t.id === event.teamId))
-        : allowClubWide);
+    const canManageEvent = canManageThisEvent(event);
     // Une famille voit tous ses enfants concernés (respondingPlayers peut
     // en contenir plusieurs). Un coach, lui, ne doit jamais voir le bouton
     // de ses coéquipiers — seulement le sien, quand il en a un sur cette
@@ -837,13 +864,10 @@ export default function CalendarView({
     // demandé de recolorer chaque élément interne un par un, bien plus
     // risqué qu'un simple accent de bordure pour le même effet de lecture
     // rapide.
+    const cardShellClass = eventCardShellClass(event, style, "upcoming");
+    // Toujours utile plus bas (fanion "Spécial") même si le calcul de
+    // cardShellClass ci-dessus est maintenant partagé.
     const isTournament = event.event_type === "TOURNAMENT";
-    const isOfficialMatch = event.event_type === "MATCH";
-    const cardShellClass = isTournament
-      ? "relative rounded-2xl border-2 border-dashed border-ubac-yellow bg-white p-4 shadow-sm"
-      : isOfficialMatch
-        ? `rounded-2xl border border-navy/15 bg-white p-4 shadow-sm border-l-8 ${style.border}`
-        : `rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm border-l-4 ${style.border}`;
 
     return (
       <div key={event.id} className={`flex flex-col gap-2 ${cardShellClass}`}>
@@ -1103,8 +1127,8 @@ export default function CalendarView({
             en base — la carte entraînement doit rester sobre par
             construction, pas juste par absence de données. */}
         {!canManageEvent && event.event_type !== "TRAINING" && (() => {
-          const hasTasks =
-            rolesForEventType(eventRoles, event.event_type).length > 0 || shouldOfferCarpool(event);
+          const roles = rolesForEventType(eventRoles, event.event_type);
+          const hasTasks = roles.length > 0 || shouldOfferCarpool(event);
           const needs = volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds;
           const hasNeeds = needs.length > 0;
           if (!hasTasks && !hasNeeds) return null;
@@ -1133,7 +1157,7 @@ export default function CalendarView({
                   canAssignAnyone={false}
                   initialTasks={tasksByEventId[event.id] ?? emptyEventTasks}
                   initialCarpool={carpoolByEventId[event.id] ?? emptyCarpool}
-                  roles={rolesForEventType(eventRoles, event.event_type)}
+                  roles={roles}
                   showCarpool={shouldOfferCarpool(event)}
                   bare
                 />
@@ -1182,11 +1206,7 @@ export default function CalendarView({
   function renderResultCard(event: AdminUpcomingEvent) {
     const style = styleFor(event.event_type);
     const homeAway = homeAwayLabel(event.isHome);
-    const canManageEvent =
-      canManage &&
-      (event.teamId
-        ? Boolean(createTeams?.some((t) => t.id === event.teamId))
-        : allowClubWide);
+    const canManageEvent = canManageThisEvent(event);
     // Les vues Résultats/Matchs officiels montrent désormais toute la
     // saison, match à venir compris (voir seasonListEvents) : le bouton
     // "Ajouter le score" ne doit s'afficher qu'une fois le match
@@ -1196,18 +1216,7 @@ export default function CalendarView({
     // artistique du 2026-08-23), gardée cohérente entre "à venir" et
     // "résultats" pour ne pas avoir deux traitements différents du même
     // match selon l'onglet où on le regarde.
-    const isTournament = event.event_type === "TOURNAMENT";
-    const isOfficialMatch = event.event_type === "MATCH";
-    // relative overflow-hidden ajoutés (retour de Cindy du 26/08, confettis
-    // sur un match gagné). Corrigé le 28/08 (retour "quelque chose de
-    // wahou") : ConfettiBurst se pose en position:fixed plein écran, pas
-    // dans les coins de cette carte — ces classes n'ont donc plus d'effet
-    // sur son affichage, seulement sur le reste du contenu de la carte.
-    const cardShellClass = isTournament
-      ? "relative overflow-hidden rounded-2xl border-2 border-dashed border-ubac-yellow bg-white p-4 shadow-sm"
-      : isOfficialMatch
-        ? `relative overflow-hidden rounded-2xl border border-navy/15 bg-white p-4 shadow-sm border-l-8 ${style.border}`
-        : `relative overflow-hidden rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm border-l-4 ${style.border}`;
+    const cardShellClass = eventCardShellClass(event, style, "result");
     return (
       <div key={event.id} className={`flex flex-col gap-1.5 ${cardShellClass}`}>
         {alreadyPlayed && (
@@ -1475,7 +1484,7 @@ export default function CalendarView({
           }}
           onCreated={(created) =>
             setLocalEvents((prev) =>
-              [...prev, ...created].sort((a, b) => a.start_time.localeCompare(b.start_time))
+              [...prev, ...created].sort(byStartTime)
             )
           }
           onUpdated={(updated) => {

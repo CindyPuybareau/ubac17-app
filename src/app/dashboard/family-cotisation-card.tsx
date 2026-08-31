@@ -7,15 +7,9 @@ import {
   computeStatus,
   formatAmount,
   due,
+  statusBadge,
 } from "./cotisation-participants-table";
 import type { AdminCotisation } from "./page";
-
-const statusBadge: Record<string, { label: string; className: string }> = {
-  PAYE: { label: "Payé", className: "bg-green-100 text-green-700" },
-  PARTIEL: { label: "Partiel", className: "bg-orange-100 text-orange-700" },
-  OFFERT: { label: "Offert", className: "bg-amber-100 text-amber-700" },
-  EN_ATTENTE: { label: "En attente", className: "bg-red-100 text-red-700" },
-};
 
 function formatPaidAt(iso: string) {
   return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });

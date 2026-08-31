@@ -8,6 +8,11 @@ export type TeamOption = {
   id: string;
   name: string | null;
   category: string | null;
+  // Optionnel (nettoyage du 31/08, cohérence avec TeamSelectorPills) :
+  // absent aujourd'hui pour tout appelant réel de ce mode "dropdown"
+  // (Bureau uniquement), donc sans effet visible pour l'instant — mais un
+  // futur appelant côté Coach n'aurait pas ce badge à réinventer.
+  role?: "COACH" | "PLAYER";
 };
 
 export default function TeamFilterDropdown({
@@ -77,6 +82,15 @@ export default function TeamFilterDropdown({
                       className="h-4 w-4 shrink-0 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
                     />
                     <span className="truncate">{teamLabel(t)}</span>
+                    {t.role && (
+                      <span
+                        className={`ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none ${
+                          t.role === "PLAYER" ? "bg-emerald-100 text-emerald-700" : "bg-navy/10 text-navy"
+                        }`}
+                      >
+                        {t.role === "PLAYER" ? "Joueur" : "Coach"}
+                      </span>
+                    )}
                   </label>
                 </li>
               ))}

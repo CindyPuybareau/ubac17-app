@@ -139,7 +139,9 @@ function parseDateRencontre(value: string): string | null {
   return date.toISOString();
 }
 
-export function parseFfbbTeamPage(html: string): FfbbMatch[] {
+// Pas exportée (nettoyage du 31/08) : utilisée uniquement par
+// fetchFfbbTeamCalendar ci-dessous, jamais ailleurs dans le repo.
+function parseFfbbTeamPage(html: string): FfbbMatch[] {
   const $ = cheerio.load(html);
   const matches: FfbbMatch[] = [];
   const dateRencontreByMatchNumber = parseDateRencontreMap(html);

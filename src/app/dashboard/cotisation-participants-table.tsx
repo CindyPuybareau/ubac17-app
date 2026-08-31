@@ -47,6 +47,11 @@ import ConfirmDialog from "./confirm-dialog";
 // de leur faire pointer vers cotisation-shared.ts un par un tant que ça
 // marche déjà.
 export { balanceDue, computeStatus, due, formatAmount, roundCents };
+// statusBadge exportée à son tour (nettoyage du 31/08) : family-cotisation-
+// card.tsx avait sa propre palette de couleurs pour ces 4 mêmes statuts,
+// différente de la palette de marque validée ci-dessous — mêmes libellés,
+// couleurs différentes selon l'espace où on regarde le même statut.
+export { statusBadge };
 
 // Palette de marque (direction artistique validée par Cindy le 2026-08-23)
 // plutôt que des teintes Tailwind au hasard — mais "En attente" reste un

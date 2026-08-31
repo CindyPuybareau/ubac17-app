@@ -39,7 +39,9 @@ export function signatureIndex(body: string) {
   return /^sportivement,?$/i.test(lastLine) ? lastBreak + 1 : markerIdx;
 }
 
-export function hasSignature(body: string) {
+// Pas exportée (nettoyage du 31/08) : utilisée uniquement par
+// withSignature ci-dessous, jamais ailleurs dans le repo.
+function hasSignature(body: string) {
   return signatureIndex(body) !== -1;
 }
 

@@ -5,7 +5,7 @@ import { formatFirstName, formatLastName, sortByLastName } from "@/lib/names";
 import { computePlayerYearStatus } from "@/lib/season";
 import PlayerYearBadge from "./player-year-badge";
 import WhatsAppDirectButton from "./whatsapp-direct-button";
-import { categoryTheme } from "./team-card";
+import { categoryTheme, roleBadge } from "./team-card";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 type CoachContact = Person & { phone: string | null; email: string | null };
@@ -42,20 +42,6 @@ export type FamilyTeamCardData = {
 // directe) que côté Coach/Bureau (team-card.tsx) — "—" pour un
 // coéquipier/une famille de l'équipe, dont le contact reste non exposé
 // ici.
-function roleBadge(role: "COACH" | "COACH_PENDING" | "JOUEUR") {
-  if (role === "COACH") return { label: "Coach", className: "bg-navy/10 text-navy" };
-  // Libellé aligné sur "Coach" tout court (retour de Cindy du 2026-08-24) :
-  // "en attente" faisait croire à la secrétaire du Bureau qu'il fallait
-  // changer un statut à la main quand le coach avait confirmé par SMS,
-  // alors que ça décrit uniquement l'absence de compte confirmé — une
-  // information déjà portée par le repère de connexion du tableau
-  // Membres (members-table.tsx), pas par ce badge-ci. Le fond ambre reste
-  // pour garder le repère visuel utile en interne, sans le mot trompeur.
-  if (role === "COACH_PENDING")
-    return { label: "Coach", className: "bg-amber-100 text-amber-700" };
-  return { label: "Joueur", className: "bg-emerald-100 text-emerald-700" };
-}
-
 export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
   const theme = categoryTheme(card.category ?? card.teamName);
   const categoryLabel = card.category ?? card.teamName;
