@@ -61,10 +61,17 @@ export async function POST(request: Request) {
   // seulement quand des matchs ont réellement changé — pour que la vue
   // d'ensemble (ffbb-manager.tsx) distingue "synchronisé, rien de neuf"
   // d'"jamais synchronisé".
-  await supabase
+  const { error: syncedAtError } = await supabase
     .from("teams")
     .update({ ffbb_last_synced_at: new Date().toISOString() })
     .eq("id", teamId);
+  // Non bloquant (les matchs ci-dessous sont le vrai résultat de la
+  // synchro) mais logué (audit du 31/08) : sans ça, un échec silencieux ici
+  // laisserait ffbb-manager.tsx afficher "Jamais synchronisé"/une date
+  // obsolète malgré une synchro par ailleurs réussie.
+  if (syncedAtError) {
+    console.error("[sync-ffbb] maj de ffbb_last_synced_at échouée:", syncedAtError);
+  }
 
   if (matches.length === 0) {
     return NextResponse.json({

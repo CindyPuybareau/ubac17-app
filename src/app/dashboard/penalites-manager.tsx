@@ -141,9 +141,25 @@ export default function PenalitesManager({
   async function confirmDelete() {
     if (!deleteTarget) return;
     setSaving(true);
+    setError(null);
     const supabase = createClient();
-    await supabase.from("penalites").delete().eq("id", deleteTarget.id);
+    // Audit du 31/08 : cette suppression n'était vérifiée ni en erreur ni
+    // en nombre de lignes affectées — une pénalité impayée pouvait rester
+    // en base malgré un "Suppression..." affiché comme réussi.
+    const { error, data } = await supabase
+      .from("penalites")
+      .delete()
+      .eq("id", deleteTarget.id)
+      .select("id");
     setSaving(false);
+    if (error) {
+      setError(`Suppression impossible : ${error.message}`);
+      return;
+    }
+    if ((data?.length ?? 0) === 0) {
+      setError("Suppression bloquée par les droits d'accès (RLS). Réessaie.");
+      return;
+    }
     setDeleteTarget(null);
     router.refresh();
   }
@@ -346,6 +362,7 @@ export default function PenalitesManager({
               La pénalité de {deleteTarget.playerName} ({formatAmount(deleteTarget.amount)}) sera
               définitivement supprimée.
             </p>
+            {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
             <div className="flex gap-2">
               <button
                 onClick={() => setDeleteTarget(null)}

@@ -172,8 +172,38 @@ export default function SponsorsManager({ sponsors }: { sponsors: AdminSponsor[]
   async function confirmDelete() {
     if (!deleteTarget) return;
     setDeleting(true);
+    setError(null);
     const supabase = createClient();
-    await supabase.from("sponsors").delete().eq("id", deleteTarget.id);
+    // Audit du 31/08 : aucune vérification d'erreur ni de ligne affectée.
+    const { error, data } = await supabase
+      .from("sponsors")
+      .delete()
+      .eq("id", deleteTarget.id)
+      .select("id");
+    if (error) {
+      setDeleting(false);
+      setError(`Suppression impossible : ${error.message}`);
+      return;
+    }
+    if ((data?.length ?? 0) === 0) {
+      setDeleting(false);
+      setError("Suppression bloquée par les droits d'accès (RLS). Réessaie.");
+      return;
+    }
+    // Best-effort : le message de confirmation annonce que le logo est
+    // supprimé avec le sponsor (audit du 31/08, ce n'était jamais fait —
+    // le fichier restait orphelin dans le bucket, accessible via son URL
+    // directe). Un échec ici n'empêche pas la suppression du sponsor
+    // lui-même, déjà actée ci-dessus.
+    const logoPath = deleteTarget.logoUrl?.split("/sponsor-logos/")[1];
+    if (logoPath) {
+      const { error: removeError } = await supabase.storage
+        .from("sponsor-logos")
+        .remove([logoPath]);
+      if (removeError) {
+        console.error("[sponsors-manager] suppression du logo échouée:", removeError);
+      }
+    }
     setDeleting(false);
     setDeleteTarget(null);
     router.refresh();
@@ -191,12 +221,34 @@ export default function SponsorsManager({ sponsors }: { sponsors: AdminSponsor[]
     const current = sponsors[index];
     const neighbor = sponsors[targetIndex];
     setMovingId(current.id);
+    setError(null);
     const supabase = createClient();
-    await Promise.all([
-      supabase.from("sponsors").update({ sort_order: neighbor.sortOrder }).eq("id", current.id),
-      supabase.from("sponsors").update({ sort_order: current.sortOrder }).eq("id", neighbor.id),
+    // Audit du 31/08 : ni erreur ni ligne affectée n'étaient vérifiées sur
+    // ces deux écritures — si l'une des deux échoue seule, les deux
+    // sponsors se retrouvent avec un sort_order incohérent (potentiellement
+    // dupliqué) sans aucun signal à l'écran.
+    const [a, b] = await Promise.all([
+      supabase
+        .from("sponsors")
+        .update({ sort_order: neighbor.sortOrder })
+        .eq("id", current.id)
+        .select("id"),
+      supabase
+        .from("sponsors")
+        .update({ sort_order: current.sortOrder })
+        .eq("id", neighbor.id)
+        .select("id"),
     ]);
     setMovingId(null);
+    const err = a.error ?? b.error;
+    if (err) {
+      setError(`Réordonnancement impossible : ${err.message}`);
+      return;
+    }
+    if ((a.data?.length ?? 0) === 0 || (b.data?.length ?? 0) === 0) {
+      setError("Réordonnancement bloqué par les droits d'accès (RLS). Réessaie.");
+      return;
+    }
     router.refresh();
   }
 
@@ -219,6 +271,13 @@ export default function SponsorsManager({ sponsors }: { sponsors: AdminSponsor[]
           {sponsors.length} sponsor{sponsors.length > 1 ? "s" : ""}
         </p>
       </div>
+
+      {/* Erreur de moveSponsor (audit du 31/08) : la seule action possible
+          hors du formulaire d'édition/de la confirmation de suppression,
+          qui ont chacun déjà leur propre affichage d'erreur. */}
+      {!editing && !deleteTarget && error && (
+        <p className="text-sm text-red-600">{error}</p>
+      )}
 
       {editing && (
         <div className="flex flex-col gap-4 rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
@@ -466,8 +525,12 @@ export default function SponsorsManager({ sponsors }: { sponsors: AdminSponsor[]
         confirmLabel="Supprimer"
         pending={deleting}
         pendingLabel="Suppression..."
+        error={deleteTarget ? error : null}
         onConfirm={confirmDelete}
-        onCancel={() => setDeleteTarget(null)}
+        onCancel={() => {
+          setDeleteTarget(null);
+          setError(null);
+        }}
       />
     </div>
   );

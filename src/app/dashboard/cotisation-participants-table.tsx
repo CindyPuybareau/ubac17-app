@@ -431,13 +431,26 @@ export default function CotisationParticipantsTable({
       }
       const newPaid = roundCents((c.paiement ?? 0) + amount);
       const newStatut = newPaid >= due(c) ? "PAYE" : "EN_ATTENTE";
-      const { error } = await supabase
+      // .select("id") + vérification du nombre de lignes (audit du 31/08) :
+      // RLS peut bloquer silencieusement cette écriture (0 ligne, pas
+      // d'erreur) — le règlement serait déjà inséré dans l'historique mais
+      // le solde affiché resterait figé à l'ancien montant sans que rien ne
+      // le signale.
+      const { error, data } = await supabase
         .from("cotisations")
         .update({ paiement: newPaid, mode_paiement: paymentMode, statut: newStatut })
-        .eq("id", id);
+        .eq("id", id)
+        .select("id");
       if (error) {
         setPaymentSaving(false);
         setActionError(`Paiement impossible : ${error.message}`);
+        return;
+      }
+      if ((data?.length ?? 0) === 0) {
+        setPaymentSaving(false);
+        setActionError(
+          "Le règlement est enregistré, mais le solde n'a pas pu être mis à jour (droits d'accès). Recharge la page et réessaie."
+        );
         return;
       }
 
@@ -464,7 +477,10 @@ export default function CotisationParticipantsTable({
       const results = await Promise.all(
         paymentIds.map(async (id) => {
           const c = byId.get(id);
-          if (!c) return { error: null };
+          // skipped: exclu du contrôle "0 ligne modifiée" plus bas — ce
+          // n'est pas un blocage RLS, juste un id qui n'a jamais correspondu
+          // à un dossier connu.
+          if (!c) return { error: null, skipped: true };
           const remaining = balanceDue(c);
           if (remaining > 0) {
             const { error: paymentError } = await supabase.from("cotisation_payments").insert({
@@ -472,18 +488,27 @@ export default function CotisationParticipantsTable({
               amount: remaining,
               mode: paymentMode,
             });
-            if (paymentError) return { error: paymentError };
+            if (paymentError) return { error: paymentError, data: [] as { id: string }[] };
           }
           return supabase
             .from("cotisations")
             .update({ paiement: due(c), mode_paiement: paymentMode, statut: "PAYE" })
-            .eq("id", id);
+            .eq("id", id)
+            .select("id");
         })
       );
       const err = results.find((r) => r.error)?.error;
       if (err) {
         setPaymentSaving(false);
         setActionError(`Paiement impossible : ${err.message}`);
+        return;
+      }
+      // Même vérification que ci-dessus, par dossier (audit du 31/08).
+      if (results.some((r) => !("skipped" in r) && (r.data?.length ?? 0) === 0)) {
+        setPaymentSaving(false);
+        setActionError(
+          "Le solde n'a pas pu être mis à jour pour au moins un membre (droits d'accès). Recharge la page et réessaie."
+        );
         return;
       }
     }
@@ -508,6 +533,14 @@ export default function CotisationParticipantsTable({
     if (!remiseId) return;
     const amount = Number(remiseAmount);
     if (Number.isNaN(amount)) return;
+    // Audit du 31/08 : une remise négative AUGMENTE le montant dû (due =
+    // prix - remise) au lieu de le diminuer — aucun garde-fou ne
+    // l'empêchait, une frappe malheureuse ("-50" au lieu de "50") changeait
+    // silencieusement ce qui est dû à la hausse.
+    if (amount < 0) {
+      setActionError("La remise ne peut pas être négative.");
+      return;
+    }
     setRemiseSaving(true);
     setActionError(null);
     const supabase = createClient();
@@ -515,13 +548,20 @@ export default function CotisationParticipantsTable({
     const paid = c?.paiement ?? 0;
     const newDue = Math.max(0, roundCents((c?.prix ?? 0) - amount));
     const newStatut = paid >= newDue ? "PAYE" : "EN_ATTENTE";
-    const { error } = await supabase
+    const { error, data } = await supabase
       .from("cotisations")
       .update({ remise: amount, statut: newStatut })
-      .eq("id", remiseId);
+      .eq("id", remiseId)
+      .select("id");
     setRemiseSaving(false);
     if (error) {
       setActionError(`Remise impossible : ${error.message}`);
+      return;
+    }
+    if ((data?.length ?? 0) === 0) {
+      setActionError(
+        "La remise n'a pas pu être enregistrée (droits d'accès). Recharge la page et réessaie."
+      );
       return;
     }
     setRemiseId(null);
@@ -540,12 +580,19 @@ export default function CotisationParticipantsTable({
     const paid = c?.paiement ?? 0;
     const newDue = Math.max(0, roundCents(c?.prix ?? 0));
     const newStatut = paid >= newDue ? "PAYE" : "EN_ATTENTE";
-    const { error } = await supabase
+    const { error, data } = await supabase
       .from("cotisations")
       .update({ remise: 0, statut: newStatut })
-      .eq("id", id);
+      .eq("id", id)
+      .select("id");
     if (error) {
       setActionError(`Suppression de la remise impossible : ${error.message}`);
+      return;
+    }
+    if ((data?.length ?? 0) === 0) {
+      setActionError(
+        "La remise n'a pas pu être supprimée (droits d'accès). Recharge la page et réessaie."
+      );
       return;
     }
     showToast("Remise supprimée.");
@@ -581,12 +628,23 @@ export default function CotisationParticipantsTable({
     if (c?.statut !== "OFFERT") {
       update.statut = total >= newDue ? "PAYE" : "EN_ATTENTE";
     }
-    const { error: updateError } = await supabase
+    const { error: updateError, data: updateData } = await supabase
       .from("cotisations")
       .update(update)
-      .eq("id", cotisationId);
+      .eq("id", cotisationId)
+      .select("id");
     if (updateError) {
       setActionError(`Recalcul du solde impossible : ${updateError.message}`);
+      return;
+    }
+    // Cette fonction est la "source de vérité" appelée après chaque édition/
+    // suppression de règlement — si CETTE écriture-là est bloquée
+    // silencieusement par RLS (audit du 31/08), plus rien ne réconcilie le
+    // solde affiché avec l'historique réel des règlements.
+    if ((updateData?.length ?? 0) === 0) {
+      setActionError(
+        "Le solde n'a pas pu être recalculé (droits d'accès). Recharge la page et réessaie."
+      );
     }
   }
 
@@ -613,7 +671,7 @@ export default function CotisationParticipantsTable({
     setEditPaymentSaving(true);
     setActionError(null);
     const supabase = createClient();
-    const { error } = await supabase
+    const { error, data } = await supabase
       .from("cotisation_payments")
       .update({
         amount,
@@ -624,10 +682,18 @@ export default function CotisationParticipantsTable({
           : new Date().toISOString(),
         expected_cash_date: editPayment.expectedCashDate || null,
       })
-      .eq("id", editPayment.id);
+      .eq("id", editPayment.id)
+      .select("id");
     if (error) {
       setEditPaymentSaving(false);
       setActionError(`Modification impossible : ${error.message}`);
+      return;
+    }
+    if ((data?.length ?? 0) === 0) {
+      setEditPaymentSaving(false);
+      setActionError(
+        "Le règlement n'a pas pu être modifié (droits d'accès). Recharge la page et réessaie."
+      );
       return;
     }
     await recomputeCotisationTotals(editPayment.cotisationId);
@@ -642,9 +708,19 @@ export default function CotisationParticipantsTable({
     setDeletePaymentTarget(null);
     setActionError(null);
     const supabase = createClient();
-    const { error } = await supabase.from("cotisation_payments").delete().eq("id", paymentId);
+    const { error, data } = await supabase
+      .from("cotisation_payments")
+      .delete()
+      .eq("id", paymentId)
+      .select("id");
     if (error) {
       setActionError(`Suppression impossible : ${error.message}`);
+      return;
+    }
+    if ((data?.length ?? 0) === 0) {
+      setActionError(
+        "Le règlement n'a pas pu être supprimé (droits d'accès). Recharge la page et réessaie."
+      );
       return;
     }
     await recomputeCotisationTotals(cotisationId);
@@ -1379,6 +1455,7 @@ export default function CotisationParticipantsTable({
             </label>
             <input
               type="number"
+              min="0"
               value={remiseAmount}
               onChange={(e) => setRemiseAmount(e.target.value)}
               className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"

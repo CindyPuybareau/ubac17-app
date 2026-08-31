@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ExternalLink, Landmark, MessageCircle, Settings, Shirt, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -59,15 +59,37 @@ function GroupCard({ title, group }: { title: string; group: WhatsAppGroup }) {
   const [open, setOpen] = useState(false);
   const [linkInput, setLinkInput] = useState(group.inviteLink ?? "");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Audit du 31/08 : cet état local n'était initialisé qu'au montage et ne
+  // se resynchronisait jamais avec group.inviteLink — si la sauvegarde
+  // échouait silencieusement, rouvrir "Modifier le lien" montrait la valeur
+  // tapée précédemment comme si elle avait été enregistrée, au lieu de la
+  // vraie valeur en base.
+  useEffect(() => {
+    setLinkInput(group.inviteLink ?? "");
+  }, [group.inviteLink]);
 
   async function saveLink() {
     setSaving(true);
+    setError(null);
     const supabase = createClient();
-    await supabase
+    const trimmed = linkInput.trim();
+    const { error: updateError, data } = await supabase
       .from("whatsapp_groups")
-      .update({ invite_link: linkInput || null })
-      .eq("id", group.id);
+      .update({ invite_link: trimmed || null })
+      .eq("id", group.id)
+      .select("id");
     setSaving(false);
+    if (updateError) {
+      setError(`Enregistrement impossible : ${updateError.message}`);
+      return;
+    }
+    if ((data?.length ?? 0) === 0) {
+      setError("Enregistrement bloqué par les droits d'accès (RLS). Réessaie.");
+      return;
+    }
+    setLinkInput(trimmed);
     setOpen(false);
     router.refresh();
   }
@@ -137,9 +159,10 @@ function GroupCard({ title, group }: { title: string; group: WhatsAppGroup }) {
               placeholder="https://chat.whatsapp.com/..."
               className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
             />
+            {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
             <button
               onClick={saveLink}
-              disabled={saving || linkInput === (group.inviteLink ?? "")}
+              disabled={saving || linkInput.trim() === (group.inviteLink ?? "")}
               className="mt-3 w-full rounded-full bg-ubac-yellow px-3 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-50"
             >
               {saving ? "Enregistrement..." : "Enregistrer"}

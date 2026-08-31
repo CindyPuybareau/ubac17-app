@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Copy, HeartHandshake, Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import ConfirmDialog from "./confirm-dialog";
 import EmptyState from "./empty-state";
 import type { AdminBenevole } from "./page";
 
@@ -91,12 +92,23 @@ export default function BenevolesManager({ benevoles }: { benevoles: AdminBenevo
   async function confirmArchive() {
     if (!archiveTarget) return;
     setSaving(true);
+    setError(null);
     const supabase = createClient();
-    await supabase
+    // Audit du 31/08 : ni erreur ni ligne affectée n'étaient vérifiées.
+    const { error: writeError, data } = await supabase
       .from("benevoles")
       .update({ archived_at: archiveTarget.archivedAt ? null : new Date().toISOString() })
-      .eq("id", archiveTarget.id);
+      .eq("id", archiveTarget.id)
+      .select("id");
     setSaving(false);
+    if (writeError) {
+      setError(`Action impossible : ${writeError.message}`);
+      return;
+    }
+    if ((data?.length ?? 0) === 0) {
+      setError("Action bloquée par les droits d'accès (RLS). Réessaie.");
+      return;
+    }
     setArchiveTarget(null);
     router.refresh();
   }
@@ -292,46 +304,28 @@ export default function BenevolesManager({ benevoles }: { benevoles: AdminBenevo
         </div>
       )}
 
-      {archiveTarget && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => !saving && setArchiveTarget(null)}
-        >
-          <div
-            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="mb-2 font-semibold text-zinc-900">
-              {archiveTarget.archivedAt ? "Réactiver ce bénévole ?" : "Retirer ce bénévole ?"}
-            </h3>
-            <p className="mb-4 text-sm text-zinc-500">
-              {archiveTarget.archivedAt
-                ? `${archiveTarget.firstName} ${archiveTarget.lastName} réapparaîtra dans la liste et pourra à nouveau être invité(e) à un événement.`
-                : `${archiveTarget.firstName} ${archiveTarget.lastName} ne sera plus invité(e) à de nouveaux événements. Son lien cessera de fonctionner, mais son historique reste conservé.`}
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setArchiveTarget(null)}
-                disabled={saving}
-                className="flex-1 rounded-full border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-50"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={confirmArchive}
-                disabled={saving}
-                className={`flex-1 rounded-full px-3 py-1.5 text-sm font-semibold text-white transition-colors disabled:opacity-50 ${
-                  archiveTarget.archivedAt
-                    ? "bg-emerald-600 hover:bg-emerald-700"
-                    : "bg-red-500 hover:bg-red-600"
-                }`}
-              >
-                {saving ? "..." : archiveTarget.archivedAt ? "Réactiver" : "Retirer"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ConfirmDialog (audit du 31/08) au lieu d'une modale maison
+          recopiant la même structure que confirmDelete/archiveTarget
+          ailleurs dans l'appli — voir confirm-dialog.tsx. */}
+      <ConfirmDialog
+        open={Boolean(archiveTarget)}
+        title={archiveTarget?.archivedAt ? "Réactiver ce bénévole ?" : "Retirer ce bénévole ?"}
+        message={
+          archiveTarget?.archivedAt
+            ? `${archiveTarget.firstName} ${archiveTarget.lastName} réapparaîtra dans la liste et pourra à nouveau être invité(e) à un événement.`
+            : `${archiveTarget?.firstName} ${archiveTarget?.lastName} ne sera plus invité(e) à de nouveaux événements. Son lien cessera de fonctionner, mais son historique reste conservé.`
+        }
+        confirmLabel={archiveTarget?.archivedAt ? "Réactiver" : "Retirer"}
+        pending={saving}
+        pendingLabel="..."
+        destructive={!archiveTarget?.archivedAt}
+        error={archiveTarget ? error : null}
+        onConfirm={confirmArchive}
+        onCancel={() => {
+          setArchiveTarget(null);
+          setError(null);
+        }}
+      />
     </div>
   );
 }

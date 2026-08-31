@@ -361,13 +361,24 @@ export default function CotisationsManager({
     // cotisations.collecte_id est en "on delete cascade" (migration
     // 20260802000000) : ses participants et paiements enregistrés
     // disparaissent avec elle, pas besoin d'un second appel.
-    const { error: deleteErr } = await supabase
+    const { error: deleteErr, data: deleteData } = await supabase
       .from("collectes")
       .delete()
-      .eq("id", deleteTarget.id);
+      .eq("id", deleteTarget.id)
+      .select("id");
     setDeletingCollecte(false);
     if (deleteErr) {
       setDeleteError(deleteErr.message);
+      return;
+    }
+    // Audit du 31/08 : RLS peut bloquer silencieusement (0 ligne, pas
+    // d'erreur) — sans ce contrôle, la collecte et tous ses paiements
+    // réels semblaient supprimés côté écran alors qu'ils persistent en
+    // base.
+    if ((deleteData?.length ?? 0) === 0) {
+      setDeleteError(
+        "Suppression bloquée par les droits d'accès (RLS). Réessaie."
+      );
       return;
     }
     if (selectedCollecteId === deleteTarget.id) {
