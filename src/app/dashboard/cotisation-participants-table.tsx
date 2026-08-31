@@ -16,6 +16,7 @@ import {
   Paperclip,
   Pencil,
   Percent,
+  Printer,
   Receipt,
   Search,
   Trash2,
@@ -210,62 +211,19 @@ function downloadReceiptPdf(c: AdminCotisation, contactEmail: string | null) {
   link.click();
 }
 
-function openReceiptWindow(c: AdminCotisation, contactEmail: string | null) {
-  const win = window.open("", "_blank");
-  if (!win) return;
-  const status = statusBadge[computeStatus(c)];
-  const paymentsRows = [...c.payments]
-    .sort((a, b) => new Date(a.paidAt).getTime() - new Date(b.paidAt).getTime())
-    .map(
-      (p) =>
-        `<tr><td>${new Date(p.paidAt).toLocaleDateString("fr-FR")}</td><td>${p.mode}</td><td>${p.detail ?? "—"}</td><td>${formatAmount(p.amount)}</td></tr>`
-    )
-    .join("");
-  win.document.write(`<!doctype html>
-<html lang="fr">
-<head>
-<meta charset="utf-8" />
-<title>Reçu - ${c.playerName}</title>
-<style>
-  body { font-family: system-ui, sans-serif; padding: 40px; color: #18181b; }
-  h1 { font-size: 20px; margin-bottom: 4px; }
-  h2 { font-size: 13px; text-transform: uppercase; color: #71717a; margin: 24px 0 4px; }
-  .muted { color: #71717a; font-size: 13px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-  td, th { padding: 8px 0; border-bottom: 1px solid #e4e4e7; text-align: left; font-size: 14px; }
-  th { color: #71717a; text-transform: uppercase; font-size: 11px; }
-  .total { font-weight: 700; font-size: 16px; }
-</style>
-</head>
-<body>
-  <h1>UBAC — Union Basket Angoulins Châtelaillon</h1>
-  <p class="muted">Reçu / Facture — ${c.collecteName ?? `Cotisation ${c.saison}`}</p>
-  <table>
-    <tr><th>Membre</th><td>${c.playerName}</td></tr>
-    <tr><th>Catégorie</th><td>${c.category ?? "—"}</td></tr>
-    ${c.membershipType ? `<tr><th>Type d'adhésion</th><td>${c.membershipType}</td></tr>` : ""}
-    ${contactEmail ? `<tr><th>Contact</th><td>${contactEmail}</td></tr>` : ""}
-    <tr><th>Tarif</th><td>${formatAmount(c.prix)}</td></tr>
-    <tr><th>Remise</th><td>${formatAmount(c.remise)}</td></tr>
-    <tr><th>Total versé</th><td>${formatAmount(c.paiement)}</td></tr>
-    <tr><th>Statut</th><td>${status.label}</td></tr>
-  </table>
-  ${
-    paymentsRows
-      ? `<h2>Détail des règlements</h2>
-  <table>
-    <tr><th>Date</th><th>Mode</th><th>Détail</th><th>Montant</th></tr>
-    ${paymentsRows}
-  </table>`
-      : ""
-  }
-  <p class="total" style="margin-top:16px;">Solde restant dû : ${formatAmount(balanceDue(c))}</p>
-</body>
-</html>`);
-  win.document.close();
-  win.focus();
-  win.print();
-}
+// Audit du 31/08 (retour de Cindy, iPhone) : ceci ouvrait auparavant une
+// vraie nouvelle fenêtre de navigateur (window.open + document.write) pour
+// y afficher le reçu avant de lancer l'impression. Sur ordinateur ça
+// fonctionne (un vrai onglet, avec sa croix normale) — mais depuis l'appli
+// installée sur l'écran d'accueil d'un iPhone (mode "standalone"), ouvrir
+// une fenêtre de cette façon n'a soit aucune croix visible, soit fait
+// sortir complètement de l'appli installée vers Safari, obligeant à se
+// reconnecter. Remplacé par une vraie fenêtre à l'intérieur de l'appli
+// (même composant Modal que partout ailleurs dans ce fichier), qui a donc
+// toujours une croix qui fonctionne, sur tous les téléphones — voir le
+// rendu de receiptTarget plus bas. L'impression cible uniquement cette
+// zone via #receipt-print-area (voir le <style> dans ce même rendu),
+// jamais besoin de quitter la page.
 
 export default function CotisationParticipantsTable({
   cotisations,
@@ -337,6 +295,11 @@ export default function CotisationParticipantsTable({
     expectedCashDate: string;
   } | null>(null);
   const [editPaymentSaving, setEditPaymentSaving] = useState(false);
+
+  const [receiptTarget, setReceiptTarget] = useState<{
+    cotisation: AdminCotisation;
+    contactEmail: string | null;
+  } | null>(null);
 
   const byId = useMemo(
     () => new Map(cotisations.map((c) => [c.id, c])),
@@ -962,7 +925,7 @@ export default function CotisationParticipantsTable({
               <button
                 onClick={() => {
                   setOpenMenuId(null);
-                  openReceiptWindow(c, contactEmail);
+                  setReceiptTarget({ cotisation: c, contactEmail });
                 }}
                 className={menuItemClass}
               >
@@ -1307,7 +1270,7 @@ export default function CotisationParticipantsTable({
                         </span>
                       )}
                       <button
-                        onClick={() => openReceiptWindow(c, contactEmail)}
+                        onClick={() => setReceiptTarget({ cotisation: c, contactEmail })}
                         className="flex items-center gap-1 text-[11px] font-semibold text-zinc-600 hover:underline"
                       >
                         <Receipt className="h-3 w-3" />
@@ -1448,6 +1411,128 @@ export default function CotisationParticipantsTable({
           </div>
         </Modal>
       )}
+
+      {receiptTarget &&
+        (() => {
+          const c = receiptTarget.cotisation;
+          const status = statusBadge[computeStatus(c)];
+          const sortedPayments = [...c.payments].sort(
+            (a, b) => new Date(a.paidAt).getTime() - new Date(b.paidAt).getTime()
+          );
+          return (
+            <Modal title="Reçu / facture" onClose={() => setReceiptTarget(null)} wide>
+              {/* Cible l'impression sur ce seul bloc (audit du 31/08) : plus
+                  besoin d'ouvrir une fenêtre séparée pour imprimer juste le
+                  reçu — voir le commentaire sur l'ancienne openReceiptWindow
+                  plus haut dans ce fichier. */}
+              <style>{`
+                @media print {
+                  body * { visibility: hidden; }
+                  #receipt-print-area, #receipt-print-area * { visibility: visible; }
+                  #receipt-print-area { position: absolute; left: 0; top: 0; width: 100%; }
+                }
+              `}</style>
+              <div id="receipt-print-area" className="flex flex-col gap-3 text-sm text-zinc-800">
+                <div>
+                  <p className="text-base font-bold text-zinc-900">
+                    UBAC — Union Basket Angoulins Châtelaillon
+                  </p>
+                  <p className="text-xs text-zinc-500">
+                    Reçu / Facture — {c.collecteName ?? `Cotisation ${c.saison}`}
+                  </p>
+                </div>
+                <table className="w-full border-collapse text-sm">
+                  <tbody>
+                    <tr className="border-b border-zinc-100">
+                      <th className="py-1.5 pr-3 text-left font-medium text-zinc-500">Membre</th>
+                      <td className="py-1.5">{c.playerName}</td>
+                    </tr>
+                    <tr className="border-b border-zinc-100">
+                      <th className="py-1.5 pr-3 text-left font-medium text-zinc-500">Catégorie</th>
+                      <td className="py-1.5">{c.category ?? "—"}</td>
+                    </tr>
+                    {c.membershipType && (
+                      <tr className="border-b border-zinc-100">
+                        <th className="py-1.5 pr-3 text-left font-medium text-zinc-500">
+                          Type d&apos;adhésion
+                        </th>
+                        <td className="py-1.5">{c.membershipType}</td>
+                      </tr>
+                    )}
+                    {receiptTarget.contactEmail && (
+                      <tr className="border-b border-zinc-100">
+                        <th className="py-1.5 pr-3 text-left font-medium text-zinc-500">Contact</th>
+                        <td className="py-1.5">{receiptTarget.contactEmail}</td>
+                      </tr>
+                    )}
+                    <tr className="border-b border-zinc-100">
+                      <th className="py-1.5 pr-3 text-left font-medium text-zinc-500">Tarif</th>
+                      <td className="py-1.5">{formatAmount(c.prix)}</td>
+                    </tr>
+                    <tr className="border-b border-zinc-100">
+                      <th className="py-1.5 pr-3 text-left font-medium text-zinc-500">Remise</th>
+                      <td className="py-1.5">{formatAmount(c.remise)}</td>
+                    </tr>
+                    <tr className="border-b border-zinc-100">
+                      <th className="py-1.5 pr-3 text-left font-medium text-zinc-500">Total versé</th>
+                      <td className="py-1.5">{formatAmount(c.paiement)}</td>
+                    </tr>
+                    <tr>
+                      <th className="py-1.5 pr-3 text-left font-medium text-zinc-500">Statut</th>
+                      <td className="py-1.5">{status.label}</td>
+                    </tr>
+                  </tbody>
+                </table>
+                {sortedPayments.length > 0 && (
+                  <div>
+                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                      Détail des règlements
+                    </p>
+                    <table className="w-full border-collapse text-sm">
+                      <thead>
+                        <tr className="text-left text-[11px] uppercase text-zinc-400">
+                          <th className="py-1">Date</th>
+                          <th className="py-1">Mode</th>
+                          <th className="py-1">Détail</th>
+                          <th className="py-1">Montant</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sortedPayments.map((p) => (
+                          <tr key={p.id} className="border-b border-zinc-100">
+                            <td className="py-1">{new Date(p.paidAt).toLocaleDateString("fr-FR")}</td>
+                            <td className="py-1">{p.mode}</td>
+                            <td className="py-1">{p.detail ?? "—"}</td>
+                            <td className="py-1">{formatAmount(p.amount)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                <p className="text-base font-bold text-zinc-900">
+                  Solde restant dû : {formatAmount(balanceDue(c))}
+                </p>
+              </div>
+              <div className="mt-4 flex items-center gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="flex items-center gap-1.5 rounded-full bg-ubac-yellow px-3.5 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark"
+                >
+                  <Printer className="h-3.5 w-3.5" />
+                  Imprimer
+                </button>
+                <button
+                  onClick={() => downloadReceiptPdf(c, receiptTarget.contactEmail)}
+                  className="flex items-center gap-1.5 rounded-full border border-zinc-200 px-3.5 py-1.5 text-sm font-semibold text-zinc-600 hover:bg-zinc-50"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  Télécharger en PDF
+                </button>
+              </div>
+            </Modal>
+          );
+        })()}
 
       {remiseId && (
         <Modal
