@@ -8,5 +8,10 @@
       "path": "/api/cron/bureau-alerts",
       "schedule": "0 7 * * *"
     }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "dev": false
+    }
+  }
 }
