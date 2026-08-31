@@ -537,44 +537,73 @@ function findNextEventIdByTeamId(
   return map;
 }
 
+// Retour de Cindy du 31/08 (chantier "un seul calcul de présences pour
+// toute l'appli") : Bureau/Coach/Famille avaient chacun leur propre calcul
+// de compteurs/présents — un vrai risque de divergence, déjà responsable
+// d'un bug le 30/08 (Famille marchait, Bureau non, et inversement pour une
+// fonctionnalité). Famille faisait mieux que Bureau/Coach sur un point
+// précis : elle ne comptait que les réponses des joueurs réellement dans
+// l'effectif de CET événement, jamais une réponse orpheline (joueur retiré
+// de l'équipe depuis, etc.). Bureau/Coach comptaient toute réponse reçue
+// pour l'événement, sans revérifier l'effectif. Le calcul unique ci-dessous
+// reprend la méthode de Famille (la plus prudente) : sur les données
+// actuelles (aucune réponse orpheline connue), le résultat affiché ne
+// change nulle part ; si une incohérence apparaissait un jour, elle serait
+// désormais ignorée partout, jamais comptée à tort quelque part.
+//
+// Statuts bruts, jamais pré-agrégés : chaque appelant (Bureau/Coach via
+// fetchRsvpsByEvent, Famille via sa propre requête plus prudente,
+// inchangée) construit cette même Map à partir de ses propres lignes, puis
+// appelle buildRsvpCounts/buildPresentPlayers avec l'effectif de
+// l'événement concerné — c'est cet effectif, pas la requête, qui fait la
+// différence de prudence entre espaces.
+function buildRsvpStatusByEvent(
+  rows: { event_id: string; player_id: string; status: string | null }[]
+): Map<string, Map<string, string | null>> {
+  const map = new Map<string, Map<string, string | null>>();
+  rows.forEach((r) => {
+    const byPlayer = map.get(r.event_id) ?? new Map<string, string | null>();
+    byPlayer.set(r.player_id, r.status);
+    map.set(r.event_id, byPlayer);
+  });
+  return map;
+}
+
 function buildRsvpCounts(
-  rsvpsByEvent: Map<
-    string,
-    { present: number; absent: number; late: number; answered: number; presentPlayerIds: string[] }
-  >,
+  statusByEvent: Map<string, Map<string, string | null>>,
   eventId: string,
-  rosterSize: number
+  roster: { id: string }[]
 ) {
-  const rsvp = rsvpsByEvent.get(eventId);
-  const present = rsvp?.present ?? 0;
-  const absent = rsvp?.absent ?? 0;
-  const late = rsvp?.late ?? 0;
-  const answered = rsvp?.answered ?? 0;
+  const statuses = statusByEvent.get(eventId);
+  let present = 0;
+  let absent = 0;
+  let late = 0;
+  let answered = 0;
+  roster.forEach((p) => {
+    const status = statuses?.get(p.id);
+    if (!status) return;
+    answered += 1;
+    if (status === "PRESENT") present += 1;
+    else if (status === "ABSENT") absent += 1;
+    else if (status === "LATE") late += 1;
+  });
   return {
     present,
     absent,
     late,
-    pending: Math.max(0, rosterSize - answered),
+    pending: Math.max(0, roster.length - answered),
   };
 }
 
-// Retour de Cindy du 30/08 : "qui sera présent" doit être visible sur
-// TOUS les espaces (Bureau/Coach), pas seulement côté Famille — reprend
-// exactement la même Map que buildRsvpCounts (presentPlayerIds), résolue
-// en noms via l'effectif déjà connu au point d'appel (rosterByTeam), sans
-// requête supplémentaire.
 function buildPresentPlayers(
-  rsvpsByEvent: Map<
-    string,
-    { present: number; absent: number; late: number; answered: number; presentPlayerIds: string[] }
-  >,
+  statusByEvent: Map<string, Map<string, string | null>>,
   eventId: string,
   roster: { id: string; first_name: string | null; last_name: string | null }[]
 ) {
-  const presentIds = new Set(rsvpsByEvent.get(eventId)?.presentPlayerIds ?? []);
-  if (presentIds.size === 0) return [];
+  const statuses = statusByEvent.get(eventId);
+  if (!statuses) return [];
   return roster
-    .filter((p) => presentIds.has(p.id))
+    .filter((p) => statuses.get(p.id) === "PRESENT")
     .map((p) => ({ id: p.id, firstName: p.first_name, lastName: p.last_name }));
 }
 
@@ -582,11 +611,7 @@ async function fetchRsvpsByEvent(
   supabase: Awaited<ReturnType<typeof createClient>>,
   eventIds: string[]
 ) {
-  const rsvpsByEvent = new Map<
-    string,
-    { present: number; absent: number; late: number; answered: number; presentPlayerIds: string[] }
-  >();
-  if (eventIds.length === 0) return rsvpsByEvent;
+  if (eventIds.length === 0) return new Map<string, Map<string, string | null>>();
 
   // Pas de .in("event_id", eventIds) ici : même bug déjà trouvé et corrigé
   // pour les besoins d'organisation (getVolunteerNeedsByEventId, event-
@@ -598,9 +623,10 @@ async function fetchRsvpsByEvent(
   // partout côté Bureau, alors que la donnée existait bel et bien en base
   // (confirmé par Cindy le 29-30/08 — Coach et Famille, qui ne portent que
   // sur leurs propres équipes/enfants, n'atteignaient jamais cette limite).
-  // La policy RLS "Lecture des rsvps" autorise déjà tout compte connecté à
-  // lire toutes les lignes, donc un fetch sans filtre renvoie exactement le
-  // même ensemble, sans URL géante.
+  // La policy RLS "select own or coached rsvps" (et les autres policies
+  // rsvps) scope déjà tout compte connecté aux lignes qu'il a le droit de
+  // voir, donc un fetch sans filtre renvoie exactement le même ensemble,
+  // sans URL géante.
   const eventIdSet = new Set(eventIds);
   const { data: allRsvpRows, error: rsvpRowsError } = await supabase
     .from("rsvps")
@@ -611,25 +637,7 @@ async function fetchRsvpsByEvent(
   }
 
   const rsvpRows = (allRsvpRows ?? []).filter((r) => eventIdSet.has(r.event_id));
-
-  rsvpRows.forEach((r) => {
-    const bucket = rsvpsByEvent.get(r.event_id) ?? {
-      present: 0,
-      absent: 0,
-      late: 0,
-      answered: 0,
-      presentPlayerIds: [] as string[],
-    };
-    bucket.answered += 1;
-    if (r.status === "PRESENT") {
-      bucket.present += 1;
-      bucket.presentPlayerIds.push(r.player_id);
-    } else if (r.status === "ABSENT") bucket.absent += 1;
-    else if (r.status === "LATE") bucket.late += 1;
-    rsvpsByEvent.set(r.event_id, bucket);
-  });
-
-  return rsvpsByEvent;
+  return buildRsvpStatusByEvent(rsvpRows);
 }
 
 export default async function DashboardPage() {
@@ -1646,7 +1654,7 @@ export default async function DashboardPage() {
         teamId: team?.id ?? null,
         targetTeamIds: e.target_team_ids ?? null,
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, teamsById),
-        rsvpCounts: buildRsvpCounts(rsvpsByEvent, e.id, eventRoster.length),
+        rsvpCounts: buildRsvpCounts(rsvpsByEvent, e.id, eventRoster),
         // Retour de Cindy du 30/08 : "qui sera présent" visible partout, pas
         // seulement côté Famille (voir buildPresentPlayers) — même sujet que
         // le bug des présences plus tôt aujourd'hui, cette fois une
@@ -2278,7 +2286,7 @@ export default async function DashboardPage() {
         teamId: team?.id ?? null,
         targetTeamIds: e.target_team_ids ?? null,
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, clubTeamById),
-        rsvpCounts: buildRsvpCounts(rsvpsByEvent, e.id, eventRoster.length),
+        rsvpCounts: buildRsvpCounts(rsvpsByEvent, e.id, eventRoster),
         // Retour de Cindy du 30/08 : "qui sera présent" visible partout,
         // pas seulement côté Famille — voir buildPresentPlayers/bloc Bureau.
         presentPlayers: buildPresentPlayers(rsvpsByEvent, e.id, eventRoster),
@@ -2837,26 +2845,24 @@ export default async function DashboardPage() {
     logQueryErrors("Famille (rsvps/paiements)", { rsvpRowsRes, familyPaymentRes });
     familyVolunteerNeedsByEventId = familyVolunteerNeedsData;
 
-    // Statuts par équipe/événement, pour construire à la fois
-    // familyRsvpStatusByKey (boutons Présent/Absent de ses propres
-    // enfants — inchangé) et, juste après, le nombre et le nom des
-    // coéquipiers présents sur chaque carte.
-    const teammateStatusByEvent = new Map<string, Map<string, string>>();
+    // familyRsvpStatusByKey (boutons Présent/Absent de ses propres enfants)
+    // reste construit directement ici — un usage différent (statut d'UN
+    // joueur précis) de rsvpsByEvent juste en dessous (statut de TOUT
+    // l'effectif d'un événement, pour les compteurs/la liste des présents).
     (rsvpRowsRes?.data ?? []).forEach((r) => {
       familyRsvpStatusByKey[`${r.event_id}:${r.player_id}`] = r.status;
-      const byPlayer = teammateStatusByEvent.get(r.event_id) ?? new Map<string, string>();
-      byPlayer.set(r.player_id, r.status);
-      teammateStatusByEvent.set(r.event_id, byPlayer);
     });
 
-    // Compteurs (déjà affichés en pastilles) ET liste nominative des
-    // présents (nouveau) : les deux se lisent dans la même donnée, pas la
-    // peine de les calculer séparément. Un événement club-wide (teamId ET
-    // targetTeamIds null, ex. stage d'été) n'a pas d'effectif d'équipe :
-    // ni pastille ni liste, comme avant ce correctif. Un événement ciblant
-    // des équipes précises (targetTeamIds, retour d'audit du 28/08) prend
-    // l'union dédupliquée de leurs rosters, même principe que rosterSize
-    // plus haut dans ce fichier.
+    // Retour de Cindy du 31/08 : même calcul que Bureau/Coach
+    // (buildRsvpCounts/buildPresentPlayers, voir en tête de fichier) —
+    // reprend la requête de Famille, plus prudente (filtrée aussi par
+    // player_id, pas seulement par event_id), inchangée. Un événement
+    // club-wide (teamId ET targetTeamIds null, ex. stage d'été) n'a pas
+    // d'effectif d'équipe : ni pastille ni liste, comme avant ce
+    // correctif. Un événement ciblant des équipes précises (targetTeamIds,
+    // retour d'audit du 28/08) prend l'union dédupliquée de leurs rosters,
+    // même principe que rosterSize plus haut dans ce fichier.
+    const rsvpsByEvent = buildRsvpStatusByEvent(rsvpRowsRes?.data ?? []);
     familyEvents.forEach((e) => {
       const roster = e.teamId
         ? rosterByTeamId.get(e.teamId) ?? []
@@ -2869,25 +2875,8 @@ export default async function DashboardPage() {
               ).values()
             )
           : [];
-      const statuses = teammateStatusByEvent.get(e.id);
-      let present = 0;
-      let absent = 0;
-      let late = 0;
-      let answered = 0;
-      const presentPlayers: { id: string; firstName: string | null; lastName: string | null }[] =
-        [];
-      roster.forEach((p) => {
-        const status = statuses?.get(p.id);
-        if (!status) return;
-        answered += 1;
-        if (status === "PRESENT") {
-          present += 1;
-          presentPlayers.push({ id: p.id, firstName: p.first_name, lastName: p.last_name });
-        } else if (status === "ABSENT") absent += 1;
-        else if (status === "LATE") late += 1;
-      });
-      e.rsvpCounts = { present, absent, late, pending: Math.max(0, roster.length - answered) };
-      e.presentPlayers = presentPlayers;
+      e.rsvpCounts = buildRsvpCounts(rsvpsByEvent, e.id, roster);
+      e.presentPlayers = buildPresentPlayers(rsvpsByEvent, e.id, roster);
     });
 
     if (familyCotisationRows) {
