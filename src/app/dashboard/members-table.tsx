@@ -31,7 +31,7 @@ import MemberDetailModal from "./member-detail-modal";
 import PlayerYearBadge from "./player-year-badge";
 import WhatsAppButton from "./whatsapp-button";
 import WhatsAppDirectButton from "./whatsapp-direct-button";
-import { formatFirstName, formatLastName, formatPersonName } from "@/lib/names";
+import { formatFirstName, formatLastName, formatPersonName, sortByLastName } from "@/lib/names";
 import { formatLocalDateFr } from "@/lib/local-date";
 import type { AdminMember, AdminMemberTeam } from "./page";
 
@@ -264,18 +264,22 @@ export default function MembersTable({
           .includes(q)
       );
     }
-    return [...list].sort((a, b) => {
-      // Archivés groupés en tête (retour de Cindy du 2026-08-24, "afficher
-      // les archivés en haut du tableau des membres pour ne pas avoir à
-      // les chercher") — seulement quand "Afficher les archivés" est
-      // coché, sinon `list` n'en contient déjà plus aucun. Toujours en
-      // premier quel que soit le sens du tri, qui ne s'applique qu'à
-      // l'intérieur de chaque groupe (archivés, puis actifs).
-      const archivedDiff = Number(Boolean(b.archivedAt)) - Number(Boolean(a.archivedAt));
-      if (archivedDiff !== 0) return archivedDiff;
-      const cmp = fullLastName(a).localeCompare(fullLastName(b), "fr");
-      return sortDir === "asc" ? cmp : -cmp;
-    });
+    // Archivés groupés en tête (retour de Cindy du 2026-08-24, "afficher les
+    // archivés en haut du tableau des membres pour ne pas avoir à les
+    // chercher") — seulement quand "Afficher les archivés" est coché, sinon
+    // `list` n'en contient déjà plus aucun. Toujours en premier quel que
+    // soit le sens du tri, qui ne s'applique qu'à l'intérieur de chaque
+    // groupe. Tri par nom via sortByLastName (lib/names.ts, audit du 31/08)
+    // au lieu d'un localeCompare("fr") réécrit ici — la même règle que
+    // partout ailleurs dans l'appli (listes d'équipe, trombinoscope...).
+    const sortGroup = (group: typeof list) => {
+      const sorted = sortByLastName(group, (m) => m.lastName);
+      return sortDir === "asc" ? sorted : sorted.reverse();
+    };
+    return [
+      ...sortGroup(list.filter((m) => m.archivedAt)),
+      ...sortGroup(list.filter((m) => !m.archivedAt)),
+    ];
   }, [localMembers, teamFilter, search, sortDir, showArchived]);
 
   const allFilteredSelected =
@@ -865,7 +869,12 @@ export default function MembersTable({
               </th>
               <th className="w-auto whitespace-nowrap px-2 py-3">Prénom</th>
               <th className="whitespace-nowrap px-2 py-3">Coach de</th>
-              <th className="whitespace-nowrap px-2 py-3">Catégorie</th>
+              {/* "Équipe(s)", pas "Catégorie" (audit du 31/08) : cette
+                  colonne affiche m.teams (les équipes jouées), pas
+                  m.category — l'ancien intitulé prêtait à confusion avec
+                  la colonne "Catégorie" bien réelle de l'export Excel,
+                  qui elle utilise m.category. */}
+              <th className="whitespace-nowrap px-2 py-3">Équipe(s)</th>
               <th className="whitespace-nowrap px-2 py-3">Statut</th>
               <th className="whitespace-nowrap px-2 py-3">Email</th>
               <th className="whitespace-nowrap px-2 py-3">Téléphone</th>

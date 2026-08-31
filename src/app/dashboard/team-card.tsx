@@ -117,16 +117,14 @@ export default function TeamCard({
   contactPhoneByPlayerId,
   createCotisationOnNewPlayer = true,
   memberDetailsByPlayerId,
-  // The Bureau's "Membres" tab now owns member creation + team assignment
-  // end to end (AddMemberModal), so its Équipes tab no longer needs its own
-  // "+ Ajouter un joueur" shortcut here — Coach space still does, since
-  // coaches have no other way to add a brand-new player to their roster.
+  // La création de membres et l'assignation de coachs sont désormais
+  // centralisées côté Bureau (AddMemberModal, fiche membre "Coach de") :
+  // les deux seuls appelants réels de TeamCard (team-manager.tsx pour le
+  // Bureau, coach-teams.tsx pour le Coach) coupent tous les deux ces deux
+  // props explicitement — le défaut `true` ci-dessous n'est plus exercé
+  // par personne aujourd'hui (corrigé le 31/08 : le commentaire prétendait
+  // encore que le Coach les gardait, ce qui n'est plus le cas).
   allowCreatePlayer = true,
-  // Same reasoning for coach assignment: the Bureau now designates coaches
-  // exclusively from the member's own fiche ("Coach de" section), so its
-  // Équipes tab drops the "+ Assigner un coach" picker — Coach space keeps
-  // it, since a coach can't reach the (Bureau-only) Membres tab to add a
-  // co-coach any other way.
   allowAssignCoach = true,
   // Consultation only: used by the Coach space for a team the user merely
   // plays in. Hides every write affordance (add/remove player, add/remove

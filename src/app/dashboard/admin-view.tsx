@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import DocumentsPanel from "@/components/club-documents";
 import { BOUTIQUE_URL } from "./boutique";
-import TeamManager, { type TeamWithMembers } from "./team-manager";
+import TeamManager, { type Person, type TeamWithMembers } from "./team-manager";
 import ImportInscriptions from "./import-inscriptions";
 import ImportPlanning from "./import-planning";
 import ImportCoaches from "./import-coaches";
@@ -52,8 +52,6 @@ import type {
 import type { BirthdaySource } from "./birthdays";
 import type { EventRoleType } from "./event-tasks";
 import type { VolunteerNeed } from "./event-volunteer-needs";
-
-type Person = { id: string; first_name: string | null; last_name: string | null };
 
 export default function AdminView({
   clubFunction,

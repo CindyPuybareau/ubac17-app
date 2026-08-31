@@ -4,12 +4,15 @@ import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "rea
 import { useRouter } from "next/navigation";
 import { Shield } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { sortTeamsByGroup } from "@/lib/teams";
 import EmptyState from "./empty-state";
 import TeamCard from "./team-card";
 import TeamFilterDropdown from "./team-filter-dropdown";
 import type { AdminMemberTeam, AdminUpcomingEvent, MemberDetail, WhatsAppGroup } from "./page";
 
-type Person = { id: string; first_name: string | null; last_name: string | null };
+// Exporté (audit du 31/08) : coach-teams.tsx et admin-view.tsx redéfinissaient
+// chacun le même littéral au lieu d'importer celui-ci.
+export type Person = { id: string; first_name: string | null; last_name: string | null };
 
 export type RosterPlayer = Person & {
   position: string | null;
@@ -126,8 +129,12 @@ export default function TeamManager({
     router.refresh();
   }
 
+  // sortTeamsByGroup (audit du 31/08) : jusqu'ici cette liste suivait l'ordre
+  // brut renvoyé par la requête, sans rapport avec l'ordre "équipe mère puis
+  // ses déclinaisons" déjà appliqué côté Coach (coach-teams.tsx) pour cette
+  // même liste conceptuelle d'équipes.
   const filteredTeams = useMemo(
-    () => teams.filter((t) => selectedTeamIds.has(t.id)),
+    () => sortTeamsByGroup(teams.filter((t) => selectedTeamIds.has(t.id))),
     [teams, selectedTeamIds]
   );
 

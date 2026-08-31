@@ -6,7 +6,7 @@ import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
 import PenalitesCard from "./penalites-card";
 import TeamCard from "./team-card";
 import TeamSelectorPills from "./team-selector-pills";
-import type { TeamWithMembers } from "./team-manager";
+import type { Person, TeamWithMembers } from "./team-manager";
 import type {
   AdminMemberTeam,
   AdminPenalite,
@@ -14,8 +14,6 @@ import type {
   MemberDetail,
   WhatsAppGroup,
 } from "./page";
-
-type Person = { id: string; first_name: string | null; last_name: string | null };
 
 export default function CoachTeams({
   teams,
@@ -27,7 +25,6 @@ export default function CoachTeams({
   teamRoleByTeamId,
   clubTeams,
   whatsappGroups,
-  forcedTeamId,
   penalites = [],
 }: {
   teams: TeamWithMembers[];
@@ -44,28 +41,13 @@ export default function CoachTeams({
   // dans une seule liste, quelle que soit l'équipe sélectionnée ci-dessus —
   // désormais filtrée sur l'effectif de l'équipe active uniquement.
   penalites?: AdminPenalite[];
-  // Utilisé par les sous-onglets "Équipe" dédiés (un par équipe+rôle,
-  // sidebar Coach) : verrouille la carte sur cette équipe précise, cette
-  // page n'ayant plus besoin de son propre sélecteur — la navigation vit
-  // maintenant dans le sous-menu (même principe que forcedTab/forcedView
-  // ailleurs). Le bloc "Commissions & Admin" (ni lié à une équipe ni
-  // propre à celle-ci) est alors masqué : il vit dans son propre
-  // sous-onglet, voir CommissionGroups plus bas.
-  forcedTeamId?: string;
 }) {
   // L'équipe mère passe avant ses déclinaisons : U13M, puis U13M-1, U13M-2.
   const sortedTeams = useMemo(() => sortTeamsByGroup(teams), [teams]);
-  const [activeId, setActiveId] = useState(forcedTeamId ?? sortedTeams[0]?.id);
-  const active = forcedTeamId
-    ? (sortedTeams.find((t) => t.id === forcedTeamId) ?? sortedTeams[0])
-    : (sortedTeams.find((t) => t.id === activeId) ?? sortedTeams[0]);
+  const [activeId, setActiveId] = useState(sortedTeams[0]?.id);
+  const active = sortedTeams.find((t) => t.id === activeId) ?? sortedTeams[0];
 
-  // Désactivé quand forcedTeamId est fourni : le montage vient alors d'un
-  // clic dans le menu (sous-onglet "Équipe" dédié), qui ne scrolle déjà
-  // plus (voir use-scroll-top-on-change.ts) — sans ce garde-fou, le
-  // montage du composant relancerait quand même le saut de scroll à
-  // chaque clic.
-  useScrollTopOnChange(active?.id, undefined, !forcedTeamId);
+  useScrollTopOnChange(active?.id);
 
   if (!active) {
     return (
@@ -86,18 +68,16 @@ export default function CoachTeams({
 
   return (
     <div className="flex flex-col gap-4">
-      {!forcedTeamId && (
-        <TeamSelectorPills
-          teams={sortedTeams.map((t) => ({
-            id: t.id,
-            name: t.name,
-            category: t.category,
-            role: teamRoleByTeamId[t.id] ?? "COACH",
-          }))}
-          activeId={active.id}
-          onSelect={setActiveId}
-        />
-      )}
+      <TeamSelectorPills
+        teams={sortedTeams.map((t) => ({
+          id: t.id,
+          name: t.name,
+          category: t.category,
+          role: teamRoleByTeamId[t.id] ?? "COACH",
+        }))}
+        activeId={active.id}
+        onSelect={setActiveId}
+      />
       {isPlayerTeam && (
         <p className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
           Tu figures dans cette équipe en tant que joueur : l&apos;effectif est
