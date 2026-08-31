@@ -119,8 +119,17 @@ export default function ImportPlanning({
     setError(null);
     setResult(null);
 
-    const buffer = await file.arrayBuffer();
-    const wb = XLSX.read(buffer, { type: "array", cellDates: true });
+    // try/catch (audit du 31/08) : un fichier corrompu/pas vraiment un
+    // classeur Excel faisait planter XLSX.read sans jamais passer par le
+    // message d'erreur propre utilisé partout ailleurs dans ce composant.
+    let wb: XLSX.WorkBook;
+    try {
+      const buffer = await file.arrayBuffer();
+      wb = XLSX.read(buffer, { type: "array", cellDates: true });
+    } catch {
+      setError("Fichier illisible — vérifie que c'est bien un classeur Excel valide.");
+      return;
+    }
     const ws = wb.Sheets["Planning complet"];
 
     if (!ws) {
@@ -145,6 +154,23 @@ export default function ImportPlanning({
       heure: headerRow.findIndex((h) => h === "Heure"),
       salle: headerRow.findIndex((h) => h === "Salle"),
     };
+
+    // Garde-fou (audit du 31/08) : sans ça, une colonne renommée fait
+    // ignorer toutes les lignes en silence (idx.xxx = -1, "continue" plus
+    // bas) — l'écran affiche juste "0 match(s) détecté(s)" sans jamais dire
+    // pourquoi.
+    const missingColumns = [
+      idx.division < 0 ? "Division" : null,
+      idx.equipe1 < 0 ? "Equipe 1" : null,
+      idx.equipe2 < 0 ? "Equipe 2" : null,
+      idx.date < 0 ? "Date" : null,
+    ].filter((c): c is string => c !== null);
+    if (missingColumns.length > 0) {
+      setError(
+        `Colonne(s) introuvable(s) dans le fichier : ${missingColumns.join(", ")}. Vérifie les en-têtes de la feuille "Planning complet".`
+      );
+      return;
+    }
 
     const parsed: ParsedRow[] = [];
     for (let i = 1; i < raw.length; i++) {
@@ -193,7 +219,7 @@ export default function ImportPlanning({
     // minuit.
     let unknownTime = 0;
 
-    const eventsRows = rows
+    const resolvedRows = rows
       .map((r) => {
         const team = findTeamForDivision(r.division, existingTeams);
         if (!team) {
@@ -215,13 +241,57 @@ export default function ImportPlanning({
       })
       .filter((r): r is NonNullable<typeof r> => Boolean(r));
 
-    if (eventsRows.length > 0) {
-      const { error: insertError } = await supabase
+    // Détection de doublons (audit du 31/08) : aucune contrainte d'unicité
+    // en base ne couvre cet import — réimporter le même fichier (erreur
+    // corrigée, export renvoyé par erreur...) créerait sinon deux fois le
+    // même match. Comparaison par horodatage réel (getTime()), pas par
+    // chaîne de caractères brute : Supabase peut renvoyer un format
+    // légèrement différent de celui qu'on vient de calculer pour le même
+    // instant.
+    const keyFor = (teamId: string, iso: string) => `${teamId}|${new Date(iso).getTime()}`;
+    const teamIds = Array.from(new Set(resolvedRows.map((r) => r.team_id)));
+    const existingKeys = new Set<string>();
+    if (teamIds.length > 0) {
+      const { data: existingEvents, error: existingEventsError } = await supabase
         .from("events")
-        .insert(eventsRows);
+        .select("team_id, start_time")
+        .in("team_id", teamIds);
+      if (existingEventsError) {
+        setLoading(false);
+        setError(existingEventsError.message);
+        return;
+      }
+      (existingEvents ?? []).forEach((ev) => {
+        if (ev.team_id) existingKeys.add(keyFor(ev.team_id, ev.start_time));
+      });
+    }
+
+    let duplicateCount = 0;
+    const eventsRows = resolvedRows.filter((r) => {
+      if (existingKeys.has(keyFor(r.team_id, r.start_time))) {
+        duplicateCount += 1;
+        return false;
+      }
+      return true;
+    });
+
+    if (eventsRows.length > 0) {
+      // .select("id") + vérification du nombre de lignes (audit du 31/08) :
+      // RLS peut bloquer une écriture sans erreur.
+      const { error: insertError, data: insertedRows } = await supabase
+        .from("events")
+        .insert(eventsRows)
+        .select("id");
       if (insertError) {
         setLoading(false);
         setError(insertError.message);
+        return;
+      }
+      if ((insertedRows?.length ?? 0) < eventsRows.length) {
+        setLoading(false);
+        setError(
+          "Import partiellement bloqué par les droits d'accès (RLS) — certains matchs n'ont pas été enregistrés. Réessaie."
+        );
         return;
       }
     }
@@ -229,6 +299,9 @@ export default function ImportPlanning({
     setLoading(false);
     setResult(
       `${eventsRows.length} match(s) importé(s).` +
+        (duplicateCount > 0
+          ? ` ${duplicateCount} déjà présent(s) dans le calendrier, ignoré(s).`
+          : "") +
         (unmatched.length > 0
           ? ` ${unmatched.length} ligne(s) ignorée(s) (division non reconnue: ${Array.from(
               new Set(unmatched)

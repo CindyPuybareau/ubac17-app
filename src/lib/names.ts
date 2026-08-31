@@ -13,6 +13,20 @@ export function formatLastName(last: string | null | undefined) {
   return (last ?? "").trim().toUpperCase();
 }
 
+// Pour comparer/dédupliquer des noms, jamais pour l'affichage (audit du
+// 31/08, bug remonté par Cindy : "Leonore"/"Léonore" traités comme deux
+// personnes différentes lors d'un import — l'accent seul suffisait à
+// casser la correspondance). Retire les accents en plus de la casse/des
+// espaces, pour que "Léonore" et "Leonore" (accent oublié/perdu à la
+// saisie ou à l'export) soient reconnus comme le même nom.
+export function normalizeNameForMatching(value: string | null | undefined): string {
+  return (value ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+}
+
 // Majuscule en tête de chaque partie, reste en minuscules — traite les
 // prénoms composés (espace ou tiret : "Jean-Pierre", "Marie Claire") et les
 // apostrophes ("N'Guyen") comme autant de limites de mot, quelle que soit

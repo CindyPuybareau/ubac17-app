@@ -42,10 +42,23 @@ export default function ImportCoaches({
     setError(null);
     setResult(null);
 
-    const buffer = await file.arrayBuffer();
-    const wb = XLSX.read(buffer, { type: "array" });
+    // try/catch + garde sur la feuille (audit du 31/08, même correctif que
+    // import-planning.tsx) : un fichier corrompu ou sans aucune feuille
+    // faisait planter la lecture sans jamais passer par un message propre.
+    let wb: XLSX.WorkBook;
+    try {
+      const buffer = await file.arrayBuffer();
+      wb = XLSX.read(buffer, { type: "array" });
+    } catch {
+      setError("Fichier illisible — vérifie que c'est bien un classeur Excel valide.");
+      return;
+    }
     const sheetName = wb.SheetNames[0];
-    const ws = wb.Sheets[sheetName];
+    const ws = sheetName ? wb.Sheets[sheetName] : undefined;
+    if (!ws) {
+      setError("Aucune feuille trouvée dans ce fichier.");
+      return;
+    }
 
     const raw = XLSX.utils.sheet_to_json(ws, {
       header: 1,
@@ -83,10 +96,26 @@ export default function ImportCoaches({
 
     const supabase = createClient();
 
+    // Détection de collision (audit du 31/08) : sans elle, deux équipes
+    // différentes qui produisent le même libellé normalisé (l'une via sa
+    // catégorie, l'autre via son nom — ex. un doublon/une erreur de saisie
+    // historique) s'écrasaient silencieusement dans cette map ; les coachs
+    // du libellé en collision pouvaient alors être rattachés à la mauvaise
+    // équipe selon l'ordre de retour de la requête, sans la moindre erreur.
     const teamIdByNorm = new Map<string, string>();
+    const collidedLabels = new Set<string>();
+    function registerTeamLabel(label: string, teamId: string) {
+      const norm = normalizeLabel(label);
+      const existing = teamIdByNorm.get(norm);
+      if (existing && existing !== teamId) {
+        collidedLabels.add(norm);
+        return;
+      }
+      teamIdByNorm.set(norm, teamId);
+    }
     existingTeams.forEach((t) => {
-      if (t.category) teamIdByNorm.set(normalizeLabel(t.category), t.id);
-      if (t.name) teamIdByNorm.set(normalizeLabel(t.name), t.id);
+      if (t.category) registerTeamLabel(t.category, t.id);
+      if (t.name) registerTeamLabel(t.name, t.id);
     });
 
     const missingLabels = rows
@@ -106,7 +135,7 @@ export default function ImportCoaches({
         return;
       }
       (newTeams ?? []).forEach((t) => {
-        if (t.category) teamIdByNorm.set(normalizeLabel(t.category), t.id);
+        if (t.category) registerTeamLabel(t.category, t.id);
       });
     }
 
@@ -117,20 +146,34 @@ export default function ImportCoaches({
     });
 
     if (inviteRows.length > 0) {
-      const { error: inviteError } = await supabase
+      // .select() + vérification du nombre de lignes (audit du 31/08) : RLS
+      // peut bloquer une écriture sans erreur.
+      const { error: inviteError, data: upsertedRows } = await supabase
         .from("team_coach_invites")
-        .upsert(inviteRows, { onConflict: "team_id,email" });
+        .upsert(inviteRows, { onConflict: "team_id,email" })
+        .select("team_id, email");
 
       if (inviteError) {
         setLoading(false);
         setError(inviteError.message);
         return;
       }
+      if ((upsertedRows?.length ?? 0) < inviteRows.length) {
+        setLoading(false);
+        setError(
+          "Enregistrement partiellement bloqué par les droits d'accès (RLS) — certaines invitations n'ont pas été enregistrées. Réessaie."
+        );
+        return;
+      }
     }
 
     setLoading(false);
+    const collisionNote =
+      collidedLabels.size > 0
+        ? ` Attention : ${collidedLabels.size} libellé(s) correspondent à plusieurs équipes à la fois (${Array.from(collidedLabels).join(", ")}) — vérifie qu'il n'y a pas de doublon d'équipe, les coachs concernés ont été rattachés à une seule d'entre elles au hasard.`
+        : "";
     setResult(
-      `${uniqueMissing.length} équipe(s) créée(s), ${inviteRows.length} invitation(s) coach enregistrée(s). Chaque coach sera rattaché automatiquement dès son inscription avec l'email correspondant.`
+      `${uniqueMissing.length} équipe(s) créée(s), ${inviteRows.length} invitation(s) coach enregistrée(s). Chaque coach sera rattaché automatiquement dès son inscription avec l'email correspondant.${collisionNote}`
     );
     setRows(null);
     router.refresh();

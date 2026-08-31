@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import { createClient } from "@/lib/supabase/client";
 import { getCurrentSeasonLabel } from "@/lib/season";
-import { formatFirstName } from "@/lib/names";
+import { suggestTeamCategory } from "@/lib/team-assignment";
+import { formatFirstName, normalizeNameForMatching } from "@/lib/names";
 import FilePickerButton from "./file-picker-button";
 
 type ParsedRow = {
@@ -94,30 +95,86 @@ function strOrNull(v: unknown): string | null {
 // match a row against an already-imported player: nom + prénom + date de
 // naissance, normalized. License number is preferred when available (see
 // resolveMatch), but the source file doesn't always carry one.
+// normalizeNameForMatching (audit du 31/08, bug remonté par Cindy sur un
+// import réel : "Leonore"/"Léonore" traités comme deux personnes
+// différentes) : un accent oublié ou perdu (saisie, export Excel...) ne
+// doit jamais suffire à faire passer une correspondance pour un nouveau
+// membre plutôt qu'une mise à jour.
 function nameBirthKey(
   firstName: string,
   lastName: string,
   birthDate: string | null
 ) {
-  return `${firstName.trim().toLowerCase()}|${lastName.trim().toLowerCase()}|${birthDate ?? ""}`;
+  return `${normalizeNameForMatching(firstName)}|${normalizeNameForMatching(lastName)}|${birthDate ?? ""}`;
 }
 
-type MatchedRow = ParsedRow & { id: string };
+// suggestedTeamCategory/suggestedTeamId (audit du 31/08) : calculés dès
+// l'analyse, seulement pour un joueur qui n'a AUJOURD'HUI aucune équipe —
+// jamais pour quelqu'un déjà affecté. Les deux restent null quand aucune
+// équipe réelle du club ne correspond (voir suggestTeamCategory) : dans ce
+// cas, rien n'est proposé, exactement le comportement d'avant.
+type MatchedRow = ParsedRow & {
+  id: string;
+  suggestedTeamCategory: string | null;
+  suggestedTeamId: string | null;
+};
 
 // Calculé dès l'analyse du fichier (pas seulement au clic "Confirmer") pour
 // que le Bureau voie exactement qui sera créé vs mis à jour *avant*
 // d'écrire quoi que ce soit — l'aperçu demandé après l'incident du
 // 15/08/2026 (une importation ne doit plus jamais surprendre).
+// toReview (audit du 31/08) : cas d'un seul homonyme existant mais dont la
+// date de naissance ne correspond pas du tout — voir resolveExistingId.
+// Jamais fusionné ni créé automatiquement, seulement listé pour une
+// décision manuelle du Bureau.
 type ImportPreview = {
   toInsert: MatchedRow[];
   toUpdate: MatchedRow[];
+  toReview: MatchedRow[];
+};
+
+// Champs de players relus avant l'écriture (audit du 31/08) : sert à ne
+// jamais laisser une cellule vide du fichier effacer une valeur déjà
+// renseignée en base — voir mergedPlayerFields dans handleImport.
+type ExistingPlayerRow = {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  birth_date: string | null;
+  category: string | null;
+  pending_parent_email: string | null;
+  sex: string | null;
+  registration_email: string | null;
+  registration_phone: string | null;
+  address: string | null;
+  postal_code: string | null;
+  city: string | null;
+  secondary_email: string | null;
+  mother_phone: string | null;
+  father_phone: string | null;
+  other_phones: string | null;
+  secondary_address: string | null;
+  license_type: string | null;
+  membership_type: string | null;
+  fbi_status: string | null;
+  medical_notes: string | null;
+  other_notes: string | null;
+  image_rights: string | null;
+  player_charter_accepted: string | null;
+  parent_charter_accepted: string | null;
+  license_number: string | null;
 };
 
 export default function ImportInscriptions() {
   const router = useRouter();
   const [rows, setRows] = useState<ParsedRow[] | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
+  const [existingById, setExistingById] = useState<Map<string, ExistingPlayerRow>>(new Map());
   const [duplicateCount, setDuplicateCount] = useState(0);
+  // Coché par défaut (audit du 31/08) : applique les suggestions d'équipe
+  // calculées ci-dessous à la confirmation de l'import — décochable pour
+  // importer sans toucher aux équipes, comme avant cette fonctionnalité.
+  const [applyTeamSuggestions, setApplyTeamSuggestions] = useState(true);
   // Plus de champ éditable : personne ne change jamais cette valeur à la
   // main, elle suit simplement la saison en cours.
   const season = getCurrentSeasonLabel();
@@ -201,6 +258,23 @@ export default function ImportInscriptions() {
         "Numero_Licence",
       ]),
     };
+
+    // Garde-fou (audit du 31/08) : sans ça, une colonne renommée dans le
+    // fichier (ex. "Catégorie" -> "Catégorie d'âge") faisait ignorer TOUTES
+    // les lignes en silence (idx.categorie = -1, chaque ligne rejetée par
+    // le "continue" plus bas) — l'écran affichait juste "0 inscriptions
+    // détectées" sans jamais dire pourquoi.
+    const missingColumns = [
+      idx.categorie < 0 ? "Catégorie" : null,
+      idx.nom < 0 ? "Nom" : null,
+      idx.prenom < 0 ? "Prénom" : null,
+    ].filter((c): c is string => c !== null);
+    if (missingColumns.length > 0) {
+      setError(
+        `Colonne(s) introuvable(s) dans le fichier : ${missingColumns.join(", ")}. Vérifie les en-têtes de la feuille "Suivi Inscriptions".`
+      );
+      return;
+    }
 
     const get = (r: unknown[], i: number) => (i >= 0 ? r[i] : null);
 
@@ -310,9 +384,16 @@ export default function ImportInscriptions() {
     // l'analyse, pour pouvoir montrer "X nouveaux / Y mis à jour" avant
     // que le Bureau ne clique sur "Confirmer l'import".
     const supabase = createClient();
+    // Sélection élargie (audit du 31/08, cf. mergedPlayerFields dans
+    // handleImport) : toutes les colonnes qu'une mise à jour pourrait
+    // toucher, pas seulement celles qui servent au matching — pour pouvoir
+    // garder une valeur déjà en base quand la cellule correspondante du
+    // fichier est vide, au lieu de l'effacer.
     const { data: existingPlayers, error: existingError } = await supabase
       .from("players")
-      .select("id, first_name, last_name, birth_date, license_number");
+      .select(
+        "id, first_name, last_name, birth_date, category, pending_parent_email, sex, registration_email, registration_phone, address, postal_code, city, secondary_email, mother_phone, father_phone, other_phones, secondary_address, license_type, membership_type, fbi_status, medical_notes, other_notes, image_rights, player_charter_accepted, parent_charter_accepted, license_number"
+      );
 
     if (existingError) {
       setError(existingError.message);
@@ -322,56 +403,132 @@ export default function ImportInscriptions() {
     const existingByLicense = new Map<string, string>();
     const existingByNameBirth = new Map<string, string>();
     // Repli de dernier recours (voir resolveExistingId ci-dessous) : liste
-    // des id par nom+prénom seuls, pour retrouver un membre même si sa
-    // date de naissance stockée diffère de celle fraîchement relue du
-    // fichier — incident du 16/08/2026, où une correction du parsing des
-    // dates a changé la valeur calculée et fait perdre la correspondance
-    // exacte nom+prénom+date pour tout membre sans n° de licence, créant
-    // des doublons en masse. Un tableau (pas juste le dernier id) pour
-    // détecter l'ambiguïté : deux homonymes ne doivent jamais fusionner.
-    const existingByNameOnly = new Map<string, string[]>();
+    // des candidats par nom+prénom seuls (id + date de naissance connue),
+    // pour retrouver un membre même si sa date de naissance stockée diffère
+    // de celle fraîchement relue du fichier — incident du 16/08/2026, où
+    // une correction du parsing des dates a changé la valeur calculée et
+    // fait perdre la correspondance exacte nom+prénom+date pour tout membre
+    // sans n° de licence, créant des doublons en masse. Un tableau (pas
+    // juste le dernier id) pour détecter l'ambiguïté : deux homonymes ne
+    // doivent jamais fusionner.
+    const existingByNameOnly = new Map<
+      string,
+      { id: string; birthDate: string | null }[]
+    >();
+    const byId = new Map<string, ExistingPlayerRow>();
     (existingPlayers ?? []).forEach((p) => {
+      byId.set(p.id, p);
       if (p.license_number) existingByLicense.set(p.license_number, p.id);
       existingByNameBirth.set(
         nameBirthKey(p.first_name ?? "", p.last_name ?? "", p.birth_date),
         p.id
       );
-      const nameKey = `${(p.first_name ?? "").trim().toLowerCase()}|${(p.last_name ?? "").trim().toLowerCase()}`;
+      const nameKey = `${normalizeNameForMatching(p.first_name)}|${normalizeNameForMatching(p.last_name)}`;
       const list = existingByNameOnly.get(nameKey) ?? [];
-      list.push(p.id);
+      list.push({ id: p.id, birthDate: p.birth_date });
       existingByNameOnly.set(nameKey, list);
     });
+    setExistingById(byId);
 
-    function resolveExistingId(r: ParsedRow): string | null {
+    // uncertain: vrai quand le repli nom-seul (ci-dessous) a trouvé un
+    // candidat unique, mais dont l'année de naissance connue ne correspond
+    // pas du tout à celle du fichier (audit du 31/08) — un frère/soeur
+    // homonyme qui s'inscrit pour la première fois serait sinon fusionné
+    // avec l'aîné(e) déjà en base. Comparaison par ANNÉE seulement (pas la
+    // date exacte) pour rester tolérant au même genre d'écart de parsing
+    // que l'incident du 16/08, sans jamais avaler un vrai homonyme différent.
+    function resolveExistingId(
+      r: ParsedRow
+    ): { id: string; uncertain: boolean } | null {
       if (r.licenseNumber && existingByLicense.has(r.licenseNumber)) {
-        return existingByLicense.get(r.licenseNumber) ?? null;
+        return { id: existingByLicense.get(r.licenseNumber)!, uncertain: false };
       }
       const key = nameBirthKey(r.firstName, r.lastName, r.birthDate);
       const exact = existingByNameBirth.get(key);
-      if (exact) return exact;
+      if (exact) return { id: exact, uncertain: false };
       // La date de naissance seule a changé (import précédent buggé,
       // correction manuelle...) : si un seul membre existant porte ce
       // nom+prénom, c'est très probablement lui — mieux vaut le mettre à
       // jour (et corriger sa date au passage) que le dupliquer. En cas
       // d'homonymie (plusieurs membres, ex. jumeaux), on refuse de
       // deviner : mieux vaut rater une mise à jour qu'en fusionner deux.
-      const nameKey = `${r.firstName.trim().toLowerCase()}|${r.lastName.trim().toLowerCase()}`;
+      const nameKey = `${normalizeNameForMatching(r.firstName)}|${normalizeNameForMatching(r.lastName)}`;
       const candidates = existingByNameOnly.get(nameKey);
-      if (candidates && candidates.length === 1) return candidates[0];
+      if (candidates && candidates.length === 1) {
+        const candidate = candidates[0];
+        const sameYear =
+          !r.birthDate || !candidate.birthDate
+            ? true
+            : r.birthDate.slice(0, 4) === candidate.birthDate.slice(0, 4);
+        return { id: candidate.id, uncertain: !sameYear };
+      }
       return null;
+    }
+
+    // Suggestion automatique d'équipe (audit du 31/08, retour de Cindy) :
+    // seulement pour un joueur qui n'a AUJOURD'HUI aucune équipe — jamais
+    // pour quelqu'un déjà affecté (toujours additif, jamais de retrait/
+    // déplacement). Les deux requêtes ci-dessous restent légères : les
+    // équipes du club se comptent en dizaines, pas en centaines.
+    const [{ data: teamsData, error: teamsError }, { data: existingLinks, error: linksError }] =
+      await Promise.all([
+        supabase.from("teams").select("id, category"),
+        supabase.from("team_players").select("player_id"),
+      ]);
+    if (teamsError) {
+      setError(teamsError.message);
+      return;
+    }
+    if (linksError) {
+      setError(linksError.message);
+      return;
+    }
+    const teamIdByCategory = new Map<string, string>();
+    (teamsData ?? []).forEach((t) => {
+      if (t.category) teamIdByCategory.set(t.category.trim().toLowerCase(), t.id);
+    });
+    const playersWithTeam = new Set((existingLinks ?? []).map((l) => l.player_id));
+
+    function computeSuggestion(playerId: string, r: ParsedRow) {
+      if (playersWithTeam.has(playerId)) return { category: null, teamId: null };
+      const category = suggestTeamCategory({
+        birthDate: r.birthDate,
+        sex: r.sex,
+        licenseType: r.licenseType,
+      });
+      const teamId = category ? (teamIdByCategory.get(category.toLowerCase()) ?? null) : null;
+      // Ne montrer une suggestion que si une équipe réelle y correspond
+      // vraiment — sinon silence total, comme avant cette fonctionnalité.
+      return teamId ? { category, teamId } : { category: null, teamId: null };
     }
 
     const toInsert: MatchedRow[] = [];
     const toUpdate: MatchedRow[] = [];
+    const toReview: MatchedRow[] = [];
     for (const r of deduped) {
-      const existingId = resolveExistingId(r);
-      if (existingId) {
-        toUpdate.push({ ...r, id: existingId });
+      const resolved = resolveExistingId(r);
+      if (!resolved) {
+        const id = crypto.randomUUID();
+        const suggestion = computeSuggestion(id, r);
+        toInsert.push({
+          ...r,
+          id,
+          suggestedTeamCategory: suggestion.category,
+          suggestedTeamId: suggestion.teamId,
+        });
+      } else if (resolved.uncertain) {
+        toReview.push({ ...r, id: resolved.id, suggestedTeamCategory: null, suggestedTeamId: null });
       } else {
-        toInsert.push({ ...r, id: crypto.randomUUID() });
+        const suggestion = computeSuggestion(resolved.id, r);
+        toUpdate.push({
+          ...r,
+          id: resolved.id,
+          suggestedTeamCategory: suggestion.category,
+          suggestedTeamId: suggestion.teamId,
+        });
       }
     }
-    setPreview({ toInsert, toUpdate });
+    setPreview({ toInsert, toUpdate, toReview });
   }
 
   async function handleImport() {
@@ -380,6 +537,8 @@ export default function ImportInscriptions() {
     setError(null);
 
     const supabase = createClient();
+    // toReview n'est jamais écrit ici, ni en insert ni en update — voir le
+    // commentaire sur ImportPreview plus haut.
     const { toInsert, toUpdate } = preview;
 
     const playerFields = (r: ParsedRow) => ({
@@ -410,6 +569,25 @@ export default function ImportInscriptions() {
       license_number: r.licenseNumber,
     });
 
+    // Audit du 31/08 : sans ceci, une cellule vide du fichier (le Bureau
+    // n'a pas eu à retaper ce qu'il avait déjà donné l'an dernier, ou un
+    // champ facultatif jamais rempli) effaçait silencieusement une valeur
+    // déjà en base — notes médicales, n° de licence, téléphone d'un
+    // parent... Ne remplace un champ que si le fichier apporte une vraie
+    // valeur ; sinon garde ce qui est déjà enregistré.
+    function mergedPlayerFields(r: MatchedRow) {
+      const fresh = playerFields(r);
+      const existing = existingById.get(r.id);
+      if (!existing) return fresh;
+      const merged = { ...fresh } as Record<string, unknown>;
+      (Object.keys(merged) as (keyof typeof fresh)[]).forEach((key) => {
+        if (merged[key] === null && existing[key] != null) {
+          merged[key] = existing[key];
+        }
+      });
+      return merged as ReturnType<typeof playerFields>;
+    }
+
     if (toInsert.length > 0) {
       const { error: insertError } = await supabase.from("players").insert(
         toInsert.map((r) => ({ id: r.id, ...playerFields(r) }))
@@ -421,14 +599,18 @@ export default function ImportInscriptions() {
       }
     }
 
-    // Overwrite the existing member's data with the file's values, and
-    // un-archive them if they'd been archived (they're registering again).
+    // Complète les champs vides avec le fichier (mergedPlayerFields), et
+    // un-archive le membre (il se réinscrit). .select("id") + vérification
+    // du nombre de lignes (audit du 31/08) : RLS peut bloquer une écriture
+    // sans erreur — sans ce contrôle, l'écran affichait "mis à jour" même
+    // quand rien n'avait changé en base.
     const updateResults = await Promise.all(
       toUpdate.map((r) =>
         supabase
           .from("players")
-          .update({ ...playerFields(r), archived_at: null })
+          .update({ ...mergedPlayerFields(r), archived_at: null })
           .eq("id", r.id)
+          .select("id")
       )
     );
     const updateError = updateResults.find((res) => res.error)?.error;
@@ -437,6 +619,7 @@ export default function ImportInscriptions() {
       setError(updateError.message);
       return;
     }
+    const blockedUpdates = updateResults.filter((res) => (res.data?.length ?? 0) === 0).length;
 
     const allRows = [...toInsert, ...toUpdate];
     const allIds = allRows.map((r) => r.id);
@@ -511,21 +694,63 @@ export default function ImportInscriptions() {
           .from("cotisations")
           .update(cotisationFields(r))
           .eq("id", cotisationIdByPlayerId.get(r.id))
+          .select("id")
       )
     );
     const cotisationsUpdateError = cotisationsUpdateResults.find(
       (res) => res.error
     )?.error;
-
-    setLoading(false);
-
     if (cotisationsUpdateError) {
+      setLoading(false);
       setError(cotisationsUpdateError.message);
       return;
     }
+    const blockedCotisations = cotisationsUpdateResults.filter(
+      (res) => (res.data?.length ?? 0) === 0
+    ).length;
 
+    // Affectation d'équipe suggérée (audit du 31/08, retour de Cindy) :
+    // toujours additive — un insert dans team_players, jamais un retrait
+    // ni un déplacement d'une affectation existante (déjà garanti par
+    // computeSuggestion, qui ignore tout joueur ayant déjà une équipe).
+    let teamAssignedCount = 0;
+    let blockedTeamAssignments = 0;
+    if (applyTeamSuggestions) {
+      const teamLinksToInsert = allRows
+        .filter((r) => r.suggestedTeamId)
+        .map((r) => ({ team_id: r.suggestedTeamId as string, player_id: r.id }));
+      if (teamLinksToInsert.length > 0) {
+        const { error: teamLinksError, data: insertedTeamLinks } = await supabase
+          .from("team_players")
+          .insert(teamLinksToInsert)
+          .select("player_id");
+        if (teamLinksError) {
+          setLoading(false);
+          setError(teamLinksError.message);
+          return;
+        }
+        teamAssignedCount = insertedTeamLinks?.length ?? 0;
+        blockedTeamAssignments = teamLinksToInsert.length - teamAssignedCount;
+      }
+    }
+
+    setLoading(false);
+
+    const blockedTotal = blockedUpdates + blockedCotisations + blockedTeamAssignments;
+    const reviewNote =
+      preview.toReview.length > 0
+        ? ` ${preview.toReview.length} fiche${preview.toReview.length > 1 ? "s" : ""} ignorée${preview.toReview.length > 1 ? "s" : ""} (nom identique à un membre existant, mais date de naissance différente — à vérifier à la main dans l'onglet Membres).`
+        : "";
+    const blockedNote =
+      blockedTotal > 0
+        ? ` Attention : ${blockedTotal} écriture${blockedTotal > 1 ? "s" : ""} bloquée${blockedTotal > 1 ? "s" : ""} par les droits d'accès (RLS) — rien n'a changé pour ces lignes-là, réessaie.`
+        : "";
+    const teamNote =
+      applyTeamSuggestions && teamAssignedCount > 0
+        ? ` ${teamAssignedCount} affecté${teamAssignedCount > 1 ? "s" : ""} automatiquement à leur équipe.`
+        : "";
     setResult(
-      `${toInsert.length} nouveau${toInsert.length > 1 ? "x" : ""} membre${toInsert.length > 1 ? "s" : ""}, ${toUpdate.length} mis à jour, pour la saison ${season}.`
+      `${toInsert.length} nouveau${toInsert.length > 1 ? "x" : ""} membre${toInsert.length > 1 ? "s" : ""}, ${toUpdate.length} mis à jour, pour la saison ${season}.${teamNote}${reviewNote}${blockedNote}`
     );
     setRows(null);
     setPreview(null);
@@ -588,7 +813,9 @@ export default function ImportInscriptions() {
                   {preview.toUpdate.length} fiche{preview.toUpdate.length > 1 ? "s" : ""} existante
                   {preview.toUpdate.length > 1 ? "s" : ""}
                 </span>{" "}
-                seront mises à jour. Aucune équipe ne sera modifiée.
+                seront mises à jour. Une équipe existante n&apos;est jamais retirée ni changée —
+                seule une fiche sans aucune équipe peut en recevoir une nouvelle, en plus (jamais
+                à la place) des équipes déjà affectées.
               </p>
               {preview.toInsert.length > 0 && (
                 <details className="mt-2">
@@ -599,10 +826,82 @@ export default function ImportInscriptions() {
                     {preview.toInsert.map((r, i) => (
                       <li key={i}>
                         {formatFirstName(r.firstName)} {r.lastName} · {r.category}
+                        {r.suggestedTeamCategory && (
+                          <span className="ml-1 font-medium text-emerald-700">
+                            → {r.suggestedTeamCategory}
+                          </span>
+                        )}
                       </li>
                     ))}
                   </ul>
                 </details>
+              )}
+              {preview.toUpdate.length > 0 && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-xs font-medium text-zinc-500 hover:text-zinc-700">
+                    Voir les {preview.toUpdate.length} fiches mises à jour
+                  </summary>
+                  <ul className="mt-1.5 flex max-h-40 flex-col gap-0.5 overflow-y-auto text-xs text-zinc-500">
+                    {preview.toUpdate.map((r, i) => (
+                      <li key={i}>
+                        {formatFirstName(r.firstName)} {r.lastName} · {r.category}
+                        {r.suggestedTeamCategory && (
+                          <span className="ml-1 font-medium text-emerald-700">
+                            → {r.suggestedTeamCategory}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              {preview.toInsert.some((r) => r.suggestedTeamCategory) ||
+              preview.toUpdate.some((r) => r.suggestedTeamCategory) ? (
+                <label className="mt-2 flex items-center gap-2 text-xs text-zinc-600">
+                  <input
+                    type="checkbox"
+                    checked={applyTeamSuggestions}
+                    onChange={(e) => setApplyTeamSuggestions(e.target.checked)}
+                    className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
+                  />
+                  Affecter automatiquement les équipes suggérées ci-dessus (
+                  {[...preview.toInsert, ...preview.toUpdate].filter((r) => r.suggestedTeamCategory)
+                    .length}{" "}
+                  fiche
+                  {[...preview.toInsert, ...preview.toUpdate].filter((r) => r.suggestedTeamCategory)
+                    .length > 1
+                    ? "s"
+                    : ""}{" "}
+                  concernée
+                  {[...preview.toInsert, ...preview.toUpdate].filter((r) => r.suggestedTeamCategory)
+                    .length > 1
+                    ? "s"
+                    : ""}
+                  )
+                </label>
+              ) : null}
+              {preview.toReview.length > 0 && (
+                <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5">
+                  <p className="text-xs font-semibold text-amber-800">
+                    {preview.toReview.length} fiche{preview.toReview.length > 1 ? "s" : ""} à
+                    vérifier à la main — ne sera{preview.toReview.length > 1 ? "ont" : ""} pas
+                    importée{preview.toReview.length > 1 ? "s" : ""}
+                  </p>
+                  <p className="mt-0.5 text-xs text-amber-700">
+                    Un membre du même nom existe déjà, mais sa date de naissance ne correspond
+                    pas à celle du fichier — pour ne jamais fusionner deux personnes différentes
+                    par erreur (ex. un frère/une sœur homonyme), rien n&apos;est écrit
+                    automatiquement pour ces lignes-là.
+                  </p>
+                  <ul className="mt-1.5 flex max-h-32 flex-col gap-0.5 overflow-y-auto text-xs text-amber-700">
+                    {preview.toReview.map((r, i) => (
+                      <li key={i}>
+                        {formatFirstName(r.firstName)} {r.lastName} · {r.category} · né(e) le{" "}
+                        {r.birthDate ?? "date inconnue"}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </div>
           ) : (
