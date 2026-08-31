@@ -372,11 +372,9 @@ export type AdminUpcomingEvent = {
     pending: number;
   };
   // Coéquipiers ayant répondu Présent, avec leur nom — pour le module "Qui
-  // sera là ?" de la carte d'événement. Seul le bloc Famille (le seul
-  // endroit où "vue Parent/Joueur" a du sens) le renseigne : undefined
-  // ailleurs (Bureau, Coach) plutôt qu'un tableau vide, pour que la carte
-  // sache distinguer "personne n'a encore répondu" de "pas concerné par
-  // ce module".
+  // sera là ?" de la carte d'événement. Retour de Cindy du 30/08 : visible
+  // sur les 3 espaces (Bureau/Coach/Famille, voir buildPresentPlayers) —
+  // avant cette date, seul le bloc Famille le renseignait.
   presentPlayers?: { id: string; firstName: string | null; lastName: string | null }[];
   // Bénévoles déjà invités à cet événement (retour de Cindy du 2026-08-25)
   // — préremplit la case "Bénévoles invités" en édition, voir
@@ -724,7 +722,8 @@ export default async function DashboardPage() {
           "teams(id, name, category, ffbb_url, sort_order, pending_coach_names)"
         )
         .eq("player_id", ownPlayerId)
-    : { data: [] as { teams: unknown }[] };
+    : { data: [] as { teams: unknown }[], error: null };
+  logQueryErrors("détection de rôle (coach en attente)", { pendingCoachResult });
 
   const seenCoachedTeamIds = new Set<string>();
   const coachedTeams = [
@@ -2164,10 +2163,12 @@ export default async function DashboardPage() {
     const parentIds = Array.from(
       new Set((parentPlayerRes.data ?? []).map((r) => r.parent_id))
     );
-    const { data: parentProfiles } =
+    const parentProfilesRes =
       parentIds.length > 0
         ? await supabase.from("profiles").select("id, phone, email").in("id", parentIds)
-        : { data: [] as { id: string; phone: string | null; email: string | null }[] };
+        : { data: [] as { id: string; phone: string | null; email: string | null }[], error: null };
+    logQueryErrors("Coach (contacts parents)", { parentProfilesRes });
+    const parentProfiles = parentProfilesRes.data;
     const phoneByParentId = new Map(
       (parentProfiles ?? []).map((p) => [p.id, p.phone])
     );
