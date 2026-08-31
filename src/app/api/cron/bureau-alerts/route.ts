@@ -183,7 +183,13 @@ async function runExpiryAlerts(supabase: ReturnType<typeof createServiceClient>)
       const update: Record<string, string> = {};
       if (dueLicense) update.license_expiry_alert_sent_at = new Date().toISOString();
       if (dueMedical) update.medical_expiry_alert_sent_at = new Date().toISOString();
-      await supabase.from("players").update(update).eq("id", p.id);
+      const { error: markSentError } = await supabase.from("players").update(update).eq("id", p.id);
+      // Audit du 31/08 : ce marqueur est ce qui empêche un renvoi — un
+      // échec silencieux ici ferait relancer la même alerte les jours
+      // suivants (toujours dans la fenêtre d'avril).
+      if (markSentError) {
+        console.error("[bureau-alerts] marquage alerte échéance échoué:", markSentError);
+      }
     }
   }
 
@@ -275,10 +281,16 @@ async function runCotisationRelances(supabase: ReturnType<typeof createServiceCl
     // fournisseur configuré) ne doit jamais poser last_auto_relance_sent_at.
     if (result.ok && !result.simulated) {
       sent += 1;
-      await supabase
+      const { error: markSentError } = await supabase
         .from("cotisations")
         .update({ last_auto_relance_sent_at: new Date().toISOString() })
         .eq("id", row.id);
+      // Audit du 31/08 : ce marqueur est ce qui fait tenir le cooldown de
+      // 14 jours — un échec silencieux ici ferait relancer dès le
+      // lendemain au lieu d'attendre le délai prévu.
+      if (markSentError) {
+        console.error("[bureau-alerts] marquage relance cotisation échoué:", markSentError);
+      }
     }
   }
 
@@ -343,10 +355,13 @@ async function runPenaliteRelances(supabase: ReturnType<typeof createServiceClie
     const result = await sendEmail({ to: email, subject, body });
     if (result.ok && !result.simulated) {
       sent += 1;
-      await supabase
+      const { error: markSentError } = await supabase
         .from("penalites")
         .update({ last_auto_relance_sent_at: new Date().toISOString() })
         .eq("id", row.id);
+      if (markSentError) {
+        console.error("[bureau-alerts] marquage relance pénalité échoué:", markSentError);
+      }
     }
   }
 

@@ -53,7 +53,10 @@ export async function POST() {
     .map((id) => ({ notification_id: id, player_id: playerId }));
 
   if (toInsert.length > 0) {
-    await supabase.from("notification_reads").insert(toInsert);
+    const { error: insertError } = await supabase.from("notification_reads").insert(toInsert);
+    if (insertError) {
+      console.error("[child-notifications/read-all] insert échoué:", insertError);
+    }
   }
 
   return NextResponse.json({ ok: true });

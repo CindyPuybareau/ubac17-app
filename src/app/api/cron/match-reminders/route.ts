@@ -141,7 +141,15 @@ export async function GET(request: Request) {
     // Marqué "envoyé" même si personne n'était abonné aux notifications
     // ce jour-là : ce n'est pas une erreur à réessayer demain, juste un
     // fait — sans quoi le job retenterait indéfiniment ce même match.
-    await supabase.from("events").update({ reminder_sent_at: new Date().toISOString() }).eq("id", event.id);
+    const { error: markSentError } = await supabase
+      .from("events")
+      .update({ reminder_sent_at: new Date().toISOString() })
+      .eq("id", event.id);
+    // Audit du 31/08 : ce marqueur est ce qui empêche un double envoi — un
+    // échec silencieux ici ferait renvoyer le même rappel le lendemain.
+    if (markSentError) {
+      console.error("[match-reminders] marquage reminder_sent_at échoué:", markSentError);
+    }
   }
 
   return NextResponse.json({ sent: totalSent, matches: matches.length });
