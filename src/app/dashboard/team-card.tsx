@@ -28,8 +28,6 @@ import WhatsAppGroupButton from "./whatsapp-group-button";
 import type { AdminMemberTeam, AdminUpcomingEvent, MemberDetail, WhatsAppGroup } from "./page";
 import type { RosterPlayer, TeamWithMembers } from "./team-manager";
 
-const now = Date.now();
-
 type Person = { id: string; first_name: string | null; last_name: string | null };
 
 function fullName(p: { first_name: string | null; last_name: string | null }) {
@@ -187,6 +185,10 @@ export default function TeamCard({
   canEditFullProfile?: boolean;
 }) {
   const router = useRouter();
+  // Recalculé à chaque rendu plutôt qu'au chargement du module (audit du
+  // 31/08) : figé au niveau module, un onglet resté ouvert plusieurs
+  // heures continuait de traiter un match déjà passé comme "à venir".
+  const now = Date.now();
   const [detailPlayerId, setDetailPlayerId] = useState<string | null>(null);
   const [removeTarget, setRemoveTarget] = useState<RosterPlayer | null>(null);
   const [removing, setRemoving] = useState(false);
@@ -565,6 +567,11 @@ export default function TeamCard({
         detail?.registrationEmail ??
         contactEmailByPlayerId?.[id] ??
         detail?.secondaryEmail ??
+        // Repli du 31/08 : un joueur invité par email (parent) mais sans
+        // registration_email ni compte lié n'avait aucun contact affiché
+        // ici, alors qu'il reste joignable depuis l'onglet Membres via ce
+        // même champ (pending_parent_email) — voir MemberDetail.
+        detail?.pendingParentEmail ??
         null,
     };
   }

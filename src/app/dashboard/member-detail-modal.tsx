@@ -965,7 +965,14 @@ export default function MemberDetailModal({
                 // silencieusement toute autre écriture même hors de cette
                 // interface) : un coach a le droit de corriger la fiche
                 // pratique de ses joueurs, jamais leurs papiers officiels.
-                editable={editable && canManageTeamAndRoles}
+                // canEditFullProfile, pas canManageTeamAndRoles (audit du
+                // 31/08) : ce dernier est coupé à false pour TOUT appelant
+                // depuis l'onglet Équipes (team-card.tsx), Bureau inclus —
+                // ce champ devenait alors non modifiable même pour le
+                // Bureau depuis cet onglet, alors qu'il l'est depuis
+                // Membres. canEditFullProfile porte la bonne distinction
+                // (Bureau oui, coach non) pour ce champ précis.
+                editable={fullProfileEditable}
                 onChange={(v) => set("licenseNumber", v)}
               />
               <Field
@@ -985,8 +992,9 @@ export default function MemberDetailModal({
                 label="Particularités médicales"
                 multiline
                 value={form.medicalNotes}
-                // Réservé au Bureau, même raison que N° Licence ci-dessus.
-                editable={editable && canManageTeamAndRoles}
+                // Réservé au Bureau, même raison — et même correctif du
+                // 31/08 — que N° Licence ci-dessus.
+                editable={fullProfileEditable}
                 onChange={(v) => set("medicalNotes", v)}
               />
               <Field
@@ -1035,7 +1043,7 @@ export default function MemberDetailModal({
                   className="flex shrink-0 items-center gap-1.5 rounded-full border border-red-200 px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
                 >
                   <Trash2 className="h-4 w-4" />
-                  Supprimer ce membre
+                  Archiver ce membre
                 </button>
               )}
               <button

@@ -315,13 +315,34 @@ export default function MembersTable({
     const supabase = createClient();
 
     if (reassignReplace) {
-      const { error: deleteError } = await supabase
+      // .select("id") + vérification du nombre de lignes : comme dans
+      // setArchived ci-dessous, RLS peut bloquer silencieusement une
+      // suppression (0 ligne affectée, pas d'erreur) — sans ce contrôle,
+      // l'écran afficherait le membre comme "déplacé" alors qu'il reste
+      // aussi dans son ancienne équipe en base (audit du 31/08). Pas de
+      // .eq("team_id", ...) ici (comportement voulu : "Retirer aussi de
+      // leur(s) équipe(s) actuelle(s)" retire bien TOUTES les équipes d'un
+      // membre prêté, pas juste une) — donc le total attendu se calcule à
+      // partir du nombre d'équipes déjà connu de chacun, pas 1 par membre.
+      const expectedDeleteCount = reassignIds.reduce(
+        (sum, id) => sum + (localMembers.find((m) => m.id === id)?.teams.length ?? 0),
+        0
+      );
+      const { data: deletedRows, error: deleteError } = await supabase
         .from("team_players")
         .delete()
-        .in("player_id", reassignIds);
+        .in("player_id", reassignIds)
+        .select("id");
       if (deleteError) {
         setReassignSaving(false);
         setActionError(`Changement d'équipe impossible : ${deleteError.message}`);
+        return;
+      }
+      if ((deletedRows?.length ?? 0) < expectedDeleteCount) {
+        setReassignSaving(false);
+        setActionError(
+          "Action bloquée par les droits d'accès (RLS) : le retrait de l'ancienne équipe n'a pas été appliqué pour tout le monde. Réessaie."
+        );
         return;
       }
     }
@@ -416,16 +437,29 @@ export default function MembersTable({
         .map((id) => localMembers.find((m) => m.id === id)?.email?.trim().toLowerCase())
         .filter((e): e is string => Boolean(e));
 
-      await Promise.all([
+      const cleanupResults = await Promise.all([
         supabase.from("team_players").delete().in("player_id", ids),
         supabase.from("team_pending_coaches").delete().in("player_id", ids),
         profileIds.length > 0
           ? supabase.from("team_coaches").delete().in("coach_id", profileIds)
-          : Promise.resolve(),
+          : Promise.resolve({ error: null }),
         emails.length > 0
           ? supabase.from("club_administrators").delete().in("email", emails)
-          : Promise.resolve(),
+          : Promise.resolve({ error: null }),
       ]);
+      // Ces 4 suppressions ne bloquent jamais l'archivage lui-même (déjà
+      // acté ci-dessus), mais une erreur avalée en silence ici laisserait
+      // une fiche archivée coach d'une équipe ou membre du Bureau sans que
+      // rien ne le signale (audit du 31/08 — c'est justement le bug que ce
+      // nettoyage existe pour éviter).
+      cleanupResults.forEach((r, i) => {
+        if (r.error) {
+          console.error(
+            `[setArchived] nettoyage cascade #${i} a échoué:`,
+            r.error
+          );
+        }
+      });
     }
 
     // Affichage immédiat plutôt que d'attendre le rafraîchissement temps

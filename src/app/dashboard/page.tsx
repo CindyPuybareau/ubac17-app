@@ -172,13 +172,19 @@ export type MemberDetail = {
   // AdminMember seul (un coach voyait sinon les anniversaires de joueurs
   // partis, faute de ce champ sur sa propre vue).
   archivedAt: string | null;
+  // Repli de contact (audit du 31/08) : un joueur invité par email (parent)
+  // sans registration_email ni compte lié reste joignable via ce champ,
+  // utilisé par team-card.tsx (contactsFor) — sur le type de base pour que
+  // l'onglet Équipes (Bureau ET Coach) en bénéficie, pas seulement Membres.
+  pendingParentEmail: string | null;
 };
 
 export type AdminMember = MemberDetail & {
   email: string | null;
   phone: string | null;
   hasParent: boolean;
-  pendingParentEmail: string | null;
+  // pendingParentEmail: hérité de MemberDetail depuis le 31/08 (voir plus
+  // haut) — plus dupliqué ici.
   // Teams this member also coaches, detected by matching their contact
   // email against a coach account's email — display-only (see the Membres
   // table's "Coach" badges), doesn't grant or reflect any actual access.
@@ -1831,7 +1837,7 @@ export default async function DashboardPage() {
     );
 
     const playerColumns =
-      "id, profile_id, first_name, last_name, birth_date, category, sex, registration_email, registration_phone, address, postal_code, city, secondary_email, mother_phone, father_phone, other_phones, secondary_address, license_type, membership_type, fbi_status, medical_notes, other_notes, image_rights, player_charter_accepted, parent_charter_accepted, license_number, license_expires_at, medical_certificate_expires_at, archived_at";
+      "id, profile_id, first_name, last_name, birth_date, category, sex, registration_email, registration_phone, address, postal_code, city, secondary_email, mother_phone, father_phone, other_phones, secondary_address, license_type, membership_type, fbi_status, medical_notes, other_notes, image_rights, player_charter_accepted, parent_charter_accepted, license_number, license_expires_at, medical_certificate_expires_at, archived_at, pending_parent_email";
 
     // Retour de Cindy du 2026-08-23 : "les connexions qui sont lentes,
     // surtout celle de Basile" (coach de plusieurs équipes ET joueur —
@@ -2126,6 +2132,7 @@ export default async function DashboardPage() {
         license_expires_at: string | null;
         medical_certificate_expires_at: string | null;
         archived_at: string | null;
+        pending_parent_email: string | null;
       };
       coachMemberDetailsByPlayerId[player.id] = {
         id: player.id,
@@ -2158,6 +2165,7 @@ export default async function DashboardPage() {
         medicalCertificateExpiresAt: player.medical_certificate_expires_at,
         teams: coachTeamRefsByPlayerId.get(player.id) ?? [],
         archivedAt: player.archived_at,
+        pendingParentEmail: player.pending_parent_email,
       };
       // Deuxième clé pour une fiche de coach : le tableau d'équipe
       // identifie une ligne Coach par l'id de son compte, pas par celui de
