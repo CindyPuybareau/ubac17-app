@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import { jsPDF } from "jspdf";
@@ -82,16 +83,55 @@ function Modal({
   onClose,
   children,
   wide = false,
+  portalId,
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
   wide?: boolean;
+  // Audit du 2026-09-01 (retour de Cindy, "page vide" après le premier
+  // correctif de l'impression) : cette Modal reste imbriquée dans l'arbre
+  // normal de la page (jamais un portail vers <body>), donc "cacher tout le
+  // reste avec display:none" cachait aussi SES PROPRES ancêtres (le reste
+  // du tableau Cotisations, le layout du dashboard...) — un display:none
+  // sur un ancêtre retire tout son sous-arbre du rendu, quoi qu'on essaie
+  // de forcer plus bas dans la Modal elle-même. visibility:hidden (la
+  // version d'avant) n'avait pas ce souci d'ancêtre, mais laissait leur
+  // hauteur en place, d'où les pages blanches en surnombre.
+  // portalId règle les deux à la fois : cette Modal devient un vrai enfant
+  // direct de <body> (voir createPortal plus bas), donc "cacher tout le
+  // reste" ne cache plus aucun de ses ancêtres — seulement décidé au cas
+  // par cas (uniquement pour le reçu, qui a besoin d'imprimer proprement ;
+  // les autres Modal de ce fichier n'ont pas cet identifiant et gardent
+  // leur comportement d'avant, inchangé).
+  portalId?: string;
 }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className={`w-full ${wide ? "max-w-lg" : "max-w-sm"} rounded-2xl bg-white p-5 shadow-xl`}>
-        <div className="mb-3 flex items-center justify-between">
+  // Retour de Cindy du 2026-09-01 ("le bloc à moitié avec de l'ombre au
+  // milieu") : #receipt-print-area (dans children) s'échappe bien de cette
+  // carte via position:absolute à l'impression, mais la carte elle-même
+  // (fond blanc, coins arrondis, ombre, padding) reste un vrai bloc dans la
+  // page — on ne peut pas la display:none (elle contiendrait alors aussi
+  // #receipt-print-area, display:none sur un ancêtre retire tout son
+  // sous-arbre, voir le commentaire sur portalId plus haut). On retire donc
+  // seulement son HABILLAGE visuel à l'impression, jamais pour les autres
+  // Modal de ce fichier.
+  const printNeutralBackdrop = portalId ? "print:bg-transparent print:p-0" : "";
+  const printNeutralCard = portalId
+    ? "print:m-0 print:max-w-none print:rounded-none print:p-0 print:shadow-none print:bg-transparent"
+    : "";
+  const node = (
+    <div
+      id={portalId}
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 ${printNeutralBackdrop}`}
+    >
+      <div
+        className={`w-full ${wide ? "max-w-lg" : "max-w-sm"} rounded-2xl bg-white p-5 shadow-xl ${printNeutralCard}`}
+      >
+        {/* print:hidden uniquement quand portalId est posé (le reçu) : le
+            titre/la croix n'ont rien à faire sur la page imprimée, mais les
+            autres Modal de ce fichier (jamais imprimées) restent
+            inchangées. */}
+        <div className={`mb-3 flex items-center justify-between ${portalId ? "print:hidden" : ""}`}>
           <h3 className="font-semibold text-zinc-900">{title}</h3>
           <button
             onClick={onClose}
@@ -104,6 +144,10 @@ function Modal({
       </div>
     </div>
   );
+  if (portalId && typeof document !== "undefined") {
+    return createPortal(node, document.body);
+  }
+  return node;
 }
 
 // The line auto-appended to a relance's body when the "Joindre la
@@ -135,22 +179,65 @@ export function withReceiptMention(body: string, attach: boolean) {
     : `${RECEIPT_ATTACHMENT_MENTION}\n\n${signature}`;
 }
 
+// Logo public/logo.png chargé une seule fois et mis en cache (retour de
+// Cindy du 2026-09-01, "ajouter le logo ubac dans la facture") : jsPDF a
+// besoin de l'image déjà en base64 pour l'insérer (doc.addImage), donc un
+// fetch est nécessaire avant de construire le PDF — mémorisé pour ne pas
+// re-télécharger le même fichier à chaque reçu généré dans la session.
+let logoBase64Promise: Promise<string | null> | null = null;
+function getLogoBase64(): Promise<string | null> {
+  if (!logoBase64Promise) {
+    logoBase64Promise = fetch("/logo.png")
+      .then((res) => {
+        if (!res.ok) throw new Error(`logo.png: ${res.status}`);
+        return res.blob();
+      })
+      .then(
+        (blob) =>
+          new Promise<string | null>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(blob);
+          })
+      )
+      .catch((e) => {
+        console.error("[cotisation-participants-table] chargement du logo échoué:", e);
+        return null;
+      });
+  }
+  return logoBase64Promise;
+}
+
 // Same content as openReceiptWindow's printable page, laid out as an
 // actual PDF (via jsPDF, pure client-side, no server round-trip) so it can
 // be attached to a relance/confirmation email. Title reflects the same
 // "Reçu / Facture acquittée" vs "Appel de cotisation" distinction the
 // ticket asks for, driven by whether anything is still due.
-function buildReceiptPdfBase64(c: AdminCotisation, contactEmail: string | null) {
+async function buildReceiptPdfBase64(c: AdminCotisation, contactEmail: string | null) {
   const balance = balanceDue(c);
   const isSettled = balance <= 0;
   const title = isSettled ? "Reçu / Facture acquittée" : "Appel de cotisation";
   const status = statusBadge[computeStatus(c)];
+  const logo = await getLogoBase64();
 
   const doc = new jsPDF();
   let y = 20;
 
+  // Logo à gauche du titre — jamais bloquant : si le chargement échoue
+  // (offline, fichier manquant...), le PDF garde son en-tête texte seul
+  // plutôt que d'empêcher toute génération de reçu.
+  if (logo) {
+    try {
+      doc.addImage(logo, "PNG", 14, y - 10, 12, 12);
+      y += 2;
+    } catch (e) {
+      console.error("[cotisation-participants-table] insertion du logo échouée:", e);
+    }
+  }
+
   doc.setFontSize(16);
-  doc.text("UBAC — Union Basket Angoulins Châtelaillon", 14, y);
+  doc.text("UBAC — Union Basket Angoulins Châtelaillon", logo ? 29 : 14, y);
   y += 8;
   doc.setFontSize(12);
   doc.text(`${title} — ${c.collecteName ?? `Cotisation ${c.saison}`}`, 14, y);
@@ -203,8 +290,8 @@ function buildReceiptPdfBase64(c: AdminCotisation, contactEmail: string | null) 
 // draft (browser + provider security boundary), so when no mail service is
 // configured the PDF is dropped in the user's Downloads for them to drag
 // into the draft that opens alongside.
-function downloadReceiptPdf(c: AdminCotisation, contactEmail: string | null) {
-  const { base64, filename } = buildReceiptPdfBase64(c, contactEmail);
+async function downloadReceiptPdf(c: AdminCotisation, contactEmail: string | null) {
+  const { base64, filename } = await buildReceiptPdfBase64(c, contactEmail);
   const link = document.createElement("a");
   link.href = `data:application/pdf;base64,${base64}`;
   link.download = filename;
@@ -815,7 +902,7 @@ export default function CotisationParticipantsTable({
       targets.map(async ({ c, email }) => {
         try {
           const attachment = attachReceipt
-            ? buildReceiptPdfBase64(c, contactEmailByPlayerId[c.playerId] ?? null)
+            ? await buildReceiptPdfBase64(c, contactEmailByPlayerId[c.playerId] ?? null)
             : null;
           const res = await fetch("/api/send-email", {
             method: "POST",
@@ -1436,26 +1523,54 @@ export default function CotisationParticipantsTable({
             (a, b) => new Date(a.paidAt).getTime() - new Date(b.paidAt).getTime()
           );
           return (
-            <Modal title="Reçu / facture" onClose={() => setReceiptTarget(null)} wide>
+            <Modal
+              title="Reçu / facture"
+              onClose={() => setReceiptTarget(null)}
+              wide
+              portalId="receipt-modal-root"
+            >
               {/* Cible l'impression sur ce seul bloc (audit du 31/08) : plus
                   besoin d'ouvrir une fenêtre séparée pour imprimer juste le
                   reçu — voir le commentaire sur l'ancienne openReceiptWindow
-                  plus haut dans ce fichier. */}
+                  plus haut dans ce fichier.
+                  Audit du 2026-09-01 (retour de Cindy, "5 pages"/"23 pages"
+                  selon le PC, puis "page vide" après un premier correctif
+                  raté) : voir le commentaire sur portalId dans Modal
+                  ci-dessus pour l'explication complète. Grâce au portail,
+                  masquer tout ce qui n'est pas #receipt-modal-root (un vrai
+                  enfant direct de body) ne cache plus aucun ancêtre du reçu
+                  — le reçu s'affiche normalement, et l'impression ne mesure
+                  plus que sa propre hauteur (une seule page). Le titre/la
+                  croix (print:hidden dans Modal) et les boutons juste en
+                  dessous (print:hidden plus bas) restent masqués à
+                  l'impression comme avant ; #receipt-print-area repasse en
+                  position absolute, pleine largeur, pour ignorer le
+                  max-w-lg de la carte Modal (pensé pour l'écran, pas pour
+                  une page à imprimer) — sans dépendre cette fois d'un
+                  display:none/revert fragile sur ses ancêtres. */}
               <style>{`
                 @media print {
-                  body * { visibility: hidden; }
-                  #receipt-print-area, #receipt-print-area * { visibility: visible; }
+                  body > *:not(#receipt-modal-root) { display: none !important; }
                   #receipt-print-area { position: absolute; left: 0; top: 0; width: 100%; }
                 }
               `}</style>
               <div id="receipt-print-area" className="flex flex-col gap-3 text-sm text-zinc-800">
-                <div>
-                  <p className="text-base font-bold text-zinc-900">
-                    UBAC — Union Basket Angoulins Châtelaillon
-                  </p>
-                  <p className="text-xs text-zinc-500">
-                    Reçu / Facture — {c.collecteName ?? `Cotisation ${c.saison}`}
-                  </p>
+                <div className="flex items-center gap-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element --
+                      <Image> de next/image ne s'affiche pas de façon fiable
+                      à l'impression (chargement différé/optimisation) ;
+                      un <img> classique, direct sur le fichier public,
+                      reste simple et fiable ici (retour de Cindy du
+                      2026-09-01, "ajouter le logo ubac dans la facture"). */}
+                  <img src="/logo.png" alt="UBAC" className="h-12 w-12 shrink-0 object-contain" />
+                  <div>
+                    <p className="text-base font-bold text-zinc-900">
+                      UBAC — Union Basket Angoulins Châtelaillon
+                    </p>
+                    <p className="text-xs text-zinc-500">
+                      Reçu / Facture — {c.collecteName ?? `Cotisation ${c.saison}`}
+                    </p>
+                  </div>
                 </div>
                 <table className="w-full border-collapse text-sm">
                   <tbody>
@@ -1530,7 +1645,9 @@ export default function CotisationParticipantsTable({
                   Solde restant dû : {formatAmount(balanceDue(c))}
                 </p>
               </div>
-              <div className="mt-4 flex flex-col gap-2">
+              {/* print:hidden : ces boutons n'ont rien à faire sur la page
+                  imprimée (voir le commentaire sur portalId dans Modal). */}
+              <div className="mt-4 flex flex-col gap-2 print:hidden">
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => window.print()}
