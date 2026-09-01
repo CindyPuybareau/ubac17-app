@@ -163,6 +163,13 @@ export default function FamilyView({
     [whatsappGroups, visibleTeamIds]
   );
 
+  // Retour de Cindy du 2026-09-01 : l'onglet "Groupes WhatsApp" ci-dessous
+  // ne montre jamais que les commissions (showTeamGroups=false) — s'il n'y
+  // en a aucune de configurée, il n'affichait qu'un "Aucun groupe." sans
+  // aucun autre contenu, un onglet mort pour rien. Visible seulement dès
+  // qu'au moins une commission existe.
+  const hasCommissionGroups = whatsappGroups.some((g) => g.category === "COMMISSION");
+
   // Même logique que les groupes WhatsApp ci-dessus : un anniversaire ne
   // reste affiché (puce du calendrier ET bloc "Anniversaires de la
   // semaine", tous deux dérivés de ce même tableau à l'intérieur de
@@ -318,20 +325,25 @@ export default function FamilyView({
         },
       ],
     },
-    {
-      // Retour de Cindy du 29/08 : les groupes "Commission" (Buvette,
-      // Coachs UBAC...) ne sont plus mêlés à "Mon équipe"/"Mon enfant"
-      // (voir visibleWhatsappGroups plus haut) — un parent/joueur membre
-      // d'une commission sans être aussi au Bureau (seul espace avec
-      // l'équivalent "Vie du club") a donc besoin de son propre accès.
-      // showTeamGroups=false : la grille "Équipes du Club" resterait vide
-      // de sens ici, chaque équipe a déjà son groupe sur sa propre carte
-      // plus haut.
-      key: "whatsapp",
-      label: "Groupes WhatsApp",
-      icon: <MessageCircle className={iconClass} />,
-      content: <WhatsAppGroupsManager groups={whatsappGroups} showTeamGroups={false} />,
-    },
+    // Retour de Cindy du 29/08 : les groupes "Commission" (Buvette,
+    // Coachs UBAC...) ne sont plus mêlés à "Mon équipe"/"Mon enfant" (voir
+    // visibleWhatsappGroups plus haut) — un parent/joueur membre d'une
+    // commission sans être aussi au Bureau (seul espace avec l'équivalent
+    // "Vie du club") a donc besoin de son propre accès. showTeamGroups=false :
+    // la grille "Équipes du Club" resterait vide de sens ici, chaque équipe
+    // a déjà son groupe sur sa propre carte plus haut. Onglet entier retiré
+    // (retour du 2026-09-01) tant qu'aucune commission n'est configurée —
+    // voir hasCommissionGroups.
+    ...(hasCommissionGroups
+      ? [
+          {
+            key: "whatsapp",
+            label: "Groupes WhatsApp",
+            icon: <MessageCircle className={iconClass} />,
+            content: <WhatsAppGroupsManager groups={whatsappGroups} showTeamGroups={false} />,
+          },
+        ]
+      : []),
     {
       // Retour de Cindy du 25/08 : Charte du Joueur + Charte du Parent +
       // Règlement Intérieur — ce sont les parents qui portent la
