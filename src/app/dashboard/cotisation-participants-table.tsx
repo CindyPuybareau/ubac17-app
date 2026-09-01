@@ -209,75 +209,191 @@ function getLogoBase64(): Promise<string | null> {
   return logoBase64Promise;
 }
 
-// Same content as openReceiptWindow's printable page, laid out as an
-// actual PDF (via jsPDF, pure client-side, no server round-trip) so it can
-// be attached to a relance/confirmation email. Title reflects the same
-// "Reçu / Facture acquittée" vs "Appel de cotisation" distinction the
-// ticket asks for, driven by whether anything is still due.
+// Couleurs de marque en RGB (jsPDF ne lit pas les variables CSS de l'appli)
+// — reprises telles quelles de globals.css/statusBadge, pour que le PDF
+// garde la même identité que le reçu à l'écran (retour de Cindy du
+// 2026-09-01, "plus sexy", maquette validée). Un seul endroit à retoucher
+// si la charte graphique change un jour.
+const PDF_COLORS = {
+  navy: [32, 48, 144] as const,
+  navyDark: [22, 35, 101] as const,
+  gold: [244, 196, 48] as const,
+  white: [255, 255, 255] as const,
+  headerSubtext: [205, 210, 235] as const,
+  ink: [15, 23, 42] as const,
+  muted: [113, 113, 122] as const,
+  line: [228, 228, 231] as const,
+  rowAlt: [250, 250, 249] as const,
+};
+// Mêmes 4 états que statusBadge (cotisation-shared / ce fichier), en RGB
+// {fond, texte} pour le bandeau de solde du PDF.
+const PDF_STATUS_COLORS: Record<StatusKey, { bg: readonly [number, number, number]; text: readonly [number, number, number] }> = {
+  PAYE: { bg: [233, 245, 238], text: [62, 143, 95] },
+  PARTIEL: { bg: [248, 236, 221], text: [185, 116, 48] },
+  OFFERT: { bg: [230, 232, 245], text: [32, 48, 144] },
+  EN_ATTENTE: { bg: [253, 232, 224], text: [209, 74, 34] },
+};
+
+// Same content as the on-screen/printed receipt (#receipt-print-area plus
+// haut), laid out as an actual PDF (via jsPDF, pure client-side, no server
+// round-trip) so it can be attached to a relance/confirmation email. Title
+// reflects the same "Reçu / Facture acquittée" vs "Appel de cotisation"
+// distinction, driven by whether anything is still due.
 async function buildReceiptPdfBase64(c: AdminCotisation, contactEmail: string | null) {
   const balance = balanceDue(c);
   const isSettled = balance <= 0;
-  const title = isSettled ? "Reçu / Facture acquittée" : "Appel de cotisation";
-  const status = statusBadge[computeStatus(c)];
+  const kicker = isSettled ? "Reçu / Facture acquittée" : "Appel de cotisation";
+  const statusKey = computeStatus(c);
+  const status = statusBadge[statusKey];
+  const statusColors = PDF_STATUS_COLORS[statusKey];
   const logo = await getLogoBase64();
 
   const doc = new jsPDF();
-  let y = 20;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const marginX = 14;
+  const contentWidth = pageWidth - marginX * 2;
 
-  // Logo à gauche du titre — jamais bloquant : si le chargement échoue
-  // (offline, fichier manquant...), le PDF garde son en-tête texte seul
-  // plutôt que d'empêcher toute génération de reçu.
+  // --- Bandeau d'en-tête marine, même dégradé/logo/kicker que l'écran ---
+  doc.setFillColor(...PDF_COLORS.navy);
+  doc.rect(0, 0, pageWidth, 42, "F");
+  let logoWidth = 0;
   if (logo) {
     try {
-      doc.addImage(logo, "PNG", 14, y - 10, 12, 12);
-      y += 2;
+      doc.setFillColor(...PDF_COLORS.white);
+      doc.roundedRect(marginX, 8, 14, 14, 2, 2, "F");
+      doc.addImage(logo, "PNG", marginX + 1, 9, 12, 12);
+      logoWidth = 18;
     } catch (e) {
       console.error("[cotisation-participants-table] insertion du logo échouée:", e);
     }
   }
-
-  doc.setFontSize(16);
-  doc.text("UBAC — Union Basket Angoulins Châtelaillon", logo ? 29 : 14, y);
-  y += 8;
+  doc.setTextColor(...PDF_COLORS.white);
+  doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
-  doc.text(`${title} — ${c.collecteName ?? `Cotisation ${c.saison}`}`, 14, y);
-  y += 10;
+  doc.text("Union Basket Angoulins Châtelaillon", marginX + logoWidth, 13);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(...PDF_COLORS.headerSubtext);
+  doc.text("Angoulins · Châtelaillon-Plage · Saint-Vivien", marginX + logoWidth, 18);
 
-  doc.setFontSize(10);
-  const row = (label: string, value: string) => {
-    doc.text(`${label} :`, 14, y);
-    doc.text(value, 65, y);
-    y += 7;
-  };
-  row("Membre", c.playerName);
-  if (c.category) row("Catégorie", c.category);
-  if (c.membershipType) row("Type d'adhésion", c.membershipType);
-  if (contactEmail) row("Contact", contactEmail);
-  row("Tarif", formatAmount(c.prix));
-  row("Remise", formatAmount(c.remise));
-  row("Total versé", formatAmount(c.paiement));
-  row("Statut", status.label);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(...PDF_COLORS.gold);
+  doc.text(kicker.toUpperCase(), marginX, 28);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...PDF_COLORS.headerSubtext);
+  doc.text(new Date().toLocaleDateString("fr-FR"), pageWidth - marginX, 28, { align: "right" });
 
-  if (c.payments.length > 0) {
-    y += 3;
-    doc.setFontSize(11);
-    doc.text("Détail des règlements", 14, y);
-    y += 7;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  doc.setTextColor(...PDF_COLORS.white);
+  doc.text(c.playerName, marginX, 35);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...PDF_COLORS.headerSubtext);
+  doc.text(c.collecteName ?? `Cotisation ${c.saison}`, marginX, 40);
+
+  // --- Carte d'identité (catégorie / adhésion / contact) ---
+  let y = 54;
+  const infoLines = [
+    c.category ? `Catégorie : ${c.category}` : null,
+    c.membershipType ? `Type d'adhésion : ${c.membershipType}` : null,
+    contactEmail ? `Contact : ${contactEmail}` : null,
+  ].filter((l): l is string => Boolean(l));
+  if (infoLines.length > 0) {
+    const boxHeight = infoLines.length * 6 + 6;
+    doc.setDrawColor(...PDF_COLORS.line);
+    doc.roundedRect(marginX, y, contentWidth, boxHeight, 2, 2, "S");
+    doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
-    [...c.payments]
-      .sort((a, b) => new Date(a.paidAt).getTime() - new Date(b.paidAt).getTime())
-      .forEach((p) => {
-        const label = `${new Date(p.paidAt).toLocaleDateString("fr-FR")} — ${p.mode}${p.detail ? ` (${p.detail})` : ""}`;
-        doc.text(label, 14, y);
-        doc.text(formatAmount(p.amount), 160, y);
-        y += 6;
-      });
-    y += 4;
+    doc.setTextColor(...PDF_COLORS.ink);
+    let lineY = y + 8;
+    infoLines.forEach((line) => {
+      doc.text(line, marginX + 5, lineY);
+      lineY += 6;
+    });
+    y += boxHeight + 8;
   }
 
-  y += 4;
+  // --- Tarif / remise / total versé ---
+  doc.setFontSize(10);
+  const amountRow = (label: string, value: string) => {
+    doc.setTextColor(...PDF_COLORS.muted);
+    doc.text(label, marginX, y);
+    doc.setTextColor(...PDF_COLORS.ink);
+    doc.setFont("helvetica", "bold");
+    doc.text(value, pageWidth - marginX, y, { align: "right" });
+    doc.setFont("helvetica", "normal");
+    y += 7;
+    doc.setDrawColor(...PDF_COLORS.line);
+    doc.line(marginX, y - 3, pageWidth - marginX, y - 3);
+  };
+  amountRow("Tarif", formatAmount(c.prix));
+  amountRow("Remise", formatAmount(c.remise));
+  amountRow("Total versé", formatAmount(c.paiement));
+  y += 3;
+
+  // --- Bandeau de solde, couleur du statut (même palette que l'écran) ---
+  doc.setFillColor(...statusColors.bg);
+  doc.roundedRect(marginX, y, contentWidth, 14, 2, 2, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(...statusColors.text);
+  doc.text(`SOLDE RESTANT DÛ · ${status.label.toUpperCase()}`, marginX + 5, y + 9);
   doc.setFontSize(12);
-  doc.text(`Solde restant dû : ${formatAmount(balance)}`, 14, y);
+  doc.text(formatAmount(balance), pageWidth - marginX - 5, y + 9.5, { align: "right" });
+  y += 22;
+
+  // --- Détail des règlements ---
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(...PDF_COLORS.muted);
+  doc.text("DÉTAIL DES RÈGLEMENTS", marginX, y);
+  y += 6;
+  if (c.payments.length > 0) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    [...c.payments]
+      .sort((a, b) => new Date(a.paidAt).getTime() - new Date(b.paidAt).getTime())
+      .forEach((p, i) => {
+        if (i % 2 === 1) {
+          doc.setFillColor(...PDF_COLORS.rowAlt);
+          doc.rect(marginX, y - 4.5, contentWidth, 6.5, "F");
+        }
+        doc.setTextColor(...PDF_COLORS.ink);
+        const label = `${new Date(p.paidAt).toLocaleDateString("fr-FR")} — ${p.mode}${p.detail ? ` (${p.detail})` : ""}`;
+        doc.text(label, marginX, y);
+        doc.setFont("helvetica", "bold");
+        doc.text(formatAmount(p.amount), pageWidth - marginX, y, { align: "right" });
+        doc.setFont("helvetica", "normal");
+        y += 6.5;
+      });
+  } else {
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(9);
+    doc.setTextColor(...PDF_COLORS.muted);
+    doc.text("Aucun règlement enregistré pour le moment.", marginX, y);
+    doc.setFont("helvetica", "normal");
+    y += 6.5;
+  }
+
+  // --- Pied de page ---
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const footerY = pageHeight - 16;
+  doc.setDrawColor(...PDF_COLORS.line);
+  doc.line(marginX, footerY - 6, pageWidth - marginX, footerY - 6);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(...PDF_COLORS.navy);
+  doc.text(
+    isSettled ? "Merci pour votre confiance !" : "Merci de régulariser cette cotisation",
+    marginX,
+    footerY
+  );
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(...PDF_COLORS.muted);
+  doc.text("ubac17.basket@gmail.com · ubac17.fr", pageWidth - marginX, footerY, { align: "right" });
 
   const dataUri = doc.output("datauristring");
   const base64 = dataUri.slice(dataUri.indexOf(",") + 1);
@@ -1519,6 +1635,10 @@ export default function CotisationParticipantsTable({
         (() => {
           const c = receiptTarget.cotisation;
           const status = statusBadge[computeStatus(c)];
+          // Même seuil que buildReceiptPdfBase64 (le PDF téléchargeable) :
+          // les deux versions doivent afficher exactement le même intitulé
+          // ("acquittée" vs "appel de cotisation") pour la même situation.
+          const isSettled = balanceDue(c) <= 0;
           const sortedPayments = [...c.payments].sort(
             (a, b) => new Date(a.paidAt).getTime() - new Date(b.paidAt).getTime()
           );
@@ -1548,102 +1668,192 @@ export default function CotisationParticipantsTable({
                   max-w-lg de la carte Modal (pensé pour l'écran, pas pour
                   une page à imprimer) — sans dépendre cette fois d'un
                   display:none/revert fragile sur ses ancêtres. */}
+              {/* Audit du 2026-09-01 (retour de Cindy, "moins beau à
+                  l'impression" alors que le PDF est nickel) : Chrome/Edge
+                  n'impriment JAMAIS les couleurs de fond par défaut (case
+                  "Graphiques d'arrière-plan" décochée par défaut dans
+                  "Plus de paramètres") — le bandeau marine, le bandeau de
+                  solde coloré etc. disparaissaient donc silencieusement à
+                  l'impression, sans que rien dans le code n'ait changé.
+                  print-color-adjust: exact force leur impression sans que
+                  l'utilisateur ait à cocher quoi que ce soit. @page portrait
+                  évite aussi qu'un réglage "Paysage" resté en mémoire du
+                  navigateur/de l'imprimante déforme la mise en page conçue
+                  pour une feuille verticale. */}
               <style>{`
                 @media print {
+                  @page { size: portrait; }
                   body > *:not(#receipt-modal-root) { display: none !important; }
                   #receipt-print-area { position: absolute; left: 0; top: 0; width: 100%; }
+                  #receipt-print-area, #receipt-print-area * {
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                  }
                 }
               `}</style>
-              <div id="receipt-print-area" className="flex flex-col gap-3 text-sm text-zinc-800">
-                <div className="flex items-center gap-3">
-                  {/* eslint-disable-next-line @next/next/no-img-element --
-                      <Image> de next/image ne s'affiche pas de façon fiable
-                      à l'impression (chargement différé/optimisation) ;
-                      un <img> classique, direct sur le fichier public,
-                      reste simple et fiable ici (retour de Cindy du
-                      2026-09-01, "ajouter le logo ubac dans la facture"). */}
-                  <img src="/logo.png" alt="UBAC" className="h-12 w-12 shrink-0 object-contain" />
-                  <div>
-                    <p className="text-base font-bold text-zinc-900">
-                      UBAC — Union Basket Angoulins Châtelaillon
-                    </p>
-                    <p className="text-xs text-zinc-500">
-                      Reçu / Facture — {c.collecteName ?? `Cotisation ${c.saison}`}
-                    </p>
+              {/* Refonte visuelle (retour de Cindy du 2026-09-01, "plus
+                  sexy", maquette validée) : même identité que le reste de
+                  l'appli — bandeau marine/or, Poppins pour les titres
+                  (font-display), Space Grotesk pour les montants
+                  (font-numeric), et les 4 couleurs de statut déjà utilisées
+                  dans le tableau Cotisations (statusBadge) réutilisées telle
+                  quelles pour la ligne de solde, plutôt qu'une nouvelle
+                  palette inventée pour ce seul écran. */}
+              <div
+                id="receipt-print-area"
+                className="overflow-hidden rounded-2xl border border-zinc-100 text-zinc-800"
+              >
+                <div className="relative overflow-hidden bg-gradient-to-br from-navy to-navy-dark px-6 py-5 text-white">
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute -right-6 -top-10 h-32 w-32 rounded-full bg-ubac-yellow/15 blur-2xl"
+                  />
+                  <div className="relative flex items-center gap-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element --
+                        <Image> de next/image ne s'affiche pas de façon
+                        fiable à l'impression (chargement différé/
+                        optimisation) ; un <img> classique, direct sur le
+                        fichier public, reste simple et fiable ici (retour
+                        de Cindy du 2026-09-01, "ajouter le logo ubac dans
+                        la facture"). */}
+                    <img
+                      src="/logo.png"
+                      alt="UBAC"
+                      className="h-11 w-11 shrink-0 rounded-xl bg-white object-contain p-1 shadow"
+                    />
+                    <div className="min-w-0">
+                      <p className="font-display truncate text-sm font-bold">
+                        Union Basket Angoulins Châtelaillon
+                      </p>
+                      <p className="text-[11px] text-white/60">
+                        Angoulins · Châtelaillon-Plage · Saint-Vivien
+                      </p>
+                    </div>
                   </div>
+                  <div className="relative mt-4 flex items-baseline justify-between gap-2">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-ubac-yellow">
+                      {isSettled ? "Reçu / Facture acquittée" : "Appel de cotisation"}
+                    </span>
+                    <span className="text-[11px] text-white/50">
+                      {new Date().toLocaleDateString("fr-FR")}
+                    </span>
+                  </div>
+                  <p className="font-display relative mt-1 text-xl font-bold">{c.playerName}</p>
+                  <p className="relative text-sm text-white/70">
+                    {c.collecteName ?? `Cotisation ${c.saison}`}
+                  </p>
                 </div>
-                <table className="w-full border-collapse text-sm">
-                  <tbody>
-                    <tr className="border-b border-zinc-100">
-                      <th className="py-1.5 pr-3 text-left font-medium text-zinc-500">Membre</th>
-                      <td className="py-1.5">{c.playerName}</td>
-                    </tr>
-                    <tr className="border-b border-zinc-100">
-                      <th className="py-1.5 pr-3 text-left font-medium text-zinc-500">Catégorie</th>
-                      <td className="py-1.5">{c.category ?? "—"}</td>
-                    </tr>
+
+                <div className="flex flex-col gap-4 bg-white px-6 py-5">
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 rounded-xl border border-zinc-100 p-4">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
+                        Catégorie
+                      </p>
+                      <p className="text-sm font-semibold text-zinc-900">{c.category ?? "—"}</p>
+                    </div>
                     {c.membershipType && (
-                      <tr className="border-b border-zinc-100">
-                        <th className="py-1.5 pr-3 text-left font-medium text-zinc-500">
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
                           Type d&apos;adhésion
-                        </th>
-                        <td className="py-1.5">{c.membershipType}</td>
-                      </tr>
+                        </p>
+                        <p className="text-sm font-semibold text-zinc-900">{c.membershipType}</p>
+                      </div>
                     )}
                     {receiptTarget.contactEmail && (
-                      <tr className="border-b border-zinc-100">
-                        <th className="py-1.5 pr-3 text-left font-medium text-zinc-500">Contact</th>
-                        <td className="py-1.5">{receiptTarget.contactEmail}</td>
-                      </tr>
+                      <div className="col-span-2">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
+                          Contact
+                        </p>
+                        <p className="text-sm font-semibold text-zinc-900">
+                          {receiptTarget.contactEmail}
+                        </p>
+                      </div>
                     )}
-                    <tr className="border-b border-zinc-100">
-                      <th className="py-1.5 pr-3 text-left font-medium text-zinc-500">Tarif</th>
-                      <td className="py-1.5">{formatAmount(c.prix)}</td>
-                    </tr>
-                    <tr className="border-b border-zinc-100">
-                      <th className="py-1.5 pr-3 text-left font-medium text-zinc-500">Remise</th>
-                      <td className="py-1.5">{formatAmount(c.remise)}</td>
-                    </tr>
-                    <tr className="border-b border-zinc-100">
-                      <th className="py-1.5 pr-3 text-left font-medium text-zinc-500">Total versé</th>
-                      <td className="py-1.5">{formatAmount(c.paiement)}</td>
-                    </tr>
-                    <tr>
-                      <th className="py-1.5 pr-3 text-left font-medium text-zinc-500">Statut</th>
-                      <td className="py-1.5">{status.label}</td>
-                    </tr>
-                  </tbody>
-                </table>
-                {sortedPayments.length > 0 && (
+                  </div>
+
+                  <table className="w-full border-collapse text-sm">
+                    <tbody>
+                      <tr className="border-b border-dashed border-zinc-200">
+                        <td className="py-1.5 text-zinc-500">Tarif</td>
+                        <td className="font-numeric py-1.5 text-right font-semibold">
+                          {formatAmount(c.prix)}
+                        </td>
+                      </tr>
+                      <tr className="border-b border-dashed border-zinc-200">
+                        <td className="py-1.5 text-zinc-500">Remise</td>
+                        <td className="font-numeric py-1.5 text-right font-semibold">
+                          {formatAmount(c.remise)}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="py-1.5 text-zinc-500">Total versé</td>
+                        <td className="font-numeric py-1.5 text-right font-semibold">
+                          {formatAmount(c.paiement)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+
+                  <div className={`flex items-center justify-between rounded-xl px-4 py-3 ${status.className}`}>
+                    <span className="text-[11px] font-bold uppercase tracking-wide">
+                      Solde restant dû · {status.label}
+                    </span>
+                    <span className="font-numeric text-lg font-bold">
+                      {formatAmount(balanceDue(c))}
+                    </span>
+                  </div>
+
                   <div>
-                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                    <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-zinc-400">
                       Détail des règlements
                     </p>
-                    <table className="w-full border-collapse text-sm">
-                      <thead>
-                        <tr className="text-left text-[11px] uppercase text-zinc-400">
-                          <th className="py-1">Date</th>
-                          <th className="py-1">Mode</th>
-                          <th className="py-1">Détail</th>
-                          <th className="py-1">Montant</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {sortedPayments.map((p) => (
-                          <tr key={p.id} className="border-b border-zinc-100">
-                            <td className="py-1">{new Date(p.paidAt).toLocaleDateString("fr-FR")}</td>
-                            <td className="py-1">{p.mode}</td>
-                            <td className="py-1">{p.detail ?? "—"}</td>
-                            <td className="py-1">{formatAmount(p.amount)}</td>
+                    {sortedPayments.length > 0 ? (
+                      <table className="w-full border-collapse text-sm">
+                        <thead>
+                          <tr className="border-b border-zinc-200 text-left text-[10px] uppercase text-zinc-400">
+                            <th className="pb-1.5 font-semibold">Date</th>
+                            <th className="pb-1.5 font-semibold">Mode</th>
+                            <th className="pb-1.5 font-semibold">Détail</th>
+                            <th className="pb-1.5 text-right font-semibold">Montant</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {sortedPayments.map((p, i) => (
+                            <tr
+                              key={p.id}
+                              className={i % 2 === 1 ? "bg-zinc-50" : undefined}
+                            >
+                              <td className="py-1.5 pl-0">
+                                {new Date(p.paidAt).toLocaleDateString("fr-FR")}
+                              </td>
+                              <td className="py-1.5">{p.mode}</td>
+                              <td className="py-1.5 text-zinc-500">{p.detail ?? "—"}</td>
+                              <td className="font-numeric py-1.5 text-right font-semibold">
+                                {formatAmount(p.amount)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <p className="text-sm italic text-zinc-400">
+                        Aucun règlement enregistré pour le moment.
+                      </p>
+                    )}
                   </div>
-                )}
-                <p className="text-base font-bold text-zinc-900">
-                  Solde restant dû : {formatAmount(balanceDue(c))}
-                </p>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 border-t border-zinc-100 px-6 py-4">
+                  <p className="font-display text-xs font-semibold text-navy">
+                    {isSettled ? "Merci pour votre confiance !" : "Merci de régulariser cette cotisation"}
+                  </p>
+                  <p className="text-right text-[10px] leading-relaxed text-zinc-400">
+                    ubac17.basket@gmail.com
+                    <br />
+                    ubac17.fr
+                  </p>
+                </div>
               </div>
               {/* print:hidden : ces boutons n'ont rien à faire sur la page
                   imprimée (voir le commentaire sur portalId dans Modal). */}
