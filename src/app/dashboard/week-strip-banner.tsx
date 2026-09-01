@@ -4,6 +4,12 @@ import { useState } from "react";
 import { MapPin, Sparkles } from "lucide-react";
 import { styleFor, isMatchType, homeAwayLabel } from "@/app/dashboard/event-style";
 import { parseMatchTitle } from "@/lib/match-display";
+import RsvpControl from "./rsvp-control";
+import MatchTasksPanel from "./match-tasks-panel";
+import VolunteerNeedsPanel from "./volunteer-needs-panel";
+import OrganisationCard from "./organisation-card";
+import type { EventRoleType, EventTasksState, CarpoolOffer } from "./event-tasks";
+import type { VolunteerNeed } from "./event-volunteer-needs";
 
 // Bandeau "Cette semaine" intégré directement dans l'en-tête bleu marine
 // (direction artistique validée par Cindy le 2026-08-24, sur maquette :
@@ -23,6 +29,10 @@ import { parseMatchTitle } from "@/lib/match-display";
 // child-calendar-tab.tsx / renderEventCard, calendar-view.tsx).
 const DAY_LETTERS = ["L", "M", "M", "J", "V", "S", "D"];
 
+// Un enfant concerné par l'événement, avec sa réponse RSVP actuelle — le
+// bandeau reçoit tout déjà calculé (page.tsx), il n'a plus qu'à afficher.
+export type WeekStripRsvpPlayer = { id: string; name: string; status: string };
+
 export type WeekStripEvent = {
   id: string;
   title: string | null;
@@ -32,6 +42,28 @@ export type WeekStripEvent = {
   salle: string | null;
   isHome: boolean | null;
   teamName: string | null;
+  // Retour de Cindy du 2026-09-01 ("pouvoir dire présent ou absent et les
+  // besoins en organisation, comme les autres cartes") : le bandeau
+  // mélangeait jusqu'ici Coach + Famille en un seul tableau plat (perte de
+  // l'origine à la fusion, voir dashboard/page.tsx) — source distingue
+  // maintenant les deux, car les deux casquettes n'ont pas les mêmes droits
+  // ici. Une famille répond présent/absent pour ses enfants ; un coach ne
+  // répond jamais pour son propre match, il ne voit que les besoins
+  // d'organisation (même règle que calendar-view.tsx). Quand la même
+  // personne cumule les deux casquettes sur un même événement (elle est à
+  // la fois coach de l'équipe et parent d'un joueur concerné), "family"
+  // l'emporte (voir la fusion dans page.tsx) : elle garde son bouton
+  // présent/absent pour son enfant.
+  source: "coach" | "family";
+  // Toujours vide pour un entraînement et côté coach — même règle que
+  // calendar-view.tsx (un entraînement ne montre jamais l'onglet
+  // Organisation, un coach ne répond jamais présent/absent).
+  rsvpPlayers: WeekStripRsvpPlayer[];
+  roles: EventRoleType[];
+  tasks: EventTasksState;
+  carpool: CarpoolOffer[];
+  showCarpool: boolean;
+  needs: VolunteerNeed[];
 };
 
 function startOfDay(d: Date) {
@@ -106,6 +138,12 @@ function DayEventCard({ event }: { event: WeekStripEvent }) {
       ? `rounded-2xl border border-navy/15 bg-white p-3.5 shadow-sm border-l-8 ${style.border}`
       : `rounded-2xl border border-zinc-100 bg-white p-3.5 shadow-sm border-l-4 ${style.border}`;
 
+  // Même règle que calendar-view.tsx : jamais d'onglet Organisation pour un
+  // entraînement, même s'il porte un jour un rôle/besoin en base.
+  const isTraining = event.eventType === "TRAINING";
+  const hasTasks = !isTraining && (event.roles.length > 0 || event.showCarpool);
+  const hasNeeds = !isTraining && event.needs.length > 0;
+
   return (
     <div className={shellClass}>
       {isTournament && (
@@ -139,6 +177,58 @@ function DayEventCard({ event }: { event: WeekStripEvent }) {
           </span>
         )}
       </div>
+
+      {/* Présent/Absent : uniquement côté Famille, un enfant à la fois
+          (même composant que family-attendance-requests.tsx). */}
+      {event.source === "family" && event.rsvpPlayers.length > 0 && (
+        <div className="mt-2 flex flex-col gap-2">
+          {event.rsvpPlayers.map((p) => (
+            <RsvpControl
+              key={p.id}
+              eventId={event.id}
+              playerId={p.id}
+              playerName={event.rsvpPlayers.length > 1 ? p.name : undefined}
+              currentStatus={p.status}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Besoins d'organisation : même boîte rétractable "Organisation" que
+          calendar-view.tsx, avec les mêmes règles de visibilité selon la
+          casquette (voir WeekStripEvent.source). */}
+      {event.source === "family" && (hasTasks || hasNeeds) && (
+        <OrganisationCard>
+          {hasTasks && (
+            <MatchTasksPanel
+              eventId={event.id}
+              eventDate={event.startTime}
+              roster={event.rsvpPlayers}
+              myPlayerIds={event.rsvpPlayers.map((p) => p.id)}
+              canAssignAnyone={false}
+              initialTasks={event.tasks}
+              initialCarpool={event.carpool}
+              roles={event.roles}
+              showCarpool={event.showCarpool}
+              bare
+            />
+          )}
+          {hasNeeds && (
+            <VolunteerNeedsPanel
+              eventId={event.id}
+              needs={event.needs}
+              myPlayerIds={event.rsvpPlayers.map((p) => p.id)}
+              canManage={false}
+              bare
+            />
+          )}
+        </OrganisationCard>
+      )}
+      {event.source === "coach" && hasNeeds && (
+        <OrganisationCard>
+          <VolunteerNeedsPanel eventId={event.id} needs={event.needs} myPlayerIds={[]} canManage bare />
+        </OrganisationCard>
+      )}
     </div>
   );
 }

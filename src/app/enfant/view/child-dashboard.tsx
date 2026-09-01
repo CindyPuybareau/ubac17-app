@@ -139,6 +139,10 @@ export default function ChildDashboard({
 
   // Même bandeau "Cette semaine" que côté Coach/Parent (retour de Cindy du
   // 2026-08-24), fondu dans l'en-tête bleu — voir week-strip-banner.tsx.
+  // Retour de Cindy du 2026-09-01 ("l'enfant ne peut pas répondre, jamais,
+  // visuel seulement") : source/rsvpPlayers/roles/needs... restent vides
+  // ici volontairement — DayEventCard n'affiche alors ni bouton
+  // présent/absent ni panneau Organisation, uniquement la carte visuelle.
   const headerWeekEvents: WeekStripEvent[] = events.map((e) => ({
     id: e.id,
     title: e.title,
@@ -148,6 +152,13 @@ export default function ChildDashboard({
     salle: e.salle,
     isHome: e.isHome,
     teamName: e.teamName,
+    source: "coach",
+    rsvpPlayers: [],
+    roles: [],
+    tasks: {},
+    carpool: [],
+    showCarpool: false,
+    needs: [],
   }));
 
   const thisMonth = new Date().getMonth();

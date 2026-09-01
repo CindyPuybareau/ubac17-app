@@ -34,10 +34,12 @@ import {
   getEventRoleTypesCached,
   getEventTasksByEventId,
   getSeasonTaskTallyByTeamIds,
+  rolesForEventType,
   type EventTasksState,
   type SeasonTaskTally,
 } from "./event-tasks";
 import { getVolunteerNeedsByEventId, type VolunteerNeed } from "./event-volunteer-needs";
+import { shouldOfferCarpool } from "./salles";
 
 type PlayerRow = {
   id: string;
@@ -3111,26 +3113,87 @@ export default async function DashboardPage() {
   // Parent. Fusion coachEvents + familyEvents (dédoublonnée par id) pour
   // que quelqu'un qui cumule les deux casquettes (ex. Sandrine Manzelle)
   // voie tout d'un coup d'œil sans avoir à choisir un onglet d'abord.
-  const headerWeekEvents: WeekStripEvent[] = isAdmin
-    ? []
-    : Array.from(
+  //
+  // Retour de Cindy du 2026-09-01 ("pouvoir dire présent ou absent et les
+  // besoins en organisation, comme les autres cartes") : chaque événement
+  // garde maintenant son origine (source) au lieu de la perdre à la
+  // fusion — une famille répond présent/absent pour ses enfants, un coach
+  // ne répond jamais pour son propre match (même règle que
+  // calendar-view.tsx). familyEvents est fusionné EN DERNIER : si le même
+  // événement existe des deux côtés (double casquette), c'est la version
+  // "family" qui l'emporte dans le Map, exactement comme avant.
+  function respondingPlayersFor(
+    event: AdminUpcomingEvent,
+    players: { id: string; name: string; teamIds: string[] }[]
+  ) {
+    return players.filter(
+      (p) =>
+        (event.teamId && p.teamIds.includes(event.teamId)) ||
+        (event.targetTeamIds?.some((id) => p.teamIds.includes(id)) ?? false)
+    );
+  }
+  function buildCoachWeekEvent(e: AdminUpcomingEvent): WeekStripEvent {
+    return {
+      id: e.id,
+      title: e.title,
+      eventType: e.event_type,
+      startTime: e.start_time,
+      location: e.location,
+      salle: e.salle,
+      isHome: e.isHome,
+      teamName: e.teamName,
+      source: "coach",
+      rsvpPlayers: [],
+      roles: [],
+      tasks: {},
+      carpool: [],
+      showCarpool: false,
+      needs: coachVolunteerNeedsByEventId[e.id] ?? [],
+    };
+  }
+  function buildFamilyWeekEvent(e: AdminUpcomingEvent): WeekStripEvent {
+    const respondingPlayers = respondingPlayersFor(e, familyRsvpPlayers);
+    return {
+      id: e.id,
+      title: e.title,
+      eventType: e.event_type,
+      startTime: e.start_time,
+      location: e.location,
+      salle: e.salle,
+      isHome: e.isHome,
+      teamName: e.teamName,
+      source: "family",
+      rsvpPlayers: respondingPlayers.map((p) => ({
+        id: p.id,
+        name: p.name,
+        status: familyRsvpStatusByKey[`${e.id}:${p.id}`] ?? "PENDING",
+      })),
+      roles: rolesForEventType(eventRoleTypes, e.event_type),
+      tasks: familyOrganisationTasks[e.id] ?? {},
+      carpool: carpoolOffersByEventId[e.id] ?? [],
+      showCarpool: shouldOfferCarpool(e),
+      needs: familyVolunteerNeedsByEventId[e.id] ?? [],
+    };
+  }
+  // Retour de Cindy du 2026-09-01 (capture d'écran de Basile — Bureau ET
+  // coach ET joueur Séniors M, "Bureau" écrasait tout) : le !isAdmin
+  // d'origine (retour du 24/08, "jamais pour le Bureau") visait le Bureau
+  // PUR, sans équipe coachée ni fiche joueur — pas quelqu'un qui cumule
+  // aussi une de ces deux casquettes. isCoach/players.length restent à
+  // zéro pour un Bureau pur, donc retirer isAdmin d'ici ne change rien
+  // pour lui ; ça répare seulement le cumul (Basile et les futurs cas
+  // similaires).
+  const showHeaderWeekBanner = isCoach || players.length > 0;
+  const headerWeekEvents: WeekStripEvent[] = showHeaderWeekBanner
+    ? Array.from(
         new Map(
-          [...coachEvents, ...familyEvents].map((e) => [
-            e.id,
-            {
-              id: e.id,
-              title: e.title,
-              eventType: e.event_type,
-              startTime: e.start_time,
-              location: e.location,
-              salle: e.salle,
-              isHome: e.isHome,
-              teamName: e.teamName,
-            },
-          ])
+          [
+            ...coachEvents.map((e): [string, WeekStripEvent] => [e.id, buildCoachWeekEvent(e)]),
+            ...familyEvents.map((e): [string, WeekStripEvent] => [e.id, buildFamilyWeekEvent(e)]),
+          ]
         ).values()
-      );
-  const showHeaderWeekBanner = !isAdmin && (isCoach || players.length > 0);
+      )
+    : [];
 
   return (
     <MobileNavProvider>
@@ -3232,8 +3295,8 @@ export default async function DashboardPage() {
             </div>
           </div>
           {/* Bandeau "Cette semaine" (retour de Cindy/Sandrine Manzelle du
-              2026-08-24) : jamais pour le Bureau, voir showHeaderWeekBanner
-              plus haut. */}
+              2026-08-24, affiné le 2026-09-01 pour le cumul Bureau+coach
+              +joueur) : voir showHeaderWeekBanner plus haut. */}
           {showHeaderWeekBanner && (
             // Retour de Cindy du 2026-08-25 : "CETTE SEMAINE" se retrouvait
             // coupé en haut de l'en-tête — top-1/2 + -translate-y-1/2
