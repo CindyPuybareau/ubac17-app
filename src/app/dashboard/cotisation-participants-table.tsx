@@ -211,6 +211,22 @@ function downloadReceiptPdf(c: AdminCotisation, contactEmail: string | null) {
   link.click();
 }
 
+// Audit du 2026-09-01 (retour de Cindy, un membre du Bureau sur iPhone) :
+// "Télécharger en PDF" ci-dessus repose sur data:URI + <a download>, une
+// combinaison que Safari/iOS ne respecte pas de façon fiable (ignore le
+// téléchargement, ouvre juste un onglet, ou ne fait rien du tout en mode
+// standalone) — même famille de bug que window.open le 31/08, mais aucun
+// contournement web fiable n'existe côté téléchargement direct pour iOS.
+// Le bouton "Imprimer" juste à côté, lui, ouvre la vraie feuille
+// d'impression native d'Apple — et depuis cette feuille, iOS propose déjà
+// "Enregistrer dans Fichiers"/export PDF, un mécanisme 100% fiable. Sur
+// iPhone/iPad, on met donc ce chemin en avant plutôt que de réparer un
+// téléchargement qui ne peut pas l'être.
+function isIOS() {
+  if (typeof navigator === "undefined") return false;
+  return /iPad|iPhone|iPod/.test(navigator.userAgent);
+}
+
 // Audit du 31/08 (retour de Cindy, iPhone) : ceci ouvrait auparavant une
 // vraie nouvelle fenêtre de navigateur (window.open + document.write) pour
 // y afficher le reçu avant de lancer l'impression. Sur ordinateur ça
@@ -1514,21 +1530,35 @@ export default function CotisationParticipantsTable({
                   Solde restant dû : {formatAmount(balanceDue(c))}
                 </p>
               </div>
-              <div className="mt-4 flex items-center gap-2">
-                <button
-                  onClick={() => window.print()}
-                  className="flex items-center gap-1.5 rounded-full bg-ubac-yellow px-3.5 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark"
-                >
-                  <Printer className="h-3.5 w-3.5" />
-                  Imprimer
-                </button>
-                <button
-                  onClick={() => downloadReceiptPdf(c, receiptTarget.contactEmail)}
-                  className="flex items-center gap-1.5 rounded-full border border-zinc-200 px-3.5 py-1.5 text-sm font-semibold text-zinc-600 hover:bg-zinc-50"
-                >
-                  <FileText className="h-3.5 w-3.5" />
-                  Télécharger en PDF
-                </button>
+              <div className="mt-4 flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => window.print()}
+                    className="flex items-center gap-1.5 rounded-full bg-ubac-yellow px-3.5 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark"
+                  >
+                    <Printer className="h-3.5 w-3.5" />
+                    Imprimer
+                  </button>
+                  {/* data:URI + <a download> ne fonctionne pas de façon
+                      fiable sur iPhone/iPad (voir isIOS ci-dessus) : le
+                      bouton n'y est proposé que là où il marche vraiment. */}
+                  {!isIOS() && (
+                    <button
+                      onClick={() => downloadReceiptPdf(c, receiptTarget.contactEmail)}
+                      className="flex items-center gap-1.5 rounded-full border border-zinc-200 px-3.5 py-1.5 text-sm font-semibold text-zinc-600 hover:bg-zinc-50"
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      Télécharger en PDF
+                    </button>
+                  )}
+                </div>
+                {isIOS() && (
+                  <p className="text-xs text-zinc-500">
+                    Pour l&apos;enregistrer en PDF sur iPhone/iPad : bouton Imprimer
+                    ci-dessus, puis « Enregistrer dans Fichiers » (ou « Options
+                    PDF ») depuis l&apos;aperçu d&apos;impression.
+                  </p>
+                )}
               </div>
             </Modal>
           );
@@ -1739,10 +1769,21 @@ export default function CotisationParticipantsTable({
                         rel="noreferrer"
                         onClick={() => {
                           if (relancePreview.attachReceipt) {
-                            downloadReceiptPdf(c, email);
-                            setManualNotice(
-                              "Le PDF de la facture a été téléchargé dans vos Téléchargements. Glissez-le simplement dans le mail Gmail qui vient de s'ouvrir."
-                            );
+                            // Même limite que le bouton "Télécharger en PDF"
+                            // ci-dessus (audit du 2026-09-01) : le
+                            // téléchargement automatique ne fonctionne pas
+                            // sur iPhone/iPad, glisser un fichier inexistant
+                            // dans Gmail n'a aucun sens sur ces appareils.
+                            if (isIOS()) {
+                              setManualNotice(
+                                "Sur iPhone/iPad, le PDF ne se télécharge pas automatiquement : ouvre « Générer reçu / facture » sur cette fiche, puis Imprimer → Enregistrer dans Fichiers, avant de joindre le fichier au mail Gmail qui vient de s'ouvrir."
+                              );
+                            } else {
+                              downloadReceiptPdf(c, email);
+                              setManualNotice(
+                                "Le PDF de la facture a été téléchargé dans vos Téléchargements. Glissez-le simplement dans le mail Gmail qui vient de s'ouvrir."
+                              );
+                            }
                           }
                         }}
                         className="rounded-full bg-ubac-yellow px-3 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark"
