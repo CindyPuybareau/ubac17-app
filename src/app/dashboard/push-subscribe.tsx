@@ -35,30 +35,45 @@ export default function PushSubscribe() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (
-      typeof window === "undefined" ||
-      !("serviceWorker" in navigator) ||
-      !("PushManager" in window) ||
-      // Retour d'audit du 28/08 : Notification.permission était lu juste
-      // en dessous sans que l'API Notification elle-même ait été vérifiée
-      // — sur un navigateur qui a serviceWorker/PushManager mais pas
-      // Notification, l'effet levait et le composant restait bloqué en
-      // "checking" (aucun rendu, ligne 121), sans explication.
-      !("Notification" in window) ||
-      !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-    ) {
-      setState(isIosNotInstalled() ? "ios-not-installed" : "unsupported");
-      return;
+    // Détection encapsulée dans une fonction async à part (audit du
+    // 2026-09-01) : un setState() posé directement dans le corps
+    // synchrone d'un effet déclenche le lint react-hooks/set-state-in-effect
+    // ("cascading renders") — préexistant ici, jamais relevé faute d'avoir
+    // lint ce fichier seul jusqu'ici. Ce détour ne change rien au
+    // comportement.
+    let cancelled = false;
+    async function detect() {
+      if (
+        typeof window === "undefined" ||
+        !("serviceWorker" in navigator) ||
+        !("PushManager" in window) ||
+        // Retour d'audit du 28/08 : Notification.permission était lu juste
+        // en dessous sans que l'API Notification elle-même ait été
+        // vérifiée — sur un navigateur qui a serviceWorker/PushManager
+        // mais pas Notification, l'effet levait et le composant restait
+        // bloqué en "checking" (aucun rendu), sans explication.
+        !("Notification" in window) ||
+        !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+      ) {
+        if (!cancelled) setState(isIosNotInstalled() ? "ios-not-installed" : "unsupported");
+        return;
+      }
+      if (Notification.permission === "denied") {
+        if (!cancelled) setState("denied");
+        return;
+      }
+      try {
+        const reg = await navigator.serviceWorker.register("/sw.js");
+        const sub = await reg.pushManager.getSubscription();
+        if (!cancelled) setState(sub ? "on" : "off");
+      } catch {
+        if (!cancelled) setState(isIosNotInstalled() ? "ios-not-installed" : "unsupported");
+      }
     }
-    if (Notification.permission === "denied") {
-      setState("denied");
-      return;
-    }
-    navigator.serviceWorker
-      .register("/sw.js")
-      .then((reg) => reg.pushManager.getSubscription())
-      .then((sub) => setState(sub ? "on" : "off"))
-      .catch(() => setState(isIosNotInstalled() ? "ios-not-installed" : "unsupported"));
+    detect();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function enable() {

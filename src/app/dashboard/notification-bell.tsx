@@ -18,11 +18,14 @@ type NotificationRow = {
   read_at: string | null;
 };
 
-// Historique 30 derniers jours (côté écran, pas côté requête — la fonction
-// renvoie déjà tout ce qui compte) : matchs, entraînements, changements
-// d'horaire, demandes de présence — tout ce qui passe aujourd'hui par
-// sendEventPush()/request-attendance-button.tsx, désormais aussi loggé en
-// base (voir la migration 20260817000000_notifications.sql).
+// Historique des 14 derniers jours, 30 lignes maximum (côté requête, voir
+// notifications_for_me() / migration 20260901000000 — corrigé le 2026-09-01,
+// l'ancienne limite ne regardait jamais la date et pouvait laisser une
+// notification s'afficher pendant des mois pour une équipe peu active) :
+// matchs, entraînements, changements d'horaire, demandes de présence — tout
+// ce qui passe aujourd'hui par sendEventPush()/request-attendance-button.tsx,
+// désormais aussi loggé en base (voir la migration
+// 20260817000000_notifications.sql).
 export default function NotificationBell() {
   const [notifications, setNotifications] = useState<NotificationRow[] | null>(null);
   const [open, setOpen] = useState(false);
@@ -139,6 +142,17 @@ export default function NotificationBell() {
             {marking && <span className="text-[11px] text-zinc-400">Mise à jour...</span>}
           </div>
 
+          {/* Interrupteur "recevoir les notifications" : même composant que
+              partout ailleurs dans l'app (family-view.tsx, coach-view.tsx),
+              rendu accessible directement depuis la cloche plutôt qu'enfoui
+              dans un onglet. Retour de Cindy du 2026-09-01 ("on ne le voit
+              pas trop") : remonté ici, tout en haut, juste sous le titre —
+              c'était auparavant tout en bas, après la liste, donc caché par
+              tout ce qui la précède pour qui a beaucoup de notifications. */}
+          <div className="border-b border-zinc-100 px-4 py-3">
+            <PushSubscribe />
+          </div>
+
           <div className="max-h-80 overflow-y-auto">
             {notifications === null ? (
               <p className="px-4 py-6 text-center text-sm text-zinc-400">Chargement...</p>
@@ -169,14 +183,6 @@ export default function NotificationBell() {
                 </div>
               ))
             )}
-          </div>
-
-          {/* Interrupteur "recevoir les notifications" : même composant que
-              partout ailleurs dans l'app (family-view.tsx, coach-view.tsx),
-              simplement rendu accessible directement depuis la cloche
-              plutôt qu'enfoui dans un onglet. */}
-          <div className="border-t border-zinc-100 px-4 py-3">
-            <PushSubscribe />
           </div>
         </div>
       )}
