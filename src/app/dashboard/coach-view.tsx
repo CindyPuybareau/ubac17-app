@@ -14,6 +14,7 @@ import {
   Users,
 } from "lucide-react";
 import DocumentsPanel from "@/components/club-documents";
+import ClubReportsSection from "./club-reports-section";
 import { BOUTIQUE_URL } from "./boutique";
 import CalendarView from "./calendar-view";
 import CalendarSubscribe from "./calendar-subscribe";
@@ -28,6 +29,7 @@ import type {
   AdminMemberTeam,
   AdminPenalite,
   AdminUpcomingEvent,
+  ClubReport,
   MemberDetail,
   SponsorDisplay,
   WhatsAppGroup,
@@ -65,6 +67,8 @@ export default function CoachView({
   ownPlayerNextEvent = null,
   penalites = [],
   sponsorDisplay = [],
+  clubReports,
+  currentUserId,
 }: {
   teams: TeamWithMembers[];
   events: AdminUpcomingEvent[];
@@ -109,6 +113,12 @@ export default function CoachView({
   // (voir penalites-manager.tsx) — jamais de droit de saisie ici.
   penalites?: AdminPenalite[];
   sponsorDisplay?: SponsorDisplay[];
+  clubReports: ClubReport[];
+  // Retour de Cindy du 2026-09-01 : les comptes rendus COACH sont
+  // désormais visibles par tous les coachs, mais seul leur auteur (compte
+  // de connexion, pas la fiche joueur) peut les modifier/supprimer — voir
+  // canEditRow dans club-reports-section.tsx.
+  currentUserId: string;
 }) {
   // Créer / modifier / supprimer un événement n'est permis que pour les
   // équipes réellement entraînées : proposer celle où l'utilisateur n'est
@@ -387,9 +397,48 @@ export default function CoachView({
           label: "Documents",
           icon: <ScrollText className={iconClass} />,
           content: (
-            <DocumentsPanel
-              documentIds={["charte-joueur", "charte-parent", "reglement-interieur"]}
-            />
+            <div className="flex flex-col gap-4">
+              <DocumentsPanel
+                documentIds={["charte-joueur", "charte-parent", "reglement-interieur"]}
+              />
+              {/* Comptes rendus (retour de Cindy du 2026-09-01) : un coach
+                  consulte Mairies/Bureau (lecture seule) et voit AUSSI les
+                  comptes rendus de tous les coachs (pas seulement les
+                  siens — correction du 2026-09-01, "ce n'est pas ce que
+                  j'ai demandé") ; isAdmin={false} + currentUserId : il ne
+                  peut modifier/supprimer que ceux qu'il a lui-même écrits
+                  (les lignes Mairies/Bureau, jamais créées par un coach,
+                  restent donc non modifiables ici quoi qu'il arrive).
+                  CD17/Ligue viendra plus tard, volontairement en dernier. */}
+              <ClubReportsSection
+                category="MAIRIE"
+                title="Comptes rendus mairies"
+                emptyLabel="Aucun compte rendu de réunion avec une mairie pour le moment."
+                canCreate={false}
+                isAdmin={false}
+                currentUserId={currentUserId}
+                reports={clubReports}
+              />
+              <ClubReportsSection
+                category="BUREAU"
+                title="Comptes rendus Bureau"
+                emptyLabel="Aucun compte rendu de réunion du Bureau pour le moment."
+                canCreate={false}
+                isAdmin={false}
+                currentUserId={currentUserId}
+                reports={clubReports}
+              />
+              <ClubReportsSection
+                category="COACH"
+                title="Comptes rendus des coachs"
+                emptyLabel="Aucun compte rendu de coach pour le moment."
+                canCreate
+                isAdmin={false}
+                currentUserId={currentUserId}
+                showAuthor
+                reports={clubReports}
+              />
+            </div>
           ),
         },
         {

@@ -20,6 +20,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import DocumentsPanel from "@/components/club-documents";
+import ClubReportsSection from "./club-reports-section";
 import { BOUTIQUE_URL } from "./boutique";
 import TeamManager, { type Person, type TeamWithMembers } from "./team-manager";
 import ImportInscriptions from "./import-inscriptions";
@@ -45,6 +46,7 @@ import type {
   AdminPenalite,
   AdminSponsor,
   AdminUpcomingEvent,
+  ClubReport,
   MemberDetail,
   SponsorDisplay,
   WhatsAppGroup,
@@ -74,6 +76,7 @@ export default function AdminView({
   automationSettings,
   eventRoles,
   volunteerNeedsByEventId,
+  clubReports,
 }: {
   clubFunction?: string | null;
   teams: TeamWithMembers[];
@@ -98,6 +101,7 @@ export default function AdminView({
   // bénévoles directement depuis la carte de l'événement.
   eventRoles: EventRoleType[];
   volunteerNeedsByEventId: Record<string, VolunteerNeed[]>;
+  clubReports: ClubReport[];
 }) {
   const teamRefs = teams.map((t) => ({
     id: t.id,
@@ -395,9 +399,49 @@ export default function AdminView({
           label: "Documents",
           icon: <ScrollText className={iconClass} />,
           content: (
-            <DocumentsPanel
-              documentIds={["charte-joueur", "charte-parent", "reglement-interieur"]}
-            />
+            <div className="flex flex-col gap-4">
+              <DocumentsPanel
+                documentIds={["charte-joueur", "charte-parent", "reglement-interieur"]}
+              />
+              {/* Comptes rendus (retour de Cindy du 2026-09-01) : texte
+                  simple rédigé dans l'appli, jamais un fichier déposé pour
+                  ces trois catégories — voir club-reports-section.tsx.
+                  isAdmin={true} : le Bureau peut tout modifier/supprimer,
+                  y compris les comptes rendus des coachs — RLS
+                  (is_club_admin()) l'autorise déjà côté base. CD17/Ligue
+                  (fichier verrouillé après dépôt) viendra dans un second
+                  temps, volontairement laissé pour la fin. */}
+              <ClubReportsSection
+                category="MAIRIE"
+                title="Comptes rendus mairies"
+                emptyLabel="Aucun compte rendu de réunion avec une mairie pour le moment."
+                canCreate
+                isAdmin
+                reports={clubReports}
+              />
+              <ClubReportsSection
+                category="BUREAU"
+                title="Comptes rendus Bureau"
+                emptyLabel="Aucun compte rendu de réunion du Bureau pour le moment."
+                canCreate
+                isAdmin
+                reports={clubReports}
+              />
+              {/* Retour de Cindy du 2026-09-01 ("ce n'est pas ce que j'ai
+                  demandé") : le Bureau voit AUSSI les comptes rendus des
+                  coachs (jamais n'en rédige depuis cet écran, canCreate
+                  false) — showAuthor pour savoir qui a écrit quoi, plusieurs
+                  coachs partageant cette même liste. */}
+              <ClubReportsSection
+                category="COACH"
+                title="Comptes rendus des coachs"
+                emptyLabel="Aucun compte rendu de coach pour le moment."
+                canCreate={false}
+                isAdmin
+                showAuthor
+                reports={clubReports}
+              />
+            </div>
           ),
         },
         {

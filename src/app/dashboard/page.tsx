@@ -250,6 +250,25 @@ export type CotisationPayment = {
   paidAt: string;
 };
 
+// Comptes rendus (retour de Cindy du 2026-09-01) : mairies/Bureau/coachs,
+// texte simple rédigé dans l'appli (voir club-reports-section.tsx) — RLS
+// (migrations 20260901010000/20260901020000) filtre déjà tout seule ce que
+// chaque rôle a le droit de VOIR, donc une seule requête suffit ici, jamais
+// une par catégorie/par rôle. authorName résolu ici (pas dans le composant
+// client) : les comptes rendus COACH sont visibles par tous les coachs
+// (retour explicite de Cindy, "visible pour le bureau et les coach"), donc
+// il faut pouvoir dire qui a écrit quoi.
+export type ClubReport = {
+  id: string;
+  category: "MAIRIE" | "BUREAU" | "COACH" | "CD17_LIGUE";
+  title: string;
+  reportDate: string;
+  body: string | null;
+  createdBy: string | null;
+  authorName: string | null;
+  updatedAt: string;
+};
+
 export type AdminCotisation = {
   id: string;
   saison: string;
@@ -765,6 +784,53 @@ export default async function DashboardPage() {
     })
     .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999));
   const isCoach = coachedTeams.length > 0;
+
+  // Comptes rendus (retour de Cindy du 2026-09-01) : jamais pour un simple
+  // parent/joueur, seulement Bureau et/ou Coach. RLS filtre déjà tout
+  // (Bureau voit tout ; un coach voit Mairies/Bureau/CD17-Ligue et TOUS les
+  // comptes rendus COACH, retour explicite de Cindy — la modification/
+  // suppression, elle, reste réservée à l'auteur ou au Bureau, voir
+  // canEditRow dans club-reports-section.tsx).
+  let clubReports: ClubReport[] = [];
+  if (isAdmin || isCoach) {
+    const { data: clubReportsData, error: clubReportsError } = await supabase
+      .from("club_reports")
+      .select("id, category, title, report_date, body, created_by, updated_at")
+      .order("report_date", { ascending: false });
+    if (clubReportsError) {
+      console.error("[dashboard] lecture club_reports échouée:", clubReportsError);
+    }
+    // Résolution des noms d'auteur (retour de Cindy : les comptes rendus
+    // COACH sont maintenant partagés entre tous les coachs, il faut pouvoir
+    // dire qui a écrit quoi) — une seule requête groupée plutôt qu'une par
+    // ligne.
+    const authorIds = Array.from(
+      new Set((clubReportsData ?? []).map((r) => r.created_by).filter((id): id is string => Boolean(id)))
+    );
+    const authorNameById = new Map<string, string>();
+    if (authorIds.length > 0) {
+      const { data: authorProfiles, error: authorProfilesError } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name")
+        .in("id", authorIds);
+      if (authorProfilesError) {
+        console.error("[dashboard] résolution des auteurs de club_reports échouée:", authorProfilesError);
+      }
+      (authorProfiles ?? []).forEach((p) => {
+        authorNameById.set(p.id, formatPersonName(p.first_name, p.last_name, "Membre"));
+      });
+    }
+    clubReports = (clubReportsData ?? []).map((r) => ({
+      id: r.id,
+      category: r.category as ClubReport["category"],
+      title: r.title,
+      reportDate: r.report_date,
+      body: r.body,
+      createdBy: r.created_by,
+      authorName: r.created_by ? (authorNameById.get(r.created_by) ?? null) : null,
+      updatedAt: r.updated_at,
+    }));
+  }
 
   const childPlayerRows = (playerLinksResult.data ?? [])
     .map((link) => link.players as unknown as PlayerRow | null)
@@ -3052,6 +3118,7 @@ export default async function DashboardPage() {
           automationSettings={adminAutomationSettings}
           eventRoles={eventRoleTypes}
           volunteerNeedsByEventId={adminVolunteerNeedsByEventId}
+          clubReports={clubReports}
         />
       ),
     });
@@ -3090,6 +3157,8 @@ export default async function DashboardPage() {
           ownPlayerNextEvent={ownPlayerNextEvent}
           penalites={coachPenalites}
           sponsorDisplay={sponsorDisplay}
+          clubReports={clubReports}
+          currentUserId={user.id}
         />
       ),
     });

@@ -25,6 +25,7 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { getLogoBase64, PDF_COLORS } from "@/lib/pdf-brand";
 import EmptyState from "./empty-state";
 import { buildGmailComposeLink, signatureIndex, withSignature } from "@/lib/email";
 import {
@@ -179,54 +180,10 @@ export function withReceiptMention(body: string, attach: boolean) {
     : `${RECEIPT_ATTACHMENT_MENTION}\n\n${signature}`;
 }
 
-// Logo public/logo.png chargé une seule fois et mis en cache (retour de
-// Cindy du 2026-09-01, "ajouter le logo ubac dans la facture") : jsPDF a
-// besoin de l'image déjà en base64 pour l'insérer (doc.addImage), donc un
-// fetch est nécessaire avant de construire le PDF — mémorisé pour ne pas
-// re-télécharger le même fichier à chaque reçu généré dans la session.
-let logoBase64Promise: Promise<string | null> | null = null;
-function getLogoBase64(): Promise<string | null> {
-  if (!logoBase64Promise) {
-    logoBase64Promise = fetch("/logo.png")
-      .then((res) => {
-        if (!res.ok) throw new Error(`logo.png: ${res.status}`);
-        return res.blob();
-      })
-      .then(
-        (blob) =>
-          new Promise<string | null>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = () => resolve(null);
-            reader.readAsDataURL(blob);
-          })
-      )
-      .catch((e) => {
-        console.error("[cotisation-participants-table] chargement du logo échoué:", e);
-        return null;
-      });
-  }
-  return logoBase64Promise;
-}
-
-// Couleurs de marque en RGB (jsPDF ne lit pas les variables CSS de l'appli)
-// — reprises telles quelles de globals.css/statusBadge, pour que le PDF
-// garde la même identité que le reçu à l'écran (retour de Cindy du
-// 2026-09-01, "plus sexy", maquette validée). Un seul endroit à retoucher
-// si la charte graphique change un jour.
-const PDF_COLORS = {
-  navy: [32, 48, 144] as const,
-  navyDark: [22, 35, 101] as const,
-  gold: [244, 196, 48] as const,
-  white: [255, 255, 255] as const,
-  headerSubtext: [205, 210, 235] as const,
-  ink: [15, 23, 42] as const,
-  muted: [113, 113, 122] as const,
-  line: [228, 228, 231] as const,
-  rowAlt: [250, 250, 249] as const,
-};
 // Mêmes 4 états que statusBadge (cotisation-shared / ce fichier), en RGB
-// {fond, texte} pour le bandeau de solde du PDF.
+// {fond, texte} pour le bandeau de solde du PDF. Le logo et les couleurs de
+// marque génériques vivent maintenant dans src/lib/pdf-brand.ts (audit du
+// 2026-09-01, en ajoutant les comptes rendus) — réutilisés tels quels ici.
 const PDF_STATUS_COLORS: Record<StatusKey, { bg: readonly [number, number, number]; text: readonly [number, number, number] }> = {
   PAYE: { bg: [233, 245, 238], text: [62, 143, 95] },
   PARTIEL: { bg: [248, 236, 221], text: [185, 116, 48] },
