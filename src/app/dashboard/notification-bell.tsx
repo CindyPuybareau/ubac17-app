@@ -137,20 +137,21 @@ export default function NotificationBell() {
         // est ancré au viewport lui-même, jamais au bouton — plus aucun
         // dépassement possible quelle que soit la position de la cloche.
         <div className="fixed inset-x-4 top-16 z-30 overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-80">
-          <div className="flex items-center justify-between gap-2 border-b border-zinc-100 px-4 py-3">
-            <p className="text-sm font-semibold text-zinc-900">Notifications</p>
-            {marking && <span className="text-[11px] text-zinc-400">Mise à jour...</span>}
-          </div>
-
           {/* Interrupteur "recevoir les notifications" : même composant que
               partout ailleurs dans l'app (family-view.tsx, coach-view.tsx),
               rendu accessible directement depuis la cloche plutôt qu'enfoui
               dans un onglet. Retour de Cindy du 2026-09-01 ("on ne le voit
-              pas trop") : remonté ici, tout en haut, juste sous le titre —
-              c'était auparavant tout en bas, après la liste, donc caché par
-              tout ce qui la précède pour qui a beaucoup de notifications. */}
-          <div className="border-b border-zinc-100 px-4 py-3">
+              pas trop") : remonté ici, tout en haut — c'était auparavant
+              tout en bas, après la liste, donc caché par tout ce qui la
+              précède pour qui a beaucoup de notifications. Le titre "
+              Notifications" qui vivait au-dessus a été retiré juste après
+              (retour de Cindy, "redondance" — la fenêtre ouverte depuis la
+              cloche se comprend déjà comme le panneau de notifications) ;
+              l'indicateur "Mise à jour..." qui l'accompagnait vit
+              maintenant ici. */}
+          <div className="flex items-center justify-between gap-2 border-b border-zinc-100 px-4 py-3">
             <PushSubscribe />
+            {marking && <span className="shrink-0 text-[11px] text-zinc-400">Mise à jour...</span>}
           </div>
 
           <div className="max-h-80 overflow-y-auto">
