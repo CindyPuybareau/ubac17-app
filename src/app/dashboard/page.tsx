@@ -297,7 +297,17 @@ function mapCotisationRow(
     category: string | null;
     membership_type: string | null;
     fbi_status: string | null;
+    team_players: { teams: { name: string | null; category: string | null } | null }[] | null;
   } | null;
+  // Retour de Cindy du 2026-09-01 ("z.Sénior" affiché alors que Membres
+  // montre "Loisirs F") : players.category est un texte figé, rempli une
+  // fois à l'import et jamais mis à jour par tous les chemins qui changent
+  // l'équipe d'un joueur ensuite (seule la fiche membre le fait). L'équipe
+  // réellement affectée (team_players -> teams.category, la même donnée
+  // que la colonne "Équipe(s)" de Membres depuis le 31/08) prime donc ici ;
+  // players.category ne sert plus qu'en dernier recours, pour un joueur
+  // qui n'a jamais été affecté à aucune équipe.
+  const realCategory = player?.team_players?.[0]?.teams?.category ?? null;
   const collecte = c.collectes as unknown as {
     id: string;
     name: string;
@@ -321,7 +331,7 @@ function mapCotisationRow(
     playerName: formatPersonName(player?.first_name, player?.last_name, "Joueur"),
     firstName: player?.first_name ?? null,
     lastName: player?.last_name ?? null,
-    category: player?.category ?? null,
+    category: realCategory ?? player?.category ?? null,
   };
 }
 
@@ -1048,7 +1058,7 @@ export default async function DashboardPage() {
           supabase
             .from("cotisations")
             .select(
-              "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, collecte_id, players(first_name, last_name, category, membership_type, fbi_status), collectes(id, name, type)"
+              "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, collecte_id, players(first_name, last_name, category, membership_type, fbi_status, team_players(teams(name, category))), collectes(id, name, type)"
             )
             .order("saison", { ascending: false }),
         () =>
@@ -2600,7 +2610,7 @@ export default async function DashboardPage() {
         ? supabase
             .from("cotisations")
             .select(
-              "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, collecte_id, players(first_name, last_name, category, membership_type, fbi_status), collectes(id, name, type)"
+              "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, collecte_id, players(first_name, last_name, category, membership_type, fbi_status, team_players(teams(name, category))), collectes(id, name, type)"
             )
             .in("player_id", familyPlayerIds)
             .order("saison", { ascending: false })
