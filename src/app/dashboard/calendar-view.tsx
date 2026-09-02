@@ -277,6 +277,7 @@ export default function CalendarView({
   allowClubWide = false,
   birthdayMembers = [],
   scopeTeams = [],
+  scopeTeamRoleById,
   tasksByEventId = {},
   carpoolByEventId = {},
   eventRoles = [],
@@ -301,6 +302,14 @@ export default function CalendarView({
   // sans cette ligne, un calendrier vide ne dit pas s'il ne couvre rien ou
   // s'il n'y a simplement rien de programmé.
   scopeTeams?: { id: string; name: string | null; category: string | null }[];
+  // Retour de Cindy du 2026-09-02 (Basile, "le texte ne va pas") : côté
+  // Coach, scopeTeams mélange volontairement les équipes coachées et celle
+  // où la personne n'est QUE joueuse (son propre calendrier de joueur ne
+  // doit pas disparaître selon l'onglet — voir coach-view.tsx) — mais
+  // "Événements de X, Y, Z" à plat laissait croire que tout était coaché,
+  // sous un onglet nommé "Équipes coachées". Optionnel : sans lui (Bureau,
+  // Famille), le texte reste une simple liste comme avant.
+  scopeTeamRoleById?: Record<string, "COACH" | "PLAYER">;
   // Rôles attribués (voiture, maillots, goûter...) et places de covoiturage,
   // affichés dans la carte d'un match/tournoi côté famille — seulement là où
   // ils sont fournis : ni Bureau ni Coach n'en ont besoin sur leur propre
@@ -1459,12 +1468,41 @@ export default function CalendarView({
         </div>
       </div>
 
-      {scopeTeams.length > 0 && (
-        <p className="flex flex-wrap items-center gap-1.5 text-xs text-zinc-500">
-          <Users className="h-3.5 w-3.5 shrink-0" />
-          Événements de {scopeTeams.map((t) => teamLabel(t)).join(", ")}
-        </p>
-      )}
+      {scopeTeams.length > 0 &&
+        (() => {
+          // scopeTeamRoleById absent (Bureau/Famille) : simple liste, comme
+          // avant — retour de Cindy du 2026-09-02 pour le cas où il est
+          // fourni (Coach), voir le commentaire sur ce prop plus haut.
+          if (!scopeTeamRoleById) {
+            return (
+              <p className="flex flex-wrap items-center gap-1.5 text-xs text-zinc-500">
+                <Users className="h-3.5 w-3.5 shrink-0" />
+                Événements de {scopeTeams.map((t) => teamLabel(t)).join(", ")}
+              </p>
+            );
+          }
+          const coached = scopeTeams.filter((t) => scopeTeamRoleById[t.id] !== "PLAYER");
+          const playedOnly = scopeTeams.filter((t) => scopeTeamRoleById[t.id] === "PLAYER");
+          return (
+            <p className="flex flex-wrap items-center gap-1.5 text-xs text-zinc-500">
+              <Users className="h-3.5 w-3.5 shrink-0" />
+              Événements de{" "}
+              {coached.length > 0 && (
+                <>
+                  {coached.map((t) => teamLabel(t)).join(", ")} (coaché
+                  {coached.length > 1 ? "es" : "e"})
+                </>
+              )}
+              {coached.length > 0 && playedOnly.length > 0 && " et "}
+              {playedOnly.length > 0 && (
+                <>
+                  {playedOnly.map((t) => teamLabel(t)).join(", ")} (joué
+                  {playedOnly.length > 1 ? "es" : "e"})
+                </>
+              )}
+            </p>
+          );
+        })()}
 
       {createTeams && createTeams.length > 0 && (
         <CreateEventForm

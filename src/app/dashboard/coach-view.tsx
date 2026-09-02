@@ -176,6 +176,7 @@ export default function CoachView({
               name: t.name,
               category: t.category,
             }))}
+            scopeTeamRoleById={teamRoleByTeamId}
             selfPlayerId={ownPlayerId}
             eventRoles={eventRoles}
             volunteerNeedsByEventId={volunteerNeedsByEventId}
@@ -292,6 +293,7 @@ export default function CoachView({
           createTeams={createTeams}
           rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
           scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
+          scopeTeamRoleById={teamRoleByTeamId}
           forcedView="clubEvents"
           // Un coach qui encadre plusieurs équipes (et joue parfois dans
           // une autre) doit pouvoir choisir laquelle regarder, comme dans
@@ -330,6 +332,7 @@ export default function CoachView({
               createTeams={createTeams}
               rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
               scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
+              scopeTeamRoleById={teamRoleByTeamId}
               forcedView="officialMatches"
               resultsTeams={resultsTeamsForCalendar}
               selfPlayerId={ownPlayerId}
@@ -348,6 +351,7 @@ export default function CoachView({
               createTeams={createTeams}
               rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
               scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
+              scopeTeamRoleById={teamRoleByTeamId}
               forcedView="officialResults"
               resultsTeams={resultsTeamsForCalendar}
               selfPlayerId={ownPlayerId}
