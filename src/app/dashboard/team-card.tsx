@@ -648,6 +648,15 @@ export default function TeamCard({
   // Boutons d'action (retirer coach/joueur, affecter à une autre équipe) —
   // identiques dans la ligne de tableau et la carte mobile.
   function renderActions(m: MemberRow, isLentIn: boolean) {
+    // Une famille peut compter plus de deux équipes (U13M / U13M-1 /
+    // U13M-2) : un joueur déjà prêté à l'une d'elles doit pouvoir l'être
+    // aussi à une autre. L'ancienne logique masquait "Affecter" dès que
+    // isLentIn passait à vrai (un seul prêt possible) — retour de Cindy du
+    // 02/09 : Raphaël Lamouret, déjà U13M + U13M-1, ne pouvait plus être
+    // affecté à U13M-2 depuis aucune des deux cartes.
+    const detail = memberDetailsByPlayerId?.[m.id];
+    const playerTeamIds = new Set((detail?.teams ?? []).map((t) => t.id));
+    const hasMoreFamilyTeams = sameFamilyTeams.some((t) => !playerTeamIds.has(t.id));
     return (
       <>
         {(m.role === "COACH" || m.role === "COACH_PENDING") && canAssignCoach && (
@@ -666,15 +675,26 @@ export default function TeamCard({
         {m.player &&
           !readOnly &&
           (isLentIn ? (
-            canRemoveMembers && (
-              <button
-                onClick={() => setRemoveTarget(m.player)}
-                title={`Retirer de ${team.name ?? "cette équipe"}`}
-                className="rounded-full p-1.5 text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            )
+            <>
+              {hasMoreFamilyTeams && (
+                <button
+                  onClick={() => openSwitch(m.player!)}
+                  title="Affecter à une autre équipe"
+                  className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-navy"
+                >
+                  <ArrowRightLeft className="h-3.5 w-3.5" />
+                </button>
+              )}
+              {canRemoveMembers && (
+                <button
+                  onClick={() => setRemoveTarget(m.player)}
+                  title={`Retirer de ${team.name ?? "cette équipe"}`}
+                  className="rounded-full p-1.5 text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </>
           ) : canSwitchTeam ? (
             <button
               onClick={() => openSwitch(m.player!)}
