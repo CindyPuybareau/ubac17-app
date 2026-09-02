@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { chunkIds, runBatched } from "@/lib/batch";
+import { chunkedQuery, runBatched } from "@/lib/batch";
 import { logQueryErrors } from "@/lib/query-errors";
 import { formatFirstName, formatPersonName } from "@/lib/names";
 import { EMAIL_REPLY_TO } from "@/lib/email";
@@ -664,23 +664,17 @@ async function fetchRsvpsByEvent(
   // scan complet devient plus lent à mesure que la table grossit — retour
   // de Cindy du 02/09 : Postgres a fini par annuler ces requêtes lui-même
   // ("statement timeout"), avec une vraie page d'erreur ("Internal Server
-  // Error") à la clé. chunkIds() découpe en tranches assez petites pour
-  // rester un .in() normal (lecture indexée, rapide, insensible à la
-  // taille de l'historique) — parties en parallèle, résultats fusionnés.
-  const chunks = chunkIds(eventIds);
-  const results = await Promise.all(
-    chunks.map((chunk) =>
-      supabase.from("rsvps").select("event_id, player_id, status").in("event_id", chunk)
-    )
+  // Error") à la clé, puis un deuxième incident le même jour ("mes membres
+  // ont disparu") causé cette fois par les tranches elles-mêmes, parties
+  // toutes en même temps via Promise.all — voir chunkedQuery (lib/batch.ts)
+  // pour le détail : plafonnées maintenant, comme le reste des requêtes de
+  // cette page.
+  const { data: rsvpRows, errors } = await chunkedQuery(
+    eventIds,
+    75,
+    (chunk) => supabase.from("rsvps").select("event_id, player_id, status").in("event_id", chunk)
   );
-  const rsvpRows: { event_id: string; player_id: string; status: string | null }[] = [];
-  results.forEach((res, i) => {
-    if (res.error) {
-      console.error(`[fetchRsvpsByEvent] select rsvps failed (tranche ${i}):`, res.error);
-      return;
-    }
-    rsvpRows.push(...(res.data ?? []));
-  });
+  errors.forEach((error) => console.error("[fetchRsvpsByEvent] select rsvps failed (tranche):", error));
   return buildRsvpStatusByEvent(rsvpRows);
 }
 

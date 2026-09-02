@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { chunkIds } from "@/lib/batch";
+import { chunkedQuery } from "@/lib/batch";
 import { formatPersonName } from "@/lib/names";
 import type { RoleIconName } from "./role-icon";
 
@@ -80,40 +80,26 @@ export async function getVolunteerNeedsByEventId(
   // filtré en mémoire) posé alors ne tient plus à cette échelle : retour
   // de Cindy du 02/09, Postgres a fini par annuler ce genre de scan
   // complet lui-même ailleurs dans l'appli ("statement timeout", vraie
-  // "Internal Server Error"). chunkIds() garde un vrai .in() (lecture
-  // indexée) découpé en tranches assez petites pour l'URL — chaque
-  // tranche porte son propre tri par sort_order, donc l'ordre des besoins
-  // d'un même événement (toujours dans la même tranche, puisqu'on découpe
-  // sur les ids d'événement) reste correct une fois les tranches mises
-  // bout à bout.
-  const chunks = chunkIds(eventIds);
-  const chunkResults = await Promise.all(
-    chunks.map((chunk) =>
-      supabase
-        .from("event_volunteer_needs")
-        .select("id, event_id, role_code, custom_label, required_count, sort_order")
-        .in("event_id", chunk)
-        .order("sort_order", { ascending: true })
+  // "Internal Server Error") — puis un deuxième incident le même jour
+  // causé cette fois par les tranches elles-mêmes, parties toutes en même
+  // temps (voir chunkedQuery, lib/batch.ts) : plafonnées maintenant.
+  // Chaque tranche porte son propre tri par sort_order, donc l'ordre des
+  // besoins d'un même événement (toujours dans la même tranche, puisqu'on
+  // découpe sur les ids d'événement) reste correct une fois les tranches
+  // mises bout à bout.
+  const { data: needRows, errors } = await chunkedQuery(eventIds, 75, (chunk) =>
+    supabase
+      .from("event_volunteer_needs")
+      .select("id, event_id, role_code, custom_label, required_count, sort_order")
+      .in("event_id", chunk)
+      .order("sort_order", { ascending: true })
+  );
+  errors.forEach((error) =>
+    console.error(
+      "[getVolunteerNeedsByEventId] select event_volunteer_needs failed (tranche):",
+      error
     )
   );
-  const needRows: {
-    id: unknown;
-    event_id: unknown;
-    role_code: unknown;
-    custom_label: unknown;
-    required_count: unknown;
-    sort_order: unknown;
-  }[] = [];
-  chunkResults.forEach((res, i) => {
-    if (res.error) {
-      console.error(
-        `[getVolunteerNeedsByEventId] select event_volunteer_needs failed (tranche ${i}):`,
-        res.error
-      );
-      return;
-    }
-    needRows.push(...(res.data ?? []));
-  });
 
   const needIds = needRows.map((row) => row.id as string);
 

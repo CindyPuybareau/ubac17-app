@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { unstable_cache } from "next/cache";
-import { chunkIds } from "@/lib/batch";
+import { chunkedQuery } from "@/lib/batch";
 import { formatPersonName } from "@/lib/names";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -133,23 +133,15 @@ export async function getEventTasksByEventId(
   // fetch de TOUTE la table, filtré en mémoire) posé le 30/08 ne tient
   // plus : retour de Cindy du 02/09, Postgres a fini par annuler ce scan
   // complet lui-même ("statement timeout"), avec une vraie "Internal
-  // Server Error" à la clé. chunkIds() garde un vrai .in() (lecture
-  // indexée, insensible à la taille de l'historique) en le découpant en
-  // tranches assez petites pour l'URL — parties en parallèle.
-  const chunks = chunkIds(eventIds);
-  const chunkResults = await Promise.all(
-    chunks.map((chunk) =>
-      supabase.from("event_tasks").select("event_id, task_type, player_id, source").in("event_id", chunk)
-    )
+  // Server Error" à la clé — puis un deuxième incident le même jour causé
+  // cette fois par les tranches elles-mêmes, parties toutes en même temps
+  // (voir chunkedQuery, lib/batch.ts) : plafonnées maintenant.
+  const { data, errors } = await chunkedQuery(eventIds, 75, (chunk) =>
+    supabase.from("event_tasks").select("event_id, task_type, player_id, source").in("event_id", chunk)
   );
-  const data: { event_id: unknown; task_type: unknown; player_id: unknown; source: unknown }[] = [];
-  chunkResults.forEach((res, i) => {
-    if (res.error) {
-      console.error(`[getEventTasksByEventId] select event_tasks failed (tranche ${i}):`, res.error);
-      return;
-    }
-    data.push(...(res.data ?? []));
-  });
+  errors.forEach((error) =>
+    console.error("[getEventTasksByEventId] select event_tasks failed (tranche):", error)
+  );
 
   // Requête séparée vers club_member_names plutôt qu'une jointure
   // players(...) directe : la fiche players complète d'un autre membre
@@ -197,36 +189,19 @@ export async function getCarpoolOffersByEventId(
   if (eventIds.length === 0) return result;
 
   // Même correctif que getEventTasksByEventId ci-dessus (voir son
-  // commentaire) : chunkIds() garde un vrai .in() plutôt que de scanner
-  // toute la table, découpé en tranches assez petites pour l'URL.
-  const chunks = chunkIds(eventIds);
-  const chunkResults = await Promise.all(
-    chunks.map((chunk) =>
-      supabase
-        .from("event_carpool_offers")
-        .select("id, event_id, player_id, seats, departure_time, meeting_point")
-        .in("event_id", chunk)
-        .gt("seats", 0)
-    )
+  // commentaire) : chunkedQuery() garde un vrai .in() plutôt que de
+  // scanner toute la table, tranches plafonnées plutôt que toutes en même
+  // temps.
+  const { data: offerRows, errors } = await chunkedQuery(eventIds, 75, (chunk) =>
+    supabase
+      .from("event_carpool_offers")
+      .select("id, event_id, player_id, seats, departure_time, meeting_point")
+      .in("event_id", chunk)
+      .gt("seats", 0)
   );
-  const offerRows: {
-    id: unknown;
-    event_id: unknown;
-    player_id: unknown;
-    seats: unknown;
-    departure_time: unknown;
-    meeting_point: unknown;
-  }[] = [];
-  chunkResults.forEach((res, i) => {
-    if (res.error) {
-      console.error(
-        `[getCarpoolOffersByEventId] select event_carpool_offers failed (tranche ${i}):`,
-        res.error
-      );
-      return;
-    }
-    offerRows.push(...(res.data ?? []));
-  });
+  errors.forEach((error) =>
+    console.error("[getCarpoolOffersByEventId] select event_carpool_offers failed (tranche):", error)
+  );
 
   const offerIds = offerRows.map((row) => row.id as string);
 

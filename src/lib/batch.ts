@@ -48,6 +48,44 @@ export function chunkIds(ids: string[], size = 150): string[][] {
   return chunks;
 }
 
+// Exécute une requête .in(colonne, ids) découpée en tranches (chunkIds
+// ci-dessus), tranches parties en parallèle mais PLAFONNÉES (comme
+// runBatched) plutôt que toutes d'un coup — retour de Cindy du 02/09
+// (deuxième incident le même jour, "mes membres ont disparu") : un plein
+// Promise.all() sur toutes les tranches à la fois ajoutait sa propre
+// pointe de connexions simultanées à celles déjà en vol pour les blocs
+// Bureau/Coach/Famille (parallélisés entre eux depuis le 22/08) — assez
+// pour dépasser les 15 connexions disponibles à elle seule, même pour un
+// seul utilisateur, et faire annuler une requête par Postgres
+// ("statement timeout"), ce qui a ensuite fait échouer en cascade toutes
+// les autres requêtes de la même transaction (dont celle des Membres).
+// Fusionne aussi les résultats et les erreurs de chaque tranche, pour ne
+// pas répéter cette boucle aux 4 mêmes endroits (fetchRsvpsByEvent,
+// getVolunteerNeedsByEventId, getEventTasksByEventId,
+// getCarpoolOffersByEventId).
+export async function chunkedQuery<T>(
+  ids: string[],
+  size: number,
+  run: (chunk: string[]) => PromiseLike<{ data: T[] | null; error: unknown }>,
+  concurrency = 4
+): Promise<{ data: T[]; errors: unknown[] }> {
+  const chunks = chunkIds(ids, size);
+  const results = await runBatched(
+    chunks.map((chunk) => () => run(chunk)),
+    concurrency
+  );
+  const data: T[] = [];
+  const errors: unknown[] = [];
+  results.forEach((res) => {
+    if (res.error) {
+      errors.push(res.error);
+      return;
+    }
+    data.push(...(res.data ?? []));
+  });
+  return { data, errors };
+}
+
 export async function runBatched<T extends readonly unknown[]>(
   tasks: { [K in keyof T]: () => T[K] | PromiseLike<T[K]> },
   limit: number
