@@ -420,7 +420,7 @@ export default function AdminView({
               />
               <ClubReportsSection
                 category="BUREAU"
-                title="Comptes rendus Bureau"
+                title="Comptes rendus bureau"
                 emptyLabel="Aucun compte rendu de réunion du Bureau pour le moment."
                 canCreate
                 isAdmin
