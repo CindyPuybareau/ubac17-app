@@ -9,7 +9,6 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { jsPDF } from "jspdf";
 import { Bold, Eraser, FileText, Highlighter, Italic, Plus, Printer, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getLogoBase64, PDF_COLORS } from "@/lib/pdf-brand";
@@ -407,7 +406,13 @@ async function buildReportPdfBase64(report: {
   body: string | null;
   authorName?: string | null;
 }) {
-  const logo = await getLogoBase64();
+  // jsPDF (1,2 Mo) importé ici, seulement au moment où un PDF est
+  // vraiment demandé — retour de Cindy du 02/09 ("le site est très long
+  // à s'afficher") : en haut du fichier, cette librairie partait dans le
+  // même paquet JS que TOUT le tableau de bord, chargé et exécuté par
+  // n'importe quel compte (Bureau, Coach, Famille) dès la connexion,
+  // alors qu'elle ne sert qu'au clic sur "Télécharger en PDF".
+  const [{ jsPDF }, logo] = await Promise.all([import("jspdf"), getLogoBase64()]);
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();

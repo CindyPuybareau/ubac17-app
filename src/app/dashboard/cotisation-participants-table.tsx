@@ -3,8 +3,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import * as XLSX from "xlsx";
-import { jsPDF } from "jspdf";
 import {
   CheckCircle2,
   ChevronDown,
@@ -203,7 +201,13 @@ async function buildReceiptPdfBase64(c: AdminCotisation, contactEmail: string | 
   const statusKey = computeStatus(c);
   const status = statusBadge[statusKey];
   const statusColors = PDF_STATUS_COLORS[statusKey];
-  const logo = await getLogoBase64();
+  // jsPDF (1,2 Mo) importé ici, seulement au moment où un reçu est
+  // vraiment demandé — retour de Cindy du 02/09 ("le site est très long
+  // à s'afficher") : en haut du fichier, cette librairie partait dans le
+  // même paquet JS que tout le tableau de bord, chargé et exécuté par
+  // n'importe quel compte dès la connexion, alors qu'elle ne sert qu'au
+  // clic sur "Télécharger en PDF"/"Imprimer".
+  const [{ jsPDF }, logo] = await Promise.all([import("jspdf"), getLogoBase64()]);
 
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -872,7 +876,11 @@ export default function CotisationParticipantsTable({
     router.refresh();
   }
 
-  function exportSelection(ids: string[]) {
+  async function exportSelection(ids: string[]) {
+    // xlsx importé ici seulement (même correctif que jsPDF plus haut) : ne
+    // sert qu'à ce bouton "Exporter", pas de raison qu'il pèse sur le
+    // chargement initial du tableau de bord pour tout le monde.
+    const XLSX = await import("xlsx");
     const items = cotisations.filter((c) => ids.includes(c.id));
     const header = [
       "Nom & Prénom",

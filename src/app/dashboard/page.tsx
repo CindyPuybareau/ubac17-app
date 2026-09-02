@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { runBatched } from "@/lib/batch";
+import { chunkIds, runBatched } from "@/lib/batch";
 import { logQueryErrors } from "@/lib/query-errors";
 import { formatFirstName, formatPersonName } from "@/lib/names";
 import { EMAIL_REPLY_TO } from "@/lib/email";
@@ -657,30 +657,30 @@ async function fetchRsvpsByEvent(
 ) {
   if (eventIds.length === 0) return new Map<string, Map<string, string | null>>();
 
-  // Pas de .in("event_id", eventIds) ici : même bug déjà trouvé et corrigé
-  // pour les besoins d'organisation (getVolunteerNeedsByEventId, event-
-  // volunteer-needs.ts, retour de Cindy du 2026-08-20) mais jamais reporté
-  // sur les présences — côté Bureau, eventIds couvre TOUT l'historique du
-  // club (872 événements le 30/08), largement de quoi dépasser la taille
-  // d'URL acceptée par Supabase. La requête échouait alors silencieusement
-  // (erreur jamais vérifiée ci-dessous), laissant la Map vide : "0 présent"
-  // partout côté Bureau, alors que la donnée existait bel et bien en base
-  // (confirmé par Cindy le 29-30/08 — Coach et Famille, qui ne portent que
-  // sur leurs propres équipes/enfants, n'atteignaient jamais cette limite).
-  // La policy RLS "select own or coached rsvps" (et les autres policies
-  // rsvps) scope déjà tout compte connecté aux lignes qu'il a le droit de
-  // voir, donc un fetch sans filtre renvoie exactement le même ensemble,
-  // sans URL géante.
-  const eventIdSet = new Set(eventIds);
-  const { data: allRsvpRows, error: rsvpRowsError } = await supabase
-    .from("rsvps")
-    .select("event_id, player_id, status");
-
-  if (rsvpRowsError) {
-    console.error("[fetchRsvpsByEvent] select rsvps failed:", rsvpRowsError);
-  }
-
-  const rsvpRows = (allRsvpRows ?? []).filter((r) => eventIdSet.has(r.event_id));
+  // Un .in("event_id", eventIds) direct posait problème dès que eventIds
+  // couvrait tout l'historique du club (872 événements le 30/08) : URL
+  // trop longue, requête rejetée par Supabase. Le contournement posé alors
+  // (fetch de TOUTE la table, filtré en mémoire) fonctionnait, mais un
+  // scan complet devient plus lent à mesure que la table grossit — retour
+  // de Cindy du 02/09 : Postgres a fini par annuler ces requêtes lui-même
+  // ("statement timeout"), avec une vraie page d'erreur ("Internal Server
+  // Error") à la clé. chunkIds() découpe en tranches assez petites pour
+  // rester un .in() normal (lecture indexée, rapide, insensible à la
+  // taille de l'historique) — parties en parallèle, résultats fusionnés.
+  const chunks = chunkIds(eventIds);
+  const results = await Promise.all(
+    chunks.map((chunk) =>
+      supabase.from("rsvps").select("event_id, player_id, status").in("event_id", chunk)
+    )
+  );
+  const rsvpRows: { event_id: string; player_id: string; status: string | null }[] = [];
+  results.forEach((res, i) => {
+    if (res.error) {
+      console.error(`[fetchRsvpsByEvent] select rsvps failed (tranche ${i}):`, res.error);
+      return;
+    }
+    rsvpRows.push(...(res.data ?? []));
+  });
   return buildRsvpStatusByEvent(rsvpRows);
 }
 

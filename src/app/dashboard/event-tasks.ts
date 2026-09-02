@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { unstable_cache } from "next/cache";
+import { chunkIds } from "@/lib/batch";
 import { formatPersonName } from "@/lib/names";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -126,25 +127,29 @@ export async function getEventTasksByEventId(
   const result: Record<string, EventTasksState> = {};
   if (eventIds.length === 0) return result;
 
-  // Pas de .in("event_id", eventIds) ici : même bug que
-  // getVolunteerNeedsByEventId plus haut dans ce fichier — eventIds peut
-  // couvrir tout l'historique du club (plusieurs centaines d'événements
-  // côté Bureau) et produire une URL trop longue, rejetée par le serveur
-  // (bug confirmé côté présences, event_id similaire, retour de Cindy du
-  // 29-30/08 — jamais déclenché ici jusqu'ici faute d'appel à cette échelle,
-  // mais même fragilité). La policy RLS scope déjà les lignes visibles par
-  // l'utilisateur courant, donc un fetch sans filtre renvoie le même
-  // ensemble, sans URL géante.
-  const eventIdSet = new Set(eventIds);
-  const { data: allData, error: tasksError } = await supabase
-    .from("event_tasks")
-    .select("event_id, task_type, player_id, source");
-
-  if (tasksError) {
-    console.error("[getEventTasksByEventId] select event_tasks failed:", tasksError);
-  }
-
-  const data = (allData ?? []).filter((row) => eventIdSet.has(row.event_id as string));
+  // Un .in("event_id", eventIds) direct posait problème dès que eventIds
+  // couvrait tout l'historique du club (plusieurs centaines d'événements
+  // côté Bureau) : URL trop longue, requête rejetée. Le contournement (un
+  // fetch de TOUTE la table, filtré en mémoire) posé le 30/08 ne tient
+  // plus : retour de Cindy du 02/09, Postgres a fini par annuler ce scan
+  // complet lui-même ("statement timeout"), avec une vraie "Internal
+  // Server Error" à la clé. chunkIds() garde un vrai .in() (lecture
+  // indexée, insensible à la taille de l'historique) en le découpant en
+  // tranches assez petites pour l'URL — parties en parallèle.
+  const chunks = chunkIds(eventIds);
+  const chunkResults = await Promise.all(
+    chunks.map((chunk) =>
+      supabase.from("event_tasks").select("event_id, task_type, player_id, source").in("event_id", chunk)
+    )
+  );
+  const data: { event_id: unknown; task_type: unknown; player_id: unknown; source: unknown }[] = [];
+  chunkResults.forEach((res, i) => {
+    if (res.error) {
+      console.error(`[getEventTasksByEventId] select event_tasks failed (tranche ${i}):`, res.error);
+      return;
+    }
+    data.push(...(res.data ?? []));
+  });
 
   // Requête séparée vers club_member_names plutôt qu'une jointure
   // players(...) directe : la fiche players complète d'un autre membre
@@ -191,23 +196,39 @@ export async function getCarpoolOffersByEventId(
   const result: Record<string, CarpoolOffer[]> = {};
   if (eventIds.length === 0) return result;
 
-  // Pas de .in("event_id", eventIds) ici : même bug que
-  // getEventTasksByEventId/getVolunteerNeedsByEventId dans ce fichier —
-  // voir leur commentaire pour le détail (URL trop longue dès que eventIds
-  // couvre tout l'historique du club).
-  const eventIdSet = new Set(eventIds);
-  const { data: allOfferRows, error: offersError } = await supabase
-    .from("event_carpool_offers")
-    .select("id, event_id, player_id, seats, departure_time, meeting_point")
-    .gt("seats", 0);
+  // Même correctif que getEventTasksByEventId ci-dessus (voir son
+  // commentaire) : chunkIds() garde un vrai .in() plutôt que de scanner
+  // toute la table, découpé en tranches assez petites pour l'URL.
+  const chunks = chunkIds(eventIds);
+  const chunkResults = await Promise.all(
+    chunks.map((chunk) =>
+      supabase
+        .from("event_carpool_offers")
+        .select("id, event_id, player_id, seats, departure_time, meeting_point")
+        .in("event_id", chunk)
+        .gt("seats", 0)
+    )
+  );
+  const offerRows: {
+    id: unknown;
+    event_id: unknown;
+    player_id: unknown;
+    seats: unknown;
+    departure_time: unknown;
+    meeting_point: unknown;
+  }[] = [];
+  chunkResults.forEach((res, i) => {
+    if (res.error) {
+      console.error(
+        `[getCarpoolOffersByEventId] select event_carpool_offers failed (tranche ${i}):`,
+        res.error
+      );
+      return;
+    }
+    offerRows.push(...(res.data ?? []));
+  });
 
-  if (offersError) {
-    console.error("[getCarpoolOffersByEventId] select event_carpool_offers failed:", offersError);
-  }
-
-  const offerRows = (allOfferRows ?? []).filter((row) => eventIdSet.has(row.event_id as string));
-
-  const offerIds = (offerRows ?? []).map((row) => row.id as string);
+  const offerIds = offerRows.map((row) => row.id as string);
 
   // Requête séparée plutôt qu'une jointure imbriquée à deux niveaux
   // (offres -> réservations -> fiches) : plus simple à relire, et cohérent

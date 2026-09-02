@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { chunkIds } from "@/lib/batch";
 import { formatPersonName } from "@/lib/names";
 import type { RoleIconName } from "./role-icon";
 
@@ -72,27 +73,47 @@ export async function getVolunteerNeedsByEventId(
   const result: Record<string, VolunteerNeed[]> = {};
   if (eventIds.length === 0) return result;
 
-  // Pas de .in("event_id", eventIds) ici : depuis que ce fetch couvre
-  // TOUS les événements affichés (calendrier entier, plus seulement ceux
-  // à venir — voir plus haut), la liste d'ids pouvait dépasser plusieurs
-  // centaines d'entrées et produire une URL trop longue, rejetée par le
-  // serveur avec un "Bad Request" sans détail (bug remonté par Cindy le
-  // 2026-08-20, confirmé par les logs). La policy RLS "select volunteer
-  // needs for visible events" filtre déjà aux seuls événements visibles
-  // par l'utilisateur courant, donc récupérer sans filtre d'id renvoie
-  // exactement le même ensemble de lignes, sans construire une URL
-  // gigantesque — on ne garde ensuite que celles demandées.
-  const eventIdSet = new Set(eventIds);
-  const { data: allNeedRows, error: needRowsError } = await supabase
-    .from("event_volunteer_needs")
-    .select("id, event_id, role_code, custom_label, required_count, sort_order")
-    .order("sort_order", { ascending: true });
-
-  if (needRowsError) {
-    console.error("[getVolunteerNeedsByEventId] select event_volunteer_needs failed:", needRowsError);
-  }
-
-  const needRows = (allNeedRows ?? []).filter((row) => eventIdSet.has(row.event_id as string));
+  // Un .in("event_id", eventIds) direct posait problème dès que ce fetch
+  // couvrait TOUS les événements affichés (calendrier entier, plusieurs
+  // centaines d'entrées) : URL trop longue, "Bad Request" (bug remonté
+  // par Cindy le 2026-08-20). Le contournement (fetch de toute la table,
+  // filtré en mémoire) posé alors ne tient plus à cette échelle : retour
+  // de Cindy du 02/09, Postgres a fini par annuler ce genre de scan
+  // complet lui-même ailleurs dans l'appli ("statement timeout", vraie
+  // "Internal Server Error"). chunkIds() garde un vrai .in() (lecture
+  // indexée) découpé en tranches assez petites pour l'URL — chaque
+  // tranche porte son propre tri par sort_order, donc l'ordre des besoins
+  // d'un même événement (toujours dans la même tranche, puisqu'on découpe
+  // sur les ids d'événement) reste correct une fois les tranches mises
+  // bout à bout.
+  const chunks = chunkIds(eventIds);
+  const chunkResults = await Promise.all(
+    chunks.map((chunk) =>
+      supabase
+        .from("event_volunteer_needs")
+        .select("id, event_id, role_code, custom_label, required_count, sort_order")
+        .in("event_id", chunk)
+        .order("sort_order", { ascending: true })
+    )
+  );
+  const needRows: {
+    id: unknown;
+    event_id: unknown;
+    role_code: unknown;
+    custom_label: unknown;
+    required_count: unknown;
+    sort_order: unknown;
+  }[] = [];
+  chunkResults.forEach((res, i) => {
+    if (res.error) {
+      console.error(
+        `[getVolunteerNeedsByEventId] select event_volunteer_needs failed (tranche ${i}):`,
+        res.error
+      );
+      return;
+    }
+    needRows.push(...(res.data ?? []));
+  });
 
   const needIds = needRows.map((row) => row.id as string);
 

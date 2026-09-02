@@ -24,6 +24,30 @@
 // littéralement — d'où Awaited<T[K]> plutôt que Promise<T[K]> ici, sans
 // quoi TypeScript n'arrive plus à déduire le type de chaque résultat et
 // tout retombe silencieusement en `unknown`).
+// Découpe un tableau d'ids en tranches assez petites pour tenir dans une
+// URL — utilisé pour remplacer les .in("event_id", eventIds) qui, avec
+// TOUT l'historique du club (800+ événements dès fin août), produisaient
+// une URL trop longue et une requête rejetée par Supabase.
+//
+// Retour du 02/09 : le contournement posé le 30/08 pour ce même bug
+// (getVolunteerNeedsByEventId, fetchRsvpsByEvent, getEventTasksByEventId,
+// getCarpoolOffersByEventId) supprimait purement et simplement le filtre
+// .in() — un fetch de la table ENTIÈRE, filtré ensuite en mémoire. Ça
+// marchait, mais un scan complet devient plus lent à chaque événement
+// ajouté ; ce matin, Postgres a fini par annuler ces requêtes lui-même
+// ("canceling statement due to statement timeout", erreur 500 sur
+// /dashboard). chunkIds() permet de garder un vrai .in() — donc une
+// lecture indexée, rapide, qui ne grossit pas avec l'historique — tout en
+// restant sous la limite de taille d'URL grâce à plusieurs requêtes plus
+// petites (parties en parallèle par l'appelant).
+export function chunkIds(ids: string[], size = 150): string[][] {
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += size) {
+    chunks.push(ids.slice(i, i + size));
+  }
+  return chunks;
+}
+
 export async function runBatched<T extends readonly unknown[]>(
   tasks: { [K in keyof T]: () => T[K] | PromiseLike<T[K]> },
   limit: number
