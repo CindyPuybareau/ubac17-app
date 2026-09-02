@@ -266,6 +266,13 @@ export type ClubReport = {
   body: string | null;
   createdBy: string | null;
   authorName: string | null;
+  // CD17_LIGUE uniquement (20260901030000) : un vrai fichier déposé, jamais
+  // du texte. fileUrl est une URL signée déjà prête à l'emploi, générée ici
+  // (jamais côté client) — un lien <a href> classique au premier rendu,
+  // pas une navigation déclenchée après un clic + un aller-retour réseau,
+  // qui se ferait bloquer par le bloqueur de popup sur iPhone.
+  filePath: string | null;
+  fileUrl: string | null;
   updatedAt: string;
 };
 
@@ -795,10 +802,31 @@ export default async function DashboardPage() {
   if (isAdmin || isCoach) {
     const { data: clubReportsData, error: clubReportsError } = await supabase
       .from("club_reports")
-      .select("id, category, title, report_date, body, created_by, updated_at")
+      .select("id, category, title, report_date, body, created_by, file_path, updated_at")
       .order("report_date", { ascending: false });
     if (clubReportsError) {
       console.error("[dashboard] lecture club_reports échouée:", clubReportsError);
+    }
+    // CD17/Ligue (20260901030000) : un vrai fichier déposé, jamais du
+    // texte. L'URL signée est générée ICI, une fois pour toutes au
+    // chargement de la page — jamais côté client après un clic (bloqueur
+    // de popup sur iPhone, même piège déjà corrigé ailleurs cette session).
+    const fileUrlByPath = new Map<string, string>();
+    const filePaths = (clubReportsData ?? [])
+      .map((r) => r.file_path)
+      .filter((p): p is string => Boolean(p));
+    if (filePaths.length > 0) {
+      const { data: signedUrls, error: signedUrlsError } = await supabase.storage
+        .from("club-report-files")
+        .createSignedUrls(filePaths, 3600);
+      if (signedUrlsError) {
+        console.error("[dashboard] génération des liens club-report-files échouée:", signedUrlsError);
+      }
+      // .path (pas l'index) : createSignedUrls ne garantit pas de renvoyer
+      // ses résultats dans le même ordre que les chemins demandés.
+      (signedUrls ?? []).forEach((s) => {
+        if (s.signedUrl && s.path) fileUrlByPath.set(s.path, s.signedUrl);
+      });
     }
     // Résolution des noms d'auteur (retour de Cindy : les comptes rendus
     // COACH sont maintenant partagés entre tous les coachs, il faut pouvoir
@@ -828,6 +856,8 @@ export default async function DashboardPage() {
       body: r.body,
       createdBy: r.created_by,
       authorName: r.created_by ? (authorNameById.get(r.created_by) ?? null) : null,
+      filePath: r.file_path,
+      fileUrl: r.file_path ? (fileUrlByPath.get(r.file_path) ?? null) : null,
       updatedAt: r.updated_at,
     }));
   }

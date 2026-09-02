@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import DocumentsPanel from "@/components/club-documents";
 import ClubReportsSection from "./club-reports-section";
+import Cd17LigueSection from "./cd17-ligue-section";
 import { BOUTIQUE_URL } from "./boutique";
 import TeamManager, { type Person, type TeamWithMembers } from "./team-manager";
 import ImportInscriptions from "./import-inscriptions";
@@ -408,9 +409,7 @@ export default function AdminView({
                   ces trois catégories — voir club-reports-section.tsx.
                   isAdmin={true} : le Bureau peut tout modifier/supprimer,
                   y compris les comptes rendus des coachs — RLS
-                  (is_club_admin()) l'autorise déjà côté base. CD17/Ligue
-                  (fichier verrouillé après dépôt) viendra dans un second
-                  temps, volontairement laissé pour la fin. */}
+                  (is_club_admin()) l'autorise déjà côté base. */}
               <ClubReportsSection
                 category="MAIRIE"
                 title="Comptes rendus mairies"
@@ -441,6 +440,11 @@ export default function AdminView({
                 showAuthor
                 reports={clubReports}
               />
+              {/* CD17/Ligue (retour de Cindy du 2026-09-01, construit en
+                  dernier comme convenu) : un vrai fichier reçu de
+                  l'extérieur, déposé uniquement par le Bureau, verrouillé
+                  pour toujours dès le dépôt — voir cd17-ligue-section.tsx. */}
+              <Cd17LigueSection canUpload reports={clubReports} />
             </div>
           ),
         },

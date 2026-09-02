@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import DocumentsPanel from "@/components/club-documents";
 import ClubReportsSection from "./club-reports-section";
+import Cd17LigueSection from "./cd17-ligue-section";
 import { BOUTIQUE_URL } from "./boutique";
 import CalendarView from "./calendar-view";
 import CalendarSubscribe from "./calendar-subscribe";
@@ -438,6 +439,9 @@ export default function CoachView({
                 showAuthor
                 reports={clubReports}
               />
+              {/* CD17/Ligue : consultation seule pour un coach, jamais de
+                  dépôt (canUpload={false}) — voir cd17-ligue-section.tsx. */}
+              <Cd17LigueSection canUpload={false} reports={clubReports} />
             </div>
           ),
         },
