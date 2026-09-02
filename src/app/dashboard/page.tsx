@@ -798,8 +798,19 @@ export default async function DashboardPage() {
   // comptes rendus COACH, retour explicite de Cindy — la modification/
   // suppression, elle, reste réservée à l'auteur ou au Bureau, voir
   // canEditRow dans club-reports-section.tsx).
+  //
+  // Retour de Cindy du 2026-09-02 ("connexions très longues") : ces 3
+  // allers-retours (la liste, puis les auteurs, puis les liens de fichiers)
+  // étaient attendus ici, bloquant tout le reste de la page derrière eux à
+  // chaque connexion Bureau/Coach — même bug déjà corrigé le 22/08 pour
+  // adminPromise/coachPromise/familyPromise (voir leur commentaire plus
+  // bas) : démarré ici en arrière-plan, réellement attendu beaucoup plus
+  // loin, aux côtés de ces trois mêmes promesses. Les deux étapes internes
+  // (liens de fichiers, noms d'auteurs) ne dépendent l'une de l'autre en
+  // rien non plus — lancées ensemble plutôt qu'à la queue leu leu.
   let clubReports: ClubReport[] = [];
-  if (isAdmin || isCoach) {
+  const clubReportsPromise = (async () => {
+    if (!isAdmin && !isCoach) return;
     const { data: clubReportsData, error: clubReportsError } = await supabase
       .from("club_reports")
       .select("id, category, title, report_date, body, created_by, file_path, updated_at")
@@ -807,47 +818,40 @@ export default async function DashboardPage() {
     if (clubReportsError) {
       console.error("[dashboard] lecture club_reports échouée:", clubReportsError);
     }
-    // CD17/Ligue (20260901030000) : un vrai fichier déposé, jamais du
-    // texte. L'URL signée est générée ICI, une fois pour toutes au
-    // chargement de la page — jamais côté client après un clic (bloqueur
-    // de popup sur iPhone, même piège déjà corrigé ailleurs cette session).
-    const fileUrlByPath = new Map<string, string>();
     const filePaths = (clubReportsData ?? [])
       .map((r) => r.file_path)
       .filter((p): p is string => Boolean(p));
-    if (filePaths.length > 0) {
-      const { data: signedUrls, error: signedUrlsError } = await supabase.storage
-        .from("club-report-files")
-        .createSignedUrls(filePaths, 3600);
-      if (signedUrlsError) {
-        console.error("[dashboard] génération des liens club-report-files échouée:", signedUrlsError);
-      }
-      // .path (pas l'index) : createSignedUrls ne garantit pas de renvoyer
-      // ses résultats dans le même ordre que les chemins demandés.
-      (signedUrls ?? []).forEach((s) => {
-        if (s.signedUrl && s.path) fileUrlByPath.set(s.path, s.signedUrl);
-      });
-    }
-    // Résolution des noms d'auteur (retour de Cindy : les comptes rendus
-    // COACH sont maintenant partagés entre tous les coachs, il faut pouvoir
-    // dire qui a écrit quoi) — une seule requête groupée plutôt qu'une par
-    // ligne.
     const authorIds = Array.from(
       new Set((clubReportsData ?? []).map((r) => r.created_by).filter((id): id is string => Boolean(id)))
     );
-    const authorNameById = new Map<string, string>();
-    if (authorIds.length > 0) {
-      const { data: authorProfiles, error: authorProfilesError } = await supabase
-        .from("profiles")
-        .select("id, first_name, last_name")
-        .in("id", authorIds);
-      if (authorProfilesError) {
-        console.error("[dashboard] résolution des auteurs de club_reports échouée:", authorProfilesError);
-      }
-      (authorProfiles ?? []).forEach((p) => {
-        authorNameById.set(p.id, formatPersonName(p.first_name, p.last_name, "Membre"));
-      });
+    const [signedUrlsResult, authorProfilesResult] = await Promise.all([
+      filePaths.length > 0
+        ? supabase.storage.from("club-report-files").createSignedUrls(filePaths, 3600)
+        : Promise.resolve({ data: [] as { path: string | null; signedUrl: string }[], error: null }),
+      authorIds.length > 0
+        ? supabase.from("profiles").select("id, first_name, last_name").in("id", authorIds)
+        : Promise.resolve({ data: [] as { id: string; first_name: string | null; last_name: string | null }[], error: null }),
+    ]);
+    if (signedUrlsResult.error) {
+      console.error("[dashboard] génération des liens club-report-files échouée:", signedUrlsResult.error);
     }
+    if (authorProfilesResult.error) {
+      console.error("[dashboard] résolution des auteurs de club_reports échouée:", authorProfilesResult.error);
+    }
+    // .path (pas l'index) : createSignedUrls ne garantit pas de renvoyer
+    // ses résultats dans le même ordre que les chemins demandés.
+    const fileUrlByPath = new Map<string, string>();
+    (signedUrlsResult.data ?? []).forEach((s) => {
+      if (s.signedUrl && s.path) fileUrlByPath.set(s.path, s.signedUrl);
+    });
+    const authorNameById = new Map<string, string>();
+    (authorProfilesResult.data ?? []).forEach((p) => {
+      authorNameById.set(p.id, formatPersonName(p.first_name, p.last_name, "Membre"));
+    });
+    // Même faux positif que adminAutomationSettings plus bas (voir son
+    // commentaire) : composant serveur, exécuté une seule fois, jamais relu
+    // avant le "await Promise.all(...)" qui suit tous ces blocs.
+    // eslint-disable-next-line react-hooks/immutability
     clubReports = (clubReportsData ?? []).map((r) => ({
       id: r.id,
       category: r.category as ClubReport["category"],
@@ -860,7 +864,7 @@ export default async function DashboardPage() {
       fileUrl: r.file_path ? (fileUrlByPath.get(r.file_path) ?? null) : null,
       updatedAt: r.updated_at,
     }));
-  }
+  })();
 
   const childPlayerRows = (playerLinksResult.data ?? [])
     .map((link) => link.players as unknown as PlayerRow | null)
@@ -3022,9 +3026,11 @@ export default async function DashboardPage() {
   })();
 
   // Les trois blocs Bureau/Coach/Famille ci-dessus tournent en parallèle
-  // (voir commentaire au-dessus de adminPromise) : on attend ici le plus
-  // lent des trois, juste avant le premier endroit qui lit leurs résultats.
-  await Promise.all([adminPromise, coachPromise, familyPromise]);
+  // (voir commentaire au-dessus de adminPromise), rejoints par
+  // clubReportsPromise (retour de Cindy du 2026-09-02) : on attend ici le
+  // plus lent des quatre, juste avant le premier endroit qui lit leurs
+  // résultats.
+  await Promise.all([adminPromise, coachPromise, familyPromise, clubReportsPromise]);
 
   const adminBirthdayMembers: BirthdaySource[] = isAdmin
     ? adminMembers
