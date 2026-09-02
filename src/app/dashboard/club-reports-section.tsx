@@ -1,12 +1,24 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import {
+  useRef,
+  useState,
+  type ClipboardEvent,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { jsPDF } from "jspdf";
-import { FileText, Plus, Printer, Trash2, X } from "lucide-react";
+import { Bold, Eraser, FileText, Highlighter, Italic, Plus, Printer, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getLogoBase64, PDF_COLORS } from "@/lib/pdf-brand";
+import {
+  editableNodeToReportText,
+  parseReportRuns,
+  reportTextToHtml,
+  type ReportRun,
+} from "@/lib/report-format";
 import type { ClubReport } from "./page";
 import ConfirmDialog from "./confirm-dialog";
 
@@ -23,6 +35,234 @@ import ConfirmDialog from "./confirm-dialog";
 function isIOS() {
   if (typeof navigator === "undefined") return false;
   return /iPad|iPhone|iPod/.test(navigator.userAgent);
+}
+
+// Affiche un texte de compte rendu en tenant compte des marqueurs
+// **gras**/_italique_/==surligné== (retour de Cindy du 02/09) — jamais de
+// HTML injecté, ces <strong>/<em>/<mark> viennent uniquement des segments
+// que parseReportRuns calcule, jamais du texte tel quel. Mêmes retours à
+// la ligne que l'ancien rendu texte brut (un <br/> par saut de ligne, pas
+// de <p> imbriqués).
+function FormattedReportText({ text }: { text: string }) {
+  if (!text) return <span className="text-zinc-400">—</span>;
+  const runs = parseReportRuns(text);
+  return (
+    <>
+      {runs.map((run, i) => {
+        const lines = run.text.split("\n");
+        const content = lines.map((line, j) => (
+          <span key={j}>
+            {j > 0 && <br />}
+            {line}
+          </span>
+        ));
+        let node: ReactNode = content;
+        if (run.bold) node = <strong>{node}</strong>;
+        if (run.italic) node = <em>{node}</em>;
+        if (run.highlight) node = <mark className="rounded bg-ubac-yellow/60 px-0.5">{node}</mark>;
+        return <span key={i}>{node}</span>;
+      })}
+    </>
+  );
+}
+
+// Barre d'outils Gras/Italique/Surligner/Effacer + champ éditable —
+// factorisée pour ne pas dupliquer les mêmes gestes entre les modales
+// Création et Modification. Retour de Cindy du 02/09 ("voir le visuel
+// directement dans le champ") : contentEditable plutôt qu'un <textarea> —
+// on tape, on sélectionne, on clique sur un bouton, et le texte apparaît
+// déjà en gras/italique/surligné à l'écran, jamais de marqueurs bruts
+// visibles. La conversion vers/depuis la micro-syntaxe (**gras**...) se
+// fait aux deux bouts (reportTextToHtml au montage, editableNodeToReportText
+// à chaque frappe) : le stockage, le PDF et l'impression n'ont pas changé.
+function ReportBodyEditor({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  // Le contenu HTML n'est posé qu'une seule fois, au montage (voir le ref
+  // callback ci-dessous) — jamais réaffecté à chaque frappe, sinon le
+  // curseur sauterait au début du texte à chaque caractère tapé (React
+  // reconstruirait le HTML depuis `value` et le navigateur perdrait la
+  // position d'édition en cours, comme pour n'importe quel champ non
+  // contrôlé dont on réécrirait le contenu pendant la saisie).
+  const initializedRef = useRef(false);
+
+  function initEditor(el: HTMLDivElement | null) {
+    ref.current = el;
+    if (!el || initializedRef.current) return;
+    initializedRef.current = true;
+    el.innerHTML = reportTextToHtml(value);
+  }
+
+  function syncFromDom() {
+    const el = ref.current;
+    if (!el) return;
+    onChange(editableNodeToReportText(el));
+  }
+
+  // Sélectionne le contenu du nœud fraîchement créé pour permettre
+  // d'enchaîner une autre mise en forme sans re-sélectionner à la main.
+  function reselect(node: Node) {
+    const sel = window.getSelection();
+    if (!sel) return;
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  function currentSelectionRange(): Range | null {
+    const el = ref.current;
+    const sel = window.getSelection();
+    if (!el || !sel || sel.rangeCount === 0) return null;
+    const range = sel.getRangeAt(0);
+    if (range.collapsed) return null; // rien de sélectionné : aucun bouton n'a de texte à habiller
+    if (!el.contains(range.commonAncestorContainer)) return null; // sélection hors du champ
+    return range;
+  }
+
+  function wrapSelection(tagName: "strong" | "em" | "mark") {
+    const range = currentSelectionRange();
+    if (!range) return;
+    const el = document.createElement(tagName);
+    if (tagName === "mark") el.className = "rounded bg-ubac-yellow/60 px-0.5";
+    el.appendChild(range.extractContents());
+    range.insertNode(el);
+    reselect(el);
+    syncFromDom();
+  }
+
+  // Retire la mise en forme la plus englobante (gras/italique/surligné)
+  // qui contient la sélection. Remplace la balise entière par son texte
+  // brut plutôt que de ne toucher qu'au fragment sélectionné : un simple
+  // extractContents+insertNode réinsère sinon le texte À L'INTÉRIEUR de la
+  // même balise (son point de collage après extraction reste dedans), ce
+  // qui ne change rien à l'écran — bogue trouvé en testant ce bouton en
+  // conditions réelles.
+  function clearFormatting() {
+    const range = currentSelectionRange();
+    const root = ref.current;
+    if (!range || !root) return;
+
+    let node: Node | null = range.commonAncestorContainer;
+    let outerFormatted: HTMLElement | null = null;
+    while (node && node !== root) {
+      if (
+        node.nodeType === Node.ELEMENT_NODE &&
+        ["STRONG", "B", "EM", "I", "MARK"].includes((node as HTMLElement).tagName)
+      ) {
+        outerFormatted = node as HTMLElement;
+      }
+      node = node.parentNode;
+    }
+
+    if (outerFormatted) {
+      const text = document.createTextNode(outerFormatted.textContent ?? "");
+      outerFormatted.replaceWith(text);
+      reselect(text);
+      syncFromDom();
+      return;
+    }
+
+    // Sélection hors de toute balise de mise en forme : rien à faire,
+    // mais on aplatit quand même par sécurité (fragment potentiellement
+    // hétérogène après un collage, par exemple).
+    const text = document.createTextNode(range.extractContents().textContent ?? "");
+    range.insertNode(text);
+    reselect(text);
+    syncFromDom();
+  }
+
+  // Un texte collé (WhatsApp, Word, mail...) arrive souvent avec une mise
+  // en forme cachée (police, couleurs, liens) qu'on ne veut jamais voir
+  // atterrir dans un compte rendu — toujours collé en texte simple, la
+  // seule façon d'avoir du gras/italique/surligné reste les boutons.
+  function handlePaste(e: ClipboardEvent<HTMLDivElement>) {
+    e.preventDefault();
+    const el = ref.current;
+    const sel = window.getSelection();
+    if (!el || !sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    if (!el.contains(range.commonAncestorContainer)) return;
+    const text = e.clipboardData.getData("text/plain");
+    range.deleteContents();
+    const node = document.createTextNode(text);
+    range.insertNode(node);
+    range.setStartAfter(node);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    syncFromDom();
+  }
+
+  // onMouseDown (pas seulement onClick) avec preventDefault : un clic sur
+  // un bouton de la barre déplacerait sinon le focus dessus AVANT que le
+  // clic ne se déclenche, ce qui efface la sélection en cours dans le
+  // champ — le geste "sélectionner puis cliquer sur Gras" ne marcherait
+  // jamais sans ça.
+  const toolbarButtonClass =
+    "rounded-lg border border-zinc-200 p-1.5 text-zinc-600 transition-colors hover:bg-zinc-50 hover:text-navy";
+  function preventFocusSteal(e: MouseEvent) {
+    e.preventDefault();
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex flex-wrap items-center gap-1">
+        <button
+          type="button"
+          title="Gras"
+          onMouseDown={preventFocusSteal}
+          onClick={() => wrapSelection("strong")}
+          className={toolbarButtonClass}
+        >
+          <Bold className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          title="Italique"
+          onMouseDown={preventFocusSteal}
+          onClick={() => wrapSelection("em")}
+          className={toolbarButtonClass}
+        >
+          <Italic className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          title="Surligner"
+          onMouseDown={preventFocusSteal}
+          onClick={() => wrapSelection("mark")}
+          className={toolbarButtonClass}
+        >
+          <Highlighter className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          title="Effacer la mise en forme"
+          onMouseDown={preventFocusSteal}
+          onClick={clearFormatting}
+          className={toolbarButtonClass}
+        >
+          <Eraser className="h-3.5 w-3.5" />
+        </button>
+        <span className="text-xs text-zinc-400">
+          Sélectionnez du texte, puis cliquez sur un bouton.
+        </span>
+      </div>
+      <div
+        ref={initEditor}
+        contentEditable
+        suppressContentEditableWarning
+        onInput={syncFromDom}
+        onPaste={handlePaste}
+        className="min-h-[10rem] w-full whitespace-pre-wrap rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm outline-none focus:border-ubac-yellow"
+      />
+    </div>
+  );
 }
 
 // Modal avec option de portail vers <body> — copie du même mécanisme que
@@ -122,6 +362,45 @@ function ReportLetterhead({
   );
 }
 
+// Fond clair derrière un passage surligné dans le PDF — même geste que
+// bg-ubac-yellow/60 à l'écran (globals.css), mais jsPDF ne comprend pas
+// les couleurs avec transparence pour un simple rect(): ce ton est l'or de
+// la marque (PDF_COLORS.gold) mélangé à du blanc à ~55%, calculé une fois
+// pour donner visuellement le même résultat qu'à l'écran.
+const PDF_HIGHLIGHT_BG: [number, number, number] = [249, 223, 141];
+
+function pdfFontStyle(bold: boolean, italic: boolean) {
+  if (bold && italic) return "bolditalic";
+  if (bold) return "bold";
+  if (italic) return "italic";
+  return "normal";
+}
+
+// Un "atome" par mot (ou par unique bloc d'espaces, pour ne perdre aucune
+// largeur entre deux mots) — c'est l'unité que le retour à la ligne manuel
+// ci-dessous déplace d'une ligne à l'autre. `break` marque un vrai saut de
+// ligne du texte d'origine (\n), toujours respecté même si la ligne
+// n'était pas pleine.
+type PdfAtom =
+  | { text: string; bold: boolean; italic: boolean; highlight: boolean }
+  | { break: true };
+
+function reportRunsToPdfAtoms(runs: ReportRun[]): PdfAtom[] {
+  const atoms: PdfAtom[] = [];
+  runs.forEach((run) => {
+    run.text.split("\n").forEach((paragraph, i) => {
+      if (i > 0) atoms.push({ break: true });
+      paragraph
+        .split(/(\s+)/)
+        .filter((piece) => piece.length > 0)
+        .forEach((piece) => {
+          atoms.push({ text: piece, bold: run.bold, italic: run.italic, highlight: run.highlight });
+        });
+    });
+  });
+  return atoms;
+}
+
 async function buildReportPdfBase64(report: {
   title: string;
   reportDate: string;
@@ -175,17 +454,69 @@ async function buildReportPdfBase64(report: {
   }
 
   let y = 50;
-  doc.setFont("helvetica", "normal");
+  const lineHeight = 6;
+  const maxWidth = pageWidth - marginX * 2;
   doc.setFontSize(10);
-  doc.setTextColor(...PDF_COLORS.ink);
-  const lines = doc.splitTextToSize(report.body ?? "", pageWidth - marginX * 2) as string[];
+
+  // Retour à la ligne manuel (jsPDF ne sait pas mettre en page du texte à
+  // styles mixtes) : les atomes sont regroupés ligne par ligne selon leur
+  // largeur réelle une fois le bon style appliqué avant chaque mesure —
+  // doc.getTextWidth() lit la police actuellement sélectionnée.
+  const atoms = reportRunsToPdfAtoms(parseReportRuns(report.body ?? ""));
+  const lines: Exclude<PdfAtom, { break: true }>[][] = [];
+  let current: Exclude<PdfAtom, { break: true }>[] = [];
+  let currentWidth = 0;
+
+  function widthOf(atom: Exclude<PdfAtom, { break: true }>) {
+    doc.setFont("helvetica", pdfFontStyle(atom.bold, atom.italic));
+    return doc.getTextWidth(atom.text);
+  }
+  function trimTrailingSpace(line: Exclude<PdfAtom, { break: true }>[]) {
+    while (line.length > 0 && /^\s+$/.test(line[line.length - 1].text)) line.pop();
+  }
+
+  atoms.forEach((atom) => {
+    if ("break" in atom) {
+      trimTrailingSpace(current);
+      lines.push(current);
+      current = [];
+      currentWidth = 0;
+      return;
+    }
+    const isSpace = /^\s+$/.test(atom.text);
+    if (current.length === 0 && isSpace) return; // jamais d'espace en début de ligne
+    const w = widthOf(atom);
+    if (current.length > 0 && currentWidth + w > maxWidth) {
+      trimTrailingSpace(current);
+      lines.push(current);
+      current = [];
+      currentWidth = 0;
+      if (isSpace) return; // l'espace qui a provoqué le retour est inutile en début de ligne suivante
+    }
+    current.push(atom);
+    currentWidth += w;
+  });
+  trimTrailingSpace(current);
+  lines.push(current);
+
   lines.forEach((line) => {
     if (y > pageHeight - 16) {
       doc.addPage();
       y = 20;
     }
-    doc.text(line, marginX, y);
-    y += 6;
+    let x = marginX;
+    line.forEach((atom) => {
+      doc.setFont("helvetica", pdfFontStyle(atom.bold, atom.italic));
+      const w = doc.getTextWidth(atom.text);
+      if (atom.highlight) {
+        doc.setFillColor(...PDF_HIGHLIGHT_BG);
+        doc.rect(x, y - 4.2, w, 5.3, "F");
+      }
+      doc.setTextColor(...PDF_COLORS.ink);
+      doc.text(atom.text, x, y);
+      x += w;
+    });
+    y += lineHeight;
   });
 
   const dataUri = doc.output("datauristring");
@@ -414,7 +745,7 @@ export default function ClubReportsSection({
                 />
                 <div className="bg-white px-5 py-4">
                   <p className="whitespace-pre-wrap text-sm text-zinc-800">
-                    {detail.body || "—"}
+                    <FormattedReportText text={detail.body ?? ""} />
                   </p>
                 </div>
               </div>
@@ -501,12 +832,7 @@ export default function ClubReportsSection({
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-zinc-600">Texte</label>
-              <textarea
-                value={formBody}
-                onChange={(e) => setFormBody(e.target.value)}
-                rows={10}
-                className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
-              />
+              <ReportBodyEditor value={formBody} onChange={setFormBody} />
             </div>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <div className="mt-1 flex items-center gap-2">
@@ -554,12 +880,7 @@ export default function ClubReportsSection({
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-zinc-600">Texte</label>
-              <textarea
-                value={formBody}
-                onChange={(e) => setFormBody(e.target.value)}
-                rows={10}
-                className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
-              />
+              <ReportBodyEditor value={formBody} onChange={setFormBody} />
             </div>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <div className="mt-1 flex items-center gap-2">
