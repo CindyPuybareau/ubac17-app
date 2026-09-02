@@ -17,7 +17,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { formatFirstName, formatLastName, formatPersonName, sortByLastName } from "@/lib/names";
 import { computePlayerYearStatus, getCurrentSeasonLabel } from "@/lib/season";
-import { teamLabel } from "@/lib/teams";
+import { sameCategoryFamily, teamCategoryLabel, teamLabel } from "@/lib/teams";
 import { notifyBureauNewMemberFromClient, notifyCoachesOfNewTeamMember } from "@/lib/member-notifications";
 import { formatEventTime, isMatchType, styleFor } from "./calendar-view";
 import OpponentDisplay from "./opponent-display";
@@ -53,49 +53,10 @@ export function categoryTheme(category: string | null): { badge: string; border:
   return { badge: "bg-ubac-yellow/15 text-ubac-yellow-dark", border: "border-ubac-yellow/20" };
 }
 
-// Clé de catégorie d'une équipe, débarrassée du numéro de sous-groupe.
-// Le club nomme ses équipes de façons très variées ("U13M-1", "U13M2",
-// "U18 1", "Seniors G1 /RM3", "Séniors M") : découper sur le dernier
-// chiffre ne suffit pas, sinon "U13" perdrait le sien.
-function categoryKey(label: string | null | undefined) {
-  if (!label) return "";
-  const raw = label
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toUpperCase();
-
-  // Catégories d'âge : U + âge + genre éventuel + numéro de groupe
-  // éventuel. "U13M-1" et "U13M2" donnent "U13M", "U18 1" donne "U18",
-  // et "U09" rejoint "U9".
-  const youth = raw.replace(/[^A-Z0-9]/g, "").match(/^U(\d{1,2})([A-Z]*)\d*$/);
-  if (youth) return `U${Number(youth[1])}${youth[2]}`;
-
-  // Le reste : on écarte les marqueurs de groupe et de niveau ("1", "G2",
-  // "RM3") et on garde ce qui nomme la catégorie ("SENIORS M" -> SENIORSM,
-  // "Seniors G1 /RM3" -> SENIORS).
-  return raw
-    .split(/[^A-Z0-9]+/)
-    .filter((token) => token && !/^(?:G|RM|RF|PR|D)?\d+$/.test(token))
-    .join("");
-}
-
-// Un U13M ne peut être prêté qu'à un autre groupe U13M : proposer U15M ou
-// U13F n'a aucun sens sportif. La comparaison est bidirectionnelle pour que
-// l'équipe de base ("U13") et ses déclinaisons ("U13M-1") se reconnaissent
-// mutuellement, sans pour autant rapprocher U13M et U13F.
-function sameCategoryFamily(a: string | null | undefined, b: string | null | undefined) {
-  const ka = categoryKey(a);
-  const kb = categoryKey(b);
-  if (!ka || !kb) return true; // catégorie inconnue : ne rien masquer
-  return ka.startsWith(kb) || kb.startsWith(ka);
-}
-
-// Le nom porte le niveau ("U13M-1"), la catégorie souvent le seul tronc
-// commun ("U13") : c'est le nom qui discrimine, la catégorie ne sert que
-// de repli quand il manque.
-function teamCategoryLabel(t: { name: string | null; category: string | null }) {
-  return t.name ?? t.category;
-}
+// categoryKey / sameCategoryFamily / teamCategoryLabel : déplacées dans
+// src/lib/teams.ts le 02/09 (retour de Cindy, fiche Membres) — member-detail-
+// modal.tsx en a besoin lui aussi, et cette fiche importe déjà ce fichier-ci
+// (MemberDetailModal), donc les garder ici aurait créé un import circulaire.
 
 // Exportée (nettoyage du 31/08) : family-team-card.tsx en avait sa propre
 // copie identique plutôt que d'importer celle-ci.

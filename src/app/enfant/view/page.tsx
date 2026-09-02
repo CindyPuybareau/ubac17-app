@@ -37,12 +37,31 @@ export default async function ChildViewPage() {
 
   const supabase = createServiceClient();
 
-  const playerRes = await supabase
-    .from("players")
-    .select("id, first_name, category, notifications_enabled, avatar_url")
-    .eq("id", playerId)
-    .maybeSingle();
-  logQueryErrors("Enfant", { playerRes });
+  // Les trois requêtes ci-dessous tournaient jusqu'ici en séquence pure
+  // (playerRes, PUIS ownTeamLinksRes, PUIS... jusqu'à penaliteRes tout en
+  // bas) alors qu'aucune des trois ne dépend d'une autre — seul playerId
+  // (déjà connu via le cookie de session) leur est nécessaire. C'est cette
+  // chaîne de sept allers-retours à la queue leu leu qui rendait l'espace
+  // Enfant perceptiblement lent (retour de Cindy du 02/09, ~10s) — même
+  // famille de correctif que le "chargement de ton espace" côté
+  // Bureau/Coach/Famille (page.tsx, 2026-08-20/22).
+  const [playerRes, ownTeamLinksRes, penaliteRes] = await Promise.all([
+    supabase
+      .from("players")
+      .select("id, first_name, category, notifications_enabled, avatar_url")
+      .eq("id", playerId)
+      .maybeSingle(),
+    supabase.from("team_players").select("team_id").eq("player_id", playerId),
+    // "Mes pénalités" (retour de Cindy du 2026-08-22), lecture seule — ne
+    // dépend que de playerId, jamais des équipes ni des événements calculés
+    // plus bas : n'a donc aucune raison d'attendre leur tour.
+    supabase
+      .from("penalites")
+      .select("id, amount, notes, penalite_date, statut, paid_at")
+      .eq("player_id", playerId)
+      .order("penalite_date", { ascending: false }),
+  ]);
+  logQueryErrors("Enfant", { playerRes, ownTeamLinksRes, penaliteRes });
   const player = playerRes.data;
 
   if (!player) {
@@ -55,15 +74,14 @@ export default async function ChildViewPage() {
     );
   }
 
-  const ownTeamLinksRes = await supabase
-    .from("team_players")
-    .select("team_id")
-    .eq("player_id", playerId);
-  logQueryErrors("Enfant", { ownTeamLinksRes });
   const ownTeamLinks = ownTeamLinksRes.data;
   const teamIds = (ownTeamLinks ?? []).map((t) => t.team_id);
+  // Connu dès playerRes (parti en parallèle juste au-dessus) : la
+  // condition peut donc déjà filtrer la requête ci-dessous plutôt que de
+  // forcer un aller-retour séquentiel de plus juste pour la lire.
+  const notificationsEnabled = player.notifications_enabled ?? true;
 
-  const [teamsRes, teammatesRes, coachesRes, eventsRes] = await Promise.all([
+  const [teamsRes, teammatesRes, coachesRes, eventsRes, notifRes] = await Promise.all([
     teamIds.length > 0
       ? supabase.from("teams").select("id, name, category").in("id", teamIds)
       : Promise.resolve({
@@ -93,8 +111,25 @@ export default async function ChildViewPage() {
           .or(teamOrClubWideFilter(teamIds))
           .order("start_time", { ascending: true })
       : Promise.resolve({ data: [] as never[], error: null }),
+    // Cloche de notifications (voir plus bas pour le détail) : ne dépend
+    // que de teamIds et de notificationsEnabled, tous deux déjà connus —
+    // partie ici avec le reste plutôt qu'après coup, à la queue leu leu.
+    notificationsEnabled && teamIds.length > 0
+      ? supabase
+          .from("notifications")
+          .select("id, team_id, title, body, created_at, teams(name)")
+          .order("created_at", { ascending: false })
+          .limit(30)
+          // Retour d'audit du 28/08 : team_id.is.null seul traitait à tort
+          // une notification ciblant plusieurs équipes précises
+          // (target_team_ids) comme "tout le club" — tous les enfants la
+          // recevaient, y compris hors cible. Même filtre que côté
+          // Famille/Coach (notifications_for_me) et que la requête events
+          // ci-dessus.
+          .or(teamOrClubWideFilter(teamIds))
+      : Promise.resolve({ data: [] as never[], error: null }),
   ]);
-  logQueryErrors("Enfant", { teamsRes, teammatesRes, coachesRes, eventsRes });
+  logQueryErrors("Enfant", { teamsRes, teammatesRes, coachesRes, eventsRes, notifRes });
 
   const teams = (teamsRes.data ?? []) as { id: string; name: string | null; category: string | null }[];
   // Catégorie propre à l'équipe de chaque ligne (retour de Cindy du
@@ -194,15 +229,35 @@ export default async function ChildViewPage() {
     isPaid: Array.isArray(e.collectes) ? e.collectes.length > 0 : Boolean(e.collectes),
   }));
 
+  // Notifications déjà remontées dans la vague précédente (notifRes) —
+  // notifIds ici ne sert qu'à lancer la lecture des accusés de lecture
+  // (notification_reads) en même temps que les RSVPs juste en dessous,
+  // plutôt qu'à la queue leu leu comme avant.
+  const notifRows = notifRes.data;
+  const notifIds = (notifRows ?? []).map((n) => n.id);
+
   // RSVPs : nécessaires à la fois pour "qui vient au prochain rendez-vous"
   // (onglet Mon Équipe) et pour le badge d'assiduité de l'enfant (onglet
-  // Défis) — jamais pour les modifier, seulement pour les lire.
+  // Défis) — jamais pour les modifier, seulement pour les lire. Ne dépend
+  // en rien des accusés de lecture des notifications juste à côté : les
+  // deux partent ensemble.
   const eventIds = events.map((e) => e.id);
-  const rsvpRes =
+  const [rsvpRes, readRes] = await Promise.all([
     eventIds.length > 0
-      ? await supabase.from("rsvps").select("event_id, player_id, status").in("event_id", eventIds)
-      : { data: [] as { event_id: string; player_id: string; status: string | null }[], error: null };
-  logQueryErrors("Enfant", { rsvpRes });
+      ? supabase.from("rsvps").select("event_id, player_id, status").in("event_id", eventIds)
+      : Promise.resolve({
+          data: [] as { event_id: string; player_id: string; status: string | null }[],
+          error: null,
+        }),
+    notifIds.length > 0
+      ? supabase
+          .from("notification_reads")
+          .select("notification_id, read_at")
+          .eq("player_id", playerId)
+          .in("notification_id", notifIds)
+      : Promise.resolve({ data: [] as { notification_id: string; read_at: string }[], error: null }),
+  ]);
+  logQueryErrors("Enfant", { rsvpRes, readRes });
   const rsvpRows = rsvpRes.data;
   const rsvpStatusByKey = new Map(
     (rsvpRows ?? []).map((r) => [`${r.event_id}:${r.player_id}`, r.status])
@@ -264,64 +319,26 @@ export default async function ChildViewPage() {
   // migration 20260817000000_notifications.sql), lues ici en service_role
   // et filtrées à la main sur les équipes de l'enfant — pas de fonction
   // SQL notifications_for_me() côté enfant, elle repose sur auth.uid() qui
-  // n'existe pas pour lui.
-  const notificationsEnabled = player.notifications_enabled ?? true;
-  let notifications: {
-    id: string;
-    teamName: string | null;
-    title: string;
-    body: string;
-    createdAt: string;
-    readAt: string | null;
-  }[] = [];
-  if (notificationsEnabled) {
-    const notifQuery = supabase
-      .from("notifications")
-      .select("id, team_id, title, body, created_at, teams(name)")
-      .order("created_at", { ascending: false })
-      .limit(30);
-    // Retour d'audit du 28/08 : team_id.is.null seul traitait à tort une
-    // notification ciblant plusieurs équipes précises (target_team_ids)
-    // comme "tout le club" — tous les enfants la recevaient, y compris
-    // hors cible. Même filtre que côté Famille/Coach (notifications_for_me)
-    // et que la requête events ci-dessus.
-    const notifRes = await notifQuery.or(teamOrClubWideFilter(teamIds));
-    const notifRows = notifRes.data;
-
-    const notifIds = (notifRows ?? []).map((n) => n.id);
-    const readRes =
-      notifIds.length > 0
-        ? await supabase
-            .from("notification_reads")
-            .select("notification_id, read_at")
-            .eq("player_id", playerId)
-            .in("notification_id", notifIds)
-        : { data: [] as { notification_id: string; read_at: string }[], error: null };
-    logQueryErrors("Enfant", { notifRes, readRes });
-    const readRows = readRes.data;
-    const readAtByNotifId = new Map((readRows ?? []).map((r) => [r.notification_id, r.read_at]));
-
-    notifications = (notifRows ?? []).map((n) => ({
-      id: n.id,
-      teamName: (n.teams as unknown as { name: string | null } | null)?.name ?? null,
-      title: n.title,
-      body: n.body,
-      createdAt: n.created_at,
-      readAt: readAtByNotifId.get(n.id) ?? null,
-    }));
-  }
+  // n'existe pas pour lui. Le fetch lui-même (notifRes) est déjà parti
+  // avec teams/teammates/coaches/events, plus haut — il ne reste ici qu'à
+  // recouper avec les accusés de lecture (readRes, parti avec les RSVPs).
+  const readRows = readRes.data;
+  const readAtByNotifId = new Map((readRows ?? []).map((r) => [r.notification_id, r.read_at]));
+  const notifications = (notifRows ?? []).map((n) => ({
+    id: n.id,
+    teamName: (n.teams as unknown as { name: string | null } | null)?.name ?? null,
+    title: n.title,
+    body: n.body,
+    createdAt: n.created_at,
+    readAt: readAtByNotifId.get(n.id) ?? null,
+  }));
 
   // "Mes pénalités" (retour de Cindy du 2026-08-22), lecture seule, comme
   // le reste de cet espace — lues en service_role et filtrées à la main
   // sur playerId, même raison que notifications ci-dessus (pas
   // d'auth.uid() côté enfant, la RLS "select own linked penalites" ne
-  // s'applique pas à cette session).
-  const penaliteRes = await supabase
-    .from("penalites")
-    .select("id, amount, notes, penalite_date, statut, paid_at")
-    .eq("player_id", playerId)
-    .order("penalite_date", { ascending: false });
-  logQueryErrors("Enfant", { penaliteRes });
+  // s'applique pas à cette session). Le fetch (penaliteRes) est déjà parti
+  // avec playerRes/ownTeamLinksRes tout en haut.
   const penaliteRows = penaliteRes.data;
   const penalites = (penaliteRows ?? []).map((p) => ({
     id: p.id,

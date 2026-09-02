@@ -17,6 +17,7 @@ import { formatLocalDateFr } from "@/lib/local-date";
 import { teamLabel } from "@/lib/teams";
 import { notifyCoachesOfNewTeamMember } from "@/lib/member-notifications";
 import { buildAppDeepLink } from "@/lib/whatsapp";
+import { sameCategoryFamily, teamCategoryLabel } from "@/lib/teams";
 import ConfirmDialog from "./confirm-dialog";
 import ParentLinkManager from "./parent-link-manager";
 import type { AdminMember, AdminMemberTeam, MemberDetail } from "./page";
@@ -206,6 +207,89 @@ export default function MemberDetailModal({
     currentTeam && !teams.some((t) => t.id === currentTeam.id)
       ? [...teams, currentTeam]
       : teams;
+
+  // Équipes "en plus" de la principale (prêts additifs, voir team-card.tsx
+  // "Affecter à une autre équipe") — retour de Cindy du 02/09 : ce même
+  // geste doit aussi être possible depuis la fiche Membres, pas seulement
+  // depuis la carte de l'équipe. État local propre (pas juste member.teams,
+  // qui est un prop figé) pour refléter chaque ajout/retrait immédiatement,
+  // même s'il n'est pas rattaché au bouton "Enregistrer" du reste de la
+  // fiche : mêmes mutations directes, immédiates, que team-card.tsx.
+  const [extraTeams, setExtraTeams] = useState<AdminMemberTeam[]>(member.teams.slice(1));
+  const [addingExtraTeam, setAddingExtraTeam] = useState(false);
+  const [extraTeamPickId, setExtraTeamPickId] = useState("");
+  const [extraTeamError, setExtraTeamError] = useState<string | null>(null);
+  const [removingExtraTeamId, setRemovingExtraTeamId] = useState<string | null>(null);
+
+  // Équipes de la même famille (U13M/U13M-1/U13M-2...) où le joueur n'est
+  // pas encore, en excluant la principale ET les prêts déjà en cours —
+  // même logique que sameFamilyTeams/switchableTeams dans team-card.tsx.
+  const assignedTeamIds = new Set(
+    [currentTeam, ...extraTeams].filter((t): t is AdminMemberTeam => Boolean(t)).map((t) => t.id)
+  );
+  const addableExtraTeams = teams.filter(
+    (t) =>
+      !assignedTeamIds.has(t.id) &&
+      sameCategoryFamily(
+        teamCategoryLabel(currentTeam ?? { name: null, category: member.category }),
+        teamCategoryLabel(t)
+      )
+  );
+
+  function openAddExtraTeam() {
+    setAddingExtraTeam(true);
+    setExtraTeamPickId("");
+    setExtraTeamError(null);
+  }
+
+  async function confirmAddExtraTeam() {
+    if (!extraTeamPickId) return;
+    setExtraTeamError(null);
+    const supabase = createClient();
+    const { error: insertError } = await supabase
+      .from("team_players")
+      .insert({ team_id: extraTeamPickId, player_id: member.id });
+    if (insertError) {
+      setExtraTeamError(
+        insertError.code === "23505"
+          ? "Ce membre fait déjà partie de cette équipe."
+          : insertError.message
+      );
+      return;
+    }
+    const addedTeam = addableExtraTeams.find((t) => t.id === extraTeamPickId);
+    const nextExtraTeams = addedTeam ? [...extraTeams, addedTeam] : extraTeams;
+    setExtraTeams(nextExtraTeams);
+    setAddingExtraTeam(false);
+    onSaved?.({ teams: [currentTeam, ...nextExtraTeams].filter((t): t is AdminMemberTeam => Boolean(t)) });
+    if (addedTeam) {
+      notifyCoachesOfNewTeamMember(
+        supabase,
+        addedTeam.id,
+        `${member.firstName ?? ""} ${member.lastName ?? ""} vient d'être affecté(e) à ${teamLabel(addedTeam)}.`
+      );
+    }
+  }
+
+  async function removeExtraTeam(team: AdminMemberTeam) {
+    setRemovingExtraTeamId(team.id);
+    setExtraTeamError(null);
+    const supabase = createClient();
+    const { error: deleteError } = await supabase
+      .from("team_players")
+      .delete()
+      .eq("player_id", member.id)
+      .eq("team_id", team.id);
+    setRemovingExtraTeamId(null);
+    if (deleteError) {
+      setExtraTeamError(`Retrait impossible : ${deleteError.message}`);
+      return;
+    }
+    const nextExtraTeams = extraTeams.filter((t) => t.id !== team.id);
+    setExtraTeams(nextExtraTeams);
+    onSaved?.({ teams: [currentTeam, ...nextExtraTeams].filter((t): t is AdminMemberTeam => Boolean(t)) });
+  }
+
   const [coachTeamIds, setCoachTeamIds] = useState<Set<string>>(
     () => new Set([...initialCoachTeams, ...initialPendingCoachTeams].map((t) => t.id))
   );
@@ -834,7 +918,88 @@ export default function MemberDetailModal({
                     ))}
                   </select>
                 </div>
-              ) : (
+              ) : null}
+
+              {/* Équipes "en plus" de la principale (U13M ET U13M-1, par
+                  exemple) : même geste additif que "Affecter à une autre
+                  équipe" dans l'onglet Équipes (team-card.tsx), mais
+                  accessible directement depuis la fiche — retour de Cindy
+                  du 02/09, cas Raphaël LAMOURET. Uniquement quand la fiche
+                  a déjà une équipe principale : sans elle, "prêter à une
+                  autre équipe" n'a pas de sens. */}
+              {editable && canManageTeamAndRoles && currentTeam && (
+                <div className="flex flex-col gap-1.5 sm:col-span-2">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                    Autre(s) équipe(s) (prêt)
+                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {extraTeams.map((t) => (
+                      <span
+                        key={t.id}
+                        className="inline-flex items-center gap-1 rounded-full bg-navy/10 py-0.5 pl-2.5 pr-1 text-xs font-semibold leading-none text-navy"
+                      >
+                        {teamLabel(t)}
+                        <button
+                          type="button"
+                          onClick={() => removeExtraTeam(t)}
+                          disabled={removingExtraTeamId === t.id}
+                          title={`Retirer de ${teamLabel(t)}`}
+                          className="rounded-full p-0.5 text-navy/60 transition-colors hover:bg-navy/10 hover:text-red-600 disabled:opacity-50"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                    {extraTeams.length === 0 && !addingExtraTeam && (
+                      <span className="text-sm text-zinc-400">Aucune</span>
+                    )}
+                    {addingExtraTeam ? (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <select
+                          value={extraTeamPickId}
+                          onChange={(e) => setExtraTeamPickId(e.target.value)}
+                          className="rounded-lg border border-zinc-200 px-2 py-1 text-xs"
+                        >
+                          <option value="">Choisir une équipe...</option>
+                          {addableExtraTeams.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {teamLabel(t)}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={confirmAddExtraTeam}
+                          disabled={!extraTeamPickId}
+                          className="rounded-full bg-navy px-2.5 py-1 text-xs font-semibold text-white transition-colors hover:bg-navy/90 disabled:opacity-50"
+                        >
+                          Ajouter
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAddingExtraTeam(false)}
+                          className="rounded-full border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                        >
+                          Annuler
+                        </button>
+                      </div>
+                    ) : (
+                      addableExtraTeams.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={openAddExtraTeam}
+                          className="rounded-full border border-dashed border-navy/30 px-2.5 py-1 text-xs font-medium text-navy hover:bg-navy/5"
+                        >
+                          + Ajouter une équipe
+                        </button>
+                      )
+                    )}
+                  </div>
+                  {extraTeamError && <p className="text-xs text-red-600">{extraTeamError}</p>}
+                </div>
+              )}
+
+              {!(editable && canManageTeamAndRoles) && (
                 <ReadOnlyField label="Équipe(s)">
                   <div className="flex flex-wrap gap-1">
                     {member.teams.length === 0 ? (

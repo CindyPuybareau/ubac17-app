@@ -900,6 +900,18 @@ export default async function DashboardPage() {
   // C'est cette chaîne de petites requêtes séquentielles, répétée à chaque
   // clic (voir router.refresh() dans toute l'appli), qui rendait chaque
   // action perceptiblement lente.
+  //
+  // Toute cette "zone prioritaire" (retour de Cindy du 02/09, connexions
+  // Famille/Enfant très lentes) tournait ensuite en bloquant : un
+  // `await` de plus au tout premier niveau de la fonction, AVANT même que
+  // adminPromise/coachPromise/familyPromise ne soient définies plus bas —
+  // donc avant qu'elles ne commencent à s'exécuter, alors qu'elles n'ont
+  // besoin de rien de ce qui suit ici. Comme les quatre autres promesses
+  // différées de cette page, elle démarre maintenant en même temps
+  // qu'elles (voir priorityZonePromise, rejointe au même
+  // "await Promise.all(...)" plus bas) au lieu de les faire toutes
+  // attendre son tour.
+  const priorityZonePromise = (async () => {
   const [
     whatsappGroupsRes,
     convocationCardsRaw,
@@ -1057,6 +1069,18 @@ export default async function DashboardPage() {
     getEventTasksByEventId(supabase, priorityEventIds),
     getCarpoolOffersByEventId(supabase, priorityEventIds),
   ]);
+
+  return {
+    convocationCards,
+    coachCards,
+    ownPlayerNextEvent,
+    whatsappGroups,
+    eventRoleTypes,
+    sponsorDisplay,
+    eventTasksByEventId,
+    carpoolOffersByEventId,
+  };
+  })();
 
   let adminTeams: TeamWithMembers[] = [];
   let allProfilesForAdmin: Person[] = [];
@@ -2417,10 +2441,10 @@ export default async function DashboardPage() {
     // Les rôles (maillots/goûter) de TOUS les événements à venir (requête
     // déjà lancée en parallèle plus haut — voir
     // coachOrganisationTasksExtraPromise/coachVolunteerNeedsPromise).
-    coachOrganisationTasks = {
-      ...eventTasksByEventId,
-      ...(await coachOrganisationTasksExtraPromise),
-    };
+    // eventTasksByEventId (zone prioritaire) n'est fusionné qu'après le
+    // "await Promise.all(...)" plus bas — voir priorityZonePromise — pour
+    // que ce bloc n'ait pas à l'attendre pendant son propre calcul.
+    coachOrganisationTasks = await coachOrganisationTasksExtraPromise;
     // Besoins d'organisation de TOUS les événements de l'équipe, pas
     // seulement ceux à venir — même raison que côté Bureau juste plus haut.
     coachVolunteerNeedsByEventId = await coachVolunteerNeedsPromise;
@@ -3018,19 +3042,42 @@ export default async function DashboardPage() {
       );
     }
 
-    familyOrganisationTasks = {
-      ...eventTasksByEventId,
-      ...extraFamilyTasks,
-    };
+    // eventTasksByEventId (zone prioritaire) n'est fusionné qu'après le
+    // "await Promise.all(...)" plus bas — voir priorityZonePromise — pour
+    // que ce bloc n'ait pas à l'attendre pendant son propre calcul.
+    familyOrganisationTasks = extraFamilyTasks;
   }
   })();
 
   // Les trois blocs Bureau/Coach/Famille ci-dessus tournent en parallèle
   // (voir commentaire au-dessus de adminPromise), rejoints par
-  // clubReportsPromise (retour de Cindy du 2026-09-02) : on attend ici le
-  // plus lent des quatre, juste avant le premier endroit qui lit leurs
+  // clubReportsPromise (retour de Cindy du 2026-09-02) et priorityZonePromise
+  // (retour de Cindy du 2026-09-02, correctif de lenteur) : on attend ici
+  // le plus lent des cinq, juste avant le premier endroit qui lit leurs
   // résultats.
-  await Promise.all([adminPromise, coachPromise, familyPromise, clubReportsPromise]);
+  const [, , , , priorityZone] = await Promise.all([
+    adminPromise,
+    coachPromise,
+    familyPromise,
+    clubReportsPromise,
+    priorityZonePromise,
+  ]);
+  const {
+    coachCards,
+    ownPlayerNextEvent,
+    whatsappGroups,
+    eventRoleTypes,
+    sponsorDisplay,
+    eventTasksByEventId,
+    carpoolOffersByEventId,
+  } = priorityZone;
+  // Fusionnés seulement maintenant (voir les commentaires dans
+  // coachPromise/familyPromise plus haut) : les deux blocs avaient déjà
+  // fini de construire leur propre "extra" avant que priorityZonePromise
+  // soit forcément résolue, donc pas besoin d'un await de plus à
+  // l'intérieur d'eux — juste ce merge une fois tout le monde revenu.
+  coachOrganisationTasks = { ...eventTasksByEventId, ...coachOrganisationTasks };
+  familyOrganisationTasks = { ...eventTasksByEventId, ...familyOrganisationTasks };
 
   const adminBirthdayMembers: BirthdaySource[] = isAdmin
     ? adminMembers
