@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { chunkedQuery, runBatched } from "@/lib/batch";
+import { chunkedQuery, runBatched, Semaphore } from "@/lib/batch";
 import { logQueryErrors } from "@/lib/query-errors";
 import { formatFirstName, formatPersonName } from "@/lib/names";
 import { EMAIL_REPLY_TO } from "@/lib/email";
@@ -653,7 +653,8 @@ function buildPresentPlayers(
 
 async function fetchRsvpsByEvent(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  eventIds: string[]
+  eventIds: string[],
+  dbLimit: Semaphore
 ) {
   if (eventIds.length === 0) return new Map<string, Map<string, string | null>>();
 
@@ -665,14 +666,17 @@ async function fetchRsvpsByEvent(
   // de Cindy du 02/09 : Postgres a fini par annuler ces requêtes lui-même
   // ("statement timeout"), avec une vraie page d'erreur ("Internal Server
   // Error") à la clé, puis un deuxième incident le même jour ("mes membres
-  // ont disparu") causé cette fois par les tranches elles-mêmes, parties
-  // toutes en même temps via Promise.all — voir chunkedQuery (lib/batch.ts)
-  // pour le détail : plafonnées maintenant, comme le reste des requêtes de
-  // cette page.
+  // ont disparu") causé par les tranches elles-mêmes, parties toutes en
+  // même temps via Promise.all — puis un TROISIÈME incident (retour du
+  // 03/09, vrai chargement Coach cette fois) causé par des plafonds locaux
+  // (un par bloc) qui s'additionnaient au lieu de partager une seule
+  // limite. dbLimit (voir sa création dans DashboardPage) est maintenant
+  // LE plafond unique de toute la page, partagé jusqu'ici.
   const { data: rsvpRows, errors } = await chunkedQuery(
     eventIds,
     75,
-    (chunk) => supabase.from("rsvps").select("event_id, player_id, status").in("event_id", chunk)
+    (chunk) => supabase.from("rsvps").select("event_id, player_id, status").in("event_id", chunk),
+    dbLimit
   );
   errors.forEach((error) => console.error("[fetchRsvpsByEvent] select rsvps failed (tranche):", error));
   return buildRsvpStatusByEvent(rsvpRows);
@@ -680,6 +684,16 @@ async function fetchRsvpsByEvent(
 
 export default async function DashboardPage() {
   const supabase = await createClient();
+  // Retour de Cindy du 03/09 (troisième incident en moins de 24h, cette
+  // fois sur un vrai chargement Coach) : UN seul plafond de requêtes
+  // simultanées, partagé par TOUTE cette page — Bureau, Coach, Famille,
+  // zone prioritaire, comptes rendus, requêtes en tranches — au lieu d'un
+  // plafond par bloc qui s'additionnait aux autres (voir Semaphore,
+  // lib/batch.ts, pour le détail). 10 plutôt que 15 : garde un peu de
+  // marge sous le plafond réel de Supabase pour qu'une deuxième personne
+  // connectée en même temps ne se retrouve pas à zéro connexion
+  // disponible.
+  const dbLimit = new Semaphore(10);
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -1060,8 +1074,8 @@ export default async function DashboardPage() {
   // faire l'appel getTeamRoster correspondant à chaque chargement du
   // tableau de bord.
   const [eventTasksByEventId, carpoolOffersByEventId] = await Promise.all([
-    getEventTasksByEventId(supabase, priorityEventIds),
-    getCarpoolOffersByEventId(supabase, priorityEventIds),
+    getEventTasksByEventId(supabase, priorityEventIds, dbLimit),
+    getCarpoolOffersByEventId(supabase, priorityEventIds, dbLimit),
   ]);
 
   return {
@@ -1242,12 +1256,12 @@ export default async function DashboardPage() {
             .order("last_name"),
         () => supabase.from("event_benevole_invites").select("event_id, benevole_id"),
       ],
-      // Plafond de requêtes simultanées pour ce bloc (voir lib/batch.ts) :
-      // le projet Supabase n'autorise que 15 connexions réelles au total,
-      // partagées avec les blocs Coach/Famille lancés en parallèle (voir
-      // adminPromise/coachPromise/familyPromise plus bas) et les autres
-      // utilisateurs connectés en même temps.
-      5
+      // dbLimit (voir sa définition plus haut) : UN seul plafond partagé
+      // avec tous les autres blocs de cette page (Coach, Famille, les
+      // requêtes en tranches...) — retour de Cindy du 03/09, incident
+      // causé par des plafonds séparés qui s'additionnaient au lieu de
+      // partager une seule limite.
+      dbLimit
     );
 
     logQueryErrors("Bureau", {
@@ -1372,8 +1386,8 @@ export default async function DashboardPage() {
             data: [] as { player_id: string; status: string; event_id: string }[],
             error: null,
           });
-    const rsvpsByEventPromise = fetchRsvpsByEvent(supabase, upcomingEventIds);
-    const adminVolunteerNeedsPromise = getVolunteerNeedsByEventId(supabase, upcomingEventIds);
+    const rsvpsByEventPromise = fetchRsvpsByEvent(supabase, upcomingEventIds, dbLimit);
+    const adminVolunteerNeedsPromise = getVolunteerNeedsByEventId(supabase, upcomingEventIds, dbLimit);
     const adminNextEventRsvpRes = await adminNextEventRsvpPromise;
     logQueryErrors("Bureau (prochain événement)", { adminNextEventRsvpRes });
     const adminNextEventRsvpRows = adminNextEventRsvpRes.data;
@@ -1917,8 +1931,8 @@ export default async function DashboardPage() {
             .not("sort_order", "is", null)
             .order("sort_order"),
       ],
-      // Voir lib/batch.ts / le bloc Bureau plus haut pour le contexte.
-      5
+      // dbLimit partagé (voir lib/batch.ts / le bloc Bureau plus haut).
+      dbLimit
     );
 
     logQueryErrors("Coach", {
@@ -2039,7 +2053,7 @@ export default async function DashboardPage() {
       playerIds.length > 0
         ? supabase.from("team_players").select("team_id, player_id").in("player_id", playerIds)
         : Promise.resolve({ data: [] as { team_id: string; player_id: string }[], error: null });
-    const rsvpsByEventPromise = fetchRsvpsByEvent(supabase, coachEventIds);
+    const rsvpsByEventPromise = fetchRsvpsByEvent(supabase, coachEventIds, dbLimit);
     const coachRsvpRowsPromise =
       coachEventIds.length > 0
         ? supabase
@@ -2069,11 +2083,12 @@ export default async function DashboardPage() {
     // date par date.
     const coachOrganisationTasksExtraPromise = getEventTasksByEventId(
       supabase,
-      upcomingCoachEventIds
+      upcomingCoachEventIds,
+      dbLimit
     );
     // Besoins d'organisation de TOUS les événements de l'équipe, pas
     // seulement ceux à venir — même raison que côté Bureau juste plus haut.
-    const coachVolunteerNeedsPromise = getVolunteerNeedsByEventId(supabase, coachEventIds);
+    const coachVolunteerNeedsPromise = getVolunteerNeedsByEventId(supabase, coachEventIds, dbLimit);
 
     const [playersRes, coachProfilesRes, parentPlayerRes, coachFichesRes] =
       await runBatched(
@@ -2108,8 +2123,8 @@ export default async function DashboardPage() {
               ? supabase.from("players").select(playerColumns).in("profile_id", coachIds)
               : Promise.resolve({ data: [] as Person[], error: null }),
         ],
-        // Voir lib/batch.ts / le bloc Bureau plus haut pour le contexte.
-        4
+        // dbLimit partagé (voir lib/batch.ts / le bloc Bureau plus haut).
+        dbLimit
       );
 
     logQueryErrors("Coach (fiches)", {
@@ -2709,8 +2724,8 @@ export default async function DashboardPage() {
                 };
               },
             ],
-            // Voir lib/batch.ts / le bloc Bureau plus haut pour le contexte.
-            4
+            // dbLimit partagé (voir lib/batch.ts / le bloc Bureau plus haut).
+            dbLimit
           )
         : null,
       supabase
@@ -2974,11 +2989,11 @@ export default async function DashboardPage() {
                   .in("cotisation_id", familyCotisationIds)
                   .order("paid_at", { ascending: false })
               : Promise.resolve(null),
-          () => getEventTasksByEventId(supabase, upcomingFamilyEventIds),
-          () => getVolunteerNeedsByEventId(supabase, eventIds),
+          () => getEventTasksByEventId(supabase, upcomingFamilyEventIds, dbLimit),
+          () => getVolunteerNeedsByEventId(supabase, eventIds, dbLimit),
         ],
-        // Voir lib/batch.ts / le bloc Bureau plus haut pour le contexte.
-        4
+        // dbLimit partagé (voir lib/batch.ts / le bloc Bureau plus haut).
+        dbLimit
       );
     logQueryErrors("Famille (rsvps/paiements)", { rsvpRowsRes, familyPaymentRes });
     familyVolunteerNeedsByEventId = familyVolunteerNeedsData;

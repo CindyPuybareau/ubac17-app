@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { unstable_cache } from "next/cache";
-import { chunkedQuery } from "@/lib/batch";
+import { chunkedQuery, type Semaphore } from "@/lib/batch";
 import { formatPersonName } from "@/lib/names";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -122,7 +122,8 @@ export function rolesForEventType(
 
 export async function getEventTasksByEventId(
   supabase: SupabaseClient,
-  eventIds: string[]
+  eventIds: string[],
+  dbLimit?: Semaphore
 ): Promise<Record<string, EventTasksState>> {
   const result: Record<string, EventTasksState> = {};
   if (eventIds.length === 0) return result;
@@ -134,10 +135,17 @@ export async function getEventTasksByEventId(
   // plus : retour de Cindy du 02/09, Postgres a fini par annuler ce scan
   // complet lui-même ("statement timeout"), avec une vraie "Internal
   // Server Error" à la clé — puis un deuxième incident le même jour causé
-  // cette fois par les tranches elles-mêmes, parties toutes en même temps
-  // (voir chunkedQuery, lib/batch.ts) : plafonnées maintenant.
-  const { data, errors } = await chunkedQuery(eventIds, 75, (chunk) =>
-    supabase.from("event_tasks").select("event_id, task_type, player_id, source").in("event_id", chunk)
+  // par les tranches elles-mêmes, parties toutes en même temps, puis un
+  // TROISIÈME (retour du 03/09) causé par des plafonds locaux qui
+  // s'additionnaient entre blocs. dbLimit, quand fourni par l'appelant
+  // (page.tsx), est le plafond unique partagé par toute la page — repli
+  // sur 4 (comportement d'avant) si jamais rien n'est passé.
+  const { data, errors } = await chunkedQuery(
+    eventIds,
+    75,
+    (chunk) =>
+      supabase.from("event_tasks").select("event_id, task_type, player_id, source").in("event_id", chunk),
+    dbLimit ?? 4
   );
   errors.forEach((error) =>
     console.error("[getEventTasksByEventId] select event_tasks failed (tranche):", error)
@@ -183,21 +191,27 @@ export async function getEventTasksByEventId(
 
 export async function getCarpoolOffersByEventId(
   supabase: SupabaseClient,
-  eventIds: string[]
+  eventIds: string[],
+  dbLimit?: Semaphore
 ): Promise<Record<string, CarpoolOffer[]>> {
   const result: Record<string, CarpoolOffer[]> = {};
   if (eventIds.length === 0) return result;
 
   // Même correctif que getEventTasksByEventId ci-dessus (voir son
   // commentaire) : chunkedQuery() garde un vrai .in() plutôt que de
-  // scanner toute la table, tranches plafonnées plutôt que toutes en même
+  // scanner toute la table, tranches plafonnées via dbLimit (le plafond
+  // partagé de toute la page, quand fourni) plutôt que toutes en même
   // temps.
-  const { data: offerRows, errors } = await chunkedQuery(eventIds, 75, (chunk) =>
-    supabase
-      .from("event_carpool_offers")
-      .select("id, event_id, player_id, seats, departure_time, meeting_point")
-      .in("event_id", chunk)
-      .gt("seats", 0)
+  const { data: offerRows, errors } = await chunkedQuery(
+    eventIds,
+    75,
+    (chunk) =>
+      supabase
+        .from("event_carpool_offers")
+        .select("id, event_id, player_id, seats, departure_time, meeting_point")
+        .in("event_id", chunk)
+        .gt("seats", 0),
+    dbLimit ?? 4
   );
   errors.forEach((error) =>
     console.error("[getCarpoolOffersByEventId] select event_carpool_offers failed (tranche):", error)

@@ -48,6 +48,54 @@ export function chunkIds(ids: string[], size = 150): string[][] {
   return chunks;
 }
 
+// Retour de Cindy du 03/09 (deuxième incident en moins de 24h, cette fois
+// sur un vrai chargement Coach) : chaque bloc de la page (Bureau, Coach,
+// Famille, les requêtes en tranches...) plafonnait déjà SES PROPRES
+// requêtes (via runBatched, limite locale de 4 ou 5) — mais comme ces
+// blocs tournent tous en parallèle (retour de Cindy du 22/08), leurs
+// plafonds s'additionnent : 5 (Bureau) + 5 (Coach) + 4 (Famille) + 4
+// (une seule fonction en tranches) peut déjà dépasser les 15 connexions
+// autorisées par l'offre Supabase, même pour un seul utilisateur, sans
+// qu'aucun bloc pris isolément n'ait rien fait de mal.
+//
+// Semaphore résout ça : au lieu d'une limite par bloc, UNE seule instance
+// partagée par toute la page (créée une fois en haut de DashboardPage,
+// voir page.tsx), à laquelle chaque bloc demande la permission avant
+// d'envoyer une requête. Le total de requêtes réellement en vol AU MÊME
+// INSTANT, tous blocs confondus, ne dépasse alors jamais la limite
+// choisie — plus question que les plafonds locaux s'additionnent.
+export class Semaphore {
+  private available: number;
+  private readonly queue: (() => void)[] = [];
+
+  constructor(limit: number) {
+    this.available = Math.max(1, limit);
+  }
+
+  // Rend une "release" à appeler une fois la requête terminée (succès ou
+  // échec) — toujours via un bloc finally chez l'appelant (voir
+  // runBatched ci-dessous), pour ne jamais garder un jeton bloqué si la
+  // requête plante.
+  acquire(): Promise<() => void> {
+    if (this.available > 0) {
+      this.available--;
+      return Promise.resolve(() => this.release());
+    }
+    return new Promise<() => void>((resolve) => {
+      this.queue.push(() => {
+        this.available--;
+        resolve(() => this.release());
+      });
+    });
+  }
+
+  private release() {
+    this.available++;
+    const next = this.queue.shift();
+    if (next) next();
+  }
+}
+
 // Exécute une requête .in(colonne, ids) découpée en tranches (chunkIds
 // ci-dessus), tranches parties en parallèle mais PLAFONNÉES (comme
 // runBatched) plutôt que toutes d'un coup — retour de Cindy du 02/09
@@ -62,12 +110,14 @@ export function chunkIds(ids: string[], size = 150): string[][] {
 // Fusionne aussi les résultats et les erreurs de chaque tranche, pour ne
 // pas répéter cette boucle aux 4 mêmes endroits (fetchRsvpsByEvent,
 // getVolunteerNeedsByEventId, getEventTasksByEventId,
-// getCarpoolOffersByEventId).
+// getCarpoolOffersByEventId). `concurrency` accepte maintenant aussi un
+// Semaphore partagé (retour du 03/09) — un nombre simple reste accepté
+// pour ne rien casser là où ce partage global n'a pas encore été branché.
 export async function chunkedQuery<T>(
   ids: string[],
   size: number,
   run: (chunk: string[]) => PromiseLike<{ data: T[] | null; error: unknown }>,
-  concurrency = 4
+  concurrency: number | Semaphore = 4
 ): Promise<{ data: T[]; errors: unknown[] }> {
   const chunks = chunkIds(ids, size);
   const results = await runBatched(
@@ -86,21 +136,29 @@ export async function chunkedQuery<T>(
   return { data, errors };
 }
 
+// `limit` accepte un nombre simple (plafond local, propre à cet appel —
+// comportement historique, inchangé) ou un Semaphore partagé (retour de
+// Cindy du 03/09 : plafond commun à TOUTE la page, voir son commentaire
+// plus haut). Ré-écrit avec un Semaphore dans les deux cas plutôt que le
+// bassin de "workers" d'avant : chaque tâche demande elle-même son jeton
+// avant de s'exécuter, ce qui donne exactement le même résultat (jamais
+// plus de `limit` requêtes en vol, la suivante démarre dès qu'une place
+// se libère) tout en acceptant un Semaphore déjà en cours d'utilisation
+// ailleurs.
 export async function runBatched<T extends readonly unknown[]>(
   tasks: { [K in keyof T]: () => T[K] | PromiseLike<T[K]> },
-  limit: number
+  limit: number | Semaphore
 ): Promise<{ [K in keyof T]: Awaited<T[K]> }> {
-  const results: unknown[] = new Array(tasks.length);
-  let nextIndex = 0;
-
-  async function worker() {
-    while (nextIndex < tasks.length) {
-      const current = nextIndex++;
-      results[current] = await tasks[current]();
-    }
-  }
-
-  const workerCount = Math.max(1, Math.min(limit, tasks.length));
-  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  const semaphore = limit instanceof Semaphore ? limit : new Semaphore(limit);
+  const results = await Promise.all(
+    tasks.map(async (task) => {
+      const release = await semaphore.acquire();
+      try {
+        return await task();
+      } finally {
+        release();
+      }
+    })
+  );
   return results as { [K in keyof T]: Awaited<T[K]> };
 }

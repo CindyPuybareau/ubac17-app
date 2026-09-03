@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { chunkedQuery } from "@/lib/batch";
+import { chunkedQuery, type Semaphore } from "@/lib/batch";
 import { formatPersonName } from "@/lib/names";
 import type { RoleIconName } from "./role-icon";
 
@@ -68,7 +68,8 @@ export type VolunteerNeed = {
 
 export async function getVolunteerNeedsByEventId(
   supabase: SupabaseClient,
-  eventIds: string[]
+  eventIds: string[],
+  dbLimit?: Semaphore
 ): Promise<Record<string, VolunteerNeed[]>> {
   const result: Record<string, VolunteerNeed[]> = {};
   if (eventIds.length === 0) return result;
@@ -81,18 +82,24 @@ export async function getVolunteerNeedsByEventId(
   // de Cindy du 02/09, Postgres a fini par annuler ce genre de scan
   // complet lui-même ailleurs dans l'appli ("statement timeout", vraie
   // "Internal Server Error") — puis un deuxième incident le même jour
-  // causé cette fois par les tranches elles-mêmes, parties toutes en même
-  // temps (voir chunkedQuery, lib/batch.ts) : plafonnées maintenant.
+  // causé par les tranches elles-mêmes, parties toutes en même temps, puis
+  // un TROISIÈME (retour du 03/09) causé par des plafonds locaux qui
+  // s'additionnaient entre blocs. dbLimit, quand fourni par l'appelant
+  // (page.tsx), est le plafond unique partagé par toute la page.
   // Chaque tranche porte son propre tri par sort_order, donc l'ordre des
   // besoins d'un même événement (toujours dans la même tranche, puisqu'on
   // découpe sur les ids d'événement) reste correct une fois les tranches
   // mises bout à bout.
-  const { data: needRows, errors } = await chunkedQuery(eventIds, 75, (chunk) =>
-    supabase
-      .from("event_volunteer_needs")
-      .select("id, event_id, role_code, custom_label, required_count, sort_order")
-      .in("event_id", chunk)
-      .order("sort_order", { ascending: true })
+  const { data: needRows, errors } = await chunkedQuery(
+    eventIds,
+    75,
+    (chunk) =>
+      supabase
+        .from("event_volunteer_needs")
+        .select("id, event_id, role_code, custom_label, required_count, sort_order")
+        .in("event_id", chunk)
+        .order("sort_order", { ascending: true }),
+    dbLimit ?? 4
   );
   errors.forEach((error) =>
     console.error(
