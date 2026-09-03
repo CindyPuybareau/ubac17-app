@@ -1,0 +1,24 @@
+-- Retour de Cindy du 03/09 (troisième round du soir) : même après les index
+-- event_id (20261031090000), des "canceling statement due to statement
+-- timeout" (57014) réapparaissent par pics ponctuels sur des requêtes par
+-- ailleurs rapides (event_tasks : 67ms en moyenne, 1286 appels, mais un pic
+-- à 5.4s dans pg_stat_statements) -- confirmé via le Query ID du log Postgres
+-- recoupé avec pg_stat_statements : ce n'est PAS un index manquant (vérifié,
+-- event_tasks_event_id_idx existe bien), mais une contention passagère (offre
+-- Nano, ressources partagées, ou verrou bref pendant une écriture concurrente
+-- sur la même table).
+--
+-- Le vrai dégât n'est pas le pic lui-même (inévitable sans changer d'offre,
+-- refusé par Cindy pour l'instant -- voir 20260830 hosting capacity) mais sa
+-- conséquence : dès qu'UNE requête dépasse le délai, elle est annulée et
+-- entraîne en cascade toutes les autres requêtes de la même connexion
+-- (25P02 "current transaction is aborted") -- d'où des membres/équipes qui
+-- disparaissent alors que rien ne les concernait directement.
+--
+-- 8s -> 15s ne rend rien plus rapide, mais donne assez de marge pour absorber
+-- un pic ponctuel sans faire tomber toute la page avec lui. `authenticated`
+-- est le rôle réellement utilisé une fois connecté (dashboard) ; `authenticator`
+-- est le rôle de connexion initial de PostgREST avant le SET ROLE, remonté en
+-- miroir par cohérence.
+alter role authenticated set statement_timeout = '15s';
+alter role authenticator set statement_timeout = '15s';
