@@ -689,11 +689,19 @@ export default async function DashboardPage() {
   // simultanées, partagé par TOUTE cette page — Bureau, Coach, Famille,
   // zone prioritaire, comptes rendus, requêtes en tranches — au lieu d'un
   // plafond par bloc qui s'additionnait aux autres (voir Semaphore,
-  // lib/batch.ts, pour le détail). 10 plutôt que 15 : garde un peu de
+  // lib/batch.ts, pour le détail). 13 plutôt que 15 : garde un peu de
   // marge sous le plafond réel de Supabase pour qu'une deuxième personne
   // connectée en même temps ne se retrouve pas à zéro connexion
-  // disponible.
-  const dbLimit = new Semaphore(10);
+  // disponible. Relevé de 10 à 13 le 03/09 après coup : la vraie cause de
+  // la lenteur/des plantages était l'absence d'index sur event_id
+  // (rsvps/event_tasks/event_volunteer_needs/event_carpool_offers, voir
+  // 20261031090000_event_scoped_indexes.sql) — chaque requête, même
+  // seule, scannait la table entière. Une fois les index posés, chaque
+  // requête redevient rapide, donc un plafond plus proche des 15
+  // connexions réelles n'a plus la même raison d'être aussi prudent
+  // qu'avant, et redonne du parallélisme (donc de la vitesse) là où 10
+  // était plus prudent que nécessaire.
+  const dbLimit = new Semaphore(13);
   const {
     data: { user },
   } = await supabase.auth.getUser();
