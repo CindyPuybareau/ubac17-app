@@ -689,19 +689,26 @@ export default async function DashboardPage() {
   // simultanées, partagé par TOUTE cette page — Bureau, Coach, Famille,
   // zone prioritaire, comptes rendus, requêtes en tranches — au lieu d'un
   // plafond par bloc qui s'additionnait aux autres (voir Semaphore,
-  // lib/batch.ts, pour le détail). 13 plutôt que 15 : garde un peu de
-  // marge sous le plafond réel de Supabase pour qu'une deuxième personne
-  // connectée en même temps ne se retrouve pas à zéro connexion
-  // disponible. Relevé de 10 à 13 le 03/09 après coup : la vraie cause de
-  // la lenteur/des plantages était l'absence d'index sur event_id
-  // (rsvps/event_tasks/event_volunteer_needs/event_carpool_offers, voir
-  // 20261031090000_event_scoped_indexes.sql) — chaque requête, même
-  // seule, scannait la table entière. Une fois les index posés, chaque
-  // requête redevient rapide, donc un plafond plus proche des 15
-  // connexions réelles n'a plus la même raison d'être aussi prudent
-  // qu'avant, et redonne du parallélisme (donc de la vitesse) là où 10
-  // était plus prudent que nécessaire.
-  const dbLimit = new Semaphore(13);
+  // lib/batch.ts, pour le détail).
+  //
+  // Historique du 03/09 (même soirée, deux ajustements successifs) :
+  // 1) Remonté de 10 à 13 après avoir posé les index event_id
+  //    (20261031090000) et team_players.player_id/team_coaches.coach_id
+  //    (20261031110000) : les requêtes seules étaient redevenues rapides,
+  //    donc un plafond plus proche des 15 connexions réelles de Supabase
+  //    semblait pouvoir redonner du parallélisme sans risque.
+  // 2) Redescendu à 6 juste après : preuve par pg_stat_activity, prise
+  //    PENDANT un vrai ralentissement, que ce n'est pas le nombre de
+  //    connexions qui limite (22 vues, largement sous le plafond) mais la
+  //    puissance de calcul réelle de l'offre Nano — 6 à 9 requêtes
+  //    event_tasks/event_volunteer_needs tournaient EN MÊME TEMPS, toutes
+  //    aussi lentes les unes que les autres (jusqu'à 15s chacune, plutôt
+  //    que quelques-unes rapides et le reste en attente). Autoriser plus
+  //    de requêtes de front ne les fait pas aller plus vite quand c'est le
+  //    calcul qui manque : ça les fait toutes ramer ensemble. Moins de
+  //    requêtes en vol à la fois, mais chacune qui a vraiment la place de
+  //    finir vite, plutôt que beaucoup qui se traînent ensemble.
+  const dbLimit = new Semaphore(6);
   const {
     data: { user },
   } = await supabase.auth.getUser();
