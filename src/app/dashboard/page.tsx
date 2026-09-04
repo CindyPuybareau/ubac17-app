@@ -672,9 +672,17 @@ async function fetchRsvpsByEvent(
   // (un par bloc) qui s'additionnaient au lieu de partager une seule
   // limite. dbLimit (voir sa création dans DashboardPage) est maintenant
   // LE plafond unique de toute la page, partagé jusqu'ici.
+  // Retour de Cindy du 04/09 : ~94 requêtes Supabase distinctes par
+  // chargement de tableau de bord (confirmé via l'onglet Observability de
+  // Vercel, "External APIs") -- chacune rapide isolément (index/RLS/ANALYZE
+  // déjà corrigés), mais leur simple NOMBRE, additionné, explique le temps
+  // de chargement encore élevé. 150 (plutôt que 75) : divise par ~2 le
+  // nombre de tranches nécessaires pour le même nombre d'événements, sans
+  // rien restructurer -- valeur déjà utilisée par le passé sur ce projet,
+  // jamais en cause pour une taille d'URL excessive.
   const { data: rsvpRows, errors } = await chunkedQuery(
     eventIds,
-    75,
+    150,
     (chunk) => supabase.from("rsvps").select("event_id, player_id, status").in("event_id", chunk),
     dbLimit
   );

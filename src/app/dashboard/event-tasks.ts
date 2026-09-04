@@ -140,9 +140,12 @@ export async function getEventTasksByEventId(
   // s'additionnaient entre blocs. dbLimit, quand fourni par l'appelant
   // (page.tsx), est le plafond unique partagé par toute la page — repli
   // sur 4 (comportement d'avant) si jamais rien n'est passé.
+  // 150 plutôt que 75 (retour de Cindy du 04/09, ~94 requêtes distinctes
+  // par chargement) : moins de tranches pour le même nombre d'événements,
+  // valeur déjà utilisée par le passé sans souci de taille d'URL.
   const { data, errors } = await chunkedQuery(
     eventIds,
-    75,
+    150,
     (chunk) =>
       supabase.from("event_tasks").select("event_id, task_type, player_id, source").in("event_id", chunk),
     dbLimit ?? 4
@@ -204,7 +207,7 @@ export async function getCarpoolOffersByEventId(
   // temps.
   const { data: offerRows, errors } = await chunkedQuery(
     eventIds,
-    75,
+    150,
     (chunk) =>
       supabase
         .from("event_carpool_offers")

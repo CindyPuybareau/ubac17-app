@@ -92,7 +92,7 @@ export async function getVolunteerNeedsByEventId(
   // mises bout à bout.
   const { data: needRows, errors } = await chunkedQuery(
     eventIds,
-    75,
+    150,
     (chunk) =>
       supabase
         .from("event_volunteer_needs")
