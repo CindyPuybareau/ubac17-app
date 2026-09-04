@@ -722,11 +722,13 @@ export default async function DashboardPage() {
   //    la contention de calcul qui avait justifié la baisse à 6 est moins
   //    probable pour le même volume de travail réel. Confirmé par un test
   //    réseau réel juste après déploiement : "Content Download" 21s -> 12,3s.
-  // 4) Remonté à 11 juste après, même soirée : la tendance (6->9 a nettement
-  //    aidé) laisse penser qu'il reste de la marge avant de retrouver la
-  //    contention observée à 13 avec les tranches de 75. Un cran à la fois,
-  //    revérifié par le même test réseau avant d'aller plus loin.
-  const dbLimit = new Semaphore(11);
+  // 4) Testé à 11 juste après, même soirée : régression nette, "Content
+  //    Download" repassé à plus d'1 minute (contre 12,3s à 9) — la marge
+  //    espérée n'existait pas, la limite réelle est entre 9 et 11.
+  //    Redescendu à 9 aussitôt, confirmé comme le meilleur réglage mesuré
+  //    ce soir (tranches à 150 comprises). Ne pas remonter au-delà sans
+  //    revalider par le même test réseau avant/après.
+  const dbLimit = new Semaphore(9);
   // Retour de Cindy du 03/09 (dernier round de la soirée, "content download"
   // à 30s malgré des requêtes individuelles redevenues rapides) : les 3
   // requêtes "events" de cette page (Bureau/Coach/Famille) n'avaient AUCUN
