@@ -1,0 +1,33 @@
+-- Retour de Cindy du 03/09 (quatrième round du soir) : capture pg_stat_activity
+-- pendant un ralentissement réel a montré plusieurs requêtes rsvps/event_tasks/
+-- event_volunteer_needs actives depuis 6 à 9 secondes CHACUNE, en parallèle,
+-- alors que les index event_id (20261031090000) sont bien en place et
+-- utilisés. La lenteur n'était donc plus "trouver la ligne" mais "vérifier le
+-- droit de la voir" (RLS), refait pour chaque ligne.
+--
+-- En lisant le contenu réel des fonctions RLS (pg_get_functiondef) : deux
+-- d'entre elles, appelées ligne par ligne par la policy "select teammates
+-- rsvps" sur rsvps (is_teammate_of_my_child, player_on_own_team), filtrent
+-- team_players par player_id SEUL :
+--   select 1 from team_players tp where tp.player_id = ...
+--
+-- team_players n'a qu'une seule clé, composée (team_id, player_id) --
+-- team_players_pkey. Un index composé ne sert que si on filtre au moins sur
+-- sa PREMIÈRE colonne (team_id) -- filtrer sur player_id seul, comme ici, ne
+-- peut pas s'en servir : chaque appel force Postgres à fouiller la table
+-- sans raccourci, alors qu'il est fait une fois par ligne de rsvps examinée.
+--
+-- Effet attendu : ce lookup (répété à chaque ligne de rsvps, event_tasks,
+-- event_volunteer_needs consultée par un Coach/Famille) redevient un accès
+-- direct par index au lieu d'un parcours de table.
+--
+-- team_coaches (même composition de clé, team_id + coach_id) reçoit le même
+-- traitement en miroir : is_any_coach()/is_coach_anywhere() le filtrent par
+-- coach_id seul. Table plus petite aujourd'hui (un rôle par coach et par
+-- équipe), donc moins urgent, mais ajouté par cohérence pour ne plus dépendre
+-- de sa taille actuelle.
+--
+-- "if not exists" : sans risque même si l'un d'eux existe déjà sous un autre
+-- nom -- juste un index de plus, aucune donnée touchée, aucun accès changé.
+create index if not exists team_players_player_id_idx on public.team_players (player_id);
+create index if not exists team_coaches_coach_id_idx on public.team_coaches (coach_id);
