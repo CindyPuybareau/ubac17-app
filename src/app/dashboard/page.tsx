@@ -744,7 +744,11 @@ export default async function DashboardPage() {
   // ancien n'est plus chargé par défaut ici (à réintroduire plus tard via
   // un onglet "historique" séparé si besoin, pas au chargement du tableau
   // de bord).
+  // Composant serveur (pas un hook), exécuté une fois par requête réelle :
+  // lire l'heure courante ici est le comportement voulu, pas un effet de
+  // bord à masquer.
   const eventsWindowStart = new Date(
+    // eslint-disable-next-line react-hooks/purity -- voir commentaire au-dessus
     Date.now() - 183 * 24 * 60 * 60 * 1000
   ).toISOString();
   const {
@@ -1191,6 +1195,27 @@ export default async function DashboardPage() {
   // IIFE async assignée à une promesse, les trois promesses étant
   // attendues ensemble juste avant le premier endroit qui a besoin de
   // leur résultat (voir "await Promise.all([adminPromise..." plus bas).
+  // Retour de Cindy du 04/09 : un compte qui cumule Bureau + Coach (ou +
+  // Famille) déclenchait deux fois la même lecture de teams/team_players/
+  // team_coaches/team_pending_coaches -- le Bureau charge déjà TOUT
+  // (aucun filtre), donc c'est forcément un sur-ensemble de ce dont
+  // coachPromise/familyPromise ont besoin. Exposées ici (brutes, avant
+  // toute mise en forme) pour que ces deux blocs puissent, seulement
+  // quand isAdmin est vrai, filtrer ces données déjà en mémoire au lieu
+  // de les redemander à la base -- aucun changement pour un compte à un
+  // seul espace (ces variables restent vides, jamais lues).
+  let adminTeamsRaw: {
+    id: string;
+    name: string | null;
+    category: string | null;
+    ffbb_url: string | null;
+    sort_order: number | null;
+    pending_coach_names: string | null;
+  }[] = [];
+  let adminTeamPlayersRaw: { team_id: string; player_id: string; position: string | null }[] = [];
+  let adminTeamCoachesRaw: { team_id: string; coach_id: string }[] = [];
+  let adminTeamPendingCoachesRaw: { team_id: string; player_id: string }[] = [];
+
   const adminPromise = (async () => {
   if (isAdmin) {
     const [
@@ -1317,6 +1342,13 @@ export default async function DashboardPage() {
       // partager une seule limite.
       dbLimit
     );
+
+    // Exposées pour coachPromise/familyPromise (voir leur commentaire) --
+    // avant tout filtrage/mise en forme, telles que reçues de la base.
+    adminTeamsRaw = teamsRes.data ?? [];
+    adminTeamPlayersRaw = teamPlayersRes.data ?? [];
+    adminTeamCoachesRaw = teamCoachesRes.data ?? [];
+    adminTeamPendingCoachesRaw = teamPendingCoachesRes.data ?? [];
 
     logQueryErrors("Bureau", {
       teamsRes,
@@ -1922,6 +1954,21 @@ export default async function DashboardPage() {
     );
     const ownOnlyTeamIds = ownTeamIds.filter((id) => !coachedTeamIds.includes(id));
 
+    // Retour de Cindy du 04/09 ("pourquoi ça bug quand on a plusieurs
+    // espaces") : un compte Bureau + Coach (comme Basile après son ajout au
+    // Bureau) redemandait team_players/team_coaches/team_pending_coaches/
+    // teams à la base ICI, alors que le bloc Bureau (adminPromise) vient de
+    // charger exactement ça, sans filtre -- un sur-ensemble garanti. Quand
+    // isAdmin, on attend adminPromise (déjà bien avancé en parallèle, ou
+    // quasi instantané si non-admin -- ce await ne coûte donc rien pour un
+    // compte Coach seul) puis on filtre ces données déjà en mémoire au lieu
+    // d'un aller-retour réseau. Forme du tableau ({data,error} par entrée)
+    // inchangée exprès : tout le code plus bas (logQueryErrors, .data...)
+    // n'a rien à savoir de la provenance.
+    if (isAdmin) {
+      await adminPromise;
+    }
+
     const [
       teamPlayersRes,
       teamCoachesRes,
@@ -1932,20 +1979,37 @@ export default async function DashboardPage() {
     ] = await runBatched(
       [
         () =>
-          supabase
-            .from("team_players")
-            .select("team_id, player_id, position")
-            .in("team_id", coachCalendarTeamIds),
+          isAdmin
+            ? Promise.resolve({
+                data: adminTeamPlayersRaw.filter((tp) => coachCalendarTeamIds.includes(tp.team_id)),
+                error: null,
+              })
+            : supabase
+                .from("team_players")
+                .select("team_id, player_id, position")
+                .in("team_id", coachCalendarTeamIds),
         () =>
-          supabase
-            .from("team_coaches")
-            .select("team_id, coach_id")
-            .in("team_id", coachCalendarTeamIds),
+          isAdmin
+            ? Promise.resolve({
+                data: adminTeamCoachesRaw.filter((tc) => coachCalendarTeamIds.includes(tc.team_id)),
+                error: null,
+              })
+            : supabase
+                .from("team_coaches")
+                .select("team_id, coach_id")
+                .in("team_id", coachCalendarTeamIds),
         () =>
-          supabase
-            .from("team_pending_coaches")
-            .select("team_id, player_id")
-            .in("team_id", coachCalendarTeamIds),
+          isAdmin
+            ? Promise.resolve({
+                data: adminTeamPendingCoachesRaw.filter((tpc) =>
+                  coachCalendarTeamIds.includes(tpc.team_id)
+                ),
+                error: null,
+              })
+            : supabase
+                .from("team_pending_coaches")
+                .select("team_id, player_id")
+                .in("team_id", coachCalendarTeamIds),
         // Retour de Cindy du 30/08 : Basile (coach U13F/U13M1 ET joueur
         // Séniors M) voyait le match de SON équipe jouée apparaître dans
         // le calendrier de "Équipe(s) coachée(s)" — coachCalendarTeamIds
@@ -1970,21 +2034,35 @@ export default async function DashboardPage() {
             .gte("start_time", eventsWindowStart)
             .order("start_time", { ascending: true }),
         () =>
-          ownOnlyTeamIds.length > 0
-            ? supabase
-                .from("teams")
-                .select("id, name, category, ffbb_url, sort_order, pending_coach_names")
-                .in("id", ownOnlyTeamIds)
-            : Promise.resolve({ data: [] as CoachedTeam[], error: null }),
+          isAdmin
+            ? Promise.resolve({
+                data: adminTeamsRaw.filter((t) => ownOnlyTeamIds.includes(t.id)) as CoachedTeam[],
+                error: null,
+              })
+            : ownOnlyTeamIds.length > 0
+              ? supabase
+                  .from("teams")
+                  .select("id, name, category, ffbb_url, sort_order, pending_coach_names")
+                  .in("id", ownOnlyTeamIds)
+              : Promise.resolve({ data: [] as CoachedTeam[], error: null }),
         // Every club team, for the "Changer d'équipe" picker — teams is
-        // readable by anyone (policy `using (true)`), and legacy rows
-        // without a sort_order are filtered out like everywhere else.
+        // readable by anyone (policy `using (true)`), et déjà chargé sans
+        // filtre par le Bureau quand isAdmin (voir plus haut) : re-trié en
+        // mémoire de la même façon (sort_order non nul) plutôt que
+        // redemandé.
         () =>
-          supabase
-            .from("teams")
-            .select("id, name, category, sort_order")
-            .not("sort_order", "is", null)
-            .order("sort_order"),
+          isAdmin
+            ? Promise.resolve({
+                data: adminTeamsRaw
+                  .filter((t) => t.sort_order !== null)
+                  .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999)),
+                error: null,
+              })
+            : supabase
+                .from("teams")
+                .select("id, name, category, sort_order")
+                .not("sort_order", "is", null)
+                .order("sort_order"),
       ],
       // dbLimit partagé (voir lib/batch.ts / le bloc Bureau plus haut).
       dbLimit
