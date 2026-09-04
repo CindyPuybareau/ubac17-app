@@ -709,6 +709,24 @@ export default async function DashboardPage() {
   //    requêtes en vol à la fois, mais chacune qui a vraiment la place de
   //    finir vite, plutôt que beaucoup qui se traînent ensemble.
   const dbLimit = new Semaphore(6);
+  // Retour de Cindy du 03/09 (dernier round de la soirée, "content download"
+  // à 30s malgré des requêtes individuelles redevenues rapides) : les 3
+  // requêtes "events" de cette page (Bureau/Coach/Famille) n'avaient AUCUN
+  // filtre de date -- elles chargeaient les 872 événements de tout
+  // l'historique du club depuis sa création, à chaque connexion, pour tout
+  // le monde. Cette liste sert ensuite de base à fetchRsvpsByEvent/
+  // getVolunteerNeedsByEventId/getEventTasksByEventId/getCarpoolOffersByEventId
+  // (voir upcomingEventIds/coachEventIds/familyEvents plus bas) -- gonflant
+  // à la fois le nombre de requêtes en tranches ET la taille de la page à
+  // construire et transférer (React doit sérialiser des centaines
+  // d'événements/présences jamais affichés). 6 mois en arrière + tout
+  // l'avenir couvre largement une saison en cours ; l'historique plus
+  // ancien n'est plus chargé par défaut ici (à réintroduire plus tard via
+  // un onglet "historique" séparé si besoin, pas au chargement du tableau
+  // de bord).
+  const eventsWindowStart = new Date(
+    Date.now() - 183 * 24 * 60 * 60 * 1000
+  ).toISOString();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -1221,6 +1239,7 @@ export default async function DashboardPage() {
             .select(
               "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
             )
+            .gte("start_time", eventsWindowStart)
             .order("start_time", { ascending: true }),
         () => supabase.from("parent_player").select("parent_id, player_id"),
         () => supabase.from("club_administrators").select("email, club_function"),
@@ -1928,6 +1947,7 @@ export default async function DashboardPage() {
               "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
             )
             .or(teamOrClubWideFilter(coachedTeamIds))
+            .gte("start_time", eventsWindowStart)
             .order("start_time", { ascending: true }),
         () =>
           ownOnlyTeamIds.length > 0
@@ -2749,6 +2769,7 @@ export default async function DashboardPage() {
           "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
         )
         .or(teamOrClubWideFilter(allTeamIds))
+        .gte("start_time", eventsWindowStart)
         .order("start_time", { ascending: true }),
       // Filtre explicite par player_id plutôt que de compter sur la seule
       // RLS : Cindy elle-même est Bureau ET parente, et la policy admin sur
