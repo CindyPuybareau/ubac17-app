@@ -1048,6 +1048,41 @@ export default async function DashboardPage({
     players.length > 0 &&
     (onlyOneEspace || activeTab === "own-team" || activeTab === "children");
 
+  // Retour de Cindy du 05/09 ("le calendrier ralentit tout") : les
+  // entraînements récurrents (2-3 par semaine et par équipe, toute la
+  // saison à venir) dominent largement le volume d'événements chargés --
+  // les matchs, eux, restent peu nombreux (1-2 par équipe et par mois).
+  // Seuls les entraînements sont désormais bornés autour du mois affiché
+  // (?month=... posé par calendar-view.tsx au clic sur les flèches, même
+  // principe que ?tab=... plus haut) ; matchs et autres événements
+  // ponctuels restent chargés en entier comme avant -- la vue "Résultats"
+  // (calendar-view.tsx) en a besoin sur toute la saison, pas juste le mois
+  // affiché dans la grille.
+  const requestedMonth =
+    typeof resolvedSearchParams.month === "string" ? resolvedSearchParams.month : null;
+  const now = new Date();
+  const viewedMonthDate =
+    requestedMonth && /^\d{4}-\d{2}$/.test(requestedMonth)
+      ? new Date(Number(requestedMonth.slice(0, 4)), Number(requestedMonth.slice(5, 7)) - 1, 1)
+      : new Date(now.getFullYear(), now.getMonth(), 1);
+  // Un mois de marge de chaque côté du mois affiché : la grille montre
+  // toujours quelques jours du mois précédent/suivant en gris, et un aller
+  // simple vers le mois d'à côté reste possible sans redemander la page
+  // (préchargé au survol des flèches, voir calendar-view.tsx).
+  const trainingsWindowStart = new Date(
+    viewedMonthDate.getFullYear(),
+    viewedMonthDate.getMonth() - 1,
+    1
+  ).toISOString();
+  const trainingsWindowEnd = new Date(
+    viewedMonthDate.getFullYear(),
+    viewedMonthDate.getMonth() + 2,
+    0,
+    23,
+    59,
+    59
+  ).toISOString();
+
   // Ces quatre requêtes ne dépendent que de valeurs déjà connues à ce stade
   // (players, coachedTeams, isAdmin/coachedTeamIds) — jamais les unes des
   // autres — donc parties en même temps plutôt qu'à la queue leu leu.
@@ -1316,6 +1351,7 @@ export default async function DashboardPage({
       cotisationsRes,
       collectesRes,
       upcomingEventsRes,
+      upcomingTrainingsRes,
       parentPlayerRes,
       clubAdminsRes,
       teamPendingCoachesRes,
@@ -1367,13 +1403,32 @@ export default async function DashboardPage({
               "id, name, type, prix, event_id, event_date, payment_link, events(start_time)"
             )
             .order("created_at", { ascending: false }),
+        // Matchs, tournois, stages... — chargés en entier (comme avant),
+        // exclut désormais les entraînements récurrents (voir
+        // upcomingTrainingsRes juste après) pour ne plus faire porter tout
+        // le poids de la saison à ce seul "select".
         () =>
           supabase
             .from("events")
             .select(
               "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
             )
+            .neq("event_type", "TRAINING")
             .gte("start_time", eventsWindowStart)
+            .order("start_time", { ascending: true }),
+        // Entraînements récurrents uniquement, bornés au mois affiché (voir
+        // trainingsWindowStart/End plus haut) -- rechargé au clic sur les
+        // flèches du calendrier (calendar-view.tsx), pas toute la saison à
+        // chaque connexion.
+        () =>
+          supabase
+            .from("events")
+            .select(
+              "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
+            )
+            .eq("event_type", "TRAINING")
+            .gte("start_time", trainingsWindowStart)
+            .lte("start_time", trainingsWindowEnd)
             .order("start_time", { ascending: true }),
         () => supabase.from("parent_player").select("parent_id, player_id"),
         () => supabase.from("club_administrators").select("email, club_function"),
@@ -1448,6 +1503,7 @@ export default async function DashboardPage({
       cotisationsRes,
       collectesRes,
       upcomingEventsRes,
+      upcomingTrainingsRes,
       parentPlayerRes,
       clubAdminsRes,
       teamPendingCoachesRes,
@@ -1536,21 +1592,30 @@ export default async function DashboardPage({
       rosterByTeam.set(tp.team_id, list);
     });
 
-    // Each team's next upcoming event (upcomingEventsRes is ordered
+    // Matchs/événements ponctuels (upcomingEventsRes) + entraînements du
+    // mois affiché (upcomingTrainingsRes, voir sa requête plus haut) --
+    // recombinés ici une fois pour toutes, avant tout calcul qui dépendait
+    // auparavant d'une seule liste complète. Sans ça, "prochain événement"
+    // juste en dessous sauterait un entraînement pourtant plus proche que
+    // le prochain match.
+    const adminEventsData = [
+      ...(upcomingEventsRes.data ?? []),
+      ...(upcomingTrainingsRes.data ?? []),
+    ].sort((a, b) => a.start_time.localeCompare(b.start_time));
+
+    // Each team's next upcoming event (adminEventsData is ordered
     // ascending) drives the roster table's "Statut Présence" badge, so a
     // coach/Bureau can see at a glance who's confirmed for the next match
     // without drilling into the calendar.
-    const adminNextEventIdByTeamId = findNextEventIdByTeamId(
-      upcomingEventsRes.data ?? []
-    );
+    const adminNextEventIdByTeamId = findNextEventIdByTeamId(adminEventsData);
     const adminNextEventIds = Array.from(adminNextEventIdByTeamId.values());
     // Les trois lignes ci-dessous ne dépendent que des ids déjà connus
-    // (upcomingEventsRes, résolu plus haut dans le gros Promise.all) —
+    // (adminEventsData, résolu plus haut dans le gros Promise.all) —
     // lancées ensemble ici puis attendues chacune à son point d'usage plus
     // bas, au lieu de trois allers-retours séquentiels entrecoupés de
     // calculs synchrones. Même correctif que coachPromise (Stage D),
     // creusé suite au retour de Cindy sur la lenteur de connexion.
-    const upcomingEventIds = (upcomingEventsRes.data ?? []).map((e) => e.id);
+    const upcomingEventIds = adminEventsData.map((e) => e.id);
     const adminNextEventRsvpPromise =
       adminNextEventIds.length > 0
         ? supabase
@@ -1935,7 +2000,7 @@ export default async function DashboardPage({
       };
     });
 
-    adminUpcomingEvents = (upcomingEventsRes.data ?? []).map((e) => {
+    adminUpcomingEvents = adminEventsData.map((e) => {
       const team = e.teams as unknown as {
         id: string;
         name: string | null;
@@ -2067,6 +2132,7 @@ export default async function DashboardPage({
       teamCoachesRes,
       teamPendingCoachesRes,
       eventsRes,
+      trainingsRes,
       ownTeamsRes,
       allClubTeamsRes,
     ] = await runBatched(
@@ -2117,6 +2183,9 @@ export default async function DashboardPage({
         // utilisé juste au-dessus pour l'effectif (teamPlayersRes etc.),
         // nécessaire à l'onglet "Équipes" qui liste volontairement
         // l'équipe jouée comme un pill "Joueur" à part.
+        // Matchs/événements ponctuels de ces équipes, chargés en entier
+        // comme avant -- voir upcomingTrainingsRes (bloc Bureau) pour la
+        // raison de ce découpage.
         () =>
           supabase
             .from("events")
@@ -2124,7 +2193,20 @@ export default async function DashboardPage({
               "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
             )
             .or(teamOrClubWideFilter(coachedTeamIds))
+            .neq("event_type", "TRAINING")
             .gte("start_time", eventsWindowStart)
+            .order("start_time", { ascending: true }),
+        // Entraînements récurrents de ces équipes, bornés au mois affiché.
+        () =>
+          supabase
+            .from("events")
+            .select(
+              "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
+            )
+            .or(teamOrClubWideFilter(coachedTeamIds))
+            .eq("event_type", "TRAINING")
+            .gte("start_time", trainingsWindowStart)
+            .lte("start_time", trainingsWindowEnd)
             .order("start_time", { ascending: true }),
         () =>
           bureauDataLoaded
@@ -2166,9 +2248,17 @@ export default async function DashboardPage({
       teamCoachesRes,
       teamPendingCoachesRes,
       eventsRes,
+      trainingsRes,
       ownTeamsRes,
       allClubTeamsRes,
     });
+
+    // Matchs/événements ponctuels (eventsRes) + entraînements du mois
+    // affiché (trainingsRes) -- même principe que le bloc Bureau plus haut.
+    const coachEventsData = [
+      ...(eventsRes.data ?? []),
+      ...(trainingsRes.data ?? []),
+    ].sort((a, b) => a.start_time.localeCompare(b.start_time));
 
     // Coached teams first, then the ones they only play in — each keeps
     // the club's canonical order within its own group.
@@ -2223,8 +2313,8 @@ export default async function DashboardPage({
     // players/profiles/parent_player/coachFiches juste en dessous, plutôt
     // qu'après lui — seul leur `await`, plus bas, à l'endroit où le
     // résultat sert réellement, reste à sa place.
-    const coachEventIds = (eventsRes.data ?? []).map((e) => e.id);
-    const coachNextEventIdByTeamId = findNextEventIdByTeamId(eventsRes.data ?? []);
+    const coachEventIds = coachEventsData.map((e) => e.id);
+    const coachNextEventIdByTeamId = findNextEventIdByTeamId(coachEventsData);
     const coachNextEventIds = Array.from(coachNextEventIdByTeamId.values());
     // Retour de Cindy du 2026-08-22 : Basile (coach ET joueur Séniors 1)
     // voyait sa propre pénalité apparaître sous "Pénalités de l'équipe" —
@@ -2256,7 +2346,7 @@ export default async function DashboardPage({
     // Mêmes id que coachEvents.map(e => e.id)/le filtre "à venir" plus bas
     // (start_time/id ne changent pas entre la ligne brute et la version
     // enrichie) — inutile d'attendre l'enrichissement pour les calculer.
-    const upcomingCoachEventIds = (eventsRes.data ?? [])
+    const upcomingCoachEventIds = coachEventsData
       .filter((e) => new Date(e.start_time).getTime() >= Date.now())
       .map((e) => e.id);
 
@@ -2623,7 +2713,7 @@ export default async function DashboardPage({
       })
       .filter((p): p is { id: string; name: string; teamIds: string[] } => Boolean(p));
 
-    coachEvents = (eventsRes.data ?? []).map((e) => {
+    coachEvents = coachEventsData.map((e) => {
       const team = e.teams as unknown as {
         id: string;
         name: string | null;
@@ -2760,7 +2850,8 @@ export default async function DashboardPage({
     // Ces trois groupes de requêtes ne dépendent que de allTeamIds /
     // familyPlayerIds, déjà connus ci-dessus — jamais les uns des autres —
     // donc partis ensemble plutôt qu'à la queue leu leu.
-    const [teamsQueryResults, eventsRes, familyCotisationRes, familyPenaliteRes] = await Promise.all([
+    const [teamsQueryResults, eventsRes, trainingsRes, familyCotisationRes, familyPenaliteRes] =
+      await Promise.all([
       allTeamIds.length > 0
         ? runBatched(
             [
@@ -2954,13 +3045,27 @@ export default async function DashboardPage({
             dbLimit
           )
         : null,
+      // Matchs/événements ponctuels, chargés en entier comme avant — voir
+      // upcomingTrainingsRes (bloc Bureau) pour la raison de ce découpage.
       supabase
         .from("events")
         .select(
           "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
         )
         .or(teamOrClubWideFilter(allTeamIds))
+        .neq("event_type", "TRAINING")
         .gte("start_time", eventsWindowStart)
+        .order("start_time", { ascending: true }),
+      // Entraînements récurrents de ces équipes, bornés au mois affiché.
+      supabase
+        .from("events")
+        .select(
+          "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
+        )
+        .or(teamOrClubWideFilter(allTeamIds))
+        .eq("event_type", "TRAINING")
+        .gte("start_time", trainingsWindowStart)
+        .lte("start_time", trainingsWindowEnd)
         .order("start_time", { ascending: true }),
       // Filtre explicite par player_id plutôt que de compter sur la seule
       // RLS : Cindy elle-même est Bureau ET parente, et la policy admin sur
@@ -2988,7 +3093,7 @@ export default async function DashboardPage({
         : null,
     ]);
 
-    logQueryErrors("Famille", { eventsRes, familyCotisationRes, familyPenaliteRes });
+    logQueryErrors("Famille", { eventsRes, trainingsRes, familyCotisationRes, familyPenaliteRes });
 
     familyPenalites = (
       (familyPenaliteRes?.data ?? []) as unknown as {
@@ -3133,8 +3238,12 @@ export default async function DashboardPage({
       );
     }
 
-    const eventsData = eventsRes.data;
-    const eventIds = (eventsData ?? []).map((e) => e.id);
+    // Matchs/événements ponctuels (eventsRes) + entraînements du mois
+    // affiché (trainingsRes) -- même principe que les blocs Bureau/Coach.
+    const eventsData = [...(eventsRes.data ?? []), ...(trainingsRes.data ?? [])].sort((a, b) =>
+      a.start_time.localeCompare(b.start_time)
+    );
+    const eventIds = eventsData.map((e) => e.id);
     const familyCotisationRows = familyCotisationRes?.data ?? null;
 
     familyEvents = (eventsData ?? []).map((e) => {

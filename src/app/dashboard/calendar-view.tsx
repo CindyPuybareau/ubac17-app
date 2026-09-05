@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ChevronDown,
   ChevronLeft,
@@ -447,7 +448,21 @@ export default function CalendarView({
 
   const today = new Date();
   const todayKey = toKey(today);
-  const [viewMonth, setViewMonth] = useState<Date>(today);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [isMonthPending, startMonthTransition] = useTransition();
+  // Retour de Cindy du 05/09 ("le calendrier ralentit tout") : les
+  // entraînements récurrents affichés dans la grille ne sont plus chargés
+  // sur toute la saison, seulement autour du mois demandé par ?month=...
+  // (voir page.tsx, trainingsWindowStart/End) -- ce composant part donc du
+  // mois que le serveur a déjà résolu, plutôt que "aujourd'hui" par défaut,
+  // pour ne jamais afficher un mois différent de celui réellement chargé.
+  const monthParam = searchParams.get("month");
+  const initialViewMonth =
+    monthParam && /^\d{4}-\d{2}$/.test(monthParam)
+      ? new Date(Number(monthParam.slice(0, 4)), Number(monthParam.slice(5, 7)) - 1, 1)
+      : today;
+  const [viewMonth, setViewMonth] = useState<Date>(initialViewMonth);
   const [selectedDate, setSelectedDate] = useState<Date>(today);
   // Retour de Cindy/Sandrine Manzelle du 2026-08-24 : "les entraînements
   // polluent le calendrier" — un cumul Bureau + joueuse + parent voit tout
@@ -690,10 +705,38 @@ export default function CalendarView({
   // jours, juste plus d'encart séparé qui doublonnait l'info.
   const nearBirthdays = useMemo(() => upcomingBirthdays(birthdayMembers), [birthdayMembers]);
 
+  // Retour de Cindy du 05/09 : changer de mois redemande désormais la page
+  // avec le bon ?month=... (préservant les autres paramètres, ex: ?tab=...)
+  // pour que le serveur recharge les entraînements de CE mois précis --
+  // exactement le même principe que dashboard-tabs.tsx pour les espaces.
+  // L'état local (viewMonth/selectedDate) change immédiatement, pour un
+  // retour visuel sans attendre l'aller-retour ; seuls les entraînements
+  // du nouveau mois arrivent un instant après.
+  function monthParamFor(d: Date) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }
+
+  function hrefForMonth(d: Date) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("month", monthParamFor(d));
+    return `/dashboard?${params.toString()}`;
+  }
+
+  function navigateToMonth(d: Date) {
+    startMonthTransition(() => {
+      router.push(hrefForMonth(d));
+    });
+  }
+
+  function prefetchMonth(d: Date) {
+    router.prefetch(hrefForMonth(d));
+  }
+
   function goToday() {
     const now = new Date();
     setViewMonth(now);
     setSelectedDate(now);
+    navigateToMonth(now);
   }
 
   function step(amount: number) {
@@ -701,9 +744,23 @@ export default function CalendarView({
     d.setMonth(d.getMonth() + amount);
     setViewMonth(d);
     setSelectedDate(d);
+    navigateToMonth(d);
   }
 
   const selectedKey = toKey(selectedDate);
+
+  // Précalculés pour le préchargement au survol des flèches (voir leur
+  // onMouseEnter plus bas) -- même principe que dashboard-tabs.tsx.
+  const prevMonthDate = useMemo(() => {
+    const d = new Date(viewMonth);
+    d.setMonth(d.getMonth() - 1);
+    return d;
+  }, [viewMonth]);
+  const nextMonthDate = useMemo(() => {
+    const d = new Date(viewMonth);
+    d.setMonth(d.getMonth() + 1);
+    return d;
+  }, [viewMonth]);
 
   const headerLabel = viewMonth.toLocaleDateString("fr-FR", {
     month: "long",
@@ -1378,15 +1435,23 @@ export default function CalendarView({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => step(-1)}
+                onMouseEnter={() => prefetchMonth(prevMonthDate)}
+                onFocus={() => prefetchMonth(prevMonthDate)}
+                onTouchStart={() => prefetchMonth(prevMonthDate)}
                 aria-label="Précédent"
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-navy text-white transition-colors hover:bg-navy-dark"
+                disabled={isMonthPending}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-navy text-white transition-colors hover:bg-navy-dark disabled:opacity-60"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <button
                 onClick={() => step(1)}
+                onMouseEnter={() => prefetchMonth(nextMonthDate)}
+                onFocus={() => prefetchMonth(nextMonthDate)}
+                onTouchStart={() => prefetchMonth(nextMonthDate)}
                 aria-label="Suivant"
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-navy text-white transition-colors hover:bg-navy-dark"
+                disabled={isMonthPending}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-navy text-white transition-colors hover:bg-navy-dark disabled:opacity-60"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
@@ -1401,7 +1466,11 @@ export default function CalendarView({
           {view === "month" && (
             <button
               onClick={goToday}
-              className="rounded-full border border-ubac-yellow px-3 py-1 text-xs font-semibold text-ubac-yellow-dark hover:bg-ubac-yellow/10"
+              onMouseEnter={() => prefetchMonth(today)}
+              onFocus={() => prefetchMonth(today)}
+              onTouchStart={() => prefetchMonth(today)}
+              disabled={isMonthPending}
+              className="rounded-full border border-ubac-yellow px-3 py-1 text-xs font-semibold text-ubac-yellow-dark hover:bg-ubac-yellow/10 disabled:opacity-60"
             >
               Aujourd&apos;hui
             </button>
