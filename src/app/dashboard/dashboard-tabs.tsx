@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useTransition, type ReactNode } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export type DashboardTab = {
   key: string;
@@ -8,14 +9,41 @@ export type DashboardTab = {
   content: ReactNode;
 };
 
-export default function DashboardTabs({ tabs }: { tabs: DashboardTab[] }) {
-  const [active, setActive] = useState(tabs[0]?.key);
+// Retour de Cindy du 04/09 ("pourquoi ça bug quand on a plusieurs
+// espaces") : côté page.tsx, un seul espace est désormais réellement
+// calculé par chargement (celui désigné par `activeKey`, lui-même dérivé
+// de l'URL ?tab=...) -- les autres n'ont qu'un bouton, leur `content` vaut
+// `null`. Ce composant ne peut donc plus se contenter de cacher/afficher
+// des contenus déjà tous là : cliquer sur un onglet inactif doit
+// redemander la page avec le bon ?tab=... pour que CET espace soit calculé
+// à son tour. useTransition donne un état "en cours" pendant cet aller-
+// retour, affiché sur le bouton cliqué (le seul dont le contenu n'est pas
+// encore là) plutôt qu'un écran blanc silencieux.
+export default function DashboardTabs({
+  tabs,
+  activeKey,
+}: {
+  tabs: DashboardTab[];
+  activeKey: string | null;
+}) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
 
   if (tabs.length === 0) {
     return null;
   }
 
-  const current = tabs.find((t) => t.key === active) ?? tabs[0];
+  const current = tabs.find((t) => t.key === activeKey) ?? tabs[0];
+
+  function handleClick(key: string) {
+    if (key === current.key) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", key);
+    startTransition(() => {
+      router.push(`/dashboard?${params.toString()}`);
+    });
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -24,8 +52,9 @@ export default function DashboardTabs({ tabs }: { tabs: DashboardTab[] }) {
           {tabs.map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setActive(tab.key)}
-              className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+              onClick={() => handleClick(tab.key)}
+              disabled={isPending}
+              className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-60 ${
                 current.key === tab.key
                   ? "border-ubac-yellow bg-ubac-yellow/10 text-ubac-yellow-dark"
                   : // Retour de Cindy du 29/08 ("les onglets se fondent dans le
@@ -38,12 +67,18 @@ export default function DashboardTabs({ tabs }: { tabs: DashboardTab[] }) {
               }`}
             >
               {tab.label}
+              {isPending && current.key !== tab.key ? "…" : ""}
             </button>
           ))}
         </div>
       )}
 
-      {current.content}
+      {/* Retour de Cindy du 04/09 : content peut valoir `null` le temps
+          qu'un clic recharge l'espace demandé (voir handleClick) -- un
+          message plutôt qu'un vide silencieux pendant ce court instant. */}
+      {current.content ?? (
+        <p className="text-sm text-zinc-500">Chargement de cet espace…</p>
+      )}
     </div>
   );
 }

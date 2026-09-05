@@ -690,7 +690,11 @@ async function fetchRsvpsByEvent(
   return buildRsvpStatusByEvent(rsvpRows);
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const supabase = await createClient();
   // Retour de Cindy du 03/09 (troisième incident en moins de 24h, cette
   // fois sur un vrai chargement Coach) : UN seul plafond de requêtes
@@ -957,6 +961,61 @@ export default async function DashboardPage() {
     avatarUrl: p.avatar_url,
   }));
 
+  // Retour de Cindy du 04/09 ("il a trois espaces, pourquoi ça bug") : un
+  // compte qui cumule Bureau + Coach + Famille faisait construire et
+  // envoyer les TROIS espaces en entier à chaque connexion, alors qu'un
+  // seul est regardé à la fois (DashboardTabs, plus bas, se contentait de
+  // les cacher/afficher côté client, tous déjà là). Repéré via un compte
+  // à un seul espace toujours rapide contre le même compte à trois espaces
+  // systématiquement lent, indépendamment de tous les autres correctifs de
+  // la soirée (index, sécurité, tranches...).
+  //
+  // Ici, en amont de adminPromise/coachPromise/familyPromise : décider
+  // lequel des espaces éligibles est "actif" pour CETTE requête, à partir
+  // du paramètre d'URL ?tab=... posé par DashboardTabs au clic (voir ce
+  // fichier). Seul l'espace actif sera réellement calculé plus bas ; les
+  // autres gardent juste leur bouton (visible, cliquable) mais un contenu
+  // vide tant qu'on n'a pas cliqué dessus. Un compte à un seul espace
+  // éligible n'est JAMAIS concerné (activeTab tombe toujours sur cet
+  // unique espace) : zéro changement de comportement pour lui.
+  //
+  // Éligibilité calculée avec des données déjà connues à ce stade (isAdmin,
+  // isCoach, ownPlayerId, players) — sans attendre aucune des trois grosses
+  // promesses -- volontairement approximative pour "children" (le vrai
+  // filtre "doublon avec une équipe déjà coachée" ne s'applique qu'une fois
+  // cet onglet réellement actif et familyPromise exécutée en entier ; ici,
+  // ça ne sert qu'à décider si le bouton doit apparaître ou non).
+  const hasOwnTeamTab = ownPlayerId !== null;
+  const hasChildrenTab = players.some((p) => !p.isSelf);
+  const eligibleTabKeys = [
+    isAdmin && "admin",
+    isCoach && "coach",
+    hasOwnTeamTab && "own-team",
+    hasChildrenTab && "children",
+  ].filter((k): k is string => Boolean(k));
+  const resolvedSearchParams = await searchParams;
+  const requestedTab =
+    typeof resolvedSearchParams.tab === "string" ? resolvedSearchParams.tab : null;
+  const activeTab =
+    requestedTab && eligibleTabKeys.includes(requestedTab)
+      ? requestedTab
+      : (eligibleTabKeys[0] ?? null);
+  // Un seul espace éligible : jamais de distinction actif/inactif à faire,
+  // tout se calcule comme avant. Ces trois booléens décident, une fois pour
+  // toutes, quel(s) bloc(s) font vraiment leur travail lourd pour CETTE
+  // requête -- réutilisés à la fois pour les gardes de adminPromise/
+  // coachPromise/familyPromise ET pour la réutilisation Bureau -> Coach
+  // (bureauDataLoaded : coachPromise ne peut piocher dans adminTeamsRaw
+  // etc. QUE si le bloc Bureau a réellement tourné, pas juste si isAdmin
+  // est vrai -- sinon un compte Bureau+Coach qui regarde l'onglet Coach
+  // lirait des tableaux vides puisque adminPromise n'aurait rien rempli).
+  const onlyOneEspace = eligibleTabKeys.length <= 1;
+  const bureauDataLoaded = isAdmin && (onlyOneEspace || activeTab === "admin");
+  const coachDataActive = isCoach && (onlyOneEspace || activeTab === "coach");
+  const familyDataActive =
+    players.length > 0 &&
+    (onlyOneEspace || activeTab === "own-team" || activeTab === "children");
+
   const coachedTeamIds = new Set(coachedTeams.map((t) => t.id));
 
   // Ces quatre requêtes ne dépendent que de valeurs déjà connues à ce stade
@@ -1217,7 +1276,7 @@ export default async function DashboardPage() {
   let adminTeamPendingCoachesRaw: { team_id: string; player_id: string }[] = [];
 
   const adminPromise = (async () => {
-  if (isAdmin) {
+  if (bureauDataLoaded) {
     const [
       teamsRes,
       playersRes,
@@ -1936,7 +1995,7 @@ export default async function DashboardPage() {
   const coachRsvpReasonByKey: Record<string, string | null> = {};
 
   const coachPromise = (async () => {
-  if (isCoach) {
+  if (coachDataActive) {
     const coachedTeamIds = coachedTeams.map((t) => t.id);
     // Les deux ne dépendent pas l'une de l'autre — parties ensemble
     // plutôt qu'à la queue leu leu.
@@ -1958,14 +2017,18 @@ export default async function DashboardPage() {
     // espaces") : un compte Bureau + Coach (comme Basile après son ajout au
     // Bureau) redemandait team_players/team_coaches/team_pending_coaches/
     // teams à la base ICI, alors que le bloc Bureau (adminPromise) vient de
-    // charger exactement ça, sans filtre -- un sur-ensemble garanti. Quand
-    // isAdmin, on attend adminPromise (déjà bien avancé en parallèle, ou
-    // quasi instantané si non-admin -- ce await ne coûte donc rien pour un
-    // compte Coach seul) puis on filtre ces données déjà en mémoire au lieu
-    // d'un aller-retour réseau. Forme du tableau ({data,error} par entrée)
-    // inchangée exprès : tout le code plus bas (logQueryErrors, .data...)
-    // n'a rien à savoir de la provenance.
-    if (isAdmin) {
+    // charger exactement ça, sans filtre -- un sur-ensemble garanti. On
+    // teste bureauDataLoaded, pas isAdmin tout court : si l'espace Bureau
+    // n'est pas l'onglet actif (voir plus haut, "un seul espace calculé à
+    // la fois"), adminPromise n'a rien rempli du tout, et lire ses tableaux
+    // reviendrait à lire du vide. Quand bureauDataLoaded, on attend
+    // adminPromise (déjà bien avancé en parallèle, ou quasi instantané si
+    // non-admin -- ce await ne coûte donc rien pour un compte Coach seul)
+    // puis on filtre ces données déjà en mémoire au lieu d'un aller-retour
+    // réseau. Forme du tableau ({data,error} par entrée) inchangée exprès :
+    // tout le code plus bas (logQueryErrors, .data...) n'a rien à savoir de
+    // la provenance.
+    if (bureauDataLoaded) {
       await adminPromise;
     }
 
@@ -1979,7 +2042,7 @@ export default async function DashboardPage() {
     ] = await runBatched(
       [
         () =>
-          isAdmin
+          bureauDataLoaded
             ? Promise.resolve({
                 data: adminTeamPlayersRaw.filter((tp) => coachCalendarTeamIds.includes(tp.team_id)),
                 error: null,
@@ -1989,7 +2052,7 @@ export default async function DashboardPage() {
                 .select("team_id, player_id, position")
                 .in("team_id", coachCalendarTeamIds),
         () =>
-          isAdmin
+          bureauDataLoaded
             ? Promise.resolve({
                 data: adminTeamCoachesRaw.filter((tc) => coachCalendarTeamIds.includes(tc.team_id)),
                 error: null,
@@ -1999,7 +2062,7 @@ export default async function DashboardPage() {
                 .select("team_id, coach_id")
                 .in("team_id", coachCalendarTeamIds),
         () =>
-          isAdmin
+          bureauDataLoaded
             ? Promise.resolve({
                 data: adminTeamPendingCoachesRaw.filter((tpc) =>
                   coachCalendarTeamIds.includes(tpc.team_id)
@@ -2034,7 +2097,7 @@ export default async function DashboardPage() {
             .gte("start_time", eventsWindowStart)
             .order("start_time", { ascending: true }),
         () =>
-          isAdmin
+          bureauDataLoaded
             ? Promise.resolve({
                 data: adminTeamsRaw.filter((t) => ownOnlyTeamIds.includes(t.id)) as CoachedTeam[],
                 error: null,
@@ -2051,7 +2114,7 @@ export default async function DashboardPage() {
         // mémoire de la même façon (sort_order non nul) plutôt que
         // redemandé.
         () =>
-          isAdmin
+          bureauDataLoaded
             ? Promise.resolve({
                 data: adminTeamsRaw
                   .filter((t) => t.sort_order !== null)
@@ -2618,7 +2681,7 @@ export default async function DashboardPage() {
   let familyPenalites: AdminPenalite[] = [];
 
   const familyPromise = (async () => {
-  if (players.length > 0) {
+  if (familyDataActive) {
     const playerTeamIdsList = await Promise.all(
       players.map((p) => getPlayerTeamIds(supabase, p.id))
     );
@@ -3318,35 +3381,45 @@ export default async function DashboardPage() {
     );
   }
 
+  // Retour de Cindy du 04/09 : chaque bloc ci-dessous garde sa condition
+  // d'ÉLIGIBILITÉ (isAdmin/isCoach/hasOwnTeamTab/hasChildrenTab, connues
+  // avant toute grosse requête -- voir plus haut) pour que le bouton de
+  // l'onglet apparaisse toujours, même inactif. Seul `content` devient
+  // conditionnel à `activeTab` : un onglet inactif n'affiche jamais ses
+  // props réelles (elles seraient de toute façon vides, ce bloc n'a pas
+  // tourné), juste `null` -- DashboardTabs ne rend que l'onglet actif,
+  // ce `null` n'est donc jamais visible tant qu'on ne clique pas dessus
+  // (ce qui redemande la page avec ?tab=... et fait de LUI l'actif).
   if (isAdmin) {
     tabs.push({
       key: "admin",
       label: "Bureau",
-      content: (
-        <AdminView
-          clubFunction={clubFunction}
-          teams={adminTeams}
-          allProfiles={allProfilesForAdmin}
-          cotisations={adminCotisations}
-          collectes={adminCollectes}
-          categoryTariffs={adminCategoryTariffs}
-          upcomingEvents={adminUpcomingEvents}
-          contactPhoneByPlayerId={adminContactPhoneByPlayerId}
-          contactEmailByPlayerId={adminContactEmailByPlayerId}
-          members={adminMembers}
-          birthdayMembers={adminBirthdayMembers}
-          canonicalTeamRefs={canonicalTeamRefs}
-          whatsappGroups={whatsappGroups}
-          sponsors={adminSponsors}
-          sponsorDisplay={sponsorDisplay}
-          benevoles={adminBenevoles}
-          penalites={adminPenalites}
-          automationSettings={adminAutomationSettings}
-          eventRoles={eventRoleTypes}
-          volunteerNeedsByEventId={adminVolunteerNeedsByEventId}
-          clubReports={clubReports}
-        />
-      ),
+      content:
+        activeTab === "admin" ? (
+          <AdminView
+            clubFunction={clubFunction}
+            teams={adminTeams}
+            allProfiles={allProfilesForAdmin}
+            cotisations={adminCotisations}
+            collectes={adminCollectes}
+            categoryTariffs={adminCategoryTariffs}
+            upcomingEvents={adminUpcomingEvents}
+            contactPhoneByPlayerId={adminContactPhoneByPlayerId}
+            contactEmailByPlayerId={adminContactEmailByPlayerId}
+            members={adminMembers}
+            birthdayMembers={adminBirthdayMembers}
+            canonicalTeamRefs={canonicalTeamRefs}
+            whatsappGroups={whatsappGroups}
+            sponsors={adminSponsors}
+            sponsorDisplay={sponsorDisplay}
+            benevoles={adminBenevoles}
+            penalites={adminPenalites}
+            automationSettings={adminAutomationSettings}
+            eventRoles={eventRoleTypes}
+            volunteerNeedsByEventId={adminVolunteerNeedsByEventId}
+            clubReports={clubReports}
+          />
+        ) : null,
     });
   }
 
@@ -3356,37 +3429,41 @@ export default async function DashboardPage() {
       // Retour de Cindy du 29/08 : "Équipe" tout court prêtait à confusion
       // une fois "Mon équipe" introduit à côté (celui-là, c'est là où on
       // JOUE soi-même) — "coachée(s)" lève l'ambiguïté d'un coup d'œil.
-      label: coachTeamsWithRoster.length > 1 ? "Équipes coachées" : "Équipe coachée",
-      content: (
-        <CoachView
-          teams={coachTeamsWithRoster}
-          events={coachEvents}
-          contactPhoneByPlayerId={coachContactPhoneByPlayerId}
-          contactEmailByPlayerId={coachContactEmailByPlayerId}
-          memberDetailsByPlayerId={coachMemberDetailsByPlayerId}
-          rsvpPlayers={coachRsvpPlayers}
-          rsvpStatusByKey={coachRsvpStatusByKey}
-          rsvpReasonByKey={coachRsvpReasonByKey}
-          taskTallyByTeamId={coachTaskTallyByTeamId}
-          teamRoleByTeamId={coachTeamRoleByTeamId}
-          clubTeams={coachClubTeams}
-          birthdayMembers={coachBirthdayMembers}
-          organisationCards={coachCards}
-          // Couvre le prochain match de chaque équipe ET tous les
-          // événements à venir listés dans "Planning & Rôles".
-          tasksByEventId={coachOrganisationTasks}
-          carpoolByEventId={carpoolOffersByEventId}
-          whatsappGroups={whatsappGroups}
-          eventRoles={eventRoleTypes}
-          volunteerNeedsByEventId={coachVolunteerNeedsByEventId}
-          ownPlayerId={ownPlayerId}
-          ownPlayerNextEvent={ownPlayerNextEvent}
-          penalites={coachPenalites}
-          sponsorDisplay={sponsorDisplay}
-          clubReports={clubReports}
-          currentUserId={user.id}
-        />
-      ),
+      // coachedTeams (connu avant coachPromise) plutôt que
+      // coachTeamsWithRoster (vide tant que ce bloc n'a pas tourné) : le
+      // libellé reste correct même quand cet onglet n'est pas l'actif.
+      label: coachedTeams.length > 1 ? "Équipes coachées" : "Équipe coachée",
+      content:
+        activeTab === "coach" ? (
+          <CoachView
+            teams={coachTeamsWithRoster}
+            events={coachEvents}
+            contactPhoneByPlayerId={coachContactPhoneByPlayerId}
+            contactEmailByPlayerId={coachContactEmailByPlayerId}
+            memberDetailsByPlayerId={coachMemberDetailsByPlayerId}
+            rsvpPlayers={coachRsvpPlayers}
+            rsvpStatusByKey={coachRsvpStatusByKey}
+            rsvpReasonByKey={coachRsvpReasonByKey}
+            taskTallyByTeamId={coachTaskTallyByTeamId}
+            teamRoleByTeamId={coachTeamRoleByTeamId}
+            clubTeams={coachClubTeams}
+            birthdayMembers={coachBirthdayMembers}
+            organisationCards={coachCards}
+            // Couvre le prochain match de chaque équipe ET tous les
+            // événements à venir listés dans "Planning & Rôles".
+            tasksByEventId={coachOrganisationTasks}
+            carpoolByEventId={carpoolOffersByEventId}
+            whatsappGroups={whatsappGroups}
+            eventRoles={eventRoleTypes}
+            volunteerNeedsByEventId={coachVolunteerNeedsByEventId}
+            ownPlayerId={ownPlayerId}
+            ownPlayerNextEvent={ownPlayerNextEvent}
+            penalites={coachPenalites}
+            sponsorDisplay={sponsorDisplay}
+            clubReports={clubReports}
+            currentUserId={user.id}
+          />
+        ) : null,
     });
   }
 
@@ -3394,22 +3471,29 @@ export default async function DashboardPage() {
   // sa présence, ses pénalités, le WhatsApp de SON équipe) — dès qu'elle
   // en a une, qu'elle coache par ailleurs ou non. Toujours une identité
   // unique, jamais de sélecteur de pastilles à construire ici.
-  if (myTeamRsvpPlayers.length > 0) {
+  // hasOwnTeamTab (connu avant familyPromise) plutôt que
+  // myTeamRsvpPlayers.length > 0 (vide tant que ce bloc n'a pas tourné) :
+  // le bouton doit apparaître même quand cet onglet n'est pas l'actif.
+  if (hasOwnTeamTab) {
     tabs.push({
       key: "own-team",
       label: "Mon équipe",
-      content: buildFamilyView(myTeamRsvpPlayers),
+      content: activeTab === "own-team" ? buildFamilyView(myTeamRsvpPlayers) : null,
     });
   }
 
   // "Mon enfant"/"Mes enfants" : uniquement les enfants, jamais mélangés
   // avec sa propre fiche — le sélecteur de pastilles de FamilyView ne sert
-  // plus qu'à choisir entre eux quand il y en a plusieurs.
-  if (myChildrenRsvpPlayers.length > 0) {
+  // plus qu'à choisir entre eux quand il y en a plusieurs. Même principe
+  // que ci-dessus : hasChildrenTab pour le bouton, childrenCountEarly
+  // (players, connu avant familyPromise) pour le singulier/pluriel du
+  // libellé même inactif.
+  if (hasChildrenTab) {
+    const childrenCountEarly = players.filter((p) => !p.isSelf).length;
     tabs.push({
       key: "children",
-      label: myChildrenRsvpPlayers.length > 1 ? "Mes enfants" : "Mon enfant",
-      content: buildFamilyView(myChildrenRsvpPlayers),
+      label: childrenCountEarly > 1 ? "Mes enfants" : "Mon enfant",
+      content: activeTab === "children" ? buildFamilyView(myChildrenRsvpPlayers) : null,
     });
   }
 
@@ -3618,7 +3702,7 @@ export default async function DashboardPage() {
       </header>
 
       <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
-      <DashboardTabs tabs={tabs} />
+      <DashboardTabs tabs={tabs} activeKey={activeTab} />
 
       {/* Cas normalement rare depuis que "Mon espace" couvre aussi un
           adulte inscrit sans enfant (voir le merge de playerRows plus
