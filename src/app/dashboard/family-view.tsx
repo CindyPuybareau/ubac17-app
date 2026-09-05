@@ -118,13 +118,28 @@ export default function FamilyView({
       }),
     [events, visibleTeamIds]
   );
+  // Retour de Cindy du 05/09 (Basile : "Mes enfants" affichait SES PROPRES
+  // équipes Séniors 1/M) : teamCards porte les équipes de TOUTE la famille
+  // (parent inclus, voir page.tsx) -- ce composant n'en reçoit qu'un
+  // sous-ensemble via rsvpPlayers ("Mon équipe" ou "Mes enfants"), jamais
+  // filtré par appartenance avant ce jour. Sans ce filtre, le cas où
+  // rsvpPlayers est vide (ici : les deux enfants de Basile sont déjà
+  // couverts par "Équipes coachées", donc exclus d'ici -- règle existante,
+  // pas nouvelle) faisait tomber `selectedPlayerId` à `null`, et l'ancien
+  // repli "personne sélectionné -> tout montrer" affichait alors TOUTES les
+  // équipes de la famille sans distinction, y compris celles du parent.
+  // rsvpPlayerIds borne désormais teamCards à ce que CETTE instance
+  // (Mon équipe ou Mes enfants) a vraiment le droit de montrer, avant même
+  // de tenir compte d'une sélection précise.
+  const rsvpPlayerIds = useMemo(() => new Set(rsvpPlayers.map((p) => p.id)), [rsvpPlayers]);
   const visibleTeamCards = useMemo(() => {
+    const scoped = teamCards.filter((c) => rsvpPlayerIds.has(c.playerId));
     const cards = selectedPlayerId
-      ? teamCards.filter((c) => c.playerId === selectedPlayerId)
-      : teamCards;
+      ? scoped.filter((c) => c.playerId === selectedPlayerId)
+      : scoped;
     // Même ordre que côté coach : l'équipe mère avant ses déclinaisons.
     return sortTeamsByGroup(cards.map((c) => ({ ...c, name: c.teamName })));
-  }, [teamCards, selectedPlayerId]);
+  }, [teamCards, rsvpPlayerIds, selectedPlayerId]);
 
   // Sélecteur d'équipe de la vue Résultats (voir calendar-view.tsx) : une
   // famille à plusieurs enfants sur des équipes différentes a exactement
