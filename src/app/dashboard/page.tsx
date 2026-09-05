@@ -998,7 +998,27 @@ export default async function DashboardPage({
   // cet onglet réellement actif et familyPromise exécutée en entier ; ici,
   // ça ne sert qu'à décider si le bouton doit apparaître ou non).
   const hasOwnTeamTab = ownPlayerId !== null;
-  const hasChildrenTab = players.some((p) => !p.isSelf);
+  // Retour de Cindy du 05/09 (Basile, qui coache déjà toutes les équipes
+  // de ses deux enfants) : la première version de ce contrôle ("y a-t-il ne
+  // serait-ce qu'un enfant ?") ne suffisait pas -- si le VRAI filtre plus
+  // bas (doublon avec une équipe déjà coachée, voir myChildrenRsvpPlayers)
+  // finit par tous les exclure, l'onglet apparaissait quand même, vide, sans
+  // rien à montrer. Reproduit ici ce même filtre, tôt et à moindre coût
+  // (une requête légère par enfant candidat -- pas tout familyPromise) pour
+  // que le bouton lui-même n'existe pas quand il n'y a vraiment rien
+  // derrière.
+  const coachedTeamIds = new Set(coachedTeams.map((t) => t.id));
+  const childCandidates = players.filter((p) => !p.isSelf);
+  let hasChildrenTab = false;
+  if (childCandidates.length > 0) {
+    const childCandidateTeamIdsList = await Promise.all(
+      childCandidates.map((p) => getPlayerTeamIds(supabase, p.id))
+    );
+    hasChildrenTab = childCandidates.some((_, i) => {
+      const teamIds = childCandidateTeamIdsList[i];
+      return !(teamIds.length > 0 && teamIds.every((id) => coachedTeamIds.has(id)));
+    });
+  }
   const eligibleTabKeys = [
     isAdmin && "admin",
     isCoach && "coach",
@@ -1027,8 +1047,6 @@ export default async function DashboardPage({
   const familyDataActive =
     players.length > 0 &&
     (onlyOneEspace || activeTab === "own-team" || activeTab === "children");
-
-  const coachedTeamIds = new Set(coachedTeams.map((t) => t.id));
 
   // Ces quatre requêtes ne dépendent que de valeurs déjà connues à ce stade
   // (players, coachedTeams, isAdmin/coachedTeamIds) — jamais les unes des

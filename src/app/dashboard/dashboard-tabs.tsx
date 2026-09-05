@@ -36,12 +36,27 @@ export default function DashboardTabs({
 
   const current = tabs.find((t) => t.key === activeKey) ?? tabs[0];
 
-  function handleClick(key: string) {
-    if (key === current.key) return;
+  // Retour de Cindy du 05/09 ("le délai au clic est long") : router.push
+  // (contrairement à un <Link>) ne préchauffe rien tout seul. Survoler un
+  // bouton (ou le toucher, sur mobile où il n'y a pas de survol) déclenche
+  // ce même aller-retour EN AVANCE, pendant que la personne hésite encore
+  // -- Next.js garde la réponse en mémoire côté client, donc le clic qui
+  // suit la retrouve déjà prête au lieu de repartir de zéro.
+  function tabHref(key: string) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", key);
+    return `/dashboard?${params.toString()}`;
+  }
+
+  function handlePrefetch(key: string) {
+    if (key === current.key) return;
+    router.prefetch(tabHref(key));
+  }
+
+  function handleClick(key: string) {
+    if (key === current.key) return;
     startTransition(() => {
-      router.push(`/dashboard?${params.toString()}`);
+      router.push(tabHref(key));
     });
   }
 
@@ -53,6 +68,9 @@ export default function DashboardTabs({
             <button
               key={tab.key}
               onClick={() => handleClick(tab.key)}
+              onMouseEnter={() => handlePrefetch(tab.key)}
+              onFocus={() => handlePrefetch(tab.key)}
+              onTouchStart={() => handlePrefetch(tab.key)}
               disabled={isPending}
               className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-60 ${
                 current.key === tab.key
