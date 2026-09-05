@@ -935,9 +935,21 @@ export default async function DashboardPage({
     }));
   })();
 
+  // Retour de Cindy du 05/09 (Basile : "Mes enfants" affichait SA PROPRE
+  // équipe Séniors M, calendrier vide) : une ligne parent_player où
+  // parent_id est ÉGAL au profile_id du joueur lié -- quelqu'un enregistré
+  // comme le parent de sa propre fiche joueur, ce qui n'a aucun sens
+  // (probablement un reliquat du rattachement automatique parent/joueur
+  // partageant le même compte, voir 2026-08-22). Sans ce filtre, cette
+  // fiche apparaissait deux fois : correctement comme "Mon équipe"
+  // (ownPlayerRow, profile_id = user.id) ET, à tort, comme "un enfant" via
+  // ce lien parent_player erroné -- toujours exclue ici, quelle que soit la
+  // donnée côté parent_player : une fiche dont le profile_id est le sien
+  // est TOUJOURS "Mon équipe", jamais "Mes enfants".
   const childPlayerRows = (playerLinksResult.data ?? [])
     .map((link) => link.players as unknown as PlayerRow | null)
-    .filter((p): p is PlayerRow => Boolean(p));
+    .filter((p): p is PlayerRow => Boolean(p))
+    .filter((p) => p.profile_id !== user.id);
   // Un adulte inscrit lui-même (Séniors, Loisirs...) n'apparaît dans
   // aucune ligne parent_player : sans ce merge, il n'a ni enfant ni
   // équipe coachée ni accès Bureau, donc zéro onglet — voir le
