@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Calendar, Check, MapPin, X } from "lucide-react";
+import { Calendar, Check, HandHeart, MapPin, ScrollText, X } from "lucide-react";
 import { styleFor, formatEventTime } from "@/app/dashboard/event-style";
 import RoleIcon from "@/app/dashboard/role-icon";
 import {
@@ -12,9 +12,12 @@ import {
 } from "@/app/dashboard/event-volunteer-needs";
 import { formatFirstName } from "@/lib/names";
 import DocumentsPanel from "@/components/club-documents";
+import AdminSidebar, { type AdminSection } from "@/app/dashboard/admin-sidebar";
+import { MobileNavProvider } from "@/app/dashboard/mobile-nav-context";
+import MobileMenuButton from "@/app/dashboard/mobile-menu-button";
 import type { ChildEvent } from "@/app/enfant/view/child-dashboard";
 import type { ClubReport, SponsorDisplay } from "@/app/dashboard/page";
-import BenevoleProfileSections, { type ProfileMember, type ProfileTeam } from "./profile-sections";
+import { buildProfileSections, type ProfileMember, type ProfileTeam } from "./profile-sections";
 
 // Événement tel que vu par un bénévole : uniquement date/heure/lieu et les
 // besoins d'organisation (retour de Cindy du 2026-08-25, "pour le reste
@@ -197,8 +200,7 @@ export default function BenevoleView({
   volunteerNeedsByEventId: Record<string, VolunteerNeed[]>;
   // Retour de Cindy du 05/09 ("profil et bénévoles doivent être
   // fusionnés") : voir profile-sections.tsx. allowedBriques vide (cas
-  // historique, aucun profil assigné) -> BenevoleProfileSections ne rend
-  // rien du tout.
+  // historique, aucun profil assigné) -> aucune entrée de menu en plus.
   allowedBriques: string[];
   profileTeams: ProfileTeam[];
   profileMembers: ProfileMember[];
@@ -206,59 +208,89 @@ export default function BenevoleView({
   profileSponsors: SponsorDisplay[];
   profileClubReports: ClubReport[];
 }) {
-  return (
-    <div className="flex flex-1 flex-col overflow-x-hidden bg-zinc-50">
-      <header className="bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-5 shadow-md sm:px-6">
-        <div className="mx-auto flex w-full max-w-3xl items-center gap-3">
-          <Image src="/logo.png" alt="UBAC" width={44} height={44} className="h-11 w-11 object-contain" priority />
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">Bonjour</p>
-            <h1 className="truncate text-xl font-bold text-white">
-              {formatFirstName(firstName) || "bénévole"}
-            </h1>
-          </div>
+  // Retour de Cindy du 06/09 ("un menu comme les autres espaces... toutes
+  // les vues de l'application doivent se ressembler") : même AdminSidebar
+  // que Bureau/Coach/Famille (sidebar fixe sur PC, panneau + bouton
+  // hamburger sur mobile via MobileNavProvider/MobileMenuButton) plutôt
+  // qu'un simple empilement de blocs sur une seule page. "Mes événements"
+  // (le cœur du rôle de bénévole) est toujours la première entrée ;
+  // "Règlement intérieur" toujours la dernière ; entre les deux, une
+  // entrée par brique cochée dans son profil d'accès (voir
+  // profile-sections.tsx), s'il en a un.
+  const sections: AdminSection[] = [
+    {
+      key: "invites",
+      label: "Mes événements",
+      icon: <HandHeart className="h-4 w-4 shrink-0" />,
+      content: (
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-zinc-500">
+            Merci de ton aide ! Voici les événements où le Bureau a besoin de toi — clique sur un
+            besoin pour te proposer.
+          </p>
+          {events.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 rounded-2xl border border-zinc-100 bg-white p-8 text-center shadow-sm">
+              <Check className="h-8 w-8 text-emerald-400" />
+              <p className="text-sm text-zinc-500">
+                Aucun événement pour le moment. Le Bureau te préviendra dès qu&apos;il aura besoin
+                de toi.
+              </p>
+            </div>
+          ) : (
+            events.map((event) => (
+              <EventCard
+                key={event.id}
+                event={event}
+                needs={volunteerNeedsByEventId[event.id] ?? []}
+                benevoleId={benevoleId}
+              />
+            ))
+          )}
         </div>
-      </header>
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 px-4 py-6">
-        <p className="text-sm text-zinc-500">
-          Merci de ton aide ! Voici les événements où le Bureau a besoin de toi — clique sur un
-          besoin pour te proposer.
-        </p>
-        {events.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 rounded-2xl border border-zinc-100 bg-white p-8 text-center shadow-sm">
-            <Check className="h-8 w-8 text-emerald-400" />
-            <p className="text-sm text-zinc-500">
-              Aucun événement pour le moment. Le Bureau te préviendra dès qu&apos;il aura besoin de
-              toi.
-            </p>
+      ),
+    },
+    ...buildProfileSections({
+      allowedBriques,
+      teams: profileTeams,
+      members: profileMembers,
+      events: profileEvents,
+      sponsors: profileSponsors,
+      clubReports: profileClubReports,
+    }),
+    {
+      // Retour de Cindy du 25/08 : "penser en 360° avec les bénévoles, ils
+      // font partie de la boucle" — mêmes règles de respect/fair-play que
+      // sur le terrain les concernent aussi. Règlement Intérieur
+      // uniquement (pas les deux chartes, propres aux licenciés/parents
+      // d'un licencié).
+      key: "reglement",
+      label: "Règlement intérieur",
+      icon: <ScrollText className="h-4 w-4 shrink-0" />,
+      content: <DocumentsPanel documentIds={["reglement-interieur"]} />,
+    },
+  ];
+
+  return (
+    <MobileNavProvider>
+      <div className="flex flex-1 flex-col overflow-x-hidden bg-zinc-50">
+        <header className="bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-5 shadow-md sm:px-6">
+          <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <Image src="/logo.png" alt="UBAC" width={44} height={44} className="h-11 w-11 object-contain" priority />
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">Bonjour</p>
+                <h1 className="truncate text-xl font-bold text-white">
+                  {formatFirstName(firstName) || "bénévole"}
+                </h1>
+              </div>
+            </div>
+            <MobileMenuButton />
           </div>
-        ) : (
-          events.map((event) => (
-            <EventCard
-              key={event.id}
-              event={event}
-              needs={volunteerNeedsByEventId[event.id] ?? []}
-              benevoleId={benevoleId}
-            />
-          ))
-        )}
-
-        <BenevoleProfileSections
-          allowedBriques={allowedBriques}
-          teams={profileTeams}
-          members={profileMembers}
-          events={profileEvents}
-          sponsors={profileSponsors}
-          clubReports={profileClubReports}
-        />
-
-        {/* Retour de Cindy du 25/08 : "penser en 360° avec les bénévoles,
-            ils font partie de la boucle" — mêmes règles de respect/fair-play
-            que sur le terrain les concernent aussi. Règlement Intérieur
-            uniquement (pas les deux chartes, propres aux licenciés/parents
-            d'un licencié). */}
-        <DocumentsPanel documentIds={["reglement-interieur"]} />
-      </main>
-    </div>
+        </header>
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">
+          <AdminSidebar sections={sections} />
+        </main>
+      </div>
+    </MobileNavProvider>
   );
 }

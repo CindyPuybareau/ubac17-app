@@ -82,8 +82,9 @@ export default function CreateEventForm({
   onUpdated,
 }: {
   teams: Team[];
-  // Uniquement rempli côté Bureau (allowClubWide) — voir le commentaire sur
-  // la section "Bénévoles invités" plus bas.
+  // Rempli côté Bureau ET Coach depuis le 06/09 (retour de Cindy : "pour
+  // tous ceux qui peuvent modifier un événement ou en créer un") — voir le
+  // commentaire sur la section "Bénévoles invités" plus bas.
   benevoles?: AdminBenevole[];
   allowClubWide?: boolean;
   // Ouverture pilotee par l appelant : le bouton "+ Creer un evenement"
@@ -524,7 +525,7 @@ export default function CreateEventForm({
         teamId: inserted.team_id,
         targetTeamIds: inserted.target_team_ids,
         teamName,
-        benevoleIds: allowClubWide ? selectedBenevoleIds : editingEvent.benevoleIds,
+        benevoleIds: selectedBenevoleIds,
       });
     } else {
       onCreated?.([
@@ -589,12 +590,14 @@ export default function CreateEventForm({
 
     // Bénévoles invités : modifiable en édition (contrairement à
     // draftNeeds ci-dessus), donc calculé en diff contre la liste déjà
-    // invitée plutôt qu'en simple insert — même garde allowClubWide que la
-    // portée (team_id/target_team_ids) plus haut, un coach n'a jamais cette
-    // section à l'écran (voir plus bas). Best-effort, comme les besoins
-    // d'organisation : une erreur ici ne doit pas laisser croire que
-    // l'événement n'a pas été créé/modifié.
-    if (!isEditing || allowClubWide) {
+    // invitée plutôt qu'en simple insert. Bureau ET coach depuis le 06/09
+    // (retour de Cindy) — la RLS sur event_benevole_invites (Bureau ou
+    // is_team_coach(e.team_id)) tranche qui peut réellement écrire, pas ce
+    // code : un coach qui verrait ce formulaire pour un événement qu'il ne
+    // gère pas se ferait simplement refuser l'écriture. Best-effort, comme
+    // les besoins d'organisation : une erreur ici ne doit pas laisser
+    // croire que l'événement n'a pas été créé/modifié.
+    {
       const previousBenevoleIds = editingEvent?.benevoleIds ?? [];
       const toAdd = selectedBenevoleIds.filter((id) => !previousBenevoleIds.includes(id));
       const toRemove = previousBenevoleIds.filter((id) => !selectedBenevoleIds.includes(id));
@@ -953,10 +956,12 @@ export default function CreateEventForm({
 
       {/* Bénévoles invités (retour de Cindy du 2026-08-25 : "le bureau
           devrait... pouvoir selectionner ses membres, pour que ces meme
-          membres voient l'evenement avec les besoins") — Bureau uniquement,
-          et seulement s'il existe des bénévoles enregistrés. Modifiable en
-          édition, contrairement aux besoins d'organisation ci-dessus. */}
-      {allowClubWide && benevoles.length > 0 && (
+          membres voient l'evenement avec les besoins", étendu au coach le
+          06/09) — Bureau ET coach, seulement s'il existe des bénévoles
+          enregistrés (benevoles vide par défaut partout ailleurs, voir
+          calendar-view.tsx). Modifiable en édition, contrairement aux
+          besoins d'organisation ci-dessus. */}
+      {benevoles.length > 0 && (
         <div className="flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3">
           <p className="text-xs font-medium text-zinc-600">Bénévoles invités (optionnel)</p>
           <div className="flex flex-wrap gap-1.5">

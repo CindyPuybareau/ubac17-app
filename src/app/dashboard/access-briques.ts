@@ -11,6 +11,7 @@ export const BRIQUE_GROUPS: { label: string; briques: { key: string; label: stri
   {
     label: "Général",
     briques: [
+      { key: "calendrier", label: "Calendrier" },
       { key: "membres", label: "Membres" },
       { key: "equipes", label: "Équipes" },
       { key: "evenements", label: "Événements" },

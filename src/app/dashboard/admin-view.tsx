@@ -524,6 +524,10 @@ export default function AdminView({
   // chaque <ClubReportsSection>) ; ici on décide seulement si l'onglet
   // lui-même mérite d'apparaître dans le menu.
   const REQUIRED_BRIQUE: Record<string, string> = {
+    // Retour de Cindy du 06/09 ("ajouter le calendrier aussi, il est
+    // important") : "home" est le premier onglet du Bureau, littéralement
+    // intitulé "Calendrier" (résumé + calendrier complet).
+    home: "calendrier",
     members: "membres",
     teams: "equipes",
     "cotisations-licences": "cotisations",
@@ -551,10 +555,10 @@ export default function AdminView({
         return filteredChildren.length > 0 ? [{ ...section, children: filteredChildren }] : [];
       }
       const required = REQUIRED_BRIQUE[section.key];
-      // "home" (résumé Bureau), FFBB, WhatsApp, Boutique et "Profils
-      // d'accès" lui-même n'ont volontairement aucune entrée ici : jamais
-      // dans la liste blanche, donc jamais accessibles à un profil
-      // restreint (même logique que Paiements/"attribuer un accès").
+      // FFBB, WhatsApp et Boutique n'ont volontairement aucune entrée ici :
+      // jamais dans la liste blanche, donc jamais accessibles à un profil
+      // restreint (même logique que Paiements/"attribuer un accès"). "home"
+      // (Calendrier), lui, y figure depuis le 06/09 (brique "calendrier").
       return required && has(required) ? [section] : [];
     });
   }

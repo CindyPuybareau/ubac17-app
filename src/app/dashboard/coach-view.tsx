@@ -27,6 +27,7 @@ import SponsorsDisplay from "./sponsors-display";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import type { TeamWithMembers } from "./team-manager";
 import type {
+  AdminBenevole,
   AdminMemberTeam,
   AdminPenalite,
   AdminUpcomingEvent,
@@ -70,6 +71,7 @@ export default function CoachView({
   sponsorDisplay = [],
   clubReports,
   currentUserId,
+  benevoles = [],
 }: {
   teams: TeamWithMembers[];
   events: AdminUpcomingEvent[];
@@ -120,6 +122,13 @@ export default function CoachView({
   // de connexion, pas la fiche joueur) peut les modifier/supprimer — voir
   // canEditRow dans club-reports-section.tsx.
   currentUserId: string;
+  // Retour de Cindy du 06/09 ("pour tous ceux qui peuvent modifier un
+  // événement ou en créer un : bureau et coach") : un coach peut désormais
+  // lui aussi inviter un bénévole du club sur un événement de SA propre
+  // équipe (voir create-event-form.tsx, section "Bénévoles invités" —
+  // n'exige plus allowClubWide, seulement une liste non vide) — jamais le
+  // droit de créer/modifier un bénévole lui-même, juste de l'inviter.
+  benevoles?: AdminBenevole[];
 }) {
   // Créer / modifier / supprimer un événement n'est permis que pour les
   // équipes réellement entraînées : proposer celle où l'utilisateur n'est
@@ -165,6 +174,7 @@ export default function CoachView({
           <CalendarView
             events={events}
             createTeams={createTeams}
+            benevoles={benevoles}
             rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
             contactEmailByPlayerId={contactEmailByPlayerId}
             birthdayMembers={birthdayMembers}
@@ -291,6 +301,7 @@ export default function CoachView({
         <CalendarView
           events={events}
           createTeams={createTeams}
+          benevoles={benevoles}
           rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
           scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
           scopeTeamRoleById={teamRoleByTeamId}
@@ -330,6 +341,7 @@ export default function CoachView({
             <CalendarView
               events={events}
               createTeams={createTeams}
+              benevoles={benevoles}
               rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
               scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
               scopeTeamRoleById={teamRoleByTeamId}
@@ -349,6 +361,7 @@ export default function CoachView({
             <CalendarView
               events={events}
               createTeams={createTeams}
+              benevoles={benevoles}
               rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
               scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
               scopeTeamRoleById={teamRoleByTeamId}

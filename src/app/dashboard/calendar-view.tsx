@@ -362,7 +362,8 @@ export default function CalendarView({
   // déjà utilisé par team-manager.tsx (Bureau).
   resultsTeamSelector?: "pills" | "dropdown";
   // Liste des bénévoles du club, transmise telle quelle à CreateEventForm
-  // (section "Bénévoles invités") — vide partout sauf côté Bureau.
+  // (section "Bénévoles invités") — Bureau et Coach depuis le 06/09, vide
+  // ailleurs (Famille, Espace Enfant).
   benevoles?: AdminBenevole[];
   // Confettis sur un match gagné (retour de Cindy du 26/08) — réservé à
   // l'équipe gagnante (Coach de cette équipe, Famille/Enfant des joueurs

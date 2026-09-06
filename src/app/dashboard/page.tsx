@@ -1322,6 +1322,11 @@ export default async function DashboardPage({
   let adminMembers: AdminMember[] = [];
   let adminSponsors: AdminSponsor[] = [];
   let adminBenevoles: AdminBenevole[] = [];
+  // Retour de Cindy du 06/09 ("bureau et coach" peuvent inviter un
+  // bénévole) : calculé une seule fois ici (dans le bloc Bureau, voir plus
+  // bas) puis réutilisé tel quel par le bloc Coach quand bureauDataLoaded
+  // -- même principe que adminTeamsRaw/adminBenevoles ci-dessus.
+  let benevoleIdsByEventId = new Map<string, string[]>();
   let adminPenalites: AdminPenalite[] = [];
   let adminAccessProfiles: AdminAccessProfile[] = [];
   // The Membres table's team pickers (filter + "Modifier le profil") only
@@ -2066,7 +2071,7 @@ export default async function DashboardPage({
     // Quels bénévoles ont déjà été invités à chaque événement (retour de
     // Cindy du 2026-08-25) — préremplit la case "Bénévoles invités" en
     // édition, voir create-event-form.tsx.
-    const benevoleIdsByEventId = new Map<string, string[]>();
+    benevoleIdsByEventId = new Map<string, string[]>();
     (eventBenevoleInvitesRes.data ?? []).forEach((row) => {
       const list = benevoleIdsByEventId.get(row.event_id) ?? [];
       list.push(row.benevole_id);
@@ -2167,6 +2172,9 @@ export default async function DashboardPage({
   // pénalités des joueurs de ses équipes, mais ne peut ni en créer ni en
   // modifier — seul le Bureau saisit une pénalité.
   let coachPenalites: AdminPenalite[] = [];
+  // Retour de Cindy du 06/09 ("bureau et coach" peuvent inviter un
+  // bénévole) : voir coachPromise plus bas.
+  let coachBenevoles: AdminBenevole[] = [];
   // Joueurs ET coachs des équipes réellement COACHÉES uniquement (jamais
   // l'équipe où le coach joue lui-même) — même distinction que
   // coachPenaliteScope plus bas, réutilisée pour le widget anniversaires
@@ -2226,6 +2234,8 @@ export default async function DashboardPage({
       trainingsRes,
       ownTeamsRes,
       allClubTeamsRes,
+      coachBenevolesRes,
+      coachEventBenevoleInvitesRes,
     ] = await runBatched(
       [
         () =>
@@ -2329,6 +2339,28 @@ export default async function DashboardPage({
                 .select("id, name, category, sort_order")
                 .not("sort_order", "is", null)
                 .order("sort_order"),
+        // Retour de Cindy du 06/09 ("bureau et coach" peuvent inviter un
+        // bénévole à un événement) : mêmes deux requêtes que le bloc
+        // Bureau, réutilisées telles quelles quand bureauDataLoaded (voir
+        // adminBenevoles/benevoleIdsByEventId plus haut), sinon
+        // redemandées ici -- la RLS (20261031180000) limite alors ce
+        // qu'un coach voit/écrit à ses propres équipes.
+        () =>
+          bureauDataLoaded
+            ? Promise.resolve({ data: adminBenevoles, error: null })
+            : supabase
+                .from("benevoles")
+                .select("id, first_name, last_name, phone, email, notes, access_token, archived_at, access_profile_id")
+                .order("last_name"),
+        () =>
+          bureauDataLoaded
+            ? Promise.resolve({
+                data: Array.from(benevoleIdsByEventId.entries()).flatMap(([event_id, ids]) =>
+                  ids.map((benevole_id) => ({ event_id, benevole_id }))
+                ),
+                error: null,
+              })
+            : supabase.from("event_benevole_invites").select("event_id, benevole_id"),
       ],
       // dbLimit partagé (voir lib/batch.ts / le bloc Bureau plus haut).
       dbLimit
@@ -2342,6 +2374,38 @@ export default async function DashboardPage({
       trainingsRes,
       ownTeamsRes,
       allClubTeamsRes,
+      coachBenevolesRes,
+      coachEventBenevoleInvitesRes,
+    });
+
+    coachBenevoles = (
+      (coachBenevolesRes.data ?? []) as {
+        id: string;
+        first_name: string;
+        last_name: string;
+        phone: string | null;
+        email: string | null;
+        notes: string | null;
+        access_token: string;
+        archived_at: string | null;
+        access_profile_id: string | null;
+      }[]
+    ).map((b) => ({
+      id: b.id,
+      firstName: b.first_name,
+      lastName: b.last_name,
+      phone: b.phone,
+      email: b.email,
+      notes: b.notes,
+      accessToken: b.access_token,
+      archivedAt: b.archived_at,
+      accessProfileId: b.access_profile_id,
+    }));
+    const coachBenevoleIdsByEventId = new Map<string, string[]>();
+    (coachEventBenevoleInvitesRes.data ?? []).forEach((row) => {
+      const list = coachBenevoleIdsByEventId.get(row.event_id) ?? [];
+      list.push(row.benevole_id);
+      coachBenevoleIdsByEventId.set(row.event_id, list);
     });
 
     // Matchs/événements ponctuels (eventsRes) + entraînements du mois
@@ -2850,7 +2914,10 @@ export default async function DashboardPage({
         // Retour de Cindy du 30/08 : "qui sera présent" visible partout,
         // pas seulement côté Famille — voir buildPresentPlayers/bloc Bureau.
         presentPlayers: buildPresentPlayers(rsvpsByEvent, e.id, eventRoster),
-        benevoleIds: [],
+        // Retour de Cindy du 06/09 ("bureau et coach" peuvent inviter un
+        // bénévole) : préremplit "Bénévoles invités" en édition, comme côté
+        // Bureau -- voir coachBenevoleIdsByEventId plus haut.
+        benevoleIds: coachBenevoleIdsByEventId.get(e.id) ?? [],
       };
     });
 
@@ -3670,6 +3737,7 @@ export default async function DashboardPage({
           <CoachView
             teams={coachTeamsWithRoster}
             events={coachEvents}
+            benevoles={coachBenevoles}
             contactPhoneByPlayerId={coachContactPhoneByPlayerId}
             contactEmailByPlayerId={coachContactEmailByPlayerId}
             memberDetailsByPlayerId={coachMemberDetailsByPlayerId}
