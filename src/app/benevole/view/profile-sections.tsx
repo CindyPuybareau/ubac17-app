@@ -9,10 +9,12 @@ import {
   EyeOff,
   ExternalLink,
   Flag,
+  Handshake,
   ListOrdered,
   MessageCircle,
   ScrollText,
   Shield,
+  ShoppingBag,
   Trophy,
   Users,
 } from "lucide-react";
@@ -28,6 +30,7 @@ import ClubReportsSection from "@/app/dashboard/club-reports-section";
 import EmptyState from "@/app/dashboard/empty-state";
 import TeamFilterDropdown from "@/app/dashboard/team-filter-dropdown";
 import DocumentsPanel from "@/components/club-documents";
+import { BOUTIQUE_URL } from "@/app/dashboard/boutique";
 import type { ClubReport, SponsorDisplay } from "@/app/dashboard/page";
 
 // Retour de Cindy du 05/09 ("profil et bénévoles doivent être fusionnés"),
@@ -303,66 +306,15 @@ export function buildProfileSections({
     });
   }
 
-  // Retour de Cindy du 06/09 ("voir dans Vie du club les sponsors... mais
-  // en lecture seule pour les bénévoles", puis "son groupe WhatsApp") :
-  // même regroupement "Vie du club" que côté Bureau (admin-view.tsx),
-  // fusionnant Sponsors (lecture seule, brique "sponsors") et le(s)
-  // groupe(s) WhatsApp auquel ce bénévole a été rattaché (jamais
-  // conditionné par une brique, voir plus haut). Visible dès que l'un des
-  // deux a quelque chose à montrer.
-  if (has("sponsors") || whatsappGroups.length > 0) {
-    sections.push({
-      key: "vie-du-club",
-      label: "Vie du club",
-      icon: <Building2 className={iconClass} />,
-      content: (
-        <div className="flex flex-col gap-4">
-          {whatsappGroups.length > 0 && (
-            <div className="flex flex-col gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
-              <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                <MessageCircle className="h-3.5 w-3.5 text-navy" />
-                {whatsappGroups.length > 1 ? "Tes groupes WhatsApp" : "Ton groupe WhatsApp"}
-              </p>
-              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                {whatsappGroups.map((g) =>
-                  g.inviteLink ? (
-                    <a
-                      key={g.id}
-                      href={g.inviteLink}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center justify-center gap-1.5 rounded-full bg-emerald-500 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                      {g.name}
-                    </a>
-                  ) : (
-                    <span
-                      key={g.id}
-                      className="flex items-center justify-center gap-1.5 rounded-full bg-zinc-50 px-3.5 py-2 text-sm font-medium text-zinc-400"
-                    >
-                      {g.name} — lien non renseigné
-                    </span>
-                  )
-                )}
-              </div>
-            </div>
-          )}
-          {has("sponsors") && <SponsorsDisplay sponsors={sponsors} />}
-        </div>
-      ),
-    });
-  }
-
-  // Retour de Cindy du 06/09 ("comptes rendus et règlement intérieur
-  // doivent être dans un seul onglet 'Documents', comme les autres
-  // espaces") : un seul onglet, toujours présent (contrairement aux
-  // comptes rendus, le Règlement intérieur n'est pas une brique -- comme
-  // côté Espace Enfant/bénévole avant cette fusion, tout le monde y a
-  // accès), les comptes rendus ne s'y ajoutant que si la brique
-  // correspondante est cochée. Même regroupement que "Documents" côté
-  // Bureau/Coach (admin-view.tsx/coach-view.tsx).
-  sections.push({
+  // Retour de Cindy du 06/09 ("comme pour le bureau... le même menu mais
+  // sélectionnable et sur mesure : groupe whatsapp, documents, sponsors,
+  // boutique") : vrai sous-menu "Vie du club" (children), comme côté
+  // Bureau (admin-view.tsx), pas un seul écran qui empile tout. Chaque
+  // sous-entrée apparaît indépendamment des autres -- Documents et
+  // Boutique toujours là (comme le Règlement intérieur qu'il contient),
+  // Sponsors et le(s) groupe(s) WhatsApp seulement s'il y a quelque chose
+  // à y montrer.
+  const documentsChild: AdminSection = {
     key: "documents",
     label: "Documents",
     icon: <ScrollText className={iconClass} />,
@@ -403,12 +355,82 @@ export function buildProfileSections({
             ils font partie de la boucle" — mêmes règles de respect/fair-
             play que sur le terrain les concernent aussi. Règlement
             Intérieur uniquement (pas les deux chartes, propres aux
-            licenciés/parents d'un licencié) -- déplacé ici depuis
-            benevole-view.tsx (retour de Cindy du 06/09, fusion en un seul
-            onglet "Documents"). */}
+            licenciés/parents d'un licencié). */}
         <DocumentsPanel documentIds={["reglement-interieur"]} />
       </div>
     ),
+  };
+
+  const vieDuClubChildren: AdminSection[] = [
+    ...(whatsappGroups.length > 0
+      ? [
+          {
+            key: "whatsapp-groups",
+            label: whatsappGroups.length > 1 ? "Groupes WhatsApp" : "Groupe WhatsApp",
+            icon: <MessageCircle className={iconClass} />,
+            content: (
+              <div className="flex flex-col gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
+                <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  <MessageCircle className="h-3.5 w-3.5 text-navy" />
+                  {whatsappGroups.length > 1 ? "Tes groupes WhatsApp" : "Ton groupe WhatsApp"}
+                </p>
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                  {whatsappGroups.map((g) =>
+                    g.inviteLink ? (
+                      <a
+                        key={g.id}
+                        href={g.inviteLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center justify-center gap-1.5 rounded-full bg-emerald-500 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        {g.name}
+                      </a>
+                    ) : (
+                      <span
+                        key={g.id}
+                        className="flex items-center justify-center gap-1.5 rounded-full bg-zinc-50 px-3.5 py-2 text-sm font-medium text-zinc-400"
+                      >
+                        {g.name} — lien non renseigné
+                      </span>
+                    )
+                  )}
+                </div>
+              </div>
+            ),
+          },
+        ]
+      : []),
+    documentsChild,
+    ...(has("sponsors")
+      ? [
+          {
+            key: "sponsors",
+            label: "Sponsors",
+            icon: <Handshake className={iconClass} />,
+            content: <SponsorsDisplay sponsors={sponsors} />,
+          },
+        ]
+      : []),
+    // Un simple lien externe (retour de Cindy du 06/09) : toujours
+    // proposé, comme côté Bureau -- même principe que Documents/Règlement
+    // intérieur, jamais conditionné par une brique.
+    {
+      key: "boutique",
+      label: "Boutique en ligne",
+      icon: <ShoppingBag className={iconClass} />,
+      content: null,
+      href: BOUTIQUE_URL,
+    },
+  ];
+
+  sections.push({
+    key: "vie-du-club",
+    label: "Vie du club",
+    icon: <Building2 className={iconClass} />,
+    content: null,
+    children: vieDuClubChildren,
   });
 
   return sections;
