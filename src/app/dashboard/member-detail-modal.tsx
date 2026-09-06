@@ -974,6 +974,7 @@ export default function MemberDetailModal({
                     ...form.otherPhones.split(/[\n,;/]+/),
                   ]}
                   candidateSecondaryEmail={form.secondaryEmail || null}
+                  onSuggestSecondaryEmail={(email) => set("secondaryEmail", email)}
                 />
               )}
               <Field

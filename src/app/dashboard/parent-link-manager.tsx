@@ -36,12 +36,21 @@ export default function ParentLinkManager({
   playerId,
   candidatePhones,
   candidateSecondaryEmail,
+  onSuggestSecondaryEmail,
 }: {
   playerId: string;
   // Téléphones déjà saisis sur CETTE fiche (mère/père/autres) — comparés
   // au téléphone du compte pour suggérer un rattachement.
   candidatePhones: (string | null)[];
   candidateSecondaryEmail: string | null;
+  // Retour de Cindy du 06/09 : quand elle relie manuellement le DEUXIÈME
+  // parent (le premier étant déjà rattaché — inscription initiale ou lien
+  // précédent), son email peut directement pré-remplir le champ "Email
+  // secondaire" de la fiche, pour que ce futur deuxième parent soit
+  // ensuite reconnu automatiquement par handle_new_user() s'il doit un
+  // jour recréer son compte. Jamais si le champ contient déjà quelque
+  // chose : on complète, on n'écrase jamais une valeur saisie à la main.
+  onSuggestSecondaryEmail?: (email: string) => void;
 }) {
   const [linked, setLinked] = useState<LinkedParent[] | null>(null);
   const [suggestion, setSuggestion] = useState<ProfileMatch | null>(null);
@@ -162,9 +171,13 @@ export default function ParentLinkManager({
     return () => clearTimeout(timeout);
   }, [query]);
 
-  async function linkParent(parentId: string) {
+  async function linkParent(parentId: string, email: string | null) {
     setBusyId(parentId);
     setError(null);
+    // Capturé avant l'insertion : c'est le fait qu'un premier parent soit
+    // déjà relié (et pas celui-ci) qui fait de celui qu'on relie ici "le
+    // deuxième parent" au sens de Cindy.
+    const isSecondOrLaterParent = (linked?.length ?? 0) > 0;
     const supabase = createClient();
     const { error: insertError } = await supabase
       .from("parent_player")
@@ -177,6 +190,9 @@ export default function ParentLinkManager({
           : "Rattachement impossible, réessaie."
       );
       return;
+    }
+    if (isSecondOrLaterParent && email && !candidateSecondaryEmail) {
+      onSuggestSecondaryEmail?.(email);
     }
     setQuery("");
     setResults([]);
@@ -245,7 +261,7 @@ export default function ParentLinkManager({
           </span>
           <button
             type="button"
-            onClick={() => linkParent(suggestion.id)}
+            onClick={() => linkParent(suggestion.id, suggestion.email)}
             disabled={busyId === suggestion.id}
             className="ml-auto flex shrink-0 items-center gap-1 rounded-full bg-navy px-2.5 py-1 font-semibold text-white transition-colors hover:bg-navy-dark disabled:opacity-50"
           >
@@ -273,7 +289,7 @@ export default function ParentLinkManager({
               <button
                 key={r.id}
                 type="button"
-                onClick={() => linkParent(r.id)}
+                onClick={() => linkParent(r.id, r.email)}
                 disabled={busyId === r.id}
                 className="flex items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-left text-sm transition-colors hover:bg-zinc-50 disabled:opacity-50"
               >
