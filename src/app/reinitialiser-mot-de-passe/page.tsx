@@ -1,14 +1,12 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import PasswordInput from "@/components/password-input";
 
 export default function ReinitialiserMotDePassePage() {
-  const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -71,9 +69,11 @@ export default function ReinitialiserMotDePassePage() {
       }
 
       setMessage("Mot de passe mis à jour ! Redirection...");
+      // Retour de Cindy du 06/09 (Sébastien PEULVEY, "aucun message
+      // d'erreur, mais tout s'efface") : même correctif que connexion/
+      // page.tsx -- rechargement complet plutôt qu'une navigation douce.
       setTimeout(() => {
-        router.push("/dashboard");
-        router.refresh();
+        window.location.href = "/dashboard";
       }, 1200);
     } catch {
       setError("Un problème est survenu, réessaie dans quelques instants.");

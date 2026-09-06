@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -9,7 +8,6 @@ import PasswordInput from "@/components/password-input";
 import AuthTabs from "@/components/auth-tabs";
 
 export default function ConnexionPage() {
-  const router = useRouter();
   const [mode, setMode] = useState<"password" | "otp">("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -39,13 +37,23 @@ export default function ConnexionPage() {
         return;
       }
 
-      // router.refresh() juste après push() était redondant : la
-      // navigation vers /dashboard déclenche déjà son propre chargement
-      // (et c'est une page lourde en données) — l'appeler une deuxième
-      // fois rechargeait tout deux fois de suite, ressenti comme une
-      // connexion lente (retour de Cindy du 2026-08-20, même famille de
-      // souci que le double rafraîchissement des besoins d'organisation).
-      router.push("/dashboard");
+      // Retour de Cindy du 06/09 (Sébastien PEULVEY, "aucun message
+      // d'erreur, mais tout s'efface") : router.push("/dashboard") est une
+      // navigation CÔTÉ NAVIGATEUR — /dashboard est protégée par le
+      // middleware (proxy.ts), qui lit les cookies de LA REQUÊTE HTTP
+      // envoyée à ce moment précis. Sur certains navigateurs/réseaux
+      // (4G capricieuse, navigateur intégré WhatsApp/Instagram...), le
+      // cookie de session que le client Supabase vient d'écrire n'est pas
+      // encore visible par cette requête-là -- le middleware ne voit
+      // personne de connecté et renvoie tout droit vers /connexion, sans
+      // la moindre erreur puisque la connexion, elle, a bien réussi. Même
+      // famille de bug déjà rencontrée et documentée sur le lien de
+      // connexion rapide (voir lien-de-connexion/page.tsx). Un vrai
+      // rechargement complet (au lieu d'une navigation douce) repart
+      // d'une requête neuve où le cookie fraîchement écrit est cette fois
+      // garanti présent -- plus fiable qu'un router.push()+refresh() dont
+      // l'ordre d'exécution exact n'est pas garanti par Next.js.
+      window.location.href = "/dashboard";
     } catch {
       setError("Connexion impossible, vérifie ta connexion et réessaie.");
     } finally {

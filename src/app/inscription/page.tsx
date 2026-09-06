@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -19,7 +18,6 @@ function isAlreadyRegistered(message: string) {
 }
 
 export default function InscriptionPage() {
-  const router = useRouter();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
@@ -73,8 +71,14 @@ export default function InscriptionPage() {
       }
 
       if (data.session) {
-        router.push("/dashboard");
-        router.refresh();
+        // Retour de Cindy du 06/09 (Sébastien PEULVEY, "aucun message
+        // d'erreur, mais tout s'efface") : même correctif que connexion/
+        // page.tsx -- un vrai rechargement complet plutôt qu'une
+        // navigation douce, pour garantir que le cookie de session que le
+        // client Supabase vient d'écrire soit bien celui que /dashboard
+        // (protégée par proxy.ts) verra à la requête suivante, sur tout
+        // navigateur/réseau.
+        window.location.href = "/dashboard";
         return;
       }
 

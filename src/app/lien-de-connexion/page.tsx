@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -15,7 +14,6 @@ import { createClient } from "@/lib/supabase/client";
 // Sans cette étape intermédiaire, le clic sur le lien renvoyait droit vers
 // l'écran de connexion, sans le moindre message — un vrai mur silencieux.
 export default function LienDeConnexionPage() {
-  const router = useRouter();
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -32,7 +30,14 @@ export default function LienDeConnexionPage() {
       .then(({ data }) => {
         if (cancelled) return;
         if (data.session) {
-          router.replace("/dashboard");
+          // Retour de Cindy du 06/09 (Sébastien PEULVEY, "aucun message
+          // d'erreur, mais tout s'efface") : router.replace() ici retombait
+          // dans le même piège que celui déjà documenté plus haut pour
+          // cette page (silent wall) -- une navigation douce peut arriver
+          // à /dashboard avant que le cookie fraîchement échangé soit
+          // visible par le middleware. Rechargement complet, comme
+          // connexion/page.tsx et inscription/page.tsx.
+          window.location.href = "/dashboard";
         } else {
           setFailed(true);
         }
@@ -43,7 +48,7 @@ export default function LienDeConnexionPage() {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, []);
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center bg-zinc-50 px-4 py-16 text-center">
