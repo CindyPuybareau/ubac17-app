@@ -353,7 +353,6 @@ export default async function ChildViewPage() {
     <ChildDashboard
       firstName={player.first_name}
       avatarUrl={player.avatar_url}
-      category={player.category}
       teams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
       events={events}
       teammates={teammates}

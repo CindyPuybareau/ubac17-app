@@ -103,7 +103,6 @@ export type ChildPenalite = {
 export default function ChildDashboard({
   firstName,
   avatarUrl,
-  category,
   teams,
   events,
   teammates,
@@ -117,7 +116,6 @@ export default function ChildDashboard({
 }: {
   firstName: string | null;
   avatarUrl: string | null;
-  category: string | null;
   teams: { id: string; name: string | null; category: string | null }[];
   events: ChildEvent[];
   teammates: ChildTeammate[];

@@ -1602,13 +1602,6 @@ export default async function DashboardPage({
     });
 
     const clubSettingsRow = clubSettingsRes.data as Record<AutomationKey, boolean> | null;
-    // Le compilateur React signale la réaffectation d'une variable de portée
-    // externe depuis cette IIFE async (pensée pour un composant client qui
-    // re-render) — sans objet ici : ce composant serveur exécute chaque
-    // bloc une seule fois, et tout est relu seulement après le
-    // "await Promise.all(...)" plus bas, jamais pendant l'exécution des
-    // trois blocs en parallèle.
-    // eslint-disable-next-line react-hooks/immutability
     adminAutomationSettings = {
       match_reminder_enabled: Boolean(clubSettingsRow?.match_reminder_enabled),
       expiry_alert_enabled: Boolean(clubSettingsRow?.expiry_alert_enabled),
