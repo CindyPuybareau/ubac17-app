@@ -2,13 +2,15 @@
 
 import { useMemo, useState } from "react";
 import {
+  Building2,
   CalendarDays,
   Contact,
   Eye,
   EyeOff,
+  ExternalLink,
   Flag,
-  Handshake,
   ListOrdered,
+  MessageCircle,
   ScrollText,
   Shield,
   Trophy,
@@ -211,6 +213,7 @@ export function buildProfileSections({
   events,
   sponsors,
   clubReports,
+  whatsappGroups,
 }: {
   allowedBriques: string[];
   teams: ProfileTeam[];
@@ -222,6 +225,9 @@ export function buildProfileSections({
   events: ChildEvent[];
   sponsors: SponsorDisplay[];
   clubReports: ClubReport[];
+  // Retour de Cindy du 06/09 ("je ne vois pas dans Vie du club son groupe
+  // WhatsApp") : jamais conditionné par une brique, voir benevole-view.tsx.
+  whatsappGroups: { id: string; name: string; inviteLink: string | null }[];
 }): AdminSection[] {
   const has = (b: string) => allowedBriques.includes(b);
   const teamRefs = teams.map((t) => ({ id: t.id, name: t.name, category: t.category }));
@@ -297,12 +303,54 @@ export function buildProfileSections({
     });
   }
 
-  if (has("sponsors")) {
+  // Retour de Cindy du 06/09 ("voir dans Vie du club les sponsors... mais
+  // en lecture seule pour les bénévoles", puis "son groupe WhatsApp") :
+  // même regroupement "Vie du club" que côté Bureau (admin-view.tsx),
+  // fusionnant Sponsors (lecture seule, brique "sponsors") et le(s)
+  // groupe(s) WhatsApp auquel ce bénévole a été rattaché (jamais
+  // conditionné par une brique, voir plus haut). Visible dès que l'un des
+  // deux a quelque chose à montrer.
+  if (has("sponsors") || whatsappGroups.length > 0) {
     sections.push({
-      key: "sponsors",
-      label: "Sponsors",
-      icon: <Handshake className={iconClass} />,
-      content: <SponsorsDisplay sponsors={sponsors} />,
+      key: "vie-du-club",
+      label: "Vie du club",
+      icon: <Building2 className={iconClass} />,
+      content: (
+        <div className="flex flex-col gap-4">
+          {whatsappGroups.length > 0 && (
+            <div className="flex flex-col gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
+              <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                <MessageCircle className="h-3.5 w-3.5 text-navy" />
+                {whatsappGroups.length > 1 ? "Tes groupes WhatsApp" : "Ton groupe WhatsApp"}
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                {whatsappGroups.map((g) =>
+                  g.inviteLink ? (
+                    <a
+                      key={g.id}
+                      href={g.inviteLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center justify-center gap-1.5 rounded-full bg-emerald-500 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      {g.name}
+                    </a>
+                  ) : (
+                    <span
+                      key={g.id}
+                      className="flex items-center justify-center gap-1.5 rounded-full bg-zinc-50 px-3.5 py-2 text-sm font-medium text-zinc-400"
+                    >
+                      {g.name} — lien non renseigné
+                    </span>
+                  )
+                )}
+              </div>
+            </div>
+          )}
+          {has("sponsors") && <SponsorsDisplay sponsors={sponsors} />}
+        </div>
+      ),
     });
   }
 
