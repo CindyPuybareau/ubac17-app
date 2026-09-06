@@ -2,6 +2,7 @@ import { FileWarning, Gavel, Handshake, Users, Wallet } from "lucide-react";
 import { formatPersonName } from "@/lib/names";
 import { formatLocalDateFr } from "@/lib/local-date";
 import { balanceDue, computeStatus, formatAmount } from "./cotisation-shared";
+import AnimatedNumber from "./animated-number";
 import AutomationSettings, { type AutomationKey } from "./automation-settings";
 import DeferredCalendar from "./deferred-calendar";
 import type {
@@ -36,17 +37,26 @@ function KpiCard({
   icon: Icon,
   iconClass,
   value,
+  format,
   label,
 }: {
   icon: typeof Wallet;
   iconClass: string;
-  value: string;
+  // Retour de Cindy du 06/09 ("une sorte de compteur") : value est
+  // désormais le NOMBRE brut (plus une chaîne déjà mise en forme), pour
+  // qu'AnimatedNumber puisse l'animer de 0 jusqu'à sa vraie valeur --
+  // format porte la mise en forme (€, %, arrondi entier...) que value
+  // portait auparavant directement.
+  value: number;
+  format: (n: number) => string;
   label: string;
 }) {
   return (
     <div className="flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-zinc-100 bg-white p-4 text-center shadow-sm">
       <Icon className={`h-5 w-5 shrink-0 ${iconClass}`} />
-      <p className="text-xl font-bold text-zinc-900 sm:text-2xl">{value}</p>
+      <p className="text-xl font-bold text-zinc-900 sm:text-2xl">
+        <AnimatedNumber value={value} format={format} />
+      </p>
       <p className="text-xs font-medium leading-tight text-zinc-500">{label}</p>
     </div>
   );
@@ -146,31 +156,36 @@ export default function BureauDashboard({
         <KpiCard
           icon={Wallet}
           iconClass="text-rose-600"
-          value={String(pending.length)}
+          value={pending.length}
+          format={(n) => String(Math.round(n))}
           label="Cotisations en attente"
         />
         <KpiCard
           icon={Wallet}
           iconClass="text-amber-700"
-          value={formatAmount(pendingAmount)}
+          value={pendingAmount}
+          format={formatAmount}
           label="Montant en attente"
         />
         <KpiCard
           icon={Gavel}
           iconClass="text-rose-600"
-          value={formatAmount(penalitesTotalAmount)}
+          value={penalitesTotalAmount}
+          format={formatAmount}
           label="Total pénalités"
         />
         <KpiCard
           icon={Handshake}
           iconClass="text-orange-600"
-          value={String(sponsorsNeedingRenewal.length)}
+          value={sponsorsNeedingRenewal.length}
+          format={(n) => String(Math.round(n))}
           label="Renouvellement Sponsors"
         />
         <KpiCard
           icon={Users}
           iconClass="text-navy"
-          value={String(activeMembers)}
+          value={activeMembers}
+          format={(n) => String(Math.round(n))}
           label="Membres actifs"
         />
       </div>

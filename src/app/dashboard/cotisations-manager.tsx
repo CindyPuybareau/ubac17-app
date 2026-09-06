@@ -25,6 +25,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
 import { formatPersonName } from "@/lib/names";
+import AnimatedNumber from "./animated-number";
 import CategoryTariffsEditor from "./category-tariffs-editor";
 import ConfirmDialog from "./confirm-dialog";
 import CotisationParticipantsTable, {
@@ -92,12 +93,19 @@ function KpiCard({
   icon: Icon,
   iconClass,
   value,
+  format,
   label,
   wide = false,
 }: {
   icon: typeof Wallet;
   iconClass: string;
-  value: string;
+  // Retour de Cindy du 06/09 ("une sorte de compteur") : value est
+  // désormais le NOMBRE brut (plus une chaîne déjà mise en forme), pour
+  // qu'AnimatedNumber puisse l'animer de 0 jusqu'à sa vraie valeur --
+  // format porte la mise en forme (€, %, arrondi entier...) que value
+  // portait auparavant directement. Même composant que bureau-dashboard.tsx.
+  value: number;
+  format: (n: number) => string;
   label: string;
   wide?: boolean;
 }) {
@@ -108,7 +116,9 @@ function KpiCard({
       }`}
     >
       <Icon className={`h-5 w-5 shrink-0 ${iconClass}`} />
-      <p className="text-xl font-bold text-slate-900 sm:text-2xl">{value}</p>
+      <p className="text-xl font-bold text-slate-900 sm:text-2xl">
+        <AnimatedNumber value={value} format={format} />
+      </p>
       <p className="text-xs font-medium leading-tight text-slate-500">{label}</p>
     </div>
   );
@@ -124,43 +134,50 @@ function KpiHeader({ cotisations }: { cotisations: AdminCotisation[] }) {
       <KpiCard
         icon={TrendingUp}
         iconClass="text-navy"
-        value={`${kpis.percentage} %`}
+        value={kpis.percentage}
+        format={(n) => `${Math.round(n)} %`}
         label="Collecté"
       />
       <KpiCard
         icon={CheckCircle2}
         iconClass="text-court-green"
-        value={String(kpis.payeCount)}
+        value={kpis.payeCount}
+        format={(n) => String(Math.round(n))}
         label="Payés"
       />
       <KpiCard
         icon={Clock}
         iconClass="text-parquet-dark"
-        value={String(kpis.partielCount)}
+        value={kpis.partielCount}
+        format={(n) => String(Math.round(n))}
         label="Partiels"
       />
       <KpiCard
         icon={ShieldCheck}
         iconClass="text-navy"
-        value={String(kpis.offertCount)}
+        value={kpis.offertCount}
+        format={(n) => String(Math.round(n))}
         label="Offerts / Dispensés"
       />
       <KpiCard
         icon={AlertTriangle}
         iconClass="text-coral-dark"
-        value={String(kpis.enAttenteCount)}
+        value={kpis.enAttenteCount}
+        format={(n) => String(Math.round(n))}
         label="En attente / Non payés"
       />
       <KpiCard
         icon={Wallet}
         iconClass="text-amber-700"
-        value={formatAmount(kpis.totalCollected)}
+        value={kpis.totalCollected}
+        format={formatAmount}
         label="Total collecté"
       />
       <KpiCard
         icon={Target}
         iconClass="text-indigo-600"
-        value={formatAmount(kpis.totalDue)}
+        value={kpis.totalDue}
+        format={formatAmount}
         label="Total attendu"
         wide
       />
