@@ -10,6 +10,37 @@ export type DashboardTab = {
   content: ReactNode;
 };
 
+// Repère de chargement aux couleurs du club (logo qui pulse + barre de
+// progression), repris à l'identique de dashboard/loading.tsx : partagé
+// ici entre le cas "content vaut encore null" (juste en dessous) et le
+// voile de changement d'onglet (plus bas) plutôt que dupliqué deux fois.
+// Retour de Cindy du 06/09 ("c'est moche... logo avec chargement bien
+// placé, centré et tout ! pas de retour à la ligne") : le texte porte
+// désormais whitespace-nowrap -- rien ne justifie qu'une phrase aussi
+// courte se coupe en deux lignes, quelle que soit la largeur de l'écran.
+function SpaceLoadingIndicator() {
+  return (
+    <div className="flex flex-col items-center justify-center gap-3">
+      {/* eslint-disable-next-line @next/next/no-img-element -- même raison
+          que club-reports-section.tsx : le logo doit s'afficher
+          immédiatement, sans dépendre de l'optimisation à la volée de
+          next/image (qui, pour ce court repère de chargement, n'a
+          jamais le temps d'arriver). */}
+      <img src="/logo.png" alt="UBAC" className="h-10 w-10 animate-pulse object-contain" />
+      <div className="h-1.5 w-40 overflow-hidden rounded-full bg-zinc-200">
+        <div className="h-full w-1/3 animate-[loading-bar_1.1s_ease-in-out_infinite] rounded-full bg-ubac-yellow" />
+      </div>
+      <p className="whitespace-nowrap text-sm font-medium text-zinc-500">Chargement de cet espace...</p>
+      <style>{`
+        @keyframes loading-bar {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(300%); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 // Retour de Cindy du 04/09 ("pourquoi ça bug quand on a plusieurs
 // espaces") : côté page.tsx, un seul espace est désormais réellement
 // calculé par chargement (celui désigné par `activeKey`, lui-même dérivé
@@ -113,7 +144,10 @@ export default function DashboardTabs({
 
       {/* Retour de Cindy du 04/09 : content peut valoir `null` le temps
           qu'un clic recharge l'espace demandé (voir handleClick) -- un
-          message plutôt qu'un vide silencieux pendant ce court instant. */}
+          repère de chargement complet plutôt qu'un texte gris qui se
+          coupait en deux lignes (retour de Cindy du 06/09, "c'est moche
+          ... pas de retour à la ligne"), dans une carte à sa taille plutôt
+          que perdu dans un grand espace blanc. */}
       {/* Retour de Cindy du 06/09 (Sandrine MANZELLE, Bureau + joueuse +
           maman -- "Mon équipe" et "Mes enfants" sont réutilisés à vide l'un
           après l'autre) : "Mon équipe" et "Mes enfants" sont tous les deux
@@ -129,27 +163,15 @@ export default function DashboardTabs({
           tard, pas seulement FamilyView). */}
       <div key={current.key} className="relative">
         {current.content ?? (
-          <p className="text-sm text-zinc-500">Chargement de cet espace…</p>
+          <div className="flex items-center justify-center rounded-2xl border border-zinc-100 bg-white py-16 shadow-sm">
+            <SpaceLoadingIndicator />
+          </div>
         )}
         {/* Voile de chargement (retour de Cindy du 06/09, voir plus haut) :
             recouvre juste ce bloc-ci, jamais le menu au-dessus -- pendant
             ce temps, `current` pointe toujours vers l'ANCIEN onglet actif
             (activeKey ne bascule qu'une fois le nouveau prêt), donc c'est
-            bien son contenu qu'on assombrit, en attendant le nouveau.
-            Retour de Cindy du 06/09 ("toujours un écran blanc quand on
-            passe d'un onglet à un autre" / "je ne vois pas le logo") : un
-            simple logo qui pulse, sans la barre de progression, se lisait
-            comme un fond blanc/vide -- repris ici à l'identique de
-            dashboard/loading.tsx (même logo, même barre, même texte).
-            <Image> de next/image ne s'affichait jamais à temps ici (son
-            optimisation à la volée demande un aller-retour serveur avant
-            le tout premier affichage d'une taille donnée -- le voile
-            disparaît généralement avant que cette image arrive) : même
-            correctif déjà appliqué au logo ailleurs dans l'appli pour la
-            même raison de fiabilité (voir club-reports-section.tsx,
-            cotisation-participants-table.tsx) -- une simple balise <img>
-            sert le fichier tel quel depuis /public, sans aller-retour
-            d'optimisation. */}
+            bien son contenu qu'on assombrit, en attendant le nouveau. */}
         {isPending && (
           <>
             {/* Fond qui recouvre TOUT l'ancien contenu, aussi haut soit-il
@@ -173,29 +195,11 @@ export default function DashboardTabs({
                 qui n'ont jamais ce souci. */}
             {typeof document !== "undefined" &&
               createPortal(
-                <div className="fixed left-1/2 top-1/2 z-20 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-3">
-                  {/* eslint-disable-next-line @next/next/no-img-element --
-                      même raison que club-reports-section.tsx : le logo
-                      doit s'afficher immédiatement, sans dépendre de
-                      l'optimisation à la volée de next/image. */}
-                  <img
-                    src="/logo.png"
-                    alt="UBAC"
-                    className="h-10 w-10 animate-pulse object-contain"
-                  />
-                  <div className="h-1.5 w-40 overflow-hidden rounded-full bg-zinc-200">
-                    <div className="h-full w-1/3 animate-[loading-bar_1.1s_ease-in-out_infinite] rounded-full bg-ubac-yellow" />
-                  </div>
-                  <p className="text-sm font-medium text-zinc-500">Chargement de cet espace...</p>
+                <div className="fixed left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
+                  <SpaceLoadingIndicator />
                 </div>,
                 document.body
               )}
-            <style>{`
-              @keyframes loading-bar {
-                0% { transform: translateX(-100%); }
-                100% { transform: translateX(300%); }
-              }
-            `}</style>
           </>
         )}
       </div>
