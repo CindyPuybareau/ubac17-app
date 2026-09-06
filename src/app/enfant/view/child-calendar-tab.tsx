@@ -25,6 +25,7 @@ import {
   formatEventTime,
 } from "@/app/dashboard/event-style";
 import { groupBirthdaysByMonthDay, type BirthdaySource } from "@/app/dashboard/birthdays";
+import EmptyState from "@/app/dashboard/empty-state";
 import { parseMatchTitle } from "@/lib/match-display";
 import { formatFirstName } from "@/lib/names";
 import type { ChildEvent, ChildTeammate } from "./child-dashboard";
@@ -319,9 +320,7 @@ export default function ChildCalendarTab({
       {view === "list" && (
         <div className="flex flex-col gap-4">
           {upcoming.length === 0 && past.length === 0 && (
-            <p className="rounded-2xl border border-zinc-100 bg-white p-4 text-sm text-zinc-500 shadow-sm">
-              Aucun événement pour le moment.
-            </p>
+            <EmptyState icon={LayoutGrid} message="Aucun événement pour le moment." />
           )}
           {upcoming.length > 0 && (
             <div className="flex flex-col gap-2">

@@ -397,7 +397,13 @@ export default function AdminView({
           key: "benevoles",
           label: "Bénévoles & Accès",
           icon: <HandHeart className={iconClass} />,
-          content: <BenevolesManager benevoles={benevoles} accessProfiles={accessProfiles} />,
+          content: (
+            <BenevolesManager
+              benevoles={benevoles}
+              accessProfiles={accessProfiles}
+              whatsappGroups={whatsappGroups}
+            />
+          ),
         },
         {
           key: "ffbb",

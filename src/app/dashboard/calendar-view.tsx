@@ -15,6 +15,7 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
+  HeartHandshake,
   LayoutGrid,
   List,
   Mail,
@@ -44,7 +45,7 @@ import MatchScore from "./match-score";
 import TeamSelectorPills from "./team-selector-pills";
 import TeamFilterDropdown from "./team-filter-dropdown";
 import { sendEventPush } from "./event-push";
-import type { AdminBenevole, AdminUpcomingEvent } from "./page";
+import type { AdminBenevole, AdminUpcomingEvent, BenevoleInviteStatus } from "./page";
 import {
   groupBirthdaysByMonthDay,
   upcomingBirthdays,
@@ -262,6 +263,82 @@ function PaidParticipantsList({
             >
               {formatFirstName(p.firstName)}{" "}
               <span className="font-bold uppercase">{formatLastName(p.lastName)}</span>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Retour de Cindy du 06/09 ("le bureau ou les coachs doivent avoir la
+// vision des bénévoles qui ont répondu présent") : même principe que
+// PresentPlayersList ci-dessus (repliée par défaut, dépliable), mais pour
+// les bénévoles invités à cet événement — jamais affichée si personne n'a
+// été invité (contrairement aux joueurs, systématiquement de la partie).
+function BenevoleInvitesList({
+  invites,
+}: {
+  invites: { id: string; firstName: string; lastName: string; status: BenevoleInviteStatus }[];
+}) {
+  const [open, setOpen] = useState(false);
+
+  if (invites.length === 0) return null;
+
+  const present = invites.filter((b) => b.status === "PRESENT");
+  const absent = invites.filter((b) => b.status === "ABSENT");
+  const pending = invites.filter((b) => b.status === "PENDING");
+  const statusClass = (status: BenevoleInviteStatus) =>
+    status === "PRESENT"
+      ? "bg-emerald-50 text-emerald-700"
+      : status === "ABSENT"
+        ? "bg-red-50 text-red-700"
+        : "bg-zinc-100 text-zinc-500";
+
+  return (
+    <div className="flex flex-col gap-1.5 border-t border-zinc-100 pt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:text-zinc-900"
+      >
+        <HeartHandshake className="h-3.5 w-3.5 shrink-0 text-navy" />
+        {invites.length} bénévole{invites.length > 1 ? "s" : ""} invité{invites.length > 1 ? "s" : ""}
+        {open ? (
+          <ChevronUp className="h-3.5 w-3.5 shrink-0" />
+        ) : (
+          <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+        )}
+      </button>
+      <div className="flex flex-wrap gap-1.5">
+        {present.length > 0 && (
+          <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold leading-none text-green-700">
+            <Check className="h-3 w-3" />
+            {present.length} présent{present.length > 1 ? "s" : ""}
+          </span>
+        )}
+        {absent.length > 0 && (
+          <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold leading-none text-red-700">
+            <X className="h-3 w-3" />
+            {absent.length} absent{absent.length > 1 ? "s" : ""}
+          </span>
+        )}
+        {pending.length > 0 && (
+          <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold leading-none text-zinc-600">
+            <Clock className="h-3 w-3" />
+            {pending.length} en attente
+          </span>
+        )}
+      </div>
+      {open && (
+        <div className="flex flex-wrap gap-1.5">
+          {sortByLastName(invites, (b) => b.lastName).map((b) => (
+            <span
+              key={b.id}
+              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${statusClass(b.status)}`}
+            >
+              {formatFirstName(b.firstName)}{" "}
+              <span className="font-bold uppercase">{formatLastName(b.lastName)}</span>
             </span>
           ))}
         </div>
@@ -1129,6 +1206,10 @@ export default function CalendarView({
             les espaces (Bureau/Coach/Famille), plus seulement côté Famille
             comme avant (voir presentPlayers sur AdminUpcomingEvent). */}
         <PresentPlayersList players={event.presentPlayers ?? []} />
+
+        {/* Retour de Cindy du 06/09 : vision des bénévoles invités et de
+            leur réponse, même endroit que "Qui sera là ?" ci-dessus. */}
+        <BenevoleInvitesList invites={event.benevoleInvites ?? []} />
 
         {/* Plus d'appel express ici pour une équipe gérée : le coach ne
             répond pas à la place des familles, il leur demande de le

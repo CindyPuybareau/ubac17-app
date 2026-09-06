@@ -123,6 +123,13 @@ export type AdminBenevole = {
   // lui, toujours) -- null = aucune brique supplémentaire, comportement
   // historique (juste ses événements/besoins de bénévolat habituels).
   accessProfileId: string | null;
+  // Retour de Cindy du 06/09 ("quel groupe whatsapp lui sera attribué",
+  // puis "un bénévole peut faire partie de plusieurs groupes") : simple
+  // attribution informative parmi les groupes "Commissions &
+  // Administration" -- ne rattache jamais un bénévole à
+  // whatsapp_group_members (réservé aux joueurs, voir whatsapp-groups-
+  // manager.tsx). Voir benevole_whatsapp_groups (20261031210000).
+  whatsappGroupIds: string[];
 };
 
 // Profils d'accès sur-mesure (retour de Cindy du 05/09, reprise du sujet
@@ -444,10 +451,19 @@ export type AdminUpcomingEvent = {
   presentPlayers?: { id: string; firstName: string | null; lastName: string | null }[];
   // Bénévoles déjà invités à cet événement (retour de Cindy du 2026-08-25)
   // — préremplit la case "Bénévoles invités" en édition, voir
-  // create-event-form.tsx. Bureau uniquement (allowClubWide) : []
-  // ailleurs, jamais rempli côté Coach/Famille/Enfant.
+  // create-event-form.tsx. Bureau et Coach depuis le 06/09 : [] côté
+  // Famille/Enfant.
   benevoleIds: string[];
+  // Retour de Cindy du 06/09 ("le bureau ou les coachs doivent avoir la
+  // vision des bénévoles qui ont répondu présent") : même invitations que
+  // benevoleIds ci-dessus, mais avec le nom et la réponse de chacun — pour
+  // l'affichage "X bénévoles présents" sur la carte (voir
+  // BenevolePresentList, calendar-view.tsx). PENDING tant que le bénévole
+  // n'a pas répondu depuis son propre lien (voir /api/benevole-rsvp).
+  benevoleInvites: { id: string; firstName: string; lastName: string; status: BenevoleInviteStatus }[];
 };
+
+export type BenevoleInviteStatus = "PENDING" | "PRESENT" | "ABSENT";
 
 // Un mineur ne peut jamais afficher le badge Bureau (voir bureauRole
 // plus bas) : seul critère fiable, contrairement à pending_parent_email
@@ -1323,10 +1339,17 @@ export default async function DashboardPage({
   let adminSponsors: AdminSponsor[] = [];
   let adminBenevoles: AdminBenevole[] = [];
   // Retour de Cindy du 06/09 ("bureau et coach" peuvent inviter un
-  // bénévole) : calculé une seule fois ici (dans le bloc Bureau, voir plus
-  // bas) puis réutilisé tel quel par le bloc Coach quand bureauDataLoaded
-  // -- même principe que adminTeamsRaw/adminBenevoles ci-dessus.
-  let benevoleIdsByEventId = new Map<string, string[]>();
+  // bénévole, puis "le bureau ou les coachs doivent avoir la vision des
+  // bénévoles qui ont répondu présent") : calculé une seule fois ici (dans
+  // le bloc Bureau, voir plus bas) puis réutilisé tel quel par le bloc
+  // Coach quand bureauDataLoaded -- même principe que
+  // adminTeamsRaw/adminBenevoles ci-dessus. Le nom + le statut (pas
+  // seulement l'id) permettent l'affichage "X bénévoles présents" sur la
+  // carte d'événement (voir BenevoleInviteStatus, AdminUpcomingEvent).
+  let benevoleInvitesByEventId = new Map<
+    string,
+    { id: string; firstName: string; lastName: string; status: BenevoleInviteStatus }[]
+  >();
   let adminPenalites: AdminPenalite[] = [];
   let adminAccessProfiles: AdminAccessProfile[] = [];
   // The Membres table's team pickers (filter + "Modifier le profil") only
@@ -1524,10 +1547,13 @@ export default async function DashboardPage({
           supabase
             .from("benevoles")
             .select(
-              "id, first_name, last_name, phone, email, notes, access_token, archived_at, access_profile_id"
+              "id, first_name, last_name, phone, email, notes, access_token, archived_at, access_profile_id, benevole_whatsapp_groups(whatsapp_group_id)"
             )
             .order("last_name"),
-        () => supabase.from("event_benevole_invites").select("event_id, benevole_id"),
+        () =>
+          supabase
+            .from("event_benevole_invites")
+            .select("event_id, benevole_id, status, benevoles(first_name, last_name)"),
         // Profils d'accès sur-mesure (retour de Cindy du 05/09) : liste des
         // profils et de leurs briques, pour l'écran de gestion et pour
         // remplir le sélecteur "Étendue de l'accès" dans la fiche membre.
@@ -2044,7 +2070,20 @@ export default async function DashboardPage({
       sortOrder: s.sort_order,
     }));
 
-    adminBenevoles = (benevolesRes.data ?? []).map((b) => ({
+    adminBenevoles = (
+      (benevolesRes.data ?? []) as unknown as {
+        id: string;
+        first_name: string;
+        last_name: string;
+        phone: string | null;
+        email: string | null;
+        notes: string | null;
+        access_token: string;
+        archived_at: string | null;
+        access_profile_id: string | null;
+        benevole_whatsapp_groups: { whatsapp_group_id: string }[] | null;
+      }[]
+    ).map((b) => ({
       id: b.id,
       firstName: b.first_name,
       lastName: b.last_name,
@@ -2054,6 +2093,7 @@ export default async function DashboardPage({
       accessToken: b.access_token,
       archivedAt: b.archived_at,
       accessProfileId: b.access_profile_id,
+      whatsappGroupIds: (b.benevole_whatsapp_groups ?? []).map((g) => g.whatsapp_group_id),
     }));
 
     adminAccessProfiles = (
@@ -2068,14 +2108,28 @@ export default async function DashboardPage({
       briques: (p.access_profile_briques ?? []).map((b) => b.brique),
     }));
 
-    // Quels bénévoles ont déjà été invités à chaque événement (retour de
-    // Cindy du 2026-08-25) — préremplit la case "Bénévoles invités" en
-    // édition, voir create-event-form.tsx.
-    benevoleIdsByEventId = new Map<string, string[]>();
-    (eventBenevoleInvitesRes.data ?? []).forEach((row) => {
-      const list = benevoleIdsByEventId.get(row.event_id) ?? [];
-      list.push(row.benevole_id);
-      benevoleIdsByEventId.set(row.event_id, list);
+    // Quels bénévoles ont déjà été invités à chaque événement, avec leur
+    // réponse (retour de Cindy du 2026-08-25, complété le 06/09) —
+    // préremplit la case "Bénévoles invités" en édition (create-event-
+    // form.tsx) et alimente "X bénévoles présents" sur la carte
+    // (calendar-view.tsx).
+    benevoleInvitesByEventId = new Map();
+    (
+      (eventBenevoleInvitesRes.data ?? []) as unknown as {
+        event_id: string;
+        benevole_id: string;
+        status: BenevoleInviteStatus;
+        benevoles: { first_name: string; last_name: string } | null;
+      }[]
+    ).forEach((row) => {
+      const list = benevoleInvitesByEventId.get(row.event_id) ?? [];
+      list.push({
+        id: row.benevole_id,
+        firstName: row.benevoles?.first_name ?? "",
+        lastName: row.benevoles?.last_name ?? "",
+        status: row.status,
+      });
+      benevoleInvitesByEventId.set(row.event_id, list);
     });
 
     adminPenalites = (penalitesRes.data ?? []).map((p) => {
@@ -2146,7 +2200,8 @@ export default async function DashboardPage({
         // le bug des présences plus tôt aujourd'hui, cette fois une
         // fonctionnalité jamais reportée sur Bureau/Coach plutôt qu'un bug.
         presentPlayers: buildPresentPlayers(rsvpsByEvent, e.id, eventRoster),
-        benevoleIds: benevoleIdsByEventId.get(e.id) ?? [],
+        benevoleIds: (benevoleInvitesByEventId.get(e.id) ?? []).map((b) => b.id),
+        benevoleInvites: benevoleInvitesByEventId.get(e.id) ?? [],
       };
     });
 
@@ -2347,20 +2402,53 @@ export default async function DashboardPage({
         // qu'un coach voit/écrit à ses propres équipes.
         () =>
           bureauDataLoaded
-            ? Promise.resolve({ data: adminBenevoles, error: null })
+            ? // Retour de Cindy du 06/09 ("plusieurs groupes") : adminBenevoles
+              // est déjà reconstruit (camelCase) à ce stade -- reconstruit ici
+              // la même forme brute (snake_case + jointure imbriquée) que la
+              // requête fraîche ci-dessous, pour que le .map() qui suit
+              // fonctionne à l'identique quelle que soit la branche (audit du
+              // 06/09 : la précédente réutilisation retournait adminBenevoles
+              // tel quel, déjà camelCase, faisant échouer silencieusement ce
+              // même .map() -- b.first_name etc. valaient undefined partout).
+              Promise.resolve({
+                data: adminBenevoles.map((b) => ({
+                  id: b.id,
+                  first_name: b.firstName,
+                  last_name: b.lastName,
+                  phone: b.phone,
+                  email: b.email,
+                  notes: b.notes,
+                  access_token: b.accessToken,
+                  archived_at: b.archivedAt,
+                  access_profile_id: b.accessProfileId,
+                  benevole_whatsapp_groups: b.whatsappGroupIds.map((id) => ({
+                    whatsapp_group_id: id,
+                  })),
+                })),
+                error: null,
+              })
             : supabase
                 .from("benevoles")
-                .select("id, first_name, last_name, phone, email, notes, access_token, archived_at, access_profile_id")
+                .select(
+                  "id, first_name, last_name, phone, email, notes, access_token, archived_at, access_profile_id, benevole_whatsapp_groups(whatsapp_group_id)"
+                )
                 .order("last_name"),
         () =>
           bureauDataLoaded
             ? Promise.resolve({
-                data: Array.from(benevoleIdsByEventId.entries()).flatMap(([event_id, ids]) =>
-                  ids.map((benevole_id) => ({ event_id, benevole_id }))
+                data: Array.from(benevoleInvitesByEventId.entries()).flatMap(([event_id, invites]) =>
+                  invites.map((inv) => ({
+                    event_id,
+                    benevole_id: inv.id,
+                    status: inv.status,
+                    benevoles: { first_name: inv.firstName, last_name: inv.lastName },
+                  }))
                 ),
                 error: null,
               })
-            : supabase.from("event_benevole_invites").select("event_id, benevole_id"),
+            : supabase
+                .from("event_benevole_invites")
+                .select("event_id, benevole_id, status, benevoles(first_name, last_name)"),
       ],
       // dbLimit partagé (voir lib/batch.ts / le bloc Bureau plus haut).
       dbLimit
@@ -2389,6 +2477,7 @@ export default async function DashboardPage({
         access_token: string;
         archived_at: string | null;
         access_profile_id: string | null;
+        benevole_whatsapp_groups: { whatsapp_group_id: string }[] | null;
       }[]
     ).map((b) => ({
       id: b.id,
@@ -2400,12 +2489,28 @@ export default async function DashboardPage({
       accessToken: b.access_token,
       archivedAt: b.archived_at,
       accessProfileId: b.access_profile_id,
+      whatsappGroupIds: (b.benevole_whatsapp_groups ?? []).map((g) => g.whatsapp_group_id),
     }));
-    const coachBenevoleIdsByEventId = new Map<string, string[]>();
-    (coachEventBenevoleInvitesRes.data ?? []).forEach((row) => {
-      const list = coachBenevoleIdsByEventId.get(row.event_id) ?? [];
-      list.push(row.benevole_id);
-      coachBenevoleIdsByEventId.set(row.event_id, list);
+    const coachBenevoleInvitesByEventId = new Map<
+      string,
+      { id: string; firstName: string; lastName: string; status: BenevoleInviteStatus }[]
+    >();
+    (
+      (coachEventBenevoleInvitesRes.data ?? []) as unknown as {
+        event_id: string;
+        benevole_id: string;
+        status: BenevoleInviteStatus;
+        benevoles: { first_name: string; last_name: string } | null;
+      }[]
+    ).forEach((row) => {
+      const list = coachBenevoleInvitesByEventId.get(row.event_id) ?? [];
+      list.push({
+        id: row.benevole_id,
+        firstName: row.benevoles?.first_name ?? "",
+        lastName: row.benevoles?.last_name ?? "",
+        status: row.status,
+      });
+      coachBenevoleInvitesByEventId.set(row.event_id, list);
     });
 
     // Matchs/événements ponctuels (eventsRes) + entraînements du mois
@@ -2915,9 +3020,10 @@ export default async function DashboardPage({
         // pas seulement côté Famille — voir buildPresentPlayers/bloc Bureau.
         presentPlayers: buildPresentPlayers(rsvpsByEvent, e.id, eventRoster),
         // Retour de Cindy du 06/09 ("bureau et coach" peuvent inviter un
-        // bénévole) : préremplit "Bénévoles invités" en édition, comme côté
-        // Bureau -- voir coachBenevoleIdsByEventId plus haut.
-        benevoleIds: coachBenevoleIdsByEventId.get(e.id) ?? [],
+        // bénévole, puis vision des présences) : comme côté Bureau -- voir
+        // coachBenevoleInvitesByEventId plus haut.
+        benevoleIds: (coachBenevoleInvitesByEventId.get(e.id) ?? []).map((b) => b.id),
+        benevoleInvites: coachBenevoleInvitesByEventId.get(e.id) ?? [],
       };
     });
 
@@ -3434,6 +3540,7 @@ export default async function DashboardPage({
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, teamsById),
         rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
         benevoleIds: [],
+        benevoleInvites: [],
       };
     });
 

@@ -56,9 +56,15 @@ export default async function BenevoleViewPage() {
 
   const { data: inviteRows } = await supabase
     .from("event_benevole_invites")
-    .select("event_id")
+    .select("event_id, status")
     .eq("benevole_id", benevoleId);
   const eventIds = (inviteRows ?? []).map((r) => r.event_id as string);
+  // Retour de Cindy du 06/09 ("le bénévole doit pouvoir se mettre présent
+  // ou non") : sa réponse à CETTE invitation précise -- voir
+  // /api/benevole-rsvp pour l'écriture.
+  const statusByEventId = new Map(
+    (inviteRows ?? []).map((r) => [r.event_id as string, r.status as "PENDING" | "PRESENT" | "ABSENT"])
+  );
 
   let events: BenevoleEvent[] = [];
   let volunteerNeedsByEventId: Record<string, VolunteerNeed[]> = {};
@@ -88,6 +94,7 @@ export default async function BenevoleViewPage() {
       startTime: e.start_time,
       endTime: e.end_time,
       teamName: (e.teams as unknown as { name: string | null } | null)?.name ?? null,
+      status: statusByEventId.get(e.id) ?? "PENDING",
     }));
 
     volunteerNeedsByEventId = await getVolunteerNeedsByEventId(supabase, eventIds);

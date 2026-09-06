@@ -23,6 +23,7 @@ import ChildEventsTab from "@/app/enfant/view/child-events-tab";
 import ChildResultsTab from "@/app/enfant/view/child-results-tab";
 import SponsorsDisplay from "@/app/dashboard/sponsors-display";
 import ClubReportsSection from "@/app/dashboard/club-reports-section";
+import EmptyState from "@/app/dashboard/empty-state";
 import type { ClubReport, SponsorDisplay } from "@/app/dashboard/page";
 
 // Retour de Cindy du 05/09 ("profil et bénévoles doivent être fusionnés"),
@@ -58,7 +59,7 @@ function MembersSection({ members }: { members: ProfileMember[] }) {
   return (
     <div className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
       {sorted.length === 0 ? (
-        <p className="text-sm text-zinc-500">Aucun membre pour le moment.</p>
+        <EmptyState icon={Contact} message="Aucun membre pour le moment." />
       ) : (
         <div className="flex flex-col gap-1">
           {sorted.map((m) => (

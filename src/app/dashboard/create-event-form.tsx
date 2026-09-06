@@ -506,6 +506,25 @@ export default function CreateEventForm({
     // serveur — corrigé silencieusement par le prochain rafraîchissement
     // temps réel si besoin.
     const teamName = resolveTeamNameClient(inserted.team_id, inserted.target_team_ids, teams);
+    // Retour de Cindy du 06/09 ("vision des bénévoles qui ont répondu
+    // présent") : affichage optimiste construit ici, comme le reste de ce
+    // patch -- garde le statut déjà connu pour un bénévole déjà invité
+    // (editingEvent.benevoleInvites), "PENDING" par défaut pour un
+    // nouvellement ajouté (il n'a pas encore pu répondre).
+    const previousInvitesById = new Map(
+      (editingEvent?.benevoleInvites ?? []).map((inv) => [inv.id, inv])
+    );
+    const optimisticBenevoleInvites = selectedBenevoleIds.map((id) => {
+      const previous = previousInvitesById.get(id);
+      if (previous) return previous;
+      const b = benevoles.find((x) => x.id === id);
+      return {
+        id,
+        firstName: b?.firstName ?? "",
+        lastName: b?.lastName ?? "",
+        status: "PENDING" as const,
+      };
+    });
     if (isEditing && editingEvent) {
       onUpdated?.({
         ...editingEvent,
@@ -526,6 +545,7 @@ export default function CreateEventForm({
         targetTeamIds: inserted.target_team_ids,
         teamName,
         benevoleIds: selectedBenevoleIds,
+        benevoleInvites: optimisticBenevoleInvites,
       });
     } else {
       onCreated?.([
@@ -552,6 +572,7 @@ export default function CreateEventForm({
           teamName,
           rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
           benevoleIds: selectedBenevoleIds,
+          benevoleInvites: optimisticBenevoleInvites,
         },
       ]);
     }

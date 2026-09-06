@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { CalendarDays } from "lucide-react";
 import { sortTeamsByGroup, teamLabel } from "@/lib/teams";
+import EmptyState from "@/app/dashboard/empty-state";
 import { EventRow } from "./child-calendar-tab";
 import type { ChildEvent } from "./child-dashboard";
 
@@ -83,9 +85,7 @@ export default function ChildEventsTab({
         </div>
       )}
       {clubEvents.length === 0 ? (
-        <p className="rounded-2xl border border-zinc-100 bg-white p-4 text-sm text-zinc-500 shadow-sm">
-          Aucun événement programmé pour le moment.
-        </p>
+        <EmptyState icon={CalendarDays} message="Aucun événement programmé pour le moment." />
       ) : (
         clubEvents.map((e) => (
           <EventRow

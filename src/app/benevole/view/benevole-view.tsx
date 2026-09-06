@@ -11,7 +11,15 @@ import {
   type VolunteerNeed,
 } from "@/app/dashboard/event-volunteer-needs";
 import { formatFirstName } from "@/lib/names";
+import {
+  SEGMENT_ABSENT_ON,
+  SEGMENT_BUTTON,
+  SEGMENT_GROUP,
+  SEGMENT_OFF,
+  SEGMENT_PRESENT_ON,
+} from "@/app/dashboard/rsvp-segment";
 import DocumentsPanel from "@/components/club-documents";
+import EmptyState from "@/app/dashboard/empty-state";
 import AdminSidebar, { type AdminSection } from "@/app/dashboard/admin-sidebar";
 import { MobileNavProvider } from "@/app/dashboard/mobile-nav-context";
 import MobileMenuButton from "@/app/dashboard/mobile-menu-button";
@@ -32,6 +40,11 @@ export type BenevoleEvent = {
   startTime: string;
   endTime: string | null;
   teamName: string | null;
+  // Retour de Cindy du 06/09 ("le bénévole doit pouvoir se mettre présent
+  // ou non") : sa réponse à cette invitation précise, distincte de
+  // "Je m'en occupe" sur un besoin (BenevoleNeedRow ci-dessous) — voir
+  // /api/benevole-rsvp.
+  status: "PENDING" | "PRESENT" | "ABSENT";
 };
 
 function remainingSlots(need: VolunteerNeed) {
@@ -128,6 +141,66 @@ function BenevoleNeedRow({
   );
 }
 
+// Retour de Cindy du 06/09 ("le bénévole doit pouvoir se mettre présent ou
+// non") : réponse générale à CETTE invitation (distincte de "Je m'en
+// occupe" sur un besoin précis, voir BenevoleNeedRow) — même habillage que
+// RsvpButtons (calendar-view.tsx, joueurs), mais écrit via
+// /api/benevole-rsvp plutôt qu'un appel Supabase direct (aucune session
+// Supabase Auth côté bénévole).
+function BenevoleRsvpButtons({ eventId, currentStatus }: { eventId: string; currentStatus: string }) {
+  const [status, setStatus] = useState(currentStatus);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function respond(newStatus: "PRESENT" | "ABSENT") {
+    const previousStatus = status;
+    setStatus(newStatus);
+    setPending(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/benevole-rsvp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId, status: newStatus }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        setStatus(previousStatus);
+        setError(body?.error ?? "Réponse non enregistrée.");
+      }
+    } catch {
+      setStatus(previousStatus);
+      setError("Réponse non enregistrée.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className={SEGMENT_GROUP}>
+        <button
+          disabled={pending}
+          onClick={() => respond("PRESENT")}
+          className={`${SEGMENT_BUTTON} ${status === "PRESENT" ? SEGMENT_PRESENT_ON : SEGMENT_OFF}`}
+        >
+          <Check className="h-3.5 w-3.5 shrink-0" />
+          Présent
+        </button>
+        <button
+          disabled={pending}
+          onClick={() => respond("ABSENT")}
+          className={`${SEGMENT_BUTTON} ${status === "ABSENT" ? SEGMENT_ABSENT_ON : SEGMENT_OFF}`}
+        >
+          <X className="h-3.5 w-3.5 shrink-0" />
+          Absent
+        </button>
+      </div>
+      {error && <p className="text-[11px] text-red-600">{error}</p>}
+    </div>
+  );
+}
+
 function EventCard({
   event,
   needs,
@@ -141,7 +214,11 @@ function EventCard({
   const lieu = event.salle || event.location;
 
   return (
-    <div className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
+    // Retour de Cindy du 06/09 ("le liséré coloré comme sur les autres
+    // espaces, même pour les bénévoles") : même bordure gauche que
+    // calendar-view.tsx (border-l-4 + style.border, couleur par type
+    // d'événement), jusqu'ici oubliée sur cette carte-ci.
+    <div className={`rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm border-l-4 ${style.border}`}>
       <div className="flex flex-wrap items-center gap-2">
         <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${style.badge}`}>
           {style.label}
@@ -165,6 +242,13 @@ function EventCard({
             {lieu}
           </span>
         )}
+      </div>
+      {/* Retour de Cindy du 06/09 : réponse générale à l'événement, avant
+          le détail des besoins d'organisation plus bas -- sans intitulé
+          (retour de Cindy du 06/09), les boutons Présent/Absent parlent
+          déjà d'eux-mêmes. */}
+      <div className="mt-3 border-t border-zinc-100 pt-3">
+        <BenevoleRsvpButtons eventId={event.id} currentStatus={event.status} />
       </div>
       <div className="mt-3 flex flex-col gap-2 rounded-xl border border-zinc-100 bg-zinc-50/60 p-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
@@ -225,17 +309,14 @@ export default function BenevoleView({
       content: (
         <div className="flex flex-col gap-4">
           <p className="text-sm text-zinc-500">
-            Merci de ton aide ! Voici les événements où le Bureau a besoin de toi — clique sur un
-            besoin pour te proposer.
+            Merci de ton aide ! Voici les événements où le Bureau et les coachs ont besoin de toi
+            — clique sur un besoin pour te proposer.
           </p>
           {events.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 rounded-2xl border border-zinc-100 bg-white p-8 text-center shadow-sm">
-              <Check className="h-8 w-8 text-emerald-400" />
-              <p className="text-sm text-zinc-500">
-                Aucun événement pour le moment. Le Bureau te préviendra dès qu&apos;il aura besoin
-                de toi.
-              </p>
-            </div>
+            <EmptyState
+              icon={Check}
+              message="Aucun événement pour le moment. Le Bureau et les coachs te préviendront dès qu'ils auront besoin de toi."
+            />
           ) : (
             events.map((event) => (
               <EventCard

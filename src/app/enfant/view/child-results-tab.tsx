@@ -3,6 +3,7 @@ import { Clock, ListOrdered, Shield } from "lucide-react";
 import { formatEventTime, homeAwayLabel } from "@/app/dashboard/event-style";
 import { parseMatchTitle } from "@/lib/match-display";
 import { sortTeamsByGroup, teamLabel } from "@/lib/teams";
+import EmptyState from "@/app/dashboard/empty-state";
 import MatchResultCelebration from "@/components/match-result-celebration";
 import { EventRow } from "./child-calendar-tab";
 import type { ChildEvent } from "./child-dashboard";
@@ -200,11 +201,14 @@ export default function ChildResultsTab({
       )}
       <div className="flex flex-col gap-1.5">
         {visibleMatches.length === 0 ? (
-          <p className="text-sm text-zinc-500">
-            {shownMode === "officialMatches"
-              ? "Aucun match officiel programmé pour le moment."
-              : "Aucun résultat pour le moment."}
-          </p>
+          <EmptyState
+            icon={Shield}
+            message={
+              shownMode === "officialMatches"
+                ? "Aucun match officiel programmé pour le moment."
+                : "Aucun résultat pour le moment."
+            }
+          />
         ) : (
           listedMatches.map((e) => <ResultRow key={e.id} event={e} />)
         )}

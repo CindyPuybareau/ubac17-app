@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Copy, HeartHandshake, Pencil, RotateCcw, Trash2, X } from "lucide-react";
+import { Check, Copy, HeartHandshake, MessageCircle, Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { avatarColor } from "@/lib/avatar-color";
 import ConfirmDialog from "./confirm-dialog";
 import EmptyState from "./empty-state";
 import { BRIQUE_GROUPS } from "./access-briques";
 import { formatPersonName } from "@/lib/names";
-import type { AdminAccessProfile, AdminBenevole } from "./page";
+import type { AdminAccessProfile, AdminBenevole, WhatsAppGroup } from "./page";
 
 type BenevoleForm = {
   firstName: string;
@@ -24,6 +25,11 @@ type BenevoleForm = {
   // membre (member-detail-modal.tsx) : un profil dédié à CE bénévole est
   // créé/mis à jour silencieusement derrière, jamais montré comme un choix.
   briques: string[];
+  // [] = aucun groupe (retour de Cindy du 06/09, "quel groupe whatsapp lui
+  // sera attribué", puis "un bénévole peut faire partie de plusieurs
+  // groupes") -- simple attribution informative, voir whatsappGroupIds sur
+  // AdminBenevole.
+  whatsappGroupIds: string[];
 };
 
 const EMPTY_FORM: BenevoleForm = {
@@ -33,6 +39,7 @@ const EMPTY_FORM: BenevoleForm = {
   email: "",
   notes: "",
   briques: [],
+  whatsappGroupIds: [],
 };
 
 function toForm(b: AdminBenevole, accessProfiles: AdminAccessProfile[]): BenevoleForm {
@@ -43,6 +50,7 @@ function toForm(b: AdminBenevole, accessProfiles: AdminAccessProfile[]): Benevol
     email: b.email ?? "",
     notes: b.notes ?? "",
     briques: (b.accessProfileId && accessProfiles.find((p) => p.id === b.accessProfileId)?.briques) || [],
+    whatsappGroupIds: b.whatsappGroupIds,
   };
 }
 
@@ -58,6 +66,7 @@ function toForm(b: AdminBenevole, accessProfiles: AdminAccessProfile[]): Benevol
 export default function BenevolesManager({
   benevoles,
   accessProfiles,
+  whatsappGroups,
 }: {
   benevoles: AdminBenevole[];
   // Retour de Cindy du 05/09 ("profil et bénévoles doivent être
@@ -65,6 +74,10 @@ export default function BenevolesManager({
   // qu'un compte Bureau, pour voir en plus (toujours en lecture seule) les
   // briques cochées sur son lien privé -- voir /benevole/view.
   accessProfiles: AdminAccessProfile[];
+  // Retour de Cindy du 06/09 : pour choisir à quel groupe WhatsApp
+  // "Commissions & Administration" ce bénévole est rattaché -- jamais un
+  // groupe d'équipe, qui n'a pas de sens pour lui.
+  whatsappGroups: WhatsAppGroup[];
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState<AdminBenevole | "new" | null>(null);
@@ -105,6 +118,14 @@ export default function BenevolesManager({
       f.briques.includes(key)
         ? { ...f, briques: f.briques.filter((b) => b !== key) }
         : { ...f, briques: [...f.briques, key] }
+    );
+  }
+
+  function toggleWhatsappGroup(id: string) {
+    setForm((f) =>
+      f.whatsappGroupIds.includes(id)
+        ? { ...f, whatsappGroupIds: f.whatsappGroupIds.filter((g) => g !== id) }
+        : { ...f, whatsappGroupIds: [...f.whatsappGroupIds, id] }
     );
   }
 
@@ -245,6 +266,38 @@ export default function BenevolesManager({
       }
     }
 
+    // Groupes WhatsApp (retour de Cindy du 06/09, "un bénévole peut faire
+    // partie de plusieurs groupes") : relation à part (benevole_whatsapp_
+    // groups), synchronisée en diff comme les invitations de bénévoles à
+    // un événement -- plus simple qu'un vider-puis-réinsérer vu le faible
+    // volume (quelques groupes tout au plus), et ça évite une suppression
+    // suivie d'une réinsertion pour un groupe resté coché.
+    const initialGroupIds = editing !== "new" && editing ? editing.whatsappGroupIds : [];
+    const groupsToAdd = form.whatsappGroupIds.filter((id) => !initialGroupIds.includes(id));
+    const groupsToRemove = initialGroupIds.filter((id) => !form.whatsappGroupIds.includes(id));
+    if (groupsToAdd.length > 0) {
+      const { error: addGroupsError } = await supabase
+        .from("benevole_whatsapp_groups")
+        .insert(groupsToAdd.map((whatsapp_group_id) => ({ benevole_id: benevoleId, whatsapp_group_id })));
+      if (addGroupsError) {
+        setSaving(false);
+        setError(`Groupes WhatsApp non mis à jour : ${addGroupsError.message}`);
+        return;
+      }
+    }
+    if (groupsToRemove.length > 0) {
+      const { error: removeGroupsError } = await supabase
+        .from("benevole_whatsapp_groups")
+        .delete()
+        .eq("benevole_id", benevoleId)
+        .in("whatsapp_group_id", groupsToRemove);
+      if (removeGroupsError) {
+        setSaving(false);
+        setError(`Groupes WhatsApp non mis à jour : ${removeGroupsError.message}`);
+        return;
+      }
+    }
+
     setSaving(false);
     setEditing(null);
     setPendingNewBenevoleId(null);
@@ -324,63 +377,98 @@ export default function BenevolesManager({
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {visible.map((b) => {
             const contact = [b.phone, b.email].filter(Boolean).join(" · ");
+            // Retour de Cindy du 06/09 ("plus sexy... voir en un clin
+            // d'œil de quel groupe whatsapp il fait partie") : avatar-
+            // initiale coloré (même principe que child-team-tab.tsx) et
+            // ses groupes en pastilles WhatsApp, visibles sans ouvrir la
+            // fiche.
+            const groupNames = b.whatsappGroupIds
+              .map((id) => whatsappGroups.find((g) => g.id === id)?.name)
+              .filter((name): name is string => Boolean(name));
             return (
+              // Retour de Cindy du 06/09 ("liséré à gauche, même finesse
+              // que les autres cartes") : border-l-4, comme les cartes
+              // d'événement (calendar-view.tsx) ou de coach/joueur (team-
+              // card.tsx) -- la barre en dégradé en haut essayée d'abord
+              // ne suivait pas cette convention.
               <div
                 key={b.id}
-                className={`flex flex-col gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm ${
+                className={`flex flex-col gap-3 rounded-2xl border border-zinc-100 border-l-4 border-l-ubac-yellow bg-white p-4 shadow-sm transition-shadow hover:shadow-md ${
                   b.archivedAt ? "opacity-60" : ""
                 }`}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <span className="min-w-0 truncate text-sm font-semibold text-zinc-900">
-                    {b.firstName} {b.lastName}
-                  </span>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => openEdit(b)}
-                      title="Modifier"
-                      className="flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setArchiveTarget(b)}
-                      title={b.archivedAt ? "Réactiver" : "Retirer"}
-                      className={`flex h-7 w-7 items-center justify-center rounded-full ${
-                        b.archivedAt
-                          ? "text-emerald-500 hover:bg-emerald-50 hover:text-emerald-700"
-                          : "text-red-400 hover:bg-red-50 hover:text-red-600"
-                      }`}
-                    >
-                      {b.archivedAt ? (
-                        <RotateCcw className="h-3.5 w-3.5" />
-                      ) : (
-                        <Trash2 className="h-3.5 w-3.5" />
-                      )}
-                    </button>
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <span
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${avatarColor(b.id)}`}
+                      >
+                        {(b.firstName || "?").charAt(0).toUpperCase()}
+                      </span>
+                      <span className="min-w-0 truncate text-sm font-semibold text-zinc-900">
+                        {b.firstName} {b.lastName}
+                      </span>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => openEdit(b)}
+                        title="Modifier"
+                        className="flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setArchiveTarget(b)}
+                        title={b.archivedAt ? "Réactiver" : "Retirer"}
+                        className={`flex h-7 w-7 items-center justify-center rounded-full ${
+                          b.archivedAt
+                            ? "text-emerald-500 hover:bg-emerald-50 hover:text-emerald-700"
+                            : "text-red-400 hover:bg-red-50 hover:text-red-600"
+                        }`}
+                      >
+                        {b.archivedAt ? (
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        ) : (
+                          <Trash2 className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                    </div>
                   </div>
-                </div>
-                {contact && <p className="text-xs text-zinc-500">{contact}</p>}
-                {b.notes && <p className="text-xs text-zinc-400">{b.notes}</p>}
-                <button
-                  type="button"
-                  onClick={() => copyLink(b)}
-                  className="mt-1 flex w-fit items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100"
-                >
-                  {copiedId === b.id ? (
-                    <>
-                      <Check className="h-3.5 w-3.5 text-emerald-600" />
-                      Lien copié
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-3.5 w-3.5" />
-                      Copier son lien privé
-                    </>
+                  {contact && <p className="text-xs text-zinc-500">{contact}</p>}
+                  {b.notes && <p className="text-xs text-zinc-400">{b.notes}</p>}
+                  {groupNames.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {groupNames.map((name) => (
+                        <span
+                          key={name}
+                          className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700"
+                        >
+                          <MessageCircle className="h-3 w-3 shrink-0" />
+                          {name}
+                        </span>
+                      ))}
+                    </div>
                   )}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => copyLink(b)}
+                    className="mt-1 flex w-fit items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100"
+                  >
+                    {copiedId === b.id ? (
+                      <>
+                        <Check className="h-3.5 w-3.5 text-emerald-600" />
+                        Lien copié
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5" />
+                        Copier son lien privé
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             );
           })}
@@ -459,6 +547,38 @@ export default function BenevolesManager({
                   placeholder="Ex. disponible le week-end seulement"
                   className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
                 />
+              </div>
+              {/* Retour de Cindy du 06/09 ("quel groupe whatsapp lui sera
+                  attribué", puis "peut faire partie de plusieurs groupes,
+                  merci de créer des cases à cocher") : parmi les groupes
+                  "Commissions & Administration" seulement -- jamais un
+                  groupe d'équipe, qui n'a pas de sens pour un bénévole.
+                  Simple attribution informative, ne le rattache pas
+                  réellement au groupe (whatsapp_group_members reste
+                  réservé aux joueurs). */}
+              <div className="flex flex-col gap-1 border-t border-zinc-100 pt-2.5">
+                <label className="mb-1 block text-xs font-medium text-zinc-600">
+                  Groupes WhatsApp
+                </label>
+                {whatsappGroups.filter((g) => g.category === "COMMISSION").length === 0 ? (
+                  <p className="text-xs text-zinc-400">
+                    Aucun groupe « Commissions » créé pour l&apos;instant.
+                  </p>
+                ) : (
+                  whatsappGroups
+                    .filter((g) => g.category === "COMMISSION")
+                    .map((g) => (
+                      <label key={g.id} className="flex items-center gap-2 text-sm text-zinc-700">
+                        <input
+                          type="checkbox"
+                          checked={form.whatsappGroupIds.includes(g.id)}
+                          onChange={() => toggleWhatsappGroup(g.id)}
+                          className="h-3.5 w-3.5 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
+                        />
+                        {g.name}
+                      </label>
+                    ))
+                )}
               </div>
               {/* Retour de Cindy du 05/09 ("tout ça réuni") : en plus de ses
                   événements/besoins habituels, un bénévole peut voir
