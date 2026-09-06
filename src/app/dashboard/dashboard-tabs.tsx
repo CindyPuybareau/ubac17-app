@@ -94,9 +94,24 @@ export default function DashboardTabs({
       {/* Retour de Cindy du 04/09 : content peut valoir `null` le temps
           qu'un clic recharge l'espace demandé (voir handleClick) -- un
           message plutôt qu'un vide silencieux pendant ce court instant. */}
-      {current.content ?? (
-        <p className="text-sm text-zinc-500">Chargement de cet espace…</p>
-      )}
+      {/* Retour de Cindy du 06/09 (Sandrine MANZELLE, Bureau + joueuse +
+          maman -- "Mon équipe" et "Mes enfants" sont réutilisés à vide l'un
+          après l'autre) : "Mon équipe" et "Mes enfants" sont tous les deux
+          le MÊME composant FamilyView (voir page.tsx, buildFamilyView).
+          Sans clé distinguant les onglets, React les traite comme LA MÊME
+          instance en changeant seulement ses props d'un onglet à l'autre --
+          son état interne (le joueur sélectionné, voir family-view.tsx)
+          survit alors au changement d'onglet et pointe vers un id absent de
+          la nouvelle liste, ce qui vide tout l'écran sans le moindre
+          message. `key` force React à démonter/remonter proprement dès que
+          l'onglet actif change, quel que soit le composant qu'il utilise en
+          dessous (protège aussi Bureau/Coach d'un bug de ce genre plus
+          tard, pas seulement FamilyView). */}
+      <div key={current.key}>
+        {current.content ?? (
+          <p className="text-sm text-zinc-500">Chargement de cet espace…</p>
+        )}
+      </div>
     </div>
   );
 }

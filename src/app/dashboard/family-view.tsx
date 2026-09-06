@@ -91,11 +91,30 @@ export default function FamilyView({
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(
     () => rsvpPlayers[0]?.id ?? null
   );
+  // Retour de Cindy du 06/09 (Sandrine MANZELLE, Bureau + joueuse + maman :
+  // "Mon équipe" puis "Mes enfants" affichait tout vide, et vice versa) :
+  // ce composant est réutilisé tel quel pour "Mon équipe" ET "Mes enfants"
+  // (voir page.tsx, buildFamilyView) — l'initialisation paresseuse
+  // ci-dessus ne s'exécute qu'au tout premier montage, jamais si les props
+  // changent ensuite (React réutilisait la même instance en changeant
+  // seulement `rsvpPlayers` d'un onglet à l'autre). `selectedPlayerId`
+  // pointait alors vers un id de l'AUTRE onglet, absent de la nouvelle
+  // liste : le filtre ci-dessous ne trouvait donc plus personne, vidant
+  // tout l'écran sans le moindre message. Recalculé ici plutôt qu'un
+  // useEffect (même principe que activeTeamIdResolved dans
+  // child-results-tab.tsx) : si l'id sélectionné n'existe plus dans
+  // rsvpPlayers, on retombe sur le premier de la liste au lieu de rester
+  // bloqué sur une sélection fantôme.
+  const resolvedSelectedPlayerId = rsvpPlayers.some((p) => p.id === selectedPlayerId)
+    ? selectedPlayerId
+    : (rsvpPlayers[0]?.id ?? null);
   const hasSeveralChildren = rsvpPlayers.length > 1;
   const visiblePlayers = useMemo(
     () =>
-      selectedPlayerId ? rsvpPlayers.filter((p) => p.id === selectedPlayerId) : rsvpPlayers,
-    [rsvpPlayers, selectedPlayerId]
+      resolvedSelectedPlayerId
+        ? rsvpPlayers.filter((p) => p.id === resolvedSelectedPlayerId)
+        : rsvpPlayers,
+    [rsvpPlayers, resolvedSelectedPlayerId]
   );
 
   // Un événement concerne la famille s'il vise l'équipe d'un des enfants
@@ -134,12 +153,12 @@ export default function FamilyView({
   const rsvpPlayerIds = useMemo(() => new Set(rsvpPlayers.map((p) => p.id)), [rsvpPlayers]);
   const visibleTeamCards = useMemo(() => {
     const scoped = teamCards.filter((c) => rsvpPlayerIds.has(c.playerId));
-    const cards = selectedPlayerId
-      ? scoped.filter((c) => c.playerId === selectedPlayerId)
+    const cards = resolvedSelectedPlayerId
+      ? scoped.filter((c) => c.playerId === resolvedSelectedPlayerId)
       : scoped;
     // Même ordre que côté coach : l'équipe mère avant ses déclinaisons.
     return sortTeamsByGroup(cards.map((c) => ({ ...c, name: c.teamName })));
-  }, [teamCards, rsvpPlayerIds, selectedPlayerId]);
+  }, [teamCards, rsvpPlayerIds, resolvedSelectedPlayerId]);
 
   // Sélecteur d'équipe de la vue Résultats (voir calendar-view.tsx) : une
   // famille à plusieurs enfants sur des équipes différentes a exactement
@@ -414,7 +433,7 @@ export default function FamilyView({
                 Enfant
               </span>
               {rsvpPlayers.map((p) => {
-                const isActive = selectedPlayerId === p.id;
+                const isActive = resolvedSelectedPlayerId === p.id;
                 const color = avatarColor(p.id);
                 return (
                   <button
