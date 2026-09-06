@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 
 export type DashboardTab = {
@@ -157,28 +158,38 @@ export default function DashboardTabs({
                 pas seulement la partie visible. */}
             <div className="absolute inset-0 z-10 rounded-2xl bg-zinc-50" />
             {/* Retour de Cindy du 06/09 ("il faut scroller pour le voir
-                sur téléphone") : le logo+barre eux-mêmes NE DOIVENT PAS se
-                centrer sur cette même hauteur totale -- sur mobile, où le
-                contenu d'un onglet est souvent bien plus haut que l'écran,
-                ce centre géométrique tombe loin en dessous de ce qui est
-                réellement affiché à l'écran au moment du clic. `fixed` les
-                centre sur l'écran lui-même, quelle que soit la hauteur du
-                contenu recouvert ou la position du défilement. */}
-            <div className="fixed left-1/2 top-1/2 z-20 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-3">
-              {/* eslint-disable-next-line @next/next/no-img-element -- même
-                  raison que club-reports-section.tsx : le logo doit
-                  s'afficher immédiatement, sans dépendre de l'optimisation
-                  à la volée de next/image. */}
-              <img
-                src="/logo.png"
-                alt="UBAC"
-                className="h-10 w-10 animate-pulse object-contain"
-              />
-              <div className="h-1.5 w-40 overflow-hidden rounded-full bg-zinc-200">
-                <div className="h-full w-1/3 animate-[loading-bar_1.1s_ease-in-out_infinite] rounded-full bg-ubac-yellow" />
-              </div>
-              <p className="text-sm font-medium text-zinc-500">Chargement de cet espace...</p>
-            </div>
+                sur téléphone", persistant même après le passage en `fixed`
+                seul) : cette page a un ancêtre en overflow-x-hidden
+                (page.tsx, filet anti-scroll-horizontal posé le 25/08) --
+                déjà responsable une fois d'un piège CSS du même genre sur
+                cette page (voir le popover des notifications, même
+                fichier, juste au-dessus de <header>). Un `position:fixed`
+                sous un ancêtre non "visible" en overflow n'est pas
+                garanti de se caler sur le vrai viewport dans tous les
+                navigateurs mobiles. createPortal sort ce voile de tout
+                l'arbre DOM de la page pour le poser à la racine
+                (document.body) -- même principe que les modales de
+                l'appli (member-detail-modal.tsx, confirm-dialog.tsx...),
+                qui n'ont jamais ce souci. */}
+            {typeof document !== "undefined" &&
+              createPortal(
+                <div className="fixed left-1/2 top-1/2 z-20 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element --
+                      même raison que club-reports-section.tsx : le logo
+                      doit s'afficher immédiatement, sans dépendre de
+                      l'optimisation à la volée de next/image. */}
+                  <img
+                    src="/logo.png"
+                    alt="UBAC"
+                    className="h-10 w-10 animate-pulse object-contain"
+                  />
+                  <div className="h-1.5 w-40 overflow-hidden rounded-full bg-zinc-200">
+                    <div className="h-full w-1/3 animate-[loading-bar_1.1s_ease-in-out_infinite] rounded-full bg-ubac-yellow" />
+                  </div>
+                  <p className="text-sm font-medium text-zinc-500">Chargement de cet espace...</p>
+                </div>,
+                document.body
+              )}
             <style>{`
               @keyframes loading-bar {
                 0% { transform: translateX(-100%); }
