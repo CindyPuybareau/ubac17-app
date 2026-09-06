@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Calendar, Check, HandHeart, MapPin, ScrollText, X } from "lucide-react";
+import { Calendar, Check, HandHeart, MapPin, ScrollText, Undo2, X } from "lucide-react";
 import { styleFor, formatEventTime } from "@/app/dashboard/event-style";
 import RoleIcon from "@/app/dashboard/role-icon";
 import {
@@ -152,7 +152,7 @@ function BenevoleRsvpButtons({ eventId, currentStatus }: { eventId: string; curr
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function respond(newStatus: "PRESENT" | "ABSENT") {
+  async function respond(newStatus: "PRESENT" | "ABSENT" | "PENDING") {
     const previousStatus = status;
     setStatus(newStatus);
     setPending(true);
@@ -195,6 +195,21 @@ function BenevoleRsvpButtons({ eventId, currentStatus }: { eventId: string; curr
           <X className="h-3.5 w-3.5 shrink-0" />
           Absent
         </button>
+        {/* Retour de Cindy du 06/09 ("on se doit de pouvoir revenir en
+            arrière") : même geste que rsvp-control.tsx côté joueurs --
+            revient à "en attente", ne s'affiche qu'une fois une réponse
+            donnée. */}
+        {status !== "PENDING" && (
+          <button
+            disabled={pending}
+            onClick={() => respond("PENDING")}
+            title="Revenir à « en attente »"
+            className={`${SEGMENT_BUTTON} ${SEGMENT_OFF}`}
+          >
+            <Undo2 className="h-3.5 w-3.5 shrink-0" />
+            Annuler
+          </button>
+        )}
       </div>
       {error && <p className="text-[11px] text-red-600">{error}</p>}
     </div>

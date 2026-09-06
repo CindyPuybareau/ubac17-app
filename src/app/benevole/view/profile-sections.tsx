@@ -24,6 +24,7 @@ import ChildResultsTab from "@/app/enfant/view/child-results-tab";
 import SponsorsDisplay from "@/app/dashboard/sponsors-display";
 import ClubReportsSection from "@/app/dashboard/club-reports-section";
 import EmptyState from "@/app/dashboard/empty-state";
+import TeamFilterDropdown from "@/app/dashboard/team-filter-dropdown";
 import type { ClubReport, SponsorDisplay } from "@/app/dashboard/page";
 
 // Retour de Cindy du 05/09 ("profil et bénévoles doivent être fusionnés"),
@@ -117,6 +118,33 @@ function EventsSection({
   );
 }
 
+// Retour de Cindy du 06/09 ("à revoir seulement dans l'onglet équipe :
+// faire un onglet déroulant comme celui du bureau") : même sélecteur que
+// resultsTeamSelector="dropdown" côté Bureau (TeamFilterDropdown,
+// calendar-view.tsx/team-manager.tsx) -- toutes cochées par défaut, une
+// carte ChildTeamTab par équipe cochée en dessous.
+function EquipesSection({ teams }: { teams: ProfileTeam[] }) {
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(teams.map((t) => t.id)));
+  const visibleTeams = teams.filter((t) => selectedIds.has(t.id));
+
+  return (
+    <div className="flex flex-col gap-4">
+      <TeamFilterDropdown
+        teams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
+        selectedIds={selectedIds}
+        onChange={setSelectedIds}
+      />
+      {visibleTeams.length === 0 ? (
+        <EmptyState icon={Users} message="Aucune équipe cochée." />
+      ) : (
+        visibleTeams.map((t) => (
+          <ChildTeamTab key={t.id} title={t.name ?? "Équipe"} coaches={t.coaches} teammates={t.teammates} />
+        ))
+      )}
+    </div>
+  );
+}
+
 const iconClass = "h-4 w-4 shrink-0";
 
 // Construit les entrées de menu correspondant aux briques cochées pour ce
@@ -175,13 +203,7 @@ export function buildProfileSections({
       key: "equipes",
       label: "Équipes",
       icon: <Users className={iconClass} />,
-      content: (
-        <div className="flex flex-col gap-4">
-          {teams.map((t) => (
-            <ChildTeamTab key={t.id} title={t.name ?? "Équipe"} coaches={t.coaches} teammates={t.teammates} />
-          ))}
-        </div>
-      ),
+      content: <EquipesSection teams={teams} />,
     });
   }
 

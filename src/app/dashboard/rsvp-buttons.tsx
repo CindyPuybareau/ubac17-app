@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, X } from "lucide-react";
+import { Check, Undo2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
   SEGMENT_ABSENT_ON,
@@ -89,6 +89,31 @@ export default function RsvpButtons({
     // changement sur le reste de la page (compteurs...).
   }
 
+  // Retour de Cindy du 06/09 ("on se doit de pouvoir revenir en arrière") :
+  // même geste que rsvp-control.tsx (clearAnswer) -- revenir à "en attente"
+  // supprime la ligne, l'app lit déjà l'absence de réponse ainsi. Cette
+  // version compacte (carte d'événement) n'avait jusqu'ici que Présent/
+  // Absent, jamais de retour possible en cas de clic par erreur.
+  async function clearAnswer() {
+    const previousStatus = status;
+    setStatus("PENDING");
+    onStatusChange?.(previousStatus, "PENDING");
+    setLoading(true);
+    setError(null);
+    const supabase = createClient();
+    const { error: writeError } = await supabase
+      .from("rsvps")
+      .delete()
+      .eq("event_id", eventId)
+      .eq("player_id", playerId);
+    setLoading(false);
+    if (writeError) {
+      setStatus(previousStatus);
+      onStatusChange?.("PENDING", previousStatus);
+      setError(writeError.message);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-1">
       <div className={SEGMENT_GROUP}>
@@ -112,6 +137,19 @@ export default function RsvpButtons({
           <X className="h-3.5 w-3.5 shrink-0" />
           Absent
         </button>
+        {/* Ne s'affiche qu'une fois une réponse donnée, comme rsvp-
+            control.tsx : rien à annuler tant qu'on n'a pas répondu. */}
+        {status !== "PENDING" && (
+          <button
+            disabled={loading}
+            onClick={clearAnswer}
+            title="Revenir à « en attente »"
+            className={`${SEGMENT_BUTTON} ${SEGMENT_OFF}`}
+          >
+            <Undo2 className="h-3.5 w-3.5 shrink-0" />
+            Annuler
+          </button>
+        )}
       </div>
       {error && <p className="text-[11px] text-red-600">Réponse non enregistrée : {error}</p>}
     </div>
