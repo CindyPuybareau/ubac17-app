@@ -195,7 +195,13 @@ export default async function Home() {
             </p>
             <h1 className="mt-3 text-3xl font-bold leading-tight text-white sm:text-5xl">
               Vous jouez collectif sur le terrain.
-              <br className="hidden sm:block" /> On joue collectif en coulisses.
+              {/* Retour de Cindy du 06/09 ("sur téléphone trop serré") :
+                  ce saut de ligne était réglé à l'envers -- affiché
+                  seulement à partir de sm: (tablette/desktop), jamais sur
+                  téléphone, donc les deux phrases restaient collées
+                  justement là où l'écran est le plus étroit. Affiché
+                  partout désormais. */}
+              <br /> On joue collectif en coulisses.
             </h1>
             <p className="mx-auto mt-4 max-w-xl text-base text-white/80 sm:text-lg">
               UBAC, c&apos;est un club familial, ancré sur trois communes, où
