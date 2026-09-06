@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatAmount } from "./cotisation-shared";
 
 // Retour de Cindy du 06/09 ("toutes les cartes contenant des chiffres côté
 // bureau [...] une sorte de compteur") : les cartes-KPI (tableau de bord +
@@ -11,22 +12,37 @@ import { useEffect, useState } from "react";
 // (mise en page légèrement différente) qui n'ont besoin que de CE calcul en
 // commun.
 //
-// `format` reçoit la valeur intermédiaire (un flottant pendant l'animation)
-// et décide elle-même comment l'arrondir/afficher -- un compteur d'entiers
-// passe `Math.round`, un montant garde les centimes via formatAmount (déjà
-// tolérant à un flottant), un pourcentage arrondit à l'entier le plus
-// proche. Ainsi le "€"/"%"/séparateur de milliers affiché reste identique à
-// avant, seul le chiffre grimpe.
+// `kind` (une simple chaîne, pas une fonction) décide comment la valeur
+// intermédiaire (un flottant pendant l'animation) est mise en forme --
+// PANNE EN PRODUCTION du 06/09 : la toute première version prenait une
+// fonction `format` en prop. bureau-dashboard.tsx est un composant SERVEUR
+// (page.tsx, jamais "use client") : une fonction créée côté serveur ne
+// peut pas traverser la frontière serveur/client vers ce composant-ci
+// ("use client") -- React casse au rendu avec "Functions cannot be passed
+// directly to Client Components". cotisations-manager.tsx (déjà "use
+// client" en entier) ne montrait jamais le bug, d'où le crash uniquement
+// sur le tableau de bord. Une chaîne comme "integer"/"amount"/"percent"
+// traverse cette frontière sans problème -- la mise en forme elle-même vit
+// ici, câblée en dur, plutôt que reçue de l'appelant.
+type NumberKind = "integer" | "amount" | "percent";
+
+const FORMATTERS: Record<NumberKind, (n: number) => string> = {
+  integer: (n) => String(Math.round(n)),
+  amount: formatAmount,
+  percent: (n) => `${Math.round(n)} %`,
+};
+
 export default function AnimatedNumber({
   value,
-  format,
+  kind,
   durationMs = 900,
 }: {
   value: number;
-  format: (n: number) => string;
+  kind: NumberKind;
   durationMs?: number;
 }) {
   const [display, setDisplay] = useState(0);
+  const format = FORMATTERS[kind];
 
   useEffect(() => {
     let frameId: number;

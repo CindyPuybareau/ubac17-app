@@ -1,7 +1,7 @@
 import { FileWarning, Gavel, Handshake, Users, Wallet } from "lucide-react";
 import { formatPersonName } from "@/lib/names";
 import { formatLocalDateFr } from "@/lib/local-date";
-import { balanceDue, computeStatus, formatAmount } from "./cotisation-shared";
+import { balanceDue, computeStatus } from "./cotisation-shared";
 import AnimatedNumber from "./animated-number";
 import AutomationSettings, { type AutomationKey } from "./automation-settings";
 import DeferredCalendar from "./deferred-calendar";
@@ -37,25 +37,30 @@ function KpiCard({
   icon: Icon,
   iconClass,
   value,
-  format,
+  kind,
   label,
 }: {
   icon: typeof Wallet;
   iconClass: string;
   // Retour de Cindy du 06/09 ("une sorte de compteur") : value est
   // désormais le NOMBRE brut (plus une chaîne déjà mise en forme), pour
-  // qu'AnimatedNumber puisse l'animer de 0 jusqu'à sa vraie valeur --
-  // format porte la mise en forme (€, %, arrondi entier...) que value
-  // portait auparavant directement.
+  // qu'AnimatedNumber puisse l'animer de 0 jusqu'à sa vraie valeur.
+  // PANNE EN PRODUCTION du 06/09 : `format` était d'abord une FONCTION —
+  // ce composant est rendu côté serveur (jamais "use client" dans ce
+  // fichier), et une fonction créée côté serveur ne peut pas traverser la
+  // frontière vers AnimatedNumber ("use client") : React plantait au
+  // rendu ("Functions cannot be passed directly to Client Components").
+  // `kind`, une simple chaîne, traverse cette frontière sans problème —
+  // voir animated-number.tsx pour la mise en forme elle-même.
   value: number;
-  format: (n: number) => string;
+  kind: "integer" | "amount" | "percent";
   label: string;
 }) {
   return (
     <div className="flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-zinc-100 bg-white p-4 text-center shadow-sm">
       <Icon className={`h-5 w-5 shrink-0 ${iconClass}`} />
       <p className="text-xl font-bold text-zinc-900 sm:text-2xl">
-        <AnimatedNumber value={value} format={format} />
+        <AnimatedNumber value={value} kind={kind} />
       </p>
       <p className="text-xs font-medium leading-tight text-zinc-500">{label}</p>
     </div>
@@ -157,35 +162,35 @@ export default function BureauDashboard({
           icon={Wallet}
           iconClass="text-rose-600"
           value={pending.length}
-          format={(n) => String(Math.round(n))}
+          kind="integer"
           label="Cotisations en attente"
         />
         <KpiCard
           icon={Wallet}
           iconClass="text-amber-700"
           value={pendingAmount}
-          format={formatAmount}
+          kind="amount"
           label="Montant en attente"
         />
         <KpiCard
           icon={Gavel}
           iconClass="text-rose-600"
           value={penalitesTotalAmount}
-          format={formatAmount}
+          kind="amount"
           label="Total pénalités"
         />
         <KpiCard
           icon={Handshake}
           iconClass="text-orange-600"
           value={sponsorsNeedingRenewal.length}
-          format={(n) => String(Math.round(n))}
+          kind="integer"
           label="Renouvellement Sponsors"
         />
         <KpiCard
           icon={Users}
           iconClass="text-navy"
           value={activeMembers}
-          format={(n) => String(Math.round(n))}
+          kind="integer"
           label="Membres actifs"
         />
       </div>

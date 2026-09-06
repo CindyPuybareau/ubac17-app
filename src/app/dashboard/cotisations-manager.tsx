@@ -93,7 +93,7 @@ function KpiCard({
   icon: Icon,
   iconClass,
   value,
-  format,
+  kind,
   label,
   wide = false,
 }: {
@@ -101,11 +101,13 @@ function KpiCard({
   iconClass: string;
   // Retour de Cindy du 06/09 ("une sorte de compteur") : value est
   // désormais le NOMBRE brut (plus une chaîne déjà mise en forme), pour
-  // qu'AnimatedNumber puisse l'animer de 0 jusqu'à sa vraie valeur --
-  // format porte la mise en forme (€, %, arrondi entier...) que value
-  // portait auparavant directement. Même composant que bureau-dashboard.tsx.
+  // qu'AnimatedNumber puisse l'animer de 0 jusqu'à sa vraie valeur. `kind`
+  // (une chaîne, pas une fonction) même API que bureau-dashboard.tsx --
+  // voir animated-number.tsx : ce fichier-ci est déjà "use client" en
+  // entier donc une fonction serait passée sans planter, mais autant
+  // garder une seule et même API pour les deux KpiCard.
   value: number;
-  format: (n: number) => string;
+  kind: "integer" | "amount" | "percent";
   label: string;
   wide?: boolean;
 }) {
@@ -117,7 +119,7 @@ function KpiCard({
     >
       <Icon className={`h-5 w-5 shrink-0 ${iconClass}`} />
       <p className="text-xl font-bold text-slate-900 sm:text-2xl">
-        <AnimatedNumber value={value} format={format} />
+        <AnimatedNumber value={value} kind={kind} />
       </p>
       <p className="text-xs font-medium leading-tight text-slate-500">{label}</p>
     </div>
@@ -135,49 +137,49 @@ function KpiHeader({ cotisations }: { cotisations: AdminCotisation[] }) {
         icon={TrendingUp}
         iconClass="text-navy"
         value={kpis.percentage}
-        format={(n) => `${Math.round(n)} %`}
+        kind="percent"
         label="Collecté"
       />
       <KpiCard
         icon={CheckCircle2}
         iconClass="text-court-green"
         value={kpis.payeCount}
-        format={(n) => String(Math.round(n))}
+        kind="integer"
         label="Payés"
       />
       <KpiCard
         icon={Clock}
         iconClass="text-parquet-dark"
         value={kpis.partielCount}
-        format={(n) => String(Math.round(n))}
+        kind="integer"
         label="Partiels"
       />
       <KpiCard
         icon={ShieldCheck}
         iconClass="text-navy"
         value={kpis.offertCount}
-        format={(n) => String(Math.round(n))}
+        kind="integer"
         label="Offerts / Dispensés"
       />
       <KpiCard
         icon={AlertTriangle}
         iconClass="text-coral-dark"
         value={kpis.enAttenteCount}
-        format={(n) => String(Math.round(n))}
+        kind="integer"
         label="En attente / Non payés"
       />
       <KpiCard
         icon={Wallet}
         iconClass="text-amber-700"
         value={kpis.totalCollected}
-        format={formatAmount}
+        kind="amount"
         label="Total collecté"
       />
       <KpiCard
         icon={Target}
         iconClass="text-indigo-600"
         value={kpis.totalDue}
-        format={formatAmount}
+        kind="amount"
         label="Total attendu"
         wide
       />
