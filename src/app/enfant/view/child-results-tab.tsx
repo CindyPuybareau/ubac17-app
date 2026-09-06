@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
-import { Clock, ListOrdered, Shield } from "lucide-react";
-import { formatEventTime, homeAwayLabel } from "@/app/dashboard/event-style";
-import { parseMatchTitle } from "@/lib/match-display";
+import { Clock, ListOrdered, MapPin, Shield } from "lucide-react";
+import { formatEventTime, homeAwayLabel, styleFor } from "@/app/dashboard/event-style";
 import { sortTeamsByGroup, teamLabel } from "@/lib/teams";
 import EmptyState from "@/app/dashboard/empty-state";
 import MatchResultCelebration from "@/components/match-result-celebration";
+import MatchScore from "@/app/dashboard/match-score";
+import OpponentDisplay from "@/app/dashboard/opponent-display";
+import SalleBadge from "@/app/dashboard/salle-badge";
 import { EventRow } from "./child-calendar-tab";
 import type { ChildEvent } from "./child-dashboard";
 
@@ -23,27 +25,34 @@ function isRecentWin(event: { teamScore: number | null; opponentScore: number | 
   );
 }
 
-// Même code couleur que MatchScore côté Bureau/Coach (victoire/défaite/nul)
-// mais en lecture seule : aucun enfant ne peut jamais modifier un score.
-// Un match pas encore joué affiche "À venir" plutôt qu'un tiret ou un
-// 0-0 — jamais laisser croire qu'un résultat existe avant que le match
-// ait réellement eu lieu.
+// Retour de Cindy du 06/09 ("les cartes des matchs sont moches et ne
+// ressemble pas au reste de l'application") : cette ligne compacte
+// (fond gris plat, sans liseré) tranchait avec le reste de l'appli --
+// reprend ici le même gabarit que renderResultCard côté Bureau/Coach/
+// Famille (calendar-view.tsx) : liseré coloré par type d'événement,
+// badge + Domicile/Extérieur, avatar adversaire (OpponentDisplay),
+// salle (SalleBadge) et score (MatchScore). Simplement en lecture
+// seule : aucun enfant/bénévole ne peut jamais modifier un score
+// (canEdit toujours à false).
 function ResultRow({ event }: { event: ChildEvent }) {
-  const { opponent } = parseMatchTitle(event.title);
-  const home = homeAwayLabel(event.isHome);
+  const style = styleFor(event.eventType);
+  const homeAway = homeAwayLabel(event.isHome);
   const hasScore = event.teamScore !== null && event.opponentScore !== null;
   const alreadyPlayed = new Date(event.startTime).getTime() < new Date().getTime();
-  const diff = hasScore ? (event.teamScore as number) - (event.opponentScore as number) : 0;
-  const resultClass = !hasScore
-    ? "bg-zinc-100 text-zinc-400"
-    : diff > 0
-      ? "bg-green-100 text-green-700"
-      : diff < 0
-        ? "bg-red-100 text-red-700"
-        : "bg-zinc-100 text-zinc-600";
+  // Même différenciation que renderResultCard/EventRow (direction
+  // artistique validée par Cindy le 2026-08-23) : un match officiel porte
+  // un liseré épais, un tournoi une bordure pointillée, tout le reste un
+  // liseré fin.
+  const isTournament = event.eventType === "TOURNAMENT";
+  const isOfficialMatch = event.eventType === "MATCH";
+  const shellClass = isTournament
+    ? "relative overflow-hidden rounded-2xl border-2 border-dashed border-ubac-yellow bg-white p-4 shadow-sm"
+    : isOfficialMatch
+      ? `relative overflow-hidden rounded-2xl border border-navy/15 bg-white p-4 shadow-sm border-l-8 ${style.border}`
+      : `relative overflow-hidden rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm border-l-4 ${style.border}`;
 
   return (
-    <div className="relative flex items-center justify-between gap-2 overflow-hidden rounded-xl bg-zinc-50 px-3 py-2">
+    <div className={`flex flex-col gap-1.5 ${shellClass}`}>
       {alreadyPlayed && (
         <MatchResultCelebration
           resultKey={`${event.id}:${event.teamScore}-${event.opponentScore}`}
@@ -51,27 +60,56 @@ function ResultRow({ event }: { event: ChildEvent }) {
           enabled
         />
       )}
-      <div className="flex min-w-0 flex-col">
-        <span className="truncate text-sm font-medium text-zinc-800">{opponent}</span>
-        {/* Retour de Cindy du 2026-08-22 : côté Joueur, l'heure du match
-            n'apparaissait nulle part sur cette page — seule la date, en
-            petit gris pâle. Icône horloge + heure ajoutées, même codes
-            visuels que "Prochains événements" (team-card.tsx) plutôt
-            qu'un nouveau traitement, sans changer le gabarit compact de
-            la ligne. */}
-        <span className="flex items-center gap-1 text-[11px] font-medium text-zinc-500">
+      <div className="flex items-start justify-between gap-2">
+        <span className="min-w-0 truncate text-xs font-semibold uppercase tracking-wide text-zinc-400">
+          {event.teamName}
+        </span>
+        <span className="shrink-0 whitespace-nowrap text-xs font-bold text-ubac-blue">
           {new Date(event.startTime).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
-          <Clock className="h-3 w-3 shrink-0" />
-          {formatEventTime(event.startTime, null)}
-          {home ? ` · ${home}` : ""}
         </span>
       </div>
-      {alreadyPlayed ? (
-        <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-sm font-bold tabular-nums ${resultClass}`}>
-          {hasScore ? `${event.teamScore} – ${event.opponentScore}` : "—"}
+
+      <span className="flex flex-wrap items-center gap-2">
+        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${style.badge}`}>
+          {style.label}
         </span>
+        {homeAway && (
+          <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-bold uppercase text-zinc-600">
+            {homeAway}
+          </span>
+        )}
+      </span>
+
+      <OpponentDisplay title={event.title} size="sm" />
+
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-zinc-500">
+        <span className="flex items-center gap-1">
+          <Clock className="h-3 w-3 shrink-0" />
+          {formatEventTime(event.startTime, null)}
+        </span>
+        {(event.salle || event.location) && (
+          <span className="flex items-center gap-1 truncate">
+            <MapPin className="h-3 w-3 shrink-0" />
+            {event.salle ? <SalleBadge salle={event.salle} /> : event.location}
+          </span>
+        )}
+      </div>
+
+      {alreadyPlayed ? (
+        hasScore ? (
+          <MatchScore
+            eventId={event.id}
+            teamScore={event.teamScore}
+            opponentScore={event.opponentScore}
+            canEdit={false}
+          />
+        ) : (
+          <span className="w-fit rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-semibold text-zinc-400">
+            —
+          </span>
+        )
       ) : (
-        <span className="shrink-0 rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-semibold text-zinc-400">
+        <span className="w-fit rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-semibold text-zinc-400">
           À venir
         </span>
       )}
@@ -199,7 +237,10 @@ export default function ChildResultsTab({
           <EventRow event={nextMatch} attendance={nextEventAttendance} />
         </div>
       )}
-      <div className="flex flex-col gap-1.5">
+      {/* gap-4 (et non plus 1.5) : les cartes ont désormais la même
+          hauteur/densité que renderResultCard et EventRow, qui utilisent
+          ce même espacement entre elles. */}
+      <div className="flex flex-col gap-4">
         {visibleMatches.length === 0 ? (
           <EmptyState
             icon={Shield}
