@@ -6,6 +6,7 @@ import type { ChildEvent } from "@/app/enfant/view/child-dashboard";
 import type { ClubReport, SponsorDisplay } from "@/app/dashboard/page";
 import BenevoleView, { type BenevoleEvent } from "./benevole-view";
 import type { ProfileMember, ProfileTeam } from "./profile-sections";
+import type { BenevoleNotification } from "./benevole-notification-bell";
 
 // Toute la lecture de données vit ici, côté serveur, avec service_role
 // (un bénévole n'a pas d'auth.uid(), même principe que /enfant/view/page.tsx
@@ -40,7 +41,7 @@ export default async function BenevoleViewPage() {
 
   const { data: benevole } = await supabase
     .from("benevoles")
-    .select("id, first_name, archived_at, access_profile_id")
+    .select("id, first_name, archived_at, access_profile_id, notifications_enabled")
     .eq("id", benevoleId)
     .maybeSingle();
 
@@ -294,6 +295,40 @@ export default async function BenevoleViewPage() {
     }));
   }
 
+  // Cloche de notifications (retour de Cindy du 06/09, "comme pour tous
+  // les autres espaces") : mêmes alertes que Parent/Coach/Enfant (voir la
+  // migration 20261031220000_benevole_notifications.sql), lues ici en
+  // service_role et filtrées directement sur benevole_id -- un bénévole
+  // est notifié individuellement (son invitation à un événement précis),
+  // jamais par équipe, donc pas de filtre à recalculer comme côté enfant.
+  const notificationsEnabled = benevole.notifications_enabled ?? true;
+  let notifications: BenevoleNotification[] = [];
+  if (notificationsEnabled) {
+    const { data: notifRows } = await supabase
+      .from("notifications")
+      .select("id, title, body, created_at")
+      .eq("benevole_id", benevoleId)
+      .order("created_at", { ascending: false })
+      .limit(30);
+    const notifIds = (notifRows ?? []).map((n) => n.id);
+    const { data: readRows } =
+      notifIds.length > 0
+        ? await supabase
+            .from("notification_reads")
+            .select("notification_id, read_at")
+            .eq("benevole_id", benevoleId)
+            .in("notification_id", notifIds)
+        : { data: [] as { notification_id: string; read_at: string }[] };
+    const readAtByNotifId = new Map((readRows ?? []).map((r) => [r.notification_id, r.read_at]));
+    notifications = (notifRows ?? []).map((n) => ({
+      id: n.id,
+      title: n.title,
+      body: n.body,
+      createdAt: n.created_at,
+      readAt: readAtByNotifId.get(n.id) ?? null,
+    }));
+  }
+
   return (
     <BenevoleView
       firstName={benevole.first_name}
@@ -306,6 +341,8 @@ export default async function BenevoleViewPage() {
       profileEvents={profileEvents}
       profileSponsors={profileSponsors}
       profileClubReports={profileClubReports}
+      notifications={notifications}
+      notificationsEnabled={notificationsEnabled}
     />
   );
 }

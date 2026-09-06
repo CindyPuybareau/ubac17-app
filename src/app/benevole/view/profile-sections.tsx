@@ -25,6 +25,7 @@ import SponsorsDisplay from "@/app/dashboard/sponsors-display";
 import ClubReportsSection from "@/app/dashboard/club-reports-section";
 import EmptyState from "@/app/dashboard/empty-state";
 import TeamFilterDropdown from "@/app/dashboard/team-filter-dropdown";
+import DocumentsPanel from "@/components/club-documents";
 import type { ClubReport, SponsorDisplay } from "@/app/dashboard/page";
 
 // Retour de Cindy du 05/09 ("profil et bénévoles doivent être fusionnés"),
@@ -82,6 +83,25 @@ function MembersSection({ members }: { members: ProfileMember[] }) {
   );
 }
 
+// Retour de Cindy du 06/09 ("pourquoi je n'ai pas les autres événements du
+// club visibles ?") : ChildEventsTab/ChildResultsTab ont leur propre
+// sélecteur d'équipe intégré, mais en mode "une seule équipe à la fois"
+// (pills, pensé pour un enfant qui ne suit que la sienne) — un
+// événement club ciblant une autre équipe que celle sélectionnée
+// disparaissait donc, à tort, pour un bénévole qui doit voir large. On
+// filtre nous-mêmes avec TeamFilterDropdown (toutes cochées par défaut,
+// comme "Équipes" ci-dessus) et on passe `teams={[]}` à ces deux
+// composants pour désactiver leur propre sélecteur (ils ne l'affichent,
+// et ne filtrent, qu'à partir de 2 équipes).
+function eventMatchesTeams(event: ChildEvent, selectedIds: Set<string>): boolean {
+  if (event.teamId) return selectedIds.has(event.teamId);
+  if (event.targetTeamIds && event.targetTeamIds.length > 0) {
+    return event.targetTeamIds.some((id) => selectedIds.has(id));
+  }
+  // Événement vraiment club-wide (ni équipe ni ciblage précis) : toujours visible.
+  return true;
+}
+
 // Retour de Cindy du 06/09 ("ajouter aussi comme sur les autres espaces le
 // bouton 'masquer les entraînements'") : même comportement/libellé/icônes
 // que calendar-view.tsx (hideTrainings), appliqué ici en amont de
@@ -95,25 +115,57 @@ function EventsSection({
   teams: { id: string; name: string | null; category: string | null }[];
 }) {
   const [hideTrainings, setHideTrainings] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(teams.map((t) => t.id)));
   const visibleEvents = useMemo(
-    () => (hideTrainings ? events.filter((e) => e.eventType !== "TRAINING") : events),
-    [events, hideTrainings]
+    () =>
+      events
+        .filter((e) => !hideTrainings || e.eventType !== "TRAINING")
+        .filter((e) => eventMatchesTeams(e, selectedIds)),
+    [events, hideTrainings, selectedIds]
   );
   return (
     <div className="flex flex-col gap-3">
-      <button
-        type="button"
-        onClick={() => setHideTrainings((v) => !v)}
-        className={`flex w-fit items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
-          hideTrainings
-            ? "border-navy/30 bg-navy/10 text-navy"
-            : "border-zinc-200 bg-white text-zinc-500 hover:bg-zinc-50"
-        }`}
-      >
-        {hideTrainings ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-        {hideTrainings ? "Entraînements masqués" : "Masquer les entraînements"}
-      </button>
-      <ChildEventsTab events={visibleEvents} teams={teams} />
+      <div className="flex flex-wrap items-center gap-2">
+        <TeamFilterDropdown teams={teams} selectedIds={selectedIds} onChange={setSelectedIds} />
+        <button
+          type="button"
+          onClick={() => setHideTrainings((v) => !v)}
+          className={`flex w-fit items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+            hideTrainings
+              ? "border-navy/30 bg-navy/10 text-navy"
+              : "border-zinc-200 bg-white text-zinc-500 hover:bg-zinc-50"
+          }`}
+        >
+          {hideTrainings ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+          {hideTrainings ? "Entraînements masqués" : "Masquer les entraînements"}
+        </button>
+      </div>
+      <ChildEventsTab events={visibleEvents} teams={[]} />
+    </div>
+  );
+}
+
+// Même correctif que EventsSection ci-dessus, pour "Matchs officiels" /
+// "Résultats" -- forcedMode reste passé tel quel à ChildResultsTab (retire
+// ses boutons internes, le choix se fait dans le menu).
+function MatchsSection({
+  events,
+  teams,
+  forcedMode,
+}: {
+  events: ChildEvent[];
+  teams: { id: string; name: string | null; category: string | null }[];
+  forcedMode: "officialMatches" | "officialResults";
+}) {
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(teams.map((t) => t.id)));
+  const visibleEvents = useMemo(
+    () => events.filter((e) => eventMatchesTeams(e, selectedIds)),
+    [events, selectedIds]
+  );
+  return (
+    <div className="flex flex-col gap-3">
+      <TeamFilterDropdown teams={teams} selectedIds={selectedIds} onChange={setSelectedIds} />
+      <ChildResultsTab events={visibleEvents} teams={[]} forcedMode={forcedMode} />
     </div>
   );
 }
@@ -233,13 +285,13 @@ export function buildProfileSections({
           key: "matchs-officiels",
           label: "Matchs officiels",
           icon: <Shield className={iconClass} />,
-          content: <ChildResultsTab events={events} teams={teamRefs} forcedMode="officialMatches" />,
+          content: <MatchsSection events={events} teams={teamRefs} forcedMode="officialMatches" />,
         },
         {
           key: "matchs-resultats",
           label: "Résultats",
           icon: <ListOrdered className={iconClass} />,
-          content: <ChildResultsTab events={events} teams={teamRefs} forcedMode="officialResults" />,
+          content: <MatchsSection events={events} teams={teamRefs} forcedMode="officialResults" />,
         },
       ],
     });
@@ -254,48 +306,62 @@ export function buildProfileSections({
     });
   }
 
-  if (has("compte_rendu_mairies") || has("compte_rendu_bureau") || has("compte_rendu_coachs")) {
-    sections.push({
-      key: "comptes-rendus",
-      label: "Comptes rendus",
-      icon: <ScrollText className={iconClass} />,
-      content: (
-        <div className="flex flex-col gap-4">
-          {has("compte_rendu_mairies") && (
-            <ClubReportsSection
-              category="MAIRIE"
-              title="Comptes rendus mairies"
-              emptyLabel="Aucun compte rendu de réunion avec une mairie pour le moment."
-              canCreate={false}
-              isAdmin={false}
-              reports={clubReports}
-            />
-          )}
-          {has("compte_rendu_bureau") && (
-            <ClubReportsSection
-              category="BUREAU"
-              title="Comptes rendus bureau"
-              emptyLabel="Aucun compte rendu de réunion du Bureau pour le moment."
-              canCreate={false}
-              isAdmin={false}
-              reports={clubReports}
-            />
-          )}
-          {has("compte_rendu_coachs") && (
-            <ClubReportsSection
-              category="COACH"
-              title="Comptes rendus des coachs"
-              emptyLabel="Aucun compte rendu de coach pour le moment."
-              canCreate={false}
-              isAdmin={false}
-              showAuthor
-              reports={clubReports}
-            />
-          )}
-        </div>
-      ),
-    });
-  }
+  // Retour de Cindy du 06/09 ("comptes rendus et règlement intérieur
+  // doivent être dans un seul onglet 'Documents', comme les autres
+  // espaces") : un seul onglet, toujours présent (contrairement aux
+  // comptes rendus, le Règlement intérieur n'est pas une brique -- comme
+  // côté Espace Enfant/bénévole avant cette fusion, tout le monde y a
+  // accès), les comptes rendus ne s'y ajoutant que si la brique
+  // correspondante est cochée. Même regroupement que "Documents" côté
+  // Bureau/Coach (admin-view.tsx/coach-view.tsx).
+  sections.push({
+    key: "documents",
+    label: "Documents",
+    icon: <ScrollText className={iconClass} />,
+    content: (
+      <div className="flex flex-col gap-4">
+        {has("compte_rendu_mairies") && (
+          <ClubReportsSection
+            category="MAIRIE"
+            title="Comptes rendus mairies"
+            emptyLabel="Aucun compte rendu de réunion avec une mairie pour le moment."
+            canCreate={false}
+            isAdmin={false}
+            reports={clubReports}
+          />
+        )}
+        {has("compte_rendu_bureau") && (
+          <ClubReportsSection
+            category="BUREAU"
+            title="Comptes rendus bureau"
+            emptyLabel="Aucun compte rendu de réunion du Bureau pour le moment."
+            canCreate={false}
+            isAdmin={false}
+            reports={clubReports}
+          />
+        )}
+        {has("compte_rendu_coachs") && (
+          <ClubReportsSection
+            category="COACH"
+            title="Comptes rendus des coachs"
+            emptyLabel="Aucun compte rendu de coach pour le moment."
+            canCreate={false}
+            isAdmin={false}
+            showAuthor
+            reports={clubReports}
+          />
+        )}
+        {/* Retour de Cindy du 25/08 : "penser en 360° avec les bénévoles,
+            ils font partie de la boucle" — mêmes règles de respect/fair-
+            play que sur le terrain les concernent aussi. Règlement
+            Intérieur uniquement (pas les deux chartes, propres aux
+            licenciés/parents d'un licencié) -- déplacé ici depuis
+            benevole-view.tsx (retour de Cindy du 06/09, fusion en un seul
+            onglet "Documents"). */}
+        <DocumentsPanel documentIds={["reglement-interieur"]} />
+      </div>
+    ),
+  });
 
   return sections;
 }

@@ -632,6 +632,25 @@ export default function CreateEventForm({
           );
           return;
         }
+        // Retour de Cindy du 06/09 ("ajouter aux bénévoles les
+        // notifications... quand un événement les concerne") : best-effort,
+        // jamais bloquant (même principe que member-notifications.ts) --
+        // rate ces alertes ne doit jamais faire croire que l'invitation
+        // elle-même a échoué, elle a bien été enregistrée juste au-dessus.
+        const { error: notifyError } = await supabase.from("notifications").insert(
+          toAdd.map((benevoleId) => ({
+            benevole_id: benevoleId,
+            event_id: inserted.id,
+            title: "Tu es invité(e) à un événement",
+            body: `${inserted.title ?? "Événement"} — ${new Date(inserted.start_time).toLocaleDateString(
+              "fr-FR",
+              { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }
+            )}`,
+          }))
+        );
+        if (notifyError) {
+          console.error("[create-event-form] notification bénévole échouée:", notifyError);
+        }
       }
       if (toRemove.length > 0) {
         const { error: uninviteError } = await supabase

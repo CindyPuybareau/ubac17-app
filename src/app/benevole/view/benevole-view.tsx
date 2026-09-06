@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Calendar, Check, HandHeart, MapPin, ScrollText, Undo2, X } from "lucide-react";
+import { Calendar, Check, HandHeart, MapPin, Undo2, X } from "lucide-react";
 import { styleFor, formatEventTime } from "@/app/dashboard/event-style";
 import RoleIcon from "@/app/dashboard/role-icon";
 import {
@@ -18,14 +18,15 @@ import {
   SEGMENT_OFF,
   SEGMENT_PRESENT_ON,
 } from "@/app/dashboard/rsvp-segment";
-import DocumentsPanel from "@/components/club-documents";
 import EmptyState from "@/app/dashboard/empty-state";
 import AdminSidebar, { type AdminSection } from "@/app/dashboard/admin-sidebar";
 import { MobileNavProvider } from "@/app/dashboard/mobile-nav-context";
 import MobileMenuButton from "@/app/dashboard/mobile-menu-button";
+import OrgChartButton from "@/app/dashboard/org-chart-button";
 import type { ChildEvent } from "@/app/enfant/view/child-dashboard";
 import type { ClubReport, SponsorDisplay } from "@/app/dashboard/page";
 import { buildProfileSections, type ProfileMember, type ProfileTeam } from "./profile-sections";
+import BenevoleNotificationBell, { type BenevoleNotification } from "./benevole-notification-bell";
 
 // Événement tel que vu par un bénévole : uniquement date/heure/lieu et les
 // besoins d'organisation (retour de Cindy du 2026-08-25, "pour le reste
@@ -292,6 +293,8 @@ export default function BenevoleView({
   profileEvents,
   profileSponsors,
   profileClubReports,
+  notifications,
+  notificationsEnabled,
 }: {
   firstName: string | null;
   benevoleId: string;
@@ -306,6 +309,11 @@ export default function BenevoleView({
   profileEvents: ChildEvent[];
   profileSponsors: SponsorDisplay[];
   profileClubReports: ClubReport[];
+  // Retour de Cindy du 06/09 ("ajouter aux bénévoles les notifications
+  // comme pour tous les autres espaces") : voir benevole-notification-
+  // bell.tsx.
+  notifications: BenevoleNotification[];
+  notificationsEnabled: boolean;
 }) {
   // Retour de Cindy du 06/09 ("un menu comme les autres espaces... toutes
   // les vues de l'application doivent se ressembler") : même AdminSidebar
@@ -345,6 +353,11 @@ export default function BenevoleView({
         </div>
       ),
     },
+    // Retour de Cindy du 06/09 ("comptes rendus et règlement intérieur
+    // doivent être dans un seul onglet 'Documents'") : "Règlement
+    // intérieur" n'est plus une entrée séparée ici -- buildProfileSections
+    // pousse désormais un seul "Documents" (toujours présent) qui le
+    // contient, avec les comptes rendus éventuellement cochés à côté.
     ...buildProfileSections({
       allowedBriques,
       teams: profileTeams,
@@ -353,17 +366,6 @@ export default function BenevoleView({
       sponsors: profileSponsors,
       clubReports: profileClubReports,
     }),
-    {
-      // Retour de Cindy du 25/08 : "penser en 360° avec les bénévoles, ils
-      // font partie de la boucle" — mêmes règles de respect/fair-play que
-      // sur le terrain les concernent aussi. Règlement Intérieur
-      // uniquement (pas les deux chartes, propres aux licenciés/parents
-      // d'un licencié).
-      key: "reglement",
-      label: "Règlement intérieur",
-      icon: <ScrollText className="h-4 w-4 shrink-0" />,
-      content: <DocumentsPanel documentIds={["reglement-interieur"]} />,
-    },
   ];
 
   return (
@@ -380,7 +382,19 @@ export default function BenevoleView({
                 </h1>
               </div>
             </div>
-            <MobileMenuButton />
+            {/* Retour de Cindy du 06/09 ("notifications... et
+                l'organigramme") : mêmes icônes, même ordre que la bande
+                bleue Bureau/Coach/Famille (page.tsx) — organigramme
+                (aucune dépendance de données, une simple image statique)
+                puis cloche puis menu. */}
+            <div className="flex shrink-0 items-center gap-1">
+              <OrgChartButton />
+              <BenevoleNotificationBell
+                initialNotifications={notifications}
+                initialEnabled={notificationsEnabled}
+              />
+              <MobileMenuButton />
+            </div>
           </div>
         </header>
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">
