@@ -2,7 +2,6 @@
 
 import { useState, useTransition, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Image from "next/image";
 
 export type DashboardTab = {
   key: string;
@@ -135,17 +134,42 @@ export default function DashboardTabs({
             recouvre juste ce bloc-ci, jamais le menu au-dessus -- pendant
             ce temps, `current` pointe toujours vers l'ANCIEN onglet actif
             (activeKey ne bascule qu'une fois le nouveau prêt), donc c'est
-            bien son contenu qu'on assombrit, en attendant le nouveau. */}
+            bien son contenu qu'on assombrit, en attendant le nouveau.
+            Retour de Cindy du 06/09 ("toujours un écran blanc quand on
+            passe d'un onglet à un autre" / "je ne vois pas le logo") : un
+            simple logo qui pulse, sans la barre de progression, se lisait
+            comme un fond blanc/vide -- repris ici à l'identique de
+            dashboard/loading.tsx (même logo, même barre, même texte).
+            <Image> de next/image ne s'affichait jamais à temps ici (son
+            optimisation à la volée demande un aller-retour serveur avant
+            le tout premier affichage d'une taille donnée -- le voile
+            disparaît généralement avant que cette image arrive) : même
+            correctif déjà appliqué au logo ailleurs dans l'appli pour la
+            même raison de fiabilité (voir club-reports-section.tsx,
+            cotisation-participants-table.tsx) -- une simple balise <img>
+            sert le fichier tel quel depuis /public, sans aller-retour
+            d'optimisation. */}
         {isPending && (
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-2xl bg-zinc-50/85 backdrop-blur-[1px]">
-            <Image
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-2xl bg-zinc-50">
+            {/* eslint-disable-next-line @next/next/no-img-element -- même
+                raison que club-reports-section.tsx : le logo doit
+                s'afficher immédiatement, sans dépendre de l'optimisation à
+                la volée de next/image. */}
+            <img
               src="/logo.png"
               alt="UBAC"
-              width={40}
-              height={40}
               className="h-10 w-10 animate-pulse object-contain"
             />
+            <div className="h-1.5 w-40 overflow-hidden rounded-full bg-zinc-200">
+              <div className="h-full w-1/3 animate-[loading-bar_1.1s_ease-in-out_infinite] rounded-full bg-ubac-yellow" />
+            </div>
             <p className="text-sm font-medium text-zinc-500">Chargement de cet espace...</p>
+            <style>{`
+              @keyframes loading-bar {
+                0% { transform: translateX(-100%); }
+                100% { transform: translateX(300%); }
+              }
+            `}</style>
           </div>
         )}
       </div>
