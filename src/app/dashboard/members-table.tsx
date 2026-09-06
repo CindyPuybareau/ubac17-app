@@ -34,7 +34,7 @@ import WhatsAppButton from "./whatsapp-button";
 import WhatsAppDirectButton from "./whatsapp-direct-button";
 import { formatFirstName, formatLastName, formatPersonName, sortByLastName } from "@/lib/names";
 import { formatLocalDateFr } from "@/lib/local-date";
-import type { AdminMember, AdminMemberTeam } from "./page";
+import type { AdminAccessProfile, AdminMember, AdminMemberTeam } from "./page";
 
 // "12 août 2026 à 09:36" — utilisé uniquement dans l'infobulle de
 // l'indicateur de connexion, jamais affiché en clair dans le tableau.
@@ -84,9 +84,11 @@ function Modal({
 export default function MembersTable({
   members,
   teams,
+  accessProfiles,
 }: {
   members: AdminMember[];
   teams: AdminMemberTeam[];
+  accessProfiles: AdminAccessProfile[];
 }) {
   const searchParams = useSearchParams();
 
@@ -490,7 +492,13 @@ export default function MembersTable({
               ...m,
               archivedAt: archived ? new Date().toISOString() : null,
               ...(archived
-                ? { teams: [], coachTeams: [], pendingCoachTeams: [], bureauRole: null }
+                ? {
+                    teams: [],
+                    coachTeams: [],
+                    pendingCoachTeams: [],
+                    bureauRole: null,
+                    accessProfileId: null,
+                  }
                 : {}),
             }
           : m
@@ -1189,6 +1197,8 @@ export default function MembersTable({
               teams={teams}
               profileId={detailMember.profileId}
               bureauRole={detailMember.bureauRole}
+              accessProfileId={detailMember.accessProfileId}
+              accessProfiles={accessProfiles}
               coachTeams={detailMember.coachTeams}
               pendingCoachTeams={detailMember.pendingCoachTeams}
             />

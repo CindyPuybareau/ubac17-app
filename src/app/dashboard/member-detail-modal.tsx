@@ -20,14 +20,22 @@ import { buildAppDeepLink } from "@/lib/whatsapp";
 import { sameCategoryFamily, teamCategoryLabel } from "@/lib/teams";
 import ConfirmDialog from "./confirm-dialog";
 import ParentLinkManager from "./parent-link-manager";
-import type { AdminMember, AdminMemberTeam, MemberDetail } from "./page";
+import { BRIQUE_GROUPS } from "./access-briques";
+import type { AdminAccessProfile, AdminMember, AdminMemberTeam, MemberDetail } from "./page";
+
+// Retour de Cindy du 05/09 : seul ce rôle peut être restreint à certaines
+// briques (case à cocher plus bas, remplace l'ancien sélecteur de profil
+// pré-existant) — comparé par valeur exacte de chaîne, donc le renommer
+// ici (c'était "Responsable Commission (Sponsors, Com, Animations, etc.)")
+// suffit à faire suivre le comportement partout où il est utilisé.
+const COMMITTEE_ROLE_LABEL = "Comité directeur";
 
 const BUREAU_ROLE_OPTIONS = [
   "Président / Vice-Président",
   "Trésorier / Trésorier Adjoint",
   "Secrétaire / Secrétaire Adjoint",
   "Membre du Bureau",
-  "Responsable Commission (Sponsors, Com, Animations, etc.)",
+  COMMITTEE_ROLE_LABEL,
 ];
 
 const TABS = [
@@ -128,6 +136,8 @@ export default function MemberDetailModal({
   teams = [],
   profileId = null,
   bureauRole: initialBureauRole = null,
+  accessProfileId: initialAccessProfileId = null,
+  accessProfiles = [],
   coachTeams: initialCoachTeams = [],
   pendingCoachTeams: initialPendingCoachTeams = [],
   // Réaffecter une équipe, désigner un coach ou donner l'accès Bureau
@@ -173,6 +183,13 @@ export default function MemberDetailModal({
   teams?: AdminMemberTeam[];
   profileId?: string | null;
   bureauRole?: string | null;
+  // Profil d'accès sur-mesure actuellement assigné (voir AdminAccessProfile
+  // sur page.tsx) -- null = "Bureau complet". accessProfiles est la liste
+  // des profils créés dans Vie du club > Profils d'accès, pour peupler le
+  // sélecteur ; laissée vide par les appelants (ex. team-card.tsx) qui ne
+  // gèrent pas les rôles Bureau, comme bureauRole/canManageTeamAndRoles.
+  accessProfileId?: string | null;
+  accessProfiles?: AdminAccessProfile[];
   coachTeams?: AdminMemberTeam[];
   pendingCoachTeams?: AdminMemberTeam[];
   canManageTeamAndRoles?: boolean;
@@ -321,6 +338,30 @@ export default function MemberDetailModal({
     initialBureauRole && !BUREAU_ROLE_OPTIONS.includes(initialBureauRole)
       ? [...BUREAU_ROLE_OPTIONS, initialBureauRole]
       : BUREAU_ROLE_OPTIONS;
+  // Briques cochées pour le rôle "Comité directeur" (retour de Cindy du
+  // 05/09) — sans effet pour tout autre rôle, voir handleSave. Pré-rempli
+  // à partir du profil déjà lié à cette fiche, s'il y en a un.
+  const initialCommitteeBriques =
+    (initialAccessProfileId &&
+      accessProfiles.find((p) => p.id === initialAccessProfileId)?.briques) ||
+    [];
+  const [committeeBriques, setCommitteeBriques] = useState<string[]>(initialCommitteeBriques);
+  // Même bug/correctif que benevoles-manager.tsx ("Jimmy Pouplard 5 fois",
+  // 06/09) : si la création du profil réussit mais qu'une étape suivante
+  // échoue (ex. le club_administrators.upsert plus bas), un ressai sur
+  // cette même modale recalculerait resolvedAccessProfileId à partir de
+  // initialAccessProfileId (toujours null, la fiche n'ayant pas été
+  // rafraîchie) et tenterait de recréer un profil avec EXACTEMENT le même
+  // nom -- ici bloqué net par la contrainte unique sur access_profiles.name
+  // plutôt que dupliqué, mais tout aussi cassé (le profil déjà créé reste
+  // orphelin, impossible à réattacher). Mémorisé dès la création pour
+  // qu'un ressai la réutilise.
+  const [pendingCommitteeProfileId, setPendingCommitteeProfileId] = useState<string | null>(null);
+  function toggleCommitteeBrique(key: string) {
+    setCommitteeBriques((prev) =>
+      prev.includes(key) ? prev.filter((b) => b !== key) : [...prev, key]
+    );
+  }
   const [form, setForm] = useState({
     firstName: member.firstName ?? "",
     lastName: member.lastName ?? "",
@@ -640,11 +681,88 @@ export default function MemberDetailModal({
       }
     }
 
+    // Comité directeur (retour de Cindy du 05/09) : seul ce rôle peut être
+    // restreint. Les briques sont cochées directement sur la fiche plutôt
+    // que choisies dans une liste de profils déjà créés ailleurs — sous le
+    // capot, une ligne access_profiles + ses briques est créée/mise à jour
+    // silencieusement ici (même mécanisme que benevoles-manager.tsx).
+    // resolvedAccessProfileId ne doit JAMAIS rester null pour ce rôle
+    // précis, même sans aucune brique cochée : null équivaut à "Bureau
+    // complet" partout ailleurs (AdminView) — un Comité directeur sans
+    // profil retomberait donc, à tort, sur l'accès complet.
+    let resolvedAccessProfileId: string | null =
+      bureauRole === COMMITTEE_ROLE_LABEL
+        ? (initialAccessProfileId ?? pendingCommitteeProfileId ?? null)
+        : null;
+    const committeeBriquesKey = [...committeeBriques].sort().join(",");
+    const committeeBriquesChanged =
+      committeeBriquesKey !== [...initialCommitteeBriques].sort().join(",");
+
+    if (bureauRole === COMMITTEE_ROLE_LABEL) {
+      if (!resolvedAccessProfileId) {
+        // Nom garanti unique (access_profiles.name est UNIQUE) via l'id de
+        // la fiche, jamais affiché comme un choix nulle part.
+        const profileName = `Comité directeur — ${formatPersonName(
+          form.firstName,
+          form.lastName,
+          "Membre"
+        )} (${member.id.slice(0, 8)})`;
+        const { data: createdProfile, error: createProfileError } = await supabase
+          .from("access_profiles")
+          .insert({ name: profileName })
+          .select("id")
+          .single();
+        if (createProfileError || !createdProfile) {
+          setSaving(false);
+          setError(`Accès Comité directeur non créé : ${createProfileError?.message ?? ""}`);
+          return;
+        }
+        resolvedAccessProfileId = createdProfile.id;
+        setPendingCommitteeProfileId(createdProfile.id);
+        if (committeeBriques.length > 0) {
+          const { error: insertBriquesError } = await supabase
+            .from("access_profile_briques")
+            .insert(committeeBriques.map((brique) => ({ profile_id: resolvedAccessProfileId, brique })));
+          if (insertBriquesError) {
+            setSaving(false);
+            setError(`Accès Comité directeur non mis à jour : ${insertBriquesError.message}`);
+            return;
+          }
+        }
+      } else if (committeeBriquesChanged) {
+        const { error: clearBriquesError } = await supabase
+          .from("access_profile_briques")
+          .delete()
+          .eq("profile_id", resolvedAccessProfileId);
+        if (clearBriquesError) {
+          setSaving(false);
+          setError(`Accès Comité directeur non mis à jour : ${clearBriquesError.message}`);
+          return;
+        }
+        if (committeeBriques.length > 0) {
+          const { error: insertBriquesError } = await supabase
+            .from("access_profile_briques")
+            .insert(committeeBriques.map((brique) => ({ profile_id: resolvedAccessProfileId, brique })));
+          if (insertBriquesError) {
+            setSaving(false);
+            setError(`Accès Comité directeur non mis à jour : ${insertBriquesError.message}`);
+            return;
+          }
+        }
+      }
+    }
+
     // Bureau access is pre-provisioned by email (same pattern as coach
     // invites) — works before the member ever signs up. club_function
     // holds the specific role for display today, ahead of the
-    // finer-grained permissions it'll eventually drive.
-    if (bureauRole !== (initialBureauRole ?? "")) {
+    // finer-grained permissions it'll eventually drive. Se déclenche aussi
+    // sur un changement de resolvedAccessProfileId seul (ex. première
+    // création du profil ci-dessus, ou retour à un rôle non restreint qui
+    // le détache) sans que club_function change de valeur.
+    if (
+      bureauRole !== (initialBureauRole ?? "") ||
+      resolvedAccessProfileId !== (initialAccessProfileId ?? null)
+    ) {
       // En minuscules : is_club_admin() compare cet email à celui du JWT
       // au moment de la connexion — une casse différente entre les deux
       // (ex. "Cindy@..." ici, "cindy@..." tapé à l'inscription) ferait
@@ -667,7 +785,12 @@ export default function MemberDetailModal({
         ? await supabase
             .from("club_administrators")
             .upsert(
-              { email, role: "ADMIN", club_function: bureauRole },
+              {
+                email,
+                role: "ADMIN",
+                club_function: bureauRole,
+                access_profile_id: resolvedAccessProfileId,
+              },
               { onConflict: "email" }
             )
         : await supabase
@@ -701,6 +824,7 @@ export default function MemberDetailModal({
       coachTeams: resolvedProfileId ? desiredCoachTeamRefs : [],
       pendingCoachTeams: resolvedProfileId ? [] : desiredCoachTeamRefs,
       bureauRole: bureauRole || null,
+      accessProfileId: resolvedAccessProfileId,
     });
     onClose();
   }
@@ -1092,6 +1216,46 @@ export default function MemberDetailModal({
                       </option>
                     ))}
                   </select>
+
+                  {/* Retour de Cindy du 05/09 : seul "Comité directeur" peut
+                      être restreint — les autres rôles (Président,
+                      Trésorier, Secrétaire, Membre du Bureau) gardent
+                      l'accès complet, sans option de restriction. Cochées
+                      ici directement plutôt que choisies dans une liste de
+                      profils déjà créés ailleurs — un profil dédié à cette
+                      personne est créé/mis à jour silencieusement derrière
+                      (voir handleSave), visible ensuite dans Vie du club →
+                      Bénévoles & Accès si besoin de le réutiliser. */}
+                  {bureauRole === COMMITTEE_ROLE_LABEL && (
+                    <div className="mt-1 flex flex-col gap-3">
+                      <label className="block text-xs font-medium text-navy/70">
+                        Briques visibles pour ce membre du Comité directeur
+                      </label>
+                      {BRIQUE_GROUPS.map((group) => (
+                        <div key={group.label}>
+                          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-navy/50">
+                            {group.label}
+                          </p>
+                          <div className="flex flex-col gap-1">
+                            {group.briques.map((b) => (
+                              <label
+                                key={b.key}
+                                className="flex items-center gap-2 text-sm text-zinc-700"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={committeeBriques.includes(b.key)}
+                                  onChange={() => toggleCommitteeBrique(b.key)}
+                                  className="h-3.5 w-3.5 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
+                                />
+                                {b.label}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 

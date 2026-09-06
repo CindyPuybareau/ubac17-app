@@ -39,6 +39,7 @@ import BenevolesManager from "./benevoles-manager";
 import BureauDashboard from "./bureau-dashboard";
 import type { AutomationKey } from "./automation-settings";
 import type {
+  AdminAccessProfile,
   AdminBenevole,
   AdminCategoryTariff,
   AdminCollecte,
@@ -58,6 +59,7 @@ import type { VolunteerNeed } from "./event-volunteer-needs";
 
 export default function AdminView({
   clubFunction,
+  allowedBriques = null,
   teams,
   allProfiles,
   cotisations,
@@ -73,6 +75,7 @@ export default function AdminView({
   sponsors,
   sponsorDisplay,
   benevoles,
+  accessProfiles,
   penalites,
   automationSettings,
   eventRoles,
@@ -80,6 +83,13 @@ export default function AdminView({
   clubReports,
 }: {
   clubFunction?: string | null;
+  // Profils d'accès sur-mesure (retour de Cindy du 05/09, étape 3) : null
+  // pour un Bureau complet (comportement historique, inchangé) ; sinon, la
+  // liste des briques cochées pour le profil de CE viewer -- le menu ci-
+  // dessous se réduit en conséquence (voir filterSectionsForAccess plus
+  // bas). Un compte sans aucun profil garde l'accès complet -- rien ne
+  // change tant que personne n'a de profil assigné.
+  allowedBriques?: string[] | null;
   teams: TeamWithMembers[];
   allProfiles: Person[];
   cotisations: AdminCotisation[];
@@ -95,6 +105,7 @@ export default function AdminView({
   sponsors: AdminSponsor[];
   sponsorDisplay: SponsorDisplay[];
   benevoles: AdminBenevole[];
+  accessProfiles: AdminAccessProfile[];
   penalites: AdminPenalite[];
   automationSettings: Record<AutomationKey, boolean>;
   // Catalogue des rôles d'organisation (buvette, table de marque...) et
@@ -144,6 +155,17 @@ export default function AdminView({
     if (m.profileId) memberDetailsByPlayerId[m.profileId] = m;
   });
 
+  // Profils d'accès sur-mesure (étape 3) : isRestricted distingue "Bureau
+  // complet" (allowedBriques === null, comportement historique) d'un
+  // profil sur-mesure ; has(brique) répond toujours "oui" dans le premier
+  // cas. Tout ce qui n'est PAS dans la liste blanche de la migration
+  // 20261031130000/20261031140000 (Paiements exclu volontairement,
+  // "attribuer un accès" idem, et par la même logique FFBB/WhatsApp/
+  // Documents/Boutique/import Excel qui n'y figurent pas non plus) reste
+  // Bureau complet uniquement -- voir filterSectionsForAccess plus bas.
+  const isRestricted = allowedBriques !== null;
+  const has = (brique: string) => !isRestricted || allowedBriques!.includes(brique);
+
   const iconClass = "h-4 w-4 shrink-0";
   const sections: AdminSection[] = [
     {
@@ -181,7 +203,7 @@ export default function AdminView({
       label: "Membres",
       icon: <Contact className={iconClass} />,
       content: (
-        <MembersTable members={members} teams={canonicalTeamRefs} />
+        <MembersTable members={members} teams={canonicalTeamRefs} accessProfiles={accessProfiles} />
       ),
     },
     {
@@ -364,11 +386,18 @@ export default function AdminView({
           // pour les besoins d'organisation (buvette, table de marque...)
           // d'un événement, sans être ni joueur ni forcément parent — voir
           // benevoles-manager.tsx et la section "Bénévoles invités" sur
-          // CreateEventForm.
+          // CreateEventForm. Fusionné avec "Profils d'accès" (retour de
+          // Cindy du 05/09, "je n'en veux qu'un", puis "tout ça réuni") :
+          // il n'existe plus de catalogue de profils séparé à gérer --
+          // benevoles-manager.tsx coche les briques d'un bénévole
+          // directement sur sa fiche (même mécanisme que "Comité
+          // directeur" côté fiche membre, voir member-detail-modal.tsx),
+          // un profil dédié à cette personne étant créé/mis à jour tout
+          // seul derrière.
           key: "benevoles",
-          label: "Bénévoles",
+          label: "Bénévoles & Accès",
           icon: <HandHeart className={iconClass} />,
-          content: <BenevolesManager benevoles={benevoles} />,
+          content: <BenevolesManager benevoles={benevoles} accessProfiles={accessProfiles} />,
         },
         {
           key: "ffbb",
@@ -401,50 +430,65 @@ export default function AdminView({
           icon: <ScrollText className={iconClass} />,
           content: (
             <div className="flex flex-col gap-4">
-              <DocumentsPanel
-                documentIds={["charte-joueur", "charte-parent", "reglement-interieur"]}
-              />
+              {/* Chartes, CD17/Ligue et l'import Excel juste au-dessus ne
+                  figurent pas dans la liste blanche des briques (étape 3,
+                  05/09) — comme Paiements/"attribuer un accès", ils restent
+                  strictement Bureau complet, jamais cochables pour un
+                  profil sur-mesure. */}
+              {!isRestricted && (
+                <DocumentsPanel
+                  documentIds={["charte-joueur", "charte-parent", "reglement-interieur"]}
+                />
+              )}
               {/* Comptes rendus (retour de Cindy du 2026-09-01) : texte
                   simple rédigé dans l'appli, jamais un fichier déposé pour
                   ces trois catégories — voir club-reports-section.tsx.
                   isAdmin={true} : le Bureau peut tout modifier/supprimer,
                   y compris les comptes rendus des coachs — RLS
-                  (is_club_admin()) l'autorise déjà côté base. */}
-              <ClubReportsSection
-                category="MAIRIE"
-                title="Comptes rendus mairies"
-                emptyLabel="Aucun compte rendu de réunion avec une mairie pour le moment."
-                canCreate
-                isAdmin
-                reports={clubReports}
-              />
-              <ClubReportsSection
-                category="BUREAU"
-                title="Comptes rendus bureau"
-                emptyLabel="Aucun compte rendu de réunion du Bureau pour le moment."
-                canCreate
-                isAdmin
-                reports={clubReports}
-              />
+                  (is_club_admin()) l'autorise déjà côté base. Chacun des
+                  trois n'apparaît que si la brique correspondante est
+                  cochée pour ce profil (étape 3, 05/09). */}
+              {has("compte_rendu_mairies") && (
+                <ClubReportsSection
+                  category="MAIRIE"
+                  title="Comptes rendus mairies"
+                  emptyLabel="Aucun compte rendu de réunion avec une mairie pour le moment."
+                  canCreate
+                  isAdmin
+                  reports={clubReports}
+                />
+              )}
+              {has("compte_rendu_bureau") && (
+                <ClubReportsSection
+                  category="BUREAU"
+                  title="Comptes rendus bureau"
+                  emptyLabel="Aucun compte rendu de réunion du Bureau pour le moment."
+                  canCreate
+                  isAdmin
+                  reports={clubReports}
+                />
+              )}
               {/* Retour de Cindy du 2026-09-01 ("ce n'est pas ce que j'ai
                   demandé") : le Bureau voit AUSSI les comptes rendus des
                   coachs (jamais n'en rédige depuis cet écran, canCreate
                   false) — showAuthor pour savoir qui a écrit quoi, plusieurs
                   coachs partageant cette même liste. */}
-              <ClubReportsSection
-                category="COACH"
-                title="Comptes rendus des coachs"
-                emptyLabel="Aucun compte rendu de coach pour le moment."
-                canCreate={false}
-                isAdmin
-                showAuthor
-                reports={clubReports}
-              />
+              {has("compte_rendu_coachs") && (
+                <ClubReportsSection
+                  category="COACH"
+                  title="Comptes rendus des coachs"
+                  emptyLabel="Aucun compte rendu de coach pour le moment."
+                  canCreate={false}
+                  isAdmin
+                  showAuthor
+                  reports={clubReports}
+                />
+              )}
               {/* CD17/Ligue (retour de Cindy du 2026-09-01, construit en
                   dernier comme convenu) : un vrai fichier reçu de
                   l'extérieur, déposé uniquement par le Bureau, verrouillé
                   pour toujours dès le dépôt — voir cd17-ligue-section.tsx. */}
-              <Cd17LigueSection canUpload reports={clubReports} />
+              {!isRestricted && <Cd17LigueSection canUpload reports={clubReports} />}
             </div>
           ),
         },
@@ -469,6 +513,75 @@ export default function AdminView({
     },
   ];
 
+  // Réduit le menu aux seules briques cochées pour ce profil (étape 3,
+  // 05/09) — sans effet tant que allowedBriques est null (Bureau complet,
+  // comportement historique). Fail-closed par défaut : une clé de section
+  // absente de ce tableau (ex. une future section pas encore classée) est
+  // masquée plutôt que montrée par erreur — seul "logout" est explicitement
+  // toujours visible. "documents" est géré à part : sa liste `children`
+  // reste vide (feuille, pas un groupe), et son contenu est déjà réduit
+  // aux briques comptes-rendus autorisées juste au-dessus (has(...) sur
+  // chaque <ClubReportsSection>) ; ici on décide seulement si l'onglet
+  // lui-même mérite d'apparaître dans le menu.
+  const REQUIRED_BRIQUE: Record<string, string> = {
+    members: "membres",
+    teams: "equipes",
+    "cotisations-licences": "cotisations",
+    "cotisations-evenements": "cotisations",
+    "cotisations-penalites": "penalites",
+    events: "evenements",
+    "matches-official": "matchs_resultats",
+    "matches-results": "matchs_resultats",
+    sponsors: "sponsors",
+    benevoles: "benevoles",
+  };
+  const documentsVisible =
+    !isRestricted ||
+    has("compte_rendu_mairies") ||
+    has("compte_rendu_bureau") ||
+    has("compte_rendu_coachs");
+
+  function filterSectionsForAccess(list: AdminSection[]): AdminSection[] {
+    if (!isRestricted) return list;
+    return list.flatMap((section): AdminSection[] => {
+      if (section.key === "logout") return [section];
+      if (section.key === "documents") return documentsVisible ? [section] : [];
+      if (section.children) {
+        const filteredChildren = filterSectionsForAccess(section.children);
+        return filteredChildren.length > 0 ? [{ ...section, children: filteredChildren }] : [];
+      }
+      const required = REQUIRED_BRIQUE[section.key];
+      // "home" (résumé Bureau), FFBB, WhatsApp, Boutique et "Profils
+      // d'accès" lui-même n'ont volontairement aucune entrée ici : jamais
+      // dans la liste blanche, donc jamais accessibles à un profil
+      // restreint (même logique que Paiements/"attribuer un accès").
+      return required && has(required) ? [section] : [];
+    });
+  }
+
+  let visibleSections = filterSectionsForAccess(sections);
+  // Filet de sécurité : un profil sur-mesure assigné sans aucune brique
+  // cochée (oubli lors de sa création) ne laisserait sinon que
+  // "Déconnexion" dans le menu, avec une zone de contenu vide et rien pour
+  // expliquer pourquoi — plutôt qu'un écran silencieux, un message clair
+  // pointant vers le Bureau.
+  if (isRestricted && !visibleSections.some((s) => s.key !== "logout")) {
+    visibleSections = [
+      {
+        key: "no-access",
+        label: "Accès",
+        icon: <Shield className={iconClass} />,
+        content: (
+          <p className="rounded-2xl border border-zinc-100 bg-white p-4 text-sm text-zinc-500">
+            Aucune brique n&apos;est encore cochée pour ton profil d&apos;accès. Demande au
+            Bureau d&apos;en activer au moins une (Vie du club → Profils d&apos;accès).
+          </p>
+        ),
+      },
+      ...visibleSections,
+    ];
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <span className="inline-flex w-fit items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ubac-yellow/15 px-3 py-1 text-xs font-semibold uppercase leading-none text-ubac-yellow-dark">
@@ -476,7 +589,7 @@ export default function AdminView({
         {clubFunction ? ` · ${clubFunction}` : ""}
       </span>
 
-      <AdminSidebar sections={sections} />
+      <AdminSidebar sections={visibleSections} />
     </div>
   );
 }

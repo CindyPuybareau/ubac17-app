@@ -18,9 +18,16 @@ import type { ChildCoach, ChildTeammate } from "./child-dashboard";
 export default function ChildTeamTab({
   coaches,
   teammates,
+  // Réutilisé tel quel pour l'onglet "Équipes" du profil d'accès d'un
+  // bénévole (retour de Cindy du 05/09, "profil et bénévoles doivent être
+  // fusionnés") : un par équipe du club plutôt qu'une seule équipe perso,
+  // d'où ce titre personnalisable — reste "Mon équipe" par défaut pour ne
+  // rien changer côté Espace Enfant.
+  title = "Mon équipe",
 }: {
   coaches: ChildCoach[];
   teammates: ChildTeammate[];
+  title?: string;
 }) {
   const sortedCoaches = sortByLastName(coaches, (c) => c.lastName);
   const sortedTeammates = sortByLastName(teammates, (t) => t.lastName);
@@ -29,7 +36,7 @@ export default function ChildTeamTab({
     <div className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
       <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
         <Users className="h-3.5 w-3.5 text-navy" />
-        Mon équipe
+        {title}
       </p>
 
       {/* Tableau (≥640px) — même gabarit que TeamCard : deux sections

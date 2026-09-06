@@ -12,6 +12,9 @@ import {
 } from "@/app/dashboard/event-volunteer-needs";
 import { formatFirstName } from "@/lib/names";
 import DocumentsPanel from "@/components/club-documents";
+import type { ChildEvent } from "@/app/enfant/view/child-dashboard";
+import type { ClubReport, SponsorDisplay } from "@/app/dashboard/page";
+import BenevoleProfileSections, { type ProfileMember, type ProfileTeam } from "./profile-sections";
 
 // Événement tel que vu par un bénévole : uniquement date/heure/lieu et les
 // besoins d'organisation (retour de Cindy du 2026-08-25, "pour le reste
@@ -181,11 +184,27 @@ export default function BenevoleView({
   benevoleId,
   events,
   volunteerNeedsByEventId,
+  allowedBriques,
+  profileTeams,
+  profileMembers,
+  profileEvents,
+  profileSponsors,
+  profileClubReports,
 }: {
   firstName: string | null;
   benevoleId: string;
   events: BenevoleEvent[];
   volunteerNeedsByEventId: Record<string, VolunteerNeed[]>;
+  // Retour de Cindy du 05/09 ("profil et bénévoles doivent être
+  // fusionnés") : voir profile-sections.tsx. allowedBriques vide (cas
+  // historique, aucun profil assigné) -> BenevoleProfileSections ne rend
+  // rien du tout.
+  allowedBriques: string[];
+  profileTeams: ProfileTeam[];
+  profileMembers: ProfileMember[];
+  profileEvents: ChildEvent[];
+  profileSponsors: SponsorDisplay[];
+  profileClubReports: ClubReport[];
 }) {
   return (
     <div className="flex flex-1 flex-col overflow-x-hidden bg-zinc-50">
@@ -223,6 +242,15 @@ export default function BenevoleView({
             />
           ))
         )}
+
+        <BenevoleProfileSections
+          allowedBriques={allowedBriques}
+          teams={profileTeams}
+          members={profileMembers}
+          events={profileEvents}
+          sponsors={profileSponsors}
+          clubReports={profileClubReports}
+        />
 
         {/* Retour de Cindy du 25/08 : "penser en 360° avec les bénévoles,
             ils font partie de la boucle" — mêmes règles de respect/fair-play

@@ -106,7 +106,10 @@ export type SponsorDisplay = {
 // Bénévoles hors club (retour de Cindy du 2026-08-25) : ni joueur, ni
 // Bureau, parfois parent d'un joueur, parfois pas du tout — voir la
 // migration 20261027000000_benevoles.sql. Jamais de lien avec les
-// cotisations ni l'effectif d'une équipe.
+// cotisations ni l'effectif d'une équipe -- sauf ce que le Bureau choisit
+// explicitement de lui ouvrir via accessProfileId (retour de Cindy du
+// 05/09, "profil et bénévoles doivent être fusionnés" -- voir
+// 20261031150000_benevoles_access_profile.sql et /benevole/view).
 export type AdminBenevole = {
   id: string;
   firstName: string;
@@ -116,6 +119,21 @@ export type AdminBenevole = {
   notes: string | null;
   accessToken: string;
   archivedAt: string | null;
+  // Profil d'accès sur-mesure assigné à ce bénévole (lecture seule pour
+  // lui, toujours) -- null = aucune brique supplémentaire, comportement
+  // historique (juste ses événements/besoins de bénévolat habituels).
+  accessProfileId: string | null;
+};
+
+// Profils d'accès sur-mesure (retour de Cindy du 05/09, reprise du sujet
+// mis en pause le 02/09) : un profil nommé + la liste des briques qu'il
+// ouvre (voir la liste blanche de la migration 20261031130000). Assigné à
+// un membre via club_administrators.access_profile_id -- NULL sur ce
+// champ reste "Bureau complet", inchangé.
+export type AdminAccessProfile = {
+  id: string;
+  name: string;
+  briques: string[];
 };
 
 export type WhatsAppGroup = {
@@ -199,6 +217,10 @@ export type AdminMember = MemberDetail & {
   // stored in club_administrators.club_function; any non-null value
   // grants Bureau access today, ahead of finer-grained permissions.
   bureauRole: string | null;
+  // Profil d'accès sur-mesure assigné à ce compte Bureau
+  // (club_administrators.access_profile_id), ou null pour "Bureau complet"
+  // (comportement inchangé) -- voir AdminAccessProfile.
+  accessProfileId: string | null;
   // Teams this member's own player row is designated to coach before they
   // have a real account (team_pending_coaches) — display-only, mirrors
   // the free-text pending_coach_names shown on team cards.
@@ -777,7 +799,7 @@ export default async function DashboardPage({
       // une majuscule, et le rendre invisible au Bureau sans aucune erreur.
       supabase
         .from("club_administrators")
-        .select("role, club_function")
+        .select("role, club_function, access_profile_id")
         .eq("email", (user.email ?? "").toLowerCase())
         .maybeSingle(),
       supabase
@@ -817,6 +839,25 @@ export default async function DashboardPage({
   const isAdmin = Boolean(adminResult.data);
   const clubFunction = adminResult.data?.club_function ?? null;
   const ownPlayerId = ownPlayerRowResult.data?.id ?? null;
+
+  // Profil d'accès sur-mesure (retour de Cindy du 05/09, étape 3) : si CE
+  // compte Bureau a un access_profile_id, son espace Bureau ne doit
+  // afficher que les briques cochées pour ce profil-là -- null reste
+  // "Bureau complet", exactement le comportement d'avant cette fonctionnalité.
+  // Une seule petite requête de plus, seulement pour les rares comptes
+  // Bureau restreints (jamais pour Coach/Famille, jamais pour un Bureau
+  // complet) -- pas la peine de la batcher avec runBatched plus bas.
+  let viewerAllowedBriques: string[] | null = null;
+  if (isAdmin && adminResult.data?.access_profile_id) {
+    const { data: viewerBriquesData, error: viewerBriquesError } = await supabase
+      .from("access_profile_briques")
+      .select("brique")
+      .eq("profile_id", adminResult.data.access_profile_id);
+    if (viewerBriquesError) {
+      console.error("[dashboard] lecture des briques du profil d'accès a échoué:", viewerBriquesError);
+    }
+    viewerAllowedBriques = (viewerBriquesData ?? []).map((b) => b.brique);
+  }
 
   type CoachedTeam = {
     id: string;
@@ -1282,6 +1323,7 @@ export default async function DashboardPage({
   let adminSponsors: AdminSponsor[] = [];
   let adminBenevoles: AdminBenevole[] = [];
   let adminPenalites: AdminPenalite[] = [];
+  let adminAccessProfiles: AdminAccessProfile[] = [];
   // The Membres table's team pickers (filter + "Modifier le profil") only
   // offer teams with a sort_order set — any future leftover/legacy import
   // row without one is excluded here (though still visible in the
@@ -1362,6 +1404,7 @@ export default async function DashboardPage({
       penalitesRes,
       benevolesRes,
       eventBenevoleInvitesRes,
+      accessProfilesRes,
     ] = await runBatched(
       [
         () =>
@@ -1431,7 +1474,7 @@ export default async function DashboardPage({
             .lte("start_time", trainingsWindowEnd)
             .order("start_time", { ascending: true }),
         () => supabase.from("parent_player").select("parent_id, player_id"),
-        () => supabase.from("club_administrators").select("email, club_function"),
+        () => supabase.from("club_administrators").select("email, club_function, access_profile_id"),
         () => supabase.from("team_pending_coaches").select("team_id, player_id"),
         () =>
           supabase
@@ -1475,9 +1518,19 @@ export default async function DashboardPage({
         () =>
           supabase
             .from("benevoles")
-            .select("id, first_name, last_name, phone, email, notes, access_token, archived_at")
+            .select(
+              "id, first_name, last_name, phone, email, notes, access_token, archived_at, access_profile_id"
+            )
             .order("last_name"),
         () => supabase.from("event_benevole_invites").select("event_id, benevole_id"),
+        // Profils d'accès sur-mesure (retour de Cindy du 05/09) : liste des
+        // profils et de leurs briques, pour l'écran de gestion et pour
+        // remplir le sélecteur "Étendue de l'accès" dans la fiche membre.
+        () =>
+          supabase
+            .from("access_profiles")
+            .select("id, name, access_profile_briques(brique)")
+            .order("name"),
       ],
       // dbLimit (voir sa définition plus haut) : UN seul plafond partagé
       // avec tous les autres blocs de cette page (Coach, Famille, les
@@ -1514,6 +1567,7 @@ export default async function DashboardPage({
       penalitesRes,
       benevolesRes,
       eventBenevoleInvitesRes,
+      accessProfilesRes,
     });
 
     const clubSettingsRow = clubSettingsRes.data as Record<AutomationKey, boolean> | null;
@@ -1533,10 +1587,20 @@ export default async function DashboardPage({
     const bureauRoleByEmailLower = new Map(
       (
         clubAdminsRes.data as
-          | { email: string; club_function: string | null }[]
+          | { email: string; club_function: string | null; access_profile_id: string | null }[]
           | null
           ?? []
       ).map((a) => [a.email.trim().toLowerCase(), a.club_function ?? "Membre du Bureau"])
+    );
+    // Profil d'accès sur-mesure de ce compte Bureau (voir AdminAccessProfile
+    // plus haut) -- null = "Bureau complet", comportement inchangé.
+    const accessProfileIdByEmailLower = new Map(
+      (
+        clubAdminsRes.data as
+          | { email: string; club_function: string | null; access_profile_id: string | null }[]
+          | null
+          ?? []
+      ).map((a) => [a.email.trim().toLowerCase(), a.access_profile_id])
     );
     // Retour de Cindy du 30/08 : sert à distinguer "cette fiche EST le
     // membre du Bureau" de "cette fiche partage juste son email" (voir
@@ -1873,6 +1937,20 @@ export default async function DashboardPage({
           )
             ? (bureauRoleByEmailLower.get(memberEmail.trim().toLowerCase()) ?? null)
             : null,
+        // Même garde que bureauRole juste au-dessus (badge/rôle Bureau
+        // réservé à la fiche qui EST réellement le compte, pas à un proche
+        // qui partage son email) -- sinon un profil sur-mesure assigné à
+        // une secrétaire du Bureau s'affichait à tort sur la fiche de son
+        // fils partageant son email.
+        accessProfileId:
+          memberEmail &&
+          !isMinor(player.birth_date) &&
+          bureauFicheMatchesAccountName(
+            player,
+            profileNameByEmailLower.get(memberEmail.trim().toLowerCase())
+          )
+            ? (accessProfileIdByEmailLower.get(memberEmail.trim().toLowerCase()) ?? null)
+            : null,
         pendingCoachTeams: pendingCoachTeamsByPlayerId.get(player.id) ?? [],
         email: memberEmail,
         phone:
@@ -1970,6 +2048,19 @@ export default async function DashboardPage({
       notes: b.notes,
       accessToken: b.access_token,
       archivedAt: b.archived_at,
+      accessProfileId: b.access_profile_id,
+    }));
+
+    adminAccessProfiles = (
+      (accessProfilesRes.data ?? []) as unknown as {
+        id: string;
+        name: string;
+        access_profile_briques: { brique: string }[] | null;
+      }[]
+    ).map((p) => ({
+      id: p.id,
+      name: p.name,
+      briques: (p.access_profile_briques ?? []).map((b) => b.brique),
     }));
 
     // Quels bénévoles ont déjà été invités à chaque événement (retour de
@@ -3537,6 +3628,7 @@ export default async function DashboardPage({
         activeTab === "admin" ? (
           <AdminView
             clubFunction={clubFunction}
+            allowedBriques={viewerAllowedBriques}
             teams={adminTeams}
             allProfiles={allProfilesForAdmin}
             cotisations={adminCotisations}
@@ -3552,6 +3644,7 @@ export default async function DashboardPage({
             sponsors={adminSponsors}
             sponsorDisplay={sponsorDisplay}
             benevoles={adminBenevoles}
+            accessProfiles={adminAccessProfiles}
             penalites={adminPenalites}
             automationSettings={adminAutomationSettings}
             eventRoles={eventRoleTypes}
