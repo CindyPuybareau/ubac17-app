@@ -1,7 +1,8 @@
 "use client";
 
-import { useTransition, type ReactNode } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
 
 export type DashboardTab = {
   key: string;
@@ -29,6 +30,24 @@ export default function DashboardTabs({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  // Retour de Cindy du 06/09 ("le délai d'un espace à un autre reste
+  // long") : le seul indice visuel pendant l'attente était un "…" ajouté
+  // au texte du bouton cliqué -- discret au point de passer inaperçu,
+  // laissant penser que le clic n'avait rien fait. `pendingKey` retient
+  // VERS QUEL onglet on vient de cliquer, pour habiller le contenu
+  // actuellement affiché d'un voile + repère de chargement bien visible
+  // pendant l'attente, sans jamais faire disparaître le menu ni casser la
+  // mise en page (loading.tsx, lui, continue de couvrir le tout premier
+  // chargement/un rechargement complet -- ce voile-ci couvre
+  // spécifiquement le changement d'onglet, que useTransition empêche
+  // volontairement de déclencher pour éviter un flash plein écran).
+  // displayedPendingKey se recalcule à chaque rendu plutôt que d'être
+  // remis à zéro via un useEffect : une fois activeKey a rejoint la cible,
+  // il redevient `null` tout seul au rendu suivant -- pendingKey lui-même
+  // n'a jamais besoin d'être nettoyé, chaque nouveau clic l'écrase de
+  // toute façon.
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
+  const displayedPendingKey = pendingKey !== activeKey ? pendingKey : null;
 
   if (tabs.length === 0) {
     return null;
@@ -55,6 +74,7 @@ export default function DashboardTabs({
 
   function handleClick(key: string) {
     if (key === current.key) return;
+    setPendingKey(key);
     startTransition(() => {
       router.push(tabHref(key));
     });
@@ -85,7 +105,7 @@ export default function DashboardTabs({
               }`}
             >
               {tab.label}
-              {isPending && current.key !== tab.key ? "…" : ""}
+              {displayedPendingKey === tab.key ? "…" : ""}
             </button>
           ))}
         </div>
@@ -107,9 +127,26 @@ export default function DashboardTabs({
           l'onglet actif change, quel que soit le composant qu'il utilise en
           dessous (protège aussi Bureau/Coach d'un bug de ce genre plus
           tard, pas seulement FamilyView). */}
-      <div key={current.key}>
+      <div key={current.key} className="relative">
         {current.content ?? (
           <p className="text-sm text-zinc-500">Chargement de cet espace…</p>
+        )}
+        {/* Voile de chargement (retour de Cindy du 06/09, voir plus haut) :
+            recouvre juste ce bloc-ci, jamais le menu au-dessus -- pendant
+            ce temps, `current` pointe toujours vers l'ANCIEN onglet actif
+            (activeKey ne bascule qu'une fois le nouveau prêt), donc c'est
+            bien son contenu qu'on assombrit, en attendant le nouveau. */}
+        {isPending && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-2xl bg-zinc-50/85 backdrop-blur-[1px]">
+            <Image
+              src="/logo.png"
+              alt="UBAC"
+              width={40}
+              height={40}
+              className="h-10 w-10 animate-pulse object-contain"
+            />
+            <p className="text-sm font-medium text-zinc-500">Chargement de cet espace...</p>
+          </div>
         )}
       </div>
     </div>
