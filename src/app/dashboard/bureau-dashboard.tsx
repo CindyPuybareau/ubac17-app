@@ -265,6 +265,16 @@ export default function BureauDashboard({
           en a laissé la place). */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <KpiCard
+          icon={Users}
+          iconClass="text-navy"
+          iconBgClass="bg-navy/10"
+          value={activeMembers}
+          kind="integer"
+          label="Membres actifs"
+          href="/dashboard?tab=admin&section=members"
+          sectionKey="members"
+        />
+        <KpiCard
           icon={Wallet}
           iconClass="text-rose-600"
           iconBgClass="bg-rose-500/10"
@@ -314,16 +324,6 @@ export default function BureauDashboard({
           label="Renouvellement Sponsors"
           href="/dashboard?tab=admin&section=sponsors"
           sectionKey="sponsors"
-        />
-        <KpiCard
-          icon={Users}
-          iconClass="text-navy"
-          iconBgClass="bg-navy/10"
-          value={activeMembers}
-          kind="integer"
-          label="Membres actifs"
-          href="/dashboard?tab=admin&section=members"
-          sectionKey="members"
         />
       </div>
 
