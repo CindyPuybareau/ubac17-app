@@ -44,7 +44,6 @@ import type {
 } from "./event-tasks";
 import type { VolunteerNeed } from "./event-volunteer-needs";
 import type { BirthdaySource } from "./birthdays";
-import type { ConvocationCard } from "./family-data";
 
 export default function CoachView({
   teams,
@@ -66,7 +65,6 @@ export default function CoachView({
   eventRoles,
   volunteerNeedsByEventId = {},
   ownPlayerId,
-  ownPlayerNextEvent = null,
   penalites = [],
   sponsorDisplay = [],
   clubReports,
@@ -104,13 +102,6 @@ export default function CoachView({
   // existe — un coach qui joue aussi dans une autre équipe doit pouvoir
   // répondre présent/absent pour LUI-MÊME sur ses propres matchs.
   ownPlayerId: string | null;
-  // Le prochain événement de ce coach en tant que JOUEUR, sur une équipe
-  // qu'il ne coache pas (ex. Basile, joueur Séniors 1) — null si aucun, ou
-  // si son équipe de joueur est de toute façon déjà une équipe coachée
-  // (voir page.tsx, ownPlayerNextEvent). Affiché en tête de "Planning &
-  // Rôles", trié par date avec les cartes des équipes coachées (retour de
-  // Cindy du 2026-08-20).
-  ownPlayerNextEvent?: ConvocationCard | null;
   // Lecture seule (retour de Cindy du 2026-08-22) : les pénalités des
   // joueurs de TOUTES les équipes de ce coach, saisies par le Bureau
   // (voir penalites-manager.tsx) — jamais de droit de saisie ici.
@@ -260,7 +251,6 @@ export default function CoachView({
               rsvpReasonByKey={rsvpReasonByKey}
               roles={eventRoles}
               ownPlayerId={ownPlayerId}
-              ownPlayerNextEvent={ownPlayerNextEvent}
               forcedTab="planning"
             />
           ),
@@ -281,7 +271,6 @@ export default function CoachView({
               rsvpReasonByKey={rsvpReasonByKey}
               roles={eventRoles}
               ownPlayerId={ownPlayerId}
-              ownPlayerNextEvent={ownPlayerNextEvent}
               forcedTab="bilan"
             />
           ),

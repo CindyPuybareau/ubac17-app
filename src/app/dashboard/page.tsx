@@ -1234,29 +1234,14 @@ export default async function DashboardPage({
     (c): c is NonNullable<typeof c> => Boolean(c)
   );
 
-  // Le propre prochain événement du coach en tant que JOUEUR, sur une
-  // équipe qu'il ne coache pas (ex. Basile, joueur Séniors 1, coach
-  // U13F/U13M/U13M-1) : "Planning & Rôles" ne montrait jusqu'ici que le
-  // prochain événement de chaque équipe COACHÉE, jamais le sien propre —
-  // retour de Cindy du 2026-08-20, "ça devrait apparaître en premier
-  // puisque c'est le prochain événement de son profil". convocationCards
-  // (zone prioritaire, calculée juste au-dessus) contient déjà cette info
-  // pour tout joueur lié, lui compris (voir ownPlayerRow plus haut) — pas
-  // besoin d'une requête de plus, juste retrouver sa propre entrée. Rien
-  // à afficher si son équipe est déjà une équipe coachée (déjà couverte
-  // par sa propre carte juste au-dessus, pas de doublon).
-  // Retour d'audit du 28/08 : un événement ciblant plusieurs équipes
-  // précises (target_team_ids) n'a pas de team_id — la déduplication ne
-  // jouait donc jamais pour ce genre d'événement, et un coach dont une
-  // équipe coachée est ciblée voyait sa propre carte deux fois (sa carte
-  // joueur ci-dessous + la carte de son équipe coachée juste au-dessus).
-  const ownPlayerNextEvent =
-    convocationCards.find(
-      (c) =>
-        c.player.id === ownPlayerId &&
-        !(c.event.team_id && coachedTeamIds.has(c.event.team_id)) &&
-        !c.event.target_team_ids?.some((id) => coachedTeamIds.has(id))
-    ) ?? null;
+  // Retour de Cindy du 07/09 ("j'ai les convocations de Basile en tant que
+  // joueur dans ses équipes coachées et n'apparaissent pas dans son
+  // équipe") : ownPlayerNextEvent, calculé ici puis fusionné dans
+  // "Planning & Rôles" (ajouté le 2026-08-20), a été retiré -- il faisait
+  // apparaître la même carte de convocation personnelle à l'identique quel
+  // que soit le filtre d'équipe coachée sélectionné, comme si elle
+  // "suivait" le mauvais onglet. Cette convocation reste bien visible à sa
+  // vraie place : l'onglet "Mon équipe" du coach (voir CoachView).
 
   type WhatsAppGroupRow = {
     id: string;
@@ -1319,7 +1304,6 @@ export default async function DashboardPage({
   return {
     convocationCards,
     coachCards,
-    ownPlayerNextEvent,
     whatsappGroups,
     eventRoleTypes,
     sponsorDisplay,
@@ -3667,7 +3651,6 @@ export default async function DashboardPage({
   ]);
   const {
     coachCards,
-    ownPlayerNextEvent,
     whatsappGroups,
     eventRoleTypes,
     sponsorDisplay,
@@ -3857,7 +3840,6 @@ export default async function DashboardPage({
             eventRoles={eventRoleTypes}
             volunteerNeedsByEventId={coachVolunteerNeedsByEventId}
             ownPlayerId={ownPlayerId}
-            ownPlayerNextEvent={ownPlayerNextEvent}
             penalites={coachPenalites}
             sponsorDisplay={sponsorDisplay}
             clubReports={clubReports}
