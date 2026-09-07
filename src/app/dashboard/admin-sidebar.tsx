@@ -1,9 +1,10 @@
 "use client";
 
-import { Fragment, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronRight, X } from "lucide-react";
 import { useMobileNav } from "./mobile-nav-context";
+import { useSectionNav } from "./section-nav-context";
 import { createClient } from "@/lib/supabase/client";
 
 export type AdminSection = {
@@ -167,6 +168,36 @@ export default function AdminSidebar({
   // d'onglets) — ouvert/fermé depuis le bouton hamburger de la bande
   // bleue, via le contexte partagé (voir mobile-nav-context.tsx).
   const { open, setOpen } = useMobileNav();
+
+  // Retour de Cindy du 07/09 ("un simple changement de vue sans reload
+  // serait plus rapide") : une carte distante (ex. bureau-dashboard.tsx)
+  // peut demander une section via ce contexte plutôt que forcer un
+  // rechargement complet -- voir section-nav-context.tsx pour le
+  // raisonnement complet. Ignoré si la clé demandée n'existe pas DANS CET
+  // AdminSidebar précis (celui d'un autre espace, monté ailleurs, ne
+  // réagit pas à une clé qui n'est pas la sienne). Les ancêtres de la
+  // section visée sont aussi dépliés au passage -- sinon la bascule
+  // fonctionnerait (le bon contenu s'affiche, `active` ne dépend pas de
+  // `expanded`) mais le sous-menu resterait visuellement fermé autour de
+  // la ligne en surbrillance.
+  const { requestedSection, clearRequestedSection } = useSectionNav();
+  useEffect(() => {
+    if (!requestedSection) return;
+    // requestAnimationFrame plutôt qu'un setState direct dans le corps de
+    // l'effet (react-hooks/set-state-in-effect) -- même traitement que
+    // match-result-celebration.tsx/pending-rsvp-popup.tsx pour réagir à un
+    // signal externe.
+    const raf = requestAnimationFrame(() => {
+      if (sectionExists(sections, requestedSection)) {
+        setActive(requestedSection);
+        const ancestors = ancestorKeys(sections, requestedSection) ?? [];
+        setExpanded((prev) => new Set([...prev, ...ancestors]));
+        setOpen(false);
+      }
+      clearRequestedSection();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [requestedSection, sections, clearRequestedSection, setOpen]);
 
   function selectSection(key: string) {
     setActive(key);

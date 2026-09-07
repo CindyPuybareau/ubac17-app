@@ -1,10 +1,21 @@
-import { FileWarning, Gavel, Handshake, Users, Wallet } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  CheckCircle2,
+  FileWarning,
+  Gavel,
+  Handshake,
+  Minus,
+  Users,
+  Wallet,
+} from "lucide-react";
 import { formatPersonName } from "@/lib/names";
 import { formatLocalDateFr } from "@/lib/local-date";
 import { balanceDue, computeStatus } from "./cotisation-shared";
 import AnimatedNumber from "./animated-number";
 import AutomationSettings, { type AutomationKey } from "./automation-settings";
 import DeferredCalendar from "./deferred-calendar";
+import SectionLinkCard from "./section-link-card";
 import type {
   AdminMemberTeam,
   AdminBenevole,
@@ -36,12 +47,23 @@ function isExpiringSoon(dateStr: string | null) {
 function KpiCard({
   icon: Icon,
   iconClass,
+  iconBgClass,
   value,
   kind,
   label,
+  href,
+  sectionKey,
+  trend,
+  zeroState,
 }: {
   icon: typeof Wallet;
   iconClass: string;
+  // Fond teinté derrière l'icône (retour du 07/09, "10-15% d'opacité"
+  // plutôt qu'une icône seule sur fond blanc) -- une classe complète comme
+  // iconClass, jamais construite dynamiquement (bg-${color}-500/10 ne
+  // serait pas détecté par le scanner Tailwind, qui a besoin de voir la
+  // classe entière écrite quelque part dans le code source).
+  iconBgClass: string;
   // Retour de Cindy du 06/09 ("une sorte de compteur") : value est
   // désormais le NOMBRE brut (plus une chaîne déjà mise en forme), pour
   // qu'AnimatedNumber puisse l'animer de 0 jusqu'à sa vraie valeur.
@@ -55,16 +77,100 @@ function KpiCard({
   value: number;
   kind: "integer" | "amount" | "percent";
   label: string;
+  // Destination "liste filtrée" (retour du 07/09, puis retour du même jour
+  // sur la première version : "le clic déclenche un vrai rechargement...
+  // un simple changement de vue sans reload serait plus rapide"). `href`
+  // reste un vrai lien (accessibilité, clic milieu/Ctrl/Cmd = nouvel
+  // onglet) ; `sectionKey` est en plus la clé AdminSidebar correspondante
+  // (voir admin-view.tsx) -- SectionLinkCard intercepte le clic normal et
+  // bascule AdminSidebar déjà monté via section-nav-context.tsx, sans
+  // recharger la page. Les deux vont toujours ensemble ici ; gardés
+  // distincts plutôt qu'un seul prop parce que `href` doit rester une URL
+  // complète et valide même si, un jour, un appelant les utilisait sans
+  // AdminSidebar en face.
+  href?: string;
+  sectionKey?: string;
+  // Comparaison optionnelle avec une période précédente (retour du 07/09,
+  // "un petit indicateur de tendance... si la donnée est disponible").
+  // Personne ne fournit encore de valeur précédente aujourd'hui (ce
+  // composant ne reçoit que l'état courant, pas d'historique mensuel) --
+  // la structure est prête, il suffira de calculer `delta` (négatif =
+  // baisse) et de le passer en prop le jour où un snapshot du mois
+  // précédent existe. `delta` est toujours lu comme "moins = mieux" (ces
+  // cartes sont toutes des compteurs "en attente"), pas besoin d'un sens
+  // configurable pour l'instant.
+  trend?: { delta: number; label: string };
+  // État visuel positif quand value === 0 (retour du 07/09, carte "Total
+  // pénalités") : remplace icône/couleurs par une version "tout va bien"
+  // plutôt que l'état neutre par défaut. Optionnel et non branché sur les
+  // autres cartes : un 0 "Cotisations en attente" n'a pas la même charge
+  // symbolique qu'un 0 pénalité, seule celle-ci a été demandée.
+  zeroState?: {
+    icon: typeof Wallet;
+    iconClass: string;
+    iconBgClass: string;
+    cardClass: string;
+  };
 }) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-zinc-100 bg-white p-4 text-center shadow-sm">
-      <Icon className={`h-5 w-5 shrink-0 ${iconClass}`} />
+  const isZero = value === 0 && zeroState !== undefined;
+  const ActiveIcon = isZero ? zeroState.icon : Icon;
+  const activeIconClass = isZero ? zeroState.iconClass : iconClass;
+  const activeIconBgClass = isZero ? zeroState.iconBgClass : iconBgClass;
+
+  const content = (
+    <>
+      <span className={`flex h-10 w-10 items-center justify-center rounded-full ${activeIconBgClass}`}>
+        <ActiveIcon className={`h-5 w-5 shrink-0 ${activeIconClass}`} />
+      </span>
       <p className="text-xl font-bold text-zinc-900 sm:text-2xl">
         <AnimatedNumber value={value} kind={kind} />
       </p>
       <p className="text-xs font-medium leading-tight text-zinc-500">{label}</p>
-    </div>
+      {trend && (
+        <p
+          className={`flex items-center gap-0.5 text-[11px] font-semibold ${
+            trend.delta < 0
+              ? "text-emerald-600"
+              : trend.delta > 0
+                ? "text-red-600"
+                : "text-zinc-400"
+          }`}
+        >
+          {trend.delta < 0 ? (
+            <ArrowDown className="h-3 w-3 shrink-0" />
+          ) : trend.delta > 0 ? (
+            <ArrowUp className="h-3 w-3 shrink-0" />
+          ) : (
+            <Minus className="h-3 w-3 shrink-0" />
+          )}
+          {trend.delta > 0 ? `+${trend.delta}` : trend.delta} {trend.label}
+        </p>
+      )}
+    </>
   );
+
+  // Élévation au survol + curseur pointer (retour du 07/09) : uniquement
+  // sur les cartes qui ont une vraie destination -- sinon le curseur
+  // promettrait un clic qui ne mène nulle part.
+  const cardClass = `flex flex-col items-center justify-center gap-1.5 rounded-2xl border p-4 text-center shadow-sm transition-shadow ${
+    isZero ? zeroState.cardClass : "border-zinc-100 bg-white"
+  } ${href ? "cursor-pointer hover:shadow-md" : ""}`;
+
+  if (href && sectionKey) {
+    return (
+      <SectionLinkCard href={href} sectionKey={sectionKey} className={cardClass}>
+        {content}
+      </SectionLinkCard>
+    );
+  }
+  if (href) {
+    return (
+      <a href={href} className={cardClass}>
+        {content}
+      </a>
+    );
+  }
+  return <div className={cardClass}>{content}</div>;
 }
 
 // Vue d'ensemble condensée, pensée pour répondre en un coup d'œil à "quoi
@@ -161,37 +267,63 @@ export default function BureauDashboard({
         <KpiCard
           icon={Wallet}
           iconClass="text-rose-600"
+          iconBgClass="bg-rose-500/10"
           value={pending.length}
           kind="integer"
           label="Cotisations en attente"
+          href="/dashboard?tab=admin&section=cotisations-licences"
+          sectionKey="cotisations-licences"
         />
         <KpiCard
           icon={Wallet}
           iconClass="text-amber-700"
+          iconBgClass="bg-amber-500/10"
           value={pendingAmount}
           kind="amount"
           label="Montant en attente"
+          href="/dashboard?tab=admin&section=cotisations-licences"
+          sectionKey="cotisations-licences"
         />
         <KpiCard
           icon={Gavel}
-          iconClass="text-rose-600"
+          // Rouge plutôt que le rose déjà utilisé par "Cotisations en
+          // attente" juste à côté (retour du 07/09, "rouge pour
+          // pénalités") -- les deux cartes partageaient jusqu'ici
+          // exactement la même couleur, impossible à distinguer d'un coup
+          // d'œil malgré des sujets différents.
+          iconClass="text-red-600"
+          iconBgClass="bg-red-500/10"
           value={penalitesTotalAmount}
           kind="amount"
           label="Total pénalités"
+          href="/dashboard?tab=admin&section=cotisations-penalites"
+          sectionKey="cotisations-penalites"
+          zeroState={{
+            icon: CheckCircle2,
+            iconClass: "text-emerald-600",
+            iconBgClass: "bg-emerald-500/10",
+            cardClass: "border-emerald-200 bg-emerald-50",
+          }}
         />
         <KpiCard
           icon={Handshake}
           iconClass="text-orange-600"
+          iconBgClass="bg-orange-500/10"
           value={sponsorsNeedingRenewal.length}
           kind="integer"
           label="Renouvellement Sponsors"
+          href="/dashboard?tab=admin&section=sponsors"
+          sectionKey="sponsors"
         />
         <KpiCard
           icon={Users}
           iconClass="text-navy"
+          iconBgClass="bg-navy/10"
           value={activeMembers}
           kind="integer"
           label="Membres actifs"
+          href="/dashboard?tab=admin&section=members"
+          sectionKey="members"
         />
       </div>
 

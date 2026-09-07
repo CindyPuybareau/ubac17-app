@@ -112,13 +112,32 @@ function KpiCard({
   wide?: boolean;
 }) {
   return (
+    // min-w-0 : sans ça, une grille CSS ne laisse jamais une carte
+    // rétrécir sous la largeur intrinsèque de son contenu (min-width:auto
+    // par défaut sur un élément de grille) -- un montant en euros au
+    // format français ("17 298,96 €") est un seul bloc insécable (espace
+    // fine insécable avant "€" et entre les milliers), impossible à
+    // couper : sans min-w-0, la carte débordait littéralement sur sa
+    // voisine plutôt que de laisser le texte se réduire dans son cadre
+    // (signalé par Cindy le 07/09, sur tablette). overflow-hidden en
+    // filet de sécurité si jamais un montant futur reste malgré tout trop
+    // long pour sa carte.
     <div
-      className={`flex h-full flex-col items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm ${
-        wide ? "col-span-2 md:col-span-2 lg:col-span-1" : ""
+      className={`flex h-full min-w-0 flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm ${
+        wide ? "col-span-2" : ""
       }`}
     >
       <Icon className={`h-5 w-5 shrink-0 ${iconClass}`} />
-      <p className="text-xl font-bold text-slate-900 sm:text-2xl">
+      <p
+        className={`font-bold text-slate-900 ${
+          // Les montants ("9 624,09 €") sont des chaînes bien plus longues
+          // que les pourcentages/entiers ("56 %", "57") -- une taille un
+          // cran plus petite leur donne la marge qui manquait sur les
+          // largeurs intermédiaires (tablette), sans toucher aux cartes
+          // courtes qui n'en ont pas besoin.
+          kind === "amount" ? "text-base sm:text-lg md:text-xl" : "text-xl sm:text-2xl"
+        }`}
+      >
         <AnimatedNumber value={value} kind={kind} />
       </p>
       <p className="text-xs font-medium leading-tight text-slate-500">{label}</p>
@@ -129,10 +148,17 @@ function KpiCard({
 function KpiHeader({ cotisations }: { cotisations: AdminCotisation[] }) {
   const kpis = useMemo(() => computeKpis(cotisations), [cotisations]);
 
-  // 7 cards over 2 / 4 / 7 columns. The last one spans two columns below
-  // lg so neither breakpoint ends on a half-empty row.
+  // 7 cartes sur 2 / 3 / 4 colonnes maximum (retour de Cindy du 07/09,
+  // "sur tablette ça ne fonctionne pas, les chiffres débordent") : la
+  // grille montait jusqu'à 7 colonnes égales dès 1024px (lg), pile dans la
+  // plage des tablettes en paysage -- bien trop étroit pour un montant en
+  // euros. Plafonnée à 4 colonnes à partir de md, quelle que soit la
+  // largeur d'écran au-delà : "Total attendu" reste sur 2 colonnes à
+  // toutes les tailles (col-span-2 sans variante lg qui l'annulait), ce
+  // qui referme exactement la rangée à 4+4 sans case vide (4 cartes
+  // simples + 1 carte simple + 1 carte double = 4 puis 4).
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-7">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
       <KpiCard
         icon={TrendingUp}
         iconClass="text-navy"
