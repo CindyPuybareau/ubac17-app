@@ -27,6 +27,43 @@ import type { ChildEvent } from "@/app/enfant/view/child-dashboard";
 import type { ClubReport, SponsorDisplay } from "@/app/dashboard/page";
 import { buildProfileSections, type ProfileMember, type ProfileTeam } from "./profile-sections";
 import BenevoleNotificationBell, { type BenevoleNotification } from "./benevole-notification-bell";
+import PendingRsvpPopup, { type PendingRsvpItem } from "@/app/dashboard/pending-rsvp-popup";
+
+// Retour de Cindy du 07/09 ("2 jours avant l'événement") : même fenêtre
+// que family-view.tsx, popup silencieuse pour un événement encore
+// lointain.
+const RSVP_POPUP_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
+
+// Retour de Cindy du 07/09 (popup "n'oublie pas de répondre") : fonction
+// ordinaire (règle react-hooks/purity, même principe que
+// family-view.tsx/family-attendance-requests.tsx) -- un seul item ici, le
+// bénévole ne répond jamais que pour lui-même, jamais pour quelqu'un
+// d'autre.
+function computeBenevolePendingItem(benevoleId: string, events: BenevoleEvent[]): PendingRsvpItem[] {
+  const nowMs = Date.now();
+  const nextEvent = events
+    .filter((e) => e.status === "PENDING")
+    .filter((e) => {
+      const startMs = new Date(e.startTime).getTime();
+      return startMs >= nowMs && startMs - nowMs <= RSVP_POPUP_WINDOW_MS;
+    })
+    .sort((a, b) => a.startTime.localeCompare(b.startTime))[0];
+  if (!nextEvent) return [];
+  return [
+    {
+      id: benevoleId,
+      name: "Toi",
+      event: {
+        id: nextEvent.id,
+        title: nextEvent.title,
+        event_type: nextEvent.eventType,
+        start_time: nextEvent.startTime,
+        location: nextEvent.location,
+        salle: nextEvent.salle,
+      },
+    },
+  ];
+}
 
 // Événement tel que vu par un bénévole : uniquement date/heure/lieu et les
 // besoins d'organisation (retour de Cindy du 2026-08-25, "pour le reste
@@ -148,7 +185,19 @@ function BenevoleNeedRow({
 // RsvpButtons (calendar-view.tsx, joueurs), mais écrit via
 // /api/benevole-rsvp plutôt qu'un appel Supabase direct (aucune session
 // Supabase Auth côté bénévole).
-function BenevoleRsvpButtons({ eventId, currentStatus }: { eventId: string; currentStatus: string }) {
+function BenevoleRsvpButtons({
+  eventId,
+  currentStatus,
+  onStatusChange,
+}: {
+  eventId: string;
+  currentStatus: string;
+  // Retour de Cindy du 07/09 (popup "n'oublie pas de répondre") : même
+  // callback optionnel que RsvpButtons (calendar-view.tsx, joueurs) --
+  // permet à pending-rsvp-popup.tsx de faire disparaître la carte dès que
+  // le bénévole répond, sans attendre un rechargement de page.
+  onStatusChange?: (previousStatus: string, newStatus: string) => void;
+}) {
   const [status, setStatus] = useState(currentStatus);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -156,6 +205,7 @@ function BenevoleRsvpButtons({ eventId, currentStatus }: { eventId: string; curr
   async function respond(newStatus: "PRESENT" | "ABSENT" | "PENDING") {
     const previousStatus = status;
     setStatus(newStatus);
+    onStatusChange?.(previousStatus, newStatus);
     setPending(true);
     setError(null);
     try {
@@ -375,8 +425,22 @@ export default function BenevoleView({
     }),
   ];
 
+  const pendingRsvpItems = computeBenevolePendingItem(benevoleId, events);
+
   return (
     <MobileNavProvider>
+      <PendingRsvpPopup
+        items={pendingRsvpItems}
+        renderActions={(item, onAnswered) => (
+          <BenevoleRsvpButtons
+            eventId={item.event.id}
+            currentStatus="PENDING"
+            onStatusChange={(_, newStatus) => {
+              if (newStatus !== "PENDING") onAnswered();
+            }}
+          />
+        )}
+      />
       <div className="flex flex-1 flex-col overflow-x-hidden bg-zinc-50">
         <header className="bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-5 shadow-md sm:px-6">
           <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3">

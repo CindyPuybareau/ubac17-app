@@ -20,6 +20,8 @@ import { sortTeamsByGroup } from "@/lib/teams";
 import CalendarView, { type CalendarRsvpPlayer } from "./calendar-view";
 import FamilyTeamCard, { type FamilyTeamCardData } from "./family-team-card";
 import FamilyAttendanceRequests from "./family-attendance-requests";
+import PendingRsvpPopup, { type PendingRsvpItem } from "./pending-rsvp-popup";
+import RsvpButtons from "./rsvp-buttons";
 import FamilyAttendanceSummary from "./family-attendance-summary";
 import CalendarSubscribe from "./calendar-subscribe";
 import FamilyCotisationCard from "./family-cotisation-card";
@@ -39,6 +41,54 @@ import type {
 import type { BirthdaySource } from "./birthdays";
 import type { CarpoolOffer, EventRoleType, EventTasksState } from "./event-tasks";
 import type { VolunteerNeed } from "./event-volunteer-needs";
+
+// Retour de Cindy du 07/09 ("2 jours avant l'événement") : la popup ne
+// doit pas surgir pour un événement encore lointain, seulement une fois
+// l'échéance proche.
+const RSVP_POPUP_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
+
+// Fonction ordinaire (voir son appel dans FamilyView) : la lecture de
+// l'heure courante reste hors du corps du composant, règle
+// react-hooks/purity -- même principe que pendingRequests dans
+// family-attendance-requests.tsx.
+function computePendingRsvpItems(
+  players: CalendarRsvpPlayer[],
+  events: AdminUpcomingEvent[],
+  statusByKey: Record<string, string>
+): PendingRsvpItem[] {
+  const nowMs = Date.now();
+  return players
+    .map((p): PendingRsvpItem | null => {
+      const nextEvent = events
+        .filter((e) => {
+          const startMs = new Date(e.start_time).getTime();
+          return startMs >= nowMs && startMs - nowMs <= RSVP_POPUP_WINDOW_MS;
+        })
+        .filter((e) =>
+          e.teamId || e.targetTeamIds
+            ? (e.teamId && p.teamIds.includes(e.teamId)) ||
+              (e.targetTeamIds?.some((id) => p.teamIds.includes(id)) ?? false)
+            : true
+        )
+        .sort((a, b) => a.start_time.localeCompare(b.start_time))[0];
+      if (!nextEvent) return null;
+      const status = statusByKey[`${nextEvent.id}:${p.id}`];
+      if (status === "PRESENT" || status === "ABSENT" || status === "LATE") return null;
+      return {
+        id: p.id,
+        name: p.name,
+        event: {
+          id: nextEvent.id,
+          title: nextEvent.title,
+          event_type: nextEvent.event_type,
+          start_time: nextEvent.start_time,
+          location: nextEvent.location,
+          salle: nextEvent.salle,
+        },
+      };
+    })
+    .filter((item): item is PendingRsvpItem => item !== null);
+}
 
 // Navigation à 2 onglets, zéro redondance : "Planning & Matchs" concentre
 // tout ce qui est chronologique (prochain rendez-vous en tête, puis tous
@@ -214,6 +264,20 @@ export default function FamilyView({
     () => birthdayMembers.filter((m) => m.teamIds?.some((id) => visibleTeamIds.has(id))),
     [birthdayMembers, visibleTeamIds]
   );
+
+  // Retour de Cindy du 07/09 ("une popup ... sur l'événement à venir afin
+  // que les gens n'oublient pas de répondre") : pour CHAQUE enfant (tous,
+  // pas seulement celui actuellement sélectionné par la pastille
+  // ci-dessus -- rsvpPlayers au complet, pas visiblePlayers), son tout
+  // prochain événement s'il n'a pas encore de réponse. "Mon équipe" et
+  // "Mes enfants" utilisant tous deux ce composant (voir page.tsx,
+  // buildFamilyView), ça couvre aussi un coach qui joue ailleurs -- sa
+  // convocation personnelle (retirée de "Planning & Rôles" le 07/09) reste
+  // ainsi rappelée ici, à sa vraie place. Fonction ordinaire (comme
+  // pendingRequests dans family-attendance-requests.tsx) plutôt qu'un
+  // useMemo : la lecture de l'heure courante doit rester hors du corps du
+  // composant (règle react-hooks/purity).
+  const pendingRsvpItems = computePendingRsvpItems(rsvpPlayers, events, rsvpStatusByKey);
 
   const sections: AdminSection[] = [
     {
@@ -410,6 +474,20 @@ export default function FamilyView({
 
   return (
     <div className="flex flex-col gap-4">
+      <PendingRsvpPopup
+        items={pendingRsvpItems}
+        renderActions={(item, onAnswered) => (
+          <RsvpButtons
+            eventId={item.event.id}
+            playerId={item.id}
+            currentStatus="PENDING"
+            onStatusChange={(_, newStatus) => {
+              if (newStatus !== "PENDING") onAnswered();
+            }}
+          />
+        )}
+      />
+
       {/* En tête de page et hors des onglets : une demande du coach doit
           se voir en ouvrant l'app, pas se découvrir en fouillant. */}
       <FamilyAttendanceRequests
