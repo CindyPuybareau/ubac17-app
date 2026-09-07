@@ -352,7 +352,14 @@ export default function ChildDashboard({
             superposition (absolute, left-1/2 -translate-x-1/2) centrée
             sur ce conteneur relatif — centrage géométrique garanti,
             indépendant de la largeur de la photo/des icônes. */}
-        <div className="relative mx-auto flex w-full max-w-[1600px] flex-col gap-3 sm:min-h-[3.5rem] sm:flex-row sm:items-center sm:justify-between">
+        {/* Retour de Cindy du 07/09 ("sur tablette, ça se chevauche"),
+            même correctif que page.tsx (espace Bureau/Coach/Famille) :
+            passer en ligne dès sm: (640px) alors que le bandeau "Cette
+            semaine" juste en dessous reste maintenant empilé (donc plus
+            haut) jusqu'à lg: faisait chevaucher Bonjour/prénom et le
+            bandeau sur tablette. Repoussé à lg: partout ici pour rester
+            cohérent. */}
+        <div className="relative mx-auto flex w-full max-w-[1600px] flex-col gap-3 lg:min-h-[3.5rem] lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-center gap-3">
             <ChildAvatarUpload avatarUrl={avatarUrl} name={firstName} />
             <div className="min-w-0">
@@ -376,7 +383,7 @@ export default function ChildDashboard({
               coupé en haut de l'en-tête — même correctif que page.tsx,
               inset-y-0 + flex + items-center centre à l'intérieur de la
               vraie hauteur du conteneur, jamais au-delà. */}
-          <div className="sm:absolute sm:inset-y-0 sm:left-1/2 sm:flex sm:max-w-[calc(100%-18rem)] sm:-translate-x-1/2 sm:items-center">
+          <div className="lg:absolute lg:inset-y-0 lg:left-1/2 lg:flex lg:max-w-[calc(100%-18rem)] lg:-translate-x-1/2 lg:items-center">
             <WeekStripBanner events={headerWeekEvents} />
           </div>
         </div>

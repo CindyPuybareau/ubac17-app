@@ -4044,7 +4044,12 @@ export default async function DashboardPage({
             -translate-x-1/2) centrée sur ce conteneur relatif lui-même :
             un centrage géométrique garanti, indépendant de tout calcul de
             grille/flex fragile. */}
-        <div className="relative mx-auto flex w-full max-w-[1600px] flex-col gap-3 sm:min-h-[3.5rem]">
+        {/* Retour de Cindy du 07/09 ("sur tablette, ça se chevauche") :
+            cette réservation de hauteur n'a de sens que quand le bandeau
+            "Cette semaine" juste en dessous passe réellement en position
+            absolue superposée (voir son propre wrapper, repoussé à lg:
+            pour la même raison) -- gardé aligné sur ce même seuil. */}
+        <div className="relative mx-auto flex w-full max-w-[1600px] flex-col gap-3 lg:min-h-[3.5rem]">
           {/* Retour de Cindy du 28/08 ("le menu hamburger doit se trouver
               en haut à droite de l'écran sur smartphone") : ce duo
               photo/icônes vivait auparavant à même le conteneur externe,
@@ -4094,7 +4099,18 @@ export default async function DashboardPage({
             // plus haut que prévu. inset-y-0 + flex + items-center
             // centre à l'intérieur de la vraie hauteur du conteneur,
             // jamais au-delà.
-            <div className="sm:absolute sm:inset-y-0 sm:left-1/2 sm:flex sm:max-w-[calc(100%-18rem)] sm:-translate-x-1/2 sm:items-center">
+            // Retour de Cindy du 07/09 ("sur tablette, ça se chevauche
+            // avec Bonjour/Basile") : ce wrapper passait en absolute dès
+            // sm: (640px), pile au moment où WeekStripBanner lui-même
+            // reste maintenant empilé (donc plus haut) jusqu'à lg: (voir
+            // week-strip-banner.tsx) -- un bandeau plus haut que prévu,
+            // superposé et centré verticalement sur toute la hauteur de
+            // l'en-tête, débordait sur la ligne Bonjour/Basile juste
+            // au-dessus. Repoussé à lg: pour rester cohérent : mobile ET
+            // tablette gardent le bandeau dans le flux normal (empilé
+            // sous Bonjour/Basile, jamais en superposition), seul un
+            // écran vraiment large bascule en superposition centrée.
+            <div className="lg:absolute lg:inset-y-0 lg:left-1/2 lg:flex lg:max-w-[calc(100%-18rem)] lg:-translate-x-1/2 lg:items-center">
               <WeekStripBanner events={headerWeekEvents} />
             </div>
           )}

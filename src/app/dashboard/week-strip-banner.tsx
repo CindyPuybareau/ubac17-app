@@ -83,7 +83,10 @@ function weekSummary(events: WeekStripEvent[], weekStart: Date, weekEnd: Date): 
     const t = new Date(e.startTime);
     return t >= weekStart && t < weekEnd;
   });
-  if (inWeek.length === 0) return "Rien de prévu cette semaine.";
+  // Retour de Cindy du 07/09 ("Cette semaine / Rien de prévu cette
+  // semaine. c'est redondant") : l'eyebrow "CETTE SEMAINE" juste
+  // au-dessus (voir plus bas) porte déjà cette précision.
+  if (inWeek.length === 0) return "Rien de prévu.";
 
   let trainings = 0;
   let matches = 0;
@@ -119,7 +122,11 @@ function weekSummary(events: WeekStripEvent[], weekStart: Date, weekEnd: Date): 
     suffix = ` ${day}${loc ? ` à ${loc}` : ""}`;
   }
 
-  return `Cette semaine : ${parts.join(", ")}.${suffix}`;
+  // Retour de Cindy du 07/09 ("Cette semaine / Cette semaine : 4
+  // entraînements... c'est redondant") : même correctif que la branche
+  // "rien de prévu" juste au-dessus -- l'eyebrow "CETTE SEMAINE" porte déjà
+  // cette précision, plus besoin de la répéter dans la phrase elle-même.
+  return `${parts.join(", ")}.${suffix}`;
 }
 
 // Même habillage que EventRow (child-calendar-tab.tsx) et renderEventCard
@@ -281,7 +288,17 @@ export default function WeekStripBanner({ events }: { events: WeekStripEvent[] }
           sur le conteneur racine de la page (voir dashboard/page.tsx),
           qui rogne un éventuel dépassement au lieu de faire apparaître
           une barre de défilement, sans jamais casser la ligne texte+frise. */}
-      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-center sm:gap-8">
+      {/* Retour de Cindy du 07/09 ("sur tablette, le texte n'est pas
+          responsive") : côte à côte dès sm: (640px), la colonne de texte
+          se retrouvait écrasée à quasi rien de large sur tablette --
+          cette bannière vit dans un en-tête déjà partagé avec la photo/le
+          prénom et les icônes (voir page.tsx, max-w-[calc(100%-18rem)]),
+          donc la largeur réellement disponible ici est plus étroite que
+          la largeur d'écran brute. Repoussé à lg: (1024px) : mobile ET
+          tablette gardent la disposition empilée (texte sur toute la
+          largeur, frise en dessous), qui ne force jamais un retour à la
+          ligne caractère par caractère. */}
+      <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-center lg:gap-8">
         {/* Retour de Cindy du 2026-08-24 ("même emplacement, plus gros") :
             même poids typographique que l'ancienne carte séparée
             (family-week-banner.tsx) — eyebrow "CETTE SEMAINE" + phrase en
@@ -297,7 +314,7 @@ export default function WeekStripBanner({ events }: { events: WeekStripEvent[] }
             cliquables, même sans point — un jour sans événement referme
             simplement le panneau (selectedDayEvents reste vide, aucune
             carte ne s'affiche) plutôt que d'avoir l'air cassé/désactivé. */}
-        <div className="grid grid-cols-7 gap-1.5 sm:w-auto sm:shrink-0">
+        <div className="grid grid-cols-7 gap-1.5 lg:w-auto lg:shrink-0">
           {days.map((d) => {
             const isToday = isSameDay(d, today);
             const hasEvents = events.some((e) => isSameDay(new Date(e.startTime), d));
