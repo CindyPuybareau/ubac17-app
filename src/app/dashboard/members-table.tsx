@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import * as XLSX from "xlsx";
 import {
@@ -112,6 +113,20 @@ export default function MembersTable({
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  // Retour de Cindy du 07/09 ("bug au responsive quand je clique sur les
+  // trois petits points") : ce menu ⋮ vivait dans un <td className="relative">,
+  // dernière colonne d'un tableau large en overflow-x-auto (voir plus bas,
+  // "10 colonnes en whitespace-nowrap") -- ancré en `absolute right-0` à
+  // cette cellule, il pouvait se retrouver hors du cadre visible (coupé par
+  // le défilement horizontal du tableau, ou simplement pas encore scrollé
+  // jusque-là), exactement le même piège qu'un `position:fixed` sous un
+  // ancêtre en overflow (voir le voile de chargement de dashboard-tabs.tsx,
+  // corrigé plus tôt aujourd'hui pour la même raison). Coordonnées
+  // (top/right, relatives au VRAI viewport) calculées au clic sur le
+  // bouton ⋮, le menu lui-même sort du tableau via un portail vers
+  // document.body -- ne peut plus jamais être coupé, quel que soit le
+  // défilement du tableau ou la largeur de l'écran.
+  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
 
   // Deep-link support: "?openMember=<id>" (see buildAppDeepLink) opens
   // that member's fiche straight away — the one-click "come back here"
@@ -604,102 +619,112 @@ export default function MembersTable({
       <>
         <div className="flex items-center justify-end">
           <button
-            onClick={() => setOpenMenuId((cur) => (cur === m.id ? null : m.id))}
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              setMenuPosition({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+              setOpenMenuId((cur) => (cur === m.id ? null : m.id));
+            }}
             className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
           >
             <MoreVertical className="h-4 w-4" />
           </button>
         </div>
-        {openMenuId === m.id && (
-          <>
-            <div className="fixed inset-0 z-30" onClick={() => setOpenMenuId(null)} />
-            <div className="absolute right-0 z-40 mt-1 w-56 rounded-xl border border-zinc-100 bg-white p-1.5 text-left shadow-lg">
-              <button
-                onClick={() => {
-                  setOpenMenuId(null);
-                  setDetailMemberId(m.id);
-                }}
-                className={menuItemClass}
+        {openMenuId === m.id &&
+          menuPosition &&
+          createPortal(
+            <>
+              <div className="fixed inset-0 z-30" onClick={() => setOpenMenuId(null)} />
+              <div
+                className="fixed z-40 w-56 rounded-xl border border-zinc-100 bg-white p-1.5 text-left shadow-lg"
+                style={{ top: menuPosition.top, right: menuPosition.right }}
               >
-                <User className="h-3.5 w-3.5 text-zinc-500" />
-                Voir / Modifier le profil
-              </button>
-              {m.phone ? (
-                <WhatsAppButton
-                  phone={m.phone}
-                  message={`Bonjour ${m.firstName ? formatFirstName(m.firstName) : ""}, ici l'UBAC.`}
-                  label="Contacter sur WhatsApp"
-                  playerId={m.id}
-                  onTriggerClick={() => setOpenMenuId(null)}
-                  className={menuItemClass}
-                />
-              ) : (
-                <span
-                  title="Aucun numéro de téléphone connu"
-                  className={`${menuItemClass} cursor-not-allowed text-zinc-300 hover:bg-transparent`}
-                >
-                  <MessageCircle className="h-3.5 w-3.5" />
-                  Contacter sur WhatsApp
-                </span>
-              )}
-              {m.pendingParentEmail || m.email ? (
                 <button
                   onClick={() => {
                     setOpenMenuId(null);
-                    setEmailModalMemberId(m.id);
+                    setDetailMemberId(m.id);
                   }}
                   className={menuItemClass}
                 >
-                  <Mail className="h-3.5 w-3.5 text-navy" />
-                  Envoyer un e-mail
+                  <User className="h-3.5 w-3.5 text-zinc-500" />
+                  Voir / Modifier le profil
                 </button>
-              ) : (
-                <span
-                  title="Aucun email connu pour ce membre"
-                  className={`${menuItemClass} cursor-not-allowed text-zinc-300 hover:bg-transparent`}
-                >
-                  <Mail className="h-3.5 w-3.5" />
-                  Envoyer un e-mail
-                </span>
-              )}
-              {m.archivedAt ? (
-                <>
+                {m.phone ? (
+                  <WhatsAppButton
+                    phone={m.phone}
+                    message={`Bonjour ${m.firstName ? formatFirstName(m.firstName) : ""}, ici l'UBAC.`}
+                    label="Contacter sur WhatsApp"
+                    playerId={m.id}
+                    onTriggerClick={() => setOpenMenuId(null)}
+                    className={menuItemClass}
+                  />
+                ) : (
+                  <span
+                    title="Aucun numéro de téléphone connu"
+                    className={`${menuItemClass} cursor-not-allowed text-zinc-300 hover:bg-transparent`}
+                  >
+                    <MessageCircle className="h-3.5 w-3.5" />
+                    Contacter sur WhatsApp
+                  </span>
+                )}
+                {m.pendingParentEmail || m.email ? (
                   <button
                     onClick={() => {
                       setOpenMenuId(null);
-                      handleReactivate([m.id]);
+                      setEmailModalMemberId(m.id);
                     }}
                     className={menuItemClass}
                   >
-                    <RefreshCw className="h-3.5 w-3.5 text-zinc-500" />
-                    Réactiver le membre
+                    <Mail className="h-3.5 w-3.5 text-navy" />
+                    Envoyer un e-mail
                   </button>
+                ) : (
+                  <span
+                    title="Aucun email connu pour ce membre"
+                    className={`${menuItemClass} cursor-not-allowed text-zinc-300 hover:bg-transparent`}
+                  >
+                    <Mail className="h-3.5 w-3.5" />
+                    Envoyer un e-mail
+                  </span>
+                )}
+                {m.archivedAt ? (
+                  <>
+                    <button
+                      onClick={() => {
+                        setOpenMenuId(null);
+                        handleReactivate([m.id]);
+                      }}
+                      className={menuItemClass}
+                    >
+                      <RefreshCw className="h-3.5 w-3.5 text-zinc-500" />
+                      Réactiver le membre
+                    </button>
+                    <button
+                      onClick={() => {
+                        setOpenMenuId(null);
+                        setDeleteTarget([m]);
+                      }}
+                      className={`${menuItemClass} text-red-600 hover:bg-red-50`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Supprimer définitivement
+                    </button>
+                  </>
+                ) : (
                   <button
                     onClick={() => {
                       setOpenMenuId(null);
-                      setDeleteTarget([m]);
+                      handleArchive([m.id]);
                     }}
                     className={`${menuItemClass} text-red-600 hover:bg-red-50`}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Supprimer définitivement
+                    <Archive className="h-3.5 w-3.5" />
+                    Archiver le membre
                   </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => {
-                    setOpenMenuId(null);
-                    handleArchive([m.id]);
-                  }}
-                  className={`${menuItemClass} text-red-600 hover:bg-red-50`}
-                >
-                  <Archive className="h-3.5 w-3.5" />
-                  Archiver le membre
-                </button>
-              )}
-            </div>
-          </>
-        )}
+                )}
+              </div>
+            </>,
+            document.body
+          )}
       </>
     );
   }
