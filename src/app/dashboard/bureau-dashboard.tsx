@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -16,6 +17,7 @@ import AnimatedNumber from "./animated-number";
 import AutomationSettings, { type AutomationKey } from "./automation-settings";
 import DeferredCalendar from "./deferred-calendar";
 import SectionLinkCard from "./section-link-card";
+import RelanceRedirectButton from "./relance-redirect-button";
 import type {
   AdminMemberTeam,
   AdminBenevole,
@@ -55,6 +57,8 @@ function KpiCard({
   sectionKey,
   trend,
   zeroState,
+  extra,
+  cornerBadge,
 }: {
   icon: typeof Wallet;
   iconClass: string;
@@ -111,6 +115,17 @@ function KpiCard({
     iconBgClass: string;
     cardClass: string;
   };
+  // Emplacement libre sous le reste (retour de Cindy du 07/09 : bouton
+  // "Relancer" sur "Cotisations en attente") -- générique plutôt qu'un
+  // prop dédié à ce seul cas, pour qu'une future carte puisse y glisser
+  // autre chose sans nouveau prop.
+  extra?: ReactNode;
+  // Retour de Cindy du 07/09 ("le bouton relancer de la carte peut-il
+  // être en haut à droite") : superposé en position absolue dans le coin,
+  // jamais dans le flux normal comme `extra` -- ne pousse donc jamais le
+  // reste de la carte ni ne casse l'alignement icône+chiffre+libellé
+  // partagé par toutes les cartes.
+  cornerBadge?: ReactNode;
 }) {
   const isZero = value === 0 && zeroState !== undefined;
   const ActiveIcon = isZero ? zeroState.icon : Icon;
@@ -146,13 +161,27 @@ function KpiCard({
           {trend.delta > 0 ? `+${trend.delta}` : trend.delta} {trend.label}
         </p>
       )}
+      {extra}
+      {cornerBadge && <div className="absolute right-2 top-2">{cornerBadge}</div>}
     </>
   );
 
   // Élévation au survol + curseur pointer (retour du 07/09) : uniquement
   // sur les cartes qui ont une vraie destination -- sinon le curseur
-  // promettrait un clic qui ne mène nulle part.
-  const cardClass = `flex flex-col items-center justify-center gap-1.5 rounded-2xl border p-4 text-center shadow-sm transition-shadow ${
+  // promettrait un clic qui ne mène nulle part. `relative` : sert d'ancrage
+  // à cornerBadge (position absolute), sans effet sur les cartes qui n'en
+  // portent pas.
+  // Retour de Cindy du 07/09 ("le bouton relancer mange l'icône, style
+  // tablette") : cornerBadge flottait par-dessus l'icône centrée sans
+  // jamais réserver sa propre place -- inoffensif sur une carte large,
+  // mais l'icône centrée et le badge ancré à droite se rapprochent
+  // mécaniquement à mesure que la carte rétrécit, jusqu'à se chevaucher.
+  // pt-7 (au lieu du pt-4 habituel) quand une carte porte un cornerBadge
+  // pousse tout le contenu sous sa bande, à n'importe quelle largeur --
+  // px/pb restent inchangés, seul le haut a besoin de plus de marge.
+  const cardClass = `relative flex flex-col items-center justify-center gap-1.5 rounded-2xl border px-4 pb-4 ${
+    cornerBadge ? "pt-9" : "pt-4"
+  } text-center shadow-sm transition-shadow ${
     isZero ? zeroState.cardClass : "border-zinc-100 bg-white"
   } ${href ? "cursor-pointer hover:shadow-md" : ""}`;
 
@@ -283,6 +312,7 @@ export default function BureauDashboard({
           label="Cotisations en attente"
           href="/dashboard?tab=admin&section=cotisations-licences"
           sectionKey="cotisations-licences"
+          cornerBadge={pending.length > 0 && <RelanceRedirectButton />}
         />
         <KpiCard
           icon={Wallet}

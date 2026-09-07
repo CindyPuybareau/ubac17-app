@@ -2,20 +2,17 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { sendEmail } from "@/lib/send-email";
 import {
-  computeStatus,
-  relanceTemplateKeyFor,
-  renderRelanceTemplate,
-  RELANCE_TEMPLATES,
-} from "@/app/dashboard/cotisation-shared";
-import type { AdminCotisation } from "@/app/dashboard/page";
+  COTISATION_RELANCE_COOLDOWN_DAYS,
+  resolveContactEmail,
+  sendCotisationRelances,
+} from "@/lib/cotisation-relance";
 
-// Une cotisation ou une pénalité encore due n'est jamais relancée plus
-// souvent que ça — pas de date d'échéance propre à surveiller
-// (contrairement à une licence), donc un cooldown plutôt qu'une fenêtre.
-// Même délai pour les deux depuis que "Relance pénalités" (retour de
-// Cindy du 2026-08-22) a fusionné les deux mécanismes sous un seul
-// interrupteur.
-const COTISATION_RELANCE_COOLDOWN_DAYS = 14;
+// Une pénalité encore due n'est jamais relancée plus souvent que ça — pas
+// de date d'échéance propre à surveiller (contrairement à une licence),
+// donc un cooldown plutôt qu'une fenêtre. Même délai que les cotisations
+// (COTISATION_RELANCE_COOLDOWN_DAYS, voir lib/cotisation-relance.ts)
+// depuis que "Relance pénalités" (retour de Cindy du 2026-08-22) a
+// fusionné les deux mécanismes sous un seul interrupteur.
 
 type PlayerRow = {
   id: string;
@@ -27,22 +24,6 @@ type PlayerRow = {
   license_expiry_alert_sent_at: string | null;
   medical_certificate_expires_at: string | null;
   medical_expiry_alert_sent_at: string | null;
-};
-
-type CotisationRow = {
-  id: string;
-  prix: number | null;
-  remise: number | null;
-  paiement: number | null;
-  statut: string | null;
-  player_id: string;
-  last_auto_relance_sent_at: string | null;
-  players: {
-    first_name: string | null;
-    last_name: string | null;
-    registration_email: string | null;
-    profile_id: string | null;
-  } | null;
 };
 
 type PenaliteRow = {
@@ -66,35 +47,6 @@ function formatDateFr(iso: string) {
     month: "long",
     year: "numeric",
   });
-}
-
-// Même priorité que memberEmail dans page.tsx (registration_email de la
-// fiche d'abord, sinon l'email du compte lié — le sien s'il en a un,
-// sinon celui d'un parent) : reconstruite ici en requêtes directes,
-// service_role oblige (pas de session à faire porter la RLS).
-async function resolveContactEmail(
-  supabase: ReturnType<typeof createServiceClient>,
-  player: { id: string; registration_email: string | null; profile_id: string | null }
-): Promise<string | null> {
-  if (player.registration_email) return player.registration_email;
-
-  if (player.profile_id) {
-    const { data } = await supabase
-      .from("profiles")
-      .select("email")
-      .eq("id", player.profile_id)
-      .maybeSingle();
-    if (data?.email) return data.email;
-  }
-
-  const { data: parentRow } = await supabase
-    .from("parent_player")
-    .select("profiles(email)")
-    .eq("player_id", player.id)
-    .limit(1)
-    .maybeSingle();
-  const parentProfile = parentRow?.profiles as unknown as { email: string | null } | null;
-  return parentProfile?.email ?? null;
 }
 
 async function runExpiryAlerts(supabase: ReturnType<typeof createServiceClient>) {
@@ -196,10 +148,13 @@ async function runExpiryAlerts(supabase: ReturnType<typeof createServiceClient>)
   return { sent, skippedNoEmail, checked: (playersData ?? []).length };
 }
 
+// Retour de Cindy du 07/09 : la logique d'envoi elle-même a déménagé dans
+// lib/cotisation-relance.ts (partagée avec le bouton manuel "Relancer" de
+// la carte KPI Bureau) -- cette fonction ne garde que ce qui est propre au
+// cron : l'interrupteur Bureau, désactivé par défaut, qui protège contre
+// tout envoi automatique tant qu'il n'a pas été explicitement activé
+// (le bouton manuel, lui, l'ignore volontairement).
 async function runCotisationRelances(supabase: ReturnType<typeof createServiceClient>) {
-  // Interrupteur Bureau (onglet Cotisations & Licences) — désactivé par
-  // défaut : personne ne doit recevoir de relance automatique tant que le
-  // Bureau n'a pas explicitement choisi d'activer le mécanisme.
   const { data: settings } = await supabase
     .from("club_settings")
     .select("cotisation_relance_enabled")
@@ -209,92 +164,7 @@ async function runCotisationRelances(supabase: ReturnType<typeof createServiceCl
     return { sent: 0, skippedNoEmail: 0, checked: 0, paused: true };
   }
 
-  const cooldownStart = new Date();
-  cooldownStart.setDate(cooldownStart.getDate() - COTISATION_RELANCE_COOLDOWN_DAYS);
-  const cooldownStartIso = cooldownStart.toISOString();
-
-  // Même périmètre que le tableau de bord/l'onglet Cotisations & Licences :
-  // seulement la cotisation saison (collecte_id nul), jamais les
-  // stages/événements/boutique, qui ont leur propre suivi séparé.
-  const { data: cotisationsData, error } = await supabase
-    .from("cotisations")
-    .select(
-      "id, prix, remise, paiement, statut, player_id, last_auto_relance_sent_at, players(first_name, last_name, registration_email, profile_id)"
-    )
-    .is("collecte_id", null)
-    .or(`last_auto_relance_sent_at.is.null,last_auto_relance_sent_at.lt.${cooldownStartIso}`);
-
-  if (error) return { sent: 0, skippedNoEmail: 0, checked: 0, error: "Erreur lors de la lecture des données." };
-
-  let sent = 0;
-  let skippedNoEmail = 0;
-  let checked = 0;
-
-  for (const row of (cotisationsData ?? []) as unknown as CotisationRow[]) {
-    const player = row.players;
-    if (!player) continue;
-
-    // AdminCotisation minimal : seuls les champs que computeStatus /
-    // balanceDue / renderRelanceTemplate lisent réellement sont
-    // significatifs ici, le reste est renseigné à vide.
-    const cotisation: AdminCotisation = {
-      id: row.id,
-      saison: "",
-      prix: row.prix,
-      remise: row.remise,
-      paiement: row.paiement,
-      statut: row.statut,
-      mode_paiement: null,
-      playerName: [player.first_name, player.last_name].filter(Boolean).join(" ") || "ce membre",
-      firstName: player.first_name,
-      lastName: player.last_name,
-      category: null,
-      playerId: row.player_id,
-      membershipType: null,
-      fbiStatus: null,
-      collecteId: null,
-      collecteType: null,
-      collecteName: null,
-      payments: [],
-    };
-
-    const status = computeStatus(cotisation);
-    if (status !== "EN_ATTENTE" && status !== "PARTIEL") continue;
-    checked += 1;
-
-    const email = await resolveContactEmail(supabase, {
-      id: row.player_id,
-      registration_email: player.registration_email,
-      profile_id: player.profile_id,
-    });
-    if (!email) {
-      skippedNoEmail += 1;
-      continue;
-    }
-
-    const tpl = RELANCE_TEMPLATES[relanceTemplateKeyFor(cotisation)];
-    const subject = renderRelanceTemplate(tpl.subject, cotisation);
-    const body = renderRelanceTemplate(tpl.body, cotisation);
-
-    const result = await sendEmail({ to: email, subject, body });
-    // Même garde-fou que runExpiryAlerts : un envoi simulé (pas de
-    // fournisseur configuré) ne doit jamais poser last_auto_relance_sent_at.
-    if (result.ok && !result.simulated) {
-      sent += 1;
-      const { error: markSentError } = await supabase
-        .from("cotisations")
-        .update({ last_auto_relance_sent_at: new Date().toISOString() })
-        .eq("id", row.id);
-      // Audit du 31/08 : ce marqueur est ce qui fait tenir le cooldown de
-      // 14 jours — un échec silencieux ici ferait relancer dès le
-      // lendemain au lieu d'attendre le délai prévu.
-      if (markSentError) {
-        console.error("[bureau-alerts] marquage relance cotisation échoué:", markSentError);
-      }
-    }
-  }
-
-  return { sent, skippedNoEmail, checked };
+  return sendCotisationRelances(supabase, { respectCooldown: true });
 }
 
 // Retour de Cindy du 2026-08-22 : "Relance pénalités" — même interrupteur

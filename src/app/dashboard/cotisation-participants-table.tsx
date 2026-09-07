@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   CheckCircle2,
   ChevronDown,
@@ -415,12 +415,33 @@ export default function CotisationParticipantsTable({
   emptyLabel?: string;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusKey | "ALL">("ALL");
   const [sortKey, setSortKey] = useState<"lastName" | "firstName">("lastName");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Retour de Cindy du 07/09 ("bouton Relancer qui redirige... avec toutes
+  // les lignes concernées déjà sélectionnées") : lu une seule fois au
+  // montage (lazy initial state, jamais un effet) -- même principe que
+  // "?section=..." dans admin-sidebar.tsx, pour qu'il n'y ait aucun flash
+  // "rien sélectionné" avant que la présélection ne s'applique. Le filtre
+  // de statut reste volontairement sur "Tous les statuts" (voir la
+  // proposition du 07/09) : la sélection cochée montre déjà qui est
+  // concerné, pas besoin que le filtre visuel se limite en plus à un seul
+  // statut (En attente/Partiel sont deux valeurs séparées de ce filtre,
+  // "Cotisations en attente" au tableau de bord regroupe les deux).
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => {
+    if (searchParams.get("preselect") !== "en_attente") return new Set();
+    return new Set(
+      cotisations
+        .filter((c) => {
+          const status = computeStatus(c);
+          return status === "EN_ATTENTE" || status === "PARTIEL";
+        })
+        .map((c) => c.id)
+    );
+  });
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [clearRemiseTarget, setClearRemiseTarget] = useState<string | null>(null);
@@ -432,7 +453,14 @@ export default function CotisationParticipantsTable({
   );
   const [relanceSending, setRelanceSending] = useState(false);
   const [relancePreview, setRelancePreview] = useState<{
+    // Retour de Cindy du 07/09 ("liste les destinataires sélectionnés,
+    // avec possibilité d'en décocher") : `ids` reste la liste réellement
+    // envoyée, modifiable en cochant/décochant dans la modale ; `allIds`
+    // garde la liste complète d'origine (jamais modifiée) pour savoir quoi
+    // afficher dans la liste et proposer "tout cocher"/"tout décocher"
+    // même après une désélection partielle.
     ids: string[];
+    allIds: string[];
     subject: string;
     body: string;
     attachReceipt: boolean;
@@ -934,11 +962,13 @@ export default function CotisationParticipantsTable({
       .then((d: { configured?: boolean }) => setMailServiceConfigured(Boolean(d?.configured)))
       .catch(() => setMailServiceConfigured(false));
 
+    const allIds = targets.map((c) => c.id);
     if (targets.length === 1) {
       const c = targets[0];
       const tpl = RELANCE_TEMPLATES[relanceTemplateKeyFor(c)];
       setRelancePreview({
         ids,
+        allIds,
         subject: renderRelanceTemplate(tpl.subject, c),
         body: withReceiptMention(renderRelanceTemplate(tpl.body, c), true),
         attachReceipt: true,
@@ -947,13 +977,29 @@ export default function CotisationParticipantsTable({
       const keys = new Set(targets.map(relanceTemplateKeyFor));
       const key: RelanceTemplateKey = keys.size === 1 ? [...keys][0] : "EN_ATTENTE";
       const tpl = RELANCE_TEMPLATES[key];
+      // Un destinataire sans email connu démarre décoché (retour de Cindy
+      // du 07/09, voir la liste plus bas) : il n'a de toute façon aucune
+      // chance d'être joint, pas la peine de lui laisser prendre la place
+      // d'un "Envoyer à N" trompeur.
       setRelancePreview({
-        ids,
+        ids: targets.filter((c) => contactEmailByPlayerId[c.playerId]).map((c) => c.id),
+        allIds,
         subject: tpl.subject,
         body: withReceiptMention(tpl.body, true),
         attachReceipt: true,
       });
     }
+  }
+
+  // Retour de Cindy du 07/09 ("liste les destinataires... avec possibilité
+  // d'en décocher") : ajoute/retire un seul id de la liste réellement
+  // envoyée, sans toucher à `allIds` (la liste affichée reste stable).
+  function toggleRelanceRecipient(id: string) {
+    setRelancePreview((p) => {
+      if (!p) return p;
+      const has = p.ids.includes(id);
+      return { ...p, ids: has ? p.ids.filter((i) => i !== id) : [...p.ids, id] };
+    });
   }
 
   async function confirmSendRelance() {
@@ -1971,15 +2017,77 @@ export default function CotisationParticipantsTable({
       {relancePreview && (
         <Modal
           title={
-            relancePreview.ids.length === 1
+            relancePreview.allIds.length === 1
               ? "Prévisualisation du message"
-              : `Prévisualisation du message (${relancePreview.ids.length} destinataires)`
+              : `Prévisualisation du message (${relancePreview.allIds.length} destinataires)`
           }
           onClose={() => setRelancePreview(null)}
           wide
         >
           <div className="flex flex-col gap-3">
-            {relancePreview.ids.length > 1 && (
+            {/* Retour de Cindy du 07/09 ("liste les destinataires
+                sélectionnés... avec possibilité d'en décocher") : n'a de
+                sens que pour un envoi groupé -- un "Relancer" sur une seule
+                fiche (ligne du tableau) n'a personne à décocher. */}
+            {relancePreview.allIds.length > 1 && (
+              <div className="rounded-lg border border-zinc-200">
+                <div className="flex items-center justify-between border-b border-zinc-100 px-2.5 py-1.5">
+                  <p className="text-xs font-semibold text-zinc-600">
+                    Destinataires ({relancePreview.ids.length}/{relancePreview.allIds.length})
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setRelancePreview((p) => {
+                        if (!p) return p;
+                        const emailableIds = p.allIds.filter((id) => {
+                          const c = byId.get(id);
+                          return c && contactEmailByPlayerId[c.playerId];
+                        });
+                        return {
+                          ...p,
+                          ids: p.ids.length === emailableIds.length ? [] : emailableIds,
+                        };
+                      })
+                    }
+                    className="text-xs font-semibold text-navy hover:underline"
+                  >
+                    {relancePreview.ids.length > 0 ? "Tout décocher" : "Tout cocher"}
+                  </button>
+                </div>
+                <div className="max-h-40 overflow-y-auto">
+                  {relancePreview.allIds.map((id) => {
+                    const c = byId.get(id);
+                    if (!c) return null;
+                    const email = contactEmailByPlayerId[c.playerId] ?? null;
+                    const checked = relancePreview.ids.includes(id);
+                    return (
+                      <label
+                        key={id}
+                        className={`flex items-center justify-between gap-2 border-b border-zinc-50 px-2.5 py-1.5 text-sm last:border-b-0 ${
+                          email ? "" : "text-zinc-400"
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={!email}
+                            onChange={() => toggleRelanceRecipient(id)}
+                            className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow disabled:opacity-40"
+                          />
+                          {c.playerName}
+                        </span>
+                        <span className="text-xs">
+                          {email ? formatAmount(balanceDue(c)) : "Aucun email connu"}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {relancePreview.allIds.length > 1 && (
               <p className="rounded-lg bg-zinc-50 p-2 text-xs text-zinc-500">
                 Les balises {"{prenom}"}, {"{nom}"}, {"{tarif}"}, {"{paye}"} et {"{solde}"}{" "}
                 seront remplacées individuellement pour chaque destinataire au moment de
@@ -2040,14 +2148,19 @@ export default function CotisationParticipantsTable({
                 {manualNotice}
               </p>
             )}
+            {relancePreview.allIds.length > 1 && relancePreview.ids.length === 0 && (
+              <p className="text-xs font-medium text-red-600">
+                Sélectionne au moins un destinataire.
+              </p>
+            )}
 
             <div className="mt-1 flex items-center gap-2">
               {/* No mail service configured yet: a real <a> (not a
                   window.open after an await) so the draft opens on the
                   user's own click and never trips the popup blocker. */}
-              {mailServiceConfigured === false && relancePreview.ids.length === 1
+              {mailServiceConfigured === false && relancePreview.allIds.length === 1
                 ? (() => {
-                    const c = byId.get(relancePreview.ids[0]);
+                    const c = byId.get(relancePreview.allIds[0]);
                     const email = c ? contactEmailByPlayerId[c.playerId] ?? null : null;
                     if (!c || !email) return null;
                     return (
@@ -2087,10 +2200,18 @@ export default function CotisationParticipantsTable({
                 : (
                     <button
                       onClick={confirmSendRelance}
-                      disabled={relanceSending}
+                      // Retour de Cindy du 07/09 ("cas limite : sélection
+                      // vide") : rien à envoyer si tout le monde a été
+                      // décoché, plutôt que de laisser cliquer sur un envoi
+                      // qui ne ferait rien.
+                      disabled={relanceSending || relancePreview.ids.length === 0}
                       className="rounded-full bg-ubac-yellow px-3 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
                     >
-                      {relanceSending ? "Envoi..." : "Envoyer le mail"}
+                      {relanceSending
+                        ? "Envoi..."
+                        : relancePreview.allIds.length > 1
+                          ? `Envoyer à ${relancePreview.ids.length} destinataire${relancePreview.ids.length > 1 ? "s" : ""}`
+                          : "Envoyer le mail"}
                     </button>
                   )}
               <button

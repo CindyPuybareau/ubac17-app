@@ -325,6 +325,12 @@ export type AdminCotisation = {
   collecteType: CollecteType | null;
   collecteName: string | null;
   payments: CotisationPayment[];
+  // Retour de Cindy du 07/09 ("indicateur d'urgence... ancienneté de
+  // l'impayé" sur la carte KPI Bureau) : date de création de la ligne,
+  // seul signal d'ancienneté disponible (pas de date d'échéance propre à
+  // une cotisation) -- voir la carte "Cotisations en attente" dans
+  // bureau-dashboard.tsx.
+  createdAt: string | null;
 };
 
 // Transforme une ligne brute de "cotisations" (avec ses jointures players/
@@ -342,6 +348,7 @@ function mapCotisationRow(
     mode_paiement: string | null;
     player_id: string;
     collecte_id: string | null;
+    created_at: string | null;
     players: unknown;
     collectes: unknown;
   },
@@ -378,6 +385,7 @@ function mapCotisationRow(
     statut: c.statut,
     mode_paiement: c.mode_paiement,
     playerId: c.player_id,
+    createdAt: c.created_at,
     payments: paymentsByCotisationId.get(c.id) ?? [],
     membershipType: player?.membership_type ?? null,
     fbiStatus: player?.fbi_status ?? null,
@@ -1449,7 +1457,7 @@ export default async function DashboardPage({
           supabase
             .from("cotisations")
             .select(
-              "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, collecte_id, players(first_name, last_name, category, membership_type, fbi_status, team_players(teams(name, category))), collectes(id, name, type)"
+              "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, collecte_id, created_at, players(first_name, last_name, category, membership_type, fbi_status, team_players(teams(name, category))), collectes(id, name, type)"
             )
             .order("saison", { ascending: false }),
         () =>
@@ -3317,7 +3325,7 @@ export default async function DashboardPage({
         ? supabase
             .from("cotisations")
             .select(
-              "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, collecte_id, players(first_name, last_name, category, membership_type, fbi_status, team_players(teams(name, category))), collectes(id, name, type)"
+              "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, collecte_id, created_at, players(first_name, last_name, category, membership_type, fbi_status, team_players(teams(name, category))), collectes(id, name, type)"
             )
             .in("player_id", familyPlayerIds)
             .order("saison", { ascending: false })
