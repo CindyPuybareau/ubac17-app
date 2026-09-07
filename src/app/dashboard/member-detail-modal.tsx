@@ -847,8 +847,14 @@ export default function MemberDetailModal({
             <h3 className="font-semibold text-zinc-900">
               {formatPersonName(member.firstName, member.lastName, "Membre")}
             </h3>
-            {member.category && (
-              <p className="text-xs text-zinc-500">{member.category}</p>
+            {/* Retour de Cindy du 07/09 : même correctif que le champ
+                "Catégorie" plus bas (voir son commentaire) -- le nom de
+                l'équipe courante prime sur le texte brut figé à
+                l'inscription. */}
+            {(currentTeam ?? member.category) && (
+              <p className="text-xs text-zinc-500">
+                {teamCategoryLabel(currentTeam ?? { name: null, category: member.category })}
+              </p>
             )}
           </div>
           <div className="flex shrink-0 items-center gap-1">
@@ -1020,9 +1026,19 @@ export default function MemberDetailModal({
 
           {tab === "license" && (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {/* Retour de Cindy du 07/09 ("elle n'est pas renommée comme on
+                  l'avait dit") : affichait member.category tel quel
+                  (players.category, un texte figé à l'inscription --
+                  "z.Sénior", jamais mis à jour ensuite, voir le commentaire
+                  sur AdminCotisation.category dans page.tsx pour le même
+                  bug déjà corrigé côté Cotisations le 01/09). teamCategoryLabel
+                  reprend ici le même principe que le reste de cette fiche
+                  (currentTeam en premier -- son vrai nom canonique, ex.
+                  "Séniors M" -- category en dernier recours pour un joueur
+                  jamais affecté à aucune équipe). */}
               <ReadOnlyField label="Catégorie">
                 <span className="text-sm text-zinc-800">
-                  {member.category ?? "—"}
+                  {teamCategoryLabel(currentTeam ?? { name: null, category: member.category }) ?? "—"}
                 </span>
               </ReadOnlyField>
               {editable && canManageTeamAndRoles ? (

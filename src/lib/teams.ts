@@ -77,7 +77,21 @@ export function sameCategoryFamily(a: string | null | undefined, b: string | nul
 // commun ("U13") : c'est le nom qui discrimine, la catégorie ne sert que
 // de repli quand il manque.
 export function teamCategoryLabel(t: { name: string | null; category: string | null }) {
-  return t.name ?? t.category;
+  return t.name ?? cleanRawCategory(t.category);
+}
+
+// Retour de Cindy du 07/09 ("elle n'est pas renommée" -- fiche Membres,
+// "z.Sénior" affiché) : quand ni équipe ni nom ne sont connus (joueur
+// jamais affecté à aucune équipe, cas de Julien RUSKE), teamCategoryLabel
+// retombe sur players.category -- un texte figé à l'import, jamais
+// retouché depuis. Pour les Séniors uniquement, ce texte porte un préfixe
+// "z." purement technique (utilisé pour trier les Séniors en dernier dans
+// les listes alphabétiques, voir suggestTeamCategory) -- jamais pensé pour
+// être affiché tel quel. Nettoyé ici, au point d'entrée unique de toute
+// catégorie brute affichée en dernier recours.
+function cleanRawCategory(category: string | null): string | null {
+  if (!category) return category;
+  return category.replace(/^z\./i, "");
 }
 
 // Range chaque famille d'équipes dans l'ordre attendu — U13M avant U13M-1
