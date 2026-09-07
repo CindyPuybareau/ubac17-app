@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition, type ReactNode } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 export type DashboardTab = {
@@ -72,55 +72,6 @@ export default function DashboardTabs({
   // l'écrase de toute façon.
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const displayedPendingKey = pendingKey !== activeKey ? pendingKey : null;
-
-  // Retour de Cindy du 07/09 ("un simple changement de vue sans reload
-  // serait plus rapide", au sujet des onglets Bureau/Coach/Famille) : au
-  // contraire des sections internes de Bureau (voir section-nav-context.tsx),
-  // chaque ESPACE n'est réellement calculé que lorsqu'il devient actif
-  // (retour du 04/09, "pourquoi ça bug quand on a plusieurs espaces") --
-  // il n'existe donc rien à révéler instantanément sans un vrai aller-
-  // retour serveur, contrairement aux cartes KPI. Le pré-chargement au
-  // survol/focus/touch (handlePrefetch, plus bas) aide déjà, mais pas le
-  // tout premier tap sur mobile (pas de survol avant). Cet effet lance ce
-  // même pré-chargement pour les AUTRES onglets tout seul, une fois la
-  // page posée -- en tâche de fond (requestIdleCallback, jamais en
-  // concurrence avec le rendu de l'onglet actif ; setTimeout en repli pour
-  // Safari, qui ne connaît pas requestIdleCallback), pour qu'un futur clic
-  // les retrouve déjà prêts la plupart du temps. Se redéclenche à chaque
-  // changement d'onglet actif, pour garder les autres "chauds". Placé
-  // avant le "if (tabs.length === 0) return null" ci-dessous : les Hooks
-  // React doivent s'exécuter inconditionnellement, jamais après un retour
-  // anticipé.
-  useEffect(() => {
-    const otherKeys = tabs.map((t) => t.key).filter((key) => key !== activeKey);
-    if (otherKeys.length === 0) return;
-
-    function run() {
-      const params = new URLSearchParams(searchParams.toString());
-      for (const key of otherKeys) {
-        params.set("tab", key);
-        router.prefetch(`/dashboard?${params.toString()}`);
-      }
-    }
-
-    const w = window as typeof window & {
-      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
-      cancelIdleCallback?: (id: number) => void;
-    };
-    if (w.requestIdleCallback) {
-      const id = w.requestIdleCallback(run, { timeout: 3000 });
-      return () => w.cancelIdleCallback?.(id);
-    }
-    const id = window.setTimeout(run, 1500);
-    return () => window.clearTimeout(id);
-    // Dépendances volontairement réduites aux clés (activeKey + la liste
-    // des clés d'onglets, jamais `tabs`/`router`/`searchParams` en entier) :
-    // `tabs` porte du contenu JSX recréé à chaque rendu de page.tsx, et
-    // `searchParams` change de référence à chaque navigation -- les inclure
-    // relancerait ce pré-chargement en boucle plutôt qu'une fois par
-    // vrai changement d'onglet.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeKey, tabs.map((t) => t.key).join(",")]);
 
   if (tabs.length === 0) {
     return null;
