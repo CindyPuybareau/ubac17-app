@@ -179,7 +179,7 @@ export default function PenalitesManager({
           <Gavel className="h-3.5 w-3.5" />
           {penalites.length} pénalité{penalites.length > 1 ? "s" : ""}
           {totalDue > 0 && (
-            <span className="ml-1.5 rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-bold text-rose-700">
+            <span className="ml-1.5 rounded-full bg-status-urgent/10 px-2 py-0.5 text-[11px] font-bold text-status-urgent-dark">
               {formatAmount(totalDue)} restant à encaisser
             </span>
           )}
@@ -205,11 +205,15 @@ export default function PenalitesManager({
                 </span>
               </div>
               <div className="flex shrink-0 items-center gap-2">
+                {/* Retour de Cindy du 09/09 (phase 1 UX, couleurs
+                    sémantiques) : status-* (globals.css) plutôt
+                    qu'emerald/rose codées en dur -- même migration que
+                    penalites-card.tsx. */}
                 <span
                   className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
                     p.statut === "PAYE"
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-rose-100 text-rose-700"
+                      ? "bg-status-success/10 text-status-success"
+                      : "bg-status-urgent/10 text-status-urgent-dark"
                   }`}
                 >
                   {formatAmount(p.amount)}

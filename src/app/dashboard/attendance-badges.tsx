@@ -14,6 +14,16 @@ type Group = {
   badgeClass: string;
 };
 
+// Retour de Cindy du 09/09 (phase 1 UX, "système de couleurs sémantiques
+// cohérent... vert = positif/présent, orange = en attente, rouge =
+// urgent") : couleurs status-success/status-urgent (globals.css) plutôt
+// que emerald/rose codées en dur ici -- un audit du 09/09 avait trouvé
+// jusqu'à 3 jeux de couleurs concurrents pour ce même statut selon
+// l'écran (voir rsvp-control.tsx/rsvp-segment.ts/calendar-view.tsx/
+// child-calendar-tab.tsx, migrés en même temps). PENDING (aucune réponse,
+// pas un vrai "statut" au sens vert/orange/rouge) garde un gris neutre,
+// unifié sur zinc plutôt que le slate utilisé ici avant.
+//
 // L'absent passe en premier : c'est la réponse sur laquelle un coach doit
 // réagir (trouver un remplaçant), pas le présent qui ne demande rien.
 const GROUPS: Group[] = [
@@ -21,22 +31,22 @@ const GROUPS: Group[] = [
     key: "ABSENT",
     label: "Absents",
     Icon: X,
-    headerClass: "text-rose-700",
-    badgeClass: "border border-rose-200 bg-rose-50 text-rose-700",
+    headerClass: "text-status-urgent-dark",
+    badgeClass: "border border-status-urgent/30 bg-status-urgent/10 text-status-urgent-dark",
   },
   {
     key: "PRESENT",
     label: "Présents",
     Icon: Check,
-    headerClass: "text-emerald-700",
-    badgeClass: "border border-emerald-200 bg-emerald-50 text-emerald-700",
+    headerClass: "text-status-success",
+    badgeClass: "border border-status-success/30 bg-status-success/10 text-status-success",
   },
   {
     key: "PENDING",
     label: "En attente",
     Icon: Clock,
-    headerClass: "text-slate-500",
-    badgeClass: "border border-slate-200 bg-slate-100 text-slate-600",
+    headerClass: "text-zinc-500",
+    badgeClass: "border border-zinc-200 bg-zinc-100 text-zinc-600",
   },
 ];
 
@@ -194,7 +204,7 @@ export default function AttendanceBadges({
                 type="button"
                 disabled={saving}
                 onClick={() => setStatus(editingPlayer.id, "PRESENT")}
-                className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-60"
+                className="flex items-center gap-2 rounded-xl border border-status-success/30 bg-status-success/10 px-3 py-2.5 text-sm font-semibold text-status-success transition-colors hover:bg-status-success/15 disabled:opacity-60"
               >
                 <Check className="h-4 w-4 shrink-0" />
                 Marquer présent
@@ -203,7 +213,7 @@ export default function AttendanceBadges({
                 type="button"
                 disabled={saving}
                 onClick={() => setStatus(editingPlayer.id, "ABSENT")}
-                className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-100 disabled:opacity-60"
+                className="flex items-center gap-2 rounded-xl border border-status-urgent/30 bg-status-urgent/10 px-3 py-2.5 text-sm font-semibold text-status-urgent-dark transition-colors hover:bg-status-urgent/15 disabled:opacity-60"
               >
                 <X className="h-4 w-4 shrink-0" />
                 Marquer absent

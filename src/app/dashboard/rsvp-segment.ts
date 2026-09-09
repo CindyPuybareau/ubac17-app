@@ -16,6 +16,11 @@ export const SEGMENT_BUTTON =
 
 export const SEGMENT_OFF = "text-slate-600 hover:bg-slate-200/60";
 
-export const SEGMENT_PRESENT_ON = "bg-emerald-500 text-white shadow-sm";
+// Retour de Cindy du 09/09 (phase 1 UX, couleurs sémantiques) : status-*
+// (globals.css) plutôt qu'emerald-500/rose-500 codées en dur -- même
+// migration que attendance-badges.tsx/rsvp-control.tsx/calendar-view.tsx/
+// child-calendar-tab.tsx, pour que "présent"/"absent" porte enfin
+// exactement la même couleur partout dans l'appli.
+export const SEGMENT_PRESENT_ON = "bg-status-success text-white shadow-sm";
 
-export const SEGMENT_ABSENT_ON = "bg-rose-500 text-white shadow-sm";
+export const SEGMENT_ABSENT_ON = "bg-status-urgent text-white shadow-sm";

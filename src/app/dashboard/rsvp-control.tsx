@@ -13,13 +13,20 @@ import {
 
 type Status = "PRESENT" | "ABSENT" | "LATE" | "PENDING";
 
+// Retour de Cindy du 09/09 (phase 1 UX, couleurs sémantiques) : status-*
+// (globals.css) plutôt qu'emerald/rose/amber codées en dur -- même
+// migration que attendance-badges.tsx/rsvp-segment.ts/calendar-view.tsx/
+// child-calendar-tab.tsx. LATE (retard annoncé) rejoint "en attente"
+// (orange) : une venue plus tardive reste une forme d'attente, pas un
+// vrai succès ni une urgence. PENDING (aucune réponse, pas un vrai statut
+// vert/orange/rouge) garde un gris neutre.
 function badgeFor(status: Status) {
   if (status === "PRESENT")
-    return { label: "Confirmé présent", className: "bg-emerald-100 text-emerald-800", Icon: Check };
+    return { label: "Confirmé présent", className: "bg-status-success/15 text-status-success", Icon: Check };
   if (status === "ABSENT")
-    return { label: "Noté absent", className: "bg-rose-100 text-rose-800", Icon: X };
+    return { label: "Noté absent", className: "bg-status-urgent/15 text-status-urgent-dark", Icon: X };
   if (status === "LATE")
-    return { label: "Retard annoncé", className: "bg-amber-100 text-amber-700", Icon: Clock };
+    return { label: "Retard annoncé", className: "bg-status-pending/15 text-status-pending-dark", Icon: Clock };
   return { label: "Réponse attendue", className: "bg-zinc-100 text-zinc-500", Icon: Clock };
 }
 

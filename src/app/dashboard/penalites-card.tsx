@@ -54,7 +54,7 @@ export default function PenalitesCard({
       ) : (
         <>
           {totalDue > 0 && (
-            <p className="mt-1 text-xs font-semibold text-rose-600">
+            <p className="mt-1 text-xs font-semibold text-status-urgent-dark">
               {formatAmount(totalDue)} restant à régler
             </p>
           )}
@@ -79,11 +79,15 @@ export default function PenalitesCard({
                         {p.notes ? ` · ${p.notes}` : ""}
                       </span>
                     </div>
+                    {/* Retour de Cindy du 09/09 (phase 1 UX, couleurs
+                        sémantiques) : status-* (globals.css) plutôt
+                        qu'emerald/rose codées en dur -- même migration
+                        que penalites-manager.tsx. */}
                     <span
                       className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold ${
                         p.statut === "PAYE"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-rose-100 text-rose-700"
+                          ? "bg-status-success/10 text-status-success"
+                          : "bg-status-urgent/10 text-status-urgent-dark"
                       }`}
                     >
                       {formatAmount(p.amount)}

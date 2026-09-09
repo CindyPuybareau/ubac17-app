@@ -379,17 +379,21 @@ function AttendanceSummary({ attendance }: { attendance: { name: string | null; 
   return (
     <div className="mt-3 flex flex-col gap-1.5 border-t border-zinc-100 pt-3">
       <div className="flex flex-wrap gap-1.5">
-        <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold leading-none text-green-700">
+        {/* Retour de Cindy du 09/09 (phase 1 UX, couleurs sémantiques) :
+            status-* (globals.css) plutôt qu'emerald/amber/red codées en
+            dur -- même migration que calendar-view.tsx (AttendanceSummary,
+            équivalent Bureau/Coach de ce résumé côté Enfant). */}
+        <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-status-success/10 px-2 py-0.5 text-xs font-semibold leading-none text-status-success">
           <Check className="h-3 w-3" />
           {present.length} présent{present.length > 1 ? "s" : ""}
         </span>
         {late.length > 0 && (
-          <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold leading-none text-amber-700">
+          <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-status-pending/10 px-2 py-0.5 text-xs font-semibold leading-none text-status-pending-dark">
             <Clock className="h-3 w-3" />
             {late.length} en retard
           </span>
         )}
-        <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold leading-none text-red-700">
+        <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-status-urgent/10 px-2 py-0.5 text-xs font-semibold leading-none text-status-urgent-dark">
           <X className="h-3 w-3" />
           {absent.length} absent{absent.length > 1 ? "s" : ""}
         </span>
@@ -405,7 +409,7 @@ function AttendanceSummary({ attendance }: { attendance: { name: string | null; 
             onClick={() => setOpen((v) => !v)}
             className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:text-zinc-900"
           >
-            <Users className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+            <Users className="h-3.5 w-3.5 shrink-0 text-status-success" />
             {presentAndLate.length}{" "}
             {presentAndLate.length > 1 ? "joueurs/joueuses présent(e)s" : "joueur/joueuse présent(e)"}
             {open ? <ChevronUp className="h-3.5 w-3.5 shrink-0" /> : <ChevronDown className="h-3.5 w-3.5 shrink-0" />}
@@ -417,7 +421,7 @@ function AttendanceSummary({ attendance }: { attendance: { name: string | null; 
                 .map((a, i) => (
                   <span
                     key={i}
-                    className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700"
+                    className="inline-flex items-center gap-1 rounded-full bg-status-success/10 px-2.5 py-1 text-xs font-medium text-status-success"
                   >
                     {formatFirstName(a.name)}
                   </span>

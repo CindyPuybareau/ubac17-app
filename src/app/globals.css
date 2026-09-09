@@ -35,6 +35,26 @@
   --court-green: #3e8f5f;
   --coral: #f0653a;
   --coral-dark: #d14a22;
+  /* Trio de couleurs SÉMANTIQUES (retour de Cindy du 09/09, phase 1 de la
+     feuille de route UX — "vert = positif/payé/présent, orange = en
+     attente, rouge = urgent") : distinct de la palette de marque
+     ci-dessus, qui sert l'identité visuelle, pas le statut. Un audit du
+     09/09 a trouvé jusqu'à 3 jeux de couleurs Tailwind concurrents pour
+     un même statut selon l'écran (ex. "présent" en emerald ICI, en green
+     LÀ) — ces trois tokens deviennent la seule source pour CE genre de
+     signification, migrée composant par composant.
+     success/pending restent des alias sur des couleurs de marque déjà
+     "positives"/"tièdes" (court-green/parquet) — jamais dupliquées en
+     valeur brute, pour rester alignées si la marque change un jour.
+     urgent est neuve : `coral` reste réservée à l'Espace Enfant (règle du
+     2026-08-23, déjà enfreinte une fois dans le code avant cet audit —
+     voir cotisation-shared.ts) — un rouge franc, jamais utilisé ailleurs
+     jusqu'ici, évite justement de la réutiliser par erreur. */
+  --status-success: var(--court-green);
+  --status-pending: var(--parquet);
+  --status-pending-dark: var(--parquet-dark);
+  --status-urgent: #dc2626;
+  --status-urgent-dark: #b91c1c;
 }
 
 @theme inline {
@@ -58,6 +78,11 @@
   --color-court-green: var(--court-green);
   --color-coral: var(--coral);
   --color-coral-dark: var(--coral-dark);
+  --color-status-success: var(--status-success);
+  --color-status-pending: var(--status-pending);
+  --color-status-pending-dark: var(--status-pending-dark);
+  --color-status-urgent: var(--status-urgent);
+  --color-status-urgent-dark: var(--status-urgent-dark);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   /* Trio typographique de la maquette (direction artistique validée le

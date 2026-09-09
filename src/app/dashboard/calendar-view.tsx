@@ -199,7 +199,7 @@ function PresentPlayersList({
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:text-zinc-900"
       >
-        <Users className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+        <Users className="h-3.5 w-3.5 shrink-0 text-status-success" />
         {players.length} {players.length > 1 ? "joueurs/joueuses présent(e)s" : "joueur/joueuse présent(e)"}
         {open ? (
           <ChevronUp className="h-3.5 w-3.5 shrink-0" />
@@ -212,7 +212,7 @@ function PresentPlayersList({
           {sortByLastName(players, (p) => p.lastName).map((p) => (
             <span
               key={p.id}
-              className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700"
+              className="inline-flex items-center gap-1 rounded-full bg-status-success/10 px-2.5 py-1 text-xs font-medium text-status-success"
             >
               {formatFirstName(p.firstName)}{" "}
               <span className="font-bold uppercase">{formatLastName(p.lastName)}</span>
@@ -288,11 +288,14 @@ function BenevoleInvitesList({
   const present = invites.filter((b) => b.status === "PRESENT");
   const absent = invites.filter((b) => b.status === "ABSENT");
   const pending = invites.filter((b) => b.status === "PENDING");
+  // Retour de Cindy du 09/09 (phase 1 UX, couleurs sémantiques) : status-*
+  // (globals.css) plutôt qu'emerald/red codées en dur -- même migration
+  // que les badges résumé plus bas dans ce fichier.
   const statusClass = (status: BenevoleInviteStatus) =>
     status === "PRESENT"
-      ? "bg-emerald-50 text-emerald-700"
+      ? "bg-status-success/10 text-status-success"
       : status === "ABSENT"
-        ? "bg-red-50 text-red-700"
+        ? "bg-status-urgent/10 text-status-urgent-dark"
         : "bg-zinc-100 text-zinc-500";
 
   return (
@@ -312,13 +315,13 @@ function BenevoleInvitesList({
       </button>
       <div className="flex flex-wrap gap-1.5">
         {present.length > 0 && (
-          <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold leading-none text-green-700">
+          <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-status-success/10 px-2 py-0.5 text-xs font-semibold leading-none text-status-success">
             <Check className="h-3 w-3" />
             {present.length} présent{present.length > 1 ? "s" : ""}
           </span>
         )}
         {absent.length > 0 && (
-          <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold leading-none text-red-700">
+          <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-status-urgent/10 px-2 py-0.5 text-xs font-semibold leading-none text-status-urgent-dark">
             <X className="h-3 w-3" />
             {absent.length} absent{absent.length > 1 ? "s" : ""}
           </span>
@@ -1197,18 +1200,18 @@ export default function CalendarView({
 
         {hasRoster && (
           <div className="flex flex-wrap gap-1.5">
-            <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold leading-none text-green-700">
+            <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-status-success/10 px-2 py-0.5 text-xs font-semibold leading-none text-status-success">
               <Check className="h-3 w-3" />
               {rsvpCounts.present} présent
               {rsvpCounts.present > 1 ? "s" : ""}
             </span>
             {rsvpCounts.late > 0 && (
-              <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold leading-none text-amber-700">
+              <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-status-pending/10 px-2 py-0.5 text-xs font-semibold leading-none text-status-pending-dark">
                 <Clock className="h-3 w-3" />
                 {rsvpCounts.late} en retard
               </span>
             )}
-            <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold leading-none text-red-700">
+            <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-status-urgent/10 px-2 py-0.5 text-xs font-semibold leading-none text-status-urgent-dark">
               <X className="h-3 w-3" />
               {rsvpCounts.absent} absent
               {rsvpCounts.absent > 1 ? "s" : ""}
