@@ -303,6 +303,20 @@ export default function BureauDashboard({
           href="/dashboard?tab=admin&section=members"
           sectionKey="members"
         />
+        {/* Retour de Cindy du 09/09 (phase 1 UX, couleurs sémantiques) :
+            ces trois cartes ("Cotisations en attente", "Montant en
+            attente", "Total pénalités" juste après) restent
+            VOLONTAIREMENT en dehors de la migration status-* -- le 07/09,
+            Cindy avait explicitement demandé de les distinguer (rose vs
+            rouge) parce qu'elles se confondaient trop, toutes en rose à
+            l'époque. Les repasser toutes en status-urgent (leur vraie
+            signification -- "argent dû") réintroduirait exactement cette
+            confusion. Cette grille de cartes fonctionne comme une petite
+            palette catégorielle propre à chaque indicateur (comme
+            "Renouvellement Sponsors" en orange, "Membres actifs" en
+            navy), pas comme une liste de statuts où la cohérence
+            prime -- à la différence des badges détaillés (une ligne de
+            cotisation, une pénalité individuelle...) déjà migrés. */}
         <KpiCard
           icon={Wallet}
           iconClass="text-rose-600"
@@ -338,17 +352,24 @@ export default function BureauDashboard({
           label="Total pénalités"
           href="/dashboard?tab=admin&section=cotisations-penalites"
           sectionKey="cotisations-penalites"
+          // Retour de Cindy du 09/09 (couleurs sémantiques) : status-success
+          // (globals.css) plutôt qu'emerald codé en dur -- même vert que
+          // "présent"/"payé" ailleurs dans l'appli pour ce même "tout va
+          // bien".
           zeroState={{
             icon: CheckCircle2,
-            iconClass: "text-emerald-600",
-            iconBgClass: "bg-emerald-500/10",
-            cardClass: "border-emerald-200 bg-emerald-50",
+            iconClass: "text-status-success",
+            iconBgClass: "bg-status-success/10",
+            cardClass: "border-status-success/30 bg-status-success/10",
           }}
         />
         <KpiCard
           icon={Handshake}
-          iconClass="text-orange-600"
-          iconBgClass="bg-orange-500/10"
+          // Retour de Cindy du 09/09 (couleurs sémantiques) : status-pending
+          // (même token que le bandeau "Sponsors à renouveler" ci-dessous,
+          // même statut réel).
+          iconClass="text-status-pending-dark"
+          iconBgClass="bg-status-pending/10"
           value={sponsorsNeedingRenewal.length}
           kind="integer"
           label="Renouvellement Sponsors"
@@ -357,9 +378,16 @@ export default function BureauDashboard({
         />
       </div>
 
+      {/* Retour de Cindy du 09/09 (phase 1 UX, couleurs sémantiques) :
+          status-pending (globals.css) plutôt qu'orange codé en dur --
+          l'audit avait relevé que ce bandeau et celui des licences/
+          certificats juste en dessous partageaient déjà EXACTEMENT la
+          même classe brute, sans jamais passer par un vrai token : ils
+          restent volontairement identiques (même statut "à renouveler
+          bientôt"), juste formalisés proprement maintenant. */}
       {sponsorsNeedingRenewal.length > 0 && (
-        <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4">
-          <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-orange-800">
+        <div className="rounded-2xl border border-status-pending/30 bg-status-pending/10 p-4">
+          <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-status-pending-dark">
             <Handshake className="h-3.5 w-3.5 shrink-0" />
             Sponsors à renouveler (30 jours)
           </p>
@@ -367,7 +395,7 @@ export default function BureauDashboard({
             {sponsorsNeedingRenewal.map((s) => (
               <span
                 key={s.id}
-                className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-orange-800 shadow-sm"
+                className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-status-pending-dark shadow-sm"
               >
                 {s.name}
                 {s.renewalDate ? ` · ${formatLocalDateFr(s.renewalDate)}` : ""}
@@ -382,8 +410,8 @@ export default function BureauDashboard({
           /api/cron/bureau-alerts) — ce bloc reste un aperçu Bureau utile
           même désactivé, pour relancer soi-même sans attendre. */}
       {membersWithExpiringDocs.length > 0 && (
-        <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4">
-          <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-orange-800">
+        <div className="rounded-2xl border border-status-pending/30 bg-status-pending/10 p-4">
+          <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-status-pending-dark">
             <FileWarning className="h-3.5 w-3.5 shrink-0" />
             Licences / certificats médicaux à renouveler (30 jours)
           </p>
@@ -391,7 +419,7 @@ export default function BureauDashboard({
             {membersWithExpiringDocs.map((m) => (
               <span
                 key={m.id}
-                className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-orange-800 shadow-sm"
+                className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-status-pending-dark shadow-sm"
               >
                 {formatPersonName(m.firstName, m.lastName, "Membre")}
               </span>
