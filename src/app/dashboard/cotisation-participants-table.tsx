@@ -4,7 +4,6 @@ import { useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  CheckCircle2,
   ChevronDown,
   ChevronUp,
   CreditCard,
@@ -19,13 +18,13 @@ import {
   Receipt,
   Search,
   Trash2,
-  TriangleAlert,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getLogoBase64, PDF_COLORS } from "@/lib/pdf-brand";
 import EmptyState from "./empty-state";
 import { buildGmailComposeLink, signatureIndex, withSignature } from "@/lib/email";
+import { useToast } from "./toast-context";
 import {
   balanceDue,
   computeStatus,
@@ -448,9 +447,12 @@ export default function CotisationParticipantsTable({
   const [deletePaymentTarget, setDeletePaymentTarget] = useState<
     { paymentId: string; cotisationId: string } | null
   >(null);
-  const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(
-    null
-  );
+  // Retour de Cindy du 09/09 ("confirmations visuelles immédiates après
+  // chaque action clé") : toast partagé (toast-context.tsx) plutôt qu'une
+  // implémentation locale -- cet écran en avait la version la plus
+  // complète (variante erreur), reprise à l'identique dans le composant
+  // partagé.
+  const { showToast, showErrorToast } = useToast();
   const [relanceSending, setRelanceSending] = useState(false);
   const [relancePreview, setRelancePreview] = useState<{
     // Retour de Cindy du 07/09 ("liste les destinataires sélectionnés,
@@ -469,18 +471,6 @@ export default function CotisationParticipantsTable({
   // send button until the answer comes back, so nothing flickers.
   const [mailServiceConfigured, setMailServiceConfigured] = useState<boolean | null>(null);
   const [manualNotice, setManualNotice] = useState<string | null>(null);
-
-  function showToast(message: string) {
-    setToast({ message, variant: "success" });
-    setTimeout(() => setToast(null), 4000);
-  }
-
-  // Failures carry actionable setup info ("renseigner RESEND_API_KEY"...),
-  // so they stay up noticeably longer than a success confirmation.
-  function showErrorToast(message: string) {
-    setToast({ message, variant: "error" });
-    setTimeout(() => setToast(null), 9000);
-  }
 
   const [paymentIds, setPaymentIds] = useState<string[] | null>(null);
   const [paymentAmount, setPaymentAmount] = useState("");
@@ -2231,21 +2221,6 @@ export default function CotisationParticipantsTable({
             )}
           </div>
         </Modal>
-      )}
-
-      {toast && (
-        <div
-          className={`fixed bottom-6 left-1/2 z-[60] flex max-w-[90vw] -translate-x-1/2 items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-white shadow-lg ${
-            toast.variant === "error" ? "bg-red-600" : "bg-navy"
-          }`}
-        >
-          {toast.variant === "error" ? (
-            <TriangleAlert className="h-4 w-4 shrink-0" />
-          ) : (
-            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
-          )}
-          {toast.message}
-        </div>
       )}
 
       <ConfirmDialog

@@ -11,6 +11,7 @@ import OrgChartButton from "./org-chart-button";
 import AvatarUpload from "./avatar-upload";
 import { MobileNavProvider } from "./mobile-nav-context";
 import { SectionNavProvider } from "./section-nav-context";
+import { ToastProvider } from "./toast-context";
 import MobileMenuButton from "./mobile-menu-button";
 import RealtimeSync from "./realtime-sync";
 import DashboardTabs, { type DashboardTab } from "./dashboard-tabs";
@@ -3978,6 +3979,7 @@ export default async function DashboardPage({
   return (
     <MobileNavProvider>
     <SectionNavProvider>
+    <ToastProvider>
     {/* overflow-x-hidden (retour de Cindy du 2026-08-25, "pas de scroll
         droite gauche sur grand ecran surtout !... le responsive doit etre
         nickel") : filet de sécurité au niveau de la page entière — un
@@ -4146,6 +4148,7 @@ export default async function DashboardPage({
       )}
       </div>
     </div>
+    </ToastProvider>
     </SectionNavProvider>
     </MobileNavProvider>
   );

@@ -33,6 +33,7 @@ import MemberDetailModal from "./member-detail-modal";
 import PlayerYearBadge from "./player-year-badge";
 import WhatsAppButton from "./whatsapp-button";
 import WhatsAppDirectButton from "./whatsapp-direct-button";
+import { useToast } from "./toast-context";
 import { formatFirstName, formatLastName, formatPersonName, sortByLastName } from "@/lib/names";
 import { formatLocalDateFr } from "@/lib/local-date";
 import type { AdminAccessProfile, AdminMember, AdminMemberTeam } from "./page";
@@ -148,7 +149,9 @@ export default function MembersTable({
   const [reassignSaving, setReassignSaving] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [showAddMember, setShowAddMember] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  // Retour de Cindy du 09/09 : toast partagé (toast-context.tsx) plutôt
+  // qu'une implémentation locale.
+  const { showToast } = useToast();
   // Tableau plutôt que fiche unique (retour de Cindy du 2026-08-24 :
   // "je n'ai pas la possibilité de les supprimer en groupé") — sert à la
   // fois au bouton ⋮ "Supprimer définitivement" d'une ligne (tableau à
@@ -157,11 +160,6 @@ export default function MembersTable({
   const [deleteTarget, setDeleteTarget] = useState<AdminMember[] | null>(null);
   const [archiveTarget, setArchiveTarget] = useState<string[] | null>(null);
   const [deleting, setDeleting] = useState(false);
-
-  function showToast(message: string) {
-    setToast(message);
-    setTimeout(() => setToast(null), 4000);
-  }
 
   function handleMemberCreated(fullName: string) {
     showToast(`Membre ${fullName} ajouté avec succès !`);
@@ -1389,12 +1387,6 @@ export default function MembersTable({
           );
         })()}
 
-      {toast && (
-        <div className="fixed bottom-6 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-2 rounded-full bg-navy px-4 py-2.5 text-sm font-semibold text-white shadow-lg">
-          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-          {toast}
-        </div>
-      )}
     </div>
   );
 }

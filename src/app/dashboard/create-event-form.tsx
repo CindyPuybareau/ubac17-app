@@ -13,6 +13,7 @@ import {
   STANDARD_VOLUNTEER_ROLES,
   volunteerRoleIcon,
 } from "./event-volunteer-needs";
+import { useToast } from "./toast-context";
 import type { AdminBenevole, AdminUpcomingEvent } from "./page";
 
 type Team = { id: string; name: string | null; category: string | null };
@@ -108,6 +109,13 @@ export default function CreateEventForm({
 }) {
   const isEditing = Boolean(editingEvent);
   const formRef = useRef<HTMLFormElement>(null);
+  // Retour de Cindy du 09/09 ("confirmations visuelles immédiates après
+  // chaque action clé") : jusqu'ici, la modale se refermait simplement
+  // sans aucun accusé de réception -- voir handleSubmit, juste avant
+  // onClose(), pour l'unique point de sortie qui correspond à un succès
+  // complet (chaque échec partiel plus haut affiche déjà sa propre
+  // erreur via setError et garde le formulaire ouvert).
+  const { showToast } = useToast();
 
   // Préremplissage en mode édition : initialiseurs paresseux plutôt qu'un
   // useEffect qui viendrait setState après coup (retour de lint
@@ -667,6 +675,7 @@ export default function CreateEventForm({
       }
     }
 
+    showToast(isEditing ? "Événement modifié." : "Événement créé.");
     resetFields();
     onClose();
     // Pas de router.refresh() explicite : events/event_volunteer_needs/

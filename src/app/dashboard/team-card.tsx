@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import {
   ArrowRightLeft,
   CalendarDays,
-  CheckCircle2,
   Clock,
   ExternalLink,
   Mail,
@@ -24,6 +23,7 @@ import OpponentDisplay from "./opponent-display";
 import MemberDetailModal from "./member-detail-modal";
 import PlayerYearBadge from "./player-year-badge";
 import SalleBadge from "./salle-badge";
+import { useToast } from "./toast-context";
 import WhatsAppDirectButton from "./whatsapp-direct-button";
 import WhatsAppGroupButton from "./whatsapp-group-button";
 import type { AdminMemberTeam, AdminUpcomingEvent, MemberDetail, WhatsAppGroup } from "./page";
@@ -161,17 +161,14 @@ export default function TeamCard({
   const [removePendingCoachTarget, setRemovePendingCoachTarget] = useState<Person | null>(null);
   const [removingPendingCoach, setRemovingPendingCoach] = useState(false);
   const [removePendingCoachError, setRemovePendingCoachError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  // Retour de Cindy du 09/09 : toast partagé (toast-context.tsx) plutôt
+  // qu'une implémentation locale.
+  const { showToast } = useToast();
   const [rosterSearch, setRosterSearch] = useState("");
   const [switchTarget, setSwitchTarget] = useState<RosterPlayer | null>(null);
   const [switchTeamId, setSwitchTeamId] = useState("");
   const [switching, setSwitching] = useState(false);
   const [switchError, setSwitchError] = useState<string | null>(null);
-
-  function showToast(message: string) {
-    setToast(message);
-    setTimeout(() => setToast(null), 4000);
-  }
 
   const [openPlayerForm, setOpenPlayerForm] = useState(false);
   const [newPlayerFirstName, setNewPlayerFirstName] = useState("");
@@ -1440,12 +1437,6 @@ export default function TeamCard({
         </div>
       )}
 
-      {toast && (
-        <div className="fixed bottom-6 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-2 rounded-full bg-navy px-4 py-2.5 text-sm font-semibold text-white shadow-lg">
-          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-          {toast}
-        </div>
-      )}
     </div>
   );
 }
