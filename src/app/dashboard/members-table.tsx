@@ -464,9 +464,20 @@ export default function MembersTable({
       const profileIds = ids
         .map((id) => localMembers.find((m) => m.id === id)?.profileId)
         .filter((pid): pid is string => Boolean(pid));
+      // bureauRole (calculé côté page.tsx avec le même garde-fou que le
+      // badge Bureau affiché : null si cette fiche ne correspond pas au
+      // véritable titulaire du compte, ex. un enfant inscrit avec l'email
+      // de son parent) -- retour de Cindy du 09/09 : Emilie ROBERT perdait
+      // son rôle de Trésorière-adjointe chaque fois que la fiche de sa
+      // fille Léonore GAUTHIER (même email d'inscription) était archivée,
+      // ce club_administrators.delete() ci-dessous supprimant l'accès
+      // Bureau de la maman en croyant nettoyer celui de l'enfant. Ne
+      // jamais supprimer club_administrators pour un email que la fiche
+      // archivée ne détient pas réellement elle-même.
       const emails = ids
-        .map((id) => localMembers.find((m) => m.id === id)?.email?.trim().toLowerCase())
-        .filter((e): e is string => Boolean(e));
+        .map((id) => localMembers.find((m) => m.id === id))
+        .filter((m): m is AdminMember => Boolean(m?.bureauRole))
+        .map((m) => m.email!.trim().toLowerCase());
 
       const cleanupResults = await Promise.all([
         supabase.from("team_players").delete().in("player_id", ids),
