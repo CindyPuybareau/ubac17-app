@@ -14,6 +14,7 @@ import {
   ShoppingBag,
   Tag,
   Ticket,
+  TrendingUp,
   Trophy,
   Users,
   Wallet,
@@ -22,7 +23,7 @@ import {
 import DocumentsPanel from "@/components/club-documents";
 import ClubReportsSection from "./club-reports-section";
 import Cd17LigueSection from "./cd17-ligue-section";
-import { BOUTIQUE_URL } from "./boutique";
+import { BOUTIQUE_SALES_URL, BOUTIQUE_URL } from "./boutique";
 import TeamManager, { type Person, type TeamWithMembers } from "./team-manager";
 import ImportInscriptions from "./import-inscriptions";
 import ImportPlanning from "./import-planning";
@@ -499,12 +500,37 @@ export default function AdminView({
           ),
         },
         {
-          // Un lien externe, pas un onglet de contenu (voir href sur AdminSection).
+          // Retour de Cindy du 09/09 : devient un sous-menu (comme
+          // Paiements/Matchs & Résultats) plutôt qu'un lien direct --
+          // "Boutique en ligne" (vitrine publique, inchangée) rejoint
+          // "Suivi des ventes" (espace commerçant du même site, réservé
+          // au Bureau : identifiant/mot de passe personnels de Cindy,
+          // jamais stockés ni vus par l'appli -- chacun se connecte avec
+          // son propre compte, exactement comme pour "Boutique en
+          // ligne"). key inchangée ("boutique") pour ne pas casser un
+          // lien profond "?section=boutique" déjà partagé -- même
+          // précaution que "cotisations"/"Paiements" plus haut.
           key: "boutique",
-          label: "Boutique en ligne",
+          label: "Boutique",
           icon: <ShoppingBag className={iconClass} />,
           content: null,
-          href: BOUTIQUE_URL,
+          children: [
+            {
+              // Un lien externe, pas un onglet de contenu (voir href sur AdminSection).
+              key: "boutique-en-ligne",
+              label: "Boutique en ligne",
+              icon: <ShoppingBag className={iconClass} />,
+              content: null,
+              href: BOUTIQUE_URL,
+            },
+            {
+              key: "boutique-ventes",
+              label: "Suivi des ventes",
+              icon: <TrendingUp className={iconClass} />,
+              content: null,
+              href: BOUTIQUE_SALES_URL,
+            },
+          ],
         },
       ],
     },
