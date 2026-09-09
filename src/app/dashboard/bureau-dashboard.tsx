@@ -414,6 +414,18 @@ export default function BureauDashboard({
         eventRoles={eventRoles}
         volunteerNeedsByEventId={volunteerNeedsByEventId}
         benevoles={benevoles}
+        // Retour de Cindy du 09/09 ("le calendrier devient illisible dès
+        // qu'il y a plusieurs événements le même jour... sans filtre par
+        // équipe/catégorie visible") : même liste que createTeams (même
+        // forme, déjà utilisée à l'identique pour les deux props par
+        // admin-view.tsx/"Événements") -- calendar-view.tsx n'affiche ce
+        // filtre pour Mois/Liste QUE si resultsTeams est fourni, donc zéro
+        // effet sur les autres appels de CalendarView qui ne le passent
+        // pas. "dropdown" (case à cocher, plusieurs équipes à la fois)
+        // plutôt que "pills" (une seule active) : le Bureau gère tout le
+        // club, pas une seule équipe à la fois.
+        resultsTeams={createTeams}
+        resultsTeamSelector="dropdown"
       />
     </div>
   );

@@ -183,11 +183,13 @@ export default function CoachView({
             volunteerNeedsByEventId={volunteerNeedsByEventId}
             celebrateWins
           />
+          <SponsorsDisplay sponsors={sponsorDisplay} />
           {/* Même bloc que l'espace parent : un coach a lui aussi son
               propre agenda, et être coach ne devrait pas le priver de cet
-              outil — il fallait juste l'y ajouter aussi. */}
+              outil — il fallait juste l'y ajouter aussi. Placé sous les
+              sponsors (retour de Cindy du 09/09), pas entre le calendrier
+              et eux. */}
           <CalendarSubscribe />
-          <SponsorsDisplay sponsors={sponsorDisplay} />
         </div>
       ),
     },

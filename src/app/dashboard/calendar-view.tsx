@@ -606,6 +606,30 @@ export default function CalendarView({
     knownResultTeamIdsRef.current = new Set(sortedResultsTeams.map((t) => t.id));
   }, [sortedResultsTeams]);
 
+  // Extrait de seasonListEvents (retour de Cindy du 09/09 : "le calendrier
+  // devient illisible... sans filtre par équipe visible" -- la grille du
+  // mois/la vue Liste n'avaient jusqu'ici jamais accès à ce filtre,
+  // pourtant déjà là pour les vues Résultats/Matchs/Événements). Fonction
+  // partagée plutôt que deux copies : le bug du 2026-08-25 (un événement
+  // "Équipes spécifiques" invisible du filtre parce que seul event.teamId
+  // était regardé, jamais targetTeamIds) ne doit pouvoir se corriger qu'à
+  // UN seul endroit, pas être réparé ici et oublié là.
+  function matchesTeamFilter(e: AdminUpcomingEvent) {
+    if (!resultsTeams || resultsTeams.length <= 1) return true;
+    return resultsTeamSelector === "dropdown"
+      ? e.teamId
+        ? selectedResultTeamIds.has(e.teamId)
+        : e.targetTeamIds && e.targetTeamIds.length > 0
+          ? e.targetTeamIds.some((id) => selectedResultTeamIds.has(id))
+          : true
+      : e.teamId
+        ? e.teamId === activeResultsTeamIdResolved
+        : !e.targetTeamIds ||
+          e.targetTeamIds.length === 0 ||
+          (activeResultsTeamIdResolved != null &&
+            e.targetTeamIds.includes(activeResultsTeamIdResolved));
+  }
+
   const canManage = Boolean(createTeams && createTeams.length > 0);
 
   // canManage dit "cet utilisateur gère AU MOINS une équipe" — un coach qui
@@ -752,13 +776,32 @@ export default function CalendarView({
     });
   }
 
-  // Source unique du filtre "Masquer les entraînements" : localEvents
+  // Source unique des filtres "Masquer les entraînements" ET équipe
+  // (retour de Cindy du 09/09, ajouté ici pour que la grille du mois/le
+  // panneau du jour/la liste Événements en bénéficient aussi) : localEvents
   // reste intact (édition/suppression en ont besoin en entier), seule
-  // cette liste dérivée alimente l'affichage (grille du mois, panneau du
-  // jour, liste Événements).
+  // cette liste dérivée alimente l'affichage. matchesTeamFilter est un
+  // no-op (retourne toujours true) tant que `resultsTeams` n'est pas
+  // fourni ou n'a qu'une seule équipe -- inchangé pour tous les appels
+  // existants qui ne le passent pas encore. matchesTeamFilter n'est pas
+  // dans les deps : c'est une fonction déclarée dans le corps du
+  // composant (pas un Hook), ses propres dépendances (resultsTeams,
+  // resultsTeamSelector, selectedResultTeamIds, activeResultsTeamIdResolved)
+  // sont listées explicitement ci-dessous à sa place.
   const visibleEvents = useMemo(
-    () => (hideTrainings ? localEvents.filter((e) => e.event_type !== "TRAINING") : localEvents),
-    [localEvents, hideTrainings]
+    () =>
+      (hideTrainings ? localEvents.filter((e) => e.event_type !== "TRAINING") : localEvents).filter(
+        matchesTeamFilter
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      localEvents,
+      hideTrainings,
+      resultsTeams,
+      resultsTeamSelector,
+      selectedResultTeamIds,
+      activeResultsTeamIdResolved,
+    ]
   );
 
   const eventsByDate = useMemo(() => {
@@ -904,42 +947,17 @@ export default function CalendarView({
         if (view === "clubEvents" && new Date(e.start_time).getTime() < startOfTodayMs()) {
           return false;
         }
-        if (!resultsTeams || resultsTeams.length <= 1) return true;
-        // Deux modes de filtrage par équipe selon resultsTeamSelector :
-        // une équipe active à la fois (pills) ou plusieurs cochées à la
-        // fois (dropdown) — voir sa définition plus haut.
-        //
-        // Retour de Cindy du 2026-08-25 ("mon evenement payant ne se voit
-        // pas dans événement U13") : ce filtre ne regardait que
-        // event.teamId (portée "Une équipe"), jamais targetTeamIds (portée
-        // "Équipes spécifiques") ni le cas vraiment club-wide (teamId ET
-        // targetTeamIds tous les deux null) — un événement créé avec l'une
-        // de ces deux autres portées disparaissait silencieusement de
-        // "Événements" dès que plus d'une équipe existait, quel que soit
-        // le filtre choisi.
-        return resultsTeamSelector === "dropdown"
-          ? e.teamId
-            ? selectedResultTeamIds.has(e.teamId)
-            : e.targetTeamIds && e.targetTeamIds.length > 0
-              ? e.targetTeamIds.some((id) => selectedResultTeamIds.has(id))
-              : true
-          : e.teamId
-            ? e.teamId === activeResultsTeamIdResolved
-            : !e.targetTeamIds ||
-              e.targetTeamIds.length === 0 ||
-              (activeResultsTeamIdResolved != null &&
-                e.targetTeamIds.includes(activeResultsTeamIdResolved));
+        // Filtre équipe : plus besoin de le refaire ici, déjà appliqué en
+        // amont par visibleEvents (voir matchesTeamFilter) -- chaque
+        // événement qui arrive jusqu'ici le respecte déjà.
+        return true;
       })
       .sort(byStartTime);
+    // matchesSeasonView n'est pas dans les deps : fonction déclarée dans
+    // le corps du composant (pas un Hook), sans état propre -- son seul
+    // paramètre variable (`view`) est déjà listé ci-dessous.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    visibleEvents,
-    resultsTeams,
-    resultsTeamSelector,
-    activeResultsTeamIdResolved,
-    selectedResultTeamIds,
-    view,
-  ]);
+  }, [visibleEvents, view]);
 
   // Anniversaires + événements mélangés dans un seul fil chronologique,
   // triés ensemble : un anniversaire vaut minuit ce jour-là (avant tout
@@ -1581,6 +1599,32 @@ export default function CalendarView({
               )}
               {hideTrainings ? "Entraînements masqués" : "Masquer les entraînements"}
             </button>
+          )}
+
+          {/* Retour de Cindy du 09/09 ("le calendrier devient illisible...
+              sans filtre par équipe visible") : même sélecteur que les
+              vues Résultats/Matchs/Événements plus bas (TeamFilterDropdown/
+              TeamSelectorPills), jusqu'ici jamais montré pour Mois/Liste --
+              alors que c'est justement là que plusieurs équipes chargées le
+              même jour rendaient la grille illisible ("+1", "+4"). Masqué
+              sur les pages dédiées (forcedView) : elles ont déjà leur
+              propre sélecteur plus bas, pas la peine de le doubler ici. */}
+          {!forcedView && resultsTeams && resultsTeams.length > 1 && (
+            <div className="w-full sm:w-auto">
+              {resultsTeamSelector === "dropdown" ? (
+                <TeamFilterDropdown
+                  teams={sortedResultsTeams}
+                  selectedIds={selectedResultTeamIds}
+                  onChange={setSelectedResultTeamIds}
+                />
+              ) : (
+                <TeamSelectorPills
+                  teams={sortedResultsTeams}
+                  activeId={activeResultsTeamIdResolved}
+                  onSelect={setActiveResultsTeamId}
+                />
+              )}
+            </div>
           )}
 
           {/* Tout à droite : c'est un réglage d'affichage, pas une action

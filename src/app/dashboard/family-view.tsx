@@ -309,9 +309,10 @@ export default function FamilyView({
             volunteerNeedsByEventId={volunteerNeedsByEventId}
             celebrateWins
           />
-          <CalendarSubscribe />
           <ChildAccessManager />
           <SponsorsDisplay sponsors={sponsorDisplay} />
+          {/* Retour de Cindy du 09/09 : sous les sponsors, pas au-dessus. */}
+          <CalendarSubscribe />
         </div>
       ),
     },
