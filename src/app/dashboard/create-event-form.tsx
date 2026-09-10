@@ -7,11 +7,13 @@ import { SALLES } from "./salles";
 import { sendEventPush } from "./event-push";
 import DateTimePicker from "./date-time-picker";
 import RoleIcon from "./role-icon";
+import CommissionMultiSelect from "./commission-multi-select";
 import { Plus, X } from "lucide-react";
 import {
   CUSTOM_ROLE_CODE,
   STANDARD_VOLUNTEER_ROLES,
   volunteerRoleIcon,
+  type VolunteerNeed,
 } from "./event-volunteer-needs";
 import { useToast } from "./toast-context";
 import type { AdminBenevole, AdminUpcomingEvent } from "./page";
@@ -75,6 +77,8 @@ const typeChoices: { value: EventType; label: string; active: string }[] = [
 export default function CreateEventForm({
   teams,
   benevoles = [],
+  commissionGroups = [],
+  existingNeeds = [],
   allowClubWide = false,
   open,
   editingEvent,
@@ -87,6 +91,16 @@ export default function CreateEventForm({
   // tous ceux qui peuvent modifier un événement ou en créer un") — voir le
   // commentaire sur la section "Bénévoles invités" plus bas.
   benevoles?: AdminBenevole[];
+  // Retour de Cindy du 10/09 ("Accès Commissions & Administration", puis
+  // "il manque la possibilité de cibler une ou plusieurs commissions") :
+  // transmis à CommissionMultiSelect pour chaque besoin d'organisation
+  // (voir draftNeeds plus bas) — même liste que VolunteerNeedsPanel.
+  commissionGroups?: { id: string; name: string }[];
+  // Retour de Cindy du 10/09 ("recharge et affiche correctement les
+  // besoins d'organisation existants") : les besoins déjà en base pour
+  // editingEvent (vide en création) — l'appelant (calendar-view.tsx) les a
+  // déjà, via volunteerNeedsByEventId, jamais recalculés ici.
+  existingNeeds?: VolunteerNeed[];
   allowClubWide?: boolean;
   // Ouverture pilotee par l appelant : le bouton "+ Creer un evenement"
   // vit dans l en-tete du calendrier, a cote de la navigation de date,
@@ -168,16 +182,45 @@ export default function CreateEventForm({
           : "single"
   );
   const [targetTeamIds, setTargetTeamIds] = useState<string[]>(() => editingEvent?.targetTeamIds ?? []);
-  // Besoins d'organisation définis dès la création (buvette, table de
-  // marque...) : une liste libre de lignes rôle + effectif, comme dans le
-  // formulaire "+ Ajouter un besoin" de la carte événement. Non proposé en
-  // mode édition : ce champ ne sait qu'ajouter, jamais éditer/retirer un
-  // besoin déjà existant — VolunteerNeedsPanel, sur la carte de
-  // l'événement, reste le seul endroit fiable pour ça une fois l'événement
-  // créé.
+  // Besoins d'organisation (buvette, table de marque...) : une liste libre
+  // de lignes rôle + effectif, comme dans le formulaire "+ Ajouter un
+  // besoin" de la carte événement. Retour de Cindy du 10/09 ("en rouvrant
+  // Modifier l'événement, la section a disparu... impossible de les
+  // consulter, modifier ou supprimer") : ce champ ne se contentait avant
+  // que d'ajouter, jamais en édition -- pré-rempli maintenant depuis
+  // existingNeeds (id réel = une ligne déjà en base) dans les deux cas, la
+  // sauvegarde (handleSubmit) calculant le diff création/mise à
+  // jour/suppression. VolunteerNeedsPanel, sur la carte de l'événement,
+  // reste un deuxième endroit possible pour gérer les mêmes besoins --
+  // les deux lisent/écrivent la même table.
   const [draftNeeds, setDraftNeeds] = useState<
-    { key: number; roleCode: string; customLabel: string; count: string }[]
-  >([]);
+    {
+      // Identifiant React (clé de liste), jamais envoyé à la base -- id
+      // ci-dessous, lui, distingue une ligne déjà en base (à mettre à jour)
+      // d'une ligne nouvelle (à créer).
+      key: string;
+      id: string | null;
+      roleCode: string;
+      customLabel: string;
+      count: string;
+      // Retour de Cindy du 10/09 ("Créer un événement... il manque la
+      // possibilité de cibler une ou plusieurs commissions") : même champ
+      // que VolunteerNeedsPanel (volunteer-needs-panel.tsx), pour que les
+      // besoins créés dès ce formulaire remontent eux aussi sur la page
+      // publique des commissions concernées, pas seulement ceux ajoutés
+      // après coup sur un événement déjà créé.
+      commissionGroupIds: string[];
+    }[]
+  >(() =>
+    existingNeeds.map((n) => ({
+      key: n.id,
+      id: n.id,
+      roleCode: n.roleCode,
+      customLabel: n.customLabel ?? "",
+      count: String(n.requiredCount),
+      commissionGroupIds: n.commissionGroupIds,
+    }))
+  );
   // Bénévoles invités à cet événement (retour de Cindy du 2026-08-25) :
   // contrairement à draftNeeds, modifiable en édition comme à la création —
   // le Bureau doit pouvoir ajouter/retirer un bénévole après coup. Diff
@@ -224,15 +267,25 @@ export default function CreateEventForm({
   function addDraftNeed() {
     setDraftNeeds((rows) => [
       ...rows,
-      { key: Date.now() + rows.length, roleCode: STANDARD_VOLUNTEER_ROLES[0].code, customLabel: "", count: "1" },
+      {
+        key: `new-${Date.now()}-${rows.length}`,
+        id: null,
+        roleCode: STANDARD_VOLUNTEER_ROLES[0].code,
+        customLabel: "",
+        count: "1",
+        commissionGroupIds: [],
+      },
     ]);
   }
 
-  function removeDraftNeed(key: number) {
+  function removeDraftNeed(key: string) {
     setDraftNeeds((rows) => rows.filter((r) => r.key !== key));
   }
 
-  function updateDraftNeed(key: number, patch: Partial<{ roleCode: string; customLabel: string; count: string }>) {
+  function updateDraftNeed(
+    key: string,
+    patch: Partial<{ roleCode: string; customLabel: string; count: string; commissionGroupIds: string[] }>
+  ) {
     setDraftNeeds((rows) => rows.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   }
 
@@ -599,33 +652,92 @@ export default function CreateEventForm({
       ]);
     }
 
-    // Besoins d'organisation chiffrés dès la création (jamais en édition,
-    // voir le commentaire sur draftNeeds plus haut). Best-effort : une
-    // erreur ici ne doit pas faire croire que l'événement lui-même n'a pas
-    // été créé, il l'a bien été.
-    const validNeeds = draftNeeds
+    // Besoins d'organisation : retour de Cindy du 10/09 ("en rouvrant
+    // Modifier l'événement, la section... a disparu... impossible de les
+    // consulter, modifier ou supprimer") -- ce bloc gérait jusqu'ici
+    // uniquement la création (insert brut, jamais en édition). Diff contre
+    // les besoins déjà existants (existingNeeds, chargés par l'appelant
+    // depuis volunteerNeedsByEventId) désormais dans les deux cas, même
+    // principe que selectedBenevoleIds juste en dessous : id présent -> une
+    // ligne déjà en base, à mettre à jour ou laisser telle quelle ; id
+    // absent (retiré du formulaire) -> à supprimer ; ligne sans id -> à
+    // créer. Best-effort : une erreur ici ne doit pas faire croire que
+    // l'événement lui-même n'a pas été créé/modifié, il l'a bien été.
+    const validDraftNeeds = draftNeeds
       .map((n, i) => ({
+        id: n.id,
         roleCode: n.roleCode,
         customLabel: n.roleCode === CUSTOM_ROLE_CODE ? n.customLabel.trim() : null,
         count: Number(n.count) || 0,
         sortOrder: i,
+        commissionGroupIds: n.commissionGroupIds,
       }))
       .filter((n) => n.count > 0);
-    if (!isEditing && validNeeds.length > 0) {
+    const needsToInsert = validDraftNeeds.filter((n) => n.id === null);
+    const validDraftNeedIds = new Set(validDraftNeeds.map((n) => n.id).filter((id): id is string => id !== null));
+    const needsToDelete = existingNeeds
+      .map((n) => n.id)
+      .filter((id) => !validDraftNeedIds.has(id));
+    // Une ligne existante changée (rôle/nom/effectif/commissions/ordre) —
+    // comparaison simple champ à champ, jamais réécrite si rien n'a changé.
+    const needsToUpdate = validDraftNeeds.filter((n) => {
+      if (n.id === null) return false;
+      const original = existingNeeds.find((e) => e.id === n.id);
+      if (!original) return false;
+      return (
+        original.roleCode !== n.roleCode ||
+        (original.customLabel ?? "") !== (n.customLabel ?? "") ||
+        original.requiredCount !== n.count ||
+        [...original.commissionGroupIds].sort().join(",") !== [...n.commissionGroupIds].sort().join(",")
+      );
+    });
+
+    if (needsToDelete.length > 0) {
+      const { error: deleteNeedsError } = await supabase
+        .from("event_volunteer_needs")
+        .delete()
+        .in("id", needsToDelete);
+      if (deleteNeedsError) {
+        setError(
+          `Événement enregistré, mais la suppression d'un besoin d'organisation a échoué : ${deleteNeedsError.message}`
+        );
+        return;
+      }
+    }
+    for (const n of needsToUpdate) {
+      const { error: updateNeedError } = await supabase
+        .from("event_volunteer_needs")
+        .update({
+          role_code: n.roleCode,
+          custom_label: n.customLabel,
+          required_count: n.count,
+          sort_order: n.sortOrder,
+          commission_group_ids: n.commissionGroupIds,
+        })
+        .eq("id", n.id);
+      if (updateNeedError) {
+        setError(
+          `Événement enregistré, mais la mise à jour d'un besoin d'organisation a échoué : ${updateNeedError.message}`
+        );
+        return;
+      }
+    }
+    if (needsToInsert.length > 0) {
       const { error: needsError } = await supabase.from("event_volunteer_needs").insert(
-        validNeeds.map((n) => ({
+        needsToInsert.map((n) => ({
           event_id: inserted.id,
           role_code: n.roleCode,
           custom_label: n.customLabel,
           required_count: n.count,
           sort_order: n.sortOrder,
+          commission_group_ids: n.commissionGroupIds,
         }))
       );
       if (needsError) {
         // On garde le formulaire ouvert : fermer maintenant masquerait ce
-        // message alors que l'événement, lui, a bien été créé.
+        // message alors que l'événement, lui, a bien été créé/modifié.
         setError(
-          `Événement créé, mais l'ajout des besoins d'organisation a échoué : ${needsError.message}`
+          `Événement enregistré, mais l'ajout d'un besoin d'organisation a échoué : ${needsError.message}`
         );
         return;
       }
@@ -945,16 +1057,11 @@ export default function CreateEventForm({
         className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
       />
 
-      {/* Chiffrer sa demande dès la création (ex. "3 pour la buvette") avec
-          la même liste standard que sur la carte de l'événement une fois
-          créé (VolunteerNeedsPanel) — ceci n'est qu'un raccourci pour ne
-          pas avoir à y retourner tout de suite ; les besoins restent de
-          toute façon ajoutables/modifiables après coup. Jamais en édition
-          (voir le commentaire sur draftNeeds plus haut) — VolunteerNeedsPanel,
-          sur la carte, reste le seul endroit pour gérer les besoins déjà
-          existants. */}
-      {!isEditing && (
-        <div className="flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3">
+      {/* Même liste standard que sur la carte de l'événement (VolunteerNeedsPanel)
+          — les deux lisent/écrivent la même table. Retour de Cindy du 10/09 :
+          maintenant pré-rempli avec les besoins déjà en base en édition
+          (existingNeeds), modifiables/supprimables ici comme sur la carte. */}
+      <div className="flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3">
           <p className="text-xs font-medium text-zinc-600">
             Besoins d&apos;organisation (optionnel)
           </p>
@@ -994,6 +1101,14 @@ export default function CreateEventForm({
                       className="w-14 shrink-0 rounded-lg border border-zinc-200 px-2 py-1 text-center"
                     />
                   </label>
+                  {/* Retour de Cindy du 10/09 : "Commissions concernées" par
+                      besoin, dès la création — sinon ce besoin n'apparaît
+                      jamais sur aucune page publique de commission. */}
+                  <CommissionMultiSelect
+                    commissions={commissionGroups}
+                    selectedIds={n.commissionGroupIds}
+                    onChange={(ids) => updateDraftNeed(n.key, { commissionGroupIds: ids })}
+                  />
                   <button
                     type="button"
                     onClick={() => removeDraftNeed(n.key)}
@@ -1014,16 +1129,14 @@ export default function CreateEventForm({
             <Plus className="h-3.5 w-3.5" />
             Ajouter un besoin
           </button>
-        </div>
-      )}
+      </div>
 
       {/* Bénévoles invités (retour de Cindy du 2026-08-25 : "le bureau
           devrait... pouvoir selectionner ses membres, pour que ces meme
           membres voient l'evenement avec les besoins", étendu au coach le
           06/09) — Bureau ET coach, seulement s'il existe des bénévoles
           enregistrés (benevoles vide par défaut partout ailleurs, voir
-          calendar-view.tsx). Modifiable en édition, contrairement aux
-          besoins d'organisation ci-dessus. */}
+          calendar-view.tsx). */}
       {benevoles.length > 0 && (
         <div className="flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3">
           <p className="text-xs font-medium text-zinc-600">Bénévoles invités (optionnel)</p>

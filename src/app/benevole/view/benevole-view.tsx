@@ -128,7 +128,15 @@ function BenevoleNeedRow({
           action === "join"
             ? [
                 ...prev.signups,
-                { id: `local-${Date.now()}`, playerId: null, benevoleId, playerName: "", source: "VOLUNTEER" },
+                {
+                  id: `local-${Date.now()}`,
+                  playerId: null,
+                  benevoleId,
+                  commissionGroupId: null,
+                  guestName: null,
+                  playerName: "",
+                  source: "VOLUNTEER",
+                },
               ]
             : prev.signups.filter((s) => s.benevoleId !== benevoleId),
       }));

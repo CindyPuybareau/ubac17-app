@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ExternalLink, Landmark, MessageCircle, Settings, Shirt, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { teamLabel } from "@/lib/teams";
+import { commissionMeta } from "@/lib/commission-labels";
 import type { WhatsAppGroup } from "./page";
 
 type TeamRef = { id: string; name: string | null; category: string | null };
@@ -30,26 +31,6 @@ const TEAM_ORDER = [
   "U9 Mixte",
   "Babys",
 ];
-
-// Les group.name réels sont saisis au seed avec le millésime ("Comité
-// directeur 2026/27") — pas pensés pour tenir sur une carte épurée. Un nom
-// d'affichage court est associé ici, avec le même ordre que demandé.
-const COMMISSION_LABELS: { match: string; label: string }[] = [
-  { match: "Bureau", label: "Bureau" },
-  { match: "Comité directeur", label: "Comité Directeur" },
-  { match: "Team communication", label: "Team Communication" },
-  { match: "Coachs UBAC", label: "Coachs" },
-  { match: "Salariés", label: "Salariés" },
-  { match: "Animations et événements", label: "Animation & Événements" },
-  { match: "Buvette", label: "Buvette" },
-  { match: "Commission sponsors", label: "Sponsor" },
-  { match: "Calendrier et dates à retenir", label: "Calendrier et dates à retenir" },
-];
-
-function commissionMeta(name: string) {
-  const idx = COMMISSION_LABELS.findIndex((c) => name.startsWith(c.match));
-  return { label: idx === -1 ? name : COMMISSION_LABELS[idx].label, rank: idx === -1 ? COMMISSION_LABELS.length : idx };
-}
 
 // Carte épurée, un seul geste : ouvrir le groupe. Pas de champ pré-rempli
 // ni de bouton copier-coller — juste le lien direct, et une roue crantée

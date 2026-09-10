@@ -36,7 +36,7 @@ import FfbbManager from "./ffbb-manager";
 import WhatsAppGroupsManager from "./whatsapp-groups-manager";
 import SponsorsManager from "./sponsors-manager";
 import SponsorsDisplay from "./sponsors-display";
-import BenevolesManager from "./benevoles-manager";
+import CommissionsManager from "./commissions-manager";
 import BureauDashboard from "./bureau-dashboard";
 import type { AutomationKey } from "./automation-settings";
 import type {
@@ -122,6 +122,14 @@ export default function AdminView({
     category: t.category,
   }));
 
+  // Retour de Cindy du 10/09 ("Accès Commissions & Administration") :
+  // liste des commissions pour rattacher un besoin en bénévoles à la
+  // création (voir VolunteerNeedsPanel/commissionGroups) -- mêmes groupes
+  // que whatsapp-groups-manager.tsx, jamais une nouvelle liste.
+  const commissionGroups = whatsappGroups
+    .filter((g) => g.category === "COMMISSION")
+    .map((g) => ({ id: g.id, name: g.name }));
+
   // Retour d'audit du 28/08 : un événement ciblant plusieurs équipes
   // précises (targetTeamIds) n'a pas de teamId — il n'apparaissait dans
   // "Prochains rendez-vous" d'AUCUNE des équipes qu'il vise pourtant
@@ -194,6 +202,7 @@ export default function AdminView({
             sponsors={sponsors}
             penalites={penalites}
             benevoles={benevoles}
+            commissionGroups={commissionGroups}
           />
           <SponsorsDisplay sponsors={sponsorDisplay} />
         </div>
@@ -311,6 +320,7 @@ export default function AdminView({
           resultsTeamSelector="dropdown"
           eventRoles={eventRoles}
           volunteerNeedsByEventId={volunteerNeedsByEventId}
+          commissionGroups={commissionGroups}
         />
       ),
     },
@@ -338,6 +348,7 @@ export default function AdminView({
               resultsTeamSelector="dropdown"
               eventRoles={eventRoles}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
+              commissionGroups={commissionGroups}
             />
           ),
         },
@@ -356,6 +367,7 @@ export default function AdminView({
               resultsTeamSelector="dropdown"
               eventRoles={eventRoles}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
+              commissionGroups={commissionGroups}
             />
           ),
         },
@@ -383,26 +395,26 @@ export default function AdminView({
           content: <SponsorsManager sponsors={sponsors} />,
         },
         {
-          // Retour de Cindy du 2026-08-25 : membres non-joueurs mobilisables
-          // pour les besoins d'organisation (buvette, table de marque...)
-          // d'un événement, sans être ni joueur ni forcément parent — voir
-          // benevoles-manager.tsx et la section "Bénévoles invités" sur
-          // CreateEventForm. Fusionné avec "Profils d'accès" (retour de
-          // Cindy du 05/09, "je n'en veux qu'un", puis "tout ça réuni") :
-          // il n'existe plus de catalogue de profils séparé à gérer --
-          // benevoles-manager.tsx coche les briques d'un bénévole
-          // directement sur sa fiche (même mécanisme que "Comité
-          // directeur" côté fiche membre, voir member-detail-modal.tsx),
-          // un profil dédié à cette personne étant créé/mis à jour tout
-          // seul derrière.
-          key: "benevoles",
-          label: "Bénévoles & Accès",
+          // Retour de Cindy du 10/09 ("Accès Commissions & Administration") :
+          // remplace la gestion d'accès personne par personne
+          // (benevoles-manager.tsx, jusqu'ici "Bénévoles & Accès") par une
+          // gestion au niveau de chaque commission — mêmes commissions que
+          // whatsapp-groups-manager.tsx, mêmes briques de lecture seule
+          // qu'avant (access-briques.ts), mais portées par la commission
+          // elle-même : un seul lien public par commission plutôt qu'un
+          // lien par personne. L'ancien fonctionnement individuel reste
+          // disponible en option secondaire à l'intérieur de ce composant
+          // (voir commissions-manager.tsx) — pour inviter quelqu'un à un
+          // événement précis, ce qu'un lien de commission partagé ne sait
+          // pas faire.
+          key: "commissions",
+          label: "Accès Commissions & Administration",
           icon: <HandHeart className={iconClass} />,
           content: (
-            <BenevolesManager
-              benevoles={benevoles}
-              accessProfiles={accessProfiles}
+            <CommissionsManager
               whatsappGroups={whatsappGroups}
+              accessProfiles={accessProfiles}
+              benevoles={benevoles}
             />
           ),
         },
@@ -569,7 +581,7 @@ export default function AdminView({
     "matches-official": "matchs_resultats",
     "matches-results": "matchs_resultats",
     sponsors: "sponsors",
-    benevoles: "benevoles",
+    commissions: "benevoles",
   };
   const documentsVisible =
     !isRestricted ||

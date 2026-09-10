@@ -157,6 +157,14 @@ export type WhatsAppGroup = {
   // RLS already narrows which groups appear at all.
   canManage: boolean;
   members: { id: string; firstName: string | null; lastName: string | null }[];
+  // Retour de Cindy du 10/09 ("Accès Commissions & Administration") : lien
+  // public permanent + profil d'accès en lecture seule portés par la
+  // commission elle-même — seulement renseignés pour category='COMMISSION'
+  // (toujours présents en base pour category='EQUIPE' aussi, mais jamais
+  // utilisés ni affichés de ce côté-là). Voir commissions-manager.tsx et
+  // /commission/[token].
+  accessToken: string | null;
+  accessProfileId: string | null;
 };
 
 // Full registration record, mirroring the club's official enrollment form
@@ -1184,7 +1192,7 @@ export default async function DashboardPage({
     supabase
       .from("whatsapp_groups")
       .select(
-        "id, name, category, team_id, invite_link, sort_order, whatsapp_group_members(player_id, players(id, first_name, last_name))"
+        "id, name, category, team_id, invite_link, sort_order, access_token, access_profile_id, whatsapp_group_members(player_id, players(id, first_name, last_name))"
       )
       .order("sort_order", { ascending: true }),
     // Priority zone: next convocation per linked player.
@@ -1260,6 +1268,8 @@ export default async function DashboardPage({
     team_id: string | null;
     invite_link: string | null;
     sort_order: number;
+    access_token: string | null;
+    access_profile_id: string | null;
     whatsapp_group_members: {
       player_id: string;
       players: { id: string; first_name: string | null; last_name: string | null } | null;
@@ -1275,6 +1285,8 @@ export default async function DashboardPage({
     teamId: g.team_id,
     inviteLink: g.invite_link,
     sortOrder: g.sort_order,
+    accessToken: g.access_token,
+    accessProfileId: g.access_profile_id,
     canManage: isAdmin || (g.team_id !== null && coachedTeamIds.has(g.team_id)),
     members: g.whatsapp_group_members
       .map((m) => m.players)

@@ -368,6 +368,7 @@ export default function CalendarView({
   resultsTeams,
   benevoles = [],
   celebrateWins = false,
+  commissionGroups = [],
 }: {
   events: AdminUpcomingEvent[];
   createTeams?: CalendarTeamRef[];
@@ -452,6 +453,10 @@ export default function CalendarView({
   // (coach-view.tsx, family-view.tsx : true ; admin-view.tsx : jamais
   // passé, donc false) de trancher.
   celebrateWins?: boolean;
+  // Retour de Cindy du 10/09 ("Accès Commissions & Administration") :
+  // transmis tel quel à VolunteerNeedsPanel (voir son propre commentaire)
+  // pour rattacher un besoin à une commission à la création.
+  commissionGroups?: { id: string; name: string }[];
 }) {
   // Recalculés à chaque rendu (pas au chargement du module) : un onglet
   // Bureau laissé ouvert toute la nuit gardait sinon la pastille "jour
@@ -1412,6 +1417,7 @@ export default function CalendarView({
               myPlayerIds={[]}
               canManage
               bare
+              commissionGroups={commissionGroups}
             />
           </OrganisationCard>
         )}
@@ -1757,6 +1763,8 @@ export default function CalendarView({
           key={editingEvent?.id ?? "create"}
           teams={createTeams}
           benevoles={benevoles}
+          commissionGroups={commissionGroups}
+          existingNeeds={editingEvent ? (volunteerNeedsByEventId[editingEvent.id] ?? emptyVolunteerNeeds) : emptyVolunteerNeeds}
           allowClubWide={allowClubWide}
           open={createOpen || Boolean(editingEvent)}
           editingEvent={editingEvent}

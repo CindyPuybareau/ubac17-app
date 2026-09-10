@@ -220,6 +220,7 @@ export default function BureauDashboard({
   sponsors,
   penalites,
   benevoles,
+  commissionGroups = [],
 }: {
   cotisations: AdminCotisation[];
   members: AdminMember[];
@@ -249,6 +250,9 @@ export default function BureauDashboard({
   // après "Montant en attente" — même famille de chiffre (un montant en
   // euros restant à encaisser), voir penalites-manager.tsx pour la saisie.
   penalites: AdminPenalite[];
+  // Retour de Cindy du 10/09 ("Accès Commissions & Administration") :
+  // transmis tel quel à DeferredCalendar/VolunteerNeedsPanel plus bas.
+  commissionGroups?: { id: string; name: string }[];
 }) {
   // Même périmètre que l'onglet Cotisations & Licences (KpiHeader) : les
   // stages/événements/boutique (collecteId non nul) ont leur propre suivi
@@ -442,6 +446,7 @@ export default function BureauDashboard({
         eventRoles={eventRoles}
         volunteerNeedsByEventId={volunteerNeedsByEventId}
         benevoles={benevoles}
+        commissionGroups={commissionGroups}
         // Retour de Cindy du 09/09 ("le calendrier devient illisible dès
         // qu'il y a plusieurs événements le même jour... sans filtre par
         // équipe/catégorie visible") : même liste que createTeams (même

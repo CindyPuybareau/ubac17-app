@@ -41,17 +41,24 @@ export function volunteerRoleIcon(roleCode: string): RoleIconName {
 
 export type VolunteerSignupSource = "VOLUNTEER" | "ADMIN";
 
-// playerId/benevoleId : exactement l'un des deux est renseigné, jamais les
-// deux (retour de Cindy du 2026-08-25, "besoin en bénévoles hors club") —
+// playerId/benevoleId/commissionGroupId : exactement UN des trois est
+// renseigné, jamais deux à la fois (retour de Cindy du 2026-08-25, "besoin
+// en bénévoles hors club", puis du 10/09, lien commun d'une commission) —
 // voir la contrainte event_volunteer_signups_signer_check en base.
 export type VolunteerSignup = {
   id: string;
   playerId: string | null;
   benevoleId: string | null;
-  // Nom affiché, joueur ou bénévole selon lequel des deux ids ci-dessus
-  // est renseigné — gardé "playerName" (pas renommé) pour ne pas casser
-  // tous les usages existants (volunteer-needs-panel.tsx...), c'était déjà
-  // le seul nom affiché dans ce composant avant l'ajout des bénévoles.
+  // Retour de Cindy du 10/09 ("Accès Commissions & Administration") :
+  // inscription depuis le lien commun d'une commission, sans identité
+  // permanente -- guestName porte le prénom saisi au moment de se
+  // proposer (voir /api/commission-signup).
+  commissionGroupId: string | null;
+  guestName: string | null;
+  // Nom affiché, résolu selon lequel des trois champs ci-dessus est
+  // renseigné — gardé "playerName" (pas renommé) pour ne pas casser tous
+  // les usages existants (volunteer-needs-panel.tsx...), c'était déjà le
+  // seul nom affiché dans ce composant avant l'ajout des bénévoles/invités.
   playerName: string;
   source: VolunteerSignupSource;
 };
@@ -64,6 +71,14 @@ export type VolunteerNeed = {
   customLabel: string | null;
   requiredCount: number;
   signups: VolunteerSignup[];
+  // Retour de Cindy du 10/09 : quelle(s) commission(s) ce besoin concerne
+  // (voir whatsapp_groups.category='COMMISSION') -- [] = pas encore
+  // rattaché, comportement historique inchangé, n'apparaît sur aucune page
+  // de commission. Plusieurs possibles (ex. table de marque : Coachs ET
+  // Team Communication), retour de Cindy du 10/09 (suite) : "remplace ou
+  // complète... par un sélecteur Commissions concernées" avec "sélection
+  // multiple possible".
+  commissionGroupIds: string[];
 };
 
 export async function getVolunteerNeedsByEventId(
@@ -96,7 +111,7 @@ export async function getVolunteerNeedsByEventId(
     (chunk) =>
       supabase
         .from("event_volunteer_needs")
-        .select("id, event_id, role_code, custom_label, required_count, sort_order")
+        .select("id, event_id, role_code, custom_label, required_count, sort_order, commission_group_ids")
         .in("event_id", chunk)
         .order("sort_order", { ascending: true }),
     dbLimit ?? 4
@@ -117,7 +132,7 @@ export async function getVolunteerNeedsByEventId(
   if (needIds.length > 0) {
     const { data: signupRows } = await supabase
       .from("event_volunteer_signups")
-      .select("id, need_id, player_id, benevole_id, source")
+      .select("id, need_id, player_id, benevole_id, commission_group_id, guest_name, source")
       .in("need_id", needIds);
 
     // Noms résolus via club_member_names plutôt qu'une jointure
@@ -176,13 +191,18 @@ export async function getVolunteerNeedsByEventId(
       const list = signupsByNeedId.get(needId) ?? [];
       const playerId = row.player_id as string | null;
       const benevoleId = row.benevole_id as string | null;
+      const commissionGroupId = row.commission_group_id as string | null;
+      const guestName = row.guest_name as string | null;
       list.push({
         id: row.id as string,
         playerId,
         benevoleId,
+        commissionGroupId,
+        guestName,
         playerName:
           (playerId ? nameByPlayerId.get(playerId) : null) ??
           (benevoleId ? nameByBenevoleId.get(benevoleId) : null) ??
+          guestName ??
           "Bénévole",
         source: (row.source as VolunteerSignupSource | null) ?? "VOLUNTEER",
       });
@@ -200,6 +220,7 @@ export async function getVolunteerNeedsByEventId(
       customLabel: (row.custom_label as string | null) ?? null,
       requiredCount: (row.required_count as number | null) ?? 1,
       signups: signupsByNeedId.get(row.id as string) ?? [],
+      commissionGroupIds: (row.commission_group_ids as string[] | null) ?? [],
     });
   });
 
