@@ -2,7 +2,6 @@ import {
   Building2,
   CalendarDays,
   ClipboardList,
-  Flag,
   LayoutDashboard,
   ListOrdered,
   LogOut,
@@ -183,6 +182,13 @@ export default function CoachView({
               category: t.category,
             }))}
             scopeTeamRoleById={teamRoleByTeamId}
+            // Retour de Cindy du 10/09 (fusion Calendrier/Événements) :
+            // manquait ici alors que "Événements" (retiré plus bas) l'avait
+            // déjà -- un coach qui encadre plusieurs équipes n'avait aucun
+            // filtre par équipe sur son Calendrier, seulement sur
+            // "Événements". Même sélecteur "pills" (une équipe active à la
+            // fois, le défaut de CalendarView) que "Événements" avait.
+            resultsTeams={resultsTeamsForCalendar}
             selfPlayerId={ownPlayerId}
             eventRoles={eventRoles}
             volunteerNeedsByEventId={volunteerNeedsByEventId}
@@ -297,41 +303,11 @@ export default function CoachView({
         },
       ],
     },
-    {
-      // Retour de Cindy du 2026-08-22 : l'ancien parent "Événements et
-      // Résultats" à 4 sous-onglets est retiré au profit de deux onglets
-      // de menu directs. "Événements" regroupe tout le calendrier du club
-      // sauf les matchs officiels (entraînements, amicaux, tournois,
-      // événements club) en un seul fil, plus besoin de les voir séparés.
-      key: "events",
-      label: "Événements",
-      icon: <Flag className={iconClass} />,
-      content: (
-        <CalendarView
-          events={events}
-          createTeams={createTeams}
-          benevoles={benevoles}
-          rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey, noteByKey: rsvpNoteByKey }}
-          scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
-          scopeTeamRoleById={teamRoleByTeamId}
-          forcedView="clubEvents"
-          // Un coach qui encadre plusieurs équipes (et joue parfois dans
-          // une autre) doit pouvoir choisir laquelle regarder, comme dans
-          // "Équipe" — sinon tous les événements de toutes ses équipes se
-          // mélangent dans un seul fil.
-          resultsTeams={resultsTeamsForCalendar}
-          // Audit du 31/08 : manquait sur ces 3 onglets, contrairement à
-          // "Calendrier" ci-dessus — un coach qui joue aussi dans une autre
-          // équipe perdait son propre bouton Présent/Absent en changeant
-          // d'onglet, alors que ce sont les mêmes événements affichés via
-          // le même composant (reliquat de la scission de l'ancien onglet
-          // "Événements et Résultats" du 22/08 en onglets séparés).
-          selfPlayerId={ownPlayerId}
-          volunteerNeedsByEventId={volunteerNeedsByEventId}
-          celebrateWins
-        />
-      ),
-    },
+    // Retour de Cindy du 10/09 (fusion Calendrier/Événements) : l'onglet
+    // "Événements" qui vivait ici est retiré -- son filtre par équipe
+    // (resultsTeams) a été reporté sur "Calendrier" ci-dessus, sa carte
+    // d'événement (renderEventCard) et son icône mail étaient déjà
+    // strictement identiques à celles de "Calendrier".
     {
       // Retour de Cindy du 2026-08-22 : "Matchs officiels" / "Résultats"
       // deviennent un vrai sous-menu (comme Organisation & Bilan) au lieu

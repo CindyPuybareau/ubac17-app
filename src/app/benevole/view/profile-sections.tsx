@@ -8,7 +8,6 @@ import {
   Eye,
   EyeOff,
   ExternalLink,
-  Flag,
   Handshake,
   ListOrdered,
   MessageCircle,
@@ -23,7 +22,6 @@ import type { AdminSection } from "@/app/dashboard/admin-sidebar";
 import type { ChildCoach, ChildEvent, ChildTeammate } from "@/app/enfant/view/child-dashboard";
 import ChildCalendarTab from "@/app/enfant/view/child-calendar-tab";
 import ChildTeamTab from "@/app/enfant/view/child-team-tab";
-import ChildEventsTab from "@/app/enfant/view/child-events-tab";
 import ChildResultsTab from "@/app/enfant/view/child-results-tab";
 import SponsorsDisplay from "@/app/dashboard/sponsors-display";
 import ClubReportsSection from "@/app/dashboard/club-reports-section";
@@ -89,7 +87,7 @@ function MembersSection({ members }: { members: ProfileMember[] }) {
 }
 
 // Retour de Cindy du 06/09 ("pourquoi je n'ai pas les autres événements du
-// club visibles ?") : ChildEventsTab/ChildResultsTab ont leur propre
+// club visibles ?") : ChildCalendarTab/ChildResultsTab ont leur propre
 // sélecteur d'équipe intégré, mais en mode "une seule équipe à la fois"
 // (pills, pensé pour un enfant qui ne suit que la sienne) — un
 // événement club ciblant une autre équipe que celle sélectionnée
@@ -107,12 +105,17 @@ function eventMatchesTeams(event: ChildEvent, selectedIds: Set<string>): boolean
   return true;
 }
 
-// Retour de Cindy du 06/09 ("ajouter aussi comme sur les autres espaces le
-// bouton 'masquer les entraînements'") : même comportement/libellé/icônes
-// que calendar-view.tsx (hideTrainings), appliqué ici en amont de
-// ChildEventsTab plutôt que dans ce composant partagé avec l'Espace
-// Enfant, qui n'a jamais eu ce bouton et n'a pas à en hériter.
-function EventsSection({
+// Retour de Cindy du 10/09 (fusion Calendrier/Événements, comme sur les 4
+// autres espaces) : remplace à la fois l'ancien "Calendrier" (simple grille
+// sans aucun filtre) et l'ancien "Événements" (ChildEventsTab + ses
+// filtres) -- les deux briques d'accès "calendrier"/"evenements"
+// (access-briques.ts) donnent maintenant accès au même écran fusionné, ni
+// l'une ni l'autre n'est retirée côté permissions pour ne rien changer aux
+// profils déjà configurés. Le bouton "masquer les entraînements" (retour de
+// Cindy du 06/09, même comportement/libellé/icônes que calendar-view.tsx)
+// reste ici plutôt que dans ChildCalendarTab lui-même, partagé avec
+// l'Espace Enfant qui n'a jamais eu ce bouton et n'a pas à en hériter.
+function CalendarSection({
   events,
   teams,
 }: {
@@ -145,7 +148,7 @@ function EventsSection({
           {hideTrainings ? "Entraînements masqués" : "Masquer les entraînements"}
         </button>
       </div>
-      <ChildEventsTab events={visibleEvents} teams={[]} />
+      <ChildCalendarTab events={visibleEvents} teams={[]} />
     </div>
   );
 }
@@ -236,17 +239,19 @@ export function buildProfileSections({
   const teamRefs = teams.map((t) => ({ id: t.id, name: t.name, category: t.category }));
   const sections: AdminSection[] = [];
 
-  // Retour de Cindy du 06/09 ("ajouter le calendrier aussi") : même donnée
-  // que "Événements"/"Matchs & Résultats" (déjà chargée), affichée cette
-  // fois en grille mensuelle plutôt qu'en liste -- ChildCalendarTab est
-  // purement présentatif (voir son propre commentaire), aucun appel
-  // Supabase.
-  if (has("calendrier")) {
+  // Retour de Cindy du 10/09 (fusion Calendrier/Événements) : une seule
+  // entrée de menu "Calendrier" désormais, accessible dès que l'une ou
+  // l'autre des deux briques ("calendrier" OU "evenements") est cochée --
+  // aucun profil déjà configuré ne perd l'accès qu'il avait. Contenu
+  // fusionné dans CalendarSection (filtre équipe + "masquer les
+  // entraînements", qui vivaient jusqu'ici uniquement sur l'ancien onglet
+  // "Événements").
+  if (has("calendrier") || has("evenements")) {
     sections.push({
       key: "calendrier",
       label: "Calendrier",
       icon: <CalendarDays className={iconClass} />,
-      content: <ChildCalendarTab events={events} />,
+      content: <CalendarSection events={events} teams={teamRefs} />,
     });
   }
 
@@ -268,14 +273,9 @@ export function buildProfileSections({
     });
   }
 
-  if (has("evenements")) {
-    sections.push({
-      key: "evenements-club",
-      label: "Événements",
-      icon: <Flag className={iconClass} />,
-      content: <EventsSection events={events} teams={teamRefs} />,
-    });
-  }
+  // Retour de Cindy du 10/09 (fusion Calendrier/Événements) : l'entrée de
+  // menu "Événements" séparée qui vivait ici est retirée -- voir le bloc
+  // "calendrier" plus haut, qui couvre maintenant les deux briques.
 
   if (has("matchs_resultats")) {
     // Retour de Cindy du 06/09 ("le menu 'Matchs & Résultats' avec deux

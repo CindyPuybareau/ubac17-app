@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import {
   CalendarDays,
-  Flag,
   LayoutDashboard,
   ListOrdered,
   LogOut,
@@ -311,6 +310,12 @@ export default function FamilyView({
             carpoolByEventId={carpoolByEventId}
             eventRoles={eventRoles}
             volunteerNeedsByEventId={volunteerNeedsByEventId}
+            // Retour de Cindy du 10/09 (fusion Calendrier/Événements) :
+            // manquait ici alors que "Événements" (retiré plus bas) l'avait
+            // déjà -- une famille avec plusieurs enfants dans des équipes
+            // différentes n'avait aucun filtre par équipe sur son
+            // Calendrier, seulement sur "Événements".
+            resultsTeams={visibleResultsTeams.map((t) => ({ ...t, role: "PLAYER" as const }))}
             celebrateWins
           />
           <SponsorsDisplay sponsors={sponsorDisplay} />
@@ -382,26 +387,11 @@ export default function FamilyView({
         </div>
       ),
     },
-    {
-      // Retour de Cindy du 2026-08-22 : "Événements & Résultats" éclaté en
-      // deux onglets, même découpage que côté Bureau/Coach (calendar-view.tsx)
-      // — "Événements" pour tout le calendrier du club sauf les matchs
-      // officiels, "Matchs & Résultats" pour les matchs officiels et
-      // leurs résultats (bouton interne "Matchs officiels"/"Résultats").
-      key: "events",
-      label: "Événements",
-      icon: <Flag className={iconClass} />,
-      content: (
-        <CalendarView
-          events={visibleEvents}
-          rsvp={{ players: visiblePlayers, statusByKey: rsvpStatusByKey, noteByKey: rsvpNoteByKey }}
-          forcedView="clubEvents"
-          resultsTeams={visibleResultsTeams.map((t) => ({ ...t, role: "PLAYER" as const }))}
-          volunteerNeedsByEventId={volunteerNeedsByEventId}
-          celebrateWins
-        />
-      ),
-    },
+    // Retour de Cindy du 10/09 (fusion Calendrier/Événements) : l'onglet
+    // "Événements" qui vivait ici est retiré -- son filtre par équipe
+    // (resultsTeams) a été reporté sur "Calendrier" ci-dessus, sa carte
+    // d'événement (renderEventCard) était déjà strictement identique à
+    // celle de "Calendrier".
     {
       // Retour de Cindy du 2026-08-22 : "Matchs officiels" / "Résultats"
       // deviennent un vrai sous-menu au lieu d'un bouton interne sur la

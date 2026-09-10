@@ -4,7 +4,6 @@ import {
   BarChart3,
   Cake,
   CalendarDays,
-  Flag,
   ListOrdered,
   LogOut,
   ScrollText,
@@ -23,7 +22,6 @@ import { formatFirstName } from "@/lib/names";
 import { localDateFromParts } from "@/lib/local-date";
 import ChildCalendarTab from "./child-calendar-tab";
 import ChildTeamTab from "./child-team-tab";
-import ChildEventsTab from "./child-events-tab";
 import ChildResultsTab from "./child-results-tab";
 import ChildPresenceTab from "./child-presence-tab";
 import ChildNotificationBell, { type ChildNotification } from "./child-notification-bell";
@@ -205,7 +203,13 @@ export default function ChildDashboard({
             </div>
           )}
 
-          <ChildCalendarTab events={events} teammates={teammates} />
+          <ChildCalendarTab
+            events={events}
+            teammates={teammates}
+            teams={teams}
+            nextEventId={nextEvent?.id ?? null}
+            nextEventAttendance={nextEventAttendance}
+          />
         </div>
       ),
     },
@@ -232,24 +236,11 @@ export default function ChildDashboard({
         </div>
       ),
     },
-    {
-      // Retour de Cindy du 2026-08-22 : "Événements & Résultats" éclaté en
-      // deux onglets, même découpage que côté Bureau/Coach/Parent
-      // (calendar-view.tsx) — "Événements" pour tout le calendrier du
-      // club sauf les matchs officiels, "Matchs & Résultats" pour les
-      // matchs officiels et leurs résultats.
-      key: "events",
-      label: "Événements",
-      icon: <Flag className={iconClass} />,
-      content: (
-        <ChildEventsTab
-          events={events}
-          teams={teams}
-          nextEventId={nextEvent?.id ?? null}
-          nextEventAttendance={nextEventAttendance}
-        />
-      ),
-    },
+    // Retour de Cindy du 10/09 (fusion Calendrier/Événements) : l'onglet
+    // "Événements" qui vivait ici est retiré -- son filtre par équipe et
+    // son résumé de présences (AttendanceSummary sur la prochaine
+    // convocation) ont été reportés sur "Calendrier" ci-dessus, seul
+    // "Événements" les avait jusqu'ici (voir child-calendar-tab.tsx).
     {
       // Retour de Cindy du 2026-08-22 : "Matchs officiels" / "Résultats"
       // deviennent un vrai sous-menu au lieu d'un bouton interne sur la

@@ -28,6 +28,7 @@ import { groupBirthdaysByMonthDay, type BirthdaySource } from "@/app/dashboard/b
 import EmptyState from "@/app/dashboard/empty-state";
 import { parseMatchTitle } from "@/lib/match-display";
 import { formatFirstName } from "@/lib/names";
+import { sortTeamsByGroup, teamLabel } from "@/lib/teams";
 import type { ChildEvent, ChildTeammate } from "./child-dashboard";
 
 // Même grille mensuelle que le calendrier Parent (calendar-view.tsx) —
@@ -89,27 +90,61 @@ const todayKey = toKey(today);
 export default function ChildCalendarTab({
   events,
   teammates = [],
+  // Retour de Cindy du 10/09 (fusion Calendrier/Événements) : le filtre par
+  // équipe qui n'existait jusqu'ici que sur l'onglet "Événements" (retiré,
+  // voir child-events-tab.tsx) -- un enfant qui joue dans deux équipes
+  // voyait tout empilé sans distinction. `teams` optionnel : les tabs ne
+  // s'affichent que s'il y en a plus d'une (même règle que
+  // child-events-tab.tsx).
+  teams = [],
+  // Idem : "Événements" affichait déjà, sur la carte du prochain
+  // rendez-vous, le résumé des présences (AttendanceSummary) -- jamais
+  // reporté ici jusqu'à présent.
+  nextEventId,
+  nextEventAttendance,
 }: {
   events: ChildEvent[];
   teammates?: ChildTeammate[];
+  teams?: { id: string; name: string | null; category: string | null }[];
+  nextEventId?: string | null;
+  nextEventAttendance?: { name: string | null; status: string }[];
 }) {
   const [view, setView] = useState<"month" | "list">("month");
   const [viewMonth, setViewMonth] = useState<Date>(today);
   const [selectedDate, setSelectedDate] = useState<Date>(today);
 
+  const sortedTeams = useMemo(() => sortTeamsByGroup(teams), [teams]);
+  const [activeTeamId, setActiveTeamId] = useState<string | undefined>(undefined);
+  const activeTeamIdResolved = sortedTeams.some((t) => t.id === activeTeamId)
+    ? activeTeamId
+    : sortedTeams[0]?.id;
+
+  // Même filtre que child-events-tab.tsx, mais sans jamais exclure les
+  // matchs officiels : à la différence de l'ancien onglet "Événements",
+  // "Calendrier" a toujours montré tout le calendrier du club, matchs
+  // compris (retour de Cindy du 10/09, confirmé explicitement à la fusion).
+  const filteredEvents = useMemo(() => {
+    return events.filter(
+      (e) =>
+        sortedTeams.length <= 1 ||
+        e.teamId === activeTeamIdResolved ||
+        (activeTeamIdResolved ? (e.targetTeamIds?.includes(activeTeamIdResolved) ?? false) : false)
+    );
+  }, [events, sortedTeams, activeTeamIdResolved]);
+
   // Filtre par type d'événement retiré (retour de Cindy du 2026-08-24,
   // "supprimer ça sur le haut du calendrier ... pas necessaire") : le
-  // calendrier affiche systématiquement tous les événements.
+  // calendrier affiche systématiquement tous les types d'événement.
   const eventsByDate = useMemo(() => {
     const map = new Map<string, ChildEvent[]>();
-    events.forEach((e) => {
+    filteredEvents.forEach((e) => {
       const key = toKey(new Date(e.startTime));
       const list = map.get(key) ?? [];
       list.push(e);
       map.set(key, list);
     });
     return map;
-  }, [events]);
+  }, [filteredEvents]);
 
   const birthdaySources: BirthdaySource[] = useMemo(
     () => teammates.map((t) => ({ id: t.id, firstName: t.firstName, lastName: null, birthDate: t.birthDate })),
@@ -140,15 +175,35 @@ export default function ChildCalendarTab({
   }
 
   const now = Date.now();
-  const upcoming = events
+  const upcoming = filteredEvents
     .filter((e) => new Date(e.startTime).getTime() >= now)
     .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-  const past = events
+  const past = filteredEvents
     .filter((e) => new Date(e.startTime).getTime() < now)
     .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
 
   return (
     <div className="flex flex-col gap-4">
+      {sortedTeams.length > 1 && (
+        <div className="flex flex-wrap gap-2">
+          {sortedTeams.map((t) => {
+            const isActive = activeTeamIdResolved === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setActiveTeamId(t.id)}
+                className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                  isActive
+                    ? "border-navy bg-navy text-white"
+                    : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+                }`}
+              >
+                {teamLabel(t)}
+              </button>
+            );
+          })}
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         {view === "month" ? (
           <div className="flex items-center gap-2">
@@ -310,7 +365,11 @@ export default function ChildCalendarTab({
                 <BirthdayRow key={`bday-${m.id}`} name={m.firstName} />
               ))}
               {detailEvents.map((e) => (
-                <EventRow key={e.id} event={e} />
+                <EventRow
+                  key={e.id}
+                  event={e}
+                  attendance={e.id === nextEventId ? nextEventAttendance : undefined}
+                />
               ))}
             </div>
           )}
@@ -327,7 +386,11 @@ export default function ChildCalendarTab({
               <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">À venir</p>
               <div className="flex flex-col gap-4">
                 {upcoming.map((e) => (
-                  <EventRow key={e.id} event={e} />
+                  <EventRow
+                    key={e.id}
+                    event={e}
+                    attendance={e.id === nextEventId ? nextEventAttendance : undefined}
+                  />
                 ))}
               </div>
             </div>
