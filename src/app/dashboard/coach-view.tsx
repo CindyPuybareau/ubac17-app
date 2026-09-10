@@ -370,23 +370,26 @@ export default function CoachView({
             />
           ),
         },
-      ],
-    },
-    {
-      // Retour de Cindy du 30/08 : même sous-menu "Vie du club" que côté
-      // Bureau (admin-view.tsx), réduit aux quatre entrées qui concernent
-      // aussi un coach (pas Sponsors/Bénévoles, réservés au Bureau).
-      key: "club-life",
-      label: "Vie du club",
-      icon: <Building2 className={iconClass} />,
-      content: null,
-      children: [
         {
+          // Retour de Cindy du 10/09 : déplacé depuis "Vie du club" (en
+          // dernier ici) — même déplacement que côté Bureau (admin-view.tsx).
           key: "ffbb",
           label: "FFBB",
           icon: <RefreshCw className={iconClass} />,
           content: <CoachFfbb teams={teams} teamRoleByTeamId={teamRoleByTeamId} />,
         },
+      ],
+    },
+    {
+      // Retour de Cindy du 30/08 : même sous-menu "Vie du club" que côté
+      // Bureau (admin-view.tsx), réduit aux entrées qui concernent aussi un
+      // coach (pas Sponsors/Bénévoles, réservés au Bureau). FFBB a depuis
+      // rejoint "Matchs & Résultats" (retour de Cindy du 10/09).
+      key: "club-life",
+      label: "Vie du club",
+      icon: <Building2 className={iconClass} />,
+      content: null,
+      children: [
         {
           // Retour de Cindy du 29/08 : "Commissions & Admin" (Bureau,
           // Coachs UBAC, Buvette...) vivait uniquement comme un bloc

@@ -371,6 +371,23 @@ export default function AdminView({
             />
           ),
         },
+        {
+          // Retour de Cindy du 10/09 : déplacé depuis "Vie du club" (en
+          // dernier ici) — les imports FFBB concernent les matchs/résultats
+          // officiels, plus proche de ce sous-menu que des outils annexes
+          // (Sponsors/Commissions/WhatsApp/Documents).
+          key: "ffbb",
+          label: "FFBB",
+          icon: <RefreshCw className={iconClass} />,
+          content: (
+            <div className="flex flex-col gap-4">
+              <FfbbManager teams={teams} />
+              <ImportInscriptions />
+              <ImportPlanning existingTeams={teamRefs} />
+              <ImportCoaches existingTeams={teamRefs} />
+            </div>
+          ),
+        },
       ],
     },
     {
@@ -419,21 +436,9 @@ export default function AdminView({
           ),
         },
         {
-          key: "ffbb",
-          label: "FFBB",
-          icon: <RefreshCw className={iconClass} />,
-          content: (
-            <div className="flex flex-col gap-4">
-              <FfbbManager teams={teams} />
-              <ImportInscriptions />
-              <ImportPlanning existingTeams={teamRefs} />
-              <ImportCoaches existingTeams={teamRefs} />
-            </div>
-          ),
-        },
-        {
           // Retour de Cindy du 2026-08-22 : renommé et déplacé après FFBB
-          // (était juste après "Événements et Résultats").
+          // (était juste après "Événements et Résultats"). FFBB lui-même a
+          // depuis rejoint "Matchs & Résultats" (retour de Cindy du 10/09).
           key: "whatsapp",
           label: "Groupes WhatsApp",
           icon: <MessageCircle className={iconClass} />,
