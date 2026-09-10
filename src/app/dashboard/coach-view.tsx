@@ -54,6 +54,7 @@ export default function CoachView({
   rsvpPlayers,
   rsvpStatusByKey,
   rsvpReasonByKey,
+  rsvpNoteByKey,
   taskTallyByTeamId,
   teamRoleByTeamId,
   clubTeams,
@@ -80,6 +81,9 @@ export default function CoachView({
   rsvpStatusByKey: Record<string, string>;
   // Motif d'absence saisi par la famille, affiché sur les cartes.
   rsvpReasonByKey: Record<string, string | null>;
+  // Retour de Cindy du 10/09 ("ce que j'apporte") : même principe, côté
+  // Présent -- voir attendance-badges.tsx.
+  rsvpNoteByKey: Record<string, string | null>;
   taskTallyByTeamId: Record<string, SeasonTaskTally>;
   // "COACH" for a team they coach, "PLAYER" for one they only play in —
   // drives both the team selector's badge and the read-only mode.
@@ -166,7 +170,7 @@ export default function CoachView({
             events={events}
             createTeams={createTeams}
             benevoles={benevoles}
-            rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
+            rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey, noteByKey: rsvpNoteByKey }}
             contactEmailByPlayerId={contactEmailByPlayerId}
             birthdayMembers={birthdayMembers}
             // Toutes ses équipes, y compris celle où il n'est que joueur :
@@ -251,6 +255,7 @@ export default function CoachView({
               taskTallyByTeamId={taskTallyByTeamId}
               rsvpStatusByKey={rsvpStatusByKey}
               rsvpReasonByKey={rsvpReasonByKey}
+              rsvpNoteByKey={rsvpNoteByKey}
               roles={eventRoles}
               ownPlayerId={ownPlayerId}
               forcedTab="planning"
@@ -271,6 +276,7 @@ export default function CoachView({
               taskTallyByTeamId={taskTallyByTeamId}
               rsvpStatusByKey={rsvpStatusByKey}
               rsvpReasonByKey={rsvpReasonByKey}
+              rsvpNoteByKey={rsvpNoteByKey}
               roles={eventRoles}
               ownPlayerId={ownPlayerId}
               forcedTab="bilan"
@@ -293,7 +299,7 @@ export default function CoachView({
           events={events}
           createTeams={createTeams}
           benevoles={benevoles}
-          rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
+          rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey, noteByKey: rsvpNoteByKey }}
           scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
           scopeTeamRoleById={teamRoleByTeamId}
           forcedView="clubEvents"
@@ -333,7 +339,7 @@ export default function CoachView({
               events={events}
               createTeams={createTeams}
               benevoles={benevoles}
-              rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
+              rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey, noteByKey: rsvpNoteByKey }}
               scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
               scopeTeamRoleById={teamRoleByTeamId}
               forcedView="officialMatches"
@@ -353,7 +359,7 @@ export default function CoachView({
               events={events}
               createTeams={createTeams}
               benevoles={benevoles}
-              rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
+              rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey, noteByKey: rsvpNoteByKey }}
               scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
               scopeTeamRoleById={teamRoleByTeamId}
               forcedView="officialResults"

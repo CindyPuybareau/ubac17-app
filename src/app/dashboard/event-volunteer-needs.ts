@@ -71,14 +71,6 @@ export type VolunteerNeed = {
   customLabel: string | null;
   requiredCount: number;
   signups: VolunteerSignup[];
-  // Retour de Cindy du 10/09 : quelle(s) commission(s) ce besoin concerne
-  // (voir whatsapp_groups.category='COMMISSION') -- [] = pas encore
-  // rattaché, comportement historique inchangé, n'apparaît sur aucune page
-  // de commission. Plusieurs possibles (ex. table de marque : Coachs ET
-  // Team Communication), retour de Cindy du 10/09 (suite) : "remplace ou
-  // complète... par un sélecteur Commissions concernées" avec "sélection
-  // multiple possible".
-  commissionGroupIds: string[];
 };
 
 export async function getVolunteerNeedsByEventId(
@@ -111,7 +103,7 @@ export async function getVolunteerNeedsByEventId(
     (chunk) =>
       supabase
         .from("event_volunteer_needs")
-        .select("id, event_id, role_code, custom_label, required_count, sort_order, commission_group_ids")
+        .select("id, event_id, role_code, custom_label, required_count, sort_order")
         .in("event_id", chunk)
         .order("sort_order", { ascending: true }),
     dbLimit ?? 4
@@ -220,7 +212,6 @@ export async function getVolunteerNeedsByEventId(
       customLabel: (row.custom_label as string | null) ?? null,
       requiredCount: (row.required_count as number | null) ?? 1,
       signups: signupsByNeedId.get(row.id as string) ?? [],
-      commissionGroupIds: (row.commission_group_ids as string[] | null) ?? [],
     });
   });
 

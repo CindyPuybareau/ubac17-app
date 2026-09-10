@@ -5,7 +5,6 @@ import { Check, Minus, Plus, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import RoleIcon from "./role-icon";
 import ConfirmDialog from "./confirm-dialog";
-import CommissionMultiSelect from "./commission-multi-select";
 import {
   CUSTOM_ROLE_CODE,
   STANDARD_VOLUNTEER_ROLES,
@@ -31,7 +30,6 @@ export default function VolunteerNeedsPanel({
   myPlayerIds,
   canManage,
   bare = false,
-  commissionGroups = [],
 }: {
   eventId: string;
   needs: VolunteerNeed[];
@@ -41,13 +39,6 @@ export default function VolunteerNeedsPanel({
   // panneau et MatchTasksPanel sous un seul titre "Organisation" partagé
   // (retour de Cindy du 2026-08-20).
   bare?: boolean;
-  // Retour de Cindy du 10/09 ("Accès Commissions & Administration") :
-  // quelle commission ce besoin concerne, pour qu'il apparaisse sur la
-  // page publique de cette commission (voir /commission/[token]). Défaut
-  // [] : le sélecteur ne s'affiche simplement pas -- comportement
-  // historique inchangé pour les appelants qui ne le passent pas encore
-  // (cartes résumé du tableau de bord).
-  commissionGroups?: { id: string; name: string }[];
 }) {
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +47,6 @@ export default function VolunteerNeedsPanel({
   const [newRoleCode, setNewRoleCode] = useState(STANDARD_VOLUNTEER_ROLES[0].code);
   const [newCustomLabel, setNewCustomLabel] = useState("");
   const [newCount, setNewCount] = useState("1");
-  const [newCommissionGroupIds, setNewCommissionGroupIds] = useState<string[]>([]);
 
   // Copie locale affichée immédiatement au clic, plutôt que d'attendre le
   // rafraîchissement temps réel (débounce ~0,8s + un aller-retour serveur
@@ -221,7 +211,6 @@ export default function VolunteerNeedsPanel({
         custom_label: newRoleCode === CUSTOM_ROLE_CODE ? trimmedCustom : null,
         required_count: count,
         sort_order: localNeeds.length,
-        commission_group_ids: newCommissionGroupIds,
       })
       .select("id")
       .single();
@@ -242,13 +231,11 @@ export default function VolunteerNeedsPanel({
         customLabel: newRoleCode === CUSTOM_ROLE_CODE ? trimmedCustom : null,
         requiredCount: count,
         signups: [],
-        commissionGroupIds: newCommissionGroupIds,
       },
     ]);
     setNewRoleCode(STANDARD_VOLUNTEER_ROLES[0].code);
     setNewCustomLabel("");
     setNewCount("1");
-    setNewCommissionGroupIds([]);
     setAddOpen(false);
   }
 
@@ -440,17 +427,6 @@ export default function VolunteerNeedsPanel({
                     className="w-14 rounded-lg border border-zinc-200 px-2 py-1 text-center"
                   />
                 </label>
-                {/* Retour de Cindy du 10/09 (suite) : "Commissions
-                    concernées", sélection multiple -- un besoin doit
-                    pouvoir remonter sur plusieurs pages de commission à la
-                    fois (ex. table de marque : Coachs ET Team
-                    Communication). Optionnel (aucune sélectionnée), comme
-                    avant que cette fonctionnalité n'existe. */}
-                <CommissionMultiSelect
-                  commissions={commissionGroups}
-                  selectedIds={newCommissionGroupIds}
-                  onChange={setNewCommissionGroupIds}
-                />
               </div>
               <div className="flex items-center gap-2">
                 <button

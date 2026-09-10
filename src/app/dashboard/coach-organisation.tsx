@@ -80,6 +80,7 @@ function PlanningTab({
   upcomingEvents,
   rsvpStatusByKey,
   rsvpReasonByKey,
+  rsvpNoteByKey,
   roles,
   ownPlayerId,
 }: {
@@ -90,6 +91,7 @@ function PlanningTab({
   upcomingEvents: AdminUpcomingEvent[];
   rsvpStatusByKey: Record<string, string>;
   rsvpReasonByKey: Record<string, string | null>;
+  rsvpNoteByKey: Record<string, string | null>;
   roles: EventRoleType[];
   ownPlayerId: string | null;
 }) {
@@ -133,6 +135,7 @@ function PlanningTab({
           volunteerNeeds={item.card.event ? (volunteerNeedsByEventId[item.card.event.id] ?? []) : []}
           rsvpStatusByKey={rsvpStatusByKey}
           rsvpReasonByKey={rsvpReasonByKey}
+          rsvpNoteByKey={rsvpNoteByKey}
           roles={roles}
           // Ce coach est-il lui-même sur CETTE équipe précise ? (il peut
           // coacher plusieurs équipes sans jouer dans toutes.)
@@ -428,6 +431,7 @@ export default function CoachOrganisation({
   taskTallyByTeamId,
   rsvpStatusByKey,
   rsvpReasonByKey,
+  rsvpNoteByKey,
   roles,
   ownPlayerId = null,
   forcedTab,
@@ -440,6 +444,7 @@ export default function CoachOrganisation({
   taskTallyByTeamId: Record<string, SeasonTaskTally>;
   rsvpStatusByKey: Record<string, string>;
   rsvpReasonByKey: Record<string, string | null>;
+  rsvpNoteByKey: Record<string, string | null>;
   roles: EventRoleType[];
   // La propre fiche joueur du coach (coach qui joue aussi) — permet à
   // MatchTasksPanel de le reconnaître sur ses propres matchs coachés, où
@@ -535,6 +540,7 @@ export default function CoachOrganisation({
           upcomingEvents={visibleUpcomingEvents}
           rsvpStatusByKey={rsvpStatusByKey}
           rsvpReasonByKey={rsvpReasonByKey}
+          rsvpNoteByKey={rsvpNoteByKey}
           roles={roles}
           ownPlayerId={ownPlayerId}
         />

@@ -31,7 +31,13 @@ const DAY_LETTERS = ["L", "M", "M", "J", "V", "S", "D"];
 
 // Un enfant concerné par l'événement, avec sa réponse RSVP actuelle — le
 // bandeau reçoit tout déjà calculé (page.tsx), il n'a plus qu'à afficher.
-export type WeekStripRsvpPlayer = { id: string; name: string; status: string };
+export type WeekStripRsvpPlayer = {
+  id: string;
+  name: string;
+  status: string;
+  // Retour de Cindy du 10/09 ("ce que j'apporte") : voir rsvp-control.tsx.
+  note?: string | null;
+};
 
 export type WeekStripEvent = {
   id: string;
@@ -196,6 +202,8 @@ function DayEventCard({ event }: { event: WeekStripEvent }) {
               playerId={p.id}
               playerName={event.rsvpPlayers.length > 1 ? p.name : undefined}
               currentStatus={p.status}
+              hasOrganisationNeeds={hasNeeds}
+              currentNote={p.note}
             />
           ))}
         </div>

@@ -92,9 +92,9 @@ export default function CreateEventForm({
   // commentaire sur la section "Bénévoles invités" plus bas.
   benevoles?: AdminBenevole[];
   // Retour de Cindy du 10/09 ("Accès Commissions & Administration", puis
-  // "il manque la possibilité de cibler une ou plusieurs commissions") :
-  // transmis à CommissionMultiSelect pour chaque besoin d'organisation
-  // (voir draftNeeds plus bas) — même liste que VolunteerNeedsPanel.
+  // "un seul choix pour l'événement entier") : transmis à
+  // CommissionMultiSelect, un seul sélecteur pour tout l'événement (voir
+  // commissionGroupIds plus bas) — même liste que VolunteerNeedsPanel.
   commissionGroups?: { id: string; name: string }[];
   // Retour de Cindy du 10/09 ("recharge et affiche correctement les
   // besoins d'organisation existants") : les besoins déjà en base pour
@@ -203,13 +203,6 @@ export default function CreateEventForm({
       roleCode: string;
       customLabel: string;
       count: string;
-      // Retour de Cindy du 10/09 ("Créer un événement... il manque la
-      // possibilité de cibler une ou plusieurs commissions") : même champ
-      // que VolunteerNeedsPanel (volunteer-needs-panel.tsx), pour que les
-      // besoins créés dès ce formulaire remontent eux aussi sur la page
-      // publique des commissions concernées, pas seulement ceux ajoutés
-      // après coup sur un événement déjà créé.
-      commissionGroupIds: string[];
     }[]
   >(() =>
     existingNeeds.map((n) => ({
@@ -218,8 +211,18 @@ export default function CreateEventForm({
       roleCode: n.roleCode,
       customLabel: n.customLabel ?? "",
       count: String(n.requiredCount),
-      commissionGroupIds: n.commissionGroupIds,
     }))
+  );
+  // Retour de Cindy du 10/09 ("l'onglet commission apparaît à chaque
+  // besoin créé, pas la peine, les groupes commissions concernés seront
+  // informés de tous les besoins créés") : un seul choix pour l'événement
+  // ENTIER (pas par besoin) -- tous les besoins d'organisation de cet
+  // événement, quel que soit le moment où ils sont ajoutés (ici ou depuis
+  // VolunteerNeedsPanel sur la carte), remontent sur la page publique de
+  // CES commissions. Porté par events.commission_group_ids, plus du tout
+  // par event_volunteer_needs.
+  const [commissionGroupIds, setCommissionGroupIds] = useState<string[]>(
+    () => editingEvent?.commissionGroupIds ?? []
   );
   // Bénévoles invités à cet événement (retour de Cindy du 2026-08-25) :
   // contrairement à draftNeeds, modifiable en édition comme à la création —
@@ -273,7 +276,6 @@ export default function CreateEventForm({
         roleCode: STANDARD_VOLUNTEER_ROLES[0].code,
         customLabel: "",
         count: "1",
-        commissionGroupIds: [],
       },
     ]);
   }
@@ -284,7 +286,7 @@ export default function CreateEventForm({
 
   function updateDraftNeed(
     key: string,
-    patch: Partial<{ roleCode: string; customLabel: string; count: string; commissionGroupIds: string[] }>
+    patch: Partial<{ roleCode: string; customLabel: string; count: string }>
   ) {
     setDraftNeeds((rows) => rows.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   }
@@ -376,6 +378,7 @@ export default function CreateEventForm({
       notes: string | null;
       team_id?: string | null;
       target_team_ids?: string[] | null;
+      commission_group_ids: string[];
     } = {
       title: eventName,
       event_type: eventType,
@@ -385,6 +388,12 @@ export default function CreateEventForm({
       start_time: new Date(startTime).toISOString(),
       end_time: endTime ? new Date(`${startTime.slice(0, 10)}T${endTime}`).toISOString() : null,
       notes: notes || null,
+      // Retour de Cindy du 10/09 : un seul choix pour l'événement entier
+      // (voir commissionGroupIds plus haut) -- toujours envoyé, en création
+      // comme en édition, aucune restriction par rôle contrairement à
+      // team_id/target_team_ids plus bas (ça ne change jamais la portée de
+      // l'événement, juste qui est informé des besoins d'organisation).
+      commission_group_ids: commissionGroupIds,
     };
     // La portée club-wide/équipes spécifiques n'est modifiable que par qui
     // peut créer un événement club (allowClubWide) — un coach n'a même pas
@@ -619,6 +628,7 @@ export default function CreateEventForm({
         teamId: inserted.team_id,
         targetTeamIds: inserted.target_team_ids,
         teamName,
+        commissionGroupIds,
         benevoleIds: selectedBenevoleIds,
         benevoleInvites: optimisticBenevoleInvites,
       });
@@ -645,6 +655,7 @@ export default function CreateEventForm({
           teamId: inserted.team_id,
           targetTeamIds: inserted.target_team_ids,
           teamName,
+          commissionGroupIds,
           rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
           benevoleIds: selectedBenevoleIds,
           benevoleInvites: optimisticBenevoleInvites,
@@ -670,7 +681,6 @@ export default function CreateEventForm({
         customLabel: n.roleCode === CUSTOM_ROLE_CODE ? n.customLabel.trim() : null,
         count: Number(n.count) || 0,
         sortOrder: i,
-        commissionGroupIds: n.commissionGroupIds,
       }))
       .filter((n) => n.count > 0);
     const needsToInsert = validDraftNeeds.filter((n) => n.id === null);
@@ -678,8 +688,8 @@ export default function CreateEventForm({
     const needsToDelete = existingNeeds
       .map((n) => n.id)
       .filter((id) => !validDraftNeedIds.has(id));
-    // Une ligne existante changée (rôle/nom/effectif/commissions/ordre) —
-    // comparaison simple champ à champ, jamais réécrite si rien n'a changé.
+    // Une ligne existante changée (rôle/nom/effectif/ordre) — comparaison
+    // simple champ à champ, jamais réécrite si rien n'a changé.
     const needsToUpdate = validDraftNeeds.filter((n) => {
       if (n.id === null) return false;
       const original = existingNeeds.find((e) => e.id === n.id);
@@ -687,8 +697,7 @@ export default function CreateEventForm({
       return (
         original.roleCode !== n.roleCode ||
         (original.customLabel ?? "") !== (n.customLabel ?? "") ||
-        original.requiredCount !== n.count ||
-        [...original.commissionGroupIds].sort().join(",") !== [...n.commissionGroupIds].sort().join(",")
+        original.requiredCount !== n.count
       );
     });
 
@@ -712,7 +721,6 @@ export default function CreateEventForm({
           custom_label: n.customLabel,
           required_count: n.count,
           sort_order: n.sortOrder,
-          commission_group_ids: n.commissionGroupIds,
         })
         .eq("id", n.id);
       if (updateNeedError) {
@@ -730,7 +738,6 @@ export default function CreateEventForm({
           custom_label: n.customLabel,
           required_count: n.count,
           sort_order: n.sortOrder,
-          commission_group_ids: n.commissionGroupIds,
         }))
       );
       if (needsError) {
@@ -1062,9 +1069,21 @@ export default function CreateEventForm({
           maintenant pré-rempli avec les besoins déjà en base en édition
           (existingNeeds), modifiables/supprimables ici comme sur la carte. */}
       <div className="flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3">
-          <p className="text-xs font-medium text-zinc-600">
-            Besoins d&apos;organisation (optionnel)
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-medium text-zinc-600">
+              Besoins d&apos;organisation (optionnel)
+            </p>
+            {/* Retour de Cindy du 10/09 (suite) : "l'onglet commission
+                apparaît à chaque besoin créé, pas la peine, les groupes
+                commissions concernés seront informés de tous les besoins
+                créés" -- un seul choix pour l'événement entier, plus par
+                besoin (voir commissionGroupIds plus haut). */}
+            <CommissionMultiSelect
+              commissions={commissionGroups}
+              selectedIds={commissionGroupIds}
+              onChange={setCommissionGroupIds}
+            />
+          </div>
           {draftNeeds.length > 0 && (
             <div className="flex flex-col gap-1.5">
               {draftNeeds.map((n) => (
@@ -1101,14 +1120,6 @@ export default function CreateEventForm({
                       className="w-14 shrink-0 rounded-lg border border-zinc-200 px-2 py-1 text-center"
                     />
                   </label>
-                  {/* Retour de Cindy du 10/09 : "Commissions concernées" par
-                      besoin, dès la création — sinon ce besoin n'apparaît
-                      jamais sur aucune page publique de commission. */}
-                  <CommissionMultiSelect
-                    commissions={commissionGroups}
-                    selectedIds={n.commissionGroupIds}
-                    onChange={(ids) => updateDraftNeed(n.key, { commissionGroupIds: ids })}
-                  />
                   <button
                     type="button"
                     onClick={() => removeDraftNeed(n.key)}

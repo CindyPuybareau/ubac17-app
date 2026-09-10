@@ -43,18 +43,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Lien invalide." }, { status: 401 });
   }
 
-  // Le besoin doit réellement concerner CETTE commission -- jamais se fier
-  // à ce qu'envoie le client seul (même garde-fou que /api/benevole-signup
-  // pour l'invitation à un événement).
+  // Le besoin doit appartenir à un événement réellement rattaché à CETTE
+  // commission (retour de Cindy du 10/09 : un seul choix pour l'événement
+  // entier, plus par besoin) -- jamais se fier à ce qu'envoie le client
+  // seul (même garde-fou que /api/benevole-signup pour l'invitation à un
+  // événement).
   const { data: needRow } = await supabase
     .from("event_volunteer_needs")
-    .select("id, commission_group_ids, events(start_time)")
+    .select("id, events(start_time, commission_group_ids)")
     .eq("id", needId)
     .maybeSingle();
-  if (!needRow || !(needRow.commission_group_ids as string[]).includes(group.id)) {
+  const needEvent = needRow?.events as unknown as { start_time: string; commission_group_ids: string[] } | null;
+  if (!needRow || !needEvent || !needEvent.commission_group_ids.includes(group.id)) {
     return NextResponse.json({ error: "Besoin introuvable pour cette commission." }, { status: 404 });
   }
-  const eventStartTime = (needRow.events as unknown as { start_time: string } | null)?.start_time;
+  const eventStartTime = needEvent.start_time;
   if (eventStartTime && new Date(eventStartTime).getTime() < Date.now()) {
     return NextResponse.json({ error: "Cet événement est déjà passé." }, { status: 400 });
   }

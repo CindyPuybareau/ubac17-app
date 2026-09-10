@@ -11,11 +11,15 @@ import {
   SEGMENT_PRESENT_ON,
 } from "./rsvp-segment";
 
+const CONTRIBUTION_NOTE_MAX_LENGTH = 120;
+
 export default function RsvpButtons({
   eventId,
   playerId,
   currentStatus,
   onStatusChange,
+  hasOrganisationNeeds = false,
+  currentNote = null,
 }: {
   eventId: string;
   playerId: string;
@@ -28,10 +32,20 @@ export default function RsvpButtons({
   // fois pour le changement optimiste, une seconde fois (arguments inversés)
   // si l'écriture échoue et que le rollback ci-dessous s'applique.
   onStatusChange?: (previousStatus: string, newStatus: string) => void;
+  // Retour de Cindy du 10/09 ("ce que j'apporte") : le champ ne s'affiche
+  // que si CET événement a au moins un besoin d'organisation — calculé par
+  // l'appelant (déjà en possession de volunteerNeedsByEventId), jamais
+  // recalculé ici.
+  hasOrganisationNeeds?: boolean;
+  // Valeur déjà en base (rsvps.contribution_note) — modifiable tant qu'on
+  // est Présent, pas seulement au moment du clic initial.
+  currentNote?: string | null;
 }) {
   const [status, setStatus] = useState(currentStatus);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState(currentNote ?? "");
+  const [noteSaved, setNoteSaved] = useState(true);
 
   // La carte qui affiche ce bouton (NextConvocationCard) n'est pas
   // remontée quand "le prochain événement" change (même clé React) — un
@@ -43,7 +57,9 @@ export default function RsvpButtons({
   useEffect(() => {
     setStatus(currentStatus);
     setError(null);
-  }, [eventId, currentStatus]);
+    setNote(currentNote ?? "");
+    setNoteSaved(true);
+  }, [eventId, currentStatus, currentNote]);
 
   async function respond(newStatus: "PRESENT" | "ABSENT") {
     // Affichage optimiste (retour de Cindy du 28/08, "l'affichage au clic
@@ -87,6 +103,28 @@ export default function RsvpButtons({
     // une deuxième fois pour un seul clic, ressenti comme un délai (retour
     // de Cindy du 2026-08-20). Le temps réel se charge de répercuter le
     // changement sur le reste de la page (compteurs...).
+  }
+
+  // Retour de Cindy du 10/09 ("ce que j'apporte") : sauvegardé au blur du
+  // champ, pas à chaque frappe -- un upsert avec status: "PRESENT" explicite
+  // (jamais `status` en dépendance) : ce champ n'est de toute façon visible
+  // que dans cet état, et ça garantit la ligne même si la frappe est plus
+  // rapide que l'écriture du clic "Présent" juste avant.
+  async function saveNote() {
+    const trimmed = note.trim();
+    if (trimmed === (currentNote ?? "").trim()) return;
+    setNoteSaved(false);
+    const supabase = createClient();
+    const { error: writeError } = await supabase
+      .from("rsvps")
+      .upsert(
+        { event_id: eventId, player_id: playerId, status: "PRESENT", contribution_note: trimmed || null },
+        { onConflict: "event_id,player_id" }
+      );
+    setNoteSaved(true);
+    if (writeError) {
+      setError(writeError.message);
+    }
   }
 
   // Retour de Cindy du 06/09 ("on se doit de pouvoir revenir en arrière") :
@@ -151,7 +189,23 @@ export default function RsvpButtons({
           </button>
         )}
       </div>
+      {/* Retour de Cindy du 10/09 ("ce que j'apporte") : seulement si
+          l'événement a un besoin d'organisation ET qu'on est Présent —
+          jamais sur un Absent/En attente (voir la contrainte
+          hasOrganisationNeeds, calculée par l'appelant). */}
+      {status === "PRESENT" && hasOrganisationNeeds && (
+        <input
+          type="text"
+          value={note}
+          onChange={(e) => setNote(e.target.value.slice(0, CONTRIBUTION_NOTE_MAX_LENGTH))}
+          onBlur={saveNote}
+          maxLength={CONTRIBUTION_NOTE_MAX_LENGTH}
+          placeholder="Ce que j'apporte (optionnel)"
+          className="rounded-full border border-zinc-200 px-2.5 py-1 text-[11px] text-zinc-700 placeholder:text-zinc-400"
+        />
+      )}
       {error && <p className="text-[11px] text-red-600">Réponse non enregistrée : {error}</p>}
+      {!noteSaved && <p className="text-[11px] text-zinc-400">Enregistrement...</p>}
     </div>
   );
 }

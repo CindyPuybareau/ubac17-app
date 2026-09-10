@@ -32,6 +32,7 @@ export default function NextConvocationCard({
   carpool,
   roles,
   volunteerNeeds = [],
+  contributionNote = null,
 }: {
   playerName: string;
   playerId: string;
@@ -42,6 +43,8 @@ export default function NextConvocationCard({
   carpool: CarpoolOffer[];
   roles: EventRoleType[];
   volunteerNeeds?: VolunteerNeed[];
+  // Retour de Cindy du 10/09 ("ce que j'apporte") : voir rsvp-buttons.tsx.
+  contributionNote?: string | null;
 }) {
   // Même différenciation que calendar-view.tsx/coach-next-match-card.tsx
   // (retour de Cindy du 2026-08-24, item 6 du topo), adaptée au fond déjà
@@ -101,6 +104,8 @@ export default function NextConvocationCard({
           eventId={event.id}
           playerId={playerId}
           currentStatus={status}
+          hasOrganisationNeeds={volunteerNeeds.length > 0}
+          currentNote={contributionNote}
         />
       </div>
       <NextMatchActions venue={venueQuery(event)} />

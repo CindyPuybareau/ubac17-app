@@ -455,6 +455,11 @@ export type AdminUpcomingEvent = {
   // groupes". Sert à préremplir le sélecteur de portée en édition et à
   // afficher un badge "Équipes ciblées" au lieu de "Tous les groupes".
   targetTeamIds: string[] | null;
+  // Retour de Cindy du 10/09 ("un seul choix pour l'événement entier") :
+  // quelle(s) commission(s) voient TOUS les besoins d'organisation de cet
+  // événement sur leur page publique (/commission/[token]) -- porté par
+  // events.commission_group_ids, plus par besoin.
+  commissionGroupIds: string[];
   teamName: string;
   rsvpCounts: {
     present: number;
@@ -466,7 +471,13 @@ export type AdminUpcomingEvent = {
   // sera là ?" de la carte d'événement. Retour de Cindy du 30/08 : visible
   // sur les 3 espaces (Bureau/Coach/Famille, voir buildPresentPlayers) —
   // avant cette date, seul le bloc Famille le renseignait.
-  presentPlayers?: { id: string; firstName: string | null; lastName: string | null }[];
+  presentPlayers?: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    // Retour de Cindy du 10/09 ("ce que j'apporte") : voir buildPresentPlayers.
+    note: string | null;
+  }[];
   // Bénévoles déjà invités à cet événement (retour de Cindy du 2026-08-25)
   // — préremplit la case "Bénévoles invités" en édition, voir
   // create-event-form.tsx. Bureau et Coach depuis le 06/09 : [] côté
@@ -657,20 +668,26 @@ function findNextEventIdByTeamId(
 // appelle buildRsvpCounts/buildPresentPlayers avec l'effectif de
 // l'événement concerné — c'est cet effectif, pas la requête, qui fait la
 // différence de prudence entre espaces.
+// Retour de Cindy du 10/09 ("ce que j'apporte") : la valeur par joueur
+// porte désormais aussi contribution_note, à côté du statut -- un seul
+// endroit à corriger si un jour un troisième champ s'y ajoute, plutôt
+// qu'une deuxième Map parallèle à garder synchronisée avec celle-ci.
+type RsvpEntry = { status: string | null; note: string | null };
+
 function buildRsvpStatusByEvent(
-  rows: { event_id: string; player_id: string; status: string | null }[]
-): Map<string, Map<string, string | null>> {
-  const map = new Map<string, Map<string, string | null>>();
+  rows: { event_id: string; player_id: string; status: string | null; contribution_note?: string | null }[]
+): Map<string, Map<string, RsvpEntry>> {
+  const map = new Map<string, Map<string, RsvpEntry>>();
   rows.forEach((r) => {
-    const byPlayer = map.get(r.event_id) ?? new Map<string, string | null>();
-    byPlayer.set(r.player_id, r.status);
+    const byPlayer = map.get(r.event_id) ?? new Map<string, RsvpEntry>();
+    byPlayer.set(r.player_id, { status: r.status, note: r.contribution_note ?? null });
     map.set(r.event_id, byPlayer);
   });
   return map;
 }
 
 function buildRsvpCounts(
-  statusByEvent: Map<string, Map<string, string | null>>,
+  statusByEvent: Map<string, Map<string, RsvpEntry>>,
   eventId: string,
   roster: { id: string }[]
 ) {
@@ -680,7 +697,7 @@ function buildRsvpCounts(
   let late = 0;
   let answered = 0;
   roster.forEach((p) => {
-    const status = statuses?.get(p.id);
+    const status = statuses?.get(p.id)?.status;
     if (!status) return;
     answered += 1;
     if (status === "PRESENT") present += 1;
@@ -696,15 +713,22 @@ function buildRsvpCounts(
 }
 
 function buildPresentPlayers(
-  statusByEvent: Map<string, Map<string, string | null>>,
+  statusByEvent: Map<string, Map<string, RsvpEntry>>,
   eventId: string,
   roster: { id: string; first_name: string | null; last_name: string | null }[]
 ) {
   const statuses = statusByEvent.get(eventId);
   if (!statuses) return [];
   return roster
-    .filter((p) => statuses.get(p.id) === "PRESENT")
-    .map((p) => ({ id: p.id, firstName: p.first_name, lastName: p.last_name }));
+    .filter((p) => statuses.get(p.id)?.status === "PRESENT")
+    .map((p) => ({
+      id: p.id,
+      firstName: p.first_name,
+      lastName: p.last_name,
+      // Retour de Cindy du 10/09 ("ce que j'apporte") : affiché sur "Qui
+      // sera là ?" (calendar-view.tsx), visible Bureau/Coach/Famille.
+      note: statuses.get(p.id)?.note ?? null,
+    }));
 }
 
 async function fetchRsvpsByEvent(
@@ -712,7 +736,7 @@ async function fetchRsvpsByEvent(
   eventIds: string[],
   dbLimit: Semaphore
 ) {
-  if (eventIds.length === 0) return new Map<string, Map<string, string | null>>();
+  if (eventIds.length === 0) return new Map<string, Map<string, RsvpEntry>>();
 
   // Un .in("event_id", eventIds) direct posait problème dès que eventIds
   // couvrait tout l'historique du club (872 événements le 30/08) : URL
@@ -739,7 +763,11 @@ async function fetchRsvpsByEvent(
   const { data: rsvpRows, errors } = await chunkedQuery(
     eventIds,
     150,
-    (chunk) => supabase.from("rsvps").select("event_id, player_id, status").in("event_id", chunk),
+    (chunk) =>
+      supabase
+        .from("rsvps")
+        .select("event_id, player_id, status, contribution_note")
+        .in("event_id", chunk),
     dbLimit
   );
   errors.forEach((error) => console.error("[fetchRsvpsByEvent] select rsvps failed (tranche):", error));
@@ -1488,7 +1516,7 @@ export default async function DashboardPage({
           supabase
             .from("events")
             .select(
-              "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
+              "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
             )
             .neq("event_type", "TRAINING")
             .gte("start_time", eventsWindowStart)
@@ -1501,7 +1529,7 @@ export default async function DashboardPage({
           supabase
             .from("events")
             .select(
-              "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
+              "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
             )
             .eq("event_type", "TRAINING")
             .gte("start_time", trainingsWindowStart)
@@ -2192,6 +2220,7 @@ export default async function DashboardPage({
         paidParticipants: paidInfo.paidParticipants,
         teamId: team?.id ?? null,
         targetTeamIds: e.target_team_ids ?? null,
+        commissionGroupIds: e.commission_group_ids ?? [],
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, teamsById),
         rsvpCounts: buildRsvpCounts(rsvpsByEvent, e.id, eventRoster),
         // Retour de Cindy du 30/08 : "qui sera présent" visible partout, pas
@@ -2241,6 +2270,9 @@ export default async function DashboardPage({
   const coachRsvpStatusByKey: Record<string, string> = {};
   // Motif d'absence saisi par la famille, affiché sur la carte du coach.
   const coachRsvpReasonByKey: Record<string, string | null> = {};
+  // Retour de Cindy du 10/09 ("ce que j'apporte") : même principe, côté
+  // Présent -- voir attendance-badges.tsx.
+  const coachRsvpNoteByKey: Record<string, string | null> = {};
 
   const coachPromise = (async () => {
   if (coachDataActive) {
@@ -2345,7 +2377,7 @@ export default async function DashboardPage({
           supabase
             .from("events")
             .select(
-              "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
+              "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
             )
             .or(teamOrClubWideFilter(coachedTeamIds))
             .neq("event_type", "TRAINING")
@@ -2356,7 +2388,7 @@ export default async function DashboardPage({
           supabase
             .from("events")
             .select(
-              "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
+              "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
             )
             .or(teamOrClubWideFilter(coachedTeamIds))
             .eq("event_type", "TRAINING")
@@ -2633,7 +2665,7 @@ export default async function DashboardPage({
       coachEventIds.length > 0
         ? supabase
             .from("rsvps")
-            .select("event_id, player_id, status, reason")
+            .select("event_id, player_id, status, reason, contribution_note")
             .in("event_id", coachEventIds)
         : Promise.resolve({
             data: [] as {
@@ -2641,6 +2673,7 @@ export default async function DashboardPage({
               player_id: string;
               status: string;
               reason: string | null;
+              contribution_note: string | null;
             }[],
             error: null,
           });
@@ -2955,6 +2988,7 @@ export default async function DashboardPage({
     (coachRsvpRows ?? []).forEach((r) => {
       coachRsvpStatusByKey[`${r.event_id}:${r.player_id}`] = r.status;
       coachRsvpReasonByKey[`${r.event_id}:${r.player_id}`] = r.reason ?? null;
+      coachRsvpNoteByKey[`${r.event_id}:${r.player_id}`] = r.contribution_note ?? null;
     });
 
     const coachRosterPlayerIds = Array.from(
@@ -3013,6 +3047,7 @@ export default async function DashboardPage({
         paidParticipants: paidInfo.paidParticipants,
         teamId: team?.id ?? null,
         targetTeamIds: e.target_team_ids ?? null,
+        commissionGroupIds: e.commission_group_ids ?? [],
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, clubTeamById),
         rsvpCounts: buildRsvpCounts(rsvpsByEvent, e.id, eventRoster),
         // Retour de Cindy du 30/08 : "qui sera présent" visible partout,
@@ -3056,6 +3091,10 @@ export default async function DashboardPage({
     isSelf: boolean;
   }[] = [];
   const familyRsvpStatusByKey: Record<string, string> = {};
+  // Retour de Cindy du 10/09 ("ce que j'apporte") : pré-remplit le champ
+  // sur les boutons Présent/Absent de ses propres enfants, voir
+  // familyRsvpStatusByKey juste au-dessus pour le même principe.
+  const familyRsvpNoteByKey: Record<string, string | null> = {};
   const familyBirthdayMembers: BirthdaySource[] = [];
   const familyTeamCards: FamilyTeamCardData[] = [];
   let familyCotisations: AdminCotisation[] = [];
@@ -3313,7 +3352,7 @@ export default async function DashboardPage({
       supabase
         .from("events")
         .select(
-          "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
+          "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
         )
         .or(teamOrClubWideFilter(allTeamIds))
         .neq("event_type", "TRAINING")
@@ -3323,7 +3362,7 @@ export default async function DashboardPage({
       supabase
         .from("events")
         .select(
-          "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
+          "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
         )
         .or(teamOrClubWideFilter(allTeamIds))
         .eq("event_type", "TRAINING")
@@ -3536,6 +3575,7 @@ export default async function DashboardPage({
         paidParticipants: paidInfo.paidParticipants,
         teamId: team?.id ?? null,
         targetTeamIds: e.target_team_ids ?? null,
+        commissionGroupIds: e.commission_group_ids ?? [],
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, teamsById),
         rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
         benevoleIds: [],
@@ -3577,7 +3617,7 @@ export default async function DashboardPage({
             eventIds.length > 0 && allRosterPlayerIds.length > 0
               ? supabase
                   .from("rsvps")
-                  .select("event_id, player_id, status")
+                  .select("event_id, player_id, status, contribution_note")
                   .in("event_id", eventIds)
                   .in("player_id", allRosterPlayerIds)
               : Promise.resolve(null),
@@ -3604,6 +3644,7 @@ export default async function DashboardPage({
     // l'effectif d'un événement, pour les compteurs/la liste des présents).
     (rsvpRowsRes?.data ?? []).forEach((r) => {
       familyRsvpStatusByKey[`${r.event_id}:${r.player_id}`] = r.status;
+      familyRsvpNoteByKey[`${r.event_id}:${r.player_id}`] = r.contribution_note ?? null;
     });
 
     // Retour de Cindy du 31/08 : même calcul que Bureau/Coach
@@ -3769,6 +3810,7 @@ export default async function DashboardPage({
         events={familyEvents}
         rsvpPlayers={rsvpPlayers}
         rsvpStatusByKey={familyRsvpStatusByKey}
+        rsvpNoteByKey={familyRsvpNoteByKey}
         birthdayMembers={familyBirthdayMembers}
         teamCards={familyTeamCards}
         tasksByEventId={familyOrganisationTasks}
@@ -3849,6 +3891,7 @@ export default async function DashboardPage({
             rsvpPlayers={coachRsvpPlayers}
             rsvpStatusByKey={coachRsvpStatusByKey}
             rsvpReasonByKey={coachRsvpReasonByKey}
+            rsvpNoteByKey={coachRsvpNoteByKey}
             taskTallyByTeamId={coachTaskTallyByTeamId}
             teamRoleByTeamId={coachTeamRoleByTeamId}
             clubTeams={coachClubTeams}
@@ -3960,6 +4003,7 @@ export default async function DashboardPage({
         id: p.id,
         name: p.name,
         status: familyRsvpStatusByKey[`${e.id}:${p.id}`] ?? "PENDING",
+        note: familyRsvpNoteByKey[`${e.id}:${p.id}`] ?? null,
       })),
       roles: rolesForEventType(eventRoleTypes, e.event_type),
       tasks: familyOrganisationTasks[e.id] ?? {},
