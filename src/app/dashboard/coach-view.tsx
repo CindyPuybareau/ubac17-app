@@ -151,12 +151,21 @@ export default function CoachView({
     }
   });
 
-  const resultsTeamsForCalendar = teams.map((t) => ({
-    id: t.id,
-    name: t.name,
-    category: t.category,
-    role: teamRoleByTeamId[t.id] ?? "COACH",
-  }));
+  // Retour de Cindy du 10/09 (bug Basile) : filtré sur les équipes
+  // réellement coachées, comme createTeams ci-dessus -- reprenait avant
+  // TOUTES les équipes (y compris "Séniors 1"/"Séniors M" où Basile n'est
+  // que joueur), qui apparaissaient donc en double dans "Équipes coachées"
+  // (calendrier, filtre par équipe, texte d'en-tête) alors qu'elles vivent
+  // déjà correctement dans son onglet "Mon équipe" (family-view.tsx, tab
+  // "own-team"). role vaut donc toujours "COACH" ici désormais.
+  const resultsTeamsForCalendar = teams
+    .filter((t) => teamRoleByTeamId[t.id] !== "PLAYER")
+    .map((t) => ({
+      id: t.id,
+      name: t.name,
+      category: t.category,
+      role: teamRoleByTeamId[t.id] ?? "COACH",
+    }));
 
   const iconClass = "h-4 w-4 shrink-0";
   const sections: AdminSection[] = [
@@ -173,14 +182,13 @@ export default function CoachView({
             rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey, noteByKey: rsvpNoteByKey }}
             contactEmailByPlayerId={contactEmailByPlayerId}
             birthdayMembers={birthdayMembers}
-            // Toutes ses équipes, y compris celle où il n'est que joueur :
-            // le calendrier les montre, même si créer un événement n'y est
-            // permis que pour celles qu'il entraîne.
-            scopeTeams={teams.map((t) => ({
-              id: t.id,
-              name: t.name,
-              category: t.category,
-            }))}
+            // Retour de Cindy du 10/09 (bug Basile) : createTeams plutôt que
+            // teams.map(...) -- "Équipes coachées" ne doit montrer QUE les
+            // équipes réellement coachées, jamais celles où il n'est que
+            // joueur (déjà dans son onglet "Mon équipe" à part entière, voir
+            // resultsTeamsForCalendar ci-dessus pour le même correctif sur
+            // le filtre par équipe).
+            scopeTeams={createTeams}
             scopeTeamRoleById={teamRoleByTeamId}
             // Retour de Cindy du 10/09 (fusion Calendrier/Événements) :
             // manquait ici alors que "Événements" (retiré plus bas) l'avait
@@ -328,7 +336,9 @@ export default function CoachView({
               createTeams={createTeams}
               benevoles={benevoles}
               rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey, noteByKey: rsvpNoteByKey }}
-              scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
+              // Retour de Cindy du 10/09 (bug Basile) : createTeams, même
+              // correctif que sur "Calendrier" ci-dessus.
+              scopeTeams={createTeams}
               scopeTeamRoleById={teamRoleByTeamId}
               forcedView="officialMatches"
               resultsTeams={resultsTeamsForCalendar}
@@ -348,7 +358,9 @@ export default function CoachView({
               createTeams={createTeams}
               benevoles={benevoles}
               rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey, noteByKey: rsvpNoteByKey }}
-              scopeTeams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
+              // Retour de Cindy du 10/09 (bug Basile) : createTeams, même
+              // correctif que sur "Calendrier" ci-dessus.
+              scopeTeams={createTeams}
               scopeTeamRoleById={teamRoleByTeamId}
               forcedView="officialResults"
               resultsTeams={resultsTeamsForCalendar}
