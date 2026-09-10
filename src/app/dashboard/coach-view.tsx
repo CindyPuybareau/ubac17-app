@@ -3,6 +3,7 @@ import {
   CalendarDays,
   ClipboardList,
   Flag,
+  LayoutDashboard,
   ListOrdered,
   LogOut,
   MessageCircle,
@@ -188,11 +189,22 @@ export default function CoachView({
             celebrateWins
           />
           <SponsorsDisplay sponsors={sponsorDisplay} />
-          {/* Même bloc que l'espace parent : un coach a lui aussi son
-              propre agenda, et être coach ne devrait pas le priver de cet
-              outil — il fallait juste l'y ajouter aussi. Placé sous les
-              sponsors (retour de Cindy du 09/09), pas entre le calendrier
-              et eux. */}
+        </div>
+      ),
+    },
+    {
+      // Retour de Cindy du 10/09 ("alléger l'onglet calendrier") : le lien
+      // d'abonnement agenda quitte le Calendrier pour ce nouvel onglet,
+      // volontairement second dans la liste (jamais premier — l'ouverture
+      // de l'appli doit toujours se faire sur "Calendrier", voir
+      // admin-sidebar.tsx : le premier onglet du tableau est l'onglet actif
+      // par défaut). Premier contenu d'un onglet pensé pour accueillir
+      // d'autres blocs secondaires plus tard.
+      key: "dashboard",
+      label: "Tableau de bord",
+      icon: <LayoutDashboard className={iconClass} />,
+      content: (
+        <div className="flex flex-col gap-4">
           <CalendarSubscribe />
         </div>
       ),

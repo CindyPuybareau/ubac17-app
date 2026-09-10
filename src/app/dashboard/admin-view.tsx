@@ -6,6 +6,7 @@ import {
   Gavel,
   HandHeart,
   Handshake,
+  LayoutDashboard,
   ListOrdered,
   LogOut,
   MessageCircle,
@@ -38,6 +39,7 @@ import SponsorsManager from "./sponsors-manager";
 import SponsorsDisplay from "./sponsors-display";
 import CommissionsManager from "./commissions-manager";
 import BureauDashboard from "./bureau-dashboard";
+import EmptyState from "./empty-state";
 import type { AutomationKey } from "./automation-settings";
 import type {
   AdminAccessProfile,
@@ -206,6 +208,27 @@ export default function AdminView({
           />
           <SponsorsDisplay sponsors={sponsorDisplay} />
         </div>
+      ),
+    },
+    {
+      // Retour de Cindy du 10/09 ("alléger l'onglet calendrier") : nouvel
+      // onglet pensé pour accueillir des blocs secondaires (Accès à
+      // l'espace enfant, lien d'abonnement agenda... déjà déplacés côté
+      // Coach/Famille, voir coach-view.tsx/family-view.tsx) — rien côté
+      // Bureau pour l'instant, ces deux blocs-là n'y ayant jamais existé.
+      // Volontairement second dans la liste, jamais premier : l'ouverture
+      // de l'appli doit toujours se faire sur "Calendrier" (voir
+      // admin-sidebar.tsx, le premier onglet du tableau est l'onglet actif
+      // par défaut).
+      key: "dashboard",
+      label: "Tableau de bord",
+      icon: <LayoutDashboard className={iconClass} />,
+      content: (
+        <EmptyState
+          icon={LayoutDashboard}
+          message="Rien ici pour l'instant."
+          hint="Cet onglet accueillera prochainement d'autres blocs, pour alléger le Calendrier."
+        />
       ),
     },
     {

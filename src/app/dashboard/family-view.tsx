@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import {
   CalendarDays,
   Flag,
+  LayoutDashboard,
   ListOrdered,
   LogOut,
   MessageCircle,
@@ -312,9 +313,24 @@ export default function FamilyView({
             volunteerNeedsByEventId={volunteerNeedsByEventId}
             celebrateWins
           />
-          <ChildAccessManager />
           <SponsorsDisplay sponsors={sponsorDisplay} />
-          {/* Retour de Cindy du 09/09 : sous les sponsors, pas au-dessus. */}
+        </div>
+      ),
+    },
+    {
+      // Retour de Cindy du 10/09 ("alléger l'onglet calendrier") : Accès à
+      // l'espace enfant + lien d'abonnement agenda quittent le Calendrier
+      // pour ce nouvel onglet, volontairement second dans la liste (jamais
+      // premier — l'ouverture de l'appli doit toujours se faire sur
+      // "Calendrier", voir admin-sidebar.tsx : le premier onglet du
+      // tableau est l'onglet actif par défaut). Premier contenu d'un
+      // onglet pensé pour accueillir d'autres blocs secondaires plus tard.
+      key: "dashboard",
+      label: "Tableau de bord",
+      icon: <LayoutDashboard className={iconClass} />,
+      content: (
+        <div className="flex flex-col gap-4">
+          <ChildAccessManager />
           <CalendarSubscribe />
         </div>
       ),
