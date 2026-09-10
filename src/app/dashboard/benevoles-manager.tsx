@@ -38,7 +38,13 @@ const EMPTY_FORM: BenevoleForm = {
   phone: "",
   email: "",
   notes: "",
-  briques: [],
+  // Retour de Cindy du 10/09 : ["calendrier", "tableau_de_bord"] par
+  // défaut pour un NOUVEAU bénévole plutôt que [] -- toggleBrique reste la
+  // seule façon d'en retirer un ensuite, même mécanisme que
+  // member-detail-modal.tsx/commissions-manager.tsx. Sans effet sur un
+  // bénévole déjà existant (toForm() reprend ses briques déjà
+  // enregistrées, jamais EMPTY_FORM).
+  briques: ["calendrier", "tableau_de_bord"],
   whatsappGroupIds: [],
 };
 

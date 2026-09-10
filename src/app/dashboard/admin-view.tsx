@@ -576,17 +576,26 @@ export default function AdminView({
   // aux briques comptes-rendus autorisées juste au-dessus (has(...) sur
   // chaque <ClubReportsSection>) ; ici on décide seulement si l'onglet
   // lui-même mérite d'apparaître dans le menu.
-  const REQUIRED_BRIQUE: Record<string, string> = {
+  // Retour de Cindy du 10/09 (fusion Calendrier/Événements) : "home"
+  // accepte maintenant "calendrier" OU l'ancienne brique "evenements" --
+  // un profil qui n'avait QUE "evenements" coché (jamais "calendrier")
+  // gardait, avant ce correctif, l'accès à l'ancien onglet "Événements" ;
+  // depuis la fusion, cet onglet n'existe plus et son accès se jouait
+  // désormais uniquement sur "calendrier", lui coupant l'accès au
+  // Calendrier fusionné sans qu'il ait rien changé de son côté. "dashboard"
+  // (Tableau de bord, nouvelle brique "tableau_de_bord") ; "events" retiré
+  // (la section elle-même n'existe plus, voir plus haut).
+  const REQUIRED_BRIQUE: Record<string, string | string[]> = {
     // Retour de Cindy du 06/09 ("ajouter le calendrier aussi, il est
     // important") : "home" est le premier onglet du Bureau, littéralement
     // intitulé "Calendrier" (résumé + calendrier complet).
-    home: "calendrier",
+    home: ["calendrier", "evenements"],
+    dashboard: "tableau_de_bord",
     members: "membres",
     teams: "equipes",
     "cotisations-licences": "cotisations",
     "cotisations-evenements": "cotisations",
     "cotisations-penalites": "penalites",
-    events: "evenements",
     "matches-official": "matchs_resultats",
     "matches-results": "matchs_resultats",
     sponsors: "sponsors",
@@ -612,7 +621,9 @@ export default function AdminView({
       // jamais dans la liste blanche, donc jamais accessibles à un profil
       // restreint (même logique que Paiements/"attribuer un accès"). "home"
       // (Calendrier), lui, y figure depuis le 06/09 (brique "calendrier").
-      return required && has(required) ? [section] : [];
+      if (!required) return [];
+      const requiredList = Array.isArray(required) ? required : [required];
+      return requiredList.some((brique) => has(brique)) ? [section] : [];
     });
   }
 

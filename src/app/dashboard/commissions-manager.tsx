@@ -41,8 +41,14 @@ function CommissionCard({
   accessProfiles: AdminAccessProfile[];
 }) {
   const router = useRouter();
-  const initialBriques =
-    (group.accessProfileId && accessProfiles.find((p) => p.id === group.accessProfileId)?.briques) || [];
+  // Retour de Cindy du 10/09 : ["calendrier", "tableau_de_bord"] plutôt que
+  // [] pour une commission qui n'a JAMAIS encore été configurée (aucun
+  // profil d'accès existant) -- une commission déjà réglée, même avec zéro
+  // brique cochée, garde exactement sa sélection actuelle (accessProfileId
+  // non nul, voir la condition ci-dessous).
+  const initialBriques = group.accessProfileId
+    ? accessProfiles.find((p) => p.id === group.accessProfileId)?.briques ?? []
+    : ["calendrier", "tableau_de_bord"];
   const [open, setOpen] = useState(false);
   const [briques, setBriques] = useState<string[]>(initialBriques);
   const [saving, setSaving] = useState(false);
@@ -76,7 +82,15 @@ function CommissionCard({
     setError(null);
     const supabase = createClient();
     const initialProfileId = group.accessProfileId;
-    const changed = [...briques].sort().join(",") !== [...initialBriques].sort().join(",");
+    // Retour de Cindy du 10/09 : pour une commission jamais configurée,
+    // initialBriques vaut déjà ["calendrier", "tableau_de_bord"] (défaut
+    // pré-coché, voir plus haut) -- sans ce cas particulier, cliquer
+    // "Enregistrer" sans rien toucher aurait laissé "changed" à false et
+    // n'aurait donc jamais créé le profil, malgré des cases visiblement
+    // cochées à l'écran.
+    const changed = !initialProfileId
+      ? briques.length > 0
+      : [...briques].sort().join(",") !== [...initialBriques].sort().join(",");
 
     if (changed) {
       if (briques.length === 0) {

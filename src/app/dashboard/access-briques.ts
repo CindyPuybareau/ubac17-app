@@ -23,6 +23,14 @@ export const BRIQUE_GROUPS: { label: string; briques: { key: string; label: stri
     briques: [{ key: "calendrier", label: "Calendrier" }],
   },
   {
+    // Retour de Cindy du 10/09 : reflète le nouvel onglet "Tableau de
+    // bord" du menu Bureau (admin-view.tsx), juste après "Calendrier" --
+    // vide pour l'instant côté Bureau, mais déjà cochable pour préparer le
+    // terrain. Voir la migration 20261101060000 pour le CHECK élargi.
+    label: "Tableau de bord",
+    briques: [{ key: "tableau_de_bord", label: "Tableau de bord" }],
+  },
+  {
     label: "Membres",
     briques: [{ key: "membres", label: "Membres" }],
   },
@@ -30,10 +38,12 @@ export const BRIQUE_GROUPS: { label: string; briques: { key: string; label: stri
     label: "Équipes",
     briques: [{ key: "equipes", label: "Équipes" }],
   },
-  {
-    label: "Événements",
-    briques: [{ key: "evenements", label: "Événements" }],
-  },
+  // Retour de Cindy du 10/09 (fusion Calendrier/Événements) : le groupe
+  // "Événements" qui vivait ici est retiré -- la brique "evenements"
+  // reste reconnue en interne (aucun profil déjà créé n'est invalidé,
+  // voir admin-view.tsx/read-only-briques-data.ts) mais n'est plus
+  // proposée comme un nouveau choix séparé, "calendrier" couvrant
+  // désormais le même onglet fusionné.
   {
     label: "Matchs & Résultats",
     briques: [{ key: "matchs_resultats", label: "Matchs & Résultats" }],

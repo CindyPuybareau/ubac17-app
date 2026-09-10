@@ -340,11 +340,12 @@ export default function MemberDetailModal({
       : BUREAU_ROLE_OPTIONS;
   // Briques cochées pour le rôle "Comité directeur" (retour de Cindy du
   // 05/09) — sans effet pour tout autre rôle, voir handleSave. Pré-rempli
-  // à partir du profil déjà lié à cette fiche, s'il y en a un.
-  const initialCommitteeBriques =
-    (initialAccessProfileId &&
-      accessProfiles.find((p) => p.id === initialAccessProfileId)?.briques) ||
-    [];
+  // à partir du profil déjà lié à cette fiche, s'il y en a un ; sinon
+  // (fiche sans profil encore créé) ["calendrier", "tableau_de_bord"] par
+  // défaut (retour de Cindy du 10/09) plutôt que rien du tout.
+  const initialCommitteeBriques = initialAccessProfileId
+    ? accessProfiles.find((p) => p.id === initialAccessProfileId)?.briques ?? []
+    : ["calendrier", "tableau_de_bord"];
   const [committeeBriques, setCommitteeBriques] = useState<string[]>(initialCommitteeBriques);
   // Même bug/correctif que benevoles-manager.tsx ("Jimmy Pouplard 5 fois",
   // 06/09) : si la création du profil réussit mais qu'une étape suivante

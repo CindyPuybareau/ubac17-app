@@ -106,7 +106,13 @@ export async function getReadOnlyBriquesData(
     }));
   }
 
-  if (has("evenements") || has("matchs_resultats")) {
+  // Retour de Cindy du 10/09 (fusion Calendrier/Événements) : "calendrier"
+  // ajouté ici -- sans lui, un profil qui n'a QUE "calendrier" coché (le
+  // nouveau cas normal depuis la fusion) verrait son onglet Calendrier
+  // fusionné s'afficher vide, ces événements n'ayant jamais été chargés.
+  // "evenements" reste accepté pour les profils déjà configurés avec
+  // cette seule ancienne brique (voir access-briques.ts).
+  if (has("calendrier") || has("evenements") || has("matchs_resultats")) {
     const eventsWindowStart = new Date(Date.now() - 183 * 24 * 60 * 60 * 1000).toISOString();
     const { data: eventsData } = await supabase
       .from("events")
