@@ -13,8 +13,6 @@ import {
   Clock,
   Euro,
   ExternalLink,
-  Eye,
-  EyeOff,
   HeartHandshake,
   LayoutGrid,
   List,
@@ -44,6 +42,7 @@ import MatchTasksPanel from "./match-tasks-panel";
 import MatchScore from "./match-score";
 import TeamSelectorPills from "./team-selector-pills";
 import TeamFilterDropdown from "./team-filter-dropdown";
+import EventTypeFilterDropdown from "./event-type-filter-dropdown";
 import { sendEventPush } from "./event-push";
 import type { AdminBenevole, AdminUpcomingEvent, BenevoleInviteStatus } from "./page";
 import {
@@ -548,13 +547,67 @@ export default function CalendarView({
   // Retour de Cindy/Sandrine Manzelle du 2026-08-24 : "les entraînements
   // polluent le calendrier" — un cumul Bureau + joueuse + parent voit tout
   // empilé, et les entraînements (2-3 par semaine et par équipe) noient
-  // les événements plus rares. Un simple interrupteur, pas de nouveau
-  // menu : filtre la grille du mois, le panneau du jour et la liste
+  // les événements plus rares. Remplacé le 10/09 (retour de Cindy) par un
+  // filtre par type plus général ("Filtrer par type", voir hiddenEventTypes
+  // ci-dessous) : filtre la grille du mois, le panneau du jour et la liste
   // Événements en même temps (voir visibleEvents plus bas), jamais
   // localEvents lui-même (les formulaires d'édition en ont besoin en
-  // entier). Volontairement en mémoire seulement (pas persistant) — un
-  // interrupteur toujours visible se retrouve facilement à chaque visite.
-  const [hideTrainings, setHideTrainings] = useState(false);
+  // entier).
+  //
+  // Stocke les types MASQUÉS (pas les affichés) : un Set vide veut dire
+  // "tout affiché", cohérent avec profiles.calendar_hidden_event_types
+  // (colonne ajoutée le 10/09) qui stocke la même chose. Chargé une fois
+  // au montage puis ré-écrit à chaque case cochée/décochée -- retrouvé à
+  // la prochaine connexion, sur n'importe quel appareil (retour de Cindy :
+  // "pas juste en local dans le navigateur"), pas juste dans CE
+  // navigateur. Même schéma que calendar-subscribe.tsx (auth.getUser() +
+  // repli silencieux sur un raté réseau plutôt qu'un blocage).
+  const [hiddenEventTypes, setHiddenEventTypes] = useState<Set<string>>(new Set());
+  const userIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const supabase = createClient();
+        const { data: userData } = await supabase.auth.getUser();
+        if (!userData.user) return;
+        userIdRef.current = userData.user.id;
+        const { data } = await supabase
+          .from("profiles")
+          .select("calendar_hidden_event_types")
+          .eq("id", userData.user.id)
+          .maybeSingle();
+        const stored = data?.calendar_hidden_event_types as string[] | null;
+        if (!cancelled && stored && stored.length > 0) {
+          setHiddenEventTypes(new Set(stored));
+        }
+      } catch {
+        // Un raté réseau garde simplement "tout affiché" (l'état initial) —
+        // jamais bloqué en attente, jamais d'erreur visible pour un simple
+        // réglage d'affichage.
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function updateHiddenEventTypes(next: Set<string>) {
+    setHiddenEventTypes(next);
+    const userId = userIdRef.current;
+    if (!userId) return;
+    const supabase = createClient();
+    supabase
+      .from("profiles")
+      .update({ calendar_hidden_event_types: Array.from(next) })
+      .eq("id", userId)
+      .then(({ error }) => {
+        if (error) {
+          console.error("[CalendarView] sauvegarde du filtre par type échouée:", error);
+        }
+      });
+  }
   // Le calendrier s'ouvre sur la grille : on veut d'abord voir le mois.
   // La liste chronologique reste à un clic pour répondre à "c'est quoi la
   // suite ?".
@@ -793,13 +846,13 @@ export default function CalendarView({
   // sont listées explicitement ci-dessous à sa place.
   const visibleEvents = useMemo(
     () =>
-      (hideTrainings ? localEvents.filter((e) => e.event_type !== "TRAINING") : localEvents).filter(
-        matchesTeamFilter
-      ),
+      localEvents
+        .filter((e) => !hiddenEventTypes.has(e.event_type ?? "OTHER"))
+        .filter(matchesTeamFilter),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       localEvents,
-      hideTrainings,
+      hiddenEventTypes,
       resultsTeams,
       resultsTeamSelector,
       selectedResultTeamIds,
@@ -1558,50 +1611,42 @@ export default function CalendarView({
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
-              <span className="text-sm font-semibold capitalize text-zinc-900">
+              {/* Bouton "Aujourd'hui" retiré (retour de Cindy du 10/09) :
+                  redondant avec la case du jour déjà surlignée dans la
+                  grille du mois. La fonction "revenir au mois courant"
+                  (utile après avoir navigué ailleurs) est conservée en
+                  fusionnant avec la navigation de mois -- le libellé du
+                  mois lui-même redevient cliquable, mêmes préchargements
+                  au survol que l'ancien bouton. */}
+              <button
+                type="button"
+                onClick={goToday}
+                onMouseEnter={() => prefetchMonth(today)}
+                onFocus={() => prefetchMonth(today)}
+                onTouchStart={() => prefetchMonth(today)}
+                disabled={isMonthPending}
+                title="Revenir au mois en cours"
+                className="rounded-full px-1.5 py-0.5 text-sm font-semibold capitalize text-zinc-900 transition-colors hover:bg-zinc-100 disabled:opacity-60"
+              >
                 {headerLabel}
-              </span>
+              </button>
             </div>
           )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {view === "month" && (
-            <button
-              onClick={goToday}
-              onMouseEnter={() => prefetchMonth(today)}
-              onFocus={() => prefetchMonth(today)}
-              onTouchStart={() => prefetchMonth(today)}
-              disabled={isMonthPending}
-              className="rounded-full border border-ubac-yellow px-3 py-1 text-xs font-semibold text-ubac-yellow-dark hover:bg-ubac-yellow/10 disabled:opacity-60"
-            >
-              Aujourd&apos;hui
-            </button>
-          )}
-
-          {/* Retour Cindy/Sandrine Manzelle du 2026-08-24 : les
-              entraînements (2-3 par semaine et par équipe) noient les
-              événements plus rares pour qui cumule Bureau + joueuse +
-              parent. Un interrupteur simple, visible sur le Calendrier et
-              sur "Événements" (là où les entraînements peuvent
+          {/* Remplace "Masquer les entraînements" (retour de Cindy du
+              10/09) : filtre par type d'événement plutôt qu'un seul
+              interrupteur entraînements/reste -- visible sur le Calendrier
+              et sur "Événements" (là où les entraînements peuvent
               apparaître), masqué sur les vues Matchs/Résultats où ils
-              n'apparaissent de toute façon jamais. */}
+              n'apparaissent de toute façon jamais (même condition
+              qu'avant). */}
           {(!forcedView || forcedView === "clubEvents") && (
-            <button
-              onClick={() => setHideTrainings((v) => !v)}
-              className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
-                hideTrainings
-                  ? "border-navy/30 bg-navy/10 text-navy"
-                  : "border-zinc-200 bg-white text-zinc-500 hover:bg-zinc-50"
-              }`}
-            >
-              {hideTrainings ? (
-                <EyeOff className="h-3.5 w-3.5" />
-              ) : (
-                <Eye className="h-3.5 w-3.5" />
-              )}
-              {hideTrainings ? "Entraînements masqués" : "Masquer les entraînements"}
-            </button>
+            <EventTypeFilterDropdown
+              hiddenTypes={hiddenEventTypes}
+              onChange={updateHiddenEventTypes}
+            />
           )}
 
           {/* Retour de Cindy du 09/09 ("le calendrier devient illisible...
@@ -1619,6 +1664,7 @@ export default function CalendarView({
                   teams={sortedResultsTeams}
                   selectedIds={selectedResultTeamIds}
                   onChange={setSelectedResultTeamIds}
+                  compact
                 />
               ) : (
                 <TeamSelectorPills

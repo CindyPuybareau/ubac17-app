@@ -19,10 +19,18 @@ export default function TeamFilterDropdown({
   teams,
   selectedIds,
   onChange,
+  // Retour de Cindy du 10/09 : ce bouton restait à sa taille "normale"
+  // (text-sm, py-1.5) au milieu de la barre de filtres du Calendrier
+  // (Mois/Liste), dont tous les autres boutons sont en text-xs/py-1 --
+  // visible seulement là où ces voisins existent (Événements/Matchs
+  // officiels n'ont pas cette barre, donc jamais paru "trop grand" côté
+  // Cindy). Défaut inchangé (false) pour ne rien modifier ailleurs.
+  compact = false,
 }: {
   teams: TeamOption[];
   selectedIds: Set<string>;
   onChange: (next: Set<string>) => void;
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -44,10 +52,12 @@ export default function TeamFilterDropdown({
     <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+        className={`flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white font-medium text-zinc-700 hover:bg-zinc-50 ${
+          compact ? "px-3 py-1 text-xs" : "px-3 py-1.5 text-sm"
+        }`}
       >
         {label}
-        <ChevronDown className="h-4 w-4" />
+        <ChevronDown className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
       </button>
 
       {open && (
