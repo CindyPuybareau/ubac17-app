@@ -333,11 +333,25 @@ export default function CreateEventForm({
       end_time: endTime ? new Date(`${startTime.slice(0, 10)}T${endTime}`).toISOString() : null,
       notes: notes || null,
     };
-    // La portée (équipe/équipes/tout le club) n'est modifiable que par qui
-    // peut créer un événement club (allowClubWide) — un coach qui édite un
-    // événement d'une portée qu'il ne maîtrise pas ne doit jamais l'écraser
-    // silencieusement (même garde-fou que l'ancienne modale de modification).
-    if (!isEditing || allowClubWide) {
+    // La portée club-wide/équipes spécifiques n'est modifiable que par qui
+    // peut créer un événement club (allowClubWide) — un coach n'a même pas
+    // le sélecteur de portée dans son formulaire (voir plus bas, "allowClubWide
+    // &&"), donc scopeMode reste figé à sa valeur initiale pour lui : jamais
+    // question d'écraser silencieusement une portée club/multi-équipes qu'il
+    // ne maîtrise pas.
+    //
+    // Mais retour de Cindy du 10/09 ("un coach doit pouvoir modifier les
+    // événements de son équipe, c'est une règle de base") : Basile ne
+    // pouvait pas re-affecter un entraînement de U13M1 à U13M alors qu'il
+    // coache les deux -- le menu équipe (plus bas, affiché dès qu'un coach a
+    // plusieurs équipes) restait modifiable à l'écran, "Événement modifié."
+    // s'affichait, mais team_id n'était jamais envoyé. Un événement DÉJÀ à
+    // équipe unique (scopeMode "single" dès l'ouverture) peut être
+    // réaffecté sans risque : le menu ne liste que `teams`, déjà limité aux
+    // équipes que CE coach coache lui-même, et la policy RLS
+    // "coach update own team events" revérifie de toute façon que la
+    // nouvelle équipe choisie est bien une des siennes.
+    if (!isEditing || allowClubWide || scopeMode === "single") {
       eventPayload.team_id = effectiveTeamId || null;
       eventPayload.target_team_ids = effectiveTargetTeamIds;
     }
