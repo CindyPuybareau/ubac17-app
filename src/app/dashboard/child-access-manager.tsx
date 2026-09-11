@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronDown, ChevronUp, KeyRound, Link2, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronUp, KeyRound, Link2, Loader2, RotateCcw } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatFirstName } from "@/lib/names";
 import { isValidPinFormat } from "@/lib/pin";
+import ConfirmDialog from "./confirm-dialog";
 
 type Child = { id: string; name: string; hasPin: boolean };
 
@@ -20,6 +21,13 @@ export default function ChildAccessManager() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Retour de Cindy du 11/09 (bug "lien invalidé à chaque clic") : une
+  // vraie régénération (nouveau code, ancien lien devenu inutilisable)
+  // est désormais une action séparée et volontaire, jamais implicite --
+  // voir regenerateLink ci-dessous.
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+  const [regenerateError, setRegenerateError] = useState<string | null>(null);
   const [editingChildId, setEditingChildId] = useState<string | null>(null);
   const [pinDraft, setPinDraft] = useState("");
   const [pinError, setPinError] = useState<string | null>(null);
@@ -76,12 +84,36 @@ export default function ChildAccessManager() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Retour de Cindy du 11/09 : idempotente -- renvoie le lien déjà créé
+  // s'il existe, n'en génère un nouveau que la toute première fois (voir
+  // get_or_create_family_access_code, migration 20261101070000). Avant ce
+  // correctif, ce bouton appelait regenerate_family_access_code(), qui
+  // écrasait TOUJOURS le lien existant par un nouveau -- un second clic
+  // (le parent qui ne retrouve pas facilement son lien déjà créé, par
+  // exemple) invalidait donc silencieusement celui déjà donné à l'enfant.
   async function generateLink() {
     setGenerating(true);
     const supabase = createClient();
-    const { data, error } = await supabase.rpc("regenerate_family_access_code");
+    const { data, error } = await supabase.rpc("get_or_create_family_access_code");
     setGenerating(false);
     if (!error && data) setCode(data as string);
+  }
+
+  // Vraie régénération, volontaire et séparée (retour de Cindy du 11/09) :
+  // rend l'ancien lien inutilisable, jamais déclenchée sans confirmation
+  // explicite -- voir le ConfirmDialog plus bas.
+  async function regenerateLink() {
+    setRegenerating(true);
+    setRegenerateError(null);
+    const supabase = createClient();
+    const { data, error } = await supabase.rpc("regenerate_family_access_code");
+    setRegenerating(false);
+    if (error) {
+      setRegenerateError(error.message);
+      return;
+    }
+    if (data) setCode(data as string);
+    setConfirmRegenerate(false);
   }
 
   function copyLink(link: string) {
@@ -157,14 +189,28 @@ export default function ChildAccessManager() {
       </p>
 
       {link ? (
-        <div className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-1.5">
-          <Link2 className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-          <span className="flex-1 truncate text-xs text-zinc-600">{link}</span>
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-1.5">
+            <Link2 className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+            <span className="flex-1 truncate text-xs text-zinc-600">{link}</span>
+            <button
+              onClick={() => copyLink(link)}
+              className="shrink-0 rounded-full bg-navy px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-navy/90"
+            >
+              {copied ? "Copié !" : "Copier"}
+            </button>
+          </div>
+          {/* Retour de Cindy du 11/09 : action séparée et volontaire,
+              jamais confondue avec l'affichage du lien ci-dessus --
+              confirmation obligatoire (ConfirmDialog plus bas) avant de
+              rendre l'ancien lien inutilisable. */}
           <button
-            onClick={() => copyLink(link)}
-            className="shrink-0 rounded-full bg-navy px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-navy/90"
+            type="button"
+            onClick={() => setConfirmRegenerate(true)}
+            className="flex w-fit items-center gap-1 text-[11px] font-medium text-zinc-400 hover:text-zinc-600 hover:underline"
           >
-            {copied ? "Copié !" : "Copier"}
+            <RotateCcw className="h-3 w-3" />
+            Régénérer le lien
           </button>
         </div>
       ) : (
@@ -176,6 +222,21 @@ export default function ChildAccessManager() {
           {generating ? "Création..." : "Créer le lien d'accès enfant"}
         </button>
       )}
+
+      <ConfirmDialog
+        open={confirmRegenerate}
+        title="Régénérer le lien d'accès enfant ?"
+        message="Cela rendra l'ancien lien inutilisable, l'enfant devra utiliser le nouveau. Continuer ?"
+        confirmLabel="Régénérer"
+        pendingLabel="Régénération..."
+        pending={regenerating}
+        error={regenerateError}
+        onConfirm={regenerateLink}
+        onCancel={() => {
+          setConfirmRegenerate(false);
+          setRegenerateError(null);
+        }}
+      />
 
       <div className="flex flex-col gap-2 border-t border-zinc-100 pt-3">
         {children.map((c) => (
