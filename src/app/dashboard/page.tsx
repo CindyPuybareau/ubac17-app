@@ -478,6 +478,18 @@ export type AdminUpcomingEvent = {
     // Retour de Cindy du 10/09 ("ce que j'apporte") : voir buildPresentPlayers.
     note: string | null;
   }[];
+  // Retour de Cindy du 11/09 ("qui est absent ?") : même principe que
+  // presentPlayers ci-dessus, voir buildAbsentPlayers -- pour Coach/
+  // Famille, le roster passé à buildAbsentPlayers est déjà réduit aux
+  // équipes que ce viewer a le droit de voir (jamais l'union complète
+  // d'un événement multi-équipes), contrairement à rsvpCounts qui, lui,
+  // reste sur l'effectif complet de l'événement (comptage seulement,
+  // aucune identité exposée).
+  absentPlayers?: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+  }[];
   // Bénévoles déjà invités à cet événement (retour de Cindy du 2026-08-25)
   // — préremplit la case "Bénévoles invités" en édition, voir
   // create-event-form.tsx. Bureau et Coach depuis le 06/09 : [] côté
@@ -728,6 +740,26 @@ function buildPresentPlayers(
       // Retour de Cindy du 10/09 ("ce que j'apporte") : affiché sur "Qui
       // sera là ?" (calendar-view.tsx), visible Bureau/Coach/Famille.
       note: statuses.get(p.id)?.note ?? null,
+    }));
+}
+
+// Retour de Cindy du 11/09 ("qui est absent ?") : même principe que
+// buildPresentPlayers ci-dessus, statut ABSENT plutôt que PRESENT --
+// jamais de motif ici (reasonByKey n'est utilisé qu'avec AttendanceBadges,
+// pas sur cette carte-ci, voir calendar-view.tsx/AbsentPlayersList).
+function buildAbsentPlayers(
+  statusByEvent: Map<string, Map<string, RsvpEntry>>,
+  eventId: string,
+  roster: { id: string; first_name: string | null; last_name: string | null }[]
+) {
+  const statuses = statusByEvent.get(eventId);
+  if (!statuses) return [];
+  return roster
+    .filter((p) => statuses.get(p.id)?.status === "ABSENT")
+    .map((p) => ({
+      id: p.id,
+      firstName: p.first_name,
+      lastName: p.last_name,
     }));
 }
 
@@ -2228,6 +2260,12 @@ export default async function DashboardPage({
         // le bug des présences plus tôt aujourd'hui, cette fois une
         // fonctionnalité jamais reportée sur Bureau/Coach plutôt qu'un bug.
         presentPlayers: buildPresentPlayers(rsvpsByEvent, e.id, eventRoster),
+        // Retour de Cindy du 11/09 ("qui est absent ?") : le Bureau voit
+        // tout le club, eventRoster (déjà l'union complète pour un
+        // événement multi-équipes) est donc le bon effectif ici sans
+        // aucun filtrage supplémentaire -- à la différence de
+        // Coach/Famille plus bas.
+        absentPlayers: buildAbsentPlayers(rsvpsByEvent, e.id, eventRoster),
         benevoleIds: (benevoleInvitesByEventId.get(e.id) ?? []).map((b) => b.id),
         benevoleInvites: benevoleInvitesByEventId.get(e.id) ?? [],
       };
@@ -3026,6 +3064,28 @@ export default async function DashboardPage({
               ).values()
             )
           : [];
+      // Retour de Cindy du 11/09 ("qui est absent ?") : eventRoster
+      // ci-dessus reste l'union COMPLÈTE (toutes les équipes ciblées, même
+      // celles que ce coach ne coache pas) -- bon pour rsvpCounts (un
+      // comptage n'expose aucune identité), mais pas pour une liste de
+      // noms. ownTeamRoster restreint aux seules équipes qu'il coache
+      // réellement, pour presentPlayers/absentPlayers plus bas -- un
+      // tournoi ciblant sa propre équipe ET une autre ne doit jamais lui
+      // montrer les noms des joueurs de l'autre équipe.
+      // Set local (pas le coachedTeamIds ambiant, un tableau ici) : évite
+      // toute ambiguïté avec le coachedTeamIds de plus haut dans ce
+      // fichier.
+      const ownTeamIdSet = new Set(coachedTeamIds);
+      const ownTeamIds = team
+        ? ownTeamIdSet.has(team.id)
+          ? [team.id]
+          : []
+        : ((e.target_team_ids as string[] | null) ?? []).filter((id) => ownTeamIdSet.has(id));
+      const ownTeamRoster: RosterPlayer[] = Array.from(
+        new Map<string, RosterPlayer>(
+          ownTeamIds.flatMap((id) => rosterByTeam.get(id) ?? []).map((p) => [p.id, p] as const)
+        ).values()
+      );
       const paidInfo = resolvePaidInfo(e.collectes);
       return {
         id: e.id,
@@ -3052,7 +3112,10 @@ export default async function DashboardPage({
         rsvpCounts: buildRsvpCounts(rsvpsByEvent, e.id, eventRoster),
         // Retour de Cindy du 30/08 : "qui sera présent" visible partout,
         // pas seulement côté Famille — voir buildPresentPlayers/bloc Bureau.
-        presentPlayers: buildPresentPlayers(rsvpsByEvent, e.id, eventRoster),
+        // ownTeamRoster (pas eventRoster) depuis le 11/09 : voir son
+        // commentaire plus haut.
+        presentPlayers: buildPresentPlayers(rsvpsByEvent, e.id, ownTeamRoster),
+        absentPlayers: buildAbsentPlayers(rsvpsByEvent, e.id, ownTeamRoster),
         // Retour de Cindy du 06/09 ("bureau et coach" peuvent inviter un
         // bénévole, puis vision des présences) : comme côté Bureau -- voir
         // coachBenevoleInvitesByEventId plus haut.
@@ -3657,6 +3720,13 @@ export default async function DashboardPage({
     // retour d'audit du 28/08) prend l'union dédupliquée de leurs rosters,
     // même principe que rosterSize plus haut dans ce fichier.
     const rsvpsByEvent = buildRsvpStatusByEvent(rsvpRowsRes?.data ?? []);
+    // Retour de Cindy du 11/09 ("qui est absent ?") : toutes les équipes de
+    // TOUTE la famille (enfants + le parent lui-même s'il joue) -- ce même
+    // jeu alimente ensuite "Mon équipe" ET "Mes enfants" (buildFamilyView,
+    // filtré par sous-ensemble plus bas), donc aussi large que nécessaire
+    // pour les deux sans jamais dépasser les équipes réelles de la
+    // famille.
+    const familyOwnTeamIds = new Set(familyRsvpPlayers.flatMap((p) => p.teamIds));
     familyEvents.forEach((e) => {
       const roster = e.teamId
         ? rosterByTeamId.get(e.teamId) ?? []
@@ -3670,7 +3740,24 @@ export default async function DashboardPage({
             )
           : [];
       e.rsvpCounts = buildRsvpCounts(rsvpsByEvent, e.id, roster);
-      e.presentPlayers = buildPresentPlayers(rsvpsByEvent, e.id, roster);
+      // ownFamilyRoster (pas roster) pour presentPlayers/absentPlayers :
+      // roster ci-dessus reste l'union COMPLÈTE d'un événement
+      // multi-équipes (bon pour rsvpCounts, un comptage sans identité),
+      // mais un tournoi ciblant l'équipe de l'enfant ET une autre ne doit
+      // jamais montrer à cette famille les noms des joueurs de l'autre
+      // équipe -- même principe que côté Coach plus haut.
+      const ownFamilyTeamIds = e.teamId
+        ? familyOwnTeamIds.has(e.teamId)
+          ? [e.teamId]
+          : []
+        : (e.targetTeamIds ?? []).filter((id) => familyOwnTeamIds.has(id));
+      const ownFamilyRoster = Array.from(
+        new Map(
+          ownFamilyTeamIds.flatMap((id) => rosterByTeamId.get(id) ?? []).map((p) => [p.id, p] as const)
+        ).values()
+      );
+      e.presentPlayers = buildPresentPlayers(rsvpsByEvent, e.id, ownFamilyRoster);
+      e.absentPlayers = buildAbsentPlayers(rsvpsByEvent, e.id, ownFamilyRoster);
     });
 
     if (familyCotisationRows) {

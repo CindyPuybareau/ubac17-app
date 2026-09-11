@@ -91,23 +91,31 @@ export default function ChildCalendarTab({
   events,
   teammates = [],
   // Retour de Cindy du 10/09 (fusion Calendrier/Événements) : le filtre par
-  // équipe qui n'existait jusqu'ici que sur l'onglet "Événements" (retiré,
-  // voir child-events-tab.tsx) -- un enfant qui joue dans deux équipes
-  // voyait tout empilé sans distinction. `teams` optionnel : les tabs ne
-  // s'affichent que s'il y en a plus d'une (même règle que
-  // child-events-tab.tsx).
+  // équipe qui n'existait jusqu'ici que sur l'ancien onglet "Événements"
+  // (retiré) -- un enfant qui joue dans deux équipes voyait tout empilé
+  // sans distinction. `teams` optionnel : les tabs ne s'affichent que
+  // s'il y en a plus d'une.
   teams = [],
-  // Idem : "Événements" affichait déjà, sur la carte du prochain
-  // rendez-vous, le résumé des présences (AttendanceSummary) -- jamais
-  // reporté ici jusqu'à présent.
+  // Idem : l'ancien onglet "Événements" affichait déjà, sur la carte du
+  // prochain rendez-vous, le résumé des présences (AttendanceSummary) --
+  // jamais reporté ici jusqu'à présent.
   nextEventId,
   nextEventAttendance,
+  // Retour de Cindy du 11/09 ("qui est présent/absent ?") : résumé PAR
+  // ÉVÉNEMENT (pas seulement le prochain), utilisé par Accès Commissions &
+  // Administration / Bénévoles (voir profile-sections.tsx,
+  // read-only-briques-data.ts) -- undefined côté Espace Enfant/Accès
+  // enfant, qui gardent leur comportement "prochain événement seulement"
+  // via nextEventId/nextEventAttendance ci-dessus. Prioritaire sur ces
+  // deux-là quand fourni pour un événement donné.
+  attendanceByEventId,
 }: {
   events: ChildEvent[];
   teammates?: ChildTeammate[];
   teams?: { id: string; name: string | null; category: string | null }[];
   nextEventId?: string | null;
   nextEventAttendance?: { name: string | null; status: string }[];
+  attendanceByEventId?: Record<string, { name: string | null; status: string }[]>;
 }) {
   const [view, setView] = useState<"month" | "list">("month");
   const [viewMonth, setViewMonth] = useState<Date>(today);
@@ -127,7 +135,7 @@ export default function ChildCalendarTab({
     [activeGroup]
   );
 
-  // Même filtre que child-events-tab.tsx, mais sans jamais exclure les
+  // Même filtre que l'ancien onglet "Événements", mais sans jamais exclure les
   // matchs officiels : à la différence de l'ancien onglet "Événements",
   // "Calendrier" a toujours montré tout le calendrier du club, matchs
   // compris (retour de Cindy du 10/09, confirmé explicitement à la fusion).
@@ -180,6 +188,13 @@ export default function ChildCalendarTab({
     const now = new Date();
     setViewMonth(now);
     setSelectedDate(now);
+  }
+
+  // Retour de Cindy du 11/09 : attendanceByEventId prioritaire (résumé
+  // par événement), repli sur l'ancien comportement "prochain événement
+  // seulement" côté Espace Enfant/Accès enfant.
+  function attendanceFor(eventId: string) {
+    return attendanceByEventId?.[eventId] ?? (eventId === nextEventId ? nextEventAttendance : undefined);
   }
 
   const now = Date.now();
@@ -376,7 +391,7 @@ export default function ChildCalendarTab({
                 <EventRow
                   key={e.id}
                   event={e}
-                  attendance={e.id === nextEventId ? nextEventAttendance : undefined}
+                  attendance={attendanceFor(e.id)}
                 />
               ))}
             </div>
@@ -397,7 +412,7 @@ export default function ChildCalendarTab({
                   <EventRow
                     key={e.id}
                     event={e}
-                    attendance={e.id === nextEventId ? nextEventAttendance : undefined}
+                    attendance={attendanceFor(e.id)}
                   />
                 ))}
               </div>
@@ -408,7 +423,7 @@ export default function ChildCalendarTab({
               <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Passés</p>
               <div className="flex flex-col gap-4">
                 {past.map((e) => (
-                  <EventRow key={e.id} event={e} faded />
+                  <EventRow key={e.id} event={e} faded attendance={attendanceFor(e.id)} />
                 ))}
               </div>
             </div>
@@ -441,6 +456,9 @@ function BirthdayRow({ name }: { name: string | null }) {
 // Équipe montre déjà qui est qui, voir child-team-tab.tsx).
 function AttendanceSummary({ attendance }: { attendance: { name: string | null; status: string }[] }) {
   const [open, setOpen] = useState(false);
+  // Retour de Cindy du 11/09 ("qui est absent ?") : état séparé, pour que
+  // déplier les absents ne déplie pas aussi les présents et vice versa.
+  const [absentOpen, setAbsentOpen] = useState(false);
   const present = attendance.filter((a) => a.status === "PRESENT");
   const late = attendance.filter((a) => a.status === "LATE");
   const absent = attendance.filter((a) => a.status === "ABSENT");
@@ -501,12 +519,49 @@ function AttendanceSummary({ attendance }: { attendance: { name: string | null; 
           )}
         </div>
       )}
+      {/* Retour de Cindy du 11/09 ("qui est absent ?") : même principe que
+          présent/en retard ci-dessus, en rouge (status-urgent). */}
+      {absent.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <button
+            type="button"
+            onClick={() => setAbsentOpen((v) => !v)}
+            className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:text-zinc-900"
+          >
+            <Users className="h-3.5 w-3.5 shrink-0 text-status-urgent-dark" />
+            {absent.length}{" "}
+            {absent.length > 1 ? "joueurs/joueuses absent(e)s" : "joueur/joueuse absent(e)"}
+            {absentOpen ? (
+              <ChevronUp className="h-3.5 w-3.5 shrink-0" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+            )}
+          </button>
+          {absentOpen && (
+            <div className="flex flex-wrap gap-1.5">
+              {[...absent]
+                .sort((a, b) => formatFirstName(a.name).localeCompare(formatFirstName(b.name), "fr"))
+                .map((a, i) => (
+                  <span
+                    key={i}
+                    className="inline-flex items-center gap-1 rounded-full bg-status-urgent/10 px-2.5 py-1 text-xs font-medium text-status-urgent-dark"
+                  >
+                    {formatFirstName(a.name)}
+                  </span>
+                ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-// Exporté : réutilisé tel quel par l'onglet "Événements" (voir
-// child-events-tab.tsx) plutôt que de dupliquer ce même gabarit de carte.
+// Exporté : réutilisé par child-results-tab.tsx (carte "prochain match")
+// et par les 3 espaces qui embarquent ce même calendrier (Espace Enfant,
+// Accès enfant, et via CalendarSection/profile-sections.tsx, Commissions &
+// Administration / Bénévoles) plutôt que de dupliquer ce même gabarit de
+// carte.
 // `attendance` optionnel (retour de Cindy du 2026-08-25, onglet "Mon
 // Équipe") : quand fourni, la carte affiche aussi qui est présent/absent
 // pour CET événement précis, directement sous ses infos — plutôt qu'une

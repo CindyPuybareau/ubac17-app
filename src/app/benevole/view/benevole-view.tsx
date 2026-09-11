@@ -351,6 +351,7 @@ export default function BenevoleView({
   profileEvents,
   profileSponsors,
   profileClubReports,
+  attendanceByEventId,
   myWhatsappGroups,
   notifications,
   notificationsEnabled,
@@ -368,6 +369,9 @@ export default function BenevoleView({
   profileEvents: ChildEvent[];
   profileSponsors: SponsorDisplay[];
   profileClubReports: ClubReport[];
+  // Retour de Cindy du 11/09 ("qui est présent/absent ?") : voir
+  // read-only-briques-data.ts, gouverné par la brique "membres".
+  attendanceByEventId: Record<string, { name: string | null; status: string }[]>;
   // Retour de Cindy du 06/09 ("je ne vois pas dans Vie du club son groupe
   // WhatsApp") : à quel(s) groupe(s) ce bénévole a été rattaché (voir
   // benevoles-manager.tsx) -- jamais conditionné par une brique, c'est une
@@ -430,6 +434,7 @@ export default function BenevoleView({
       sponsors: profileSponsors,
       clubReports: profileClubReports,
       whatsappGroups: myWhatsappGroups,
+      attendanceByEventId,
     }),
   ];
 

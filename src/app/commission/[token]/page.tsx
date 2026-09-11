@@ -55,6 +55,7 @@ export default async function CommissionPage({
     profileEvents,
     profileSponsors,
     profileClubReports,
+    attendanceByEventId,
   } = await getReadOnlyBriquesData(supabase, allowedBriques);
 
   // Événements concernant CETTE commission (retour de Cindy du 10/09,
@@ -97,6 +98,7 @@ export default async function CommissionPage({
       profileEvents={profileEvents}
       profileSponsors={profileSponsors}
       profileClubReports={profileClubReports}
+      attendanceByEventId={attendanceByEventId}
     />
   );
 }

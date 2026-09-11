@@ -222,6 +222,7 @@ export default function CommissionView({
   profileEvents,
   profileSponsors,
   profileClubReports,
+  attendanceByEventId,
 }: {
   token: string;
   commissionLabel: string;
@@ -233,6 +234,9 @@ export default function CommissionView({
   profileEvents: ChildEvent[];
   profileSponsors: SponsorDisplay[];
   profileClubReports: ClubReport[];
+  // Retour de Cindy du 11/09 ("qui est présent/absent ?") : voir
+  // read-only-briques-data.ts, gouverné par la brique "membres".
+  attendanceByEventId: Record<string, { name: string | null; status: string }[]>;
 }) {
   // Même structure de menu que benevole-view.tsx (même famille d'espace en
   // lecture seule) : "Besoins bénévoles" toujours en premier, puis une
@@ -276,6 +280,7 @@ export default function CommissionView({
       sponsors: profileSponsors,
       clubReports: profileClubReports,
       whatsappGroups: [],
+      attendanceByEventId,
     }),
   ];
 

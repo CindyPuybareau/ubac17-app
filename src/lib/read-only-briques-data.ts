@@ -15,6 +15,12 @@ export type ReadOnlyBriquesData = {
   profileEvents: ChildEvent[];
   profileSponsors: SponsorDisplay[];
   profileClubReports: ClubReport[];
+  // Retour de Cindy du 11/09 ("qui est présent/absent ?") : résumé de
+  // présence par événement (voir plus bas), gouverné par la brique
+  // "membres" spécifiquement -- une commission/un bénévole sans cette
+  // brique cochée n'a droit à AUCUN nom, ni présent ni absent (objet
+  // vide dans ce cas, jamais un événement partiel).
+  attendanceByEventId: Record<string, { name: string | null; status: string }[]>;
 };
 
 export async function getReadOnlyBriquesData(
@@ -28,6 +34,7 @@ export async function getReadOnlyBriquesData(
   let profileEvents: ChildEvent[] = [];
   let profileSponsors: SponsorDisplay[] = [];
   let profileClubReports: ClubReport[] = [];
+  const attendanceByEventId: Record<string, { name: string | null; status: string }[]> = {};
 
   if (has("equipes")) {
     const { data: teamsData } = await supabase
@@ -139,6 +146,71 @@ export async function getReadOnlyBriquesData(
     }));
   }
 
+  // Retour de Cindy du 11/09 ("qui est présent/absent ?", Accès
+  // Commissions & Administration + Bénévoles) : gouverné par "membres"
+  // spécifiquement (pas "equipes"), comme demandé explicitement -- une
+  // commission qui n'a que "calendrier"/"evenements" coché voit les
+  // événements mais aucun nom. Un résumé PAR ÉVÉNEMENT (pas seulement le
+  // prochain, retour de Cindy du 11/09), même principe que Bureau/Coach/
+  // Famille (calendar-view.tsx) : effectif des équipes ciblées + statut
+  // rsvp, PENDING par défaut si aucune ligne. Filtré par player_id
+  // (borné par l'effectif des équipes concernées, jamais très grand) et
+  // non par event_id -- même correctif que le bug du 30/08
+  // (fetchRsvpsByEvent) : une longue liste d'ids d'événements dans
+  // l'URL peut dépasser la taille acceptée par Supabase, une liste de
+  // joueurs beaucoup plus courte ne risque pas ça.
+  if (has("membres") && profileEvents.length > 0) {
+    const teamIdsForEvents = Array.from(
+      new Set(
+        profileEvents.flatMap((e) =>
+          [e.teamId, ...(e.targetTeamIds ?? [])].filter((id): id is string => Boolean(id))
+        )
+      )
+    );
+    if (teamIdsForEvents.length > 0) {
+      const { data: teamPlayersData } = await supabase
+        .from("team_players")
+        .select("team_id, players(id, first_name, last_name)")
+        .in("team_id", teamIdsForEvents);
+
+      type PersonRow = { id: string; first_name: string | null; last_name: string | null };
+      const rosterByTeamId = new Map<string, PersonRow[]>();
+      (teamPlayersData ?? []).forEach((row) => {
+        const player = row.players as unknown as PersonRow | null;
+        if (!player) return;
+        (rosterByTeamId.get(row.team_id) ?? rosterByTeamId.set(row.team_id, []).get(row.team_id)!).push(
+          player
+        );
+      });
+
+      const allPlayerIds = Array.from(
+        new Set(Array.from(rosterByTeamId.values()).flat().map((p) => p.id))
+      );
+      const { data: rsvpRowsData } =
+        allPlayerIds.length > 0
+          ? await supabase.from("rsvps").select("event_id, player_id, status").in("player_id", allPlayerIds)
+          : { data: [] as { event_id: string; player_id: string; status: string }[] };
+      const statusByEventPlayer = new Map<string, string>();
+      (rsvpRowsData ?? []).forEach((r) => {
+        statusByEventPlayer.set(`${r.event_id}:${r.player_id}`, r.status);
+      });
+
+      profileEvents.forEach((e) => {
+        const teamIds = e.teamId ? [e.teamId] : e.targetTeamIds ?? [];
+        if (teamIds.length === 0) return;
+        const roster = Array.from(
+          new Map(
+            teamIds.flatMap((id) => rosterByTeamId.get(id) ?? []).map((p) => [p.id, p] as const)
+          ).values()
+        );
+        attendanceByEventId[e.id] = roster.map((p) => ({
+          name: [p.first_name, p.last_name].filter(Boolean).join(" ") || null,
+          status: statusByEventPlayer.get(`${e.id}:${p.id}`) ?? "PENDING",
+        }));
+      });
+    }
+  }
+
   if (has("sponsors")) {
     const { data: sponsorsData } = await supabase
       .from("sponsor_display")
@@ -194,5 +266,12 @@ export async function getReadOnlyBriquesData(
     }));
   }
 
-  return { profileTeams, profileMembers, profileEvents, profileSponsors, profileClubReports };
+  return {
+    profileTeams,
+    profileMembers,
+    profileEvents,
+    profileSponsors,
+    profileClubReports,
+    attendanceByEventId,
+  };
 }

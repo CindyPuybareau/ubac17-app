@@ -235,6 +235,54 @@ function PresentPlayersList({
   );
 }
 
+// Retour de Cindy du 11/09 ("qui est absent ?") : même principe que
+// PresentPlayersList ci-dessus (repliée par défaut, dépliable), en rouge
+// (status-urgent) plutôt qu'en émeraude -- même charte que le badge
+// "absent" du résumé juste au-dessus sur la carte. `players` arrive déjà
+// scopé par l'appelant (page.tsx, ownTeamRoster/ownFamilyRoster) : jamais
+// l'effectif complet d'un événement multi-équipes, seulement les équipes
+// que ce viewer a le droit de voir.
+function AbsentPlayersList({
+  players,
+}: {
+  players: { id: string; firstName: string | null; lastName: string | null }[];
+}) {
+  const [open, setOpen] = useState(false);
+
+  if (players.length === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-1.5 border-t border-zinc-100 pt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:text-zinc-900"
+      >
+        <Users className="h-3.5 w-3.5 shrink-0 text-status-urgent-dark" />
+        {players.length} {players.length > 1 ? "joueurs/joueuses absent(e)s" : "joueur/joueuse absent(e)"}
+        {open ? (
+          <ChevronUp className="h-3.5 w-3.5 shrink-0" />
+        ) : (
+          <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+        )}
+      </button>
+      {open && (
+        <div className="flex flex-wrap gap-1.5">
+          {sortByLastName(players, (p) => p.lastName).map((p) => (
+            <span
+              key={p.id}
+              className="inline-flex items-center gap-1 rounded-full bg-status-urgent/10 px-2.5 py-1 text-xs font-medium text-status-urgent-dark"
+            >
+              {formatFirstName(p.firstName)}{" "}
+              <span className="font-bold uppercase">{formatLastName(p.lastName)}</span>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Même principe que PresentPlayersList ci-dessus, en ambre plutôt qu'en
 // émeraude pour ne jamais se confondre avec "Qui sera là ?" (retour de
 // Cindy du 2026-08-25, "il faut que l'on comprenne le stage concerné") :
@@ -1320,6 +1368,10 @@ export default function CalendarView({
             les espaces (Bureau/Coach/Famille), plus seulement côté Famille
             comme avant (voir presentPlayers sur AdminUpcomingEvent). */}
         <PresentPlayersList players={event.presentPlayers ?? []} />
+
+        {/* Retour de Cindy du 11/09 ("qui est absent ?") : même endroit,
+            juste après "Qui sera là ?". */}
+        <AbsentPlayersList players={event.absentPlayers ?? []} />
 
         {/* Retour de Cindy du 06/09 : vision des bénévoles invités et de
             leur réponse, même endroit que "Qui sera là ?" ci-dessus. */}

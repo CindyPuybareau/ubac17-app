@@ -118,9 +118,15 @@ function eventMatchesTeams(event: ChildEvent, selectedIds: Set<string>): boolean
 function CalendarSection({
   events,
   teams,
+  attendanceByEventId,
 }: {
   events: ChildEvent[];
   teams: { id: string; name: string | null; category: string | null }[];
+  // Retour de Cindy du 11/09 ("qui est présent/absent ?") : voir
+  // read-only-briques-data.ts, gouverné par la brique "membres" -- objet
+  // vide si cette brique n'est pas cochée pour cette commission/ce
+  // bénévole, ChildCalendarTab n'affiche alors ni présent ni absent.
+  attendanceByEventId: Record<string, { name: string | null; status: string }[]>;
 }) {
   const [hideTrainings, setHideTrainings] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(teams.map((t) => t.id)));
@@ -148,7 +154,7 @@ function CalendarSection({
           {hideTrainings ? "Entraînements masqués" : "Masquer les entraînements"}
         </button>
       </div>
-      <ChildCalendarTab events={visibleEvents} teams={[]} />
+      <ChildCalendarTab events={visibleEvents} teams={[]} attendanceByEventId={attendanceByEventId} />
     </div>
   );
 }
@@ -220,13 +226,14 @@ export function buildProfileSections({
   sponsors,
   clubReports,
   whatsappGroups,
+  attendanceByEventId,
 }: {
   allowedBriques: string[];
   teams: ProfileTeam[];
   members: ProfileMember[];
   // Un seul jeu de données pour "evenements" ET "matchs_resultats" : les
   // deux composants ci-dessous filtrent déjà chacun de leur côté par
-  // eventType (voir child-events-tab.tsx/child-results-tab.tsx), même
+  // eventType (voir child-calendar-tab.tsx/child-results-tab.tsx), même
   // convention que côté Espace Enfant.
   events: ChildEvent[];
   sponsors: SponsorDisplay[];
@@ -234,6 +241,9 @@ export function buildProfileSections({
   // Retour de Cindy du 06/09 ("je ne vois pas dans Vie du club son groupe
   // WhatsApp") : jamais conditionné par une brique, voir benevole-view.tsx.
   whatsappGroups: { id: string; name: string; inviteLink: string | null }[];
+  // Retour de Cindy du 11/09 ("qui est présent/absent ?") : voir
+  // read-only-briques-data.ts, gouverné par la brique "membres".
+  attendanceByEventId: Record<string, { name: string | null; status: string }[]>;
 }): AdminSection[] {
   const has = (b: string) => allowedBriques.includes(b);
   const teamRefs = teams.map((t) => ({ id: t.id, name: t.name, category: t.category }));
@@ -251,7 +261,9 @@ export function buildProfileSections({
       key: "calendrier",
       label: "Calendrier",
       icon: <CalendarDays className={iconClass} />,
-      content: <CalendarSection events={events} teams={teamRefs} />,
+      content: (
+        <CalendarSection events={events} teams={teamRefs} attendanceByEventId={attendanceByEventId} />
+      ),
     });
   }
 

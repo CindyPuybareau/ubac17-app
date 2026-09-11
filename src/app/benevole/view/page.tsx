@@ -136,6 +136,7 @@ export default async function BenevoleViewPage() {
     profileEvents,
     profileSponsors,
     profileClubReports,
+    attendanceByEventId,
   } = await getReadOnlyBriquesData(supabase, allowedBriques);
 
   // Cloche de notifications (retour de Cindy du 06/09, "comme pour tous
@@ -184,6 +185,7 @@ export default async function BenevoleViewPage() {
       profileEvents={profileEvents}
       profileSponsors={profileSponsors}
       profileClubReports={profileClubReports}
+      attendanceByEventId={attendanceByEventId}
       myWhatsappGroups={myWhatsappGroups}
       notifications={notifications}
       notificationsEnabled={notificationsEnabled}
