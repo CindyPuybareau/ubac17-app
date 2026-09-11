@@ -38,8 +38,7 @@ import SponsorsManager from "./sponsors-manager";
 import SponsorsDisplay from "./sponsors-display";
 import CommissionsManager from "./commissions-manager";
 import BureauDashboard from "./bureau-dashboard";
-import EmptyState from "./empty-state";
-import type { AutomationKey } from "./automation-settings";
+import AutomationSettings, { type AutomationKey } from "./automation-settings";
 import type {
   AdminAccessProfile,
   AdminBenevole,
@@ -195,7 +194,6 @@ export default function AdminView({
             cotisations={cotisations}
             members={members}
             events={upcomingEvents}
-            automationSettings={automationSettings}
             createTeams={teamRefs}
             birthdayMembers={birthdayMembers}
             eventRoles={eventRoles}
@@ -213,22 +211,19 @@ export default function AdminView({
       // Retour de Cindy du 10/09 ("alléger l'onglet calendrier") : nouvel
       // onglet pensé pour accueillir des blocs secondaires (Accès à
       // l'espace enfant, lien d'abonnement agenda... déjà déplacés côté
-      // Coach/Famille, voir coach-view.tsx/family-view.tsx) — rien côté
-      // Bureau pour l'instant, ces deux blocs-là n'y ayant jamais existé.
-      // Volontairement second dans la liste, jamais premier : l'ouverture
-      // de l'appli doit toujours se faire sur "Calendrier" (voir
-      // admin-sidebar.tsx, le premier onglet du tableau est l'onglet actif
-      // par défaut).
+      // Coach/Famille, voir coach-view.tsx/family-view.tsx). Volontairement
+      // second dans la liste, jamais premier : l'ouverture de l'appli doit
+      // toujours se faire sur "Calendrier" (voir admin-sidebar.tsx, le
+      // premier onglet du tableau est l'onglet actif par défaut).
+      //
+      // Retour de Cindy du 12/09 : "Envois automatiques" déménage ici
+      // depuis "Calendrier" (BureauDashboard, où il vivait jusqu'ici) --
+      // même logique d'allégement, ce réglage n'a rien à voir avec le
+      // planning lui-même.
       key: "dashboard",
       label: "Tableau de bord",
       icon: <LayoutDashboard className={iconClass} />,
-      content: (
-        <EmptyState
-          icon={LayoutDashboard}
-          message="Rien ici pour l'instant."
-          hint="Cet onglet accueillera prochainement d'autres blocs, pour alléger le Calendrier."
-        />
-      ),
+      content: <AutomationSettings settings={automationSettings} />,
     },
     {
       key: "members",

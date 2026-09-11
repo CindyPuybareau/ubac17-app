@@ -14,7 +14,6 @@ import { formatPersonName } from "@/lib/names";
 import { formatLocalDateFr } from "@/lib/local-date";
 import { balanceDue, computeStatus } from "./cotisation-shared";
 import AnimatedNumber from "./animated-number";
-import AutomationSettings, { type AutomationKey } from "./automation-settings";
 import DeferredCalendar from "./deferred-calendar";
 import SectionLinkCard from "./section-link-card";
 import RelanceRedirectButton from "./relance-redirect-button";
@@ -212,7 +211,6 @@ export default function BureauDashboard({
   cotisations,
   members,
   events,
-  automationSettings,
   createTeams,
   birthdayMembers,
   eventRoles,
@@ -225,7 +223,6 @@ export default function BureauDashboard({
   cotisations: AdminCotisation[];
   members: AdminMember[];
   events: AdminUpcomingEvent[];
-  automationSettings: Record<AutomationKey, boolean>;
   // Le calendrier complet vit désormais sous ce résumé plutôt que dans son
   // propre onglet séparé (retour de Cindy du 2026-08-21 : "l'onglet
   // accueil devrait être calendrier et intégrer l'onglet existant
@@ -287,8 +284,8 @@ export default function BureauDashboard({
 
   return (
     <div className="flex flex-col gap-4">
-      <AutomationSettings settings={automationSettings} />
-
+      {/* Retour de Cindy du 12/09 : "Envois automatiques" déménage dans
+          "Tableau de bord" (admin-view.tsx) -- vivait ici avant. */}
       {/* Retour de Cindy du 2026-08-22 : "Équipes sans coach" retirée
           (pas d'intérêt) ; "Documents à renouveler" devenue
           "Renouvellement Sponsors" ; carte "Pénalités" ajoutée juste après
