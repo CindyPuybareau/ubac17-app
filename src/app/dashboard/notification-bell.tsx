@@ -114,11 +114,16 @@ export default function NotificationBell() {
 
   return (
     <div ref={containerRef} className="relative">
+      {/* Retour de Cindy du 11/09 ("la cloche aussi devrait être mise en
+          avant") : fond bg-white/10 permanent (pas seulement au survol
+          comme avant) -- se voit désormais comme un vrai bouton même sans
+          notification en attente, tout en restant plus discrète que le
+          menu doré (action secondaire, pas la navigation principale). */}
       <button
         type="button"
         onClick={toggleOpen}
         aria-label="Notifications"
-        className="relative flex items-center gap-1.5 rounded-lg p-2 text-sm font-medium text-white transition-colors hover:bg-white/10"
+        className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 active:bg-white/25"
       >
         <Bell className="h-5 w-5 shrink-0" />
         {unreadCount > 0 && (
