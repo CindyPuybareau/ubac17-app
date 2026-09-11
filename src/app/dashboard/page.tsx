@@ -3925,6 +3925,9 @@ export default async function DashboardPage({
     tabs.push({
       key: "admin",
       label: "Bureau",
+      // Retour de Cindy du 11/09 ("réutiliser le langage visuel déjà en
+      // place") : même icône que le badge Bureau existant (members-table.tsx).
+      icon: "shield",
       content:
         activeTab === "admin" ? (
           <AdminView
@@ -3966,6 +3969,9 @@ export default async function DashboardPage({
       // coachTeamsWithRoster (vide tant que ce bloc n'a pas tourné) : le
       // libellé reste correct même quand cet onglet n'est pas l'actif.
       label: coachedTeams.length > 1 ? "Équipes coachées" : "Équipe coachée",
+      // Retour de Cindy du 11/09 : même icône que le rond "Coach"
+      // (team-selector-pills.tsx).
+      icon: "clipboard",
       content:
         activeTab === "coach" ? (
           <CoachView
@@ -4012,6 +4018,9 @@ export default async function DashboardPage({
     tabs.push({
       key: "own-team",
       label: "Mon équipe",
+      // Retour de Cindy du 11/09 : même icône que le rond "Joueur"
+      // (team-selector-pills.tsx).
+      icon: "shirt",
       content: activeTab === "own-team" ? buildFamilyView(myTeamRsvpPlayers) : null,
     });
   }
@@ -4027,6 +4036,9 @@ export default async function DashboardPage({
     tabs.push({
       key: "children",
       label: childrenCountEarly > 1 ? "Mes enfants" : "Mon enfant",
+      // Retour de Cindy du 11/09 ("mes enfants aussi le mérite") : icône
+      // neutre (dashboard-tabs.tsx), distincte du "shirt" de "Mon équipe".
+      icon: "users",
       content: activeTab === "children" ? buildFamilyView(myChildrenRsvpPlayers) : null,
     });
   }

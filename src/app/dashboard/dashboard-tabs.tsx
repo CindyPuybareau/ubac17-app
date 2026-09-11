@@ -2,11 +2,36 @@
 
 import { useState, useTransition, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { ClipboardList, Shield, Shirt, Users } from "lucide-react";
+
+// Retour de Cindy du 11/09 ("réutiliser le langage visuel déjà en place
+// plutôt qu'en inventer un nouveau") : même icône que le rond de rôle
+// utilisé ailleurs dans l'appli (team-selector-pills.tsx -- ClipboardList
+// = Coach, Shirt = Joueur) ou le badge Bureau (members-table.tsx --
+// Shield). "users" (Mon enfant/Mes enfants) réutilise l'icône neutre déjà
+// utilisée par team-selector-pills.tsx pour "ni coach ni joueur de cette
+// équipe précise" -- distincte du "shirt" de "Mon équipe" (sa propre
+// fiche joueur), pour que les deux onglets restent reconnaissables l'un
+// de l'autre quand une même personne les a tous les deux. Une CHAÎNE
+// plutôt que le composant Lucide lui-même (LucideIcon) sur
+// DashboardTab.icon : ce type traverse la frontière serveur -> client
+// (page.tsx est un composant serveur, DashboardTabs un "use client") --
+// un composant React (fonction) ne s'y sérialise pas et plantait le
+// rendu ("Only plain objects can be passed..."), même bug déjà rencontré
+// et corrigé le 06/09 sur KpiCard/bureau-dashboard.tsx (`format` fonction
+// -> `kind` chaîne). Résolue ici, jamais côté appelant.
+const TAB_ICONS = {
+  shield: Shield,
+  clipboard: ClipboardList,
+  shirt: Shirt,
+  users: Users,
+} as const;
 
 export type DashboardTab = {
   key: string;
   label: string;
   content: ReactNode;
+  icon?: keyof typeof TAB_ICONS;
 };
 
 // Repère de chargement aux couleurs du club (logo qui pulse + barre de
@@ -108,30 +133,47 @@ export default function DashboardTabs({
     <div className="flex flex-col gap-4">
       {tabs.length > 1 && (
         <div className="flex flex-wrap gap-2">
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => handleClick(tab.key)}
-              onMouseEnter={() => handlePrefetch(tab.key)}
-              onFocus={() => handlePrefetch(tab.key)}
-              onTouchStart={() => handlePrefetch(tab.key)}
-              disabled={isPending}
-              className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-60 ${
-                current.key === tab.key
-                  ? "border-ubac-yellow bg-ubac-yellow/10 text-ubac-yellow-dark"
-                  : // Retour de Cindy du 29/08 ("les onglets se fondent dans le
-                    // fond") : sans fond propre, un onglet non actif (bordure
-                    // grise très claire, aucun remplissage) se distinguait à
-                    // peine du fond crème général de l'appli (--background,
-                    // globals.css) — même correctif déjà en place ailleurs
-                    // pour ce genre de pastille (team-selector-pills.tsx).
-                    "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
-              }`}
-            >
-              {tab.label}
-              {displayedPendingKey === tab.key ? "…" : ""}
-            </button>
-          ))}
+          {tabs.map((tab) => {
+            const isActive = current.key === tab.key;
+            const Icon = tab.icon ? TAB_ICONS[tab.icon] : null;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => handleClick(tab.key)}
+                onMouseEnter={() => handlePrefetch(tab.key)}
+                onFocus={() => handlePrefetch(tab.key)}
+                onTouchStart={() => handlePrefetch(tab.key)}
+                disabled={isPending}
+                // Retour de Cindy du 11/09 ("façon segmented control") :
+                // fond plein doré (pas juste un ton translucide + bordure
+                // comme avant) pour l'onglet actif, texte/icône navy --
+                // contraste vérifié à 6,8:1 (seuil WCAG AA icônes : 3:1),
+                // largement supérieur à du blanc sur ce même doré (1,6:1,
+                // illisible). py-2 (au lieu de py-1.5) : zone tactile un
+                // peu plus généreuse sur mobile, tout en gardant la forme
+                // pilule. whitespace-nowrap + shrink-0 sur l'icône :
+                // icône et texte ne se chevauchent jamais, même sur petit
+                // écran.
+                className={`flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-2 text-sm font-medium transition-colors disabled:opacity-60 ${
+                  isActive
+                    ? "border-transparent bg-ubac-yellow text-navy"
+                    : // Retour de Cindy du 29/08 ("les onglets se fondent dans le
+                      // fond") : sans fond propre, un onglet non actif (bordure
+                      // grise très claire, aucun remplissage) se distinguait à
+                      // peine du fond crème général de l'appli (--background,
+                      // globals.css) — même correctif déjà en place ailleurs
+                      // pour ce genre de pastille (team-selector-pills.tsx).
+                      "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
+                }`}
+              >
+                {Icon && (
+                  <Icon className={`h-4 w-4 shrink-0 ${isActive ? "text-navy" : "text-zinc-400"}`} />
+                )}
+                {tab.label}
+                {displayedPendingKey === tab.key ? "…" : ""}
+              </button>
+            );
+          })}
         </div>
       )}
 

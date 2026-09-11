@@ -534,8 +534,17 @@ export default function FamilyView({
         contentHeader={
           hasSeveralChildren ? (
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                Enfant
+              {/* Retour de Cindy du 12/09 ("ce texte plat... un signet
+                  sympa") : même habillage que le badge "Espace Bureau"
+                  (admin-view.tsx) plutôt qu'un simple texte gris, pour
+                  rester assorti au reste de l'appli. Pluriel/singulier
+                  selon le nombre réel d'enfants -- même principe que le
+                  libellé de l'onglet "Mon enfant"/"Mes enfants"
+                  (page.tsx) ; en pratique toujours au pluriel ici, ce
+                  bloc n'existant que si hasSeveralChildren. */}
+              <span className="inline-flex w-fit items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ubac-yellow/15 px-3 py-1 text-xs font-semibold uppercase leading-none text-ubac-yellow-dark">
+                <Users className="h-3.5 w-3.5 shrink-0" />
+                {rsvpPlayers.length > 1 ? "Mes enfants" : "Enfant"}
               </span>
               {rsvpPlayers.map((p) => {
                 const isActive = resolvedSelectedPlayerId === p.id;
