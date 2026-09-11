@@ -3,10 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Check,
   ChevronDown,
   ChevronUp,
-  Copy,
   Landmark,
   RotateCcw,
   Settings,
@@ -16,6 +14,7 @@ import { createClient } from "@/lib/supabase/client";
 import { BRIQUE_GROUPS } from "./access-briques";
 import { commissionMeta } from "@/lib/commission-labels";
 import BenevolesManager from "./benevoles-manager";
+import CopyLinkButton, { IconActionButton } from "./link-share-controls";
 import type { AdminAccessProfile, AdminBenevole, WhatsAppGroup } from "./page";
 
 // Génère un jeton équivalent à celui posé côté base par défaut
@@ -53,7 +52,6 @@ function CommissionCard({
   const [briques, setBriques] = useState<string[]>(initialBriques);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
 
   useEffect(() => {
@@ -64,17 +62,6 @@ function CommissionCard({
 
   function toggleBrique(key: string) {
     setBriques((b) => (b.includes(key) ? b.filter((x) => x !== key) : [...b, key]));
-  }
-
-  async function copyLink() {
-    const link = `${window.location.origin}/commission/${group.accessToken}`;
-    try {
-      await navigator.clipboard.writeText(link);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setError("Copie impossible, copie le lien à la main.");
-    }
   }
 
   async function save() {
@@ -185,38 +172,27 @@ function CommissionCard({
     <div className="flex flex-col gap-3 rounded-2xl border border-zinc-100 border-l-4 border-l-ubac-yellow bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
       <div className="flex items-start justify-between gap-2">
         <span className="min-w-0 truncate text-sm font-semibold text-zinc-900">{title}</span>
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          title="Accès en lecture seule"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
-        >
-          <Settings className="h-3.5 w-3.5" />
-        </button>
+        {/* Retour de Cindy du 11/09 ("l'icône rouage est trop peu visible") :
+            IconActionButton (link-share-controls.tsx) -- cercle plus grand,
+            fond navy discret, hover marqué, info-bulle au survol -- plutôt
+            qu'un simple trait gris sans zone de clic perceptible. */}
+        <IconActionButton icon={Settings} label="Configurer les accès" onClick={() => setOpen((v) => !v)} />
       </div>
       {briques.length > 0 && (
         <p className="text-xs text-zinc-400">
           {briques.length} accès en lecture seule
         </p>
       )}
-      <button
-        type="button"
-        onClick={copyLink}
+      {/* Retour de Cindy du 11/09 ("le bouton copier doit être identique
+          partout") : CopyLinkButton (link-share-controls.tsx), même
+          composant que "Copier le lien d'accès enfant" -- le lien d'une
+          commission existe toujours déjà (posé à la création du groupe),
+          getLink n'a donc jamais besoin de le créer, juste de le renvoyer. */}
+      <CopyLinkButton
+        label="Copier son lien"
         disabled={!group.accessToken}
-        className="flex w-fit items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 disabled:opacity-50"
-      >
-        {copied ? (
-          <>
-            <Check className="h-3.5 w-3.5 text-emerald-600" />
-            Lien copié
-          </>
-        ) : (
-          <>
-            <Copy className="h-3.5 w-3.5" />
-            Copier son lien
-          </>
-        )}
-      </button>
+        getLink={() => `${window.location.origin}/commission/${group.accessToken}`}
+      />
 
       {open && (
         <div
@@ -365,8 +341,12 @@ export default function CommissionsManager({
           <Landmark className="h-3.5 w-3.5" />
           {commissions.length} commission{commissions.length > 1 ? "s" : ""}
         </p>
+        {/* Retour de Cindy du 11/09 ("changer le texte... faire concis") :
+            reformulé pour préciser à qui ce lien s'adresse (les personnes
+            hors du club, sans compte) plutôt qu'une description générale
+            du fonctionnement. */}
         <p className="mb-3 text-sm text-zinc-500">
-          Chaque commission a son propre lien public et permanent, à partager une seule fois
+          À partager une seule fois aux personnes « non membres du club »
           (message épinglé dans son groupe WhatsApp). Toute personne l&apos;utilisant voit
           automatiquement les mêmes sections en lecture seule et les besoins en bénévoles qui la
           concernent — aucune connexion, aucune fiche à créer.

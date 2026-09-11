@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatFirstName } from "@/lib/names";
 import { isValidPinFormat } from "@/lib/pin";
 import ConfirmDialog from "./confirm-dialog";
+import CopyLinkButton from "./link-share-controls";
 
 type Child = { id: string; name: string; hasPin: boolean };
 
@@ -19,8 +20,6 @@ export default function ChildAccessManager() {
   const [code, setCode] = useState<string | null>(null);
   const [children, setChildren] = useState<Child[] | null>(null);
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
-  const [copied, setCopied] = useState(false);
   // Retour de Cindy du 11/09 (bug "lien invalidé à chaque clic") : une
   // vraie régénération (nouveau code, ancien lien devenu inutilisable)
   // est désormais une action séparée et volontaire, jamais implicite --
@@ -91,12 +90,16 @@ export default function ChildAccessManager() {
   // écrasait TOUJOURS le lien existant par un nouveau -- un second clic
   // (le parent qui ne retrouve pas facilement son lien déjà créé, par
   // exemple) invalidait donc silencieusement celui déjà donné à l'enfant.
-  async function generateLink() {
-    setGenerating(true);
+  // Passé tel quel à CopyLinkButton (link-share-controls.tsx) : un seul
+  // bouton fait les deux à la fois désormais (créer si besoin, copier
+  // toujours), plutôt que "Créer" puis un second bouton "Copier" séparé.
+  async function getOrCreateLink(): Promise<string | null> {
     const supabase = createClient();
     const { data, error } = await supabase.rpc("get_or_create_family_access_code");
-    setGenerating(false);
-    if (!error && data) setCode(data as string);
+    if (error || !data) return null;
+    const newCode = data as string;
+    setCode(newCode);
+    return typeof window !== "undefined" ? `${window.location.origin}/enfant/${newCode}` : null;
   }
 
   // Vraie régénération, volontaire et séparée (retour de Cindy du 11/09) :
@@ -114,13 +117,6 @@ export default function ChildAccessManager() {
     }
     if (data) setCode(data as string);
     setConfirmRegenerate(false);
-  }
-
-  function copyLink(link: string) {
-    navigator.clipboard.writeText(link).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
   }
 
   async function savePin(childId: string) {
@@ -188,20 +184,24 @@ export default function ChildAccessManager() {
         en lecture seule (ses matchs et entraînements uniquement).
       </p>
 
-      {link ? (
+      {/* Retour de Cindy du 11/09 ("le bouton copier doit être identique
+          partout, une fois créé le lien doit rester visible sans avoir à
+          recliquer") : un seul bouton, toujours affiché -- il copie le
+          lien existant, ou le crée une seule fois s'il n'y en a encore
+          aucun (getOrCreateLink, idempotent). Le libellé "Copier..." dit
+          ce qu'il fait réellement, plus jamais "Créer" qui donnait
+          l'impression, à tort, qu'un second clic en fabriquerait un
+          nouveau. */}
+      <CopyLinkButton label="Copier le lien d'accès enfant" getLink={getOrCreateLink} />
+
+      {link && (
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-1.5">
             <Link2 className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
             <span className="flex-1 truncate text-xs text-zinc-600">{link}</span>
-            <button
-              onClick={() => copyLink(link)}
-              className="shrink-0 rounded-full bg-navy px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-navy/90"
-            >
-              {copied ? "Copié !" : "Copier"}
-            </button>
           </div>
           {/* Retour de Cindy du 11/09 : action séparée et volontaire,
-              jamais confondue avec l'affichage du lien ci-dessus --
+              jamais confondue avec le bouton "Copier" ci-dessus --
               confirmation obligatoire (ConfirmDialog plus bas) avant de
               rendre l'ancien lien inutilisable. */}
           <button
@@ -213,14 +213,6 @@ export default function ChildAccessManager() {
             Régénérer le lien
           </button>
         </div>
-      ) : (
-        <button
-          onClick={generateLink}
-          disabled={generating}
-          className="w-fit rounded-full bg-ubac-yellow px-3.5 py-1.5 text-xs font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
-        >
-          {generating ? "Création..." : "Créer le lien d'accès enfant"}
-        </button>
       )}
 
       <ConfirmDialog
