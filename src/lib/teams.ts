@@ -17,8 +17,10 @@ export function teamLabel(t: { name?: string | null; category?: string | null })
 // sous-équipes des deux façons — "U13M-1" et "U13M1" — donc les deux sont
 // reconnues. Sans séparateur, le chiffre ne compte comme déclinaison que
 // s'il suit une lettre : autrement "U13" deviendrait "U1" et "U11" "U1",
-// et chaque catégorie perdrait son propre numéro.
-function splitTeamName(label: string) {
+// et chaque catégorie perdrait son propre numéro. Exportée (retour de
+// Cindy du 11/09) pour groupTeamsByPrimarySecondary ci-dessous : même
+// découpage plutôt qu'une deuxième copie.
+export function splitTeamName(label: string) {
   const trimmed = label.trim();
   const separated = trimmed.match(/^(.*?)[\s_-]+(\d+)$/);
   if (separated) return { group: separated[1].trim().toUpperCase(), rank: Number(separated[2]) };
@@ -62,7 +64,7 @@ export function categoryKey(label: string | null | undefined) {
     .join("");
 }
 
-// Un U13M ne peut être prêté qu'à un autre groupe U13M : proposer U15M ou
+// Un U13M ne peut être affecté qu'à un autre groupe U13M : proposer U15M ou
 // U13F n'a aucun sens sportif. La comparaison est bidirectionnelle pour que
 // l'équipe de base ("U13") et ses déclinaisons ("U13M-1") se reconnaissent
 // mutuellement, sans pour autant rapprocher U13M et U13F.
@@ -116,4 +118,59 @@ export function sortTeamsByGroup<T extends { name?: string | null; category?: st
     if (ga !== gb) return ga - gb;
     return sa.rank - sb.rank;
   });
+}
+
+// Retour de Cindy du 11/09 ("équipe principale" U13M/U18M/Séniors M avec
+// ses "équipes secondaires" U13M-1+U13M-2/U18M-1+U18M-2/Séniors 1+2) :
+// fusionne les calendriers d'une personne UNIQUEMENT quand elle a le tag
+// de l'équipe principale (rang 0, "U13M") ET au moins un tag d'équipe
+// secondaire (rang > 0, "U13M-1") du MÊME groupe -- jamais entre deux
+// secondaires sans la principale (ex. U13M-1 + U13M-2 sans U13M restent
+// séparées, comme demandé explicitement). Générique par construction
+// (splitTeamName lit le nom, pas une liste de catégories codée en dur) :
+// toute future équipe suivant ce même principe (mère sans suffixe +
+// déclinaisons numérotées) en bénéficie automatiquement, sans modification
+// de code. `teams` est la liste des équipes d'UNE SEULE personne (ses
+// propres team_players, coachées ou jouées selon l'espace appelant) --
+// jamais le catalogue du club entier, qui mélangerait des personnes
+// différentes.
+export function groupTeamsByPrimarySecondary<
+  T extends { id: string; name?: string | null; category?: string | null },
+>(teams: T[]): { primary: T; secondaries: T[] }[] {
+  const byGroup = new Map<string, { rank: number; team: T }[]>();
+  teams.forEach((t) => {
+    const label = t.name ?? t.category ?? "";
+    const { group, rank } = splitTeamName(label);
+    (byGroup.get(group) ?? byGroup.set(group, []).get(group)!).push({ rank, team: t });
+  });
+
+  const merged: T[] = [];
+  const secondariesByPrimaryId = new Map<string, T[]>();
+  const consumedIds = new Set<string>();
+
+  byGroup.forEach((entries) => {
+    const primaryEntry = entries.find((e) => e.rank === 0);
+    const secondaryEntries = entries.filter((e) => e.rank > 0);
+    if (primaryEntry && secondaryEntries.length > 0) {
+      merged.push(primaryEntry.team);
+      secondariesByPrimaryId.set(
+        primaryEntry.team.id,
+        secondaryEntries.map((e) => e.team)
+      );
+      consumedIds.add(primaryEntry.team.id);
+      secondaryEntries.forEach((e) => consumedIds.add(e.team.id));
+    }
+  });
+
+  // Tout ce qui n'a pas été absorbé par une fusion (équipe sans famille,
+  // ou groupe avec seulement des secondaires sans principale) reste tel
+  // quel, un onglet par équipe -- exactement le comportement actuel.
+  teams.forEach((t) => {
+    if (!consumedIds.has(t.id)) merged.push(t);
+  });
+
+  return sortTeamsByGroup(merged).map((t) => ({
+    primary: t,
+    secondaries: secondariesByPrimaryId.get(t.id) ?? [],
+  }));
 }

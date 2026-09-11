@@ -342,7 +342,7 @@ export default function MembersTable({
       // aussi dans son ancienne équipe en base (audit du 31/08). Pas de
       // .eq("team_id", ...) ici (comportement voulu : "Retirer aussi de
       // leur(s) équipe(s) actuelle(s)" retire bien TOUTES les équipes d'un
-      // membre prêté, pas juste une) — donc le total attendu se calcule à
+      // membre affecté à plusieurs équipes, pas juste une) — donc le total attendu se calcule à
       // partir du nombre d'équipes déjà connu de chacun, pas 1 par membre.
       const expectedDeleteCount = reassignIds.reduce(
         (sum, id) => sum + (localMembers.find((m) => m.id === id)?.teams.length ?? 0),

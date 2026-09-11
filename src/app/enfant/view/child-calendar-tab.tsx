@@ -28,7 +28,7 @@ import { groupBirthdaysByMonthDay, type BirthdaySource } from "@/app/dashboard/b
 import EmptyState from "@/app/dashboard/empty-state";
 import { parseMatchTitle } from "@/lib/match-display";
 import { formatFirstName } from "@/lib/names";
-import { sortTeamsByGroup, teamLabel } from "@/lib/teams";
+import { groupTeamsByPrimarySecondary, teamLabel } from "@/lib/teams";
 import type { ChildEvent, ChildTeammate } from "./child-dashboard";
 
 // Même grille mensuelle que le calendrier Parent (calendar-view.tsx) —
@@ -113,11 +113,19 @@ export default function ChildCalendarTab({
   const [viewMonth, setViewMonth] = useState<Date>(today);
   const [selectedDate, setSelectedDate] = useState<Date>(today);
 
-  const sortedTeams = useMemo(() => sortTeamsByGroup(teams), [teams]);
+  // Retour de Cindy du 11/09 ("équipe principale/secondaire") : fusionne
+  // U13M avec U13M-1/U13M-2 (même principe côté Coach/Famille, voir
+  // coach-view.tsx/family-view.tsx) en un seul onglet plutôt que trois --
+  // chaque joueur de U13M-1/U13M-2 est de toute façon déjà inscrit dans
+  // U13M aussi.
+  const groupedTeams = useMemo(() => groupTeamsByPrimarySecondary(teams), [teams]);
   const [activeTeamId, setActiveTeamId] = useState<string | undefined>(undefined);
-  const activeTeamIdResolved = sortedTeams.some((t) => t.id === activeTeamId)
-    ? activeTeamId
-    : sortedTeams[0]?.id;
+  const activeGroup =
+    groupedTeams.find((g) => g.primary.id === activeTeamId) ?? groupedTeams[0];
+  const activeMemberTeamIds = useMemo(
+    () => (activeGroup ? [activeGroup.primary.id, ...activeGroup.secondaries.map((s) => s.id)] : []),
+    [activeGroup]
+  );
 
   // Même filtre que child-events-tab.tsx, mais sans jamais exclure les
   // matchs officiels : à la différence de l'ancien onglet "Événements",
@@ -126,11 +134,11 @@ export default function ChildCalendarTab({
   const filteredEvents = useMemo(() => {
     return events.filter(
       (e) =>
-        sortedTeams.length <= 1 ||
-        e.teamId === activeTeamIdResolved ||
-        (activeTeamIdResolved ? (e.targetTeamIds?.includes(activeTeamIdResolved) ?? false) : false)
+        groupedTeams.length <= 1 ||
+        (e.teamId ? activeMemberTeamIds.includes(e.teamId) : false) ||
+        (e.targetTeamIds?.some((id) => activeMemberTeamIds.includes(id)) ?? false)
     );
-  }, [events, sortedTeams, activeTeamIdResolved]);
+  }, [events, groupedTeams, activeMemberTeamIds]);
 
   // Filtre par type d'événement retiré (retour de Cindy du 2026-08-24,
   // "supprimer ça sur le haut du calendrier ... pas necessaire") : le
@@ -184,21 +192,21 @@ export default function ChildCalendarTab({
 
   return (
     <div className="flex flex-col gap-4">
-      {sortedTeams.length > 1 && (
+      {groupedTeams.length > 1 && (
         <div className="flex flex-wrap gap-2">
-          {sortedTeams.map((t) => {
-            const isActive = activeTeamIdResolved === t.id;
+          {groupedTeams.map(({ primary }) => {
+            const isActive = activeGroup?.primary.id === primary.id;
             return (
               <button
-                key={t.id}
-                onClick={() => setActiveTeamId(t.id)}
+                key={primary.id}
+                onClick={() => setActiveTeamId(primary.id)}
                 className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
                   isActive
                     ? "border-navy bg-navy text-white"
                     : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
                 }`}
               >
-                {teamLabel(t)}
+                {teamLabel(primary)}
               </button>
             );
           })}

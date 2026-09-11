@@ -448,6 +448,17 @@ export default function CalendarView({
     name: string | null;
     category: string | null;
     role?: "COACH" | "PLAYER";
+    // Retour de Cindy du 11/09 ("fusion des calendriers équipe
+    // principale/secondaire") : un onglet "U13M" peut représenter
+    // PLUSIEURS vraies équipes à la fois (U13M + U13M-1, voir
+    // groupTeamsByPrimarySecondary dans lib/teams.ts) -- l'appelant
+    // (coach-view.tsx, family-view.tsx...) construit déjà ce
+    // regroupement, CalendarView n'a pas besoin de connaître la notion
+    // de principale/secondaire, juste de filtrer sur cet ensemble
+    // plutôt que sur `id` seul. Omis (undefined) pour une équipe qui ne
+    // représente qu'elle-même -- matchesTeamFilter retombe alors sur
+    // [id].
+    memberTeamIds?: string[];
   }[];
   // "pills" (défaut) : une équipe active à la fois, façon "Mes Équipes"
   // (Coach). "dropdown" (retour de Cindy du 2026-08-22, "comme dans
@@ -689,6 +700,17 @@ export default function CalendarView({
   // "Équipes spécifiques" invisible du filtre parce que seul event.teamId
   // était regardé, jamais targetTeamIds) ne doit pouvoir se corriger qu'à
   // UN seul endroit, pas être réparé ici et oublié là.
+  // Retour de Cindy du 11/09 : l'onglet actif ("pills") peut représenter
+  // plusieurs vraies équipes à la fois (memberTeamIds, voir resultsTeams
+  // ci-dessus) -- un événement matche dès qu'il touche N'IMPORTE
+  // LAQUELLE d'entre elles, pas seulement l'id de l'onglet lui-même.
+  // Repli sur [activeResultsTeamIdResolved] pour un onglet qui ne
+  // représente que lui-même (cas de tous les jours, memberTeamIds
+  // absent).
+  const activeMemberTeamIds =
+    sortedResultsTeams.find((t) => t.id === activeResultsTeamIdResolved)?.memberTeamIds ??
+    (activeResultsTeamIdResolved != null ? [activeResultsTeamIdResolved] : []);
+
   function matchesTeamFilter(e: AdminUpcomingEvent) {
     if (!resultsTeams || resultsTeams.length <= 1) return true;
     return resultsTeamSelector === "dropdown"
@@ -698,11 +720,10 @@ export default function CalendarView({
           ? e.targetTeamIds.some((id) => selectedResultTeamIds.has(id))
           : true
       : e.teamId
-        ? e.teamId === activeResultsTeamIdResolved
+        ? activeMemberTeamIds.includes(e.teamId)
         : !e.targetTeamIds ||
           e.targetTeamIds.length === 0 ||
-          (activeResultsTeamIdResolved != null &&
-            e.targetTeamIds.includes(activeResultsTeamIdResolved));
+          e.targetTeamIds.some((id) => activeMemberTeamIds.includes(id));
   }
 
   const canManage = Boolean(createTeams && createTeams.length > 0);

@@ -16,7 +16,7 @@ import {
 import DocumentsPanel from "@/components/club-documents";
 import { BOUTIQUE_URL } from "./boutique";
 import { avatarColor } from "@/lib/avatar-color";
-import { sortTeamsByGroup } from "@/lib/teams";
+import { sortTeamsByGroup, groupTeamsByPrimarySecondary } from "@/lib/teams";
 import CalendarView, { type CalendarRsvpPlayer } from "./calendar-view";
 import FamilyTeamCard, { type FamilyTeamCardData } from "./family-team-card";
 import FamilyAttendanceRequests from "./family-attendance-requests";
@@ -218,6 +218,13 @@ export default function FamilyView({
   // le même besoin qu'un coach sur "Mes Équipes" — dédoublonné par
   // équipe, un enfant sur 2 équipes ou 2 enfants sur la même n'y
   // apparaissant qu'une fois.
+  // Retour de Cindy du 11/09 ("équipe principale/secondaire") : fusionne
+  // une équipe principale (ex. U13M) avec la ou les secondaires de la
+  // famille dans le même groupe (U13M-1, U13M-2) en un seul onglet --
+  // memberTeamIds porte alors les vraies équipes représentées (voir
+  // calendar-view.tsx, matchesTeamFilter). Déjà prêt pour resultsTeams
+  // (role "PLAYER" toujours, jamais "COACH" côté Famille), donc plus
+  // besoin de re-mapper à chaque appel de CalendarView plus bas.
   const visibleResultsTeams = useMemo(() => {
     const byTeamId = new Map<string, { id: string; name: string | null; category: string | null }>();
     visibleTeamCards.forEach((c) => {
@@ -225,7 +232,16 @@ export default function FamilyView({
         byTeamId.set(c.teamId, { id: c.teamId, name: c.teamName, category: c.category });
       }
     });
-    return Array.from(byTeamId.values());
+    return groupTeamsByPrimarySecondary(Array.from(byTeamId.values())).map(
+      ({ primary, secondaries }) => ({
+        id: primary.id,
+        name: primary.name,
+        category: primary.category,
+        role: "PLAYER" as const,
+        memberTeamIds:
+          secondaries.length > 0 ? [primary.id, ...secondaries.map((s) => s.id)] : undefined,
+      })
+    );
   }, [visibleTeamCards]);
 
   const visiblePlayerIds = useMemo(() => visiblePlayers.map((p) => p.id), [visiblePlayers]);
@@ -315,7 +331,7 @@ export default function FamilyView({
             // déjà -- une famille avec plusieurs enfants dans des équipes
             // différentes n'avait aucun filtre par équipe sur son
             // Calendrier, seulement sur "Événements".
-            resultsTeams={visibleResultsTeams.map((t) => ({ ...t, role: "PLAYER" as const }))}
+            resultsTeams={visibleResultsTeams}
             celebrateWins
           />
           <SponsorsDisplay sponsors={sponsorDisplay} />
@@ -410,7 +426,7 @@ export default function FamilyView({
               events={visibleEvents}
               rsvp={{ players: visiblePlayers, statusByKey: rsvpStatusByKey, noteByKey: rsvpNoteByKey }}
               forcedView="officialMatches"
-              resultsTeams={visibleResultsTeams.map((t) => ({ ...t, role: "PLAYER" as const }))}
+              resultsTeams={visibleResultsTeams}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
               celebrateWins
             />
@@ -425,7 +441,7 @@ export default function FamilyView({
               events={visibleEvents}
               rsvp={{ players: visiblePlayers, statusByKey: rsvpStatusByKey, noteByKey: rsvpNoteByKey }}
               forcedView="officialResults"
-              resultsTeams={visibleResultsTeams.map((t) => ({ ...t, role: "PLAYER" as const }))}
+              resultsTeams={visibleResultsTeams}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
               celebrateWins
             />

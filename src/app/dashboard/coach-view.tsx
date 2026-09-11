@@ -17,6 +17,7 @@ import DocumentsPanel from "@/components/club-documents";
 import ClubReportsSection from "./club-reports-section";
 import Cd17LigueSection from "./cd17-ligue-section";
 import { BOUTIQUE_URL } from "./boutique";
+import { groupTeamsByPrimarySecondary } from "@/lib/teams";
 import CalendarView from "./calendar-view";
 import CalendarSubscribe from "./calendar-subscribe";
 import CoachTeams from "./coach-teams";
@@ -158,14 +159,25 @@ export default function CoachView({
   // (calendrier, filtre par équipe, texte d'en-tête) alors qu'elles vivent
   // déjà correctement dans son onglet "Mon équipe" (family-view.tsx, tab
   // "own-team"). role vaut donc toujours "COACH" ici désormais.
-  const resultsTeamsForCalendar = teams
-    .filter((t) => teamRoleByTeamId[t.id] !== "PLAYER")
-    .map((t) => ({
-      id: t.id,
-      name: t.name,
-      category: t.category,
-      role: teamRoleByTeamId[t.id] ?? "COACH",
-    }));
+  //
+  // Retour de Cindy du 11/09 ("équipe principale/secondaire") :
+  // groupTeamsByPrimarySecondary fusionne en un seul onglet une équipe
+  // principale (ex. U13M) avec la ou les secondaires qu'il coache aussi
+  // (U13M-1, U13M-2) -- memberTeamIds porte alors les vraies équipes
+  // représentées, voir calendar-view.tsx (matchesTeamFilter). Un coach qui
+  // n'a QUE des secondaires d'un même groupe sans la principale (rare,
+  // mais possible) garde des onglets séparés, sans fusion -- géré par
+  // groupTeamsByPrimarySecondary lui-même.
+  const resultsTeamsForCalendar = groupTeamsByPrimarySecondary(
+    teams.filter((t) => teamRoleByTeamId[t.id] !== "PLAYER")
+  ).map(({ primary, secondaries }) => ({
+    id: primary.id,
+    name: primary.name,
+    category: primary.category,
+    role: teamRoleByTeamId[primary.id] ?? "COACH",
+    memberTeamIds:
+      secondaries.length > 0 ? [primary.id, ...secondaries.map((s) => s.id)] : undefined,
+  }));
 
   const iconClass = "h-4 w-4 shrink-0";
   const sections: AdminSection[] = [

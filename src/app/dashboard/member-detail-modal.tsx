@@ -144,7 +144,7 @@ export default function MemberDetailModal({
   // restent des gestes du Bureau. Un coach ouvre la même fiche, mais
   // limitée aux informations pratiques — d'autant que la réaffectation
   // d'équipe ci-dessous supprime TOUS les rattachements du joueur, ce qui
-  // effacerait au passage un prêt à une autre équipe.
+  // effacerait au passage une affectation à une autre équipe.
   canManageTeamAndRoles = true,
   // Droit dédié plutôt que canManageTeamAndRoles (retour de Cindy du 29/08 :
   // le bloc "Compte(s) parent relié(s)" restait invisible depuis l'onglet
@@ -225,7 +225,7 @@ export default function MemberDetailModal({
       ? [...teams, currentTeam]
       : teams;
 
-  // Équipes "en plus" de la principale (prêts additifs, voir team-card.tsx
+  // Équipes "en plus" de la principale (affectations additives, voir team-card.tsx
   // "Affecter à une autre équipe") — retour de Cindy du 02/09 : ce même
   // geste doit aussi être possible depuis la fiche Membres, pas seulement
   // depuis la carte de l'équipe. État local propre (pas juste member.teams,
@@ -239,7 +239,7 @@ export default function MemberDetailModal({
   const [removingExtraTeamId, setRemovingExtraTeamId] = useState<string | null>(null);
 
   // Équipes de la même famille (U13M/U13M-1/U13M-2...) où le joueur n'est
-  // pas encore, en excluant la principale ET les prêts déjà en cours —
+  // pas encore, en excluant la principale ET les affectations déjà en cours —
   // même logique que sameFamilyTeams/switchableTeams dans team-card.tsx.
   const assignedTeamIds = new Set(
     [currentTeam, ...extraTeams].filter((t): t is AdminMemberTeam => Boolean(t)).map((t) => t.id)
@@ -524,11 +524,11 @@ export default function MemberDetailModal({
     const currentTeamId = member.teams[0]?.id ?? "";
     if (canManageTeamAndRoles && teamId !== currentTeamId) {
       // Uniquement la ligne de l'équipe affichée par ce sélecteur (team[0]),
-      // jamais un .delete() sans .eq("team_id", ...) : un membre "prêté" à
+      // jamais un .delete() sans .eq("team_id", ...) : un membre "affecté" à
       // une deuxième équipe depuis la fiche équipe (team-card.tsx,
       // additif) a PLUSIEURS lignes team_players. Supprimer tout ici en
       // corrigeant juste l'équipe principale désinscrivait aussi
-      // silencieusement le prêt — même classe de bug que l'incident
+      // silencieusement cette affectation — même classe de bug que l'incident
       // d'import qui avait déjà effacé des affectations d'équipe.
       if (currentTeamId) {
         const { error: deleteError } = await supabase
@@ -564,7 +564,7 @@ export default function MemberDetailModal({
 
     // Nouvelle équipe affichable immédiatement (voir basePatch plus haut) :
     // seulement si elle a effectivement changé, sinon la fiche garde ses
-    // équipes actuelles telles quelles (un prêt additif n'apparaît jamais
+    // équipes actuelles telles quelles (une affectation additive n'apparaît jamais
     // dans ce sélecteur à une seule équipe, pas de raison de le perdre ici).
     const newTeams =
       canManageTeamAndRoles && teamId !== currentTeamId
@@ -1067,12 +1067,14 @@ export default function MemberDetailModal({
                   équipe" dans l'onglet Équipes (team-card.tsx), mais
                   accessible directement depuis la fiche — retour de Cindy
                   du 02/09, cas Raphaël LAMOURET. Uniquement quand la fiche
-                  a déjà une équipe principale : sans elle, "prêter à une
-                  autre équipe" n'a pas de sens. */}
+                  a déjà une équipe principale : sans elle, "affecter à une
+                  autre équipe" n'a pas de sens. "Affectation" plutôt que
+                  "Prêt" (retour de Cindy du 11/09, vocabulaire peu adapté
+                  aux équipes adultes). */}
               {editable && canManageTeamAndRoles && currentTeam && (
                 <div className="flex flex-col gap-1.5 sm:col-span-2">
                   <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                    Autre(s) équipe(s) (prêt)
+                    Autre(s) équipe(s) (affectation)
                   </span>
                   <div className="flex flex-wrap items-center gap-1.5">
                     {extraTeams.map((t) => (

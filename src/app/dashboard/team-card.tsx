@@ -417,7 +417,7 @@ export default function TeamCard({
     notifyCoachesOfNewTeamMember(
       supabase,
       switchTeamId,
-      `${name} vient d'être prêté(e) à ${destinationLabel}.`
+      `${name} vient d'être affecté(e) à ${destinationLabel}.`
     );
     router.refresh();
   }
@@ -593,23 +593,34 @@ export default function TeamCard({
     // n'affiche alors rien) — préférable à un badge faux.
     const statusCategory = m.role === "JOUEUR" ? team.category : (detail?.category ?? null);
     const yearStatus = computePlayerYearStatus(birthDate, statusCategory);
-    // Belongs to another team as well: he was lent to this one,
-    // so the useful action is to send him back — a plain
+    // Belongs to another team as well: he was assigned to this one as a
+    // secondary team, so the useful action is to send him back — a plain
     // "Retirer" that only drops this membership. A player of
     // this team only gets the "Affecter" picker instead, since
     // removing him here would leave him with no team at all.
     const otherTeams = (detail?.teams ?? []).filter((t) => t.id !== team.id);
-    const isLentIn = otherTeams.length > 0;
-    return { phone, email, detail, role, category, birthDate, statusCategory, yearStatus, isLentIn };
+    const isSecondaryTeam = otherTeams.length > 0;
+    return {
+      phone,
+      email,
+      detail,
+      role,
+      category,
+      birthDate,
+      statusCategory,
+      yearStatus,
+      isSecondaryTeam,
+      otherTeams,
+    };
   }
 
   // Boutons d'action (retirer coach/joueur, affecter à une autre équipe) —
   // identiques dans la ligne de tableau et la carte mobile.
-  function renderActions(m: MemberRow, isLentIn: boolean) {
+  function renderActions(m: MemberRow, isSecondaryTeam: boolean) {
     // Une famille peut compter plus de deux équipes (U13M / U13M-1 /
-    // U13M-2) : un joueur déjà prêté à l'une d'elles doit pouvoir l'être
+    // U13M-2) : un joueur déjà affecté à l'une d'elles doit pouvoir l'être
     // aussi à une autre. L'ancienne logique masquait "Affecter" dès que
-    // isLentIn passait à vrai (un seul prêt possible) — retour de Cindy du
+    // isSecondaryTeam passait à vrai (une seule affectation possible) — retour de Cindy du
     // 02/09 : Raphaël Lamouret, déjà U13M + U13M-1, ne pouvait plus être
     // affecté à U13M-2 depuis aucune des deux cartes.
     const detail = memberDetailsByPlayerId?.[m.id];
@@ -632,7 +643,7 @@ export default function TeamCard({
         )}
         {m.player &&
           !readOnly &&
-          (isLentIn ? (
+          (isSecondaryTeam ? (
             <>
               {hasMoreFamilyTeams && (
                 <button
@@ -678,8 +689,18 @@ export default function TeamCard({
   // Une seule definition de ligne pour les deux sections : Encadrement et
   // Joueurs affichent les memes colonnes, seul le fond change.
   function renderMemberRow(m: MemberRow, isStaff: boolean) {
-          const { phone, email, detail, role, category, birthDate, statusCategory, yearStatus, isLentIn } =
-            computeRowData(m);
+          const {
+            phone,
+            email,
+            detail,
+            role,
+            category,
+            birthDate,
+            statusCategory,
+            yearStatus,
+            isSecondaryTeam,
+            otherTeams,
+          } = computeRowData(m);
     return (
             <tr
               key={m.key}
@@ -728,15 +749,32 @@ export default function TeamCard({
                 ) : null}
               </td>
               <td className="whitespace-nowrap px-3 py-2.5">
-                {category ? (
-                  <span
-                    className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold leading-none ${theme.badge}`}
-                  >
-                    {category}
-                  </span>
-                ) : (
-                  <span className="text-zinc-400">—</span>
-                )}
+                <span className="flex flex-wrap items-center gap-1">
+                  {category ? (
+                    <span
+                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold leading-none ${theme.badge}`}
+                    >
+                      {category}
+                    </span>
+                  ) : (
+                    <span className="text-zinc-400">—</span>
+                  )}
+                  {/* Retour de Cindy du 11/09 ("affichage cohérent... comme
+                      dans la page Membres") : un joueur affecté à la fois à
+                      sa principale et à une secondaire (U13M + U13M-1)
+                      apparaissait déjà dans les deux TeamCard, mais sans
+                      rien signalant qu'il s'agit de la même double
+                      appartenance -- même badge que members-table.tsx pour
+                      chaque autre équipe. */}
+                  {otherTeams.map((t) => (
+                    <span
+                      key={`other-${t.id}`}
+                      className="inline-flex max-w-full items-center justify-center truncate whitespace-nowrap rounded-full bg-navy/10 px-2 py-0.5 text-xs font-semibold leading-none text-navy"
+                    >
+                      {teamLabel(t)}
+                    </span>
+                  ))}
+                </span>
               </td>
               <td className="whitespace-nowrap px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
                 {phone ? (
@@ -785,7 +823,7 @@ export default function TeamCard({
                     même ligne, ouvrait déjà WhatsApp pour cette même
                     personne — celle-ci (avec sa modale de composition)
                     faisait doublon. */}
-                <div className="flex items-center gap-1">{renderActions(m, isLentIn)}</div>
+                <div className="flex items-center gap-1">{renderActions(m, isSecondaryTeam)}</div>
               </td>
             </tr>
     );
@@ -797,8 +835,18 @@ export default function TeamCard({
   // computeRowData/renderActions que la ligne de tableau ci-dessus, juste
   // réagencés verticalement plutôt qu'en colonnes.
   function renderMemberCard(m: MemberRow, isStaff: boolean) {
-    const { phone, email, detail, role, category, birthDate, statusCategory, yearStatus, isLentIn } =
-      computeRowData(m);
+    const {
+      phone,
+      email,
+      detail,
+      role,
+      category,
+      birthDate,
+      statusCategory,
+      yearStatus,
+      isSecondaryTeam,
+      otherTeams,
+    } = computeRowData(m);
     return (
       <div
         key={m.key}
@@ -827,7 +875,7 @@ export default function TeamCard({
             </span>
           </div>
           <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
-            {renderActions(m, isLentIn)}
+            {renderActions(m, isSecondaryTeam)}
           </div>
         </div>
 
@@ -847,6 +895,16 @@ export default function TeamCard({
               {category}
             </span>
           )}
+          {/* Retour de Cindy du 11/09 : même badge "autre équipe" que la
+              version tableau ci-dessus, voir son commentaire. */}
+          {otherTeams.map((t) => (
+            <span
+              key={`other-mobile-${t.id}`}
+              className="inline-flex max-w-full items-center justify-center truncate whitespace-nowrap rounded-full bg-navy/10 px-2 py-0.5 text-xs font-semibold leading-none text-navy"
+            >
+              {teamLabel(t)}
+            </span>
+          ))}
         </div>
 
         {(phone || email) && (
