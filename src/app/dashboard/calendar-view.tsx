@@ -1729,20 +1729,6 @@ export default function CalendarView({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Remplace "Masquer les entraînements" (retour de Cindy du
-              10/09) : filtre par type d'événement plutôt qu'un seul
-              interrupteur entraînements/reste -- visible sur le Calendrier
-              et sur "Événements" (là où les entraînements peuvent
-              apparaître), masqué sur les vues Matchs/Résultats où ils
-              n'apparaissent de toute façon jamais (même condition
-              qu'avant). */}
-          {(!forcedView || forcedView === "clubEvents") && (
-            <EventTypeFilterDropdown
-              hiddenTypes={hiddenEventTypes}
-              onChange={updateHiddenEventTypes}
-            />
-          )}
-
           {/* Retour de Cindy du 09/09 ("le calendrier devient illisible...
               sans filtre par équipe visible") : même sélecteur que les
               vues Résultats/Matchs/Événements plus bas (TeamFilterDropdown/
@@ -1768,6 +1754,23 @@ export default function CalendarView({
                 />
               )}
             </div>
+          )}
+
+          {/* Remplace "Masquer les entraînements" (retour de Cindy du
+              10/09) : filtre par type d'événement plutôt qu'un seul
+              interrupteur entraînements/reste -- visible sur le Calendrier
+              et sur "Événements" (là où les entraînements peuvent
+              apparaître), masqué sur les vues Matchs/Résultats où ils
+              n'apparaissent de toute façon jamais (même condition
+              qu'avant). Retour de Cindy du 12/09 : placé juste après le
+              filtre par équipe et juste avant Liste/Mois (pas avant le
+              filtre équipe comme avant) -- vérifié sur les 3 espaces
+              (Bureau/Coach/Famille), un seul composant partagé ici. */}
+          {(!forcedView || forcedView === "clubEvents") && (
+            <EventTypeFilterDropdown
+              hiddenTypes={hiddenEventTypes}
+              onChange={updateHiddenEventTypes}
+            />
           )}
 
           {/* Tout à droite : c'est un réglage d'affichage, pas une action
