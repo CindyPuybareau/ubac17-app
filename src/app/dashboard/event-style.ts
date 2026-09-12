@@ -92,6 +92,15 @@ export function formatEventTime(startIso: string, endIso: string | null) {
   return endIso ? `${fmt(startIso)} – ${fmt(endIso)}` : fmt(startIso);
 }
 
+// Retour de Cindy du 12/09 ("heure d'impact") : formateur séparé plutôt
+// qu'un 3e paramètre sur formatEventTime ci-dessus -- celui-ci a de
+// nombreux appelants (dont api/cron/match-reminders) qui n'ont rien à
+// changer pour ce nouveau champ optionnel.
+export function formatImpactTime(impactIso: string) {
+  const d = new Date(impactIso);
+  return `Arrivée ${d.getHours()}h${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 export function eventMapsQuery(event: Pick<AdminUpcomingEvent, "salle" | "location">) {
   const parts = [event.salle, event.location].filter(Boolean);
   return parts.length > 0 ? parts.join(", ") : null;

@@ -428,6 +428,20 @@ export type AdminUpcomingEvent = {
   salle: string | null;
   start_time: string;
   end_time: string | null;
+  // Retour de Cindy du 12/09 ("heure d'impact") : heure à laquelle les
+  // participants doivent être arrivés/prêts, avant start_time -- stockée
+  // en absolu (jamais un delta), null si non renseignée. Affichée sur la
+  // carte à la suite de l'heure de début, utilisée par le rappel J-1 des
+  // matchs (api/cron/match-reminders) à la place de start_time quand
+  // elle existe.
+  impactTime: string | null;
+  // Retour de Cindy du 12/09 ("Répéter") : commun à toutes les occurrences
+  // générées par une même création répétée -- null pour un événement
+  // isolé (comportement historique). Sert uniquement à proposer "cette
+  // occurrence uniquement" vs "cette occurrence et les suivantes" à la
+  // modification/suppression (calendar-view.tsx) ; jamais une règle de
+  // récurrence en soi, chaque occurrence reste une ligne indépendante.
+  seriesId: string | null;
   notes: string | null;
   // Retour de Cindy du 2026-08-25 ("Créer un événement" -> "Événement
   // payant") : dérivé de la présence d'une collecte rattachée à cet
@@ -1548,7 +1562,7 @@ export default async function DashboardPage({
           supabase
             .from("events")
             .select(
-              "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
+              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
             )
             .neq("event_type", "TRAINING")
             .gte("start_time", eventsWindowStart)
@@ -1561,7 +1575,7 @@ export default async function DashboardPage({
           supabase
             .from("events")
             .select(
-              "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
+              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
             )
             .eq("event_type", "TRAINING")
             .gte("start_time", trainingsWindowStart)
@@ -2244,6 +2258,8 @@ export default async function DashboardPage({
         salle: e.salle,
         start_time: e.start_time,
         end_time: e.end_time,
+        impactTime: e.impact_time ?? null,
+        seriesId: e.series_id ?? null,
         notes: e.notes,
         isPaid: paidInfo.isPaid,
         collecteId: paidInfo.collecteId,
@@ -2415,7 +2431,7 @@ export default async function DashboardPage({
           supabase
             .from("events")
             .select(
-              "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
+              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
             )
             .or(teamOrClubWideFilter(coachedTeamIds))
             .neq("event_type", "TRAINING")
@@ -2426,7 +2442,7 @@ export default async function DashboardPage({
           supabase
             .from("events")
             .select(
-              "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
+              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
             )
             .or(teamOrClubWideFilter(coachedTeamIds))
             .eq("event_type", "TRAINING")
@@ -3099,6 +3115,8 @@ export default async function DashboardPage({
         salle: e.salle,
         start_time: e.start_time,
         end_time: e.end_time,
+        impactTime: e.impact_time ?? null,
+        seriesId: e.series_id ?? null,
         notes: e.notes,
         isPaid: paidInfo.isPaid,
         collecteId: paidInfo.collecteId,
@@ -3415,7 +3433,7 @@ export default async function DashboardPage({
       supabase
         .from("events")
         .select(
-          "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
+          "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
         )
         .or(teamOrClubWideFilter(allTeamIds))
         .neq("event_type", "TRAINING")
@@ -3425,7 +3443,7 @@ export default async function DashboardPage({
       supabase
         .from("events")
         .select(
-          "id, title, event_type, is_home, location, salle, start_time, end_time, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
+          "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
         )
         .or(teamOrClubWideFilter(allTeamIds))
         .eq("event_type", "TRAINING")
@@ -3630,6 +3648,8 @@ export default async function DashboardPage({
         salle: e.salle,
         start_time: e.start_time,
         end_time: e.end_time,
+        impactTime: e.impact_time ?? null,
+        seriesId: e.series_id ?? null,
         notes: e.notes,
         isPaid: paidInfo.isPaid,
         collecteId: paidInfo.collecteId,

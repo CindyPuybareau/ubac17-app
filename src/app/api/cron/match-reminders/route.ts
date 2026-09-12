@@ -57,7 +57,7 @@ export async function GET(request: Request) {
   const { data: eventsData, error } = await supabase
     .from("events")
     .select(
-      "id, title, event_type, is_home, location, salle, start_time, team_id, reminder_sent_at, teams(name)"
+      "id, title, event_type, is_home, location, salle, start_time, impact_time, team_id, reminder_sent_at, teams(name)"
     )
     .gte("start_time", tomorrow.toISOString())
     .lt("start_time", dayAfter.toISOString())
@@ -92,11 +92,20 @@ export async function GET(request: Request) {
     const home = event.is_home ?? parsed.isHome;
     const homeAway = homeAwayLabel(home);
     const lieu = event.salle || event.location;
-    const heure = new Date(event.start_time).toLocaleTimeString("fr-FR", {
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZone: "Europe/Paris",
-    });
+    const fmtHeure = (iso: string) =>
+      new Date(iso).toLocaleTimeString("fr-FR", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "Europe/Paris",
+      });
+    // Retour de Cindy du 12/09 ("heure d'impact") : le rappel J-1 met en
+    // avant l'heure à laquelle la famille doit réellement être là (arrivée)
+    // plutôt que l'heure du coup d'envoi -- c'est elle qui compte pour ne
+    // pas être en retard. L'heure du match reste mentionnée juste après,
+    // pour ne pas non plus la faire disparaître.
+    const heure = event.impact_time
+      ? `Arrivée ${fmtHeure(event.impact_time)} (match ${fmtHeure(event.start_time)})`
+      : fmtHeure(event.start_time);
 
     const title = `UBAC — ${team?.name ?? "Match"} demain`;
     const body = [

@@ -36,6 +36,10 @@ export type ChildEvent = {
   salle: string | null;
   startTime: string;
   endTime: string | null;
+  // Retour de Cindy du 12/09 ("heure d'impact") : voir son commentaire sur
+  // AdminUpcomingEvent (dashboard/page.tsx) -- même champ, visible ici en
+  // lecture seule (jamais modifiable depuis cet espace).
+  impactTime: string | null;
   teamId: string | null;
   // Retour d'audit du 28/08 : un événement club peut aussi cibler
   // plusieurs équipes précises sans passer par teamId (voir

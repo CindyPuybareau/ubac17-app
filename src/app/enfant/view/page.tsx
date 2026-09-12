@@ -101,7 +101,7 @@ export default async function ChildViewPage() {
       ? supabase
           .from("events")
           .select(
-            "id, title, event_type, is_home, location, salle, start_time, end_time, team_id, target_team_ids, team_score, opponent_score, teams(name), collectes(id)"
+            "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, team_id, target_team_ids, team_score, opponent_score, teams(name), collectes(id)"
           )
           // Retour d'audit du 28/08 : un événement club ciblant plusieurs
           // équipes précises (target_team_ids) n'a pas de team_id — un
@@ -201,6 +201,7 @@ export default async function ChildViewPage() {
     salle: string | null;
     start_time: string;
     end_time: string | null;
+    impact_time: string | null;
     team_id: string | null;
     target_team_ids: string[] | null;
     team_score: number | null;
@@ -217,6 +218,7 @@ export default async function ChildViewPage() {
     salle: e.salle,
     startTime: e.start_time,
     endTime: e.end_time,
+    impactTime: e.impact_time,
     teamId: e.team_id,
     targetTeamIds: e.target_team_ids,
     teamName: e.teams?.name ?? null,

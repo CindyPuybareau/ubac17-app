@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  AlarmClock,
   CalendarDays,
   Cake,
   Check,
@@ -56,6 +57,7 @@ import SalleBadge from "./salle-badge";
 import {
   EVENT_TYPE_OPTIONS,
   formatEventTime,
+  formatImpactTime,
   homeAwayLabel,
   isMatchType,
   styleFor,
@@ -835,14 +837,46 @@ export default function CalendarView({
   // familles — supprimer les paiements reste un choix explicite, jamais
   // la conséquence machinale d'un clic sur "Supprimer l'événement".
   const [deleteCollecteToo, setDeleteCollecteToo] = useState(false);
+  // Retour de Cindy du 12/09 ("Répéter") : "cette occurrence uniquement"
+  // par défaut -- ne s'affiche/ne compte que pour un événement issu d'une
+  // série (deleteEventTarget.seriesId non nul), voir le ConfirmDialog plus
+  // bas.
+  const [deleteSeriesScope, setDeleteSeriesScope] = useState<"one" | "following">("one");
+
+  // Retour de Cindy du 12/09 ("Répéter") : même choix qu'à la suppression,
+  // mais pour "Modifier" -- editSeriesChoiceTarget porte l'événement en
+  // attente de ce choix (avant d'ouvrir CreateEventForm), editScope le choix
+  // retenu (lu une fois dans onUpdated ci-dessous pour décider de propager
+  // ou non). Jamais affiché pour un événement isolé (seriesId nul) : le clic
+  // sur "Modifier" ouvre alors directement le formulaire, comme avant.
+  const [editSeriesChoiceTarget, setEditSeriesChoiceTarget] = useState<AdminUpcomingEvent | null>(null);
+  const [editScope, setEditScope] = useState<"one" | "following">("one");
+
+  function startEditingEvent(event: AdminUpcomingEvent) {
+    if (event.seriesId) {
+      setEditScope("one");
+      setEditSeriesChoiceTarget(event);
+    } else {
+      setEditingEvent(event);
+    }
+  }
 
   // Déclenché par le bouton "Supprimer" ; la confirmation elle-même vit
   // dans deleteEventTarget + le <ConfirmDialog> rendu plus bas (retour de
   // Cindy du 2026-08-21 : la popup native window.confirm() ne ressemble
   // pas à l'appli et affiche son propre chrome de navigateur, impossible
   // à styler ou à retirer).
-  async function confirmDeleteEvent(event: AdminUpcomingEvent, alsoDeleteCollecte: boolean) {
+  async function confirmDeleteEvent(
+    event: AdminUpcomingEvent,
+    alsoDeleteCollecte: boolean,
+    seriesScope: "one" | "following" = "one"
+  ) {
     setDeleteEventTarget(null);
+    // Retour de Cindy du 12/09 ("cette occurrence uniquement" / "cette
+    // occurrence et les suivantes") : n'a d'effet que si l'événement fait
+    // partie d'une série (seriesId non nul) -- sinon deleteFollowing reste
+    // toujours false, comportement identique à avant ce correctif.
+    const deleteFollowing = seriesScope === "following" && Boolean(event.seriesId);
     // Disparition immédiate plutôt que d'attendre le rafraîchissement
     // temps réel — retour de Cindy du 2026-08-21, même correctif que la
     // création/modification ci-dessus. Levée avant sendEventPush (network,
@@ -850,13 +884,21 @@ export default function CalendarView({
     // clic restait bloqué en apparence jusqu'à ce que CET appel-là
     // termine, reproduisant exactement le même délai perçu sous un autre
     // nom.
-    setLocalEvents((prev) => prev.filter((e) => e.id !== event.id));
+    setLocalEvents((prev) =>
+      prev.filter((e) =>
+        deleteFollowing
+          ? !(e.seriesId === event.seriesId && e.start_time >= event.start_time)
+          : e.id !== event.id
+      )
+    );
 
     // Bonus, pas bloquant pour l'utilisateur (déjà reparti visuellement
     // ci-dessus) mais toujours attendu ici : voir event-push.ts. Envoyé
     // avant la suppression — push_targets_for_event a besoin de retrouver
     // l'événement pour savoir à qui l'envoyer, ce qui ne serait plus
-    // possible une fois la ligne effacée.
+    // possible une fois la ligne effacée. Une seule notification même pour
+    // "et les suivantes" : elle mentionne cette occurrence précise, pas
+    // question d'en envoyer une par occurrence supprimée.
     const when = new Date(event.start_time).toLocaleDateString("fr-FR", {
       weekday: "long",
       day: "numeric",
@@ -872,7 +914,9 @@ export default function CalendarView({
     await sendEventPush(
       event.id,
       `UBAC — ${event.teamName}`,
-      `Annulé : ${when} à ${heure}${lieu ? ` · ${lieu}` : ""}.`
+      deleteFollowing
+        ? `Annulé : ${when} à ${heure}${lieu ? ` · ${lieu}` : ""} et les suivant(e)s.`
+        : `Annulé : ${when} à ${heure}${lieu ? ` · ${lieu}` : ""}.`
     );
 
     const supabase = createClient();
@@ -880,10 +924,13 @@ export default function CalendarView({
     // lever d'erreur (0 ligne affectée) — l'événement resterait alors en
     // base, prêt à réapparaître au prochain rafraîchissement temps réel,
     // alors que la notification d'annulation ci-dessus est déjà partie.
-    const { error: deleteEventError } = await supabase
-      .from("events")
-      .delete()
-      .eq("id", event.id);
+    const { error: deleteEventError } = deleteFollowing
+      ? await supabase
+          .from("events")
+          .delete()
+          .eq("series_id", event.seriesId!)
+          .gte("start_time", event.start_time)
+      : await supabase.from("events").delete().eq("id", event.id);
     if (deleteEventError) {
       console.error("[calendar-view] suppression de l'événement échouée:", deleteEventError);
     }
@@ -899,6 +946,56 @@ export default function CalendarView({
         console.error("[calendar-view] suppression de la collecte échouée:", deleteCollecteError);
       }
     }
+  }
+
+  // Retour de Cindy du 12/09 ("Répéter", "cette occurrence et les
+  // suivantes") : appliqué APRÈS que l'occurrence éditée elle-même a été
+  // enregistrée par CreateEventForm (onUpdated) -- ne touche jamais
+  // start_time/end_time/impact_time, propres à chaque date, seulement les
+  // champs qui décrivent l'événement lui-même. `gt` (strictement après),
+  // pas `gte` : l'occurrence éditée a déjà reçu son propre update, un
+  // `gte` la réécrirait une seconde fois pour rien.
+  async function propagateToFollowingOccurrences(updated: AdminUpcomingEvent) {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("events")
+      .update({
+        title: updated.title,
+        event_type: updated.event_type,
+        is_home: updated.isHome,
+        location: updated.location,
+        salle: updated.salle,
+        notes: updated.notes,
+        team_id: updated.teamId,
+        target_team_ids: updated.targetTeamIds,
+        commission_group_ids: updated.commissionGroupIds,
+      })
+      .eq("series_id", updated.seriesId!)
+      .gt("start_time", updated.start_time);
+    if (error) {
+      console.error("[calendar-view] propagation aux occurrences suivantes échouée:", error);
+      return;
+    }
+    const teamName = createTeams?.find((t) => t.id === updated.teamId)?.name ?? updated.teamName;
+    setLocalEvents((prev) =>
+      prev.map((e) =>
+        e.seriesId === updated.seriesId && e.start_time > updated.start_time
+          ? {
+              ...e,
+              title: updated.title,
+              event_type: updated.event_type,
+              isHome: updated.isHome,
+              location: updated.location,
+              salle: updated.salle,
+              notes: updated.notes,
+              teamId: updated.teamId,
+              targetTeamIds: updated.targetTeamIds,
+              commissionGroupIds: updated.commissionGroupIds,
+              teamName,
+            }
+          : e
+      )
+    );
   }
 
   function relanceMailto(event: AdminUpcomingEvent) {
@@ -1264,7 +1361,7 @@ export default function CalendarView({
                 </a>
               )}
               <button
-                onClick={() => setEditingEvent(event)}
+                onClick={() => startEditingEvent(event)}
                 title="Modifier"
                 className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
               >
@@ -1274,6 +1371,7 @@ export default function CalendarView({
                 onClick={() => {
                   setDeleteEventTarget(event);
                   setDeleteCollecteToo(false);
+                  setDeleteSeriesScope("one");
                 }}
                 title="Supprimer"
                 className="flex h-8 w-8 items-center justify-center rounded-full text-red-400 hover:bg-red-50 hover:text-red-600"
@@ -1296,6 +1394,18 @@ export default function CalendarView({
             })}
             , {formatEventTime(event.start_time, event.end_time)}
           </span>
+          {/* Retour de Cindy du 12/09 ("heure d'impact") : visuellement
+              distincte de l'heure de début (ambre plutôt que le gris
+              neutre de la ligne date/heure) -- affichée dès qu'elle
+              existe, sur les 4 espaces qui voient cette carte
+              (Bureau/Coach/Famille/Enfant, plus Commissions/Bénévoles via
+              child-calendar-tab.tsx). */}
+          {event.impactTime && (
+            <span className="flex items-center gap-1 font-semibold text-amber-700">
+              <AlarmClock className="h-4 w-4" />
+              {formatImpactTime(event.impactTime)}
+            </span>
+          )}
           {event.location && (
             <span className="flex items-center gap-1">
               <MapPin className="h-4 w-4" />
@@ -1566,7 +1676,7 @@ export default function CalendarView({
             {canManageEvent && (
               <>
                 <button
-                  onClick={() => setEditingEvent(event)}
+                  onClick={() => startEditingEvent(event)}
                   title="Modifier"
                   className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
                 >
@@ -1576,6 +1686,7 @@ export default function CalendarView({
                   onClick={() => {
                     setDeleteEventTarget(event);
                     setDeleteCollecteToo(false);
+                    setDeleteSeriesScope("one");
                   }}
                   title="Supprimer"
                   className="flex h-8 w-8 items-center justify-center rounded-full text-red-400 hover:bg-red-50 hover:text-red-600"
@@ -1607,6 +1718,14 @@ export default function CalendarView({
             <Clock className="h-3 w-3 shrink-0" />
             {formatEventTime(event.start_time, event.end_time)}
           </span>
+          {/* Retour de Cindy du 12/09 ("heure d'impact") : même principe
+              que renderEventCard plus haut. */}
+          {event.impactTime && (
+            <span className="flex items-center gap-1 font-semibold text-amber-700">
+              <AlarmClock className="h-3 w-3 shrink-0" />
+              {formatImpactTime(event.impactTime)}
+            </span>
+          )}
           {(event.salle || event.location) && (
             <span className="flex items-center gap-1 truncate">
               <MapPin className="h-3 w-3 shrink-0" />
@@ -1871,6 +1990,15 @@ export default function CalendarView({
           onUpdated={(updated) => {
             setLocalEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
             setEditingEvent(null);
+            // Retour de Cindy du 12/09 ("Répéter", "cette occurrence et les
+            // suivantes") : propagation volontairement limitée aux champs
+            // qui ne dépendent pas de la date -- jamais start_time/end_time/
+            // impact_time, propres à chaque occurrence (voir le choix fait
+            // dans le ConfirmDialog ci-dessus).
+            if (editScope === "following" && updated.seriesId) {
+              void propagateToFollowingOccurrences(updated);
+            }
+            setEditScope("one");
           }}
         />
       )}
@@ -2111,9 +2239,39 @@ export default function CalendarView({
         open={Boolean(deleteEventTarget)}
         title="Supprimer l'événement ?"
         message={
-          deleteEventTarget?.collecteId ? (
-            <>
-              <p>Êtes-vous sûr de vouloir supprimer définitivement cet événement ?</p>
+          <>
+            <p>Êtes-vous sûr de vouloir supprimer définitivement cet événement ?</p>
+            {/* Retour de Cindy du 12/09 ("Répéter") : ne s'affiche que si
+                l'événement fait partie d'une série -- pour un événement isolé,
+                seriesId est null et ce bloc entier n'apparaît pas. */}
+            {deleteEventTarget?.seriesId && (
+              <div className="mt-3 flex flex-col gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">
+                <p className="font-semibold text-zinc-800">
+                  Cet événement fait partie d&apos;une série répétée.
+                </p>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="delete-series-scope"
+                    checked={deleteSeriesScope === "one"}
+                    onChange={() => setDeleteSeriesScope("one")}
+                    className="h-4 w-4 border-zinc-300 text-red-600 focus:ring-red-500"
+                  />
+                  Cette occurrence uniquement
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="delete-series-scope"
+                    checked={deleteSeriesScope === "following"}
+                    onChange={() => setDeleteSeriesScope("following")}
+                    className="h-4 w-4 border-zinc-300 text-red-600 focus:ring-red-500"
+                  />
+                  Cette occurrence et toutes les suivantes
+                </label>
+              </div>
+            )}
+            {deleteEventTarget?.collecteId && (
               <label className="mt-3 flex items-start gap-2 text-sm text-zinc-700">
                 <input
                   type="checkbox"
@@ -2128,16 +2286,63 @@ export default function CalendarView({
                   aussi cette collecte et les paiements déjà enregistrés dessus ?
                 </span>
               </label>
-            </>
-          ) : (
-            "Êtes-vous sûr de vouloir supprimer définitivement cet événement ?"
-          )
+            )}
+          </>
         }
         confirmLabel="Supprimer"
         onConfirm={() =>
-          deleteEventTarget && confirmDeleteEvent(deleteEventTarget, deleteCollecteToo)
+          deleteEventTarget &&
+          confirmDeleteEvent(deleteEventTarget, deleteCollecteToo, deleteSeriesScope)
         }
         onCancel={() => setDeleteEventTarget(null)}
+      />
+
+      {/* Retour de Cindy du 12/09 ("Répéter") : demandé AVANT d'ouvrir
+          CreateEventForm (jamais dedans) -- le formulaire d'édition reste
+          identique pour tout le monde, seule la portée de l'enregistrement
+          diffère (voir onUpdated de CreateEventForm ci-dessus). */}
+      <ConfirmDialog
+        open={Boolean(editSeriesChoiceTarget)}
+        title="Modifier cet événement"
+        destructive={false}
+        message={
+          <div className="flex flex-col gap-2">
+            <p>Cet événement fait partie d&apos;une série répétée. Que souhaitez-vous modifier ?</p>
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="edit-series-scope"
+                checked={editScope === "one"}
+                onChange={() => setEditScope("one")}
+                className="h-4 w-4 border-zinc-300 text-navy focus:ring-navy"
+              />
+              Cette occurrence uniquement
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="edit-series-scope"
+                checked={editScope === "following"}
+                onChange={() => setEditScope("following")}
+                className="h-4 w-4 border-zinc-300 text-navy focus:ring-navy"
+              />
+              Cette occurrence et toutes les suivantes
+            </label>
+            {editScope === "following" && (
+              <p className="text-xs text-zinc-500">
+                Seuls le titre, le type, le lieu, les notes et les équipes/commissions
+                seront appliqués aux occurrences suivantes -- leurs horaires et heure
+                d&apos;impact resteront ceux déjà enregistrés pour chaque date.
+              </p>
+            )}
+          </div>
+        }
+        confirmLabel="Continuer"
+        onConfirm={() => {
+          if (editSeriesChoiceTarget) setEditingEvent(editSeriesChoiceTarget);
+          setEditSeriesChoiceTarget(null);
+        }}
+        onCancel={() => setEditSeriesChoiceTarget(null)}
       />
     </div>
   );

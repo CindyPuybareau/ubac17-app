@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import {
+  AlarmClock,
   Cake,
   Check,
   ChevronDown,
@@ -23,6 +24,7 @@ import {
   isMatchType,
   homeAwayLabel,
   formatEventTime,
+  formatImpactTime,
 } from "@/app/dashboard/event-style";
 import { groupBirthdaysByMonthDay, type BirthdaySource } from "@/app/dashboard/birthdays";
 import EmptyState from "@/app/dashboard/empty-state";
@@ -632,6 +634,14 @@ export function EventRow({
           })}
           , {formatEventTime(event.startTime, event.endTime)}
         </span>
+        {/* Retour de Cindy du 12/09 ("heure d'impact") : même principe que
+            calendar-view.tsx (Bureau/Coach/Famille). */}
+        {event.impactTime && (
+          <span className="flex items-center gap-1 font-semibold text-amber-700">
+            <AlarmClock className="h-3 w-3" />
+            {formatImpactTime(event.impactTime)}
+          </span>
+        )}
         {lieu && (
           <span className="flex items-center gap-1">
             <MapPin className="h-3 w-3" />

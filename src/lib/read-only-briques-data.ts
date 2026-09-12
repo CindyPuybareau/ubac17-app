@@ -124,7 +124,7 @@ export async function getReadOnlyBriquesData(
     const { data: eventsData } = await supabase
       .from("events")
       .select(
-        "id, title, event_type, is_home, location, salle, start_time, end_time, team_id, target_team_ids, team_score, opponent_score, teams(name)"
+        "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, team_id, target_team_ids, team_score, opponent_score, teams(name)"
       )
       .gte("start_time", eventsWindowStart)
       .order("start_time", { ascending: true });
@@ -137,6 +137,7 @@ export async function getReadOnlyBriquesData(
       salle: e.salle,
       startTime: e.start_time,
       endTime: e.end_time,
+      impactTime: e.impact_time,
       teamId: e.team_id,
       targetTeamIds: e.target_team_ids,
       teamName: (e.teams as unknown as { name: string | null } | null)?.name ?? null,

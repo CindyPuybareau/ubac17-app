@@ -8,7 +8,7 @@ import { sendEventPush } from "./event-push";
 import DateTimePicker from "./date-time-picker";
 import RoleIcon from "./role-icon";
 import CommissionMultiSelect from "./commission-multi-select";
-import { Plus, X } from "lucide-react";
+import { CalendarSync, Plus, X } from "lucide-react";
 import {
   CUSTOM_ROLE_CODE,
   STANDARD_VOLUNTEER_ROLES,
@@ -16,7 +16,54 @@ import {
   type VolunteerNeed,
 } from "./event-volunteer-needs";
 import { useToast } from "./toast-context";
+import { getCurrentSeasonStartYear } from "@/lib/season";
 import type { AdminBenevole, AdminUpcomingEvent } from "./page";
+
+// Retour de Cindy du 12/09 ("jusqu'à la fin de la saison") : même notion
+// de saison que le reste de l'appli (lib/season.ts, bascule au 1er
+// juillet) -- jamais une deuxième définition de "saison" ici.
+function endOfCurrentSeasonDate(referenceDate: Date): string {
+  const startYear = getCurrentSeasonStartYear(referenceDate);
+  return `${startYear + 1}-06-30`;
+}
+
+// Retour de Cindy du 12/09 ("Répéter") : renvoie une "YYYY-MM-DDTHH:mm"
+// (même format que startTime) par occurrence, la première incluse -- même
+// heure que le départ à chaque fois, seule la date avance. Toujours en
+// heure locale (jamais via toISOString(), qui ferait glisser la date
+// selon le fuseau) — même principe que toDatetimeLocal/toTimeLocal plus
+// haut. Plafonné à 200 occurrences : un garde-fou, pas une limite pensée
+// pour être atteinte (une saison complète hebdomadaire en fait ~40).
+function generateRecurrenceDateTimes(
+  startDateTimeLocal: string,
+  frequency: "weekly" | "biweekly" | "monthly",
+  untilDateLocal: string
+): string[] {
+  const m = startDateTimeLocal.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!m || !untilDateLocal) return [];
+  const [, y, mo, d, h, min] = m;
+  const hour = Number(h);
+  const minute = Number(min);
+  const until = new Date(`${untilDateLocal}T23:59`);
+  let current = new Date(Number(y), Number(mo) - 1, Number(d), hour, minute);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const results: string[] = [];
+  let safety = 0;
+  while (current <= until && safety < 200) {
+    results.push(
+      `${current.getFullYear()}-${pad(current.getMonth() + 1)}-${pad(current.getDate())}T${pad(current.getHours())}:${pad(current.getMinutes())}`
+    );
+    if (frequency === "weekly") {
+      current = new Date(current.getFullYear(), current.getMonth(), current.getDate() + 7, hour, minute);
+    } else if (frequency === "biweekly") {
+      current = new Date(current.getFullYear(), current.getMonth(), current.getDate() + 14, hour, minute);
+    } else {
+      current = new Date(current.getFullYear(), current.getMonth() + 1, current.getDate(), hour, minute);
+    }
+    safety += 1;
+  }
+  return results;
+}
 
 type Team = { id: string; name: string | null; category: string | null };
 type EventType = "MATCH" | "FRIENDLY" | "TRAINING" | "OTHER" | "TOURNAMENT";
@@ -153,6 +200,37 @@ export default function CreateEventForm({
   const [endTime, setEndTime] = useState(() =>
     editingEvent?.end_time ? toTimeLocal(editingEvent.end_time) : ""
   );
+  // Retour de Cindy du 12/09 ("heure d'impact") : heure à laquelle les
+  // participants doivent être arrivés/prêts, avant le début officiel (ex.
+  // 45 min avant un match à 16h) -- même principe que endTime ci-dessus,
+  // une simple heure combinée à la date de startTime, jamais une date
+  // séparée à saisir. impactMinutesBefore n'est qu'un raccourci UI
+  // (calcule impactTime à partir de startTime) : la valeur réellement
+  // envoyée en base reste toujours l'heure absolue impactTime, jamais un
+  // delta -- si startTime change après coup, un delta figé aurait
+  // silencieusement décalé l'heure d'impact sans que personne s'en rende
+  // compte.
+  const [impactTime, setImpactTime] = useState(() =>
+    editingEvent?.impactTime ? toTimeLocal(editingEvent.impactTime) : ""
+  );
+  // Retour de Cindy du 12/09 (revue du champ) : "15 min avant le début" par
+  // défaut plutôt qu'un menu vide sur "Raccourci..." -- le cas le plus
+  // fréquent s'affiche déjà prêt, à changer seulement si besoin (voir
+  // handleStartTimeChange plus bas, qui recalcule impactTime quand le
+  // début change tant que ce raccourci reste actif). En édition, retrouve
+  // le raccourci déjà utilisé si l'écart correspond exactement à l'un
+  // d'eux, sinon retombe sur 15 min sans toucher à l'heure déjà enregistrée
+  // (impactTime ci-dessus, seule valeur réellement envoyée en base).
+  const [impactMinutesBefore, setImpactMinutesBefore] = useState(() => {
+    if (editingEvent?.impactTime) {
+      const diffMinutes = Math.round(
+        (new Date(editingEvent.start_time).getTime() - new Date(editingEvent.impactTime).getTime()) /
+          60000
+      );
+      if ([15, 30, 45, 60].includes(diffMinutes)) return String(diffMinutes);
+    }
+    return "15";
+  });
   const [notes, setNotes] = useState(() => editingEvent?.notes ?? "");
   // Retour de Cindy du 2026-08-25 : remplace "Répéter chaque semaine" (voir
   // git history pour l'ancienne version) — un événement payant crée
@@ -182,6 +260,18 @@ export default function CreateEventForm({
           : "single"
   );
   const [targetTeamIds, setTargetTeamIds] = useState<string[]>(() => editingEvent?.targetTeamIds ?? []);
+  // Retour de Cindy du 12/09 ("Répéter") : uniquement à la création --
+  // repeatOpen reste toujours false en édition (voir le bouton plus bas,
+  // masqué si isEditing), une occurrence déjà en base ne peut jamais
+  // elle-même redevenir le point de départ d'une nouvelle série. Chaque
+  // occurrence générée reste une ligne indépendante (jamais une règle de
+  // récurrence virtuelle) -- seriesId (généré une fois, voir handleSubmit)
+  // est le seul lien entre elles, pour "cette occurrence uniquement" vs
+  // "cette occurrence et les suivantes" à la modification/suppression
+  // (calendar-view.tsx).
+  const [repeatOpen, setRepeatOpen] = useState(false);
+  const [repeatFrequency, setRepeatFrequency] = useState<"weekly" | "biweekly" | "monthly">("weekly");
+  const [repeatUntil, setRepeatUntil] = useState("");
   // Besoins d'organisation (buvette, table de marque...) : une liste libre
   // de lignes rôle + effectif, comme dans le formulaire "+ Ajouter un
   // besoin" de la carte événement. Retour de Cindy du 10/09 ("en rouvrant
@@ -327,6 +417,23 @@ export default function CreateEventForm({
     return (allPlayers ?? []).map((p) => p.id);
   }
 
+  // Retour de Cindy du 12/09 (revue du champ "Heure d'impact") : tant que
+  // le raccourci "X min avant" est actif (impactMinutesBefore non vide,
+  // valeur par défaut "15" ci-dessus), l'heure d'arrivée suit le début
+  // choisi -- sans ça, "15 min avant le début" par défaut resterait vide
+  // jusqu'à ce que l'utilisateur retouche le menu après avoir choisi
+  // l'heure. Dès qu'une heure est tapée directement dans le champ heure
+  // d'arrivée, impactMinutesBefore repasse à "" (voir son onChange) et ce
+  // recalcul automatique s'arrête pour cet événement.
+  function handleStartTimeChange(value: string) {
+    setStartTime(value);
+    if (!impactMinutesBefore || !value) return;
+    const start = new Date(value);
+    start.setMinutes(start.getMinutes() - Number(impactMinutesBefore));
+    const pad = (n: number) => String(n).padStart(2, "0");
+    setImpactTime(`${pad(start.getHours())}:${pad(start.getMinutes())}`);
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     // Plus de <input required> natif depuis le passage au DateTimePicker
@@ -356,6 +463,20 @@ export default function CreateEventForm({
       setError("Indique un tarif pour un événement payant.");
       return;
     }
+    // Retour de Cindy du 12/09 ("Répéter") : mutuellement exclusif avec
+    // "Événement payant" -- une série ne prend en charge que les champs de
+    // base, jamais la collecte/les participants qui vont avec (voir plus
+    // bas). Plutôt qu'ignorer isPaid en silence pour les occurrences
+    // générées, on bloque tout de suite pour que ce ne soit jamais une
+    // surprise.
+    if (repeatOpen && isPaid) {
+      setError("Un événement répété ne peut pas être payant pour l'instant — décoche l'un des deux.");
+      return;
+    }
+    if (repeatOpen && !repeatUntil) {
+      setError("Choisis une date de fin pour la répétition.");
+      return;
+    }
 
     // null = "Tous les groupes" (comportement historique) — seulement
     // rempli quand la portée "Équipes spécifiques" est choisie explicitement.
@@ -364,9 +485,125 @@ export default function CreateEventForm({
 
     setLoading(true);
     setError(null);
-
     const supabase = createClient();
     const eventName = title || defaultTitles[eventType];
+
+    // Retour de Cindy du 12/09 ("Répéter") : chemin séparé du insert/update
+    // simple plus bas -- chaque occurrence reste une ligne indépendante en
+    // base (jamais une règle de récurrence virtuelle), seriesId (généré
+    // une fois ici) est le seul lien entre elles. Uniquement à la
+    // création : repeatOpen reste toujours false en édition (bouton
+    // masqué, voir le JSX plus bas). Une série ne prend en charge que les
+    // champs de base (équipe, type, horaires, heure d'impact, lieu,
+    // notes) -- besoins d'organisation/bénévoles invités/paiement restent
+    // à ajouter occurrence par occurrence après coup via "Modifier
+    // l'événement", qui les gère déjà un par un.
+    if (repeatOpen && !isEditing) {
+      const occurrences = generateRecurrenceDateTimes(startTime, repeatFrequency, repeatUntil);
+      if (occurrences.length === 0) {
+        setLoading(false);
+        setError("La date de fin de répétition doit être après la date de début.");
+        return;
+      }
+
+      // Conflit (retour de Cindy du 12/09, "ignorer cette date") :
+      // n'exclut que les occurrences qui tombent exactement sur un
+      // événement déjà existant pour la MÊME équipe -- seulement vérifié
+      // pour une portée à équipe unique (scopeMode "single"), la seule où
+      // "même équipe" a un sens univoque (une portée "spécifique"/"club"
+      // n'a pas d'équipe de référence à comparer).
+      let conflictingStarts = new Set<string>();
+      if (effectiveTeamId) {
+        const startIsos = occurrences.map((dt) => new Date(dt).toISOString());
+        const { data: existingRows } = await supabase
+          .from("events")
+          .select("start_time")
+          .eq("team_id", effectiveTeamId)
+          .in("start_time", startIsos);
+        conflictingStarts = new Set((existingRows ?? []).map((r) => r.start_time));
+      }
+
+      const seriesId = crypto.randomUUID();
+      const rows = occurrences
+        .map((dt) => ({
+          title: eventName,
+          event_type: eventType,
+          is_home: isMatch && isHome !== "" ? isHome === "true" : null,
+          location: location || null,
+          salle: salle || null,
+          start_time: new Date(dt).toISOString(),
+          end_time: endTime ? new Date(`${dt.slice(0, 10)}T${endTime}`).toISOString() : null,
+          impact_time: impactTime ? new Date(`${dt.slice(0, 10)}T${impactTime}`).toISOString() : null,
+          notes: notes || null,
+          commission_group_ids: commissionGroupIds,
+          team_id: effectiveTeamId || null,
+          target_team_ids: effectiveTargetTeamIds,
+          series_id: seriesId,
+        }))
+        .filter((row) => !conflictingStarts.has(row.start_time));
+      const skipped = occurrences.length - rows.length;
+
+      if (rows.length === 0) {
+        setLoading(false);
+        setError("Toutes les dates générées existent déjà pour cette équipe, rien à créer.");
+        return;
+      }
+
+      const { data: insertedRows, error: insertError } = await supabase
+        .from("events")
+        .insert(rows)
+        .select(
+          "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, team_id, target_team_ids"
+        );
+
+      setLoading(false);
+      if (insertError || !insertedRows) {
+        setError(insertError?.message ?? "La création de la série a échoué.");
+        return;
+      }
+
+      const teamName = resolveTeamNameClient(effectiveTeamId || null, effectiveTargetTeamIds, teams);
+      onCreated?.(
+        insertedRows.map((row) => ({
+          id: row.id,
+          title: row.title,
+          event_type: row.event_type,
+          isHome: row.is_home,
+          attendanceRequestedAt: null,
+          teamScore: null,
+          opponentScore: null,
+          location: row.location,
+          salle: row.salle,
+          start_time: row.start_time,
+          end_time: row.end_time,
+          impactTime: row.impact_time,
+          seriesId: row.series_id,
+          notes: row.notes,
+          isPaid: false,
+          collecteId: null,
+          paidAmount: null,
+          paymentLink: null,
+          paidParticipants: [],
+          teamId: row.team_id,
+          targetTeamIds: row.target_team_ids,
+          teamName,
+          commissionGroupIds,
+          rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
+          benevoleIds: [],
+          benevoleInvites: [],
+        }))
+      );
+
+      showToast(
+        skipped > 0
+          ? `${rows.length} occurrences créées (${skipped} déjà existante${skipped > 1 ? "s" : ""}, ignorée${skipped > 1 ? "s" : ""}).`
+          : `${rows.length} occurrences créées.`
+      );
+      resetFields();
+      onClose();
+      return;
+    }
+
     const eventPayload: {
       title: string;
       event_type: EventType;
@@ -375,6 +612,7 @@ export default function CreateEventForm({
       salle: string | null;
       start_time: string;
       end_time: string | null;
+      impact_time: string | null;
       notes: string | null;
       team_id?: string | null;
       target_team_ids?: string[] | null;
@@ -387,6 +625,11 @@ export default function CreateEventForm({
       salle: salle || null,
       start_time: new Date(startTime).toISOString(),
       end_time: endTime ? new Date(`${startTime.slice(0, 10)}T${endTime}`).toISOString() : null,
+      // Retour de Cindy du 12/09 ("heure d'impact") : même date que
+      // startTime, comme endTime ci-dessus -- toujours l'heure absolue
+      // envoyée, jamais un delta (voir impactMinutesBefore, purement un
+      // raccourci de saisie côté UI).
+      impact_time: impactTime ? new Date(`${startTime.slice(0, 10)}T${impactTime}`).toISOString() : null,
       notes: notes || null,
       // Retour de Cindy du 10/09 : un seul choix pour l'événement entier
       // (voir commissionGroupIds plus haut) -- toujours envoyé, en création
@@ -423,7 +666,7 @@ export default function CreateEventForm({
       : supabase.from("events").insert(eventPayload);
     const { data: inserted, error } = await query
       .select(
-        "id, title, event_type, is_home, location, salle, start_time, end_time, notes, team_id, target_team_ids"
+        "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, team_id, target_team_ids"
       )
       .single();
 
@@ -619,6 +862,8 @@ export default function CreateEventForm({
         salle: inserted.salle,
         start_time: inserted.start_time,
         end_time: inserted.end_time,
+        impactTime: inserted.impact_time,
+        seriesId: inserted.series_id,
         notes: inserted.notes,
         isPaid,
         collecteId,
@@ -646,6 +891,8 @@ export default function CreateEventForm({
           salle: inserted.salle,
           start_time: inserted.start_time,
           end_time: inserted.end_time,
+          impactTime: inserted.impact_time,
+          seriesId: inserted.series_id,
           notes: inserted.notes,
           isPaid,
           collecteId,
@@ -988,7 +1235,7 @@ export default function CreateEventForm({
           <label className="mb-1 block text-xs font-medium text-zinc-600">
             Début
           </label>
-          <DateTimePicker value={startTime} onChange={setStartTime} />
+          <DateTimePicker value={startTime} onChange={handleStartTimeChange} />
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-zinc-600">
@@ -1004,17 +1251,151 @@ export default function CreateEventForm({
         </div>
       </div>
 
+      {/* Retour de Cindy du 12/09 ("heure d'impact") : optionnel, jamais
+          requis quel que soit le type d'événement -- pertinent surtout
+          pour un match, mais rien n'empêche un entraînement d'en avoir
+          une aussi. Le menu "X min avant" ne fait que préremplir le champ
+          heure ci-contre : la valeur réellement envoyée reste toujours
+          cette heure absolue (impactTime), jamais un delta -- une saisie
+          directe dans le champ heure garde donc la main, sans jamais être
+          recalculée en silence si startTime change ensuite. */}
+      <div>
+        <label className="mb-1 block text-xs font-medium text-zinc-600">
+          Heure d&apos;arrivée (optionnel)
+        </label>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={impactMinutesBefore}
+            onChange={(e) => {
+              const minutes = e.target.value;
+              setImpactMinutesBefore(minutes);
+              if (!minutes || !startTime) return;
+              const start = new Date(startTime);
+              start.setMinutes(start.getMinutes() - Number(minutes));
+              const pad = (n: number) => String(n).padStart(2, "0");
+              setImpactTime(`${pad(start.getHours())}:${pad(start.getMinutes())}`);
+            }}
+            className="rounded-lg border border-zinc-200 px-2 py-2 text-sm text-zinc-600"
+          >
+            <option value="15">15 min avant le début</option>
+            <option value="30">30 min avant le début</option>
+            <option value="45">45 min avant le début</option>
+            <option value="60">1h avant le début</option>
+          </select>
+          <input
+            type="time"
+            value={impactTime}
+            onChange={(e) => {
+              setImpactTime(e.target.value);
+              setImpactMinutesBefore("");
+            }}
+            className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+          />
+          {impactTime && (
+            <button
+              type="button"
+              onClick={() => {
+                setImpactTime("");
+                setImpactMinutesBefore("");
+              }}
+              className="text-xs text-zinc-400 hover:text-zinc-600 hover:underline"
+            >
+              Effacer
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Retour de Cindy du 12/09 ("Répéter") : uniquement à la création
+          (jamais en édition, voir !isEditing) -- une occurrence déjà en
+          base ne redevient pas le point de départ d'une nouvelle série.
+          Mutuellement exclusif avec "Événement payant" juste en dessous
+          (voir la validation dans handleSubmit) : une série ne prend en
+          charge que les champs de base pour l'instant. */}
+      {!isEditing && (
+        <div className="flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3">
+          <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
+            <input
+              type="checkbox"
+              checked={repeatOpen}
+              onChange={(e) => setRepeatOpen(e.target.checked)}
+              className="h-4 w-4 rounded border-zinc-300 text-navy focus:ring-navy"
+            />
+            <CalendarSync className="h-4 w-4 shrink-0 text-navy" />
+            Répéter cet événement
+          </label>
+          {repeatOpen && (
+            <div className="flex flex-col gap-2 pl-6">
+              <div className="flex flex-wrap gap-1.5">
+                {(
+                  [
+                    { value: "weekly", label: "Toutes les semaines" },
+                    { value: "biweekly", label: "Toutes les 2 semaines" },
+                    { value: "monthly", label: "Tous les mois" },
+                  ] as const
+                ).map((f) => (
+                  <button
+                    key={f.value}
+                    type="button"
+                    onClick={() => setRepeatFrequency(f.value)}
+                    className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                      repeatFrequency === f.value
+                        ? "border-navy bg-navy text-white"
+                        : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="text-xs font-medium text-zinc-600">Jusqu&apos;au</label>
+                <input
+                  type="date"
+                  value={repeatUntil}
+                  onChange={(e) => setRepeatUntil(e.target.value)}
+                  min={startTime.slice(0, 10) || undefined}
+                  className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    setRepeatUntil(endOfCurrentSeasonDate(startTime ? new Date(startTime) : new Date()))
+                  }
+                  className="rounded-full border border-zinc-200 px-3 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                >
+                  Jusqu&apos;à la fin de la saison
+                </button>
+              </div>
+              <p className="text-xs text-zinc-400">
+                Chaque date créée est un événement indépendant. Besoins, bénévoles et
+                paiement s&apos;ajoutent ensuite, date par date, via &quot;Modifier
+                l&apos;événement&quot;.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Retour de Cindy du 2026-08-25 : remplace "Répéter chaque semaine"
-          (voir le commentaire sur isPaid plus haut). */}
-      <div className="flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3">
+          (voir le commentaire sur isPaid plus haut). Retour de Cindy du
+          12/09 : désactivé pendant que "Répéter" est coché juste au-dessus
+          -- une série ne prend pas encore en charge le paiement (voir
+          handleSubmit), plutôt que de le laisser cocher pour rien. */}
+      <div
+        className={`flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3 ${
+          repeatOpen ? "opacity-50" : ""
+        }`}
+      >
         <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
           <input
             type="checkbox"
             checked={isPaid}
+            disabled={repeatOpen}
             onChange={(e) => setIsPaid(e.target.checked)}
-            className="h-4 w-4 rounded border-zinc-300 text-navy focus:ring-navy"
+            className="h-4 w-4 rounded border-zinc-300 text-navy focus:ring-navy disabled:opacity-60"
           />
-          Événement payant
+          Événement payant{repeatOpen ? " (indisponible pour une série répétée)" : ""}
         </label>
         {isPaid && (
           <div className="flex flex-col gap-2">
