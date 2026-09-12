@@ -3931,7 +3931,6 @@ export default async function DashboardPage({
       content:
         activeTab === "admin" ? (
           <AdminView
-            clubFunction={clubFunction}
             allowedBriques={viewerAllowedBriques}
             teams={adminTeams}
             allProfiles={allProfilesForAdmin}
@@ -4265,7 +4264,7 @@ export default async function DashboardPage({
       </header>
 
       <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
-      <DashboardTabs tabs={tabs} activeKey={activeTab} />
+      <DashboardTabs tabs={tabs} activeKey={activeTab} clubFunction={clubFunction} />
 
       {/* Cas normalement rare depuis que "Mon espace" couvre aussi un
           adulte inscrit sans enfant (voir le merge de playerRows plus

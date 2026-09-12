@@ -59,7 +59,6 @@ import type { EventRoleType } from "./event-tasks";
 import type { VolunteerNeed } from "./event-volunteer-needs";
 
 export default function AdminView({
-  clubFunction,
   allowedBriques = null,
   teams,
   allProfiles,
@@ -83,7 +82,6 @@ export default function AdminView({
   volunteerNeedsByEventId,
   clubReports,
 }: {
-  clubFunction?: string | null;
   // Profils d'accès sur-mesure (retour de Cindy du 05/09, étape 3) : null
   // pour un Bureau complet (comportement historique, inchangé) ; sinon, la
   // liste des briques cochées pour le profil de CE viewer -- le menu ci-
@@ -645,14 +643,9 @@ export default function AdminView({
     ];
   }
 
-  return (
-    <div className="flex flex-col gap-4">
-      <span className="inline-flex w-fit items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ubac-yellow/15 px-3 py-1 text-xs font-semibold uppercase leading-none text-ubac-yellow-dark">
-        Espace Bureau
-        {clubFunction ? ` · ${clubFunction}` : ""}
-      </span>
-
-      <AdminSidebar sections={visibleSections} />
-    </div>
-  );
+  // Retour de Cindy du 12/09 : le badge de rôle ("Secrétaire", "Trésorier /
+  // Vice-trésorier"...) vit désormais au-dessus des onglets Bureau/Mon
+  // équipe (voir DashboardTabs, page.tsx) -- il reste valable quel que soit
+  // l'onglet sélectionné, ce n'est plus une info propre à cet espace-ci.
+  return <AdminSidebar sections={visibleSections} />;
 }

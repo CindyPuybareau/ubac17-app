@@ -34,6 +34,32 @@ export type DashboardTab = {
   icon?: keyof typeof TAB_ICONS;
 };
 
+// Retour de Cindy du 12/09 ("le badge de rôle doit rester au-dessus des
+// onglets Bureau/Mon équipe, quel que soit celui sélectionné") : ce badge
+// vivait jusqu'ici dans admin-view.tsx ("Espace Bureau · <rôle>"), affiché
+// SOUS les onglets -- alors que le rôle d'une personne au Bureau ne dépend
+// pas de l'onglet qu'elle regarde. Le préfixe "Espace Bureau ·" disparaît
+// aussi : redondant, l'onglet "Bureau" juste en dessous dit déjà où on est.
+// Les libellés stockés (club_function, voir BUREAU_ROLE_OPTIONS dans
+// member-detail-modal.tsx) restent inchangés en base -- seule leur
+// présentation ici est raccourcie/harmonisée (accord au féminin sur
+// "adjointe", "Vice-" plutôt que "... Adjoint" pour rester court sur toutes
+// les fonctions). Une valeur historique qui ne correspondrait à aucune de
+// ces options (saisie libre d'avant ce catalogue) s'affiche telle quelle
+// plutôt que de disparaître silencieusement.
+const BUREAU_ROLE_LABELS: Record<string, string> = {
+  "Président / Vice-Président": "Président / Vice-président",
+  "Trésorier / Trésorier Adjoint": "Trésorier / Vice-trésorier",
+  "Secrétaire / Secrétaire Adjoint": "Secrétaire / Secrétaire adjointe",
+  "Membre du Bureau": "Membre du Bureau",
+  "Comité directeur": "Comité directeur",
+};
+
+function bureauRoleLabel(clubFunction: string | null | undefined) {
+  if (!clubFunction) return null;
+  return BUREAU_ROLE_LABELS[clubFunction] ?? clubFunction;
+}
+
 // Repère de chargement aux couleurs du club (logo qui pulse + barre de
 // progression), repris à l'identique de dashboard/loading.tsx. Retour de
 // Cindy du 06/09 ("c'est moche... logo avec chargement bien placé,
@@ -78,9 +104,13 @@ function SpaceLoadingIndicator() {
 export default function DashboardTabs({
   tabs,
   activeKey,
+  clubFunction = null,
 }: {
   tabs: DashboardTab[];
   activeKey: string | null;
+  // Retour de Cindy du 12/09 : voir bureauRoleLabel ci-dessus. Absent
+  // (undefined/null) pour qui n'est pas au Bureau -- aucun badge affiché.
+  clubFunction?: string | null;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -103,6 +133,7 @@ export default function DashboardTabs({
   }
 
   const current = tabs.find((t) => t.key === activeKey) ?? tabs[0];
+  const roleLabel = bureauRoleLabel(clubFunction);
 
   // Retour de Cindy du 05/09 ("le délai au clic est long") : router.push
   // (contrairement à un <Link>) ne préchauffe rien tout seul. Survoler un
@@ -131,6 +162,12 @@ export default function DashboardTabs({
 
   return (
     <div className="flex flex-col gap-4">
+      {roleLabel && (
+        <span className="inline-flex w-fit items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ubac-yellow/15 px-3 py-1 text-xs font-semibold uppercase leading-none text-ubac-yellow-dark">
+          {roleLabel}
+        </span>
+      )}
+
       {tabs.length > 1 && (
         <div className="flex flex-wrap gap-2">
           {tabs.map((tab) => {
