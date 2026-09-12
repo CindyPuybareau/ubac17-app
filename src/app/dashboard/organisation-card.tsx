@@ -17,8 +17,21 @@ import type { ReactNode } from "react";
 // badge icône carré, titre en gras — un seul fichier partagé sur les 4
 // espaces au lieu de deux styles différents pour la même idée
 // "encart rétractable".
-export default function OrganisationCard({ children }: { children: ReactNode }) {
-  const [open, setOpen] = useState(false);
+export default function OrganisationCard({
+  children,
+  // Retour de Cindy du 12/09 ("ouvrir les besoins d'organisation en
+  // automatique dès le prochain événement") : exception ciblée à la règle
+  // du 2026-08-23 ci-dessus -- reste `false` partout ailleurs (calendrier,
+  // bandeau "Cette semaine", Espace Enfant), n'est passé à `true` que par
+  // l'appelant pour LA carte du tout prochain événement à venir
+  // (calendar-view.tsx) et par coach-next-match-card.tsx, qui n'affiche de
+  // toute façon jamais que celui-là.
+  defaultOpen = false,
+}: {
+  children: ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
 
   return (
     <div className="mt-3 overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm">

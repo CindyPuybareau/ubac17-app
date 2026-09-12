@@ -190,9 +190,12 @@ export default function CoachNextMatchCard({
               calendar-view.tsx. VolunteerNeedsPanel reste visible même
               sans besoin existant : le coach doit toujours avoir accès à
               "+ Ajouter un besoin". Règle explicite de Cindy du
-              2026-08-24 : jamais sur un entraînement, sur aucun espace. */}
+              2026-08-24 : jamais sur un entraînement, sur aucun espace.
+              Retour de Cindy du 12/09 : ouverte par défaut ici -- cette
+              carte n'affiche de toute façon jamais que le tout prochain
+              match du coach, exactement le cas visé par cette demande. */}
           {event.event_type !== "TRAINING" && (
-            <OrganisationCard>
+            <OrganisationCard defaultOpen>
               <MatchTasksPanel
                 eventId={event.id}
                 eventDate={event.start_time}

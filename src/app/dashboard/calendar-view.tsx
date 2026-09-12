@@ -1144,6 +1144,17 @@ export default function CalendarView({
       .sort(byStartTime);
   }, [visibleEvents]);
 
+  // Retour de Cindy du 12/09 ("ouvrir les besoins d'organisation en
+  // automatique dès le prochain événement") : upcomingEvents ci-dessus est
+  // déjà trié du plus proche au plus lointain -- le premier élément EST le
+  // prochain événement, peu importe son type (voir renderEventCard, seul
+  // à comparer son event.id à celui-ci pour ouvrir sa boîte Organisation
+  // par défaut). Recalculé à chaque changement de upcomingEvents (filtre
+  // équipe compris) : si le prochain événement sort du filtre actif, plus
+  // aucune carte visible n'est ouverte d'office, jamais une carte au
+  // hasard.
+  const nextEventId = upcomingEvents[0]?.id ?? null;
+
   // Les vues "saison" (Résultats / Matchs officiels / Résultats officiels /
   // Événements) partagent le même principe : tout le calendrier de la
   // saison filtré par type, joué ou non, dans l'ordre chronologique — même
@@ -1559,7 +1570,7 @@ export default function CalendarView({
           const hasNeeds = needs.length > 0;
           if (!hasTasks && !hasNeeds) return null;
           return (
-            <OrganisationCard>
+            <OrganisationCard defaultOpen={event.id === nextEventId}>
               {hasTasks && (
                 <MatchTasksPanel
                   eventId={event.id}
@@ -1609,7 +1620,7 @@ export default function CalendarView({
             "jamais sur un entraînement" que ci-dessus (retour de Cindy du
             2026-08-24). */}
         {canManageEvent && event.event_type !== "TRAINING" && (
-          <OrganisationCard>
+          <OrganisationCard defaultOpen={event.id === nextEventId}>
             <VolunteerNeedsPanel
               eventId={event.id}
               needs={volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds}
