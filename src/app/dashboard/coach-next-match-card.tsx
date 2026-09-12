@@ -30,7 +30,6 @@ export default function CoachNextMatchCard({
   volunteerNeeds = [],
   rsvpStatusByKey = {},
   rsvpReasonByKey = {},
-  rsvpNoteByKey = {},
   selfPlayerId = null,
 }: {
   teamName: string;
@@ -47,7 +46,6 @@ export default function CoachNextMatchCard({
   // Réponses de l'effectif sur cet événement, clé "eventId:playerId".
   rsvpStatusByKey?: Record<string, string>;
   rsvpReasonByKey?: Record<string, string | null>;
-  rsvpNoteByKey?: Record<string, string | null>;
   // Fiche joueur du coach SUR CETTE équipe (null s'il ne joue pas dans
   // cette équipe précise) — sans ça, un coach qui joue aussi dans une
   // équipe qu'il entraîne ne pouvait jamais gérer son propre covoiturage/
@@ -175,7 +173,6 @@ export default function CoachNextMatchCard({
               roster={roster}
               statusByKey={rsvpStatusByKey}
               reasonByKey={rsvpReasonByKey}
-              noteByKey={rsvpNoteByKey}
               // Ce composant n'est utilisé que côté Coach (coach-organisation.tsx) :
               // toujours vrai ici, jamais affiché côté Famille/Parent (retour de
               // Cindy du 2026-08-22 — voir attendance-badges.tsx).

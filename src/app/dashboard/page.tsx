@@ -489,8 +489,6 @@ export type AdminUpcomingEvent = {
     id: string;
     firstName: string | null;
     lastName: string | null;
-    // Retour de Cindy du 10/09 ("ce que j'apporte") : voir buildPresentPlayers.
-    note: string | null;
   }[];
   // Retour de Cindy du 11/09 ("qui est absent ?") : même principe que
   // presentPlayers ci-dessus, voir buildAbsentPlayers -- pour Coach/
@@ -694,19 +692,15 @@ function findNextEventIdByTeamId(
 // appelle buildRsvpCounts/buildPresentPlayers avec l'effectif de
 // l'événement concerné — c'est cet effectif, pas la requête, qui fait la
 // différence de prudence entre espaces.
-// Retour de Cindy du 10/09 ("ce que j'apporte") : la valeur par joueur
-// porte désormais aussi contribution_note, à côté du statut -- un seul
-// endroit à corriger si un jour un troisième champ s'y ajoute, plutôt
-// qu'une deuxième Map parallèle à garder synchronisée avec celle-ci.
-type RsvpEntry = { status: string | null; note: string | null };
+type RsvpEntry = { status: string | null };
 
 function buildRsvpStatusByEvent(
-  rows: { event_id: string; player_id: string; status: string | null; contribution_note?: string | null }[]
+  rows: { event_id: string; player_id: string; status: string | null }[]
 ): Map<string, Map<string, RsvpEntry>> {
   const map = new Map<string, Map<string, RsvpEntry>>();
   rows.forEach((r) => {
     const byPlayer = map.get(r.event_id) ?? new Map<string, RsvpEntry>();
-    byPlayer.set(r.player_id, { status: r.status, note: r.contribution_note ?? null });
+    byPlayer.set(r.player_id, { status: r.status });
     map.set(r.event_id, byPlayer);
   });
   return map;
@@ -751,9 +745,6 @@ function buildPresentPlayers(
       id: p.id,
       firstName: p.first_name,
       lastName: p.last_name,
-      // Retour de Cindy du 10/09 ("ce que j'apporte") : affiché sur "Qui
-      // sera là ?" (calendar-view.tsx), visible Bureau/Coach/Famille.
-      note: statuses.get(p.id)?.note ?? null,
     }));
 }
 
@@ -812,7 +803,7 @@ async function fetchRsvpsByEvent(
     (chunk) =>
       supabase
         .from("rsvps")
-        .select("event_id, player_id, status, contribution_note")
+        .select("event_id, player_id, status")
         .in("event_id", chunk),
     dbLimit
   );
@@ -2324,9 +2315,6 @@ export default async function DashboardPage({
   const coachRsvpStatusByKey: Record<string, string> = {};
   // Motif d'absence saisi par la famille, affiché sur la carte du coach.
   const coachRsvpReasonByKey: Record<string, string | null> = {};
-  // Retour de Cindy du 10/09 ("ce que j'apporte") : même principe, côté
-  // Présent -- voir attendance-badges.tsx.
-  const coachRsvpNoteByKey: Record<string, string | null> = {};
 
   const coachPromise = (async () => {
   if (coachDataActive) {
@@ -2719,7 +2707,7 @@ export default async function DashboardPage({
       coachEventIds.length > 0
         ? supabase
             .from("rsvps")
-            .select("event_id, player_id, status, reason, contribution_note")
+            .select("event_id, player_id, status, reason")
             .in("event_id", coachEventIds)
         : Promise.resolve({
             data: [] as {
@@ -2727,7 +2715,6 @@ export default async function DashboardPage({
               player_id: string;
               status: string;
               reason: string | null;
-              contribution_note: string | null;
             }[],
             error: null,
           });
@@ -3042,7 +3029,6 @@ export default async function DashboardPage({
     (coachRsvpRows ?? []).forEach((r) => {
       coachRsvpStatusByKey[`${r.event_id}:${r.player_id}`] = r.status;
       coachRsvpReasonByKey[`${r.event_id}:${r.player_id}`] = r.reason ?? null;
-      coachRsvpNoteByKey[`${r.event_id}:${r.player_id}`] = r.contribution_note ?? null;
     });
 
     const coachRosterPlayerIds = Array.from(
@@ -3172,10 +3158,6 @@ export default async function DashboardPage({
     isSelf: boolean;
   }[] = [];
   const familyRsvpStatusByKey: Record<string, string> = {};
-  // Retour de Cindy du 10/09 ("ce que j'apporte") : pré-remplit le champ
-  // sur les boutons Présent/Absent de ses propres enfants, voir
-  // familyRsvpStatusByKey juste au-dessus pour le même principe.
-  const familyRsvpNoteByKey: Record<string, string | null> = {};
   const familyBirthdayMembers: BirthdaySource[] = [];
   const familyTeamCards: FamilyTeamCardData[] = [];
   let familyCotisations: AdminCotisation[] = [];
@@ -3700,7 +3682,7 @@ export default async function DashboardPage({
             eventIds.length > 0 && allRosterPlayerIds.length > 0
               ? supabase
                   .from("rsvps")
-                  .select("event_id, player_id, status, contribution_note")
+                  .select("event_id, player_id, status")
                   .in("event_id", eventIds)
                   .in("player_id", allRosterPlayerIds)
               : Promise.resolve(null),
@@ -3727,7 +3709,6 @@ export default async function DashboardPage({
     // l'effectif d'un événement, pour les compteurs/la liste des présents).
     (rsvpRowsRes?.data ?? []).forEach((r) => {
       familyRsvpStatusByKey[`${r.event_id}:${r.player_id}`] = r.status;
-      familyRsvpNoteByKey[`${r.event_id}:${r.player_id}`] = r.contribution_note ?? null;
     });
 
     // Retour de Cindy du 31/08 : même calcul que Bureau/Coach
@@ -3917,7 +3898,6 @@ export default async function DashboardPage({
         events={familyEvents}
         rsvpPlayers={rsvpPlayers}
         rsvpStatusByKey={familyRsvpStatusByKey}
-        rsvpNoteByKey={familyRsvpNoteByKey}
         birthdayMembers={familyBirthdayMembers}
         teamCards={familyTeamCards}
         tasksByEventId={familyOrganisationTasks}
@@ -4004,7 +3984,6 @@ export default async function DashboardPage({
             rsvpPlayers={coachRsvpPlayers}
             rsvpStatusByKey={coachRsvpStatusByKey}
             rsvpReasonByKey={coachRsvpReasonByKey}
-            rsvpNoteByKey={coachRsvpNoteByKey}
             taskTallyByTeamId={coachTaskTallyByTeamId}
             teamRoleByTeamId={coachTeamRoleByTeamId}
             clubTeams={coachClubTeams}
@@ -4122,7 +4101,6 @@ export default async function DashboardPage({
         id: p.id,
         name: p.name,
         status: familyRsvpStatusByKey[`${e.id}:${p.id}`] ?? "PENDING",
-        note: familyRsvpNoteByKey[`${e.id}:${p.id}`] ?? null,
       })),
       roles: rolesForEventType(eventRoleTypes, e.event_type),
       tasks: familyOrganisationTasks[e.id] ?? {},

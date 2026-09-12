@@ -191,11 +191,6 @@ function PresentPlayersList({
     id: string;
     firstName: string | null;
     lastName: string | null;
-    // Retour de Cindy du 10/09 ("ce que j'apporte") : ce que ce membre
-    // apporte/prend en charge, affiché aux organisateurs (Bureau/Coach/
-    // Famille voient tous "Qui sera là ?") — jamais recalculé ici, déjà
-    // filtré côté serveur sur les Présents uniquement (buildPresentPlayers).
-    note?: string | null;
   }[];
 }) {
   const [open, setOpen] = useState(false);
@@ -226,9 +221,6 @@ function PresentPlayersList({
             >
               {formatFirstName(p.firstName)}{" "}
               <span className="font-bold uppercase">{formatLastName(p.lastName)}</span>
-              {/* Retour de Cindy du 10/09 ("ce que j'apporte") : facultatif,
-                  n'apparaît que si renseigné. */}
-              {p.note && <span className="font-normal opacity-80">— {p.note}</span>}
             </span>
           ))}
         </div>
@@ -437,8 +429,6 @@ export default function CalendarView({
   rsvp?: {
     players: CalendarRsvpPlayer[];
     statusByKey: Record<string, string>;
-    // Retour de Cindy du 10/09 ("ce que j'apporte") : voir rsvp-buttons.tsx.
-    noteByKey?: Record<string, string | null>;
   };
   contactEmailByPlayerId?: Record<string, string>;
   allowClubWide?: boolean;
@@ -585,7 +575,7 @@ export default function CalendarView({
           if (newStatus === "PRESENT" && !presentPlayers.some((p) => p.id === playerId)) {
             presentPlayers = [
               ...presentPlayers,
-              { id: playerId, firstName: playerName, lastName: null, note: null },
+              { id: playerId, firstName: playerName, lastName: null },
             ];
           } else if (previousStatus === "PRESENT" && newStatus !== "PRESENT") {
             presentPlayers = presentPlayers.filter((p) => p.id !== playerId);
@@ -1527,8 +1517,6 @@ export default function CalendarView({
                     onStatusChange={(previousStatus, newStatus) =>
                       updateLocalRsvpStatus(event.id, p.id, p.name, previousStatus, newStatus)
                     }
-                    hasOrganisationNeeds={(volunteerNeedsByEventId[event.id]?.length ?? 0) > 0}
-                    currentNote={rsvp?.noteByKey?.[`${event.id}:${p.id}`] ?? null}
                   />
                 </div>
               );

@@ -6,7 +6,6 @@ import RsvpControl from "./rsvp-control";
 import SalleBadge from "./salle-badge";
 import type { AdminUpcomingEvent } from "./page";
 import type { CalendarRsvpPlayer } from "./calendar-view";
-import type { VolunteerNeed } from "./event-volunteer-needs";
 
 // Fonction ordinaire : la lecture de l'heure courante reste hors du corps
 // du composant (règle react-hooks/purity).
@@ -52,13 +51,10 @@ export default function FamilyAttendanceRequests({
   events,
   players,
   statusByKey,
-  volunteerNeedsByEventId = {},
 }: {
   events: AdminUpcomingEvent[];
   players: CalendarRsvpPlayer[];
   statusByKey: Record<string, string>;
-  // Retour de Cindy du 10/09 ("ce que j'apporte") : voir rsvp-control.tsx.
-  volunteerNeedsByEventId?: Record<string, VolunteerNeed[]>;
 }) {
   const requests = pendingRequests(events, players, statusByKey);
 
@@ -109,7 +105,6 @@ export default function FamilyAttendanceRequests({
                 // attendus sur le même rassemblement.
                 playerName={waiting.length > 1 ? p.name : undefined}
                 currentStatus="PENDING"
-                hasOrganisationNeeds={(volunteerNeedsByEventId[event.id]?.length ?? 0) > 0}
               />
             ))}
           </div>

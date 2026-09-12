@@ -100,7 +100,6 @@ export default function FamilyView({
   events,
   rsvpPlayers,
   rsvpStatusByKey,
-  rsvpNoteByKey = {},
   birthdayMembers,
   teamCards,
   tasksByEventId,
@@ -115,8 +114,6 @@ export default function FamilyView({
   events: AdminUpcomingEvent[];
   rsvpPlayers: CalendarRsvpPlayer[];
   rsvpStatusByKey: Record<string, string>;
-  // Retour de Cindy du 10/09 ("ce que j'apporte") : voir rsvp-buttons.tsx.
-  rsvpNoteByKey?: Record<string, string | null>;
   birthdayMembers: BirthdaySource[];
   teamCards: FamilyTeamCardData[];
   tasksByEventId: Record<string, EventTasksState>;
@@ -320,7 +317,7 @@ export default function FamilyView({
               necessaire") — CalendarView seul suffit. */}
           <CalendarView
             events={visibleEvents}
-            rsvp={{ players: visiblePlayers, statusByKey: rsvpStatusByKey, noteByKey: rsvpNoteByKey }}
+            rsvp={{ players: visiblePlayers, statusByKey: rsvpStatusByKey }}
             birthdayMembers={visibleBirthdayMembers}
             tasksByEventId={tasksByEventId}
             carpoolByEventId={carpoolByEventId}
@@ -424,7 +421,7 @@ export default function FamilyView({
           content: (
             <CalendarView
               events={visibleEvents}
-              rsvp={{ players: visiblePlayers, statusByKey: rsvpStatusByKey, noteByKey: rsvpNoteByKey }}
+              rsvp={{ players: visiblePlayers, statusByKey: rsvpStatusByKey }}
               forcedView="officialMatches"
               resultsTeams={visibleResultsTeams}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
@@ -439,7 +436,7 @@ export default function FamilyView({
           content: (
             <CalendarView
               events={visibleEvents}
-              rsvp={{ players: visiblePlayers, statusByKey: rsvpStatusByKey, noteByKey: rsvpNoteByKey }}
+              rsvp={{ players: visiblePlayers, statusByKey: rsvpStatusByKey }}
               forcedView="officialResults"
               resultsTeams={visibleResultsTeams}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
@@ -520,7 +517,6 @@ export default function FamilyView({
         events={visibleEvents}
         players={visiblePlayers}
         statusByKey={rsvpStatusByKey}
-        volunteerNeedsByEventId={volunteerNeedsByEventId}
       />
 
       <AdminSidebar

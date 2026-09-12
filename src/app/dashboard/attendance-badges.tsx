@@ -65,7 +65,6 @@ export default function AttendanceBadges({
   roster,
   statusByKey,
   reasonByKey = {},
-  noteByKey = {},
   // Le coach doit pouvoir corriger la réponse d'un joueur (retour de
   // Cindy du 2026-08-22 : "si un joueur se dit présent et qu'il n'est
   // finalement pas présent... le coach doit pouvoir le mettre en absent,
@@ -79,12 +78,6 @@ export default function AttendanceBadges({
   roster: RosterPlayer[];
   statusByKey: Record<string, string>;
   reasonByKey?: Record<string, string | null>;
-  // Retour de Cindy du 10/09 ("ce que j'apporte") : même principe que
-  // reasonByKey (motif d'absence) juste au-dessus, mais pour un membre
-  // Présent -- affiché seulement sur ce statut-là, jamais sur Absent/En
-  // attente (conservé en base mais masqué si le statut change, voir
-  // rsvp-buttons.tsx/rsvp-control.tsx).
-  noteByKey?: Record<string, string | null>;
   canManage?: boolean;
 }) {
   // Réponses corrigées localement, en attendant que le prochain
@@ -169,7 +162,6 @@ export default function AttendanceBadges({
             <div className="flex flex-wrap gap-1.5">
               {members.map((p) => {
                 const reason = reasonByKey[`${eventId}:${p.id}`];
-                const note = noteByKey[`${eventId}:${p.id}`];
                 const Tag = canManage ? "button" : "span";
                 return (
                   <Tag
@@ -186,13 +178,6 @@ export default function AttendanceBadges({
                         c'est l'information qui décide d'un remplacement. */}
                     {group.key === "ABSENT" && reason && (
                       <span className="font-normal opacity-80">— {reason}</span>
-                    )}
-                    {/* Retour de Cindy du 10/09 ("ce que j'apporte") : même
-                        principe, mais côté Présent -- jamais sur Absent/En
-                        attente même si une note existe encore en base
-                        (conservée, juste masquée). */}
-                    {group.key === "PRESENT" && note && (
-                      <span className="font-normal opacity-80">— {note}</span>
                     )}
                   </Tag>
                 );

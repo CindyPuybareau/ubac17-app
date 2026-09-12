@@ -35,8 +35,6 @@ export type WeekStripRsvpPlayer = {
   id: string;
   name: string;
   status: string;
-  // Retour de Cindy du 10/09 ("ce que j'apporte") : voir rsvp-control.tsx.
-  note?: string | null;
 };
 
 export type WeekStripEvent = {
@@ -202,8 +200,6 @@ function DayEventCard({ event }: { event: WeekStripEvent }) {
               playerId={p.id}
               playerName={event.rsvpPlayers.length > 1 ? p.name : undefined}
               currentStatus={p.status}
-              hasOrganisationNeeds={hasNeeds}
-              currentNote={p.note}
             />
           ))}
         </div>

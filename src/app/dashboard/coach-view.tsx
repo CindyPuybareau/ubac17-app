@@ -55,7 +55,6 @@ export default function CoachView({
   rsvpPlayers,
   rsvpStatusByKey,
   rsvpReasonByKey,
-  rsvpNoteByKey,
   taskTallyByTeamId,
   teamRoleByTeamId,
   clubTeams,
@@ -82,9 +81,6 @@ export default function CoachView({
   rsvpStatusByKey: Record<string, string>;
   // Motif d'absence saisi par la famille, affiché sur les cartes.
   rsvpReasonByKey: Record<string, string | null>;
-  // Retour de Cindy du 10/09 ("ce que j'apporte") : même principe, côté
-  // Présent -- voir attendance-badges.tsx.
-  rsvpNoteByKey: Record<string, string | null>;
   taskTallyByTeamId: Record<string, SeasonTaskTally>;
   // "COACH" for a team they coach, "PLAYER" for one they only play in —
   // drives both the team selector's badge and the read-only mode.
@@ -191,7 +187,7 @@ export default function CoachView({
             events={events}
             createTeams={createTeams}
             benevoles={benevoles}
-            rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey, noteByKey: rsvpNoteByKey }}
+            rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
             contactEmailByPlayerId={contactEmailByPlayerId}
             birthdayMembers={birthdayMembers}
             // Retour de Cindy du 10/09 (bug Basile) : createTeams plutôt que
@@ -293,7 +289,6 @@ export default function CoachView({
               taskTallyByTeamId={taskTallyByTeamId}
               rsvpStatusByKey={rsvpStatusByKey}
               rsvpReasonByKey={rsvpReasonByKey}
-              rsvpNoteByKey={rsvpNoteByKey}
               roles={eventRoles}
               ownPlayerId={ownPlayerId}
               forcedTab="planning"
@@ -314,7 +309,6 @@ export default function CoachView({
               taskTallyByTeamId={taskTallyByTeamId}
               rsvpStatusByKey={rsvpStatusByKey}
               rsvpReasonByKey={rsvpReasonByKey}
-              rsvpNoteByKey={rsvpNoteByKey}
               roles={eventRoles}
               ownPlayerId={ownPlayerId}
               forcedTab="bilan"
@@ -347,7 +341,7 @@ export default function CoachView({
               events={events}
               createTeams={createTeams}
               benevoles={benevoles}
-              rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey, noteByKey: rsvpNoteByKey }}
+              rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
               // Retour de Cindy du 10/09 (bug Basile) : createTeams, même
               // correctif que sur "Calendrier" ci-dessus.
               scopeTeams={createTeams}
@@ -369,7 +363,7 @@ export default function CoachView({
               events={events}
               createTeams={createTeams}
               benevoles={benevoles}
-              rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey, noteByKey: rsvpNoteByKey }}
+              rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
               // Retour de Cindy du 10/09 (bug Basile) : createTeams, même
               // correctif que sur "Calendrier" ci-dessus.
               scopeTeams={createTeams}

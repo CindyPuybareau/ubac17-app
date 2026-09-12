@@ -37,26 +37,17 @@ function badgeFor(status: Status) {
 // réaligner le reste de l'écran — ça rechargeait la page deux fois pour un
 // seul clic (retour de Cindy du 2026-08-20, même correctif que
 // rsvp-buttons.tsx/volunteer-needs-panel.tsx).
-const CONTRIBUTION_NOTE_MAX_LENGTH = 120;
-
 export default function RsvpControl({
   eventId,
   playerId,
   playerName,
   currentStatus,
-  hasOrganisationNeeds = false,
-  currentNote = null,
 }: {
   eventId: string;
   playerId: string;
   // Affiché seulement quand la famille suit plusieurs enfants.
   playerName?: string;
   currentStatus: string;
-  // Retour de Cindy du 10/09 ("ce que j'apporte") : même principe que
-  // rsvp-buttons.tsx (voir son commentaire) -- calculé par l'appelant à
-  // partir de volunteerNeedsByEventId, jamais recalculé ici.
-  hasOrganisationNeeds?: boolean;
-  currentNote?: string | null;
 }) {
   const [status, setStatus] = useState<Status>(
     currentStatus === "PRESENT" || currentStatus === "ABSENT" || currentStatus === "LATE"
@@ -65,8 +56,6 @@ export default function RsvpControl({
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [note, setNote] = useState(currentNote ?? "");
-  const [noteSaved, setNoteSaved] = useState(true);
 
   async function save(next: Status) {
     setSaving(true);
@@ -93,26 +82,6 @@ export default function RsvpControl({
       return;
     }
     setStatus(next);
-  }
-
-  // Retour de Cindy du 10/09 ("ce que j'apporte") : même principe que
-  // rsvp-buttons.tsx (voir son commentaire) -- upsert avec status:
-  // "PRESENT" explicite, sauvegardé au blur du champ.
-  async function saveNote() {
-    const trimmed = note.trim();
-    if (trimmed === (currentNote ?? "").trim()) return;
-    setNoteSaved(false);
-    const supabase = createClient();
-    const { error: writeError } = await supabase
-      .from("rsvps")
-      .upsert(
-        { event_id: eventId, player_id: playerId, status: "PRESENT", contribution_note: trimmed || null },
-        { onConflict: "event_id,player_id" }
-      );
-    setNoteSaved(true);
-    if (writeError) {
-      setError(writeError.message);
-    }
   }
 
   // Revenir à "en attente", c'est supprimer la ligne : l'app lit déjà
@@ -193,22 +162,7 @@ export default function RsvpControl({
         )}
       </div>
 
-      {/* Retour de Cindy du 10/09 ("ce que j'apporte") : voir le commentaire
-          sur hasOrganisationNeeds plus haut. */}
-      {status === "PRESENT" && hasOrganisationNeeds && (
-        <input
-          type="text"
-          value={note}
-          onChange={(e) => setNote(e.target.value.slice(0, CONTRIBUTION_NOTE_MAX_LENGTH))}
-          onBlur={saveNote}
-          maxLength={CONTRIBUTION_NOTE_MAX_LENGTH}
-          placeholder="Ce que j'apporte (optionnel)"
-          className="rounded-full border border-zinc-200 px-2.5 py-1 text-xs text-zinc-700 placeholder:text-zinc-400"
-        />
-      )}
-
       {error && <p className="text-xs text-red-600">{error}</p>}
-      {!noteSaved && <p className="text-xs text-zinc-400">Enregistrement...</p>}
     </div>
   );
 }
