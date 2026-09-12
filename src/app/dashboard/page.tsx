@@ -514,6 +514,14 @@ export type AdminUpcomingEvent = {
   // BenevolePresentList, calendar-view.tsx). PENDING tant que le bénévole
   // n'a pas répondu depuis son propre lien (voir /api/benevole-rsvp).
   benevoleInvites: { id: string; firstName: string; lastName: string; status: BenevoleInviteStatus }[];
+  // Retour de Cindy du 12/09 ("Matchs officiels du club") : jamais construit
+  // ici (page.tsx) -- injecté uniquement côté client (calendar-view.tsx,
+  // toggle "Matchs officiels du club") pour un match d'une AUTRE équipe,
+  // affiché en pure consultation. Masque la boîte Organisation sur ce genre
+  // de carte (voir renderEventCard) : les icônes modifier/supprimer et
+  // "Ajouter le score" sont déjà masquées par canManageEvent (toujours faux
+  // pour ce genre d'événement de toute façon, voir canManageThisEvent).
+  readOnlyExternal?: boolean;
 };
 
 export type BenevoleInviteStatus = "PENDING" | "PRESENT" | "ABSENT";

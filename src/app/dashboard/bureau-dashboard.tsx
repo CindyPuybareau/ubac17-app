@@ -439,6 +439,12 @@ export default function BureauDashboard({
         events={events}
         createTeams={createTeams}
         allowClubWide
+        // Retour de Cindy du 12/09 ("il faut que tout espace qui ne soit
+        // pas bureau puisse avoir ce petit oeil") : seul appel de
+        // CalendarView à passer isBureau -- voir son commentaire
+        // (calendar-view.tsx) pour la raison (Bureau voit déjà tout le
+        // club, Coach/Famille non).
+        isBureau
         birthdayMembers={birthdayMembers}
         eventRoles={eventRoles}
         volunteerNeedsByEventId={volunteerNeedsByEventId}

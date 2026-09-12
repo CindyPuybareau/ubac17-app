@@ -4,6 +4,7 @@ import { CHILD_SESSION_COOKIE, verifyChildSession } from "@/lib/child-session";
 import { logQueryErrors } from "@/lib/query-errors";
 import { computePlayerYearStatus } from "@/lib/season";
 import { teamOrClubWideFilter } from "@/app/dashboard/family-data";
+import { getClubOfficialMatches } from "@/lib/club-official-matches";
 import ChildDashboard, {
   type ChildAttendanceStats,
   type ChildCoach,
@@ -81,7 +82,7 @@ export default async function ChildViewPage() {
   // forcer un aller-retour séquentiel de plus juste pour la lire.
   const notificationsEnabled = player.notifications_enabled ?? true;
 
-  const [teamsRes, teammatesRes, coachesRes, eventsRes, notifRes] = await Promise.all([
+  const [teamsRes, teammatesRes, coachesRes, eventsRes, notifRes, clubOfficialMatches] = await Promise.all([
     teamIds.length > 0
       ? supabase.from("teams").select("id, name, category").in("id", teamIds)
       : Promise.resolve({
@@ -128,6 +129,13 @@ export default async function ChildViewPage() {
           // ci-dessus.
           .or(teamOrClubWideFilter(teamIds))
       : Promise.resolve({ data: [] as never[], error: null }),
+    // Retour de Cindy du 12/09 ("Matchs officiels du club") : ne dépend de
+    // rien de ce qui précède (playerId compris) -- calculé en parallèle
+    // avec le reste plutôt qu'après coup. Voir son commentaire pour la
+    // raison d'un calcul systématique ici plutôt qu'un chargement à la
+    // demande (service_role, pas de requête client-side possible côté
+    // Enfant).
+    getClubOfficialMatches(supabase),
   ]);
   logQueryErrors("Enfant", { teamsRes, teammatesRes, coachesRes, eventsRes, notifRes });
 
@@ -357,6 +365,7 @@ export default async function ChildViewPage() {
       avatarUrl={player.avatar_url}
       teams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
       events={events}
+      clubOfficialMatches={clubOfficialMatches}
       teammates={teammates}
       coaches={coaches}
       presence={presence}

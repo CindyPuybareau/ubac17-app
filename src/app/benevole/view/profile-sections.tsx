@@ -137,6 +137,22 @@ function CalendarSection({
         .filter((e) => eventMatchesTeams(e, selectedIds)),
     [events, hideTrainings, selectedIds]
   );
+  // Retour de Cindy du 12/09 ("Matchs officiels du club", "il faut que
+  // tout espace qui ne soit pas bureau puisse avoir ce petit oeil") :
+  // `events` ici contient déjà TOUS les matchs du club sans restriction
+  // (voir read-only-briques-data.ts, requête sans filtre équipe) -- ce
+  // filtre équipe-ci (TeamFilterDropdown/selectedIds) n'existe que côté
+  // UI, pour ne pas noyer commissions/bénévoles sous des équipes qui ne
+  // les concernent pas. Pas besoin d'un second chargement comme côté
+  // Espace Enfant (dont la requête EST restreinte à ses propres équipes,
+  // voir enfant/view/page.tsx) : on repasse simplement les matchs déjà en
+  // main, non filtrés par équipe -- ChildCalendarTab se charge lui-même de
+  // ne montrer que ceux absents de `events` (visibleEvents) une fois
+  // l'œil activé, jamais un doublon.
+  const clubOfficialMatches = useMemo(
+    () => events.filter((e) => e.eventType === "MATCH"),
+    [events]
+  );
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -154,7 +170,12 @@ function CalendarSection({
           {hideTrainings ? "Entraînements masqués" : "Masquer les entraînements"}
         </button>
       </div>
-      <ChildCalendarTab events={visibleEvents} teams={[]} attendanceByEventId={attendanceByEventId} />
+      <ChildCalendarTab
+        events={visibleEvents}
+        clubOfficialMatches={clubOfficialMatches}
+        teams={[]}
+        attendanceByEventId={attendanceByEventId}
+      />
     </div>
   );
 }

@@ -11,6 +11,7 @@ import {
   ChevronUp,
   Clock,
   Euro,
+  Eye,
   LayoutGrid,
   List,
   MapPin,
@@ -91,6 +92,7 @@ const todayKey = toKey(today);
 
 export default function ChildCalendarTab({
   events,
+  clubOfficialMatches = [],
   teammates = [],
   // Retour de Cindy du 10/09 (fusion Calendrier/Événements) : le filtre par
   // équipe qui n'existait jusqu'ici que sur l'ancien onglet "Événements"
@@ -113,6 +115,14 @@ export default function ChildCalendarTab({
   attendanceByEventId,
 }: {
   events: ChildEvent[];
+  // Retour de Cindy du 12/09 ("Matchs officiels du club", "il faut que
+  // tout espace qui ne soit pas bureau puisse avoir ce petit oeil") : tous
+  // les matchs officiels du club (déjà calculés côté serveur, voir
+  // page.tsx/getClubOfficialMatches), affichés en plus de `events`
+  // uniquement si l'œil est activé -- jamais par défaut. Partagé par
+  // Espace Enfant, Commissions & Administration et Bénévoles, les trois
+  // seuls appelants de ce composant.
+  clubOfficialMatches?: ChildEvent[];
   teammates?: ChildTeammate[];
   teams?: { id: string; name: string | null; category: string | null }[];
   nextEventId?: string | null;
@@ -122,6 +132,12 @@ export default function ChildCalendarTab({
   const [view, setView] = useState<"month" | "list">("month");
   const [viewMonth, setViewMonth] = useState<Date>(today);
   const [selectedDate, setSelectedDate] = useState<Date>(today);
+  // Retour de Cindy du 12/09 ("Matchs officiels du club") : masqué par
+  // défaut, comme côté Bureau/Coach/Famille (calendar-view.tsx) -- ici,
+  // clubOfficialMatches est déjà entièrement chargé (voir son commentaire
+  // sur la prop), ce bouton ne fait donc que basculer l'affichage, jamais
+  // un chargement à la demande.
+  const [showClubMatches, setShowClubMatches] = useState(false);
 
   // Retour de Cindy du 11/09 ("équipe principale/secondaire") : fusionne
   // U13M avec U13M-1/U13M-2 (même principe côté Coach/Famille, voir
@@ -150,19 +166,32 @@ export default function ChildCalendarTab({
     );
   }, [events, groupedTeams, activeMemberTeamIds]);
 
+  // Retour de Cindy du 12/09 ("Matchs officiels du club") : ajoutés APRÈS
+  // le filtre équipe ci-dessus, jamais soumis à lui -- ce filtre-là ne
+  // parle que "parmi MES équipes", alors que ces matchs sont volontairement
+  // ceux des AUTRES équipes. Dédoublonnés contre `events` (pas seulement
+  // `filteredEvents`) : un match qui concerne déjà cet enfant ne doit
+  // jamais s'afficher deux fois.
+  const displayedEvents = useMemo(() => {
+    if (!showClubMatches) return filteredEvents;
+    const ownIds = new Set(events.map((e) => e.id));
+    const extra = clubOfficialMatches.filter((e) => !ownIds.has(e.id));
+    return [...filteredEvents, ...extra];
+  }, [filteredEvents, events, clubOfficialMatches, showClubMatches]);
+
   // Filtre par type d'événement retiré (retour de Cindy du 2026-08-24,
   // "supprimer ça sur le haut du calendrier ... pas necessaire") : le
   // calendrier affiche systématiquement tous les types d'événement.
   const eventsByDate = useMemo(() => {
     const map = new Map<string, ChildEvent[]>();
-    filteredEvents.forEach((e) => {
+    displayedEvents.forEach((e) => {
       const key = toKey(new Date(e.startTime));
       const list = map.get(key) ?? [];
       list.push(e);
       map.set(key, list);
     });
     return map;
-  }, [filteredEvents]);
+  }, [displayedEvents]);
 
   const birthdaySources: BirthdaySource[] = useMemo(
     () => teammates.map((t) => ({ id: t.id, firstName: t.firstName, lastName: null, birthDate: t.birthDate })),
@@ -200,10 +229,10 @@ export default function ChildCalendarTab({
   }
 
   const now = Date.now();
-  const upcoming = filteredEvents
+  const upcoming = displayedEvents
     .filter((e) => new Date(e.startTime).getTime() >= now)
     .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-  const past = filteredEvents
+  const past = displayedEvents
     .filter((e) => new Date(e.startTime).getTime() < now)
     .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
 
@@ -253,6 +282,25 @@ export default function ChildCalendarTab({
         )}
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Retour de Cindy du 12/09 ("Matchs officiels du club", "il faut
+              que tout espace qui ne soit pas bureau puisse avoir ce petit
+              oeil") : même bouton que calendar-view.tsx (Bureau exclu là-
+              bas, jamais montré ici de toute façon puisque cet écran-ci
+              n'est jamais utilisé côté Bureau). Style volontairement
+              distinct (doré) des autres pills de cette ligne. */}
+          <button
+            type="button"
+            onClick={() => setShowClubMatches((v) => !v)}
+            title="Afficher aussi les matchs officiels des autres équipes du club"
+            className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+              showClubMatches
+                ? "border-transparent bg-ubac-yellow text-navy"
+                : "border-ubac-yellow bg-ubac-yellow/10 text-ubac-yellow-dark hover:bg-ubac-yellow/20"
+            }`}
+          >
+            <Eye className="h-3.5 w-3.5 shrink-0" />
+            Matchs officiels du club
+          </button>
           {view === "month" && (
             <button
               onClick={goToday}

@@ -13,6 +13,7 @@ import {
   Check,
   Clock,
   Euro,
+  Eye,
   ExternalLink,
   HeartHandshake,
   LayoutGrid,
@@ -423,6 +424,7 @@ export default function CalendarView({
   benevoles = [],
   celebrateWins = false,
   commissionGroups = [],
+  isBureau = false,
 }: {
   events: AdminUpcomingEvent[];
   createTeams?: CalendarTeamRef[];
@@ -432,6 +434,16 @@ export default function CalendarView({
   };
   contactEmailByPlayerId?: Record<string, string>;
   allowClubWide?: boolean;
+  // Retour de Cindy du 12/09 ("il faut que tout espace qui ne soit pas
+  // bureau puisse avoir ce petit oeil") : createTeams/canManage ne
+  // suffisaient pas à distinguer Bureau de Coach -- les deux le passent
+  // (Bureau : toutes les équipes du club ; Coach : celles qu'il coache).
+  // Seul le Bureau voit déjà TOUT le club par construction (bureau-
+  // dashboard.tsx passe systématiquement createTeams = toutes les équipes)
+  // -- lui seul n'a donc aucun intérêt au bouton "Matchs officiels du
+  // club" (voir plus bas), jamais faux ailleurs (Coach/Famille : false par
+  // défaut).
+  isBureau?: boolean;
   birthdayMembers?: BirthdaySource[];
   // Équipes dont ce calendrier montre les événements. Affiché tel quel :
   // sans cette ligne, un calendrier vide ne dit pas s'il ne couvre rien ou
@@ -678,6 +690,92 @@ export default function CalendarView({
         }
       });
   }
+  // Retour de Cindy du 12/09 ("Matchs officiels du club") : masqué par
+  // défaut (showClubMatches=false) -- un adhérent/parent ne voit alors que
+  // son propre calendrier, inchangé. Chargé UNE SEULE FOIS au premier clic
+  // (clubMatches reste `null` tant que rien n'a encore été demandé), pas à
+  // chaque montage : cette liste n'intéresse qu'une minorité de visites
+  // ("venir encourager une autre équipe"), pas la peine d'alourdir le
+  // chargement normal du calendrier pour ça. Un second clic masque de
+  // nouveau sans tout recharger (clubMatches reste en mémoire).
+  const [showClubMatches, setShowClubMatches] = useState(false);
+  const [clubMatches, setClubMatches] = useState<AdminUpcomingEvent[] | null>(null);
+  const [loadingClubMatches, setLoadingClubMatches] = useState(false);
+
+  async function toggleClubMatches() {
+    if (showClubMatches) {
+      setShowClubMatches(false);
+      return;
+    }
+    setShowClubMatches(true);
+    if (clubMatches !== null || loadingClubMatches) return;
+    setLoadingClubMatches(true);
+    const supabase = createClient();
+    // Fenêtre alignée sur celle du reste du tableau de bord (page.tsx,
+    // eventsWindowStart) : 6 mois en arrière + tout l'avenir, largement
+    // suffisant pour "venir encourager" une équipe du club. Un match d'une
+    // autre équipe n'est jamais modifiable depuis ici (RLS événements :
+    // seuls l'équipe elle-même/son coach/le Bureau peuvent écrire) --
+    // cette lecture élargie est le seul changement, purement en
+    // consultation.
+    const windowStart = new Date(Date.now() - 183 * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase
+      .from("events")
+      .select(
+        "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, team_score, opponent_score, team_id, teams(name)"
+      )
+      .eq("event_type", "MATCH")
+      .gte("start_time", windowStart)
+      .order("start_time", { ascending: true });
+    setLoadingClubMatches(false);
+    if (error) {
+      console.error("[CalendarView] chargement des matchs officiels du club échoué:", error);
+      setClubMatches([]);
+      return;
+    }
+    setClubMatches(
+      (data ?? []).map((e) => {
+        const team = e.teams as unknown as { name: string | null } | null;
+        return {
+          id: e.id,
+          title: e.title,
+          event_type: e.event_type,
+          isHome: e.is_home,
+          attendanceRequestedAt: null,
+          teamScore: e.team_score,
+          opponentScore: e.opponent_score,
+          location: e.location,
+          salle: e.salle,
+          start_time: e.start_time,
+          end_time: e.end_time,
+          impactTime: e.impact_time,
+          seriesId: e.series_id,
+          notes: e.notes,
+          isPaid: false,
+          collecteId: null,
+          paidAmount: null,
+          paymentLink: null,
+          paidParticipants: [],
+          teamId: e.team_id,
+          targetTeamIds: null,
+          commissionGroupIds: [],
+          teamName: team?.name ?? "Équipe",
+          rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
+          presentPlayers: [],
+          absentPlayers: [],
+          benevoleIds: [],
+          benevoleInvites: [],
+          // Retour de Cindy du 12/09 : jamais construit ailleurs -- distingue
+          // ce match "juste pour regarder" d'un vrai événement du viewer, pour
+          // masquer la boîte Organisation (voir renderEventCard, hasTasks est
+          // basé sur le TYPE d'événement, pas sur qui y est inscrit -- sans ce
+          // marqueur elle s'afficherait quand même, vide et inutilisable).
+          readOnlyExternal: true,
+        };
+      })
+    );
+  }
+
   // Le calendrier s'ouvre sur la grille : on veut d'abord voir le mois.
   // La liste chronologique reste à un clic pour répondre à "c'est quoi la
   // suite ?".
@@ -1019,21 +1117,40 @@ export default function CalendarView({
   // composant (pas un Hook), ses propres dépendances (resultsTeams,
   // resultsTeamSelector, selectedResultTeamIds, activeResultsTeamIdResolved)
   // sont listées explicitement ci-dessous à sa place.
-  const visibleEvents = useMemo(
-    () =>
-      localEvents
-        .filter((e) => !hiddenEventTypes.has(e.event_type ?? "OTHER"))
-        .filter(matchesTeamFilter),
+  const visibleEvents = useMemo(() => {
+    const base = localEvents
+      .filter((e) => !hiddenEventTypes.has(e.event_type ?? "OTHER"))
+      .filter(matchesTeamFilter);
+    // Retour de Cindy du 12/09 ("Matchs officiels du club") : ajoutés APRÈS
+    // matchesTeamFilter, jamais soumis à ce filtre-là -- celui-ci ne parle
+    // que "parmi MES équipes, lesquelles afficher", alors que ces matchs-là
+    // sont volontairement ceux des AUTRES équipes. hiddenEventTypes
+    // s'applique quand même : masquer "Match officiel" via "Filtrer par
+    // type" les cache aussi ici, pour ne jamais les faire réapparaître par
+    // une voie détournée. Dédoublonnés par id contre localEvents (pas
+    // seulement `base`) : un match qui concerne déjà ce viewer ne doit
+    // jamais s'afficher deux fois, même s'il a été filtré de `base` par
+    // ailleurs (équipe/type masqués).
+    if (!showClubMatches || !clubMatches) return base;
+    const ownIds = new Set(localEvents.map((e) => e.id));
+    const extra = clubMatches.filter(
+      (e) => !ownIds.has(e.id) && !hiddenEventTypes.has(e.event_type ?? "OTHER")
+    );
+    return [...base, ...extra].sort(byStartTime);
+    // matchesTeamFilter et byStartTime sont des fonctions déclarées dans le
+    // corps du composant (pas des Hooks) ; leurs propres dépendances sont
+    // déjà listées ci-dessous, à leur place.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [
-      localEvents,
-      hiddenEventTypes,
-      resultsTeams,
-      resultsTeamSelector,
-      selectedResultTeamIds,
-      activeResultsTeamIdResolved,
-    ]
-  );
+  }, [
+    localEvents,
+    hiddenEventTypes,
+    resultsTeams,
+    resultsTeamSelector,
+    selectedResultTeamIds,
+    activeResultsTeamIdResolved,
+    showClubMatches,
+    clubMatches,
+  ]);
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, AdminUpcomingEvent[]>();
@@ -1551,7 +1668,7 @@ export default function CalendarView({
             aucun espace, même si un rôle/besoin lui est un jour rattaché
             en base — la carte entraînement doit rester sobre par
             construction, pas juste par absence de données. */}
-        {!canManageEvent && event.event_type !== "TRAINING" && (() => {
+        {!canManageEvent && !event.readOnlyExternal && event.event_type !== "TRAINING" && (() => {
           const roles = rolesForEventType(eventRoles, event.event_type);
           const hasTasks = roles.length > 0 || shouldOfferCarpool(event);
           const needs = volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds;
@@ -1889,6 +2006,38 @@ export default function CalendarView({
               hiddenTypes={hiddenEventTypes}
               onChange={updateHiddenEventTypes}
             />
+          )}
+
+          {/* Retour de Cindy du 12/09 ("Matchs officiels du club") :
+              "pour venir encourager les autres équipes du club" -- ne
+              touche jamais le filtre équipe/type ci-dessus (matchesTeamFilter
+              ne s'applique volontairement pas à ces matchs-là, voir
+              visibleEvents), pur ajout en lecture seule. Réservé à qui n'a
+              pas déjà tout le club sous les yeux (!isBureau : Coach,
+              Famille -- jamais Bureau, dont le calendrier couvre déjà
+              toutes les équipes du club par construction, voir isBureau
+              plus haut). Masqué sur les pages dédiées (forcedView, ex.
+              "Matchs officiels"/"Résultats") : elles ont déjà leur propre
+              sélecteur d'équipes plus bas, pas la peine de le doubler ici.
+              Style résolument différent des autres pills de cette ligne
+              (doré plutôt que navy/blanc/zinc) : jamais confondu avec
+              "Filtrer par type", qui ne parle que de SES propres
+              événements. */}
+          {!forcedView && !isBureau && (
+            <button
+              type="button"
+              onClick={toggleClubMatches}
+              disabled={loadingClubMatches}
+              title="Afficher aussi les matchs officiels des autres équipes du club, en lecture seule"
+              className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors disabled:opacity-60 ${
+                showClubMatches
+                  ? "border-transparent bg-ubac-yellow text-navy"
+                  : "border-ubac-yellow bg-ubac-yellow/10 text-ubac-yellow-dark hover:bg-ubac-yellow/20"
+              }`}
+            >
+              <Eye className="h-3.5 w-3.5 shrink-0" />
+              {loadingClubMatches ? "Chargement..." : "Matchs officiels du club"}
+            </button>
           )}
 
           {/* Tout à droite : c'est un réglage d'affichage, pas une action

@@ -107,6 +107,7 @@ export default function ChildDashboard({
   avatarUrl,
   teams,
   events,
+  clubOfficialMatches = [],
   teammates,
   coaches,
   presence,
@@ -120,6 +121,12 @@ export default function ChildDashboard({
   avatarUrl: string | null;
   teams: { id: string; name: string | null; category: string | null }[];
   events: ChildEvent[];
+  // Retour de Cindy du 12/09 ("Matchs officiels du club") : tous les
+  // matchs officiels du club (pas seulement ceux de MES équipes), calculés
+  // une fois côté serveur (page.tsx, getClubOfficialMatches) -- affichés
+  // uniquement si l'enfant active l'œil dans ChildCalendarTab, jamais par
+  // défaut.
+  clubOfficialMatches?: ChildEvent[];
   teammates: ChildTeammate[];
   coaches: ChildCoach[];
   presence: { trainings: ChildAttendanceStats; matches: ChildAttendanceStats };
@@ -209,6 +216,7 @@ export default function ChildDashboard({
 
           <ChildCalendarTab
             events={events}
+            clubOfficialMatches={clubOfficialMatches}
             teammates={teammates}
             teams={teams}
             nextEventId={nextEvent?.id ?? null}
