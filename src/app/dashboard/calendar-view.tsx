@@ -1991,26 +1991,9 @@ export default function CalendarView({
             </div>
           )}
 
-          {/* Remplace "Masquer les entraînements" (retour de Cindy du
-              10/09) : filtre par type d'événement plutôt qu'un seul
-              interrupteur entraînements/reste -- visible sur le Calendrier
-              et sur "Événements" (là où les entraînements peuvent
-              apparaître), masqué sur les vues Matchs/Résultats où ils
-              n'apparaissent de toute façon jamais (même condition
-              qu'avant). Retour de Cindy du 12/09 : placé juste après le
-              filtre par équipe et juste avant Liste/Mois (pas avant le
-              filtre équipe comme avant) -- vérifié sur les 3 espaces
-              (Bureau/Coach/Famille), un seul composant partagé ici. */}
-          {(!forcedView || forcedView === "clubEvents") && (
-            <EventTypeFilterDropdown
-              hiddenTypes={hiddenEventTypes}
-              onChange={updateHiddenEventTypes}
-            />
-          )}
-
           {/* Retour de Cindy du 12/09 ("Matchs officiels du club") :
               "pour venir encourager les autres équipes du club" -- ne
-              touche jamais le filtre équipe/type ci-dessus (matchesTeamFilter
+              touche jamais le filtre équipe/type ci-dessous (matchesTeamFilter
               ne s'applique volontairement pas à ces matchs-là, voir
               visibleEvents), pur ajout en lecture seule. Réservé à qui n'a
               pas déjà tout le club sous les yeux (!isBureau : Coach,
@@ -2022,7 +2005,9 @@ export default function CalendarView({
               Style résolument différent des autres pills de cette ligne
               (doré plutôt que navy/blanc/zinc) : jamais confondu avec
               "Filtrer par type", qui ne parle que de SES propres
-              événements. */}
+              événements. Retour de Cindy du 12/09 (deuxième demande) :
+              placé À GAUCHE de "Filtrer par type" (juste après le filtre
+              équipe), pas après -- sur tous les espaces concernés. */}
           {!forcedView && !isBureau && (
             <button
               type="button"
@@ -2038,6 +2023,24 @@ export default function CalendarView({
               <Eye className="h-3.5 w-3.5 shrink-0" />
               {loadingClubMatches ? "Chargement..." : "Matchs officiels du club"}
             </button>
+          )}
+
+          {/* Remplace "Masquer les entraînements" (retour de Cindy du
+              10/09) : filtre par type d'événement plutôt qu'un seul
+              interrupteur entraînements/reste -- visible sur le Calendrier
+              et sur "Événements" (là où les entraînements peuvent
+              apparaître), masqué sur les vues Matchs/Résultats où ils
+              n'apparaissent de toute façon jamais (même condition
+              qu'avant). Retour de Cindy du 12/09 : placé juste après le
+              filtre par équipe -- puis juste après "Matchs officiels du
+              club" (deuxième retour du 12/09, ce dernier passe devant) --
+              vérifié sur les 3 espaces (Bureau/Coach/Famille), un seul
+              composant partagé ici. */}
+          {(!forcedView || forcedView === "clubEvents") && (
+            <EventTypeFilterDropdown
+              hiddenTypes={hiddenEventTypes}
+              onChange={updateHiddenEventTypes}
+            />
           )}
 
           {/* Tout à droite : c'est un réglage d'affichage, pas une action
