@@ -3926,12 +3926,18 @@ export default async function DashboardPage({
   // calendar-view.tsx). familyEvents est fusionné EN DERNIER : si le même
   // événement existe des deux côtés (double casquette), c'est la version
   // "family" qui l'emporte dans le Map, exactement comme avant.
+  // Retour de Cindy du 13/09 : même bug que respondingPlayers dans
+  // calendar-view.tsx (voir son commentaire) -- teamId ET targetTeamIds
+  // tous deux vides encode "Tous les groupes", pas "personne n'est
+  // concerné".
   function respondingPlayersFor(
     event: AdminUpcomingEvent,
     players: { id: string; name: string; teamIds: string[] }[]
   ) {
+    const isClubWideEvent = !event.teamId && (!event.targetTeamIds || event.targetTeamIds.length === 0);
     return players.filter(
       (p) =>
+        isClubWideEvent ||
         (event.teamId && p.teamIds.includes(event.teamId)) ||
         (event.targetTeamIds?.some((id) => p.teamIds.includes(id)) ?? false)
     );

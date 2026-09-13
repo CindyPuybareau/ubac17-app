@@ -1279,9 +1279,22 @@ export default function CalendarView({
     // des équipes ciblées. Touchait RSVP, tâches et besoins d'organisation
     // à la fois, pour toutes les familles, sur tout événement à équipes
     // spécifiques.
+    // Retour de Cindy du 13/09 ("Formation E-marque", Basile en tant que
+    // joueur ET en tant que parent ne peuvent se mettre ni présent ni
+    // absent) : même bug, cas encore non couvert par le correctif du
+    // 26/08 -- event.teamId ET event.targetTeamIds tous deux vides encode
+    // "Tous les groupes" (voir create-event-form.tsx), pas "personne n'est
+    // concerné". Sans isClubWide, aucun des deux `||` ne matchait jamais,
+    // laissant respondingPlayers vide pour TOUT LE MONDE sur ce type
+    // d'événement -- exactement le même trou que celui déjà corrigé côté
+    // Bureau/Coach (unionRoster, family-data.ts) pour les compteurs
+    // agrégés, mais ici pour le bouton de réponse individuel.
+    const isClubWideEvent =
+      !event.teamId && (!event.targetTeamIds || event.targetTeamIds.length === 0);
     const respondingPlayers = rsvp
       ? rsvp.players.filter(
           (p) =>
+            isClubWideEvent ||
             (event.teamId && p.teamIds.includes(event.teamId)) ||
             (event.targetTeamIds?.some((id) => p.teamIds.includes(id)) ?? false)
         )

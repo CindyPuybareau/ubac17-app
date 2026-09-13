@@ -161,6 +161,12 @@ export default function ChildCalendarTab({
     return events.filter(
       (e) =>
         groupedTeams.length <= 1 ||
+        // Retour de Cindy du 13/09 : même bug que respondingPlayers côté
+        // Bureau/Coach/Famille (calendar-view.tsx) -- teamId ET
+        // targetTeamIds tous deux vides encode "Tous les groupes", un
+        // enfant avec plusieurs équipes ne le voyait alors sous AUCUN de
+        // ses onglets.
+        (!e.teamId && (!e.targetTeamIds || e.targetTeamIds.length === 0)) ||
         (e.teamId ? activeMemberTeamIds.includes(e.teamId) : false) ||
         (e.targetTeamIds?.some((id) => activeMemberTeamIds.includes(id)) ?? false)
     );
