@@ -20,7 +20,7 @@ import { buildAppDeepLink } from "@/lib/whatsapp";
 import { sameCategoryFamily, teamCategoryLabel } from "@/lib/teams";
 import ConfirmDialog from "./confirm-dialog";
 import ParentLinkManager from "./parent-link-manager";
-import { BRIQUE_GROUPS } from "./access-briques";
+import { COMMITTEE_BRIQUE_GROUPS } from "./access-briques";
 import type { AdminAccessProfile, AdminMember, AdminMemberTeam, MemberDetail } from "./page";
 
 // Retour de Cindy du 05/09 : seul ce rôle peut être restreint à certaines
@@ -1251,7 +1251,7 @@ export default function MemberDetailModal({
                       <label className="block text-xs font-medium text-navy/70">
                         Briques visibles pour ce membre du Comité directeur
                       </label>
-                      {BRIQUE_GROUPS.map((group) => (
+                      {COMMITTEE_BRIQUE_GROUPS.map((group) => (
                         <div key={group.label}>
                           <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-navy/50">
                             {group.label}

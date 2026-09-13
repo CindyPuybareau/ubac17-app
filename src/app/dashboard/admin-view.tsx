@@ -589,7 +589,12 @@ export default function AdminView({
     "matches-official": "matchs_resultats",
     "matches-results": "matchs_resultats",
     sponsors: "sponsors",
-    commissions: "benevoles",
+    // Retour de Cindy du 13/09 ("à quoi sert la case Bénévoles ?") : cette
+    // brique s'appelait "benevoles" (nom trompeur, sans rapport avec son
+    // vrai rôle) -- renommée "commissions_admin" dans COMMITTEE_BRIQUE_
+    // GROUPS (access-briques.ts, seul endroit où elle est cochable), le nom
+    // ici doit suivre à l'identique.
+    commissions: "commissions_admin",
   };
   const documentsVisible =
     !isRestricted ||

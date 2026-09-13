@@ -14,19 +14,33 @@
 // document/compte rendu plutôt qu'un seul bloc à 3 briques (pour choisir
 // précisément lesquels une commission voit), et un nouveau "Groupes
 // WhatsApp" (annuaire en lecture seule des groupes du club). Cotisations/
-// Pénalités/Bénévoles restent dans la liste malgré sa demande de les
-// retirer : ces 3 clés servent AUSSI, via REQUIRED_BRIQUE (admin-view.tsx),
+// Pénalités restent dans la liste malgré sa demande initiale de les
+// retirer : ces 2 clés servent AUSSI, via REQUIRED_BRIQUE (admin-view.tsx),
 // à autoriser un "Comité directeur" restreint à voir les VRAIS écrans
-// Bureau (Cotisations, Pénalités, Accès Commissions & Administration
-// eux-mêmes) -- les retirer casserait cette capacité-là, un sujet
-// entièrement différent de la simplification du menu PUBLIC en lecture
-// seule qu'elle demandait. Elles restent de toute façon sans aucun effet
-// pour une commission/un bénévole en lecture seule : buildProfileSections
-// (profile-sections.tsx) n'a jamais construit la moindre section pour
-// elles, cocher "Cotisations" pour une commission n'y change donc rien --
-// exactement le même comportement (nul) qu'avant cette liste, juste sans
-// perdre la capacité côté Bureau. À retirer plus tard si Cindy confirme
-// vouloir aussi perdre cette capacité côté Comité directeur.
+// Bureau (Cotisations, Pénalités) -- les retirer casserait cette
+// capacité-là, un sujet entièrement différent de la simplification du menu
+// PUBLIC en lecture seule qu'elle demandait. Elles restent de toute façon
+// sans aucun effet pour une commission/un bénévole en lecture seule :
+// buildProfileSections (profile-sections.tsx) n'a jamais construit la
+// moindre section pour elles, cocher "Cotisations" pour une commission n'y
+// change donc rien -- exactement le même comportement (nul) qu'avant cette
+// liste, juste sans perdre la capacité côté Bureau.
+//
+// Retour de Cindy du 13/09 ("à quoi sert la case Bénévoles ?", puis
+// "retire-la aussi de la fiche bénévole") : "Bénévoles" n'a jamais eu le
+// moindre effet nulle part -- ni en lecture seule (buildProfileSections ne
+// l'a jamais consommée, que ce soit pour une commission ou un bénévole
+// individuel), ni ailleurs, SAUF pour le Comité directeur où c'était en
+// réalité l'interrupteur de l'écran Bureau "Accès Commissions &
+// Administration" (REQUIRED_BRIQUE, admin-view.tsx) sous un nom qui ne
+// disait pas du tout ce qu'il faisait. Retirée entièrement de la liste
+// ci-dessous (donc de commissions-manager.tsx ET benevoles-manager.tsx, les
+// deux seuls autres écrans à la partager) ; COMMITTEE_BRIQUE_GROUPS plus
+// bas lui redonne sa vraie brique, sous son vrai nom, "commissions_admin" --
+// même interrupteur, même effet, juste honnête sur ce qu'il fait. Les
+// anciennes lignes "benevoles" en base (un bénévole, une commission) ont été
+// supprimées par la même migration -- elles n'avaient jamais rien changé à
+// l'affichage, rien à préserver contrairement au profil Comité directeur.
 // Regroupement (retour de Cindy du 06/09, "proposer le menu comme le
 // bureau est présenté, avec les sous-menus") : mêmes intitulés de groupe
 // que le vrai menu Bureau (admin-view.tsx) plutôt que "Général"/"Comptes
@@ -69,7 +83,6 @@ export const BRIQUE_GROUPS: { label: string; briques: { key: string; label: stri
     label: "Vie du club",
     briques: [
       { key: "sponsors", label: "Sponsors" },
-      { key: "benevoles", label: "Bénévoles" },
       { key: "whatsapp_groups", label: "Groupes WhatsApp" },
     ],
   },
@@ -86,6 +99,24 @@ export const BRIQUE_GROUPS: { label: string; briques: { key: string; label: stri
     ],
   },
 ];
+
+// Fiche d'un membre du Comité directeur (member-detail-modal.tsx) : seul
+// écran où "commissions_admin" a un sens -- ajoutée à "Vie du club" plutôt
+// que d'exister dans BRIQUE_GROUPS lui-même, pour ne jamais apparaître sur
+// une fiche de commission ou de bénévole individuel (voir le commentaire du
+// 13/09 plus haut). Donne accès à l'écran Bureau "Accès Commissions &
+// Administration" (REQUIRED_BRIQUE, admin-view.tsx).
+export const COMMITTEE_BRIQUE_GROUPS = BRIQUE_GROUPS.map((group) =>
+  group.label === "Vie du club"
+    ? {
+        ...group,
+        briques: [
+          ...group.briques,
+          { key: "commissions_admin", label: "Accès Commissions & Administration" },
+        ],
+      }
+    : group
+);
 
 export const ALL_BRIQUE_KEYS = BRIQUE_GROUPS.flatMap((g) => g.briques.map((b) => b.key));
 
