@@ -19,6 +19,12 @@ export type StandardVolunteerRole = {
 };
 
 export const STANDARD_VOLUNTEER_ROLES: StandardVolunteerRole[] = [
+  // Retour de Cindy du 13/09 : besoin en premier dans la liste, distinct du
+  // "goûter" de event-tasks.ts (JERSEYS/SNACKS, un seul responsable désigné
+  // par le coach pour SON match) — ici plusieurs bénévoles peuvent se
+  // proposer, pour tout type d'événement (tournoi, plateau...), pas
+  // seulement un match coaché.
+  { code: "GOUTER_ENCAS", label: "Goûter / Encas", icon: "Utensils" },
   { code: "BUVETTE", label: "Buvette", icon: "Coffee" },
   { code: "TABLE_MARQUE", label: "Table de marque", icon: "Timer" },
   { code: "ARBITRAGE", label: "Arbitrage", icon: "Flag" },
