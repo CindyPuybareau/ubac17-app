@@ -1427,6 +1427,7 @@ export default async function DashboardPage({
     match_reminder_enabled: false,
     expiry_alert_enabled: false,
     cotisation_relance_enabled: false,
+    volunteer_need_alerts_enabled: false,
   };
 
   // Les trois blocs ci-dessous (Bureau, Coach, Famille) tournaient jusqu'ici
@@ -1566,7 +1567,9 @@ export default async function DashboardPage({
         () =>
           supabase
             .from("club_settings")
-            .select("match_reminder_enabled, expiry_alert_enabled, cotisation_relance_enabled")
+            .select(
+              "match_reminder_enabled, expiry_alert_enabled, cotisation_relance_enabled, volunteer_need_alerts_enabled"
+            )
             .eq("id", true)
             .maybeSingle(),
         // Table complète (contrat + coordonnées de contact) réservée au
@@ -1661,6 +1664,7 @@ export default async function DashboardPage({
       match_reminder_enabled: Boolean(clubSettingsRow?.match_reminder_enabled),
       expiry_alert_enabled: Boolean(clubSettingsRow?.expiry_alert_enabled),
       cotisation_relance_enabled: Boolean(clubSettingsRow?.cotisation_relance_enabled),
+      volunteer_need_alerts_enabled: Boolean(clubSettingsRow?.volunteer_need_alerts_enabled),
     };
 
     const bureauRoleByEmailLower = new Map(

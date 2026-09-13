@@ -8,7 +8,8 @@ import { createClient } from "@/lib/supabase/client";
 export type AutomationKey =
   | "match_reminder_enabled"
   | "expiry_alert_enabled"
-  | "cotisation_relance_enabled";
+  | "cotisation_relance_enabled"
+  | "volunteer_need_alerts_enabled";
 
 const AUTOMATIONS: { key: AutomationKey; title: string; description: string }[] = [
   {
@@ -33,6 +34,17 @@ const AUTOMATIONS: { key: AutomationKey; title: string; description: string }[] 
     title: "Relance pénalités",
     description:
       "Email de rappel envoyé tous les 14 jours pour chaque cotisation ou pénalité encore due.",
+  },
+  {
+    key: "volunteer_need_alerts_enabled",
+    // Retour de Cindy du 13/09 : un seul interrupteur pour les 3 alertes de
+    // ce chantier (nouveau besoin, relance J-3, changement d'événement) —
+    // voir notify_event_change (trigger SQL) et notifyNewVolunteerNeed/
+    // runVolunteerNeedReminders (event-volunteer-needs.ts, cron/bureau-
+    // alerts) pour le détail de chacune.
+    title: "Besoins bénévoles",
+    description:
+      "Notification à l'équipe et aux commissions concernées : nouveau besoin créé, besoin non pourvu à J-3, ou événement modifié/annulé.",
   },
 ];
 

@@ -31,6 +31,19 @@ export default function BenevoleNotificationBell({
   const [savingPref, setSavingPref] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Shake joué une seule fois à l'ouverture de la page (retour de Cindy du
+  // 13/09) : contrairement à notification-bell.tsx, initialNotifications
+  // arrive déjà résolue en props (lecture service_role côté page.tsx) —
+  // pas besoin d'attendre un chargement, l'état de départ suffit à savoir
+  // s'il faut secouer.
+  const [shake, setShake] = useState(() => initialEnabled && initialNotifications.some((n) => !n.readAt));
+  useEffect(() => {
+    if (!shake) return;
+    const t = setTimeout(() => setShake(false), 600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -91,7 +104,7 @@ export default function BenevoleNotificationBell({
         aria-label="Notifications"
         className="relative flex items-center gap-1.5 rounded-lg p-2 text-sm font-medium text-white transition-colors hover:bg-white/10"
       >
-        <Bell className="h-5 w-5 shrink-0" />
+        <Bell className={`h-5 w-5 shrink-0 ${shake ? "animate-bell-shake" : ""}`} />
         {enabled && unreadCount > 0 && (
           <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
             {unreadCount > 9 ? "9+" : unreadCount}

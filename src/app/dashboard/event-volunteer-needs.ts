@@ -41,6 +41,86 @@ export function volunteerRoleLabel(roleCode: string, customLabel: string | null)
   return STANDARD_VOLUNTEER_ROLES.find((r) => r.code === roleCode)?.label ?? roleCode;
 }
 
+// Retour de Cindy du 13/09 ("notifier les personnes concernées dès qu'une
+// ligne est ajoutée dans event_volunteer_needs") : posée ici en code
+// applicatif plutôt qu'en trigger SQL (contrairement à notify_event_change,
+// voir la migration 20261113010000) — le libellé d'un rôle standard
+// ("Buvette", "Goûter / Encas"...) n'existe QUE dans STANDARD_VOLUNTEER_
+// ROLES ci-dessus, jamais en base (catalogue db supprimé le 2026-10-16) ; un
+// trigger SQL n'aurait accès qu'au role_code brut ("BUVETTE") et devrait
+// dupliquer cette liste rien que pour l'affichage. Appelée aux deux seuls
+// endroits qui créent un besoin (create-event-form.tsx, volunteer-needs-
+// panel.tsx "Ajouter un besoin") — best-effort, jamais bloquant : un échec
+// ici ne doit jamais faire croire que le besoin lui-même n'a pas été créé.
+//
+// Ciblage identique à notify_event_change (voir son commentaire) : le côté
+// équipe (team_id/target_team_ids) reste écrit tel quel, toujours -- y
+// compris team_id et target_team_ids tous deux null (= tout le club, même
+// codage que partout ailleurs). Le côté "commission concernée" ne vise pas
+// des personnes individuelles (voir access-briques.ts / commissions-
+// manager.tsx) mais l'espace partagé /commission/[token] lui-même : une
+// ligne par commission taguée sur l'événement, jamais par personne.
+export async function notifyNewVolunteerNeed(
+  supabase: SupabaseClient,
+  params: {
+    eventId: string;
+    eventTitle: string | null;
+    startTime: string;
+    teamId: string | null;
+    targetTeamIds: string[] | null;
+    commissionGroupIds: string[];
+    roleCode: string;
+    customLabel: string | null;
+    requiredCount: number;
+  }
+): Promise<void> {
+  // Même interrupteur unique que notify_event_change côté SQL (voir son
+  // commentaire) : "Besoins bénévoles", désactivé par défaut.
+  const { data: settings } = await supabase
+    .from("club_settings")
+    .select("volunteer_need_alerts_enabled")
+    .eq("id", true)
+    .maybeSingle();
+  if (!settings?.volunteer_need_alerts_enabled) return;
+
+  const roleLabel = volunteerRoleLabel(params.roleCode, params.customLabel);
+  const dateLabel = new Date(params.startTime).toLocaleDateString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "Europe/Paris",
+  });
+  const title = "Nouveau besoin bénévole";
+  const countLabel = params.requiredCount > 1 ? ` (${params.requiredCount})` : "";
+  const body = `${roleLabel}${countLabel} — ${params.eventTitle ?? "un événement"}, ${dateLabel}.`;
+
+  const { error: teamError } = await supabase.from("notifications").insert({
+    team_id: params.teamId,
+    target_team_ids: params.targetTeamIds,
+    event_id: params.eventId,
+    title,
+    body,
+    url: "/dashboard",
+  });
+  if (teamError) {
+    console.error("[notifyNewVolunteerNeed] notification équipe échouée:", teamError);
+  }
+
+  if (params.commissionGroupIds.length > 0) {
+    const { error: commissionError } = await supabase.from("notifications").insert(
+      params.commissionGroupIds.map((groupId) => ({
+        commission_group_id: groupId,
+        event_id: params.eventId,
+        title,
+        body,
+      }))
+    );
+    if (commissionError) {
+      console.error("[notifyNewVolunteerNeed] notification commission échouée:", commissionError);
+    }
+  }
+}
+
 export function volunteerRoleIcon(roleCode: string): RoleIconName {
   return STANDARD_VOLUNTEER_ROLES.find((r) => r.code === roleCode)?.icon ?? "Users";
 }

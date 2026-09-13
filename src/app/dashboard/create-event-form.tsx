@@ -12,6 +12,7 @@ import { CalendarSync, Plus, X } from "lucide-react";
 import {
   CUSTOM_ROLE_CODE,
   STANDARD_VOLUNTEER_ROLES,
+  notifyNewVolunteerNeed,
   volunteerRoleIcon,
   type VolunteerNeed,
 } from "./event-volunteer-needs";
@@ -953,6 +954,23 @@ export default function CreateEventForm({
           `Événement enregistré, mais l'ajout d'un besoin d'organisation a échoué : ${needsError.message}`
         );
         return;
+      }
+      // Retour de Cindy du 13/09 ("notifier... dès qu'une ligne est ajoutée
+      // dans event_volunteer_needs") : best-effort, jamais bloquant -- un
+      // échec ici ne doit jamais remettre en cause la création du besoin
+      // lui-même, déjà confirmée juste au-dessus.
+      for (const n of needsToInsert) {
+        void notifyNewVolunteerNeed(supabase, {
+          eventId: inserted.id,
+          eventTitle: inserted.title,
+          startTime: inserted.start_time,
+          teamId: inserted.team_id,
+          targetTeamIds: inserted.target_team_ids,
+          commissionGroupIds,
+          roleCode: n.roleCode,
+          customLabel: n.customLabel,
+          requiredCount: n.count,
+        });
       }
     }
 

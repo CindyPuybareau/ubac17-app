@@ -4,6 +4,7 @@ import { getVolunteerNeedsByEventId, type VolunteerNeed } from "@/app/dashboard/
 import { getReadOnlyBriquesData } from "@/lib/read-only-briques-data";
 import { commissionMeta } from "@/lib/commission-labels";
 import CommissionView, { type CommissionEvent } from "./commission-view";
+import type { CommissionNotification } from "./commission-notification-bell";
 
 // Point d'entrée du lien public et permanent d'une commission (retour de
 // Cindy du 10/09, "Accès Commissions & Administration") : contrairement à
@@ -88,12 +89,41 @@ export default async function CommissionPage({
   const volunteerNeedsByEventId: Record<string, VolunteerNeed[]> =
     eventIds.length > 0 ? await getVolunteerNeedsByEventId(supabase, eventIds) : {};
 
+  // Cloche de la commission (retour de Cindy du 13/09) : lues en
+  // service_role comme le reste de cette page, jamais via notifications_
+  // for_me()/auth.uid() -- ce lien n'a pas de session. 60 jours de recul
+  // (plus large que les 14 jours du reste de l'appli, voir notifications_
+  // for_me() : un besoin non urgent peut rester d'actualité plus longtemps
+  // pour une commission qui n'ouvre son lien que ponctuellement).
+  // Composant serveur (pas un hook), exécuté une fois par requête réelle :
+  // lire l'heure courante ici est le comportement voulu, pas un effet de
+  // bord à masquer (même exception que page.tsx, eventsWindowStart).
+  const sixtyDaysAgo = new Date(
+    // eslint-disable-next-line react-hooks/purity -- voir commentaire au-dessus
+    Date.now() - 60 * 24 * 60 * 60 * 1000
+  ).toISOString();
+  const { data: notificationRows } = await supabase
+    .from("notifications")
+    .select("id, title, body, created_at")
+    .eq("commission_group_id", group.id)
+    .gte("created_at", sixtyDaysAgo)
+    .order("created_at", { ascending: false })
+    .limit(30);
+  const notifications: CommissionNotification[] = (notificationRows ?? []).map((n) => ({
+    id: n.id,
+    title: n.title,
+    body: n.body,
+    createdAt: n.created_at,
+  }));
+
   return (
     <CommissionView
       token={token}
+      groupId={group.id}
       commissionLabel={commissionLabel}
       events={events}
       volunteerNeedsByEventId={volunteerNeedsByEventId}
+      notifications={notifications}
       allowedBriques={allowedBriques}
       profileTeams={profileTeams}
       profileMembers={profileMembers}

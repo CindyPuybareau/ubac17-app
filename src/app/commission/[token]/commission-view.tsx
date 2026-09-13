@@ -15,6 +15,9 @@ import AdminSidebar, { type AdminSection } from "@/app/dashboard/admin-sidebar";
 import { MobileNavProvider } from "@/app/dashboard/mobile-nav-context";
 import MobileMenuButton from "@/app/dashboard/mobile-menu-button";
 import OrgChartButton from "@/app/dashboard/org-chart-button";
+import CommissionNotificationBell, {
+  type CommissionNotification,
+} from "./commission-notification-bell";
 import type { ChildEvent } from "@/app/enfant/view/child-dashboard";
 import type { ClubReport, SponsorDisplay } from "@/app/dashboard/page";
 import { buildProfileSections, type ProfileMember, type ProfileTeam } from "@/app/benevole/view/profile-sections";
@@ -213,9 +216,11 @@ function EventCard({ event, needs, token }: { event: CommissionEvent; needs: Vol
 
 export default function CommissionView({
   token,
+  groupId,
   commissionLabel,
   events,
   volunteerNeedsByEventId,
+  notifications,
   allowedBriques,
   profileTeams,
   profileMembers,
@@ -227,9 +232,15 @@ export default function CommissionView({
   profileWhatsappGroups,
 }: {
   token: string;
+  // Retour de Cindy du 13/09 ("via leur espace dédié") : id du groupe
+  // whatsapp_groups derrière ce lien, nécessaire à CommissionNotification
+  // Bell pour sa clé localStorage (une par commission, jamais partagée
+  // entre deux liens différents).
+  groupId: string;
   commissionLabel: string;
   events: CommissionEvent[];
   volunteerNeedsByEventId: Record<string, VolunteerNeed[]>;
+  notifications: CommissionNotification[];
   allowedBriques: string[];
   profileTeams: ProfileTeam[];
   profileMembers: ProfileMember[];
@@ -310,6 +321,7 @@ export default function CommissionView({
             </div>
             <div className="flex shrink-0 items-center gap-1">
               <OrgChartButton />
+              <CommissionNotificationBell groupId={groupId} notifications={notifications} />
               <MobileMenuButton />
             </div>
           </div>

@@ -49,6 +49,13 @@ export default function NotificationBell() {
   // supplémentaire est dû et le relance une fois le premier terminé, sans
   // empiler plusieurs appels au-delà de celui-là.
   const refreshQueuedRef = useRef(false);
+  // Shake joué une seule fois (retour de Cindy du 13/09) : dès que
+  // `notifications` passe de null (pas encore chargé) à un tableau, jamais
+  // ensuite — le rafraîchissement périodique (60s, voir plus bas) ou
+  // l'arrivée d'une nouvelle notification en cours de visite ne doit
+  // jamais rejouer l'animation.
+  const [shake, setShake] = useState(false);
+  const shakeTriggeredRef = useRef(false);
 
   // useCallback + boucle plutôt qu'un rappel récursif de load() elle-même
   // (retour d'audit du 28/08, ajusté pour le React Compiler qui refuse de
@@ -83,6 +90,16 @@ export default function NotificationBell() {
     const interval = setInterval(load, 60000);
     return () => clearInterval(interval);
   }, [load]);
+
+  useEffect(() => {
+    if (shakeTriggeredRef.current || notifications === null) return;
+    shakeTriggeredRef.current = true;
+    if (notifications.some((n) => !n.read_at)) {
+      setShake(true);
+      const t = setTimeout(() => setShake(false), 600);
+      return () => clearTimeout(t);
+    }
+  }, [notifications]);
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -125,7 +142,7 @@ export default function NotificationBell() {
         aria-label="Notifications"
         className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 active:bg-white/25"
       >
-        <Bell className="h-5 w-5 shrink-0" />
+        <Bell className={`h-5 w-5 shrink-0 ${shake ? "animate-bell-shake" : ""}`} />
         {unreadCount > 0 && (
           <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
             {unreadCount > 9 ? "9+" : unreadCount}

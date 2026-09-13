@@ -6,6 +6,7 @@ import {
   resolveContactEmail,
   sendCotisationRelances,
 } from "@/lib/cotisation-relance";
+import { volunteerRoleLabel } from "@/app/dashboard/event-volunteer-needs";
 
 // Une pénalité encore due n'est jamais relancée plus souvent que ça — pas
 // de date d'échéance propre à surveiller (contrairement à une licence),
@@ -238,13 +239,166 @@ async function runPenaliteRelances(supabase: ReturnType<typeof createServiceClie
   return { sent, skippedNoEmail, checked };
 }
 
+type VolunteerEventRow = {
+  id: string;
+  title: string | null;
+  start_time: string;
+  team_id: string | null;
+  target_team_ids: string[] | null;
+  commission_group_ids: string[];
+};
+
+type VolunteerNeedRow = {
+  id: string;
+  event_id: string;
+  role_code: string;
+  custom_label: string | null;
+  required_count: number;
+};
+
+// Relance J-3 des besoins bénévoles non pourvus (retour de Cindy du 13/09) :
+// même interrupteur unique ("Besoins bénévoles") que notify_event_change
+// côté SQL (voir 20261113010000_notify_event_change_trigger.sql) et
+// notifyNewVolunteerNeed côté création — regroupée ici plutôt que dans une
+// route cron séparée, pour la même raison que cotisations/pénalités
+// juste au-dessus : le plan Vercel Hobby plafonne à 2 crons.
+//
+// Ciblage identique aux deux autres notifications de ce chantier : équipe
+// (team_id/target_team_ids, y compris tous deux null = tout le club) +
+// une ligne par commission taguée sur l'événement (espace partagé
+// /commission/[token], jamais une personne individuelle — voir le
+// commentaire de notifyNewVolunteerNeed pour le pourquoi).
+async function runVolunteerNeedReminders(supabase: ReturnType<typeof createServiceClient>) {
+  const { data: settings } = await supabase
+    .from("club_settings")
+    .select("volunteer_need_alerts_enabled")
+    .eq("id", true)
+    .maybeSingle();
+  if (!settings?.volunteer_need_alerts_enabled) {
+    return { sent: 0, checked: 0, paused: true };
+  }
+
+  // J+3 en heure de Paris — même construction que match-reminders (J+1),
+  // décalée de deux jours.
+  const parisNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" }));
+  const targetDay = new Date(parisNow.getFullYear(), parisNow.getMonth(), parisNow.getDate() + 3);
+  const dayAfter = new Date(targetDay.getFullYear(), targetDay.getMonth(), targetDay.getDate() + 1);
+
+  const { data: eventsData, error: eventsError } = await supabase
+    .from("events")
+    .select("id, title, start_time, team_id, target_team_ids, commission_group_ids")
+    .gte("start_time", targetDay.toISOString())
+    .lt("start_time", dayAfter.toISOString());
+
+  if (eventsError || !eventsData || eventsData.length === 0) {
+    return { sent: 0, checked: 0 };
+  }
+
+  const events = eventsData as VolunteerEventRow[];
+  const eventIds = events.map((e) => e.id);
+
+  const { data: needsData, error: needsError } = await supabase
+    .from("event_volunteer_needs")
+    .select("id, event_id, role_code, custom_label, required_count")
+    .in("event_id", eventIds)
+    .is("reminder_sent_at", null);
+
+  if (needsError || !needsData || needsData.length === 0) {
+    return { sent: 0, checked: 0 };
+  }
+
+  const needs = needsData as VolunteerNeedRow[];
+  const needIds = needs.map((n) => n.id);
+
+  const { data: signupsData } = await supabase
+    .from("event_volunteer_signups")
+    .select("need_id")
+    .in("need_id", needIds);
+
+  const signupCountByNeedId = new Map<string, number>();
+  (signupsData ?? []).forEach((s) => {
+    const needId = s.need_id as string;
+    signupCountByNeedId.set(needId, (signupCountByNeedId.get(needId) ?? 0) + 1);
+  });
+
+  const eventById = new Map(events.map((e) => [e.id, e]));
+
+  let sent = 0;
+  for (const need of needs) {
+    const filled = signupCountByNeedId.get(need.id) ?? 0;
+    if (filled >= need.required_count) continue; // déjà complet, rien à relancer
+
+    const event = eventById.get(need.event_id);
+    if (!event) continue;
+
+    const roleLabel = volunteerRoleLabel(need.role_code, need.custom_label);
+    const remaining = need.required_count - filled;
+    const dateLabel = new Date(event.start_time).toLocaleDateString("fr-FR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      timeZone: "Europe/Paris",
+    });
+    const title = "Besoin bénévole non pourvu";
+    const body = `${roleLabel} — encore ${remaining} place${remaining > 1 ? "s" : ""} pour ${
+      event.title ?? "un événement"
+    } du ${dateLabel}.`;
+
+    const { error: teamNotifError } = await supabase.from("notifications").insert({
+      team_id: event.team_id,
+      target_team_ids: event.target_team_ids,
+      event_id: event.id,
+      title,
+      body,
+      url: "/dashboard",
+    });
+    if (teamNotifError) {
+      console.error("[bureau-alerts] notification relance besoin (équipe) échouée:", teamNotifError);
+    }
+
+    if (event.commission_group_ids.length > 0) {
+      const { error: commissionNotifError } = await supabase.from("notifications").insert(
+        event.commission_group_ids.map((groupId) => ({
+          commission_group_id: groupId,
+          event_id: event.id,
+          title,
+          body,
+        }))
+      );
+      if (commissionNotifError) {
+        console.error(
+          "[bureau-alerts] notification relance besoin (commission) échouée:",
+          commissionNotifError
+        );
+      }
+    }
+
+    // Marqué "relancé" même si l'un des deux inserts ci-dessus a échoué :
+    // même logique que match-reminders (reminder_sent_at) — ce n'est pas
+    // une erreur à réessayer demain, sans quoi ce même besoin serait
+    // relancé indéfiniment tant qu'il resterait non pourvu.
+    const { error: markSentError } = await supabase
+      .from("event_volunteer_needs")
+      .update({ reminder_sent_at: new Date().toISOString() })
+      .eq("id", need.id);
+    if (markSentError) {
+      console.error("[bureau-alerts] marquage reminder_sent_at (besoin) échoué:", markSentError);
+    } else {
+      sent += 1;
+    }
+  }
+
+  return { sent, checked: needs.length };
+}
+
 // Rappels Bureau automatiques, tous regroupés dans une seule tâche
 // planifiée (le plan Vercel Hobby plafonne à 2 crons — /api/cron/match-
 // reminders occupe déjà le premier) : échéances (licence FFBB, certificat
-// médical) + relance des cotisations encore impayées. Déclenché une fois
-// par jour (voir vercel.json), protégé par CRON_SECRET. Fermé par défaut
-// (fail closed) : sans la variable posée côté Vercel, la route refuse
-// tout appel plutôt que de rester ouverte à qui la devine.
+// médical) + relance des cotisations/pénalités encore impayées + relance
+// J-3 des besoins bénévoles non pourvus (retour de Cindy du 13/09).
+// Déclenché une fois par jour (voir vercel.json), protégé par CRON_SECRET.
+// Fermé par défaut (fail closed) : sans la variable posée côté Vercel, la
+// route refuse tout appel plutôt que de rester ouverte à qui la devine.
 export async function GET(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
@@ -262,11 +416,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
 
-  const [expiry, cotisations, penalites] = await Promise.all([
+  const [expiry, cotisations, penalites, volunteerNeeds] = await Promise.all([
     runExpiryAlerts(supabase),
     runCotisationRelances(supabase),
     runPenaliteRelances(supabase),
+    runVolunteerNeedReminders(supabase),
   ]);
 
-  return NextResponse.json({ expiry, cotisations, penalites });
+  return NextResponse.json({ expiry, cotisations, penalites, volunteerNeeds });
 }

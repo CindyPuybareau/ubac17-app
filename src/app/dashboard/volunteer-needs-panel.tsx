@@ -34,6 +34,7 @@ export default function VolunteerNeedsPanel({
   commissionGroups = [],
   commissionGroupIds = [],
   onCommissionGroupIdsChange,
+  onNeedAdded,
 }: {
   eventId: string;
   needs: VolunteerNeed[];
@@ -58,6 +59,15 @@ export default function VolunteerNeedsPanel({
   // GroupIds), pour qu'une prochaine ouverture de "Modifier l'événement"
   // reparte de la bonne valeur sans attendre le rafraîchissement temps réel.
   onCommissionGroupIdsChange?: (next: string[]) => void;
+  // Retour de Cindy du 13/09 ("notifier... dès qu'une ligne est ajoutée") :
+  // ce panneau ne connaît que eventId, pas l'équipe/les commissions de
+  // l'événement (déjà en scope chez l'appelant, calendar-view.tsx) --
+  // plutôt que lui faire porter des props supplémentaires rien que pour un
+  // envoi de notification, l'appelant se charge lui-même de l'appel à
+  // notifyNewVolunteerNeed() une fois prévenu qu'un besoin vient d'être
+  // créé. Jamais fourni côté lecture seule (canManage=false, ce panneau n'y
+  // crée jamais de besoin).
+  onNeedAdded?: (need: { roleCode: string; customLabel: string | null; requiredCount: number }) => void;
 }) {
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -253,6 +263,11 @@ export default function VolunteerNeedsPanel({
         signups: [],
       },
     ]);
+    onNeedAdded?.({
+      roleCode: newRoleCode,
+      customLabel: newRoleCode === CUSTOM_ROLE_CODE ? trimmedCustom : null,
+      requiredCount: count,
+    });
     setNewRoleCode(STANDARD_VOLUNTEER_ROLES[0].code);
     setNewCustomLabel("");
     setNewCount("1");

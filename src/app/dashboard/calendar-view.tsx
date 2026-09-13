@@ -69,7 +69,7 @@ import {
   type EventTasksState,
 } from "./event-tasks";
 import VolunteerNeedsPanel from "./volunteer-needs-panel";
-import type { VolunteerNeed } from "./event-volunteer-needs";
+import { notifyNewVolunteerNeed, type VolunteerNeed } from "./event-volunteer-needs";
 import ConfirmDialog from "./confirm-dialog";
 import OrganisationCard from "./organisation-card";
 import MatchResultCelebration from "@/components/match-result-celebration";
@@ -1655,6 +1655,17 @@ export default function CalendarView({
               commissionGroupIds={event.commissionGroupIds}
               onCommissionGroupIdsChange={(next) =>
                 updateLocalEventCommissionGroupIds(event.id, next)
+              }
+              onNeedAdded={(n) =>
+                notifyNewVolunteerNeed(createClient(), {
+                  eventId: event.id,
+                  eventTitle: event.title,
+                  startTime: event.start_time,
+                  teamId: event.teamId,
+                  targetTeamIds: event.targetTeamIds,
+                  commissionGroupIds: event.commissionGroupIds,
+                  ...n,
+                })
               }
             />
           </OrganisationCard>

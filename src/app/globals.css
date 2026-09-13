@@ -143,3 +143,37 @@ h4 {
   font-family: var(--font-numeric), ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
 }
+
+/* Cloche de notifications : léger tremblement joué UNE SEULE fois à
+   l'ouverture/rafraîchissement d'une page s'il y a du non-lu (retour de
+   Cindy du 13/09) — chaque cloche (notification-bell.tsx,
+   benevole/child/commission-notification-bell.tsx) applique cette classe
+   une seule fois au montage, jamais à chaque nouvelle notification reçue.
+   Discret (quelques degrés, ~0,5s), jamais en boucle. */
+@keyframes bell-shake {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  20% {
+    transform: rotate(-12deg);
+  }
+  40% {
+    transform: rotate(10deg);
+  }
+  60% {
+    transform: rotate(-8deg);
+  }
+  80% {
+    transform: rotate(6deg);
+  }
+}
+.animate-bell-shake {
+  animation: bell-shake 0.5s ease-in-out;
+  transform-origin: 50% 0%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-bell-shake {
+    animation: none;
+  }
+}
