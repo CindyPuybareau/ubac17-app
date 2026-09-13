@@ -1178,10 +1178,26 @@ export default async function DashboardPage({
   // lirait des tableaux vides puisque adminPromise n'aurait rien rempli).
   const onlyOneEspace = eligibleTabKeys.length <= 1;
   const bureauDataLoaded = isAdmin && (onlyOneEspace || activeTab === "admin");
-  const coachDataActive = isCoach && (onlyOneEspace || activeTab === "coach");
+  // Retour de Cindy du 13/09 (bandeau "Cette semaine" vide sur l'onglet
+  // Bureau pour un compte qui cumule Bureau + Coach ou Bureau + joueur) :
+  // showHeaderWeekBanner (plus bas, même condition : isCoach ||
+  // players.length > 0) reste vrai quel que soit l'onglet actif -- normal,
+  // c'est un résumé "en un coup d'œil" -- mais ces deux gardes ne
+  // calculaient coachEvents/familyEvents que si l'onglet correspondant
+  // était RÉELLEMENT affiché. Sur l'onglet Bureau, ni "coach" ni
+  // "own-team"/"children" n'est actif : le bandeau affichait "Rien de
+  // prévu" non pas faute d'événement, mais faute d'avoir jamais chargé la
+  // donnée. bureauDataLoaded rouvre donc aussi ces deux blocs -- seul ce
+  // cumul précis (Bureau + Coach/joueur, sur l'onglet Bureau) coûte une
+  // requête de plus, et profite au passage du mécanisme de réutilisation
+  // déjà en place juste au-dessus (coachPromise pioche dans les données
+  // Bureau déjà chargées dès que bureauDataLoaded est vrai). Tous les
+  // autres comptes (un seul rôle, ou cumul sans Bureau) restent gouvernés
+  // par la même règle qu'avant -- pas de retour à la lenteur du 04/09.
+  const coachDataActive = isCoach && (onlyOneEspace || activeTab === "coach" || bureauDataLoaded);
   const familyDataActive =
     players.length > 0 &&
-    (onlyOneEspace || activeTab === "own-team" || activeTab === "children");
+    (onlyOneEspace || activeTab === "own-team" || activeTab === "children" || bureauDataLoaded);
 
   // Retour de Cindy du 05/09 ("le calendrier ralentit tout") : les
   // entraînements récurrents (2-3 par semaine et par équipe, toute la
