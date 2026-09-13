@@ -50,7 +50,13 @@ function remainingSlots(need: VolunteerNeed) {
 function CommissionNeedRow({ need, token }: { need: VolunteerNeed; token: string }) {
   const [localNeed, setLocalNeed] = useState(need);
   const [formOpen, setFormOpen] = useState(false);
-  const [guestName, setGuestName] = useState("");
+  // Retour de Cindy du 13/09 ("une case, nom et un prénom") : un seul champ
+  // "Ton prénom" ne suffisait plus à distinguer deux bénévoles homonymes
+  // (plusieurs "Marie" possibles sur une même commission). Toujours envoyé
+  // comme un seul guestName à l'API (jamais touché, aucune migration) --
+  // juste composé des deux ici plutôt qu'un seul champ côté formulaire.
+  const [guestFirstName, setGuestFirstName] = useState("");
+  const [guestLastName, setGuestLastName] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [justJoinedAs, setJustJoinedAs] = useState<string | null>(null);
@@ -59,11 +65,13 @@ function CommissionNeedRow({ need, token }: { need: VolunteerNeed; token: string
   const remaining = remainingSlots(localNeed);
 
   async function submit() {
-    const trimmed = guestName.trim();
-    if (!trimmed) {
-      setError("Indique ton prénom.");
+    const trimmedFirst = guestFirstName.trim();
+    const trimmedLast = guestLastName.trim();
+    if (!trimmedFirst || !trimmedLast) {
+      setError("Indique ton prénom et ton nom.");
       return;
     }
+    const trimmed = `${trimmedFirst} ${trimmedLast}`;
     setPending(true);
     setError(null);
     try {
@@ -94,7 +102,8 @@ function CommissionNeedRow({ need, token }: { need: VolunteerNeed; token: string
       }));
       setJustJoinedAs(trimmed);
       setFormOpen(false);
-      setGuestName("");
+      setGuestFirstName("");
+      setGuestLastName("");
     } finally {
       setPending(false);
     }
@@ -131,11 +140,19 @@ function CommissionNeedRow({ need, token }: { need: VolunteerNeed; token: string
           <input
             type="text"
             autoFocus
-            value={guestName}
-            onChange={(e) => setGuestName(e.target.value)}
+            value={guestFirstName}
+            onChange={(e) => setGuestFirstName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && submit()}
             placeholder="Ton prénom"
-            className="w-32 rounded-lg border border-zinc-200 px-2 py-1.5 text-xs"
+            className="w-28 rounded-lg border border-zinc-200 px-2 py-1.5 text-xs"
+          />
+          <input
+            type="text"
+            value={guestLastName}
+            onChange={(e) => setGuestLastName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submit()}
+            placeholder="Ton nom"
+            className="w-28 rounded-lg border border-zinc-200 px-2 py-1.5 text-xs"
           />
           <button
             type="button"
