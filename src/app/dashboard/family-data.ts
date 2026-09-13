@@ -23,6 +23,32 @@ export type RosterPlayer = {
   last_name: string | null;
 };
 
+// Retour de Cindy du 13/09 ("Formation E-marque", un événement "Tous les
+// groupes" sans aucun Présent/Absent possible) : teamId ET targetTeamIds
+// tous deux null encode "toutes les équipes" (voir create-event-form.tsx,
+// "null = Tous les groupes") -- Bureau/Coach/Famille calculaient jusqu'ici
+// l'effectif de cet événement comme un tableau VIDE dans ce cas précis
+// (seul target_team_ids, une liste d'équipes précises, était couvert par
+// le correctif du 28/08 -- teamId/targetTeamIds tous deux null retombait
+// dans le "else" final, jamais traité). rsvpCounts valait alors 0/0/0/0
+// partout, masquant purement et simplement la section Présent/Absent.
+// Union dédupliquée de TOUT ce que porte rosterByTeam (déjà scopé au bon
+// périmètre par l'appelant -- tout le club pour Bureau/Famille, les seules
+// équipes coachées pour Coach) : le même principe que le correctif du
+// 28/08, juste étendu au cas où il n'y a la moindre équipe à énumérer.
+// Générique (pas RosterPlayer ci-dessus) : page.tsx utilise sa propre
+// variante (team-manager.tsx, avec position/nextEventStatus/birthDate en
+// plus) pour ses blocs Bureau/Coach -- un seul helper pour les deux formes.
+export function unionRoster<T extends { id: string }>(rosterByTeam: Map<string, T[]>): T[] {
+  return Array.from(
+    new Map(
+      Array.from(rosterByTeam.values())
+        .flat()
+        .map((p) => [p.id, p] as const)
+    ).values()
+  );
+}
+
 // Prochaine convocation d'un joueur lié au compte courant — soi-même
 // compris (voir page.tsx, ownPlayerRow) : un adulte inscrit lui-même
 // (Séniors, Loisirs...) a aussi sa propre carte. Partagé entre family-view

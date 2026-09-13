@@ -30,6 +30,7 @@ import {
   getRsvpCounts,
   getTeamRoster,
   teamOrClubWideFilter,
+  unionRoster,
 } from "./family-data";
 import {
   getCarpoolOffersByEventId,
@@ -2189,6 +2190,13 @@ export default async function DashboardPage({
       // à 0, "pending" affichait 0 et le bandeau "Demander les présences"
       // croyait à tort que tout le monde avait répondu. Effectif = union
       // (dédupliquée) des rosters de toutes les équipes ciblées.
+      // Retour de Cindy du 13/09 ("Formation E-marque", Tous les groupes,
+      // plus aucun Présent/Absent possible) : le cas encore non couvert par
+      // ce même correctif -- teamId ET target_team_ids tous deux null
+      // ("Tous les groupes", voir create-event-form.tsx) retombait dans le
+      // else final, effectif vide, rsvpCounts à 0/0/0/0 partout. unionRoster
+      // reprend TOUT rosterByTeam (le club entier, ici) plutôt qu'un
+      // sous-ensemble d'équipes.
       const eventRoster: RosterPlayer[] = team
         ? (rosterByTeam.get(team.id) ?? [])
         : (e.target_team_ids as string[] | null)
@@ -2199,7 +2207,7 @@ export default async function DashboardPage({
                   .map((p: RosterPlayer) => [p.id, p] as const)
               ).values()
             )
-          : [];
+          : unionRoster(rosterByTeam);
       const paidInfo = resolvePaidInfo(e.collectes);
       return {
         id: e.id,
@@ -2921,6 +2929,11 @@ export default async function DashboardPage({
       // Même correctif que le bloc Bureau ci-dessus (retour d'audit du
       // 28/08) : effectif = union dédupliquée des rosters des équipes
       // ciblées pour un événement multi-équipes (teamId null).
+      // Retour de Cindy du 13/09 : même extension que le bloc Bureau --
+      // teamId ET target_team_ids tous deux null ("Tous les groupes")
+      // reprend maintenant TOUT rosterByTeam (ici : les seules équipes que
+      // ce coach coache, ce Map n'en contient pas d'autres) plutôt qu'un
+      // effectif vide.
       const eventRoster: RosterPlayer[] = team
         ? (rosterByTeam.get(team.id) ?? [])
         : (e.target_team_ids as string[] | null)
@@ -2931,7 +2944,7 @@ export default async function DashboardPage({
                   .map((p: RosterPlayer) => [p.id, p] as const)
               ).values()
             )
-          : [];
+          : unionRoster(rosterByTeam);
       // Retour de Cindy du 11/09 ("qui est absent ?") : eventRoster
       // ci-dessus reste l'union COMPLÈTE (toutes les équipes ciblées, même
       // celles que ce coach ne coache pas) -- bon pour rsvpCounts (un
