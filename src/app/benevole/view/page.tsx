@@ -1,18 +1,14 @@
 import { cookies } from "next/headers";
 import { createServiceClient } from "@/lib/supabase/service";
 import { BENEVOLE_SESSION_COOKIE, verifyBenevoleSession } from "@/lib/benevole-session";
-import { getVolunteerNeedsByEventId, type VolunteerNeed } from "@/app/dashboard/event-volunteer-needs";
 import { getReadOnlyBriquesData } from "@/lib/read-only-briques-data";
-import BenevoleView, { type BenevoleEvent } from "./benevole-view";
+import BenevoleView from "./benevole-view";
 import type { BenevoleNotification } from "./benevole-notification-bell";
 
 // Toute la lecture de données vit ici, côté serveur, avec service_role
 // (un bénévole n'a pas d'auth.uid(), même principe que /enfant/view/page.tsx
 // — voir ce fichier pour le détail du raisonnement). BenevoleView ne reçoit
-// que des props déjà calculées, en lecture seule — la seule écriture
-// possible (s'inscrire/se désinscrire d'un besoin) passe par
-// /api/benevole-signup, jamais par un appel Supabase direct depuis le
-// navigateur.
+// que des props déjà calculées, en lecture seule.
 //
 // Retour de Cindy du 05/09 ("profil et bénévoles doivent être fusionnés") :
 // en plus de ce qui précède, un bénévole peut avoir un access_profile_id
@@ -21,6 +17,14 @@ import type { BenevoleNotification } from "./benevole-notification-bell";
 // admin-view.tsx, étape 3 des profils d'accès sur-mesure) -- profile-
 // sections.tsx s'occupe de l'affichage, ce fichier ne fait que réunir les
 // données correspondant aux briques cochées, jamais plus.
+//
+// Retour de Cindy du 13/09 ("les bénévoles invités peuvent être supprimés
+// partout... un bénévole fait partie d'une commission quoi qu'il arrive") :
+// ce fichier ne lit plus event_benevole_invites -- ce bénévole voit
+// désormais ses événements via SA commission (/commission/[token]), pas via
+// des invitations individuelles. Voir git history pour l'ancien calcul
+// (events/volunteerNeedsByEventId) si jamais il fallait un jour le
+// retrouver.
 export default async function BenevoleViewPage() {
   const cookieStore = await cookies();
   const benevoleId = verifyBenevoleSession(cookieStore.get(BENEVOLE_SESSION_COOKIE)?.value);
@@ -51,52 +55,6 @@ export default async function BenevoleViewPage() {
         </p>
       </div>
     );
-  }
-
-  const { data: inviteRows } = await supabase
-    .from("event_benevole_invites")
-    .select("event_id, status")
-    .eq("benevole_id", benevoleId);
-  const eventIds = (inviteRows ?? []).map((r) => r.event_id as string);
-  // Retour de Cindy du 06/09 ("le bénévole doit pouvoir se mettre présent
-  // ou non") : sa réponse à CETTE invitation précise -- voir
-  // /api/benevole-rsvp pour l'écriture.
-  const statusByEventId = new Map(
-    (inviteRows ?? []).map((r) => [r.event_id as string, r.status as "PENDING" | "PRESENT" | "ABSENT"])
-  );
-
-  let events: BenevoleEvent[] = [];
-  let volunteerNeedsByEventId: Record<string, VolunteerNeed[]> = {};
-
-  if (eventIds.length > 0) {
-    // Retour d'audit du 28/08 : sans filtre de date, un bénévole invité en
-    // octobre qui ouvre son lien en mars retombait d'abord sur ces
-    // rendez-vous passés (tri chronologique croissant, sans borne basse),
-    // avec des boutons "Je m'en occupe" actifs pour des besoins qui n'ont
-    // plus lieu d'être. Cette page n'a aucun historique à montrer (voir
-    // benevole-view.tsx) : ne garder que ce qui reste à venir.
-    const { data: eventRows } = await supabase
-      .from("events")
-      .select(
-        "id, title, event_type, location, salle, start_time, end_time, teams(name)"
-      )
-      .in("id", eventIds)
-      .gte("start_time", new Date().toISOString())
-      .order("start_time", { ascending: true });
-
-    events = (eventRows ?? []).map((e) => ({
-      id: e.id,
-      title: e.title,
-      eventType: e.event_type,
-      location: e.location,
-      salle: e.salle,
-      startTime: e.start_time,
-      endTime: e.end_time,
-      teamName: (e.teams as unknown as { name: string | null } | null)?.name ?? null,
-      status: statusByEventId.get(e.id) ?? "PENDING",
-    }));
-
-    volunteerNeedsByEventId = await getVolunteerNeedsByEventId(supabase, eventIds);
   }
 
   // Profil d'accès sur-mesure (étape "bénévoles" du 05/09) : null/aucune
@@ -137,14 +95,14 @@ export default async function BenevoleViewPage() {
     profileSponsors,
     profileClubReports,
     attendanceByEventId,
+    profileDashboardCounts,
+    profileWhatsappGroups,
   } = await getReadOnlyBriquesData(supabase, allowedBriques);
 
   // Cloche de notifications (retour de Cindy du 06/09, "comme pour tous
   // les autres espaces") : mêmes alertes que Parent/Coach/Enfant (voir la
   // migration 20261031220000_benevole_notifications.sql), lues ici en
-  // service_role et filtrées directement sur benevole_id -- un bénévole
-  // est notifié individuellement (son invitation à un événement précis),
-  // jamais par équipe, donc pas de filtre à recalculer comme côté enfant.
+  // service_role et filtrées directement sur benevole_id.
   const notificationsEnabled = benevole.notifications_enabled ?? true;
   let notifications: BenevoleNotification[] = [];
   if (notificationsEnabled) {
@@ -176,9 +134,6 @@ export default async function BenevoleViewPage() {
   return (
     <BenevoleView
       firstName={benevole.first_name}
-      benevoleId={benevoleId}
-      events={events}
-      volunteerNeedsByEventId={volunteerNeedsByEventId}
       allowedBriques={allowedBriques}
       profileTeams={profileTeams}
       profileMembers={profileMembers}
@@ -187,6 +142,8 @@ export default async function BenevoleViewPage() {
       profileClubReports={profileClubReports}
       attendanceByEventId={attendanceByEventId}
       myWhatsappGroups={myWhatsappGroups}
+      profileDashboardCounts={profileDashboardCounts}
+      profileWhatsappGroups={profileWhatsappGroups}
       notifications={notifications}
       notificationsEnabled={notificationsEnabled}
     />

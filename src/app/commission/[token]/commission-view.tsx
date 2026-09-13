@@ -19,10 +19,10 @@ import type { ChildEvent } from "@/app/enfant/view/child-dashboard";
 import type { ClubReport, SponsorDisplay } from "@/app/dashboard/page";
 import { buildProfileSections, type ProfileMember, type ProfileTeam } from "@/app/benevole/view/profile-sections";
 
-// Événement tel que vu depuis le lien d'une commission : même principe que
-// BenevoleEvent (benevole-view.tsx) -- date/heure/lieu et les besoins
-// d'organisation seulement -- mais sans "status" : personne n'est invité
-// individuellement ici, il n'y a rien à répondre présent/absent.
+// Événement tel que vu depuis le lien d'une commission : date/heure/lieu
+// et les besoins d'organisation seulement -- sans "status" : personne
+// n'est invité individuellement ici, il n'y a rien à répondre
+// présent/absent.
 export type CommissionEvent = {
   id: string;
   title: string | null;
@@ -223,6 +223,8 @@ export default function CommissionView({
   profileSponsors,
   profileClubReports,
   attendanceByEventId,
+  profileDashboardCounts,
+  profileWhatsappGroups,
 }: {
   token: string;
   commissionLabel: string;
@@ -237,6 +239,14 @@ export default function CommissionView({
   // Retour de Cindy du 11/09 ("qui est présent/absent ?") : voir
   // read-only-briques-data.ts, gouverné par la brique "membres".
   attendanceByEventId: Record<string, { name: string | null; status: string }[]>;
+  // Retour de Cindy du 12/09 : voir read-only-briques-data.ts.
+  profileDashboardCounts: {
+    memberCount: number;
+    teamCount: number;
+    upcomingEventCount: number;
+    birthdaysThisWeekCount: number;
+  } | null;
+  profileWhatsappGroups: { id: string; name: string; inviteLink: string | null }[];
 }) {
   // Même structure de menu que benevole-view.tsx (même famille d'espace en
   // lecture seule) : "Besoins bénévoles" toujours en premier, puis une
@@ -280,6 +290,8 @@ export default function CommissionView({
       sponsors: profileSponsors,
       clubReports: profileClubReports,
       whatsappGroups: [],
+      whatsappDirectory: profileWhatsappGroups,
+      dashboardCounts: profileDashboardCounts,
       attendanceByEventId,
     }),
   ];

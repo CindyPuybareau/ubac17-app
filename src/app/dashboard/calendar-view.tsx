@@ -15,7 +15,6 @@ import {
   Euro,
   Eye,
   ExternalLink,
-  HeartHandshake,
   LayoutGrid,
   List,
   Mail,
@@ -46,7 +45,7 @@ import TeamSelectorPills from "./team-selector-pills";
 import TeamFilterDropdown from "./team-filter-dropdown";
 import EventTypeFilterDropdown from "./event-type-filter-dropdown";
 import { sendEventPush } from "./event-push";
-import type { AdminBenevole, AdminUpcomingEvent, BenevoleInviteStatus } from "./page";
+import type { AdminUpcomingEvent } from "./page";
 import {
   groupBirthdaysByMonthDay,
   upcomingBirthdays,
@@ -325,85 +324,6 @@ function PaidParticipantsList({
   );
 }
 
-// Retour de Cindy du 06/09 ("le bureau ou les coachs doivent avoir la
-// vision des bénévoles qui ont répondu présent") : même principe que
-// PresentPlayersList ci-dessus (repliée par défaut, dépliable), mais pour
-// les bénévoles invités à cet événement — jamais affichée si personne n'a
-// été invité (contrairement aux joueurs, systématiquement de la partie).
-function BenevoleInvitesList({
-  invites,
-}: {
-  invites: { id: string; firstName: string; lastName: string; status: BenevoleInviteStatus }[];
-}) {
-  const [open, setOpen] = useState(false);
-
-  if (invites.length === 0) return null;
-
-  const present = invites.filter((b) => b.status === "PRESENT");
-  const absent = invites.filter((b) => b.status === "ABSENT");
-  const pending = invites.filter((b) => b.status === "PENDING");
-  // Retour de Cindy du 09/09 (phase 1 UX, couleurs sémantiques) : status-*
-  // (globals.css) plutôt qu'emerald/red codées en dur -- même migration
-  // que les badges résumé plus bas dans ce fichier.
-  const statusClass = (status: BenevoleInviteStatus) =>
-    status === "PRESENT"
-      ? "bg-status-success/10 text-status-success"
-      : status === "ABSENT"
-        ? "bg-status-urgent/10 text-status-urgent-dark"
-        : "bg-zinc-100 text-zinc-500";
-
-  return (
-    <div className="flex flex-col gap-1.5 border-t border-zinc-100 pt-2">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:text-zinc-900"
-      >
-        <HeartHandshake className="h-3.5 w-3.5 shrink-0 text-navy" />
-        {invites.length} bénévole{invites.length > 1 ? "s" : ""} invité{invites.length > 1 ? "s" : ""}
-        {open ? (
-          <ChevronUp className="h-3.5 w-3.5 shrink-0" />
-        ) : (
-          <ChevronDown className="h-3.5 w-3.5 shrink-0" />
-        )}
-      </button>
-      <div className="flex flex-wrap gap-1.5">
-        {present.length > 0 && (
-          <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-status-success/10 px-2 py-0.5 text-xs font-semibold leading-none text-status-success">
-            <Check className="h-3 w-3" />
-            {present.length} présent{present.length > 1 ? "s" : ""}
-          </span>
-        )}
-        {absent.length > 0 && (
-          <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-status-urgent/10 px-2 py-0.5 text-xs font-semibold leading-none text-status-urgent-dark">
-            <X className="h-3 w-3" />
-            {absent.length} absent{absent.length > 1 ? "s" : ""}
-          </span>
-        )}
-        {pending.length > 0 && (
-          <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold leading-none text-zinc-600">
-            <Clock className="h-3 w-3" />
-            {pending.length} en attente
-          </span>
-        )}
-      </div>
-      {open && (
-        <div className="flex flex-wrap gap-1.5">
-          {sortByLastName(invites, (b) => b.lastName).map((b) => (
-            <span
-              key={b.id}
-              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${statusClass(b.status)}`}
-            >
-              {formatFirstName(b.firstName)}{" "}
-              <span className="font-bold uppercase">{formatLastName(b.lastName)}</span>
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function CalendarView({
   events,
   createTeams,
@@ -421,7 +341,6 @@ export default function CalendarView({
   forcedView,
   resultsTeamSelector = "pills",
   resultsTeams,
-  benevoles = [],
   celebrateWins = false,
   commissionGroups = [],
   isBureau = false,
@@ -518,10 +437,6 @@ export default function CalendarView({
   // équipes à la fois dans le même fil — réutilise TeamFilterDropdown,
   // déjà utilisé par team-manager.tsx (Bureau).
   resultsTeamSelector?: "pills" | "dropdown";
-  // Liste des bénévoles du club, transmise telle quelle à CreateEventForm
-  // (section "Bénévoles invités") — Bureau et Coach depuis le 06/09, vide
-  // ailleurs (Famille, Espace Enfant).
-  benevoles?: AdminBenevole[];
   // Confettis sur un match gagné (retour de Cindy du 26/08) — réservé à
   // l'équipe gagnante (Coach de cette équipe, Famille/Enfant des joueurs
   // concernés) : jamais côté Bureau, qui voit tous les matchs de toutes
@@ -606,6 +521,16 @@ export default function CalendarView({
     setLocalEvents((prev) =>
       prev.map((e) => (e.id === eventId ? { ...e, teamScore, opponentScore } : e))
     );
+  }
+
+  // Retour de Cindy du 12/09 ("ajoute-le aussi directement sur la carte") :
+  // même geste optimiste que ci-dessus, pour le sélecteur "Commissions
+  // concernées" modifié directement depuis VolunteerNeedsPanel (plus
+  // seulement via "Modifier l'événement") -- l'écriture réelle vit dans
+  // volunteer-needs-panel.tsx, ce callback ne fait que refléter le
+  // résultat dans localEvents.
+  function updateLocalEventCommissionGroupIds(eventId: string, commissionGroupIds: string[]) {
+    setLocalEvents((prev) => prev.map((e) => (e.id === eventId ? { ...e, commissionGroupIds } : e)));
   }
 
   const today = new Date();
@@ -763,8 +688,6 @@ export default function CalendarView({
           rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
           presentPlayers: [],
           absentPlayers: [],
-          benevoleIds: [],
-          benevoleInvites: [],
           // Retour de Cindy du 12/09 : jamais construit ailleurs -- distingue
           // ce match "juste pour regarder" d'un vrai événement du viewer, pour
           // masquer la boîte Organisation (voir renderEventCard, hasTasks est
@@ -1601,10 +1524,6 @@ export default function CalendarView({
             juste après "Qui sera là ?". */}
         <AbsentPlayersList players={event.absentPlayers ?? []} />
 
-        {/* Retour de Cindy du 06/09 : vision des bénévoles invités et de
-            leur réponse, même endroit que "Qui sera là ?" ci-dessus. */}
-        <BenevoleInvitesList invites={event.benevoleInvites ?? []} />
-
         {/* Plus d'appel express ici pour une équipe gérée : le coach ne
             répond pas à la place des familles, il leur demande de le
             faire depuis sa carte d'événement (Organisation & Bilan).
@@ -1732,6 +1651,11 @@ export default function CalendarView({
               myPlayerIds={[]}
               canManage
               bare
+              commissionGroups={commissionGroups}
+              commissionGroupIds={event.commissionGroupIds}
+              onCommissionGroupIdsChange={(next) =>
+                updateLocalEventCommissionGroupIds(event.id, next)
+              }
             />
           </OrganisationCard>
         )}
@@ -2123,7 +2047,6 @@ export default function CalendarView({
           // ferait setState après coup (voir create-event-form.tsx).
           key={editingEvent?.id ?? "create"}
           teams={createTeams}
-          benevoles={benevoles}
           commissionGroups={commissionGroups}
           existingNeeds={editingEvent ? (volunteerNeedsByEventId[editingEvent.id] ?? emptyVolunteerNeeds) : emptyVolunteerNeeds}
           allowClubWide={allowClubWide}

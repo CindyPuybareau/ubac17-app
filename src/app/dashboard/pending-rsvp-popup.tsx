@@ -12,11 +12,11 @@ import {
 } from "@/lib/dismissed-rsvp-popups";
 
 // Type minimal, volontairement indépendant des types "événement" déjà
-// utilisés ailleurs (AdminUpcomingEvent, ChildEvent, BenevoleEvent...) --
-// cette popup est partagée entre plusieurs espaces qui n'ont pas tous
-// exactement la même forme d'événement. Chaque appelant construit ce
-// sous-ensemble commun à partir de son propre type, plutôt que de
-// dépendre d'un seul type "maison" qui ne conviendrait pas partout.
+// utilisés ailleurs (AdminUpcomingEvent, ChildEvent...) -- cette popup est
+// partagée entre plusieurs espaces qui n'ont pas tous exactement la même
+// forme d'événement. Chaque appelant construit ce sous-ensemble commun à
+// partir de son propre type, plutôt que de dépendre d'un seul type
+// "maison" qui ne conviendrait pas partout.
 export type PendingRsvpEvent = {
   id: string;
   title: string | null;
@@ -30,8 +30,8 @@ export type PendingRsvpEvent = {
 // l'ouverture de l'application sur l'événement à venir afin que les gens
 // n'oublient pas de répondre") : une fenêtre par-dessus l'écran, tant
 // qu'une réponse manque pour le tout prochain événement (dans les 2 jours
-// -- filtré par chaque appelant, voir family-view.tsx/benevole-view.tsx)
-// de la personne concernée.
+// -- filtré par chaque appelant, voir family-view.tsx) de la personne
+// concernée.
 //
 // Fermée avec la croix (ou une fois répondu), elle ne revient plus JAMAIS
 // pour ce même événement+personne -- deuxième retour de Cindy le même
@@ -72,12 +72,11 @@ export default function PendingRsvpPopup({
 }: {
   items: PendingRsvpItem[];
   // Chaque espace répond différemment (RsvpButtons avec un playerId côté
-  // Famille/Enfant, BenevoleRsvpButtons sans playerId côté Bénévole) :
-  // plutôt qu'un mécanisme unique qui ne conviendrait à personne, l'appelant
-  // fournit ses propres boutons pour CET item précis -- `onAnswered` doit
-  // être appelé une fois la réponse donnée, pour que la carte disparaisse
-  // de la popup à l'instant (et que la popup se ferme d'elle-même une fois
-  // tout le monde répondu).
+  // Famille/Enfant) : plutôt qu'un mécanisme unique qui ne conviendrait à
+  // personne, l'appelant fournit ses propres boutons pour CET item précis --
+  // `onAnswered` doit être appelé une fois la réponse donnée, pour que la
+  // carte disparaisse de la popup à l'instant (et que la popup se ferme
+  // d'elle-même une fois tout le monde répondu).
   renderActions: (item: PendingRsvpItem, onAnswered: () => void) => ReactNode;
 }) {
   // Une personne qui vient de répondre disparaît de la popup à l'instant

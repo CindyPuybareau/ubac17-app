@@ -9,13 +9,16 @@ import {
   EyeOff,
   ExternalLink,
   Handshake,
+  LayoutDashboard,
   ListOrdered,
   MessageCircle,
+  PartyPopper,
   ScrollText,
   Shield,
   ShoppingBag,
   Trophy,
   Users,
+  type LucideIcon,
 } from "lucide-react";
 import { formatPersonName, sortByLastName } from "@/lib/names";
 import type { AdminSection } from "@/app/dashboard/admin-sidebar";
@@ -25,9 +28,10 @@ import ChildTeamTab from "@/app/enfant/view/child-team-tab";
 import ChildResultsTab from "@/app/enfant/view/child-results-tab";
 import SponsorsDisplay from "@/app/dashboard/sponsors-display";
 import ClubReportsSection from "@/app/dashboard/club-reports-section";
+import Cd17LigueSection from "@/app/dashboard/cd17-ligue-section";
 import EmptyState from "@/app/dashboard/empty-state";
 import TeamFilterDropdown from "@/app/dashboard/team-filter-dropdown";
-import DocumentsPanel from "@/components/club-documents";
+import DocumentsPanel, { type ClubDocumentId } from "@/components/club-documents";
 import { BOUTIQUE_URL } from "@/app/dashboard/boutique";
 import type { ClubReport, SponsorDisplay } from "@/app/dashboard/page";
 
@@ -232,6 +236,44 @@ function EquipesSection({ teams }: { teams: ProfileTeam[] }) {
   );
 }
 
+// Retour de Cindy du 12/09 ("Tableau de bord (lecture seule)" ->
+// "compteurs simples uniquement") : 4 chiffres, jamais de montant ni de
+// nom -- voir read-only-briques-data.ts pour leur calcul. Même habillage
+// de carte que MembersSection/EquipesSection ci-dessus, une grille de
+// pastilles plutôt que le tableau de KpiCard du vrai Tableau de bord
+// Bureau (bureau-dashboard.tsx), qui reste hors de portée ici.
+function DashboardSection({
+  counts,
+}: {
+  counts: {
+    memberCount: number;
+    teamCount: number;
+    upcomingEventCount: number;
+    birthdaysThisWeekCount: number;
+  };
+}) {
+  const items: { icon: LucideIcon; label: string; value: number }[] = [
+    { icon: Contact, label: "Membres", value: counts.memberCount },
+    { icon: Users, label: "Équipes", value: counts.teamCount },
+    { icon: CalendarDays, label: "Événements à venir", value: counts.upcomingEventCount },
+    { icon: PartyPopper, label: "Anniversaires cette semaine", value: counts.birthdaysThisWeekCount },
+  ];
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {items.map((item) => (
+        <div
+          key={item.label}
+          className="flex flex-col items-center gap-1.5 rounded-2xl border border-zinc-100 bg-white p-4 text-center shadow-sm"
+        >
+          <item.icon className="h-5 w-5 shrink-0 text-navy" />
+          <span className="text-2xl font-bold text-zinc-900">{item.value}</span>
+          <span className="text-xs text-zinc-500">{item.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const iconClass = "h-4 w-4 shrink-0";
 
 // Construit les entrées de menu correspondant aux briques cochées pour ce
@@ -247,6 +289,8 @@ export function buildProfileSections({
   sponsors,
   clubReports,
   whatsappGroups,
+  whatsappDirectory = [],
+  dashboardCounts = null,
   attendanceByEventId,
 }: {
   allowedBriques: string[];
@@ -261,7 +305,22 @@ export function buildProfileSections({
   clubReports: ClubReport[];
   // Retour de Cindy du 06/09 ("je ne vois pas dans Vie du club son groupe
   // WhatsApp") : jamais conditionné par une brique, voir benevole-view.tsx.
+  // Le(s) groupe(s) que CETTE personne rejoint déjà elle-même -- distinct
+  // de whatsappDirectory ci-dessous.
   whatsappGroups: { id: string; name: string; inviteLink: string | null }[];
+  // Retour de Cindy du 12/09 ("Groupes WhatsApp") : annuaire de TOUS les
+  // groupes du club (équipes + commissions), gouverné par la brique
+  // "whatsapp_groups" -- voir read-only-briques-data.ts.
+  whatsappDirectory?: { id: string; name: string; inviteLink: string | null }[];
+  // Retour de Cindy du 12/09 ("Tableau de bord (lecture seule)") : voir
+  // DashboardSection ci-dessus et read-only-briques-data.ts -- null tant
+  // que "tableau_de_bord" n'est pas coché.
+  dashboardCounts?: {
+    memberCount: number;
+    teamCount: number;
+    upcomingEventCount: number;
+    birthdaysThisWeekCount: number;
+  } | null;
   // Retour de Cindy du 11/09 ("qui est présent/absent ?") : voir
   // read-only-briques-data.ts, gouverné par la brique "membres".
   attendanceByEventId: Record<string, { name: string | null; status: string }[]>;
@@ -285,6 +344,17 @@ export function buildProfileSections({
       content: (
         <CalendarSection events={events} teams={teamRefs} attendanceByEventId={attendanceByEventId} />
       ),
+    });
+  }
+
+  // Retour de Cindy du 12/09 ("Tableau de bord (lecture seule)") : juste
+  // après Calendrier, comme dans le vrai menu Bureau (admin-view.tsx).
+  if (has("tableau_de_bord") && dashboardCounts) {
+    sections.push({
+      key: "tableau-de-bord",
+      label: "Tableau de bord",
+      icon: <LayoutDashboard className={iconClass} />,
+      content: <DashboardSection counts={dashboardCounts} />,
     });
   }
 
@@ -347,52 +417,75 @@ export function buildProfileSections({
   // Boutique toujours là (comme le Règlement intérieur qu'il contient),
   // Sponsors et le(s) groupe(s) WhatsApp seulement s'il y a quelque chose
   // à y montrer.
-  const documentsChild: AdminSection = {
-    key: "documents",
-    label: "Documents",
-    icon: <ScrollText className={iconClass} />,
-    content: (
-      <div className="flex flex-col gap-4">
-        {has("compte_rendu_mairies") && (
-          <ClubReportsSection
-            category="MAIRIE"
-            title="Comptes rendus mairies"
-            emptyLabel="Aucun compte rendu de réunion avec une mairie pour le moment."
-            canCreate={false}
-            isAdmin={false}
-            reports={clubReports}
-          />
-        )}
-        {has("compte_rendu_bureau") && (
-          <ClubReportsSection
-            category="BUREAU"
-            title="Comptes rendus bureau"
-            emptyLabel="Aucun compte rendu de réunion du Bureau pour le moment."
-            canCreate={false}
-            isAdmin={false}
-            reports={clubReports}
-          />
-        )}
-        {has("compte_rendu_coachs") && (
-          <ClubReportsSection
-            category="COACH"
-            title="Comptes rendus des coachs"
-            emptyLabel="Aucun compte rendu de coach pour le moment."
-            canCreate={false}
-            isAdmin={false}
-            showAuthor
-            reports={clubReports}
-          />
-        )}
-        {/* Retour de Cindy du 25/08 : "penser en 360° avec les bénévoles,
-            ils font partie de la boucle" — mêmes règles de respect/fair-
-            play que sur le terrain les concernent aussi. Règlement
-            Intérieur uniquement (pas les deux chartes, propres aux
-            licenciés/parents d'un licencié). */}
-        <DocumentsPanel documentIds={["reglement-interieur"]} />
-      </div>
-    ),
-  };
+  // Retour de Cindy du 12/09 ("pouvoir sélectionner les documents visibles
+  // ou non -- cases à cocher pour tous les docs en sous-menu de
+  // document") : chacune des 3 chartes/règlement a désormais SA PROPRE
+  // brique (avant : Règlement Intérieur seul, toujours affiché, aucune
+  // charte) -- même logique que les comptes rendus juste en dessous, qui
+  // avaient déjà ce grain-là. "Documents" lui-même disparaît du menu si
+  // aucune des 7 briques n'est cochée, plutôt que d'afficher une page
+  // vide.
+  const documentIds: ClubDocumentId[] = [
+    ...(has("charte_joueur") ? (["charte-joueur"] as const) : []),
+    ...(has("charte_parent") ? (["charte-parent"] as const) : []),
+    ...(has("reglement_interieur") ? (["reglement-interieur"] as const) : []),
+  ];
+  const hasAnyDocumentBrique =
+    documentIds.length > 0 ||
+    has("compte_rendu_mairies") ||
+    has("compte_rendu_bureau") ||
+    has("compte_rendu_coachs") ||
+    has("compte_rendu_cd17_ligue");
+  const documentsChild: AdminSection | null = !hasAnyDocumentBrique
+    ? null
+    : {
+        key: "documents",
+        label: "Documents",
+        icon: <ScrollText className={iconClass} />,
+        content: (
+          <div className="flex flex-col gap-4">
+            {has("compte_rendu_mairies") && (
+              <ClubReportsSection
+                category="MAIRIE"
+                title="Comptes rendus mairies"
+                emptyLabel="Aucun compte rendu de réunion avec une mairie pour le moment."
+                canCreate={false}
+                isAdmin={false}
+                reports={clubReports}
+              />
+            )}
+            {has("compte_rendu_bureau") && (
+              <ClubReportsSection
+                category="BUREAU"
+                title="Comptes rendus bureau"
+                emptyLabel="Aucun compte rendu de réunion du Bureau pour le moment."
+                canCreate={false}
+                isAdmin={false}
+                reports={clubReports}
+              />
+            )}
+            {has("compte_rendu_coachs") && (
+              <ClubReportsSection
+                category="COACH"
+                title="Comptes rendus des coachs"
+                emptyLabel="Aucun compte rendu de coach pour le moment."
+                canCreate={false}
+                isAdmin={false}
+                showAuthor
+                reports={clubReports}
+              />
+            )}
+            {/* Cd17LigueSection, pas ClubReportsSection : ce sont de vrais
+                fichiers déposés tels quels (jamais rédigés dans l'appli),
+                voir le commentaire en tête de cd17-ligue-section.tsx --
+                canUpload=false y masque déjà "Déposer" ET "Supprimer". */}
+            {has("compte_rendu_cd17_ligue") && (
+              <Cd17LigueSection canUpload={false} reports={clubReports} />
+            )}
+            {documentIds.length > 0 && <DocumentsPanel documentIds={documentIds} />}
+          </div>
+        ),
+      };
 
   const vieDuClubChildren: AdminSection[] = [
     ...(whatsappGroups.length > 0
@@ -435,7 +528,53 @@ export function buildProfileSections({
           },
         ]
       : []),
-    documentsChild,
+    // Retour de Cindy du 12/09 ("Groupes WhatsApp") : annuaire de TOUS les
+    // groupes du club (équipes + commissions), distinct du bloc "Ton/tes
+    // groupe(s)" ci-dessus (celui d'une personne précise, jamais
+    // conditionné). Celui-ci est gouverné par la brique "whatsapp_groups"
+    // -- vide tant qu'elle n'est pas cochée (whatsappDirectory=[] par
+    // défaut).
+    ...(has("whatsapp_groups") && whatsappDirectory.length > 0
+      ? [
+          {
+            key: "whatsapp-directory",
+            label: "Groupes WhatsApp",
+            icon: <MessageCircle className={iconClass} />,
+            content: (
+              <div className="flex flex-col gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
+                <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  <MessageCircle className="h-3.5 w-3.5 text-navy" />
+                  Groupes WhatsApp du club
+                </p>
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                  {whatsappDirectory.map((g) =>
+                    g.inviteLink ? (
+                      <a
+                        key={g.id}
+                        href={g.inviteLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center justify-center gap-1.5 rounded-full bg-emerald-500 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        {g.name}
+                      </a>
+                    ) : (
+                      <span
+                        key={g.id}
+                        className="flex items-center justify-center gap-1.5 rounded-full bg-zinc-50 px-3.5 py-2 text-sm font-medium text-zinc-400"
+                      >
+                        {g.name} — lien non renseigné
+                      </span>
+                    )
+                  )}
+                </div>
+              </div>
+            ),
+          },
+        ]
+      : []),
+    ...(documentsChild ? [documentsChild] : []),
     ...(has("sponsors")
       ? [
           {

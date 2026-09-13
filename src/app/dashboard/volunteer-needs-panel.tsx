@@ -5,6 +5,7 @@ import { Check, Minus, Plus, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import RoleIcon from "./role-icon";
 import ConfirmDialog from "./confirm-dialog";
+import CommissionMultiSelect from "./commission-multi-select";
 import {
   CUSTOM_ROLE_CODE,
   STANDARD_VOLUNTEER_ROLES,
@@ -30,6 +31,9 @@ export default function VolunteerNeedsPanel({
   myPlayerIds,
   canManage,
   bare = false,
+  commissionGroups = [],
+  commissionGroupIds = [],
+  onCommissionGroupIdsChange,
 }: {
   eventId: string;
   needs: VolunteerNeed[];
@@ -39,6 +43,21 @@ export default function VolunteerNeedsPanel({
   // panneau et MatchTasksPanel sous un seul titre "Organisation" partagé
   // (retour de Cindy du 2026-08-20).
   bare?: boolean;
+  // Retour de Cindy du 12/09 ("ajoute-le aussi directement sur la carte") :
+  // même sélecteur que create-event-form.tsx (CommissionMultiSelect), mais
+  // ici modifiable directement depuis la carte, sans repasser par
+  // "Modifier l'événement" -- porté par events.commission_group_ids, un
+  // seul choix pour l'événement entier (jamais par besoin), voir son
+  // commentaire dans create-event-form.tsx. commissionGroups=[] masque le
+  // sélecteur (CommissionMultiSelect se cache déjà tout seul si vide) --
+  // jamais fourni côté lecture seule (canManage=false).
+  commissionGroups?: { id: string; name: string }[];
+  commissionGroupIds?: string[];
+  // Optionnel : permet à l'appelant (calendar-view.tsx...) de refléter
+  // immédiatement le nouveau choix dans son état local (event.commission
+  // GroupIds), pour qu'une prochaine ouverture de "Modifier l'événement"
+  // reparte de la bonne valeur sans attendre le rafraîchissement temps réel.
+  onCommissionGroupIdsChange?: (next: string[]) => void;
 }) {
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +66,7 @@ export default function VolunteerNeedsPanel({
   const [newRoleCode, setNewRoleCode] = useState(STANDARD_VOLUNTEER_ROLES[0].code);
   const [newCustomLabel, setNewCustomLabel] = useState("");
   const [newCount, setNewCount] = useState("1");
+  const [savingCommissions, setSavingCommissions] = useState(false);
 
   // Copie locale affichée immédiatement au clic, plutôt que d'attendre le
   // rafraîchissement temps réel (débounce ~0,8s + un aller-retour serveur
@@ -239,6 +259,27 @@ export default function VolunteerNeedsPanel({
     setAddOpen(false);
   }
 
+  // Retour de Cindy du 12/09 : même écriture que create-event-form.tsx
+  // (handleSubmit) -- toujours le tableau complet, jamais null même vide.
+  // Rollback local si l'écriture échoue, même principe que
+  // updateRequiredCount ci-dessus.
+  async function saveCommissionGroupIds(next: string[]) {
+    const previous = commissionGroupIds;
+    setSavingCommissions(true);
+    setError(null);
+    onCommissionGroupIdsChange?.(next);
+    const supabase = createClient();
+    const { error: updateError } = await supabase
+      .from("events")
+      .update({ commission_group_ids: next })
+      .eq("id", eventId);
+    setSavingCommissions(false);
+    if (updateError) {
+      onCommissionGroupIdsChange?.(previous);
+      setError("Modification impossible, réessaie.");
+    }
+  }
+
   if (localNeeds.length === 0 && !canManage) return null;
 
   return (
@@ -249,11 +290,28 @@ export default function VolunteerNeedsPanel({
           : "mt-3 flex flex-col gap-2.5 rounded-xl border border-zinc-100 bg-zinc-50/60 p-3"
       }
     >
-      {!bare && (
-        <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-          Besoins d&apos;organisation
-        </p>
+      {(!bare || canManage) && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {!bare && (
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+              Besoins d&apos;organisation
+            </p>
+          )}
+          {/* Retour de Cindy du 12/09 ("ajoute-le aussi directement sur la
+              carte") : même contrôle que create-event-form.tsx, modifiable
+              ici sans repasser par "Modifier l'événement". Absent en
+              lecture seule (canManage=false) : ce choix reste une décision
+              de gestion, jamais du ressort d'un simple joueur/parent. */}
+          {canManage && (
+            <CommissionMultiSelect
+              commissions={commissionGroups}
+              selectedIds={commissionGroupIds}
+              onChange={saveCommissionGroupIds}
+            />
+          )}
+        </div>
       )}
+      {savingCommissions && <p className="text-xs text-zinc-400">Enregistrement...</p>}
 
       {localNeeds.length === 0 && (
         <p className="text-xs text-zinc-400">Aucun besoin défini pour cet événement.</p>

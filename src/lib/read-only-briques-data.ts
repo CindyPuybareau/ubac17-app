@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ChildEvent } from "@/app/enfant/view/child-dashboard";
 import type { ClubReport, SponsorDisplay } from "@/app/dashboard/page";
 import type { ProfileMember, ProfileTeam } from "@/app/benevole/view/profile-sections";
+import { upcomingBirthdays, type BirthdaySource } from "@/app/dashboard/birthdays";
 
 // Extrait de /benevole/view/page.tsx (retour de Cindy du 10/09, "Accès
 // Commissions & Administration") : /commission/[token] a exactement besoin
@@ -21,6 +22,22 @@ export type ReadOnlyBriquesData = {
   // brique cochée n'a droit à AUCUN nom, ni présent ni absent (objet
   // vide dans ce cas, jamais un événement partiel).
   attendanceByEventId: Record<string, { name: string | null; status: string }[]>;
+  // Retour de Cindy du 12/09 ("Tableau de bord (lecture seule)") :
+  // compteurs simples uniquement -- jamais de montant ni de nom, à la
+  // différence du vrai Tableau de bord Bureau (bureau-dashboard.tsx), qui
+  // reste hors de portée d'un profil sur-mesure. `null` tant que la
+  // brique "tableau_de_bord" n'est pas cochée (distinct de "tout à zéro",
+  // qui serait un vrai club sans rien dedans).
+  profileDashboardCounts: {
+    memberCount: number;
+    teamCount: number;
+    upcomingEventCount: number;
+    birthdaysThisWeekCount: number;
+  } | null;
+  // Retour de Cindy du 12/09 ("Groupes WhatsApp") : annuaire en lecture
+  // seule de tous les groupes du club (équipes + commissions) ayant un
+  // lien d'invitation renseigné -- gouverné par la brique "whatsapp_groups".
+  profileWhatsappGroups: { id: string; name: string; inviteLink: string | null }[];
 };
 
 export async function getReadOnlyBriquesData(
@@ -34,6 +51,8 @@ export async function getReadOnlyBriquesData(
   let profileEvents: ChildEvent[] = [];
   let profileSponsors: SponsorDisplay[] = [];
   let profileClubReports: ClubReport[] = [];
+  let profileDashboardCounts: ReadOnlyBriquesData["profileDashboardCounts"] = null;
+  let profileWhatsappGroups: ReadOnlyBriquesData["profileWhatsappGroups"] = [];
   const attendanceByEventId: Record<string, { name: string | null; status: string }[]> = {};
 
   if (has("equipes")) {
@@ -225,7 +244,49 @@ export async function getReadOnlyBriquesData(
     }));
   }
 
-  if (has("compte_rendu_mairies") || has("compte_rendu_bureau") || has("compte_rendu_coachs")) {
+  if (has("tableau_de_bord")) {
+    // Retour de Cindy du 12/09 : trois requêtes indépendantes de tout
+    // autre brique cochée (jamais couplées à "membres"/"equipes"/
+    // "calendrier") -- "Tableau de bord" doit fonctionner seul, même sans
+    // aucune autre case cochée. birth_date n'est lu QUE pour compter les
+    // anniversaires de la semaine ci-dessous, jamais renvoyé tel quel :
+    // aucune date de naissance ne quitte cette fonction.
+    const [membersCountRes, teamsCountRes, upcomingEventsCountRes, birthdaysRes] = await Promise.all([
+      supabase.from("players").select("id", { count: "exact", head: true }).is("archived_at", null),
+      supabase.from("teams").select("id", { count: "exact", head: true }),
+      supabase
+        .from("events")
+        .select("id", { count: "exact", head: true })
+        .gte("start_time", new Date().toISOString()),
+      supabase.from("players").select("id, birth_date").is("archived_at", null),
+    ]);
+    const birthdaySources: BirthdaySource[] = (birthdaysRes.data ?? []).map((p) => ({
+      id: p.id,
+      firstName: null,
+      lastName: null,
+      birthDate: p.birth_date,
+    }));
+    profileDashboardCounts = {
+      memberCount: membersCountRes.count ?? 0,
+      teamCount: teamsCountRes.count ?? 0,
+      upcomingEventCount: upcomingEventsCountRes.count ?? 0,
+      birthdaysThisWeekCount: upcomingBirthdays(birthdaySources, 7).length,
+    };
+  }
+
+  if (has("whatsapp_groups")) {
+    const { data: groupsData } = await supabase
+      .from("whatsapp_groups")
+      .select("id, name, invite_link")
+      .order("sort_order", { ascending: true });
+    profileWhatsappGroups = (groupsData ?? []).map((g) => ({
+      id: g.id,
+      name: g.name,
+      inviteLink: g.invite_link,
+    }));
+  }
+
+  if (has("compte_rendu_mairies") || has("compte_rendu_bureau") || has("compte_rendu_coachs") || has("compte_rendu_cd17_ligue")) {
     const { data: clubReportsData } = await supabase
       .from("club_reports")
       .select("id, category, title, report_date, body, created_by, file_path, updated_at")
@@ -274,5 +335,7 @@ export async function getReadOnlyBriquesData(
     profileSponsors,
     profileClubReports,
     attendanceByEventId,
+    profileDashboardCounts,
+    profileWhatsappGroups,
   };
 }

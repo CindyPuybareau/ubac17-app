@@ -34,11 +34,22 @@ export default function OrganisationCard({
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="mt-3 overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm">
+    // Retour de Cindy du 13/09 ("l'onglet déroulant des commissions n'est
+    // pas visible en entier") : cette boîte avait un overflow-hidden (pour
+    // que le bandeau or épouse les coins arrondis) qui rognait aussi le
+    // menu "Commissions concernées" de volunteer-needs-panel.tsx, positionné
+    // en absolute et donc censé déborder de la boîte pour s'afficher
+    // entièrement. Plus d'overflow-hidden sur le conteneur -- les coins
+    // arrondis sont maintenant portés par le bouton lui-même (rounded-2xl
+    // fermé, rounded-t-2xl ouvert, le corps n'ayant pas de fond coloré à
+    // clipper).
+    <div className="mt-3 rounded-2xl border border-zinc-100 bg-white shadow-sm">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-2 bg-ubac-yellow/15 px-3 py-2 text-left transition-colors hover:bg-ubac-yellow/25"
+        className={`flex w-full items-center justify-between gap-2 bg-ubac-yellow/15 px-3 py-2 text-left transition-colors hover:bg-ubac-yellow/25 ${
+          open ? "rounded-t-2xl" : "rounded-2xl"
+        }`}
       >
         <span className="flex min-w-0 items-center gap-2">
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-ubac-yellow text-navy">

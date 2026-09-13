@@ -17,7 +17,7 @@ import {
 } from "./event-volunteer-needs";
 import { useToast } from "./toast-context";
 import { getCurrentSeasonStartYear } from "@/lib/season";
-import type { AdminBenevole, AdminUpcomingEvent } from "./page";
+import type { AdminUpcomingEvent } from "./page";
 
 // Retour de Cindy du 12/09 ("jusqu'à la fin de la saison") : même notion
 // de saison que le reste de l'appli (lib/season.ts, bascule au 1er
@@ -123,7 +123,6 @@ const typeChoices: { value: EventType; label: string; active: string }[] = [
 
 export default function CreateEventForm({
   teams,
-  benevoles = [],
   commissionGroups = [],
   existingNeeds = [],
   allowClubWide = false,
@@ -134,14 +133,13 @@ export default function CreateEventForm({
   onUpdated,
 }: {
   teams: Team[];
-  // Rempli côté Bureau ET Coach depuis le 06/09 (retour de Cindy : "pour
-  // tous ceux qui peuvent modifier un événement ou en créer un") — voir le
-  // commentaire sur la section "Bénévoles invités" plus bas.
-  benevoles?: AdminBenevole[];
   // Retour de Cindy du 10/09 ("Accès Commissions & Administration", puis
   // "un seul choix pour l'événement entier") : transmis à
   // CommissionMultiSelect, un seul sélecteur pour tout l'événement (voir
   // commissionGroupIds plus bas) — même liste que VolunteerNeedsPanel.
+  // Retour de Cindy du 12/09 ("un bénévole fait partie d'une commission
+  // quoi qu'il arrive") : occupe désormais la place de l'ancienne section
+  // "Bénévoles invités" (retirée), en bas du formulaire.
   commissionGroups?: { id: string; name: string }[];
   // Retour de Cindy du 10/09 ("recharge et affiche correctement les
   // besoins d'organisation existants") : les besoins déjà en base pour
@@ -314,14 +312,6 @@ export default function CreateEventForm({
   const [commissionGroupIds, setCommissionGroupIds] = useState<string[]>(
     () => editingEvent?.commissionGroupIds ?? []
   );
-  // Bénévoles invités à cet événement (retour de Cindy du 2026-08-25) :
-  // contrairement à draftNeeds, modifiable en édition comme à la création —
-  // le Bureau doit pouvoir ajouter/retirer un bénévole après coup. Diff
-  // calculé contre editingEvent?.benevoleIds au moment de l'enregistrement,
-  // voir handleSubmit plus bas.
-  const [selectedBenevoleIds, setSelectedBenevoleIds] = useState<string[]>(
-    () => editingEvent?.benevoleIds ?? []
-  );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -341,7 +331,6 @@ export default function CreateEventForm({
     setScopeMode("single");
     setTargetTeamIds([]);
     setDraftNeeds([]);
-    setSelectedBenevoleIds([]);
     setError(null);
   }
 
@@ -383,10 +372,6 @@ export default function CreateEventForm({
 
   function toggleTargetTeam(id: string) {
     setTargetTeamIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
-  }
-
-  function toggleBenevole(id: string) {
-    setSelectedBenevoleIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
   }
 
   const isMatch = eventType === "MATCH" || eventType === "FRIENDLY";
@@ -589,8 +574,6 @@ export default function CreateEventForm({
           teamName,
           commissionGroupIds,
           rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
-          benevoleIds: [],
-          benevoleInvites: [],
         }))
       );
 
@@ -833,25 +816,6 @@ export default function CreateEventForm({
     // serveur — corrigé silencieusement par le prochain rafraîchissement
     // temps réel si besoin.
     const teamName = resolveTeamNameClient(inserted.team_id, inserted.target_team_ids, teams);
-    // Retour de Cindy du 06/09 ("vision des bénévoles qui ont répondu
-    // présent") : affichage optimiste construit ici, comme le reste de ce
-    // patch -- garde le statut déjà connu pour un bénévole déjà invité
-    // (editingEvent.benevoleInvites), "PENDING" par défaut pour un
-    // nouvellement ajouté (il n'a pas encore pu répondre).
-    const previousInvitesById = new Map(
-      (editingEvent?.benevoleInvites ?? []).map((inv) => [inv.id, inv])
-    );
-    const optimisticBenevoleInvites = selectedBenevoleIds.map((id) => {
-      const previous = previousInvitesById.get(id);
-      if (previous) return previous;
-      const b = benevoles.find((x) => x.id === id);
-      return {
-        id,
-        firstName: b?.firstName ?? "",
-        lastName: b?.lastName ?? "",
-        status: "PENDING" as const,
-      };
-    });
     if (isEditing && editingEvent) {
       onUpdated?.({
         ...editingEvent,
@@ -874,8 +838,6 @@ export default function CreateEventForm({
         targetTeamIds: inserted.target_team_ids,
         teamName,
         commissionGroupIds,
-        benevoleIds: selectedBenevoleIds,
-        benevoleInvites: optimisticBenevoleInvites,
       });
     } else {
       onCreated?.([
@@ -904,8 +866,6 @@ export default function CreateEventForm({
           teamName,
           commissionGroupIds,
           rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
-          benevoleIds: selectedBenevoleIds,
-          benevoleInvites: optimisticBenevoleInvites,
         },
       ]);
     }
@@ -915,9 +875,8 @@ export default function CreateEventForm({
     // consulter, modifier ou supprimer") -- ce bloc gérait jusqu'ici
     // uniquement la création (insert brut, jamais en édition). Diff contre
     // les besoins déjà existants (existingNeeds, chargés par l'appelant
-    // depuis volunteerNeedsByEventId) désormais dans les deux cas, même
-    // principe que selectedBenevoleIds juste en dessous : id présent -> une
-    // ligne déjà en base, à mettre à jour ou laisser telle quelle ; id
+    // depuis volunteerNeedsByEventId) désormais dans les deux cas : id
+    // présent -> une ligne déjà en base, à mettre à jour ou laisser telle quelle ; id
     // absent (retiré du formulaire) -> à supprimer ; ligne sans id -> à
     // créer. Best-effort : une erreur ici ne doit pas faire croire que
     // l'événement lui-même n'a pas été créé/modifié, il l'a bien été.
@@ -994,64 +953,6 @@ export default function CreateEventForm({
           `Événement enregistré, mais l'ajout d'un besoin d'organisation a échoué : ${needsError.message}`
         );
         return;
-      }
-    }
-
-    // Bénévoles invités : modifiable en édition (contrairement à
-    // draftNeeds ci-dessus), donc calculé en diff contre la liste déjà
-    // invitée plutôt qu'en simple insert. Bureau ET coach depuis le 06/09
-    // (retour de Cindy) — la RLS sur event_benevole_invites (Bureau ou
-    // is_team_coach(e.team_id)) tranche qui peut réellement écrire, pas ce
-    // code : un coach qui verrait ce formulaire pour un événement qu'il ne
-    // gère pas se ferait simplement refuser l'écriture. Best-effort, comme
-    // les besoins d'organisation : une erreur ici ne doit pas laisser
-    // croire que l'événement n'a pas été créé/modifié.
-    {
-      const previousBenevoleIds = editingEvent?.benevoleIds ?? [];
-      const toAdd = selectedBenevoleIds.filter((id) => !previousBenevoleIds.includes(id));
-      const toRemove = previousBenevoleIds.filter((id) => !selectedBenevoleIds.includes(id));
-      if (toAdd.length > 0) {
-        const { error: inviteError } = await supabase
-          .from("event_benevole_invites")
-          .insert(toAdd.map((benevoleId) => ({ event_id: inserted.id, benevole_id: benevoleId })));
-        if (inviteError) {
-          setError(
-            `Événement enregistré, mais l'invitation des bénévoles a échoué : ${inviteError.message}`
-          );
-          return;
-        }
-        // Retour de Cindy du 06/09 ("ajouter aux bénévoles les
-        // notifications... quand un événement les concerne") : best-effort,
-        // jamais bloquant (même principe que member-notifications.ts) --
-        // rate ces alertes ne doit jamais faire croire que l'invitation
-        // elle-même a échoué, elle a bien été enregistrée juste au-dessus.
-        const { error: notifyError } = await supabase.from("notifications").insert(
-          toAdd.map((benevoleId) => ({
-            benevole_id: benevoleId,
-            event_id: inserted.id,
-            title: "Tu es invité(e) à un événement",
-            body: `${inserted.title ?? "Événement"} — ${new Date(inserted.start_time).toLocaleDateString(
-              "fr-FR",
-              { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }
-            )}`,
-          }))
-        );
-        if (notifyError) {
-          console.error("[create-event-form] notification bénévole échouée:", notifyError);
-        }
-      }
-      if (toRemove.length > 0) {
-        const { error: uninviteError } = await supabase
-          .from("event_benevole_invites")
-          .delete()
-          .eq("event_id", inserted.id)
-          .in("benevole_id", toRemove);
-        if (uninviteError) {
-          setError(
-            `Événement enregistré, mais le retrait de certains bénévoles a échoué : ${uninviteError.message}`
-          );
-          return;
-        }
       }
     }
 
@@ -1450,21 +1351,9 @@ export default function CreateEventForm({
           maintenant pré-rempli avec les besoins déjà en base en édition
           (existingNeeds), modifiables/supprimables ici comme sur la carte. */}
       <div className="flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs font-medium text-zinc-600">
-              Besoins d&apos;organisation (optionnel)
-            </p>
-            {/* Retour de Cindy du 10/09 (suite) : "l'onglet commission
-                apparaît à chaque besoin créé, pas la peine, les groupes
-                commissions concernés seront informés de tous les besoins
-                créés" -- un seul choix pour l'événement entier, plus par
-                besoin (voir commissionGroupIds plus haut). */}
-            <CommissionMultiSelect
-              commissions={commissionGroups}
-              selectedIds={commissionGroupIds}
-              onChange={setCommissionGroupIds}
-            />
-          </div>
+          <p className="text-xs font-medium text-zinc-600">
+            Besoins d&apos;organisation (optionnel)
+          </p>
           {draftNeeds.length > 0 && (
             <div className="flex flex-col gap-1.5">
               {draftNeeds.map((n) => (
@@ -1523,36 +1412,25 @@ export default function CreateEventForm({
           </button>
       </div>
 
-      {/* Bénévoles invités (retour de Cindy du 2026-08-25 : "le bureau
-          devrait... pouvoir selectionner ses membres, pour que ces meme
-          membres voient l'evenement avec les besoins", étendu au coach le
-          06/09) — Bureau ET coach, seulement s'il existe des bénévoles
-          enregistrés (benevoles vide par défaut partout ailleurs, voir
-          calendar-view.tsx). */}
-      {benevoles.length > 0 && (
+      {/* Retour de Cindy du 12/09 ("un bénévole fait partie d'une commission
+          quoi qu'il arrive... on pourrait mettre l'onglet commissions à la
+          place de bénévoles invités optionnel") : occupe désormais cette
+          place -- l'ancienne section "Bénévoles invités" est retirée (les
+          invitations individuelles à un événement précis n'ont plus lieu
+          d'être, chaque bénévole étant de toute façon rattaché à une
+          commission qui voit déjà tous les besoins via commissionGroupIds
+          plus haut). Gardé conditionnel (commissionGroups.length > 0) comme
+          l'était "Bénévoles invités" avant elle : jamais une étiquette
+          orpheline sans le moindre contrôle à côté (CommissionMultiSelect se
+          cache tout seul, mais pas le libellé qui l'entoure ici). */}
+      {commissionGroups.length > 0 && (
         <div className="flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3">
-          <p className="text-xs font-medium text-zinc-600">Bénévoles invités (optionnel)</p>
-          <div className="flex flex-wrap gap-1.5">
-            {benevoles
-              .filter((b) => !b.archivedAt || selectedBenevoleIds.includes(b.id))
-              .map((b) => {
-                const checked = selectedBenevoleIds.includes(b.id);
-                return (
-                  <button
-                    key={b.id}
-                    type="button"
-                    onClick={() => toggleBenevole(b.id)}
-                    className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                      checked
-                        ? "border-navy bg-navy text-white"
-                        : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-100"
-                    }`}
-                  >
-                    {b.firstName} {b.lastName}
-                  </button>
-                );
-              })}
-          </div>
+          <p className="text-xs font-medium text-zinc-600">Commissions concernées (optionnel)</p>
+          <CommissionMultiSelect
+            commissions={commissionGroups}
+            selectedIds={commissionGroupIds}
+            onChange={setCommissionGroupIds}
+          />
         </div>
       )}
 

@@ -9,9 +9,14 @@ import { createHmac, timingSafeEqual } from "crypto";
 // l'URL (benevoles.access_token, voir la migration) sert directement de
 // preuve d'identité, sans étape de code supplémentaire — /benevole/view (la
 // page qui lit ce cookie) ne fait que des lectures en dur, jamais
-// d'insert/update/delete direct. Seule exception : /api/benevole-signup,
-// qui vérifie ce même cookie pour n'autoriser qu'une seule action précise
-// (s'inscrire/se désinscrire d'un besoin, sous SON PROPRE benevole_id).
+// d'insert/update/delete direct.
+//
+// Retour de Cindy du 13/09 ("les bénévoles invités peuvent être supprimés
+// partout") : l'ancienne unique exception d'écriture, /api/benevole-signup
+// (s'inscrire/se désinscrire d'un besoin via une invitation individuelle,
+// event_benevole_invites), a été supprimée -- un bénévole s'inscrit
+// désormais via le lien de SA commission (/commission/[token],
+// /api/commission-signup), jamais via son lien personnel.
 //
 // "benevole." en tête de la charge utile (absent côté enfant) : les deux
 // cookies portent un nom différent (jamais de confusion possible côté

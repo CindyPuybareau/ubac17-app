@@ -19,7 +19,6 @@ import SectionLinkCard from "./section-link-card";
 import RelanceRedirectButton from "./relance-redirect-button";
 import type {
   AdminMemberTeam,
-  AdminBenevole,
   AdminCotisation,
   AdminMember,
   AdminPenalite,
@@ -217,7 +216,6 @@ export default function BureauDashboard({
   volunteerNeedsByEventId,
   sponsors,
   penalites,
-  benevoles,
   commissionGroups = [],
 }: {
   cotisations: AdminCotisation[];
@@ -231,14 +229,6 @@ export default function BureauDashboard({
   birthdayMembers: BirthdaySource[];
   eventRoles: EventRoleType[];
   volunteerNeedsByEventId: Record<string, VolunteerNeed[]>;
-  // Retour de Cindy du 29/08 ("je ne vois pas comment ajouter des
-  // bénévoles") : jamais transmis jusqu'ici à ce composant, alors que
-  // c'est depuis CET onglet "Calendrier" (le tout premier) que les
-  // événements se créent réellement — la section "Bénévoles invités" de
-  // CreateEventForm existait déjà, mais n'avait tout simplement jamais
-  // reçu de bénévoles à afficher sur cet onglet précis (elle est bien
-  // câblée sur "Événements"/"Matchs officiels"/"Résultats").
-  benevoles: AdminBenevole[];
   // Remplace la carte "Documents à renouveler" (retour de Cindy du
   // 2026-08-22 : "pas d'intérêt") — voir sponsors-manager.tsx pour la
   // gestion complète (ajout/modification/suppression).
@@ -448,7 +438,6 @@ export default function BureauDashboard({
         birthdayMembers={birthdayMembers}
         eventRoles={eventRoles}
         volunteerNeedsByEventId={volunteerNeedsByEventId}
-        benevoles={benevoles}
         commissionGroups={commissionGroups}
         // Retour de Cindy du 09/09 ("le calendrier devient illisible dès
         // qu'il y a plusieurs événements le même jour... sans filtre par

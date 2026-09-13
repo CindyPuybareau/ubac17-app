@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
-// Écriture équivalente à /api/benevole-signup, mais pour le lien commun
-// d'une commission (retour de Cindy du 10/09, "Accès Commissions &
+// Seule écriture ouverte au lien public d'une commission (retour de Cindy
+// du 10/09, "Accès Commissions &
 // Administration") : pas de session/cookie ici, le jeton de la commission
 // est envoyé directement à chaque appel (comme la page elle-même,
 // /commission/[token] — aucune connexion requise, le lien EST la preuve
@@ -45,9 +45,7 @@ export async function POST(request: Request) {
 
   // Le besoin doit appartenir à un événement réellement rattaché à CETTE
   // commission (retour de Cindy du 10/09 : un seul choix pour l'événement
-  // entier, plus par besoin) -- jamais se fier à ce qu'envoie le client
-  // seul (même garde-fou que /api/benevole-signup pour l'invitation à un
-  // événement).
+  // entier, plus par besoin) -- jamais se fier à ce qu'envoie le client seul.
   const { data: needRow } = await supabase
     .from("event_volunteer_needs")
     .select("id, events(start_time, commission_group_ids)")

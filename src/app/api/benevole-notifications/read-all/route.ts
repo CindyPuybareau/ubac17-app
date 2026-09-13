@@ -3,8 +3,8 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { BENEVOLE_SESSION_COOKIE, verifyBenevoleSession } from "@/lib/benevole-session";
 
-// Seule autre écriture possible depuis l'espace bénévole (avec /api/
-// benevole-signup et /api/benevole-rsvp) : un accusé de lecture ("ce
+// Seule écriture possible depuis l'espace bénévole individuel (voir
+// benevole-session.ts pour le contexte général) : un accusé de lecture ("ce
 // bénévole a vu cette alerte"). Plus simple que la route équivalente côté
 // enfant (read-all/route.ts) : un bénévole est notifié individuellement
 // (benevole_id), jamais par équipe — pas de teamOrClubWideFilter à

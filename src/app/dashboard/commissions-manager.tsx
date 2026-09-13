@@ -64,91 +64,104 @@ function CommissionCard({
     setBriques((b) => (b.includes(key) ? b.filter((x) => x !== key) : [...b, key]));
   }
 
+  // Retour de Cindy du 12/09 ("le menu public n'affiche jamais les
+  // sections cochées") : audit en base (via le connecteur Supabase) a
+  // confirmé que access_profiles/access_profile_briques/whatsapp_groups
+  // acceptent bien cette écriture pour un compte Bureau (RLS testée
+  // directement, succès) -- mais qu'aucune des 8 commissions concernées
+  // n'avait jamais de access_profile_id renseigné, comme si "Enregistrer"
+  // n'aboutissait jamais. Cette fonction n'avait aucun try/catch : la
+  // moindre exception inattendue (jamais un simple {error} Supabase, qui
+  // était déjà géré) laissait le bouton bloqué sur "Enregistrement..."
+  // sans le moindre message, un clic suivant sur "Annuler"/la croix
+  // donnant l'impression que rien ne s'était passé -- exactement le
+  // symptôme observé. `finally` garantit maintenant que saving repasse à
+  // false quoi qu'il arrive, et toute exception s'affiche désormais
+  // comme n'importe quelle autre erreur ci-dessus.
   async function save() {
     setSaving(true);
     setError(null);
-    const supabase = createClient();
-    const initialProfileId = group.accessProfileId;
-    // Retour de Cindy du 10/09 : pour une commission jamais configurée,
-    // initialBriques vaut déjà ["calendrier", "tableau_de_bord"] (défaut
-    // pré-coché, voir plus haut) -- sans ce cas particulier, cliquer
-    // "Enregistrer" sans rien toucher aurait laissé "changed" à false et
-    // n'aurait donc jamais créé le profil, malgré des cases visiblement
-    // cochées à l'écran.
-    const changed = !initialProfileId
-      ? briques.length > 0
-      : [...briques].sort().join(",") !== [...initialBriques].sort().join(",");
+    try {
+      const supabase = createClient();
+      const initialProfileId = group.accessProfileId;
+      // Retour de Cindy du 10/09 : pour une commission jamais configurée,
+      // initialBriques vaut déjà ["calendrier", "tableau_de_bord"] (défaut
+      // pré-coché, voir plus haut) -- sans ce cas particulier, cliquer
+      // "Enregistrer" sans rien toucher aurait laissé "changed" à false et
+      // n'aurait donc jamais créé le profil, malgré des cases visiblement
+      // cochées à l'écran.
+      const changed = !initialProfileId
+        ? briques.length > 0
+        : [...briques].sort().join(",") !== [...initialBriques].sort().join(",");
 
-    if (changed) {
-      if (briques.length === 0) {
-        if (initialProfileId) {
-          const { error: detachError } = await supabase
+      if (changed) {
+        if (briques.length === 0) {
+          if (initialProfileId) {
+            const { error: detachError } = await supabase
+              .from("whatsapp_groups")
+              .update({ access_profile_id: null })
+              .eq("id", group.id);
+            if (detachError) {
+              setError(`Accès non mis à jour : ${detachError.message}`);
+              return;
+            }
+          }
+        } else if (initialProfileId) {
+          const { error: clearError } = await supabase
+            .from("access_profile_briques")
+            .delete()
+            .eq("profile_id", initialProfileId);
+          if (clearError) {
+            setError(`Accès non mis à jour : ${clearError.message}`);
+            return;
+          }
+          const { error: insertError } = await supabase
+            .from("access_profile_briques")
+            .insert(briques.map((brique) => ({ profile_id: initialProfileId, brique })));
+          if (insertError) {
+            setError(`Accès non mis à jour : ${insertError.message}`);
+            return;
+          }
+        } else {
+          // Nom garanti unique (access_profiles.name est UNIQUE) via l'id du
+          // groupe, jamais affiché comme un choix nulle part — même
+          // mécanisme que benevoles-manager.tsx/member-detail-modal.tsx
+          // ("Comité directeur").
+          const profileName = `Commission — ${title} (${group.id.slice(0, 8)})`;
+          const { data: createdProfile, error: createError } = await supabase
+            .from("access_profiles")
+            .insert({ name: profileName })
+            .select("id")
+            .single();
+          if (createError || !createdProfile) {
+            setError(`Accès non créé : ${createError?.message ?? ""}`);
+            return;
+          }
+          const { error: insertError } = await supabase
+            .from("access_profile_briques")
+            .insert(briques.map((brique) => ({ profile_id: createdProfile.id, brique })));
+          if (insertError) {
+            setError(`Accès non mis à jour : ${insertError.message}`);
+            return;
+          }
+          const { error: attachError } = await supabase
             .from("whatsapp_groups")
-            .update({ access_profile_id: null })
+            .update({ access_profile_id: createdProfile.id })
             .eq("id", group.id);
-          if (detachError) {
-            setSaving(false);
-            setError(`Accès non mis à jour : ${detachError.message}`);
+          if (attachError) {
+            setError(`Accès non mis à jour : ${attachError.message}`);
             return;
           }
         }
-      } else if (initialProfileId) {
-        const { error: clearError } = await supabase
-          .from("access_profile_briques")
-          .delete()
-          .eq("profile_id", initialProfileId);
-        if (clearError) {
-          setSaving(false);
-          setError(`Accès non mis à jour : ${clearError.message}`);
-          return;
-        }
-        const { error: insertError } = await supabase
-          .from("access_profile_briques")
-          .insert(briques.map((brique) => ({ profile_id: initialProfileId, brique })));
-        if (insertError) {
-          setSaving(false);
-          setError(`Accès non mis à jour : ${insertError.message}`);
-          return;
-        }
-      } else {
-        // Nom garanti unique (access_profiles.name est UNIQUE) via l'id du
-        // groupe, jamais affiché comme un choix nulle part — même
-        // mécanisme que benevoles-manager.tsx/member-detail-modal.tsx
-        // ("Comité directeur").
-        const profileName = `Commission — ${title} (${group.id.slice(0, 8)})`;
-        const { data: createdProfile, error: createError } = await supabase
-          .from("access_profiles")
-          .insert({ name: profileName })
-          .select("id")
-          .single();
-        if (createError || !createdProfile) {
-          setSaving(false);
-          setError(`Accès non créé : ${createError?.message ?? ""}`);
-          return;
-        }
-        const { error: insertError } = await supabase
-          .from("access_profile_briques")
-          .insert(briques.map((brique) => ({ profile_id: createdProfile.id, brique })));
-        if (insertError) {
-          setSaving(false);
-          setError(`Accès non mis à jour : ${insertError.message}`);
-          return;
-        }
-        const { error: attachError } = await supabase
-          .from("whatsapp_groups")
-          .update({ access_profile_id: createdProfile.id })
-          .eq("id", group.id);
-        if (attachError) {
-          setSaving(false);
-          setError(`Accès non mis à jour : ${attachError.message}`);
-          return;
-        }
       }
-    }
 
-    setSaving(false);
-    setOpen(false);
-    router.refresh();
+      setOpen(false);
+      router.refresh();
+    } catch (e) {
+      setError(`Erreur inattendue : ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function regenerateToken() {
@@ -359,11 +372,11 @@ export default function CommissionsManager({
       </div>
 
       {/* Option secondaire (retour de Cindy du 10/09, point 7) : un accès
-          individuel reste utile pour inviter quelqu'un à un événement
-          précis (event_benevole_invites, RSVP, notifications) — ce que le
-          lien d'une commission, partagé et sans identité, ne sait pas
-          faire. Repliée par défaut : ce n'est plus le mode de
-          fonctionnement principal. */}
+          individuel reste utile pour donner à UNE personne un accès (menu
+          en lecture seule, notifications) propre à elle — ce que le lien
+          d'une commission, partagé et sans identité, ne sait pas faire.
+          Repliée par défaut : ce n'est plus le mode de fonctionnement
+          principal. */}
       <div className="border-t border-zinc-100 pt-4">
         <button
           type="button"

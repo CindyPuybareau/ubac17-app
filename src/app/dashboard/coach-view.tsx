@@ -28,7 +28,6 @@ import SponsorsDisplay from "./sponsors-display";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import type { TeamWithMembers } from "./team-manager";
 import type {
-  AdminBenevole,
   AdminMemberTeam,
   AdminPenalite,
   AdminUpcomingEvent,
@@ -70,7 +69,6 @@ export default function CoachView({
   sponsorDisplay = [],
   clubReports,
   currentUserId,
-  benevoles = [],
 }: {
   teams: TeamWithMembers[];
   events: AdminUpcomingEvent[];
@@ -114,13 +112,6 @@ export default function CoachView({
   // de connexion, pas la fiche joueur) peut les modifier/supprimer — voir
   // canEditRow dans club-reports-section.tsx.
   currentUserId: string;
-  // Retour de Cindy du 06/09 ("pour tous ceux qui peuvent modifier un
-  // événement ou en créer un : bureau et coach") : un coach peut désormais
-  // lui aussi inviter un bénévole du club sur un événement de SA propre
-  // équipe (voir create-event-form.tsx, section "Bénévoles invités" —
-  // n'exige plus allowClubWide, seulement une liste non vide) — jamais le
-  // droit de créer/modifier un bénévole lui-même, juste de l'inviter.
-  benevoles?: AdminBenevole[];
 }) {
   // Créer / modifier / supprimer un événement n'est permis que pour les
   // équipes réellement entraînées : proposer celle où l'utilisateur n'est
@@ -132,6 +123,15 @@ export default function CoachView({
       name: t.name,
       category: t.category,
     }));
+
+  // Retour de Cindy du 12/09 : manquait ici alors que le sélecteur
+  // "Commissions concernées" (create-event-form.tsx/volunteer-needs-
+  // panel.tsx) l'attend depuis le 10/09 -- un coach ne l'a donc jamais vu
+  // s'afficher (CommissionMultiSelect se cache tout seul si la liste est
+  // vide). Même calcul que admin-view.tsx (commissionGroups).
+  const commissionGroups = whatsappGroups
+    .filter((g) => g.category === "COMMISSION")
+    .map((g) => ({ id: g.id, name: g.name }));
 
   // Retour d'audit du 28/08 : un événement ciblant plusieurs équipes
   // précises (targetTeamIds) n'a pas de teamId — il n'apparaissait dans
@@ -186,8 +186,8 @@ export default function CoachView({
           <CalendarView
             events={events}
             createTeams={createTeams}
-            benevoles={benevoles}
             rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
+            commissionGroups={commissionGroups}
             contactEmailByPlayerId={contactEmailByPlayerId}
             birthdayMembers={birthdayMembers}
             // Retour de Cindy du 10/09 (bug Basile) : createTeams plutôt que
@@ -340,8 +340,8 @@ export default function CoachView({
             <CalendarView
               events={events}
               createTeams={createTeams}
-              benevoles={benevoles}
               rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
+            commissionGroups={commissionGroups}
               // Retour de Cindy du 10/09 (bug Basile) : createTeams, même
               // correctif que sur "Calendrier" ci-dessus.
               scopeTeams={createTeams}
@@ -362,8 +362,8 @@ export default function CoachView({
             <CalendarView
               events={events}
               createTeams={createTeams}
-              benevoles={benevoles}
               rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
+            commissionGroups={commissionGroups}
               // Retour de Cindy du 10/09 (bug Basile) : createTeams, même
               // correctif que sur "Calendrier" ci-dessus.
               scopeTeams={createTeams}

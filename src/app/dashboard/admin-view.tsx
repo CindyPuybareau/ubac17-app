@@ -198,7 +198,6 @@ export default function AdminView({
             volunteerNeedsByEventId={volunteerNeedsByEventId}
             sponsors={sponsors}
             penalites={penalites}
-            benevoles={benevoles}
             commissionGroups={commissionGroups}
           />
           <SponsorsDisplay sponsors={sponsorDisplay} />
@@ -338,7 +337,6 @@ export default function AdminView({
             <CalendarView
               events={upcomingEvents}
               createTeams={teamRefs}
-              benevoles={benevoles}
               allowClubWide
               forcedView="officialMatches"
               resultsTeams={teamRefs}
@@ -357,7 +355,6 @@ export default function AdminView({
             <CalendarView
               events={upcomingEvents}
               createTeams={teamRefs}
-              benevoles={benevoles}
               allowClubWide
               forcedView="officialResults"
               resultsTeams={teamRefs}

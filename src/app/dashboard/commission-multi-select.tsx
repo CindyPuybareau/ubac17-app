@@ -38,9 +38,17 @@ export default function CommissionMultiSelect({
         type="button"
         onClick={() => setOpen((o) => !o)}
         className={`flex items-center gap-1.5 rounded-full border px-2 py-1.5 text-xs font-medium transition-colors ${
+          // Retour de Cindy du 12/09 ("l'onglet déroulant commissions et
+          // administration devrait être d'une autre couleur", puis "pas
+          // violet, un contour sympa en rapport avec la maquette ubac") :
+          // même contour or que les autres pastilles de marque de l'appli
+          // (bouton "Aujourd'hui", toggle "Matchs officiels du club") --
+          // reconnaissable au premier coup d'œil parmi les autres dropdowns
+          // de la carte (TeamFilterDropdown/EventTypeFilterDropdown, tous en
+          // navy/blanc/zinc), sans sortir de la charte graphique du club.
           selectedIds.length > 0
-            ? "border-navy/30 bg-navy/10 text-navy"
-            : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
+            ? "border-transparent bg-ubac-yellow text-navy"
+            : "border-ubac-yellow bg-ubac-yellow/10 text-ubac-yellow-dark hover:bg-ubac-yellow/20"
         }`}
       >
         {label}
@@ -50,7 +58,12 @@ export default function CommissionMultiSelect({
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 z-40 mt-2 max-h-72 w-64 overflow-y-auto rounded-2xl border border-zinc-100 bg-white p-3 shadow-lg">
+          {/* Retour de Cindy du 13/09 ("on ne voit pas toutes les
+              commissions") : max-h-72 (18rem) ne montrait que 4-5 des 9
+              commissions du club sans défiler -- max-h-[26rem] en montre la
+              quasi-totalité d'un coup, le scroll reste là pour les
+              profils sur-mesure qui s'ajouteraient plus tard. */}
+          <div className="absolute left-0 z-40 mt-2 max-h-[26rem] w-64 overflow-y-auto rounded-2xl border border-zinc-100 bg-white p-3 shadow-lg">
             <ul className="flex flex-col gap-0.5">
               {commissions.map((c) => (
                 <li key={c.id}>
