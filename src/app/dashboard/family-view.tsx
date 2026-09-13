@@ -529,7 +529,16 @@ export default function FamilyView({
         // qu'un bloc affiché avant AdminSidebar.
         contentHeader={
           hasSeveralChildren ? (
-            <div className="flex flex-wrap items-center gap-2">
+            // Retour de Cindy du 13/09 ("au niveau du responsive
+            // téléphone... mes enfants sous mon signet") : le signet et la
+            // première pastille se disputaient la même ligne sur un écran
+            // étroit, la coupe entre les deux tombant n'importe où selon le
+            // nombre d'enfants (parfois entre le signet et Raphaël, parfois
+            // entre Raphaël et Léonie) -- flex-col les empile proprement
+            // l'un sous l'autre, ici comme partout où ce même bloc sert
+            // (voir juste en dessous : "Mon équipe" ET "Mes enfants"
+            // réutilisent ce composant tel quel).
+            <div className="flex flex-col items-start gap-2">
               {/* Retour de Cindy du 12/09 ("ce texte plat... un signet
                   sympa") : même habillage que le badge "Espace Bureau"
                   (admin-view.tsx) plutôt qu'un simple texte gris, pour
@@ -542,44 +551,46 @@ export default function FamilyView({
                 <Users className="h-3.5 w-3.5 shrink-0" />
                 {rsvpPlayers.length > 1 ? "Mes enfants" : "Enfant"}
               </span>
-              {rsvpPlayers.map((p) => {
-                const isActive = resolvedSelectedPlayerId === p.id;
-                const color = avatarColor(p.id);
-                return (
-                  <button
-                    key={p.id}
-                    onClick={() => setSelectedPlayerId(p.id)}
-                    className={`flex items-center gap-2 rounded-full border py-1 pl-1 pr-3 text-sm font-medium transition-colors ${
-                      isActive
-                        ? "border-navy/30 bg-navy/10 ring-2 ring-navy/20"
-                        : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
-                    }`}
-                  >
-                    {/* Photo de l'enfant si elle existe (players.avatar_url,
-                        mise en ligne depuis son propre Espace Enfant),
-                        sinon repli sur une initiale colorée — même
-                        principe que les coéquipiers dans child-team-tab.tsx.
-                        Retour de Cindy du 2026-08-24 : "faire comme la
-                        capture en y incrémentant les images qu'ils
-                        mettent sur leur espace". */}
-                    {p.avatarUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={p.avatarUrl}
-                        alt=""
-                        className="h-6 w-6 shrink-0 rounded-full object-cover"
-                      />
-                    ) : (
-                      <span
-                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${color}`}
-                      >
-                        {p.name.charAt(0).toUpperCase()}
-                      </span>
-                    )}
-                    <span className={isActive ? "font-semibold text-navy" : ""}>{p.name}</span>
-                  </button>
-                );
-              })}
+              <div className="flex flex-wrap items-center gap-2">
+                {rsvpPlayers.map((p) => {
+                  const isActive = resolvedSelectedPlayerId === p.id;
+                  const color = avatarColor(p.id);
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => setSelectedPlayerId(p.id)}
+                      className={`flex items-center gap-2 rounded-full border py-1 pl-1 pr-3 text-sm font-medium transition-colors ${
+                        isActive
+                          ? "border-navy/30 bg-navy/10 ring-2 ring-navy/20"
+                          : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
+                      }`}
+                    >
+                      {/* Photo de l'enfant si elle existe (players.avatar_url,
+                          mise en ligne depuis son propre Espace Enfant),
+                          sinon repli sur une initiale colorée — même
+                          principe que les coéquipiers dans child-team-tab.tsx.
+                          Retour de Cindy du 2026-08-24 : "faire comme la
+                          capture en y incrémentant les images qu'ils
+                          mettent sur leur espace". */}
+                      {p.avatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={p.avatarUrl}
+                          alt=""
+                          className="h-6 w-6 shrink-0 rounded-full object-cover"
+                        />
+                      ) : (
+                        <span
+                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${color}`}
+                        >
+                          {p.name.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                      <span className={isActive ? "font-semibold text-navy" : ""}>{p.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           ) : undefined
         }
