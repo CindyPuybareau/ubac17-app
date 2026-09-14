@@ -6,6 +6,7 @@ import { Gavel, Pencil, Plus, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatLocalDateFr } from "@/lib/local-date";
 import { formatAmount } from "./cotisation-shared";
+import { isPaidStatut, type PenaliteStatut } from "./penalite-shared";
 import EmptyState from "./empty-state";
 import type { AdminMember, AdminPenalite } from "./page";
 
@@ -14,7 +15,7 @@ type PenaliteForm = {
   amount: string;
   penaliteDate: string;
   notes: string;
-  statut: "EN_ATTENTE" | "PAYE";
+  statut: PenaliteStatut;
   // Retour de Cindy du 29/08 : lien HelloAsso pour payer CETTE pénalité
   // précise, affiché côté joueur/parent dès qu'il est renseigné.
   paymentLink: string;
@@ -39,7 +40,7 @@ function toForm(p: AdminPenalite): PenaliteForm {
     amount: String(p.amount),
     penaliteDate: p.penaliteDate ?? todayIso(),
     notes: p.notes ?? "",
-    statut: p.statut === "PAYE" ? "PAYE" : "EN_ATTENTE",
+    statut: p.statut === "PAYE" || p.statut === "PAYE_CLUB" ? p.statut : "EN_ATTENTE",
     paymentLink: p.paymentLink ?? "",
   };
 }
@@ -76,7 +77,7 @@ export default function PenalitesManager({
   );
 
   const totalDue = useMemo(
-    () => penalites.filter((p) => p.statut !== "PAYE").reduce((sum, p) => sum + p.amount, 0),
+    () => penalites.filter((p) => !isPaidStatut(p.statut)).reduce((sum, p) => sum + p.amount, 0),
     [penalites]
   );
 
@@ -118,12 +119,11 @@ export default function PenalitesManager({
       // était perdu sans avertissement. Ne se déclenche plus que lors du
       // vrai passage à "Payée" ; une pénalité qui reste "Payée" garde sa
       // date d'origine.
-      paid_at:
-        form.statut !== "PAYE"
-          ? null
-          : editing !== "new" && editing && editing.statut === "PAYE"
-            ? editing.paidAt
-            : new Date().toISOString(),
+      paid_at: !isPaidStatut(form.statut)
+        ? null
+        : editing !== "new" && editing && isPaidStatut(editing.statut)
+          ? editing.paidAt
+          : new Date().toISOString(),
     };
     const { error: writeError } =
       editing !== "new" && editing
@@ -211,13 +211,17 @@ export default function PenalitesManager({
                     penalites-card.tsx. */}
                 <span
                   className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
-                    p.statut === "PAYE"
+                    isPaidStatut(p.statut)
                       ? "bg-status-success/10 text-status-success"
                       : "bg-status-urgent/10 text-status-urgent-dark"
                   }`}
                 >
                   {formatAmount(p.amount)}
-                  {p.statut === "PAYE" ? " · Payée" : " · En attente"}
+                  {p.statut === "PAYE"
+                    ? " · Payé par le joueur"
+                    : p.statut === "PAYE_CLUB"
+                      ? " · Payé par le club"
+                      : " · En attente"}
                 </span>
                 <button
                   type="button"
@@ -313,12 +317,13 @@ export default function PenalitesManager({
                 <select
                   value={form.statut}
                   onChange={(e) =>
-                    setForm((f) => ({ ...f, statut: e.target.value as "EN_ATTENTE" | "PAYE" }))
+                    setForm((f) => ({ ...f, statut: e.target.value as PenaliteStatut }))
                   }
                   className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
                 >
                   <option value="EN_ATTENTE">En attente</option>
-                  <option value="PAYE">Payée</option>
+                  <option value="PAYE">Payé par le joueur</option>
+                  <option value="PAYE_CLUB">Payé par le club</option>
                 </select>
               </div>
               {/* Retour de Cindy du 29/08 : "pouvoir ajouter un lien HelloAsso,

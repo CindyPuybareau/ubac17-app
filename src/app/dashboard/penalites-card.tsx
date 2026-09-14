@@ -1,6 +1,7 @@
 import { Gavel, ExternalLink } from "lucide-react";
 import { formatLocalDateFr } from "@/lib/local-date";
 import { formatAmount } from "./cotisation-shared";
+import { isPaidStatut } from "./penalite-shared";
 
 // Type structurel plutôt qu'AdminPenalite directement : réutilisé tel quel
 // par l'espace Enfant (child-dashboard.tsx), qui a son propre type léger
@@ -39,7 +40,7 @@ export default function PenalitesCard({
   emptyLabel?: string;
 }) {
   const totalDue = penalites
-    .filter((p) => p.statut !== "PAYE")
+    .filter((p) => !isPaidStatut(p.statut))
     .reduce((sum, p) => sum + p.amount, 0);
 
   return (
@@ -64,7 +65,7 @@ export default function PenalitesCard({
               // pénalité directement depuis l'espace du joueur/parent —
               // jamais une fois "Payée", et jamais côté Enfant (paymentLink
               // y est structurellement absent, voir PenaliteLike ci-dessus).
-              const showPayLink = p.statut !== "PAYE" && Boolean(p.paymentLink);
+              const showPayLink = !isPaidStatut(p.statut) && Boolean(p.paymentLink);
               return (
                 <div key={p.id} className="flex flex-col gap-1 rounded-xl bg-zinc-50 px-3 py-2">
                   <div className="flex items-center justify-between gap-2">
@@ -85,7 +86,7 @@ export default function PenalitesCard({
                         que penalites-manager.tsx. */}
                     <span
                       className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold ${
-                        p.statut === "PAYE"
+                        isPaidStatut(p.statut)
                           ? "bg-status-success/10 text-status-success"
                           : "bg-status-urgent/10 text-status-urgent-dark"
                       }`}
