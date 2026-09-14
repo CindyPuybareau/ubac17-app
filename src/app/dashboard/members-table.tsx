@@ -31,7 +31,7 @@ import EmailTemplateModal from "./email-template-modal";
 import EmptyState from "./empty-state";
 import MemberDetailModal from "./member-detail-modal";
 import PlayerYearBadge from "./player-year-badge";
-import TeamSelectDropdown from "./team-select-dropdown";
+import SelectDropdown from "./select-dropdown";
 import WhatsAppButton from "./whatsapp-button";
 import WhatsAppDirectButton from "./whatsapp-direct-button";
 import { useToast } from "./toast-context";
@@ -777,7 +777,14 @@ export default function MembersTable({
             className="w-full rounded-full border border-zinc-200 bg-white py-1.5 pl-9 pr-3 text-sm focus:border-ubac-yellow focus:outline-none"
           />
         </div>
-        <TeamSelectDropdown teams={teams} selectedId={teamFilter} onChange={setTeamFilter} />
+        <SelectDropdown
+          options={[
+            { value: "", label: "Toutes les équipes" },
+            ...teams.map((t) => ({ value: t.id, label: teamLabel(t) })),
+          ]}
+          value={teamFilter}
+          onChange={setTeamFilter}
+        />
         <label className="flex items-center gap-1.5 text-xs font-medium text-zinc-500">
           <input
             type="checkbox"

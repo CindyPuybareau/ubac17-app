@@ -24,6 +24,7 @@ import { createClient } from "@/lib/supabase/client";
 import { getLogoBase64, PDF_COLORS } from "@/lib/pdf-brand";
 import EmptyState from "./empty-state";
 import { buildGmailComposeLink, signatureIndex, withSignature } from "@/lib/email";
+import SelectDropdown from "./select-dropdown";
 import { useToast } from "./toast-context";
 import {
   balanceDue,
@@ -1195,18 +1196,17 @@ export default function CotisationParticipantsTable({
             className="w-full rounded-full border border-zinc-200 bg-white py-1.5 pl-9 pr-3 text-sm focus:border-ubac-yellow focus:outline-none"
           />
         </div>
-        <select
+        <SelectDropdown
+          options={[
+            { value: "ALL", label: "Tous les statuts" },
+            ...(Object.keys(statusBadge) as StatusKey[]).map((k) => ({
+              value: k,
+              label: statusBadge[k].label,
+            })),
+          ]}
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as StatusKey | "ALL")}
-          className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-700"
-        >
-          <option value="ALL">Tous les statuts</option>
-          {(Object.keys(statusBadge) as StatusKey[]).map((k) => (
-            <option key={k} value={k}>
-              {statusBadge[k].label}
-            </option>
-          ))}
-        </select>
+          onChange={(v) => setStatusFilter(v as StatusKey | "ALL")}
+        />
         <span className="text-xs font-medium text-zinc-400">
           {filtered.length} ligne{filtered.length > 1 ? "s" : ""}
         </span>
