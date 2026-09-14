@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Inter, Poppins, Space_Grotesk } from "next/font/google";
 import "./globals.css";
+import VersionWatcher from "./version-watcher";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -81,7 +82,15 @@ export default function RootLayout({
       lang="fr"
       className={`${geistSans.variable} ${geistMono.variable} ${poppins.variable} ${inter.variable} ${spaceGrotesk.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        {/* Retour de Cindy du 14/09 ("les enfants n'ont pas à supprimer
+            leur appli pour la réinstaller") : sur tous les espaces, pas
+            seulement l'Espace Enfant -- une PWA reste ouverte sur une
+            ancienne version après un déploiement sur n'importe quel
+            compte. Voir version-watcher.tsx. */}
+        <VersionWatcher />
+      </body>
     </html>
   );
 }

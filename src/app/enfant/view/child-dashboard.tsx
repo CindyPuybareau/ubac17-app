@@ -120,6 +120,9 @@ export default function ChildDashboard({
   notificationsEnabled,
   penalites,
   dashboardSummary,
+  rsvpCountsByEventId,
+  presentPlayersByEventId,
+  absentPlayersByEventId,
 }: {
   firstName: string | null;
   avatarUrl: string | null;
@@ -154,6 +157,15 @@ export default function ChildDashboard({
   // ne doit jamais atteindre cet espace, même précaution que le reste de
   // cette page).
   dashboardSummary: SpaceDashboardSummaryData;
+  // Retour de Cindy du 14/09 ("les enfants n'ont pas les présents/absents
+  // visibles... partout pareil") : calculés côté serveur (enfant/view/
+  // page.tsx, effectif complet + toutes les réponses RSVP déjà lues là-bas
+  // pour d'autres besoins), par id d'événement -- alimente le bandeau
+  // "Cette semaine" ci-dessous ET la carte du Tableau de bord (via
+  // dashboardSummary, calculée séparément mais avec le même principe).
+  rsvpCountsByEventId: Record<string, { present: number; absent: number; late: number; pending: number }>;
+  presentPlayersByEventId: Record<string, { id: string; firstName: string | null; lastName: string | null }[]>;
+  absentPlayersByEventId: Record<string, { id: string; firstName: string | null; lastName: string | null }[]>;
 }) {
   const teammatesOnly = teammates.filter((t) => !t.isSelf);
 
@@ -184,14 +196,14 @@ export default function ChildDashboard({
     teamName: e.teamName,
     source: "coach",
     rsvpPlayers: [],
-    // Retour de Cindy du 14/09 ("les coachs voient les présents/absents") :
-    // ChildEvent ne porte ni compteurs ni listes nominatives -- laissé vide
-    // ici volontairement, hors périmètre de cette demande (visait les
-    // coachs, jamais l'Espace Enfant), même précaution que notes/
-    // paymentLink ci-dessus.
-    rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
-    presentPlayers: [],
-    absentPlayers: [],
+    // Retour de Cindy du 14/09 ("les enfants n'ont pas les présents/
+    // absents visibles... carte du calendrier = carte du tableau de bord
+    // partout") : calculés côté serveur (enfant/view/page.tsx), même
+    // principe que Bureau/Coach/Famille -- lecture seule, aucun bouton
+    // présent/absent pour autrui, juste l'information.
+    rsvpCounts: rsvpCountsByEventId[e.id] ?? { present: 0, absent: 0, late: 0, pending: 0 },
+    presentPlayers: presentPlayersByEventId[e.id] ?? [],
+    absentPlayers: absentPlayersByEventId[e.id] ?? [],
     roles: [],
     tasks: {},
     carpool: [],

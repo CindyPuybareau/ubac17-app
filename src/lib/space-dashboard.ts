@@ -128,7 +128,20 @@ export async function getSpaceDashboardSummary(
   // vu dans les logs). Optionnel avec un plafond local par défaut : cette
   // fonction reste appelable isolément (tests, un futur appelant qui
   // n'aurait pas encore de Semaphore partagé) sans jamais planter.
-  dbLimit: Semaphore | number = 4
+  dbLimit: Semaphore | number = 4,
+  // Retour de Cindy du 14/09 ("les enfants n'ont pas les présents/absents
+  // visibles... carte du calendrier = carte du tableau de bord partout") :
+  // le remède RLS du même jour (family_teammate_roster plutôt qu'un embed
+  // direct sur players) casse silencieusement l'Espace Enfant -- cette vue
+  // filtre sur auth.uid()/auth.jwt(), qui n'existe tout simplement pas
+  // pour un appel service_role (enfant/view/page.tsx, aucune session
+  // utilisateur classique) : 0 ligne visible, roster vide, plus aucun
+  // présent/absent. true UNIQUEMENT pour un appelant service_role, déjà
+  // hors RLS par construction (service_role la contourne de toute façon
+  // sur players) -- toujours côté serveur, jamais un client authentifié
+  // classique (Bureau/Coach/Famille gardent la vue, seul rempart contre
+  // la fuite corrigée le 28/08 pour EUX).
+  trustedRosterAccess = false
 ): Promise<SpaceDashboardSummary> {
   const seasonLabel = getCurrentSeasonLabel();
 
@@ -335,15 +348,22 @@ export async function getSpaceDashboardSummary(
     if (teamIds !== null) linksQuery = linksQuery.in("team_id", teamIds);
     const [{ data: linkRows }] = await runBatched([() => linksQuery], semaphore);
     const rosterPlayerIds = Array.from(new Set((linkRows ?? []).map((r) => r.player_id)));
+    // trustedRosterAccess (service_role, Espace Enfant) : la vue plus haut
+    // ne peut rien renvoyer sans auth.uid()/auth.jwt() -- lecture directe
+    // de players à la place, sans risque puisque déjà hors RLS par
+    // construction et strictement limitée à 3 colonnes (id/prénom/nom),
+    // jamais le reste de la fiche.
     const [{ data: rosterNameRows }] = await runBatched(
       [
         () =>
-          rosterPlayerIds.length > 0
-            ? supabase.from("family_teammate_roster").select("id, first_name, last_name").in("id", rosterPlayerIds)
-            : Promise.resolve({
+          rosterPlayerIds.length === 0
+            ? Promise.resolve({
                 data: [] as { id: string; first_name: string | null; last_name: string | null }[],
                 error: null,
-              }),
+              })
+            : trustedRosterAccess
+              ? supabase.from("players").select("id, first_name, last_name").in("id", rosterPlayerIds)
+              : supabase.from("family_teammate_roster").select("id, first_name, last_name").in("id", rosterPlayerIds),
       ],
       semaphore
     );

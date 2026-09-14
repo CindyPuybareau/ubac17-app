@@ -148,7 +148,14 @@ export default async function ChildViewPage() {
     // DayEventCard (réutilisée telle quelle par SpaceDashboardSummary)
     // afficherait un vrai panneau "Organisation" gérable (canManage=true
     // côté coach/bureau) et un vrai bouton "Payer" à un enfant.
-    getSpaceDashboardSummary(supabase, teamIds, "coach", []),
+    // trustedRosterAccess=true (retour de Cindy du 14/09, "les enfants
+    // n'ont pas les présents/absents visibles") : cette page appelle
+    // supabase en service_role (pas de session utilisateur classique),
+    // donc sans auth.uid()/auth.jwt() -- family_teammate_roster (utilisée
+    // par défaut pour Bureau/Coach/Famille) ne renvoie alors plus aucune
+    // ligne, effectif vide, plus aucun présent/absent. Sans risque ici :
+    // déjà hors RLS par construction, voir space-dashboard.ts.
+    getSpaceDashboardSummary(supabase, teamIds, "coach", [], undefined, true),
   ]);
   const dashboardSummary = {
     ...rawDashboardSummary,
@@ -290,6 +297,83 @@ export default async function ChildViewPage() {
     (rsvpRows ?? []).map((r) => [`${r.event_id}:${r.player_id}`, r.status])
   );
 
+  // Retour de Cindy du 14/09 ("les enfants n'ont pas les présents/absents
+  // visibles... carte du calendrier = carte du tableau de bord partout") :
+  // même bloc compteurs + listes nominatives que le Calendrier (Bureau/
+  // Coach/Famille), sur le bandeau "Cette semaine" ET le Tableau de bord --
+  // teammateRows porte déjà l'effectif complet (embed players() direct,
+  // sûr ici : lu en service_role, jamais transmis tel quel au client, voir
+  // le commentaire en tête de fichier), rsvpRows ci-dessus porte déjà
+  // TOUTES les réponses (jamais filtrées par joueur).
+  const rosterByPlayerId = new Map<
+    string,
+    { id: string; firstName: string | null; lastName: string | null; teamIds: string[] }
+  >();
+  teammateRows.forEach((row) => {
+    if (!row.players) return;
+    const existing = rosterByPlayerId.get(row.players.id);
+    if (existing) existing.teamIds.push(row.team_id);
+    else
+      rosterByPlayerId.set(row.players.id, {
+        id: row.players.id,
+        firstName: row.players.first_name,
+        lastName: row.players.last_name,
+        teamIds: [row.team_id],
+      });
+  });
+  const fullTeammateRoster = Array.from(rosterByPlayerId.values());
+
+  function isConcernedByChildEvent(
+    p: { teamIds: string[] },
+    e: { teamId: string | null; targetTeamIds: string[] | null }
+  ) {
+    const isClubWide = !e.teamId && (!e.targetTeamIds || e.targetTeamIds.length === 0);
+    return (
+      isClubWide ||
+      (e.teamId !== null && p.teamIds.includes(e.teamId)) ||
+      (e.targetTeamIds?.some((id) => p.teamIds.includes(id)) ?? false)
+    );
+  }
+
+  const rsvpCountsByEventId: Record<
+    string,
+    { present: number; absent: number; late: number; pending: number }
+  > = {};
+  const presentPlayersByEventId: Record<
+    string,
+    { id: string; firstName: string | null; lastName: string | null }[]
+  > = {};
+  const absentPlayersByEventId: Record<
+    string,
+    { id: string; firstName: string | null; lastName: string | null }[]
+  > = {};
+  events.forEach((e) => {
+    const eventRoster = fullTeammateRoster.filter((p) => isConcernedByChildEvent(p, e));
+    let present = 0;
+    let absent = 0;
+    let late = 0;
+    let answered = 0;
+    const presentPlayers: { id: string; firstName: string | null; lastName: string | null }[] = [];
+    const absentPlayers: { id: string; firstName: string | null; lastName: string | null }[] = [];
+    eventRoster.forEach((p) => {
+      const status = rsvpStatusByKey.get(`${e.id}:${p.id}`);
+      if (!status) return;
+      answered += 1;
+      if (status === "PRESENT") {
+        present += 1;
+        presentPlayers.push(p);
+      } else if (status === "ABSENT") {
+        absent += 1;
+        absentPlayers.push(p);
+      } else if (status === "LATE") {
+        late += 1;
+      }
+    });
+    rsvpCountsByEventId[e.id] = { present, absent, late, pending: Math.max(0, eventRoster.length - answered) };
+    presentPlayersByEventId[e.id] = presentPlayers;
+    absentPlayersByEventId[e.id] = absentPlayers;
+  });
+
   // "Mes Présences" : un vrai bilan d'assiduité, pas un badge à débloquer
   // — pour chaque famille de types (entraînements / matchs-tournois), le
   // nombre de rendez-vous passés où l'enfant était Présent/En retard sur
@@ -392,6 +476,9 @@ export default async function ChildViewPage() {
       notificationsEnabled={notificationsEnabled}
       penalites={penalites}
       dashboardSummary={dashboardSummary}
+      rsvpCountsByEventId={rsvpCountsByEventId}
+      presentPlayersByEventId={presentPlayersByEventId}
+      absentPlayersByEventId={absentPlayersByEventId}
     />
   );
 }
