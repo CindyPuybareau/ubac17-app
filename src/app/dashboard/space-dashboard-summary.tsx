@@ -90,25 +90,46 @@ export default function SpaceDashboardSummary({
   // toujours vides ici (le Tableau de bord ne gère pas maillots/goûter,
   // seulement les besoins d'organisation, comme la carte Coach existante),
   // ce qui masque naturellement MatchTasksPanel sans condition à ajouter.
-  const nextEventForCard: WeekStripEvent | null = summary.nextEvent
-    ? {
-        id: summary.nextEvent.id,
-        title: summary.nextEvent.title,
-        eventType: summary.nextEvent.eventType,
-        startTime: summary.nextEvent.startTime,
-        location: summary.nextEvent.location,
-        salle: summary.nextEvent.salle,
-        isHome: summary.nextEvent.isHome,
-        teamName: summary.nextEvent.teamName,
-        source: summary.nextEvent.source,
-        rsvpPlayers: summary.nextEvent.rsvpPlayers,
-        roles: [],
-        tasks: {},
-        carpool: [],
-        showCarpool: false,
-        needs: summary.nextEvent.needs,
-      }
-    : null;
+  //
+  // Retour de Cindy du 14/09 ("le bureau n'a pas qu'un seul entraînement de
+  // prévu... si plusieurs événements dans la journée, pouvoir les
+  // visualiser") : summary.nextEvents porte déjà TOUS les événements du
+  // jour le plus proche (space-dashboard.ts) -- une carte par événement,
+  // jamais une seule tronquée.
+  const nextEventsForCards: WeekStripEvent[] = summary.nextEvents.map((e) => ({
+    id: e.id,
+    title: e.title,
+    eventType: e.eventType,
+    startTime: e.startTime,
+    location: e.location,
+    salle: e.salle,
+    isHome: e.isHome,
+    teamName: e.teamName,
+    source: e.source,
+    rsvpPlayers: e.rsvpPlayers,
+    roles: [],
+    tasks: {},
+    carpool: [],
+    showCarpool: false,
+    needs: e.needs,
+  }));
+
+  // "Aujourd'hui" plutôt qu'une date qu'on doit lire et comparer soi-même
+  // à la volée -- comparaison de dates en Europe/Paris (toLocaleDateString
+  // avec ce fuseau explicite), jamais le fuseau du navigateur qui affiche
+  // la page (déjà Paris pour tout le monde ici, mais évite toute ambiguïté).
+  const firstNextEvent = nextEventsForCards[0];
+  const nextDayLabel = firstNextEvent
+    ? new Date(firstNextEvent.startTime).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" }) ===
+      new Date().toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })
+      ? "Aujourd'hui"
+      : new Date(firstNextEvent.startTime).toLocaleDateString("fr-FR", {
+          timeZone: "Europe/Paris",
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+        })
+    : "";
 
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
@@ -213,10 +234,17 @@ export default function SpaceDashboardSummary({
         </div>
       </div>
 
-      {nextEventForCard && (
+      {nextEventsForCards.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Prochain événement</p>
-          <DayEventCard event={nextEventForCard} />
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+            {nextDayLabel}
+            {nextEventsForCards.length > 1 ? ` · ${nextEventsForCards.length} événements` : ""}
+          </p>
+          <div className="flex flex-col gap-2">
+            {nextEventsForCards.map((event) => (
+              <DayEventCard key={event.id} event={event} />
+            ))}
+          </div>
         </div>
       )}
     </div>

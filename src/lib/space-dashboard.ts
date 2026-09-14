@@ -60,7 +60,12 @@ export type SpaceDashboardSummary = {
   teamCount: number | null;
   official: { played: number; points: number };
   friendly: { played: number; points: number };
-  nextEvent: SpaceDashboardNextEvent | null;
+  // Retour de Cindy du 14/09 ("le bureau n'a pas qu'un seul entraînement de
+  // prévu cette semaine... si plusieurs événements dans la journée, pouvoir
+  // les visualiser") : TOUS les événements du jour le plus proche (pas
+  // juste le tout premier) -- un tableau plutôt qu'un événement unique,
+  // vide si rien à venir.
+  nextEvents: SpaceDashboardNextEvent[];
   seasonLabel: string;
 };
 
@@ -110,7 +115,7 @@ export async function getSpaceDashboardSummary(
       teamCount: null,
       official: { ...EMPTY_MATCH_STATS },
       friendly: { ...EMPTY_MATCH_STATS },
-      nextEvent: null,
+      nextEvents: [],
       seasonLabel,
     };
   }
@@ -118,7 +123,8 @@ export async function getSpaceDashboardSummary(
   const { startIso, endIso } = getCurrentSeasonWindow();
   const singleTeamId = teamIds && teamIds.length === 1 ? teamIds[0] : null;
 
-  const [rosterRes, teamCountRes, photoRes, matchesRes, nextEventRes] = await Promise.all([
+  const nowIso = new Date().toISOString();
+  const [rosterRes, teamCountRes, photoRes, matchesRes, firstUpcomingRes] = await Promise.all([
     teamIds === null
       ? supabase.from("players").select("id", { count: "exact", head: true }).is("archived_at", null)
       : supabase.from("team_players").select("player_id").in("team_id", teamIds),
@@ -145,19 +151,16 @@ export async function getSpaceDashboardSummary(
       if (teamIds !== null) q = q.in("team_id", teamIds);
       return q;
     })(),
-    // Prochain événement : borné à cette ou ces équipes précises côté
-    // Coach/Famille (le prochain rendez-vous qui LES concerne), jamais
-    // filtré côté Bureau (le prochain du club entier, toutes équipes
-    // confondues). is_home/event_type/team_id/target_team_ids en plus
-    // (retour de Cindy du 13/09) : nécessaires à la carte complète
-    // (DayEventCard) et au calcul "qui est concerné" ci-dessous.
+    // Retour de Cindy du 14/09 ("plusieurs événements dans la journée,
+    // pouvoir les visualiser") : première étape en deux temps -- juste la
+    // date du tout premier événement à venir, pour ensuite borner la
+    // vraie requête (plus bas) à CETTE journée entière plutôt qu'à une
+    // seule ligne.
     (() => {
       let q = supabase
         .from("events")
-        .select(
-          "id, title, event_type, start_time, location, salle, is_home, team_id, target_team_ids, teams(name)"
-        )
-        .gte("start_time", new Date().toISOString())
+        .select("start_time")
+        .gte("start_time", nowIso)
         .order("start_time", { ascending: true })
         .limit(1);
       if (teamIds !== null) q = q.in("team_id", teamIds);
@@ -180,65 +183,94 @@ export async function getSpaceDashboardSummary(
     bucket.points += m.team_score ?? 0;
   });
 
-  const nextRow = (nextEventRes.data ?? [])[0] as unknown as
-    | {
-        id: string;
-        title: string | null;
-        event_type: string | null;
-        start_time: string;
-        location: string | null;
-        salle: string | null;
-        is_home: boolean | null;
-        team_id: string | null;
-        target_team_ids: string[] | null;
-        teams: { name: string | null } | null;
-      }
-    | undefined;
+  const firstUpcomingStart = (firstUpcomingRes.data ?? [])[0]?.start_time as string | undefined;
 
-  let nextEvent: SpaceDashboardNextEvent | null = null;
-  if (nextRow) {
+  type EventRow = {
+    id: string;
+    title: string | null;
+    event_type: string | null;
+    start_time: string;
+    location: string | null;
+    salle: string | null;
+    is_home: boolean | null;
+    team_id: string | null;
+    target_team_ids: string[] | null;
+    teams: { name: string | null } | null;
+  };
+
+  let dayRows: EventRow[] = [];
+  if (firstUpcomingStart) {
+    // Bornes du jour du tout premier événement à venir, en heure de Paris
+    // -- même idiome que /api/cron/match-reminders (jamais le fuseau du
+    // runtime, UTC sur Vercel, qui ferait glisser la frontière du jour).
+    const parisRef = new Date(new Date(firstUpcomingStart).toLocaleString("en-US", { timeZone: "Europe/Paris" }));
+    const dayEnd = new Date(
+      parisRef.getFullYear(),
+      parisRef.getMonth(),
+      parisRef.getDate() + 1
+    ).toISOString();
+
+    // nowIso comme seule borne basse (pas le début du jour) : exclut un
+    // entraînement du matin déjà passé sans exclure ceux encore à venir
+    // plus tard cette même journée.
+    let dayQuery = supabase
+      .from("events")
+      .select(
+        "id, title, event_type, start_time, location, salle, is_home, team_id, target_team_ids, teams(name)"
+      )
+      .gte("start_time", nowIso)
+      .lt("start_time", dayEnd)
+      .order("start_time", { ascending: true });
+    if (teamIds !== null) dayQuery = dayQuery.in("team_id", teamIds);
+    const { data } = await dayQuery;
+    dayRows = (data ?? []) as unknown as EventRow[];
+  }
+
+  let nextEvents: SpaceDashboardNextEvent[] = [];
+  if (dayRows.length > 0) {
+    const eventIds = dayRows.map((r) => r.id);
     // Réutilise telle quelle la même fonction que le reste de l'appli
     // (VolunteerNeedsPanel, calendar-view.tsx...) -- jamais une requête
-    // event_volunteer_needs/signups dupliquée ici.
-    const needsByEventId = await getVolunteerNeedsByEventId(supabase, [nextRow.id]);
-    const rsvpPlayers: NextEventRsvpPlayer[] = rsvpCandidates
-      .filter((p) => isConcernedByEvent(p, nextRow))
-      .map((p) => ({ id: p.id, name: p.name, status: "PENDING" }));
+    // event_volunteer_needs/signups dupliquée ici. Un seul appel pour
+    // TOUS les événements du jour plutôt qu'un par carte.
+    const needsByEventId = await getVolunteerNeedsByEventId(supabase, eventIds);
 
-    // Statut réel plutôt que "PENDING" partout (retour de Cindy du 13/09,
-    // "pour les parents pouvoir y répondre ici" -- le bouton doit refléter
-    // une réponse déjà donnée, pas repartir à zéro) : une seule petite
-    // requête, seulement quand il y a vraiment quelqu'un à interroger.
-    if (rsvpPlayers.length > 0) {
+    // Une seule requête rsvps pour tous les événements du jour à la fois
+    // (retour de Cindy du 13/09, "pour les parents pouvoir y répondre
+    // ici" -- le bouton doit refléter une réponse déjà donnée), plutôt
+    // qu'une par carte.
+    const candidateIds = rsvpCandidates.map((p) => p.id);
+    const statusByEventAndPlayer = new Map<string, string>();
+    if (candidateIds.length > 0) {
       const { data: rsvpRows } = await supabase
         .from("rsvps")
-        .select("player_id, status")
-        .eq("event_id", nextRow.id)
-        .in(
-          "player_id",
-          rsvpPlayers.map((p) => p.id)
-        );
-      const statusByPlayerId = new Map(
-        ((rsvpRows ?? []) as { player_id: string; status: string }[]).map((r) => [r.player_id, r.status])
-      );
-      rsvpPlayers.forEach((p) => {
-        p.status = statusByPlayerId.get(p.id) ?? "PENDING";
+        .select("event_id, player_id, status")
+        .in("event_id", eventIds)
+        .in("player_id", candidateIds);
+      ((rsvpRows ?? []) as { event_id: string; player_id: string; status: string }[]).forEach((r) => {
+        statusByEventAndPlayer.set(`${r.event_id}:${r.player_id}`, r.status);
       });
     }
 
-    nextEvent = {
-      id: nextRow.id,
-      title: nextRow.title,
-      eventType: nextRow.event_type,
-      startTime: nextRow.start_time,
-      location: nextRow.location,
-      salle: nextRow.salle,
-      isHome: nextRow.is_home,
-      teamName: nextRow.teams?.name ?? null,
+    nextEvents = dayRows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      eventType: row.event_type,
+      startTime: row.start_time,
+      location: row.location,
+      salle: row.salle,
+      isHome: row.is_home,
+      teamName: row.teams?.name ?? null,
       source,
-      rsvpPlayers,
-      needs: needsByEventId[nextRow.id] ?? [],
-    };
+      rsvpPlayers: rsvpCandidates
+        .filter((p) => isConcernedByEvent(p, row))
+        .map((p) => ({
+          id: p.id,
+          name: p.name,
+          status: statusByEventAndPlayer.get(`${row.id}:${p.id}`) ?? "PENDING",
+        })),
+      needs: needsByEventId[row.id] ?? [],
+    }));
   }
 
   return {
@@ -248,7 +280,7 @@ export async function getSpaceDashboardSummary(
     teamCount: teamIds === null ? (teamCountRes as { count: number | null }).count ?? 0 : null,
     official,
     friendly,
-    nextEvent,
+    nextEvents,
     seasonLabel,
   };
 }
