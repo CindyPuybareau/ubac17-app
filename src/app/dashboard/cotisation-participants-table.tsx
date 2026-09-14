@@ -408,16 +408,28 @@ export default function CotisationParticipantsTable({
   cotisations,
   contactEmailByPlayerId,
   emptyLabel = "Aucune cotisation.",
+  statusFilter: controlledStatusFilter,
+  onStatusFilterChange,
 }: {
   cotisations: AdminCotisation[];
   contactEmailByPlayerId: Record<string, string>;
   emptyLabel?: string;
+  // Retour de Cindy du 14/09 ("cartes KPI cliquables, réutilise le filtre
+  // existant") : le filtre de statut peut être piloté depuis le parent
+  // (cotisations-manager.tsx, pour synchroniser les cartes KPI cliquables
+  // avec ce <select>) ou rester géré ici en interne, comme avant, pour le
+  // 2e usage du composant (détail d'une collecte) qui n'a pas de cartes
+  // cliquables.
+  statusFilter?: StatusKey | "ALL";
+  onStatusFilterChange?: (value: StatusKey | "ALL") => void;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusKey | "ALL">("ALL");
+  const [internalStatusFilter, setInternalStatusFilter] = useState<StatusKey | "ALL">("ALL");
+  const statusFilter = controlledStatusFilter ?? internalStatusFilter;
+  const setStatusFilter = onStatusFilterChange ?? setInternalStatusFilter;
   const [sortKey, setSortKey] = useState<"lastName" | "firstName">("lastName");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   // Retour de Cindy du 07/09 ("bouton Relancer qui redirige... avec toutes

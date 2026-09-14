@@ -33,6 +33,7 @@ import CotisationParticipantsTable, {
   formatAmount,
   roundCents,
 } from "./cotisation-participants-table";
+import type { StatusKey } from "./cotisation-shared";
 import PenalitesManager from "./penalites-manager";
 import type {
   AdminCategoryTariff,
@@ -96,6 +97,9 @@ function KpiCard({
   kind,
   label,
   wide = false,
+  onClick,
+  active = false,
+  activeClassName = "",
 }: {
   icon: typeof Wallet;
   iconClass: string;
@@ -110,23 +114,18 @@ function KpiCard({
   kind: "integer" | "amount" | "percent";
   label: string;
   wide?: boolean;
+  // Retour de Cindy du 14/09 ("les 4 cartes de statut cliquables, jamais
+  // Collecté/Total collecté/Total attendu") : onClick n'est fourni que par
+  // les 4 cartes de statut de KpiHeader (usage principal) -- un vrai
+  // <button> plutôt qu'un <div> + onClick, pour avoir le clavier
+  // (Entrée/Espace) gratuitement et ne jamais rendre tabbable les 3 cartes
+  // non filtrables.
+  onClick?: () => void;
+  active?: boolean;
+  activeClassName?: string;
 }) {
-  return (
-    // min-w-0 : sans ça, une grille CSS ne laisse jamais une carte
-    // rétrécir sous la largeur intrinsèque de son contenu (min-width:auto
-    // par défaut sur un élément de grille) -- un montant en euros au
-    // format français ("17 298,96 €") est un seul bloc insécable (espace
-    // fine insécable avant "€" et entre les milliers), impossible à
-    // couper : sans min-w-0, la carte débordait littéralement sur sa
-    // voisine plutôt que de laisser le texte se réduire dans son cadre
-    // (signalé par Cindy le 07/09, sur tablette). overflow-hidden en
-    // filet de sécurité si jamais un montant futur reste malgré tout trop
-    // long pour sa carte.
-    <div
-      className={`flex h-full min-w-0 flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm ${
-        wide ? "col-span-2" : ""
-      }`}
-    >
+  const cardBody = (
+    <>
       <Icon className={`h-5 w-5 shrink-0 ${iconClass}`} />
       <p
         className={`font-bold text-slate-900 ${
@@ -141,12 +140,62 @@ function KpiCard({
         <AnimatedNumber value={value} kind={kind} />
       </p>
       <p className="text-xs font-medium leading-tight text-slate-500">{label}</p>
-    </div>
+    </>
   );
+
+  // min-w-0 : sans ça, une grille CSS ne laisse jamais une carte
+  // rétrécir sous la largeur intrinsèque de son contenu (min-width:auto
+  // par défaut sur un élément de grille) -- un montant en euros au
+  // format français ("17 298,96 €") est un seul bloc insécable (espace
+  // fine insécable avant "€" et entre les milliers), impossible à
+  // couper : sans min-w-0, la carte débordait littéralement sur sa
+  // voisine plutôt que de laisser le texte se réduire dans son cadre
+  // (signalé par Cindy le 07/09, sur tablette). overflow-hidden en
+  // filet de sécurité si jamais un montant futur reste malgré tout trop
+  // long pour sa carte.
+  const baseClass = `flex h-full min-w-0 flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border p-4 text-center shadow-sm transition-colors ${
+    wide ? "col-span-2" : ""
+  }`;
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        aria-pressed={active}
+        className={`${baseClass} cursor-pointer ${
+          active ? activeClassName : "border-slate-200 bg-white hover:bg-slate-50"
+        }`}
+      >
+        {cardBody}
+      </button>
+    );
+  }
+
+  return <div className={`${baseClass} border-slate-200 bg-white`}>{cardBody}</div>;
 }
 
-function KpiHeader({ cotisations }: { cotisations: AdminCotisation[] }) {
+function KpiHeader({
+  cotisations,
+  statusFilter,
+  onStatusFilterChange,
+}: {
+  cotisations: AdminCotisation[];
+  // Retour de Cindy du 14/09 ("les cartes KPI cliquables appliquent le
+  // même filtre que le select existant") : optionnels -- le 2e usage de
+  // KpiHeader (détail d'une collecte, plus bas dans ce fichier) n'a pas de
+  // filtre partagé avec un tableau et garde ses cartes non cliquables,
+  // exactement comme avant.
+  statusFilter?: StatusKey | "ALL";
+  onStatusFilterChange?: (value: StatusKey | "ALL") => void;
+}) {
   const kpis = useMemo(() => computeKpis(cotisations), [cotisations]);
+
+  // Un clic sur la carte déjà active revient à "Tous les statuts" --
+  // même bascule que si on recliquait la même option dans le <select>.
+  const toggleFilter = (key: StatusKey) => {
+    onStatusFilterChange?.(statusFilter === key ? "ALL" : key);
+  };
 
   // 7 cartes sur 2 / 3 / 4 colonnes maximum (retour de Cindy du 07/09,
   // "sur tablette ça ne fonctionne pas, les chiffres débordent") : la
@@ -172,6 +221,9 @@ function KpiHeader({ cotisations }: { cotisations: AdminCotisation[] }) {
         value={kpis.payeCount}
         kind="integer"
         label="Payés"
+        onClick={onStatusFilterChange ? () => toggleFilter("PAYE") : undefined}
+        active={statusFilter === "PAYE"}
+        activeClassName="border-court-green bg-court-green/10"
       />
       <KpiCard
         icon={Clock}
@@ -179,20 +231,29 @@ function KpiHeader({ cotisations }: { cotisations: AdminCotisation[] }) {
         value={kpis.partielCount}
         kind="integer"
         label="Partiels"
+        onClick={onStatusFilterChange ? () => toggleFilter("PARTIEL") : undefined}
+        active={statusFilter === "PARTIEL"}
+        activeClassName="border-parquet-dark bg-parquet/15"
       />
       <KpiCard
         icon={ShieldCheck}
         iconClass="text-navy"
         value={kpis.offertCount}
         kind="integer"
-        label="Offerts / Dispensés"
+        label="Offerts"
+        onClick={onStatusFilterChange ? () => toggleFilter("OFFERT") : undefined}
+        active={statusFilter === "OFFERT"}
+        activeClassName="border-navy bg-navy/10"
       />
       <KpiCard
         icon={AlertTriangle}
         iconClass="text-coral-dark"
         value={kpis.enAttenteCount}
         kind="integer"
-        label="En attente / Non payés"
+        label="En attente"
+        onClick={onStatusFilterChange ? () => toggleFilter("EN_ATTENTE") : undefined}
+        active={statusFilter === "EN_ATTENTE"}
+        activeClassName="border-coral-dark bg-coral/15"
       />
       <KpiCard
         icon={Wallet}
@@ -248,6 +309,14 @@ export default function CotisationsManager({
   const [selectedCollecteId, setSelectedCollecteId] = useState<string | null>(
     collectes[0]?.id ?? null
   );
+  // Retour de Cindy du 14/09 ("les cartes KPI cliquables réutilisent le
+  // filtre existant") : remonté ici depuis CotisationParticipantsTable
+  // (qui le gardait en interne) pour que KpiHeader (son frère, pas son
+  // parent) et le <select> "Tous les statuts" du tableau partagent le
+  // même état -- uniquement pour l'onglet principal "Cotisations et
+  // licences" ; le détail d'une collecte (plus bas) garde son propre
+  // filtre interne, non concerné par cette demande.
+  const [mainStatusFilter, setMainStatusFilter] = useState<StatusKey | "ALL">("ALL");
   const [creatingCollecte, setCreatingCollecte] = useState(false);
   const [newName, setNewName] = useState("");
   const [newType, setNewType] = useState<CollecteType>("STAGE");
@@ -480,11 +549,17 @@ export default function CotisationsManager({
               l'onglet Accueil, avec les autres envois automatiques du
               club — un seul panneau de contrôle plutôt qu'un par onglet. */}
           <CategoryTariffsEditor categories={canonicalTeamRefs} tariffs={categoryTariffs} />
-          <KpiHeader cotisations={seasonCotisations} />
+          <KpiHeader
+            cotisations={seasonCotisations}
+            statusFilter={mainStatusFilter}
+            onStatusFilterChange={setMainStatusFilter}
+          />
           <CotisationParticipantsTable
             cotisations={seasonCotisations}
             contactEmailByPlayerId={contactEmailByPlayerId}
             emptyLabel="Aucune cotisation pour la saison en cours."
+            statusFilter={mainStatusFilter}
+            onStatusFilterChange={setMainStatusFilter}
           />
         </div>
       )}
