@@ -4,8 +4,8 @@ import {
   BarChart3,
   Cake,
   CalendarDays,
+  LayoutDashboard,
   ListOrdered,
-  LogOut,
   ScrollText,
   Shield,
   Trophy,
@@ -15,6 +15,8 @@ import type { AdminSection } from "@/app/dashboard/admin-sidebar";
 import DocumentsPanel from "@/components/club-documents";
 import OrgChartButton from "@/app/dashboard/org-chart-button";
 import PenalitesCard from "@/app/dashboard/penalites-card";
+import SpaceDashboardSummary from "@/app/dashboard/space-dashboard-summary";
+import type { SpaceDashboardSummary as SpaceDashboardSummaryData } from "@/lib/space-dashboard";
 import type { PlayerYearStatus } from "@/lib/season";
 import ChildAvatarUpload from "./child-avatar-upload";
 import ChildTileMenu from "./child-tile-menu";
@@ -25,6 +27,7 @@ import ChildTeamTab from "./child-team-tab";
 import ChildResultsTab from "./child-results-tab";
 import ChildPresenceTab from "./child-presence-tab";
 import ChildNotificationBell, { type ChildNotification } from "./child-notification-bell";
+import ChildLogoutButton from "./child-logout-button";
 import WeekStripBanner, { type WeekStripEvent } from "@/app/dashboard/week-strip-banner";
 
 export type ChildEvent = {
@@ -116,6 +119,7 @@ export default function ChildDashboard({
   notifications,
   notificationsEnabled,
   penalites,
+  dashboardSummary,
 }: {
   firstName: string | null;
   avatarUrl: string | null;
@@ -141,6 +145,15 @@ export default function ChildDashboard({
   // Lecture seule (retour de Cindy du 2026-08-22, "près de Bilan de
   // présence") : saisies par le Bureau, jamais modifiables ici.
   penalites: ChildPenalite[];
+  // Retour de Cindy du 14/09 ("les enfants aussi doivent avoir leur joli
+  // tableau de bord") : même résumé (photo d'équipe, saison, matchs
+  // joués/points/victoires, prochains événements) que Bureau/Coach/
+  // Famille -- calculé côté serveur (enfant/view/page.tsx) via la même
+  // getSpaceDashboardSummary, needs/paymentLink neutralisés là-bas avant
+  // d'arriver ici (aucun bouton "Payer" ni panneau Organisation gérable
+  // ne doit jamais atteindre cet espace, même précaution que le reste de
+  // cette page).
+  dashboardSummary: SpaceDashboardSummaryData;
 }) {
   const teammatesOnly = teammates.filter((t) => !t.isSelf);
 
@@ -193,15 +206,26 @@ export default function ChildDashboard({
     .sort((a, b) => a.birth.getDate() - b.birth.getDate());
 
   const iconClass = "h-4 w-4 shrink-0";
-  // "Accueil" a été retiré (redondant avec ce que Calendrier montre
-  // maintenant en tête de page) et "Défis" a laissé la place à "Mes
-  // Présences", un vrai bilan d'assiduité plutôt qu'un système de badges.
-  // "Résultats" a rejoint le lot en onglet séparé (repris pendant un
-  // temps dans Mon Équipe, mais Cindy voulait un onglet à part entière,
-  // comme côté Bureau/Coach/Parents). Calendrier est délibérément en
-  // premier : AdminSidebar ouvre toujours sur sections[0], c'est donc lui
-  // la page d'accueil désormais.
+  // "Accueil" avait été retiré (redondant avec ce que Calendrier montrait
+  // en tête de page) -- retour de Cindy du 14/09 ("les enfants aussi
+  // doivent avoir leur joli tableau de bord") : remplacé par le même
+  // résumé (photo/saison/KPI/prochains événements) que Bureau/Coach/
+  // Famille, en première TUILE de la grille -- mais Calendrier reste
+  // l'écran qui s'ouvre par défaut (defaultActiveKey sur ChildTileMenu
+  // plus bas), même réglage que "tableau de bord en position 1 mais
+  // ouverture sur calendrier" déjà tranché pour les 3 autres espaces.
+  // "Défis" a laissé la place à "Mes Présences", un vrai bilan
+  // d'assiduité plutôt qu'un système de badges. "Résultats" a rejoint le
+  // lot en onglet séparé (repris pendant un temps dans Mon Équipe, mais
+  // Cindy voulait un onglet à part entière, comme côté Bureau/Coach/
+  // Parents).
   const sections: AdminSection[] = [
+    {
+      key: "dashboard",
+      label: "Tableau de bord",
+      icon: <LayoutDashboard className={iconClass} />,
+      content: <SpaceDashboardSummary summary={dashboardSummary} canManagePhoto={false} />,
+    },
     {
       key: "calendar",
       label: "Calendrier",
@@ -313,15 +337,6 @@ export default function ChildDashboard({
         <DocumentsPanel documentIds={["charte-joueur", "charte-parent", "reglement-interieur"]} />
       ),
     },
-    {
-      // Tout à la fin du menu (retour de Cindy du 2026-08-22) — déplacé
-      // depuis la bande bleue.
-      key: "logout",
-      label: "Déconnexion",
-      icon: <LogOut className={iconClass} />,
-      content: null,
-      logoutAction: "child",
-    },
   ];
 
   return (
@@ -395,10 +410,14 @@ export default function ChildDashboard({
           {/* Retour de Cindy du 2026-08-25 : organigramme et notifications
               restent à gauche — pas de bouton menu ici (le menu de
               l'Espace Enfant est ChildTileMenu, ailleurs sur la page),
-              donc rien à pousser à droite dans cette en-tête. */}
+              donc rien à pousser à droite dans cette en-tête. Retour du
+              14/09 ("enlever la carte Déconnexion, un bouton plus petit
+              dans le menu à droite") : Déconnexion rejoint ce groupe,
+              en dernier, plutôt que sa propre tuile en bas de grille. */}
           <div className="flex shrink-0 items-center gap-1">
             <OrgChartButton />
             <ChildNotificationBell initialNotifications={notifications} initialEnabled={notificationsEnabled} />
+            <ChildLogoutButton />
           </div>
           {/* Retour de Cindy du 2026-08-25 : "CETTE SEMAINE" se retrouvait
               coupé en haut de l'en-tête — même correctif que page.tsx,
@@ -426,7 +445,7 @@ export default function ChildDashboard({
           )}
         </div>
 
-        <ChildTileMenu sections={sections} />
+        <ChildTileMenu sections={sections} defaultActiveKey="calendar" />
       </div>
     </div>
   );

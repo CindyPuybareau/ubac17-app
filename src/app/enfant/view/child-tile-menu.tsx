@@ -72,8 +72,22 @@ function BigIcon({ icon }: { icon: React.ReactNode }) {
   );
 }
 
-export default function ChildTileMenu({ sections }: { sections: AdminSection[] }) {
-  const [active, setActive] = useState<string | undefined>(() => firstLeafKey(sections));
+export default function ChildTileMenu({
+  sections,
+  defaultActiveKey,
+}: {
+  sections: AdminSection[];
+  // Retour de Cindy du 14/09 ("les enfants aussi doivent avoir leur joli
+  // tableau de bord") : même mécanisme que AdminSidebar (Bureau/Coach/
+  // Famille) -- "Tableau de bord" passe premier dans la grille de tuiles,
+  // mais l'espace continue de s'OUVRIR sur Calendrier par défaut, comme
+  // partout ailleurs. Deux réglages distincts : l'ORDRE (celui de
+  // `sections`) et la tuile active au montage (celle-ci).
+  defaultActiveKey?: string;
+}) {
+  const [active, setActive] = useState<string | undefined>(
+    () => defaultActiveKey ?? firstLeafKey(sections)
+  );
   // Sous-groupe actuellement ouvert (ici, seul "Matchs & Résultats" en a
   // un) : ses tuiles remplacent la grille principale le temps d'y
   // naviguer, avec une tuile "Retour" plutôt qu'un vrai changement

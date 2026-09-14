@@ -5,6 +5,7 @@ import { logQueryErrors } from "@/lib/query-errors";
 import { computePlayerYearStatus } from "@/lib/season";
 import { teamOrClubWideFilter } from "@/app/dashboard/family-data";
 import { getClubOfficialMatches } from "@/lib/club-official-matches";
+import { getSpaceDashboardSummary } from "@/lib/space-dashboard";
 import ChildDashboard, {
   type ChildAttendanceStats,
   type ChildCoach,
@@ -82,7 +83,8 @@ export default async function ChildViewPage() {
   // forcer un aller-retour séquentiel de plus juste pour la lire.
   const notificationsEnabled = player.notifications_enabled ?? true;
 
-  const [teamsRes, teammatesRes, coachesRes, eventsRes, notifRes, clubOfficialMatches] = await Promise.all([
+  const [teamsRes, teammatesRes, coachesRes, eventsRes, notifRes, clubOfficialMatches, rawDashboardSummary] =
+    await Promise.all([
     teamIds.length > 0
       ? supabase.from("teams").select("id, name, category").in("id", teamIds)
       : Promise.resolve({
@@ -136,7 +138,22 @@ export default async function ChildViewPage() {
     // demande (service_role, pas de requête client-side possible côté
     // Enfant).
     getClubOfficialMatches(supabase),
+    // Retour de Cindy du 14/09 ("les enfants aussi doivent avoir leur joli
+    // tableau de bord") : même fonction que Bureau/Coach/Famille
+    // (space-dashboard.ts), scopée sur les équipes de l'enfant --
+    // rsvpCandidates=[] (aucun bouton présent/absent ici, jamais pour lui
+    // ni pour personne d'autre). needs/paymentLink neutralisés juste en
+    // dessous, AVANT de quitter cette page (frontière de sécurité de tout
+    // l'espace Enfant, voir le commentaire en tête de fichier) : sans ça,
+    // DayEventCard (réutilisée telle quelle par SpaceDashboardSummary)
+    // afficherait un vrai panneau "Organisation" gérable (canManage=true
+    // côté coach/bureau) et un vrai bouton "Payer" à un enfant.
+    getSpaceDashboardSummary(supabase, teamIds, "coach", []),
   ]);
+  const dashboardSummary = {
+    ...rawDashboardSummary,
+    nextEvents: rawDashboardSummary.nextEvents.map((e) => ({ ...e, needs: [], paymentLink: null })),
+  };
   logQueryErrors("Enfant", { teamsRes, teammatesRes, coachesRes, eventsRes, notifRes });
 
   const teams = (teamsRes.data ?? []) as { id: string; name: string | null; category: string | null }[];
@@ -374,6 +391,7 @@ export default async function ChildViewPage() {
       notifications={notifications}
       notificationsEnabled={notificationsEnabled}
       penalites={penalites}
+      dashboardSummary={dashboardSummary}
     />
   );
 }
