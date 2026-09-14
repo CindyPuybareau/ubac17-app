@@ -1,13 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { MapPin, Sparkles } from "lucide-react";
-import { styleFor, isMatchType, homeAwayLabel } from "@/app/dashboard/event-style";
+import { AlarmClock, Check, Clock, Euro, ExternalLink, MapPin, Sparkles, StickyNote, X } from "lucide-react";
+import {
+  styleFor,
+  isMatchType,
+  homeAwayLabel,
+  formatEventTime,
+  formatImpactTime,
+} from "@/app/dashboard/event-style";
+import { PresentPlayersList, AbsentPlayersList } from "@/app/dashboard/calendar-view";
 import { parseMatchTitle } from "@/lib/match-display";
 import RsvpControl from "./rsvp-control";
 import MatchTasksPanel from "./match-tasks-panel";
 import VolunteerNeedsPanel from "./volunteer-needs-panel";
 import OrganisationCard from "./organisation-card";
+import SalleBadge from "./salle-badge";
+import ItineraryButton from "./itinerary-button";
+import { venueQuery } from "./salles";
 import type { EventRoleType, EventTasksState, CarpoolOffer } from "./event-tasks";
 import type { VolunteerNeed } from "./event-volunteer-needs";
 
@@ -42,6 +52,17 @@ export type WeekStripEvent = {
   title: string | null;
   eventType: string | null;
   startTime: string;
+  // Ajoutés le 14/09 (retour de Cindy, "les cartes du tableau de bord ne
+  // ressemblent pas à celles du calendrier... pas de dates de fin non
+  // plus") : DayEventCard n'affichait qu'un sous-ensemble des infos de
+  // renderEventCard (calendar-view.tsx) faute de porter ces champs --
+  // même parité que là-bas, sans le score ni les icônes de gestion
+  // (modifier/supprimer/relancer), hors périmètre de cette carte-ci.
+  endTime: string | null;
+  impactTime: string | null;
+  notes: string | null;
+  isPaid: boolean;
+  paymentLink: string | null;
   location: string | null;
   salle: string | null;
   isHome: boolean | null;
@@ -67,6 +88,20 @@ export type WeekStripEvent = {
   // calendar-view.tsx (un entraînement ne montre jamais l'onglet
   // Organisation, un coach ne répond jamais présent/absent).
   rsvpPlayers: WeekStripRsvpPlayer[];
+  // Ajoutés le 14/09 (retour de Cindy, "je souhaiterais que les coachs
+  // voient les présents ou absents... duplication de l'événement à venir
+  // dans le tableau de bord") : même bloc "X présents/absents/en
+  // retard/en attente" + "Qui sera là ?"/"Qui est absent ?" que
+  // renderEventCard (calendar-view.tsx), visible sur TOUS les espaces qui
+  // montrent cette carte (Bureau/Coach/Famille, pas seulement Famille --
+  // hasRoster ci-dessous ne dépend jamais de `source`, même règle que
+  // là-bas). Comptage sur l'effectif complet de l'événement (jamais
+  // l'union multi-équipes réduite à un seul viewer) ; les listes
+  // nominatives, elles, restent déjà réduites à ce que ce viewer a le
+  // droit de voir (calculées en amont, jamais filtrées ici).
+  rsvpCounts: { present: number; absent: number; late: number; pending: number };
+  presentPlayers: { id: string; firstName: string | null; lastName: string | null }[];
+  absentPlayers: { id: string; firstName: string | null; lastName: string | null }[];
   roles: EventRoleType[];
   tasks: EventTasksState;
   carpool: CarpoolOffer[];
@@ -147,7 +182,7 @@ export function DayEventCard({ event }: { event: WeekStripEvent }) {
   const style = styleFor(event.eventType);
   const parsed = parseMatchTitle(event.title);
   const home = event.isHome ?? parsed.isHome;
-  const lieu = event.salle || event.location;
+  const venue = venueQuery(event);
   const isTournament = event.eventType === "TOURNAMENT";
   const isOfficialMatch = event.eventType === "MATCH";
   const shellClass = isTournament
@@ -161,6 +196,12 @@ export function DayEventCard({ event }: { event: WeekStripEvent }) {
   const isTraining = event.eventType === "TRAINING";
   const hasTasks = !isTraining && (event.roles.length > 0 || event.showCarpool);
   const hasNeeds = !isTraining && event.needs.length > 0;
+  // Même règle que renderEventCard (calendar-view.tsx) : indépendant de
+  // `source` (Bureau/Coach/Famille voient tous ce bloc dès qu'un effectif
+  // existe), pas réservé à la Famille comme le bouton Présent/Absent
+  // individuel plus bas.
+  const { present, absent, late, pending } = event.rsvpCounts;
+  const hasRoster = present + absent + late + pending > 0;
 
   return (
     <div className={shellClass}>
@@ -175,6 +216,15 @@ export function DayEventCard({ event }: { event: WeekStripEvent }) {
           {style.label}
         </span>
         {event.teamName && <span className="text-xs font-semibold text-zinc-500">{event.teamName}</span>}
+        {/* Même badge "Payant" que renderEventCard (calendar-view.tsx) --
+            visible sur toutes les cartes qui montrent celle-ci, pas
+            seulement côté Famille (Bureau/Coach doivent savoir aussi). */}
+        {event.isPaid && (
+          <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-800">
+            <Euro className="h-3 w-3" />
+            Payant
+          </span>
+        )}
       </div>
       <p className="mt-1 font-semibold text-zinc-900">
         {isMatchType(event.eventType)
@@ -182,19 +232,82 @@ export function DayEventCard({ event }: { event: WeekStripEvent }) {
           : event.title ?? style.label}
       </p>
       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
-        <span>
-          {new Date(event.startTime).toLocaleTimeString("fr-FR", {
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </span>
-        {lieu && (
-          <span className="flex items-center gap-1">
-            <MapPin className="h-3 w-3 shrink-0" />
-            {lieu}
+        <span>{formatEventTime(event.startTime, event.endTime)}</span>
+        {/* Ambre plutôt que gris neutre : même distinction visuelle que
+            renderEventCard (calendar-view.tsx) entre l'heure de début et
+            l'heure d'arrivée demandée. */}
+        {event.impactTime && (
+          <span className="flex items-center gap-1 font-semibold text-amber-700">
+            <AlarmClock className="h-3 w-3" />
+            {formatImpactTime(event.impactTime)}
           </span>
         )}
+        {event.location && (
+          <span className="flex items-center gap-1">
+            <MapPin className="h-3 w-3 shrink-0" />
+            {event.location}
+          </span>
+        )}
+        {event.salle && <SalleBadge salle={event.salle} />}
       </div>
+
+      {event.notes && (
+        <p className="mt-1 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2.5 py-2 text-xs text-amber-900">
+          <StickyNote className="h-3.5 w-3.5 shrink-0 translate-y-0.5" />
+          {event.notes}
+        </p>
+      )}
+
+      {event.isPaid && event.paymentLink && (
+        <a
+          href={event.paymentLink}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-1 flex w-fit items-center gap-1.5 rounded-full bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-600"
+        >
+          <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+          Payer via HelloAsso
+        </a>
+      )}
+
+      {/* Rendu seulement si une vraie destination existe (venueQuery) :
+          ItineraryButton renvoie null sinon, mais ce wrapper avec sa marge
+          laisserait quand même un espace vide -- même précaution que les
+          autres blocs conditionnels de cette carte. */}
+      {venue && (
+        <div className="mt-1">
+          <ItineraryButton query={venue} />
+        </div>
+      )}
+
+      {/* Retour de Cindy du 14/09 ("je souhaiterais que les coachs voient
+          les présents ou absents... duplication de l'événement à venir") :
+          même bloc compteurs + listes nominatives dépliables que
+          renderEventCard (calendar-view.tsx), sur tous les espaces. */}
+      {hasRoster && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-status-success/10 px-2 py-0.5 text-xs font-semibold leading-none text-status-success">
+            <Check className="h-3 w-3" />
+            {present} présent{present > 1 ? "s" : ""}
+          </span>
+          {late > 0 && (
+            <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-status-pending/10 px-2 py-0.5 text-xs font-semibold leading-none text-status-pending-dark">
+              <Clock className="h-3 w-3" />
+              {late} en retard
+            </span>
+          )}
+          <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-status-urgent/10 px-2 py-0.5 text-xs font-semibold leading-none text-status-urgent-dark">
+            <X className="h-3 w-3" />
+            {absent} absent{absent > 1 ? "s" : ""}
+          </span>
+          <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold leading-none text-zinc-600">
+            <Clock className="h-3 w-3" />
+            {pending} en attente
+          </span>
+        </div>
+      )}
+      <PresentPlayersList players={event.presentPlayers} />
+      <AbsentPlayersList players={event.absentPlayers} />
 
       {/* Présent/Absent : uniquement côté Famille, un enfant à la fois
           (même composant que family-attendance-requests.tsx). */}

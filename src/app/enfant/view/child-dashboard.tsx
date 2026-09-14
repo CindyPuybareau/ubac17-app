@@ -155,12 +155,30 @@ export default function ChildDashboard({
     title: e.title,
     eventType: e.eventType,
     startTime: e.startTime,
+    endTime: e.endTime,
+    impactTime: e.impactTime,
+    // Pas de notes ici (ChildEvent ne les porte pas) : jamais montrées côté
+    // Enfant jusqu'ici, hors périmètre de cette parité de carte.
+    notes: null,
+    isPaid: e.isPaid,
+    // Jamais de lien de paiement ici (voir le commentaire sur
+    // ChildEvent.isPaid) : le badge "Payant" suffit, aucun bouton "Payer"
+    // dans cet espace.
+    paymentLink: null,
     location: e.location,
     salle: e.salle,
     isHome: e.isHome,
     teamName: e.teamName,
     source: "coach",
     rsvpPlayers: [],
+    // Retour de Cindy du 14/09 ("les coachs voient les présents/absents") :
+    // ChildEvent ne porte ni compteurs ni listes nominatives -- laissé vide
+    // ici volontairement, hors périmètre de cette demande (visait les
+    // coachs, jamais l'Espace Enfant), même précaution que notes/
+    // paymentLink ci-dessus.
+    rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
+    presentPlayers: [],
+    absentPlayers: [],
     roles: [],
     tasks: {},
     carpool: [],

@@ -184,7 +184,10 @@ export type CalendarRsvpPlayer = {
 // renderEventCard) : lui seul a besoin d'un état local d'ouverture, et un
 // Hook ne peut pas vivre dans une fonction appelée comme un simple
 // callback de rendu.
-function PresentPlayersList({
+// Exportée le 14/09 (retour de Cindy, "duplication de l'événement à venir
+// dans le tableau de bord") : réutilisée telle quelle par DayEventCard
+// (week-strip-banner.tsx), jamais reconstruite à part.
+export function PresentPlayersList({
   players,
 }: {
   players: {
@@ -236,7 +239,8 @@ function PresentPlayersList({
 // scopé par l'appelant (page.tsx, ownTeamRoster/ownFamilyRoster) : jamais
 // l'effectif complet d'un événement multi-équipes, seulement les équipes
 // que ce viewer a le droit de voir.
-function AbsentPlayersList({
+// Exportée le 14/09, même raison que PresentPlayersList ci-dessus.
+export function AbsentPlayersList({
   players,
 }: {
   players: { id: string; firstName: string | null; lastName: string | null }[];

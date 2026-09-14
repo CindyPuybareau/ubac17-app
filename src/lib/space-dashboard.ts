@@ -34,12 +34,27 @@ export type SpaceDashboardNextEvent = {
   title: string | null;
   eventType: string | null;
   startTime: string;
+  // Ajoutés le 14/09 (retour de Cindy, "les cartes du tableau de bord ne
+  // ressemblent pas à celles du calendrier") : même parité d'info que
+  // WeekStripEvent (week-strip-banner.tsx), la carte étant partagée.
+  endTime: string | null;
+  impactTime: string | null;
+  notes: string | null;
+  isPaid: boolean;
+  paymentLink: string | null;
   location: string | null;
   salle: string | null;
   isHome: boolean | null;
   teamName: string | null;
   source: NextEventSource;
   rsvpPlayers: NextEventRsvpPlayer[];
+  // Ajoutés le 14/09 (retour de Cindy, "les coachs voient les présents/
+  // absents... duplication de l'événement à venir") : même bloc que
+  // WeekStripEvent (week-strip-banner.tsx) -- comptage sur l'effectif
+  // complet de l'événement, listes nominatives incluses.
+  rsvpCounts: { present: number; absent: number; late: number; pending: number };
+  presentPlayers: { id: string; firstName: string | null; lastName: string | null }[];
+  absentPlayers: { id: string; firstName: string | null; lastName: string | null }[];
   needs: VolunteerNeed[];
 };
 
@@ -221,13 +236,40 @@ export async function getSpaceDashboardSummary(
     title: string | null;
     event_type: string | null;
     start_time: string;
+    // Ajoutés le 14/09 (retour de Cindy, "les cartes du tableau de bord ne
+    // ressemblent pas à celles du calendrier") : même parité d'info que
+    // renderEventCard (calendar-view.tsx) sur la carte DayEventCard
+    // réutilisée ici -- ces champs n'étaient jusqu'ici même pas
+    // sélectionnés par cette requête.
+    end_time: string | null;
+    impact_time: string | null;
+    notes: string | null;
     location: string | null;
     salle: string | null;
     is_home: boolean | null;
     team_id: string | null;
     target_team_ids: string[] | null;
     teams: { name: string | null } | null;
+    // "Événement payant" (voir resolvePaidInfo, page.tsx) : dérivé de la
+    // présence d'une collecte rattachée (collectes.event_id), jamais
+    // stocké sur events -- même jointure inverse, réduite au seul champ
+    // dont cette carte a besoin (pas de liste de participants ici).
+    collectes: { payment_link: string | null } | { payment_link: string | null }[] | null;
   };
+
+  // Version réduite de resolvePaidInfo (page.tsx) : cette carte n'affiche
+  // que le badge "Payant" + le bouton "Payer", jamais la liste des
+  // inscrits -- pas besoin de porter collecteId/paidAmount/paidParticipants
+  // jusqu'ici.
+  function resolvePaidFields(collectes: EventRow["collectes"]): {
+    isPaid: boolean;
+    paymentLink: string | null;
+  } {
+    const rows = Array.isArray(collectes) ? collectes : collectes ? [collectes] : [];
+    return rows.length > 0
+      ? { isPaid: true, paymentLink: rows[0].payment_link }
+      : { isPaid: false, paymentLink: null };
+  }
 
   let dayRows: EventRow[] = [];
   if (firstUpcomingStart) {
@@ -247,7 +289,7 @@ export async function getSpaceDashboardSummary(
     let dayQuery = supabase
       .from("events")
       .select(
-        "id, title, event_type, start_time, location, salle, is_home, team_id, target_team_ids, teams(name)"
+        "id, title, event_type, start_time, end_time, impact_time, notes, location, salle, is_home, team_id, target_team_ids, teams(name), collectes(payment_link)"
       )
       .gte("start_time", nowIso)
       .lt("start_time", dayEnd)
@@ -266,48 +308,111 @@ export async function getSpaceDashboardSummary(
     // TOUS les événements du jour plutôt qu'un par carte.
     const needsByEventId = await getVolunteerNeedsByEventId(supabase, eventIds, semaphore);
 
-    // Une seule requête rsvps pour tous les événements du jour à la fois
-    // (retour de Cindy du 13/09, "pour les parents pouvoir y répondre
-    // ici" -- le bouton doit refléter une réponse déjà donnée), plutôt
-    // qu'une par carte.
-    const candidateIds = rsvpCandidates.map((p) => p.id);
-    const statusByEventAndPlayer = new Map<string, string>();
-    if (candidateIds.length > 0) {
-      const [{ data: rsvpRows }] = await runBatched(
-        [
-          () =>
-            supabase
-              .from("rsvps")
-              .select("event_id, player_id, status")
-              .in("event_id", eventIds)
-              .in("player_id", candidateIds),
-        ],
-        semaphore
-      );
-      ((rsvpRows ?? []) as { event_id: string; player_id: string; status: string }[]).forEach((r) => {
-        statusByEventAndPlayer.set(`${r.event_id}:${r.player_id}`, r.status);
-      });
-    }
+    // Retour de Cindy du 14/09 ("les coachs voient les présents/absents...
+    // duplication de l'événement à venir") : même bloc compteurs +
+    // "Qui sera là ?"/"Qui est absent ?" que renderEventCard
+    // (calendar-view.tsx), sur tous les espaces -- besoin de l'effectif
+    // COMPLET (pas seulement rsvpCandidates, qui ne couvre que les
+    // enfants de la Famille pour son propre bouton). Un joueur peut
+    // apparaître dans plusieurs lignes team_players (multi-équipes) :
+    // dédupliqué par id, ses team_id cumulés pour repasser dans
+    // isConcernedByEvent.
+    let rosterQuery = supabase
+      .from("team_players")
+      .select("team_id, player_id, players(id, first_name, last_name)");
+    if (teamIds !== null) rosterQuery = rosterQuery.in("team_id", teamIds);
+    const [{ data: rosterRows }] = await runBatched([() => rosterQuery], semaphore);
+    type RosterRow = {
+      team_id: string;
+      player_id: string;
+      players: { id: string; first_name: string | null; last_name: string | null } | null;
+    };
+    const rosterByPlayerId = new Map<
+      string,
+      { id: string; firstName: string | null; lastName: string | null; teamIds: string[] }
+    >();
+    ((rosterRows ?? []) as unknown as RosterRow[]).forEach((r) => {
+      if (!r.players) return;
+      const existing = rosterByPlayerId.get(r.player_id);
+      if (existing) existing.teamIds.push(r.team_id);
+      else
+        rosterByPlayerId.set(r.player_id, {
+          id: r.players.id,
+          firstName: r.players.first_name,
+          lastName: r.players.last_name,
+          teamIds: [r.team_id],
+        });
+    });
+    const fullRoster = Array.from(rosterByPlayerId.values());
 
-    nextEvents = dayRows.map((row) => ({
-      id: row.id,
-      title: row.title,
-      eventType: row.event_type,
-      startTime: row.start_time,
-      location: row.location,
-      salle: row.salle,
-      isHome: row.is_home,
-      teamName: row.teams?.name ?? null,
-      source,
-      rsvpPlayers: rsvpCandidates
-        .filter((p) => isConcernedByEvent(p, row))
-        .map((p) => ({
-          id: p.id,
-          name: p.name,
-          status: statusByEventAndPlayer.get(`${row.id}:${p.id}`) ?? "PENDING",
-        })),
-      needs: needsByEventId[row.id] ?? [],
-    }));
+    // Une seule requête rsvps pour tous les événements du jour à la fois,
+    // sur TOUT l'effectif (retour de Cindy du 13/09, "pour les parents
+    // pouvoir y répondre ici" + celui du 14/09 ci-dessus) -- jamais un 2e
+    // .in("player_id", ...) en plus de .in("event_id", ...) : même classe
+    // de bug que l'incident du 30/08 (batch.ts), une URL démesurée sur un
+    // effectif de club entier. eventIds reste petit (un seul jour), donc
+    // seul lui filtre côté requête ; le rapprochement par joueur se fait
+    // en mémoire juste en dessous.
+    const [{ data: rsvpRows }] = await runBatched(
+      [() => supabase.from("rsvps").select("event_id, player_id, status").in("event_id", eventIds)],
+      semaphore
+    );
+    const statusByEventAndPlayer = new Map<string, string>();
+    ((rsvpRows ?? []) as { event_id: string; player_id: string; status: string }[]).forEach((r) => {
+      statusByEventAndPlayer.set(`${r.event_id}:${r.player_id}`, r.status);
+    });
+
+    nextEvents = dayRows.map((row) => {
+      const paidFields = resolvePaidFields(row.collectes);
+      const eventRoster = fullRoster.filter((p) => isConcernedByEvent(p, row));
+      let present = 0;
+      let absent = 0;
+      let late = 0;
+      let answered = 0;
+      const presentPlayers: { id: string; firstName: string | null; lastName: string | null }[] = [];
+      const absentPlayers: { id: string; firstName: string | null; lastName: string | null }[] = [];
+      eventRoster.forEach((p) => {
+        const status = statusByEventAndPlayer.get(`${row.id}:${p.id}`);
+        if (!status) return;
+        answered += 1;
+        if (status === "PRESENT") {
+          present += 1;
+          presentPlayers.push(p);
+        } else if (status === "ABSENT") {
+          absent += 1;
+          absentPlayers.push(p);
+        } else if (status === "LATE") {
+          late += 1;
+        }
+      });
+      return {
+        id: row.id,
+        title: row.title,
+        eventType: row.event_type,
+        startTime: row.start_time,
+        endTime: row.end_time,
+        impactTime: row.impact_time,
+        notes: row.notes,
+        isPaid: paidFields.isPaid,
+        paymentLink: paidFields.paymentLink,
+        location: row.location,
+        salle: row.salle,
+        isHome: row.is_home,
+        teamName: row.teams?.name ?? null,
+        source,
+        rsvpPlayers: rsvpCandidates
+          .filter((p) => isConcernedByEvent(p, row))
+          .map((p) => ({
+            id: p.id,
+            name: p.name,
+            status: statusByEventAndPlayer.get(`${row.id}:${p.id}`) ?? "PENDING",
+          })),
+        rsvpCounts: { present, absent, late, pending: Math.max(0, eventRoster.length - answered) },
+        presentPlayers,
+        absentPlayers,
+        needs: needsByEventId[row.id] ?? [],
+      };
+    });
   }
 
   return {
