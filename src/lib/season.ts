@@ -37,6 +37,24 @@ export function getCurrentSeasonLabel(referenceDate: Date = new Date()): string 
   return `${start}-${start + 1}`;
 }
 
+// Bornes de la saison en cours (retour de Cindy du 13/09, "Tableau de
+// bord" -- matchs joués/points marqués "cette saison") : 1er juillet ->
+// 30 juin, mêmes conventions que getCurrentSeasonStartYear ci-dessus (lu en
+// Europe/Paris, jamais le fuseau du runtime). "+02:00"/"+01:00" fixe plutôt
+// qu'un vrai calcul d'heure d'été aurait pu glisser d'une heure pile au
+// changement d'heure -- sans conséquence ici, ces bornes ne servent qu'à
+// borner une saison de 12 mois, pas à afficher une heure précise.
+export function getCurrentSeasonWindow(referenceDate: Date = new Date()): {
+  startIso: string;
+  endIso: string;
+} {
+  const start = getCurrentSeasonStartYear(referenceDate);
+  return {
+    startIso: `${start}-07-01T00:00:00Z`,
+    endIso: `${start + 1}-07-01T00:00:00Z`,
+  };
+}
+
 export type PlayerYearStatus =
   | { kind: "ANNEE"; label: string }
   | { kind: "ROOKIE" }

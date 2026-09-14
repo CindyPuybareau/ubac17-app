@@ -27,6 +27,8 @@ import CalendarSubscribe from "./calendar-subscribe";
 import FamilyCotisationCard from "./family-cotisation-card";
 import PenalitesCard from "./penalites-card";
 import ChildAccessManager from "./child-access-manager";
+import SpaceDashboardSummary from "./space-dashboard-summary";
+import type { SpaceDashboardSummary as SpaceDashboardSummaryData } from "@/lib/space-dashboard";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import WhatsAppGroupsFamily from "./whatsapp-groups-family";
 import WhatsAppGroupsManager from "./whatsapp-groups-manager";
@@ -110,6 +112,7 @@ export default function FamilyView({
   cotisations,
   penalites,
   sponsorDisplay = [],
+  dashboardSummary,
 }: {
   events: AdminUpcomingEvent[];
   rsvpPlayers: CalendarRsvpPlayer[];
@@ -129,6 +132,12 @@ export default function FamilyView({
   // les enfants, saisies par le Bureau (voir penalites-manager.tsx).
   penalites: AdminPenalite[];
   sponsorDisplay?: SponsorDisplay[];
+  // Retour de Cindy du 13/09 ("ce que tu mettrais dans le tableau de
+  // bord") : résumé de l'union des équipes de CE sous-ensemble de joueurs
+  // (space-dashboard.ts) -- "Mon équipe" et "Mes enfants" en reçoivent
+  // chacun un différent (voir buildFamilyView, page.tsx), calculé sur la
+  // bonne liste à chaque fois.
+  dashboardSummary: SpaceDashboardSummaryData;
 }) {
   const iconClass = "h-4 w-4 shrink-0";
 
@@ -297,6 +306,29 @@ export default function FamilyView({
 
   const sections: AdminSection[] = [
     {
+      // Retour de Cindy du 13/09 ("le tableau de bord doit être le premier
+      // onglet partout") : premier onglet désormais (admin-sidebar.tsx,
+      // firstLeafKey(sections)) -- inverse le choix du 10/09 ("jamais
+      // premier, toujours Calendrier"), qui ne tient plus une fois ce
+      // même onglet devenu la vraie vue d'ensemble (résumé + prochain
+      // événement complet), pas juste un tiroir de réglages secondaires.
+      key: "dashboard",
+      label: "Tableau de bord",
+      icon: <LayoutDashboard className={iconClass} />,
+      content: (
+        <div className="flex flex-col gap-4">
+          {/* Retour de Cindy du 13/09 : résumé de cette équipe (ou de
+              l'union des équipes des enfants affichés), en premier --
+              canManagePhoto=false : envoyer la photo d'une équipe reste
+              réservé au Bureau/coach (voir la policy du bucket
+              team-photos), jamais à un parent ou un joueur. */}
+          <SpaceDashboardSummary summary={dashboardSummary} canManagePhoto={false} />
+          <ChildAccessManager />
+          <CalendarSubscribe />
+        </div>
+      ),
+    },
+    {
       key: "planning",
       // "Planning & Matchs" se faisait tronquer en "Planning & M..." dans
       // la barre du bas mobile (retour de Cindy du 2026-08-21) —
@@ -332,24 +364,6 @@ export default function FamilyView({
             celebrateWins
           />
           <SponsorsDisplay sponsors={sponsorDisplay} />
-        </div>
-      ),
-    },
-    {
-      // Retour de Cindy du 10/09 ("alléger l'onglet calendrier") : Accès à
-      // l'espace enfant + lien d'abonnement agenda quittent le Calendrier
-      // pour ce nouvel onglet, volontairement second dans la liste (jamais
-      // premier — l'ouverture de l'appli doit toujours se faire sur
-      // "Calendrier", voir admin-sidebar.tsx : le premier onglet du
-      // tableau est l'onglet actif par défaut). Premier contenu d'un
-      // onglet pensé pour accueillir d'autres blocs secondaires plus tard.
-      key: "dashboard",
-      label: "Tableau de bord",
-      icon: <LayoutDashboard className={iconClass} />,
-      content: (
-        <div className="flex flex-col gap-4">
-          <ChildAccessManager />
-          <CalendarSubscribe />
         </div>
       ),
     },
@@ -521,6 +535,11 @@ export default function FamilyView({
 
       <AdminSidebar
         sections={sections}
+        // Retour de Cindy du 13/09 ("tableau de bord en position une mais
+        // ouverture sur l'onglet 2 calendrier") : "Tableau de bord" reste
+        // premier dans le menu (voir sections plus haut), mais l'app
+        // continue de s'ouvrir sur "Calendrier" (key "planning").
+        defaultActiveKey="planning"
         // Retour de Cindy du 2026-08-22 : le sélecteur d'enfant doit vivre
         // au-dessus du contenu de l'onglet actif (ex. juste au-dessus de
         // "Prochaine convocation" dans Calendrier), pas au-dessus de toute

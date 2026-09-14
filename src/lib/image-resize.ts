@@ -72,6 +72,57 @@ export async function resizeImageForAvatar(file: File): Promise<ResizedImage> {
   return fallback;
 }
 
+// Photo d'équipe (retour de Cindy du 13/09, "Tableau de bord" Coach/
+// Famille -- "portraits" puis corrigé en "paysage") : comme
+// resizeImageForLogo, une mise à l'échelle sans recadrage -- bornes larges
+// plutôt que hautes, en bandeau. L'affichage (space-dashboard-summary.tsx)
+// recadre en CSS (aspect-[16/9] + object-cover) pour un cadrage cohérent
+// même si la photo d'origine n'a pas exactement ce ratio -- cette fonction
+// ne fait que limiter le poids envoyé, jamais un vrai recadrage.
+const MAX_TEAM_PHOTO_WIDTH = 960;
+const MAX_TEAM_PHOTO_HEIGHT = 540;
+
+export async function resizeImageForTeamPhoto(file: File): Promise<ResizedImage> {
+  const fallback: ResizedImage = {
+    blob: file,
+    ext: file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg",
+  };
+
+  const bitmap = await createImageBitmap(file).catch(() => null);
+  if (!bitmap) return fallback;
+
+  const scale = Math.min(1, MAX_TEAM_PHOTO_WIDTH / bitmap.width, MAX_TEAM_PHOTO_HEIGHT / bitmap.height);
+  const targetWidth = Math.round(bitmap.width * scale);
+  const targetHeight = Math.round(bitmap.height * scale);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    bitmap.close();
+    return fallback;
+  }
+  ctx.drawImage(bitmap, 0, 0, bitmap.width, bitmap.height, 0, 0, targetWidth, targetHeight);
+  bitmap.close();
+
+  const webpBlob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, "image/webp", QUALITY)
+  );
+  if (webpBlob && webpBlob.type === "image/webp") {
+    return { blob: webpBlob, ext: "webp" };
+  }
+
+  const jpegBlob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, "image/jpeg", QUALITY)
+  );
+  if (jpegBlob) {
+    return { blob: jpegBlob, ext: "jpg" };
+  }
+
+  return fallback;
+}
+
 // Même principe que resizeImageForAvatar (WebP avec repli JPEG, fichier
 // d'origine renvoyé tel quel si indécodable) mais sans recadrage carré —
 // voir MAX_LOGO_WIDTH/HEIGHT ci-dessus.

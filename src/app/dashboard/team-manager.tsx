@@ -42,6 +42,14 @@ export type TeamWithMembers = {
   // legacy pendingCoachNames free-text field below).
   pendingCoaches: Person[];
   pendingCoachNames: string | null;
+  // Retour de Cindy du 13/09 ("où j'importe mes photos d'équipe dans le
+  // bureau ?") : le Tableau de bord ne peut PAS l'accueillir côté Bureau
+  // (résumé club entier, jamais scopé à une seule équipe -- voir
+  // space-dashboard-summary.tsx) -- l'onglet Équipes (team-card.tsx), lui,
+  // liste bien chaque équipe une par une, c'est le vrai bon endroit.
+  // Optionnel : les objets construits ailleurs (ex. le calendrier Coach)
+  // n'ont pas besoin de le porter.
+  photoUrl?: string | null;
 };
 
 export default function TeamManager({

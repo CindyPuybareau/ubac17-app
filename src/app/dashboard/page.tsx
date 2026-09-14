@@ -6,6 +6,7 @@ import { logQueryErrors } from "@/lib/query-errors";
 import { formatFirstName, formatPersonName } from "@/lib/names";
 import { EMAIL_REPLY_TO } from "@/lib/email";
 import { localDateFromParts } from "@/lib/local-date";
+import { getSpaceDashboardSummary, type SpaceDashboardSummary } from "@/lib/space-dashboard";
 import NotificationBell from "./notification-bell";
 import OrgChartButton from "./org-chart-button";
 import AvatarUpload from "./avatar-upload";
@@ -1510,7 +1511,7 @@ export default async function DashboardPage({
           supabase
             .from("teams")
             .select(
-              "id, name, category, ffbb_url, ffbb_last_synced_at, pending_coach_names, sort_order"
+              "id, name, category, ffbb_url, ffbb_last_synced_at, pending_coach_names, sort_order, photo_url"
             )
             .order("sort_order", { ascending: true, nullsFirst: false })
             .order("category"),
@@ -1846,6 +1847,7 @@ export default async function DashboardPage({
       coaches: coachesByTeam.get(t.id) ?? [],
       pendingCoaches: pendingCoachesByTeam.get(t.id) ?? [],
       pendingCoachNames: t.pending_coach_names,
+      photoUrl: t.photo_url,
     }));
     allProfilesForAdmin = profilesRes.data ?? [];
     canonicalTeamRefs = (teamsRes.data ?? [])
@@ -3768,7 +3770,34 @@ export default async function DashboardPage({
       !(p.teamIds.length > 0 && p.teamIds.every((id) => coachedTeamIds.has(id)))
   );
 
-  function buildFamilyView(rsvpPlayers: typeof familyRsvpPlayers) {
+  // Retour de Cindy du 13/09 ("ce que tu mettrais dans le tableau de
+  // bord... l'espace en lui-même") : "Mon équipe" et "Mes enfants" sont le
+  // même composant (FamilyView) réutilisé deux fois avec un sous-ensemble
+  // différent de joueurs (voir le commentaire au-dessus) -- donc deux
+  // résumés distincts, chacun sur l'union des équipes de SON sous-ensemble
+  // (space-dashboard.ts cumule déjà plusieurs équipes tout seul). Requêtes
+  // seulement pour l'onglet réellement actif (activeTab === "own-team"/
+  // "children", même discipline que buildFamilyView plus bas, jamais
+  // construit pour un onglet qui n'est pas affiché) -- un tableau vide fait
+  // rendre getSpaceDashboardSummary son repli à zéro sans la moindre
+  // requête (voir son court-circuit dans space-dashboard.ts).
+  const familyOwnTeamDashboardSummary = await getSpaceDashboardSummary(
+    supabase,
+    activeTab === "own-team" ? Array.from(new Set(myTeamRsvpPlayers.flatMap((p) => p.teamIds))) : [],
+    "family",
+    activeTab === "own-team" ? myTeamRsvpPlayers : []
+  );
+  const familyChildrenDashboardSummary = await getSpaceDashboardSummary(
+    supabase,
+    activeTab === "children" ? Array.from(new Set(myChildrenRsvpPlayers.flatMap((p) => p.teamIds))) : [],
+    "family",
+    activeTab === "children" ? myChildrenRsvpPlayers : []
+  );
+
+  function buildFamilyView(
+    rsvpPlayers: typeof familyRsvpPlayers,
+    dashboardSummary: SpaceDashboardSummary
+  ) {
     // Audit du 31/08 : whatsappGroups porte la liste NOMINATIVE des
     // membres de CHAQUE groupe (y compris ceux des équipes d'autres
     // familles) — le passer tel quel envoie ces noms au navigateur de
@@ -3796,6 +3825,7 @@ export default async function DashboardPage({
         cotisations={familyCotisations}
         penalites={familyPenalites}
         sponsorDisplay={sponsorDisplay}
+        dashboardSummary={dashboardSummary}
       />
     );
   }
@@ -3810,6 +3840,17 @@ export default async function DashboardPage({
   // ce `null` n'est donc jamais visible tant qu'on ne clique pas dessus
   // (ce qui redemande la page avec ?tab=... et fait de LUI l'actif).
   if (isAdmin) {
+    // Retour de Cindy du 13/09 ("ce que tu mettrais dans le tableau de
+    // bord") : club entier (teamIds null), seulement quand cet onglet est
+    // réellement affiché -- [] plutôt que null sinon fait rendre à
+    // getSpaceDashboardSummary son repli à zéro sans la moindre requête
+    // (voir son court-circuit dans space-dashboard.ts), même discipline
+    // que le reste de ce bloc (activeTab === "admin" ? ... : null).
+    const adminDashboardSummary = await getSpaceDashboardSummary(
+      supabase,
+      activeTab === "admin" ? null : [],
+      "bureau"
+    );
     tabs.push({
       key: "admin",
       label: "Bureau",
@@ -3819,6 +3860,7 @@ export default async function DashboardPage({
       content:
         activeTab === "admin" ? (
           <AdminView
+            dashboardSummary={adminDashboardSummary}
             allowedBriques={viewerAllowedBriques}
             teams={adminTeams}
             allProfiles={allProfilesForAdmin}
@@ -3847,6 +3889,17 @@ export default async function DashboardPage({
   }
 
   if (isCoach) {
+    // Retour de Cindy du 13/09 : équipe(s) réellement coachée(s)
+    // (coachedTeams, connu avant coachPromise, même source que le libellé
+    // juste en dessous) -- jamais celles où cette personne n'est que
+    // joueur, celles-là vivent dans "Mon équipe". Même discipline que
+    // adminDashboardSummary plus haut : requête seulement pour l'onglet
+    // actif.
+    const coachDashboardSummary = await getSpaceDashboardSummary(
+      supabase,
+      activeTab === "coach" ? coachedTeams.map((t) => t.id) : [],
+      "coach"
+    );
     tabs.push({
       key: "coach",
       // Retour de Cindy du 29/08 : "Équipe" tout court prêtait à confusion
@@ -3887,6 +3940,7 @@ export default async function DashboardPage({
             sponsorDisplay={sponsorDisplay}
             clubReports={clubReports}
             currentUserId={user.id}
+            dashboardSummary={coachDashboardSummary}
           />
         ) : null,
     });
@@ -3906,7 +3960,10 @@ export default async function DashboardPage({
       // Retour de Cindy du 11/09 : même icône que le rond "Joueur"
       // (team-selector-pills.tsx).
       icon: "shirt",
-      content: activeTab === "own-team" ? buildFamilyView(myTeamRsvpPlayers) : null,
+      content:
+        activeTab === "own-team"
+          ? buildFamilyView(myTeamRsvpPlayers, familyOwnTeamDashboardSummary)
+          : null,
     });
   }
 
@@ -3924,7 +3981,10 @@ export default async function DashboardPage({
       // Retour de Cindy du 11/09 ("mes enfants aussi le mérite") : icône
       // neutre (dashboard-tabs.tsx), distincte du "shirt" de "Mon équipe".
       icon: "users",
-      content: activeTab === "children" ? buildFamilyView(myChildrenRsvpPlayers) : null,
+      content:
+        activeTab === "children"
+          ? buildFamilyView(myChildrenRsvpPlayers, familyChildrenDashboardSummary)
+          : null,
     });
   }
 

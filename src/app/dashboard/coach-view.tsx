@@ -20,6 +20,8 @@ import { BOUTIQUE_URL } from "./boutique";
 import { groupTeamsByPrimarySecondary } from "@/lib/teams";
 import CalendarView from "./calendar-view";
 import CalendarSubscribe from "./calendar-subscribe";
+import SpaceDashboardSummary from "./space-dashboard-summary";
+import type { SpaceDashboardSummary as SpaceDashboardSummaryData } from "@/lib/space-dashboard";
 import CoachTeams from "./coach-teams";
 import CoachFfbb from "./coach-ffbb";
 import CoachOrganisation, { type CoachTeamMatchCard } from "./coach-organisation";
@@ -69,6 +71,7 @@ export default function CoachView({
   sponsorDisplay = [],
   clubReports,
   currentUserId,
+  dashboardSummary,
 }: {
   teams: TeamWithMembers[];
   events: AdminUpcomingEvent[];
@@ -112,6 +115,11 @@ export default function CoachView({
   // de connexion, pas la fiche joueur) peut les modifier/supprimer — voir
   // canEditRow dans club-reports-section.tsx.
   currentUserId: string;
+  // Retour de Cindy du 13/09 ("ce que tu mettrais dans le tableau de
+  // bord") : résumé de la ou des équipes réellement coachées (space-
+  // dashboard.ts, teamIds = createTeams ci-dessous) -- jamais des équipes
+  // où ce coach n'est que joueur, celles-là vivent déjà dans "Mon équipe".
+  dashboardSummary: SpaceDashboardSummaryData;
 }) {
   // Créer / modifier / supprimer un événement n'est permis que pour les
   // équipes réellement entraînées : proposer celle où l'utilisateur n'est
@@ -178,6 +186,26 @@ export default function CoachView({
   const iconClass = "h-4 w-4 shrink-0";
   const sections: AdminSection[] = [
     {
+      // Retour de Cindy du 13/09 ("le tableau de bord doit être le premier
+      // onglet partout") : premier dans le MENU -- l'app continue de
+      // s'ouvrir sur Calendrier (defaultActiveKey="calendar" plus bas,
+      // voir admin-sidebar.tsx).
+      key: "dashboard",
+      label: "Tableau de bord",
+      icon: <LayoutDashboard className={iconClass} />,
+      content: (
+        <div className="flex flex-col gap-4">
+          {/* Retour de Cindy du 13/09 : résumé de la ou des équipes
+              coachées, en premier -- canManagePhoto toujours vrai ici, ce
+              coach est bien celui de l'équipe unique éventuellement
+              montrée (dashboardSummary.singleTeamId ne vient que de
+              createTeams, jamais d'une équipe où il n'est que joueur). */}
+          <SpaceDashboardSummary summary={dashboardSummary} canManagePhoto />
+          <CalendarSubscribe />
+        </div>
+      ),
+    },
+    {
       key: "calendar",
       label: "Calendrier",
       icon: <CalendarDays className={iconClass} />,
@@ -211,23 +239,6 @@ export default function CoachView({
             celebrateWins
           />
           <SponsorsDisplay sponsors={sponsorDisplay} />
-        </div>
-      ),
-    },
-    {
-      // Retour de Cindy du 10/09 ("alléger l'onglet calendrier") : le lien
-      // d'abonnement agenda quitte le Calendrier pour ce nouvel onglet,
-      // volontairement second dans la liste (jamais premier — l'ouverture
-      // de l'appli doit toujours se faire sur "Calendrier", voir
-      // admin-sidebar.tsx : le premier onglet du tableau est l'onglet actif
-      // par défaut). Premier contenu d'un onglet pensé pour accueillir
-      // d'autres blocs secondaires plus tard.
-      key: "dashboard",
-      label: "Tableau de bord",
-      icon: <LayoutDashboard className={iconClass} />,
-      content: (
-        <div className="flex flex-col gap-4">
-          <CalendarSubscribe />
         </div>
       ),
     },
@@ -495,7 +506,7 @@ export default function CoachView({
           joue aussi lui-même vit désormais dans l'onglet "Mon équipe" à
           part entière (FamilyView la rend déjà en tête, voir page.tsx) —
           plus ici en repli. */}
-      <AdminSidebar sections={sections} />
+      <AdminSidebar sections={sections} defaultActiveKey="calendar" />
     </div>
   );
 }

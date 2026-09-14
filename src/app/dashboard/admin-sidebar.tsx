@@ -105,6 +105,7 @@ function containsKey(sections: AdminSection[], targetKey: string): boolean {
 export default function AdminSidebar({
   sections,
   contentHeader,
+  defaultActiveKey,
 }: {
   sections: AdminSection[];
   // Bloc rendu au-dessus du contenu de l'onglet actif, dans la colonne de
@@ -113,6 +114,15 @@ export default function AdminSidebar({
   // l'encart entraînement, pas au-dessus du menu"). Visible sur tous les
   // onglets puisqu'il vit ici plutôt que dans un `content` particulier.
   contentHeader?: ReactNode;
+  // Retour de Cindy du 13/09 ("tableau de bord en position une mais
+  // ouverture sur l'onglet 2 calendrier") : l'ORDRE d'affichage dans le
+  // menu (sections) et l'onglet ouvert PAR DÉFAUT sont deux choses
+  // distinctes -- avant ce prop, le premier onglet listé était forcément
+  // aussi celui-là. Chaque appelant passe sa propre clé "Calendrier"
+  // (elles diffèrent : "home" côté Bureau, "calendar" côté Coach,
+  // "planning" côté Famille) ; ignoré si absent ou si la clé n'existe pas
+  // (repli sur firstLeafKey, comportement historique).
+  defaultActiveKey?: string;
 }) {
   // Deep-link support (see buildAppDeepLink in lib/whatsapp.ts): a shared
   // "?section=…" URL — or an "?openMember=…" / "?openGroup=…" link, which
@@ -130,6 +140,9 @@ export default function AdminSidebar({
     }
     if (searchParams.get("openGroup") && sectionExists(sections, "whatsapp")) {
       return "whatsapp";
+    }
+    if (defaultActiveKey && sectionExists(sections, defaultActiveKey)) {
+      return defaultActiveKey;
     }
     return firstLeafKey(sections) ?? sections[0]?.key;
   });

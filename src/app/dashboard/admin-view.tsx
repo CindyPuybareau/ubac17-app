@@ -39,6 +39,8 @@ import SponsorsDisplay from "./sponsors-display";
 import CommissionsManager from "./commissions-manager";
 import BureauDashboard from "./bureau-dashboard";
 import AutomationSettings, { type AutomationKey } from "./automation-settings";
+import SpaceDashboardSummary from "./space-dashboard-summary";
+import type { SpaceDashboardSummary as SpaceDashboardSummaryData } from "@/lib/space-dashboard";
 import type {
   AdminAccessProfile,
   AdminBenevole,
@@ -81,6 +83,7 @@ export default function AdminView({
   eventRoles,
   volunteerNeedsByEventId,
   clubReports,
+  dashboardSummary,
 }: {
   // Profils d'accès sur-mesure (retour de Cindy du 05/09, étape 3) : null
   // pour un Bureau complet (comportement historique, inchangé) ; sinon, la
@@ -113,6 +116,10 @@ export default function AdminView({
   eventRoles: EventRoleType[];
   volunteerNeedsByEventId: Record<string, VolunteerNeed[]>;
   clubReports: ClubReport[];
+  // Retour de Cindy du 13/09 ("ce que tu mettrais dans le tableau de
+  // bord") : résumé club entier (space-dashboard.ts, teamIds null) --
+  // jamais scopé à une équipe côté Bureau.
+  dashboardSummary: SpaceDashboardSummaryData;
 }) {
   const teamRefs = teams.map((t) => ({
     id: t.id,
@@ -176,13 +183,30 @@ export default function AdminView({
   const iconClass = "h-4 w-4 shrink-0";
   const sections: AdminSection[] = [
     {
-      // Premier onglet : fusionné avec l'ancien onglet "Calendrier" séparé
-      // (retour de Cindy du 2026-08-21 : "l'onglet accueil devrait être
-      // calendrier et intégrer l'onglet existant 'calendrier'), pour ne
-      // plus avoir à ouvrir deux onglets pour voir "où est-ce que ça
-      // coince" PUIS le planning complet. Le résumé (chiffres clés,
-      // prochain événement, alertes) reste en haut, le calendrier complet
-      // juste en dessous.
+      // Retour de Cindy du 13/09 ("le tableau de bord doit être le premier
+      // onglet partout") : premier dans le MENU (listé avant Calendrier) --
+      // mais l'app continue de s'OUVRIR sur Calendrier (retour de Cindy du
+      // 13/09, "tableau de bord en position une mais ouverture sur
+      // l'onglet 2 calendrier") : voir defaultActiveKey="home" passé à
+      // AdminSidebar plus bas, deux réglages désormais distincts.
+      key: "dashboard",
+      label: "Tableau de bord",
+      icon: <LayoutDashboard className={iconClass} />,
+      content: (
+        <div className="flex flex-col gap-4">
+          {/* Retour de Cindy du 13/09 : résumé club entier, en premier --
+              c'est désormais le vrai contenu de cet onglet, "Envois
+              automatiques" reste en dessous, secondaire. */}
+          <SpaceDashboardSummary summary={dashboardSummary} canManagePhoto />
+          <AutomationSettings settings={automationSettings} />
+        </div>
+      ),
+    },
+    {
+      // Résumé (chiffres clés, prochain événement, alertes) vit maintenant
+      // dans "Tableau de bord" ci-dessus -- cet onglet ne porte plus que le
+      // planning complet. Reste l'onglet d'ouverture par défaut malgré sa
+      // position 2 dans ce tableau (voir defaultActiveKey plus bas).
       key: "home",
       label: "Calendrier",
       icon: <CalendarDays className={iconClass} />,
@@ -203,24 +227,6 @@ export default function AdminView({
           <SponsorsDisplay sponsors={sponsorDisplay} />
         </div>
       ),
-    },
-    {
-      // Retour de Cindy du 10/09 ("alléger l'onglet calendrier") : nouvel
-      // onglet pensé pour accueillir des blocs secondaires (Accès à
-      // l'espace enfant, lien d'abonnement agenda... déjà déplacés côté
-      // Coach/Famille, voir coach-view.tsx/family-view.tsx). Volontairement
-      // second dans la liste, jamais premier : l'ouverture de l'appli doit
-      // toujours se faire sur "Calendrier" (voir admin-sidebar.tsx, le
-      // premier onglet du tableau est l'onglet actif par défaut).
-      //
-      // Retour de Cindy du 12/09 : "Envois automatiques" déménage ici
-      // depuis "Calendrier" (BureauDashboard, où il vivait jusqu'ici) --
-      // même logique d'allégement, ce réglage n'a rien à voir avec le
-      // planning lui-même.
-      key: "dashboard",
-      label: "Tableau de bord",
-      icon: <LayoutDashboard className={iconClass} />,
-      content: <AutomationSettings settings={automationSettings} />,
     },
     {
       key: "members",
@@ -649,5 +655,5 @@ export default function AdminView({
   // Vice-trésorier"...) vit désormais au-dessus des onglets Bureau/Mon
   // équipe (voir DashboardTabs, page.tsx) -- il reste valable quel que soit
   // l'onglet sélectionné, ce n'est plus une info propre à cet espace-ci.
-  return <AdminSidebar sections={visibleSections} />;
+  return <AdminSidebar sections={visibleSections} defaultActiveKey="home" />;
 }

@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowRightLeft,
+  Camera,
   CalendarDays,
   Clock,
   ExternalLink,
@@ -14,6 +15,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { resizeImageForTeamPhoto } from "@/lib/image-resize";
 import { formatFirstName, formatLastName, formatPersonName, sortByLastName } from "@/lib/names";
 import { computePlayerYearStatus, getCurrentSeasonLabel } from "@/lib/season";
 import { sameCategoryFamily, teamCategoryLabel, teamLabel } from "@/lib/teams";
@@ -169,6 +171,54 @@ export default function TeamCard({
   const [switchTeamId, setSwitchTeamId] = useState("");
   const [switching, setSwitching] = useState(false);
   const [switchError, setSwitchError] = useState<string | null>(null);
+
+  // Retour de Cindy du 13/09 ("où j'importe mes photos d'équipe dans le
+  // bureau ?") : même principe que AvatarUpload (affichage optimiste,
+  // écriture directe) -- ici pour teams.photo_url, bucket dédié
+  // team-photos (voir sa migration pour les policies : Bureau ou coach de
+  // CETTE équipe précise, jamais readOnly=true ici).
+  const [photoUrl, setPhotoUrl] = useState(team.photoUrl ?? null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  async function onTeamPhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setPhotoError("Choisis une image.");
+      return;
+    }
+    setUploadingPhoto(true);
+    setPhotoError(null);
+    try {
+      const { blob, ext } = await resizeImageForTeamPhoto(file);
+      const supabase = createClient();
+      const path = `${team.id}/photo.${ext}`;
+      const { error: uploadErr } = await supabase.storage
+        .from("team-photos")
+        .upload(path, blob, { upsert: true, cacheControl: "3600", contentType: blob.type || file.type });
+      if (uploadErr) {
+        setPhotoError("Envoi impossible, réessaie.");
+        return;
+      }
+      const { data } = supabase.storage.from("team-photos").getPublicUrl(path);
+      const bustedUrl = `${data.publicUrl}?t=${Date.now()}`;
+      const { error: updateErr } = await supabase
+        .from("teams")
+        .update({ photo_url: bustedUrl })
+        .eq("id", team.id);
+      if (updateErr) {
+        setPhotoError("Enregistrement impossible, réessaie.");
+        return;
+      }
+      setPhotoUrl(bustedUrl);
+      router.refresh();
+    } catch {
+      setPhotoError("Image illisible, réessaie avec une autre photo.");
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
 
   const [openPlayerForm, setOpenPlayerForm] = useState(false);
   const [newPlayerFirstName, setNewPlayerFirstName] = useState("");
@@ -950,6 +1000,35 @@ export default function TeamCard({
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
+          {/* Retour de Cindy du 13/09 ("où j'importe mes photos d'équipe
+              dans le bureau ?") : miniature paysage + bouton d'envoi, ici
+              plutôt que dans Tableau de bord (résumé club entier côté
+              Bureau, jamais scopé à une seule équipe) -- cet onglet
+              Équipes liste bien chaque équipe une par une, c'est le bon
+              endroit. Jamais affiché en lecture seule (coach qui ne fait
+              QUE jouer dans cette équipe, sans droit d'écriture dessus). */}
+          {!readOnly && (
+            <div className="relative h-10 w-16 shrink-0 overflow-hidden rounded-lg border border-zinc-100 bg-navy">
+              {photoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={photoUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-navy via-navy to-navy-dark">
+                  <Camera className="h-3.5 w-3.5 text-white/60" />
+                </div>
+              )}
+              <label className="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/0 text-transparent transition-colors hover:bg-black/40 hover:text-white">
+                <Camera className="h-3.5 w-3.5" />
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={onTeamPhotoChange}
+                  disabled={uploadingPhoto}
+                  className="hidden"
+                />
+              </label>
+            </div>
+          )}
           <h3 className="font-semibold text-zinc-900">{team.name}</h3>
           {team.category && team.category !== team.name && (
             <span
@@ -960,6 +1039,7 @@ export default function TeamCard({
           )}
         </div>
       </div>
+      {photoError && <p className="mt-1 text-xs text-red-600">{photoError}</p>}
 
       <div className="mt-3">
         <div className="mb-1 flex flex-wrap items-center justify-between gap-2">

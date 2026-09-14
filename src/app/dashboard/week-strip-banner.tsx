@@ -58,7 +58,11 @@ export type WeekStripEvent = {
   // la fois coach de l'équipe et parent d'un joueur concerné), "family"
   // l'emporte (voir la fusion dans page.tsx) : elle garde son bouton
   // présent/absent pour son enfant.
-  source: "coach" | "family";
+  // "bureau" ajouté le 13/09 (carte "Prochain événement" du nouveau
+  // Tableau de bord) : traité comme "coach" partout ci-dessous (jamais de
+  // présent/absent, gestion complète des besoins) -- le Bureau n'a pas
+  // plus de fiche joueur propre qu'un coach pour répondre à sa place.
+  source: "coach" | "family" | "bureau";
   // Toujours vide pour un entraînement et côté coach — même règle que
   // calendar-view.tsx (un entraînement ne montre jamais l'onglet
   // Organisation, un coach ne répond jamais présent/absent).
@@ -136,7 +140,10 @@ function weekSummary(events: WeekStripEvent[], weekStart: Date, weekEnd: Date): 
 // Même habillage que EventRow (child-calendar-tab.tsx) et renderEventCard
 // (calendar-view.tsx) : bordure pointillée + fanion "Spécial" pour un
 // tournoi, bordure gauche épaisse pour un match officiel, fine sinon.
-function DayEventCard({ event }: { event: WeekStripEvent }) {
+// Exportée le 13/09 (retour de Cindy, carte "Prochain événement" complète
+// dans le nouveau Tableau de bord) : réutilisée telle quelle par
+// space-dashboard-summary.tsx, jamais dupliquée.
+export function DayEventCard({ event }: { event: WeekStripEvent }) {
   const style = styleFor(event.eventType);
   const parsed = parseMatchTitle(event.title);
   const home = event.isHome ?? parsed.isHome;
@@ -235,7 +242,7 @@ function DayEventCard({ event }: { event: WeekStripEvent }) {
           )}
         </OrganisationCard>
       )}
-      {event.source === "coach" && hasNeeds && (
+      {(event.source === "coach" || event.source === "bureau") && hasNeeds && (
         <OrganisationCard>
           <VolunteerNeedsPanel eventId={event.id} needs={event.needs} myPlayerIds={[]} canManage bare />
         </OrganisationCard>
