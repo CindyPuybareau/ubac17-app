@@ -317,29 +317,54 @@ export async function getSpaceDashboardSummary(
     // apparaître dans plusieurs lignes team_players (multi-équipes) :
     // dédupliqué par id, ses team_id cumulés pour repasser dans
     // isConcernedByEvent.
-    let rosterQuery = supabase
-      .from("team_players")
-      .select("team_id, player_id, players(id, first_name, last_name)");
-    if (teamIds !== null) rosterQuery = rosterQuery.in("team_id", teamIds);
-    const [{ data: rosterRows }] = await runBatched([() => rosterQuery], semaphore);
-    type RosterRow = {
-      team_id: string;
-      player_id: string;
-      players: { id: string; first_name: string | null; last_name: string | null } | null;
-    };
+    //
+    // Bug trouvé le 14/09 (retour de Cindy, "8 présentes à l'entraînement
+    // mais je n'en vois qu'une, la mienne") : un embed direct
+    // team_players.players(...) ne renvoyait, pour un parent, QUE ses
+    // propres enfants -- la policy RLS "select own or linked players" ne
+    // laisse un parent lire que ses fiches liées, jamais celles de ses
+    // coéquipiers (la policy plus permissive a été retirée le 28/08 au
+    // profit de family_teammate_roster, précisément pour cette raison,
+    // voir 20261029000000_family_teammate_roster_view.sql -- déjà
+    // contourné ainsi pour "Mon Équipe" côté Famille, page.tsx). Même
+    // remède ici : team_players donne les liens (id/équipe, jamais
+    // filtrés), family_teammate_roster donne les noms (vue dédiée,
+    // conçue pour être lisible par le Bureau ET tout parent/coach d'un
+    // coéquipier).
+    let linksQuery = supabase.from("team_players").select("team_id, player_id");
+    if (teamIds !== null) linksQuery = linksQuery.in("team_id", teamIds);
+    const [{ data: linkRows }] = await runBatched([() => linksQuery], semaphore);
+    const rosterPlayerIds = Array.from(new Set((linkRows ?? []).map((r) => r.player_id)));
+    const [{ data: rosterNameRows }] = await runBatched(
+      [
+        () =>
+          rosterPlayerIds.length > 0
+            ? supabase.from("family_teammate_roster").select("id, first_name, last_name").in("id", rosterPlayerIds)
+            : Promise.resolve({
+                data: [] as { id: string; first_name: string | null; last_name: string | null }[],
+                error: null,
+              }),
+      ],
+      semaphore
+    );
+    const nameById = new Map((rosterNameRows ?? []).map((p) => [p.id, p]));
     const rosterByPlayerId = new Map<
       string,
       { id: string; firstName: string | null; lastName: string | null; teamIds: string[] }
     >();
-    ((rosterRows ?? []) as unknown as RosterRow[]).forEach((r) => {
-      if (!r.players) return;
+    (linkRows ?? []).forEach((r) => {
+      const name = nameById.get(r.player_id);
+      // Cas normalement impossible (tout joueur d'une équipe visible via
+      // teamIds est forcément couvert par family_teammate_roster) -- même
+      // filet de sécurité que page.tsx, pas de ligne fantôme sans nom.
+      if (!name) return;
       const existing = rosterByPlayerId.get(r.player_id);
       if (existing) existing.teamIds.push(r.team_id);
       else
         rosterByPlayerId.set(r.player_id, {
-          id: r.players.id,
-          firstName: r.players.first_name,
-          lastName: r.players.last_name,
+          id: r.player_id,
+          firstName: name.first_name,
+          lastName: name.last_name,
           teamIds: [r.team_id],
         });
     });
