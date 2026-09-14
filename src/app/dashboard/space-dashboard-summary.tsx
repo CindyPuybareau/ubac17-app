@@ -42,6 +42,7 @@ export default function SpaceDashboardSummary({
         : {
             played: summary.official.played + summary.friendly.played,
             points: summary.official.points + summary.friendly.points,
+            won: summary.official.won + summary.friendly.won,
           };
 
   async function onPhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -133,90 +134,92 @@ export default function SpaceDashboardSummary({
 
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
-      {/* Bandeau compact (retour de Cindy du 14/09, "bloc bleu quasi vide
-          qui oblige à scroller") : hauteur FIXE plutôt qu'un aspect-ratio
-          (16/9 sur une colonne large donnait 400-500px pour rien) --
-          ~100px sur mobile, jusqu'à 160px sur desktop, jamais plus. Badge
-          "Saison" et logo se superposent maintenant EN OVERLAY sur ce
-          même bandeau (plus de ligne séparée au-dessus) : un seul bloc
-          court, pas deux. Une vraie photo garde son dégradé sombre en bas
-          pour que badge/logo restent lisibles dessus ; sans photo, le
-          dégradé marine suffit déjà (mêmes tons), pas besoin d'assombrir
-          davantage. */}
-      <div className="relative h-[100px] w-full overflow-hidden rounded-2xl border border-zinc-100 bg-navy shadow-sm sm:h-32 lg:h-40">
-        {summary.singleTeamId && photoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={photoUrl} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <div className="h-full w-full bg-gradient-to-br from-navy via-navy to-navy-dark" />
-        )}
-        {summary.singleTeamId && photoUrl && (
-          <div
-            aria-hidden
-            className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-navy/80 to-transparent"
-          />
-        )}
-        <div className="absolute inset-0 flex items-center justify-between px-3">
-          <span className="inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full bg-ubac-yellow/15 px-3 py-1 text-xs font-semibold uppercase leading-none text-ubac-yellow-dark backdrop-blur-sm">
-            Saison {summary.seasonLabel}
-          </span>
-          <Image
-            src="/logo.png"
-            alt="UBAC"
-            width={36}
-            height={36}
-            className="h-8 w-8 shrink-0 object-contain opacity-90 sm:h-9 sm:w-9"
-          />
-        </div>
-        {canManagePhoto && summary.singleTeamId && (
-          <>
-            <button
-              type="button"
-              onClick={() => inputRef.current?.click()}
-              disabled={uploading}
-              title="Changer la photo de l'équipe"
-              className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-navy/70 text-white shadow-sm backdrop-blur-sm transition-colors hover:bg-navy-dark disabled:opacity-60"
-            >
-              <Camera className="h-4 w-4" />
-            </button>
-            <input ref={inputRef} type="file" accept="image/*" onChange={onPhotoChange} className="hidden" />
-          </>
-        )}
+      {/* Retour de Cindy du 14/09 ("nos photos de groupe sont en format
+          portrait... têtes coupées, le badge de saison cache une partie
+          des visages") : le badge "Saison" sort complètement de la photo
+          -- même habillage que le signet "MES ENFANTS" (family-view.tsx),
+          au-dessus des pastilles de filtre plutôt que superposé. */}
+      <span className="inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full bg-ubac-yellow/15 px-3 py-1 text-xs font-semibold uppercase leading-none text-ubac-yellow-dark">
+        Saison {summary.seasonLabel}
+      </span>
+
+      {/* Retour de Cindy du 13/09 ("statistique matchs amicaux aussi...
+          onglet déroulant pour pouvoir choisir") : 3 positions plutôt
+          qu'un simple on/off, "Tous" cumule les deux -- même style de
+          pastille que TeamFilterDropdown/"Aujourd'hui" déjà dans
+          l'appli. */}
+      <div className="flex w-fit rounded-full border border-zinc-200 bg-zinc-50 p-0.5 text-xs font-semibold">
+        {(
+          [
+            { key: "official", label: "Officiels" },
+            { key: "friendly", label: "Amicaux" },
+            { key: "all", label: "Tous" },
+          ] as const
+        ).map((opt) => (
+          <button
+            key={opt.key}
+            type="button"
+            onClick={() => setFilter(opt.key)}
+            className={`rounded-full px-3 py-1.5 transition-colors ${
+              filter === opt.key ? "bg-navy text-white" : "text-zinc-500 hover:text-navy"
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
       </div>
-      {uploadError && <p className="text-xs text-red-600">{uploadError}</p>}
 
-      <div className="flex flex-col gap-3">
-        {/* Retour de Cindy du 13/09 ("statistique matchs amicaux aussi...
-            onglet déroulant pour pouvoir choisir") : 3 positions plutôt
-            qu'un simple on/off, "Tous" cumule les deux -- même style de
-            pastille que TeamFilterDropdown/"Aujourd'hui" déjà dans
-            l'appli. */}
-        <div className="flex w-fit rounded-full border border-zinc-200 bg-zinc-50 p-0.5 text-xs font-semibold">
-          {(
-            [
-              { key: "official", label: "Officiels" },
-              { key: "friendly", label: "Amicaux" },
-              { key: "all", label: "Tous" },
-            ] as const
-          ).map((opt) => (
-            <button
-              key={opt.key}
-              type="button"
-              onClick={() => setFilter(opt.key)}
-              className={`rounded-full px-3 py-1.5 transition-colors ${
-                filter === opt.key ? "bg-navy text-white" : "text-zinc-500 hover:text-navy"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+      {/* Retour de Cindy du 14/09 ("je me suis trompée, pardon, paysage !") :
+          empilé sur mobile (photo pleine largeur en haut, ratio paysage
+          raisonnable, grille KPI 2x2 dessous) -- côte à côte à partir de
+          sm: (photo ~58% de la largeur, pour respecter son ratio naturel
+          plutôt que l'écraser, grille sur le reste). aspect-[4/3] --
+          "raisonnable" plutôt qu'un bandeau très large et écrasé (16/9
+          sur toute la largeur du composant, essayé puis retiré) : moins
+          de recadrage sur une photo de groupe déjà large. */}
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden rounded-2xl border border-zinc-100 bg-navy shadow-sm sm:w-[58%]">
+          {summary.singleTeamId && photoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={photoUrl} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-navy via-navy to-navy-dark">
+              <Image src="/logo.png" alt="UBAC" width={64} height={64} className="object-contain opacity-90" />
+            </div>
+          )}
+          {/* Logo mascotte en petit coin bas-droit UNIQUEMENT par-dessus une
+              vraie photo (retour de Cindy du 14/09, "petit, semi-
+              transparent... sans jamais recouvrir de visages") -- jamais
+              au centre d'une photo de groupe, contrairement au repli
+              ci-dessus (aucune photo, rien à recouvrir). */}
+          {summary.singleTeamId && photoUrl && (
+            <Image
+              src="/logo.png"
+              alt=""
+              aria-hidden
+              width={28}
+              height={28}
+              className="absolute bottom-2 right-2 h-7 w-7 object-contain opacity-60"
+            />
+          )}
+          {canManagePhoto && summary.singleTeamId && (
+            <>
+              <button
+                type="button"
+                onClick={() => inputRef.current?.click()}
+                disabled={uploading}
+                title="Changer la photo de l'équipe"
+                className="absolute bottom-2 left-2 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-navy/70 text-white shadow-sm backdrop-blur-sm transition-colors hover:bg-navy-dark disabled:opacity-60"
+              >
+                <Camera className="h-4 w-4" />
+              </button>
+              <input ref={inputRef} type="file" accept="image/*" onChange={onPhotoChange} className="hidden" />
+            </>
+          )}
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:flex-1 sm:grid-cols-2">
           <KpiTile icon={Users} iconClass="text-navy" iconBgClass="bg-navy/10" value={summary.playerCount} label="Joueurs" />
-          {summary.teamCount !== null && (
-            <KpiTile icon={ShieldCheck} iconClass="text-court-green" iconBgClass="bg-court-green/10" value={summary.teamCount} label="Équipes" />
-          )}
           <KpiTile
             icon={Trophy}
             iconClass="text-ubac-yellow-dark"
@@ -224,6 +227,12 @@ export default function SpaceDashboardSummary({
             value={stats.played}
             label="Matchs joués"
           />
+          {/* Retour de Cindy du 14/09 ("Victoires") : remplace "Équipes"
+              (jamais pertinent hors Bureau -- teamCount y valait toujours
+              null) -- celle-ci s'applique partout (club entier ou une
+              seule équipe), et complète mieux "Matchs joués"/"Points
+              marqués" dans une grille 2x2 qui n'a plus de case creuse. */}
+          <KpiTile icon={ShieldCheck} iconClass="text-court-green" iconBgClass="bg-court-green/10" value={stats.won} label="Victoires" />
           <KpiTile
             icon={Trophy}
             iconClass="text-coral"
@@ -233,6 +242,7 @@ export default function SpaceDashboardSummary({
           />
         </div>
       </div>
+      {uploadError && <p className="text-xs text-red-600">{uploadError}</p>}
 
       {nextEventsForCards.length > 0 && (
         <div className="flex flex-col gap-1.5">

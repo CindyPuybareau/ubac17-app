@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCurrentSeasonLabel, getCurrentSeasonWindow } from "./season";
 import { getVolunteerNeedsByEventId, type VolunteerNeed } from "@/app/dashboard/event-volunteer-needs";
+import { runBatched, Semaphore } from "./batch";
 
 // "Tableau de bord" (retour de Cindy du 13/09, "ce que tu mettrais dans le
 // tableau de bord... photo d'équipe, nombre de joueurs, matchs officiels/
@@ -58,8 +59,12 @@ export type SpaceDashboardSummary = {
   // d'équipes n'a pas de sens une fois qu'on est déjà dans une équipe
   // précise.
   teamCount: number | null;
-  official: { played: number; points: number };
-  friendly: { played: number; points: number };
+  // "won" ajouté le 14/09 (nouvelle grille KPI 2x2, "Victoires" plutôt
+  // qu'"Équipes" -- pertinent aussi bien pour le club entier que pour une
+  // seule équipe, contrairement à teamCount ci-dessus, toujours null hors
+  // Bureau).
+  official: { played: number; points: number; won: number };
+  friendly: { played: number; points: number; won: number };
   // Retour de Cindy du 14/09 ("le bureau n'a pas qu'un seul entraînement de
   // prévu cette semaine... si plusieurs événements dans la journée, pouvoir
   // les visualiser") : TOUS les événements du jour le plus proche (pas
@@ -69,7 +74,7 @@ export type SpaceDashboardSummary = {
   seasonLabel: string;
 };
 
-const EMPTY_MATCH_STATS = { played: 0, points: 0 };
+const EMPTY_MATCH_STATS = { played: 0, points: 0, won: 0 };
 
 // Retour de Cindy du 13/09 : même bug/même correctif que respondingPlayers
 // (calendar-view.tsx) -- teamId ET target_team_ids tous deux vides encode
@@ -96,7 +101,19 @@ export async function getSpaceDashboardSummary(
   // événement, et donc leur faire porter un bouton Présent/Absent. Jamais
   // fourni côté Bureau/Coach (rsvpPlayers restera toujours vide pour eux,
   // ce qui est le comportement voulu -- même règle que DayEventCard).
-  rsvpCandidates: { id: string; name: string; teamIds: string[] }[] = []
+  rsvpCandidates: { id: string; name: string; teamIds: string[] }[] = [],
+  // Retour de Cindy du 14/09 ("ça rame en local"... "je n'arrive pas à me
+  // connecter") : ces requêtes ne passaient par AUCUN plafond, alors que
+  // tout le reste de page.tsx respecte scrupuleusement le Semaphore
+  // partagé (voir batch.ts) pour ne jamais dépasser les 15 connexions
+  // Postgres de l'offre Supabase -- un seul chargement (Bureau, Coach OU
+  // Famille) ajoutait jusqu'à 8 requêtes strictement simultanées en plus
+  // de tout le reste, assez pour déclencher un vrai "statement timeout"
+  // Postgres sur une requête complètement différente (getEventTasksByEventId,
+  // vu dans les logs). Optionnel avec un plafond local par défaut : cette
+  // fonction reste appelable isolément (tests, un futur appelant qui
+  // n'aurait pas encore de Semaphore partagé) sans jamais planter.
+  dbLimit: Semaphore | number = 4
 ): Promise<SpaceDashboardSummary> {
   const seasonLabel = getCurrentSeasonLabel();
 
@@ -122,51 +139,62 @@ export async function getSpaceDashboardSummary(
 
   const { startIso, endIso } = getCurrentSeasonWindow();
   const singleTeamId = teamIds && teamIds.length === 1 ? teamIds[0] : null;
+  // Même normalisation que runBatched (batch.ts) : un Semaphore déjà
+  // construit passe tel quel (le Semaphore PARTAGÉ de page.tsx, dans
+  // l'usage réel), un simple nombre en construit un local -- getVolunteer
+  // NeedsByEventId n'accepte qu'un vrai Semaphore, jamais un nombre.
+  const semaphore = dbLimit instanceof Semaphore ? dbLimit : new Semaphore(dbLimit);
 
   const nowIso = new Date().toISOString();
-  const [rosterRes, teamCountRes, photoRes, matchesRes, firstUpcomingRes] = await Promise.all([
-    teamIds === null
-      ? supabase.from("players").select("id", { count: "exact", head: true }).is("archived_at", null)
-      : supabase.from("team_players").select("player_id").in("team_id", teamIds),
-    teamIds === null
-      ? supabase.from("teams").select("id", { count: "exact", head: true })
-      : Promise.resolve({ count: null, data: null, error: null }),
-    singleTeamId
-      ? supabase.from("teams").select("photo_url").eq("id", singleTeamId).maybeSingle()
-      : Promise.resolve({ data: null, error: null }),
-    // Matchs (officiels = MATCH, amicaux = FRIENDLY) de la saison en cours,
-    // avec un score déjà enregistré -- un match programmé mais pas encore
-    // joué (ou dont le score a été oublié) ne doit compter ni dans "joués"
-    // ni dans les points. Un tournoi (TOURNAMENT) n'a pas de score unique
-    // opposant deux équipes au sens propre -- volontairement hors de ces
-    // deux compteurs.
-    (() => {
-      let q = supabase
-        .from("events")
-        .select("event_type, team_score")
-        .in("event_type", ["MATCH", "FRIENDLY"])
-        .gte("start_time", startIso)
-        .lt("start_time", endIso)
-        .not("team_score", "is", null);
-      if (teamIds !== null) q = q.in("team_id", teamIds);
-      return q;
-    })(),
-    // Retour de Cindy du 14/09 ("plusieurs événements dans la journée,
-    // pouvoir les visualiser") : première étape en deux temps -- juste la
-    // date du tout premier événement à venir, pour ensuite borner la
-    // vraie requête (plus bas) à CETTE journée entière plutôt qu'à une
-    // seule ligne.
-    (() => {
-      let q = supabase
-        .from("events")
-        .select("start_time")
-        .gte("start_time", nowIso)
-        .order("start_time", { ascending: true })
-        .limit(1);
-      if (teamIds !== null) q = q.in("team_id", teamIds);
-      return q;
-    })(),
-  ]);
+  const [rosterRes, teamCountRes, photoRes, matchesRes, firstUpcomingRes] = await runBatched(
+    [
+      () =>
+        teamIds === null
+          ? supabase.from("players").select("id", { count: "exact", head: true }).is("archived_at", null)
+          : supabase.from("team_players").select("player_id").in("team_id", teamIds),
+      () =>
+        teamIds === null
+          ? supabase.from("teams").select("id", { count: "exact", head: true })
+          : Promise.resolve({ count: null, data: null, error: null }),
+      () =>
+        singleTeamId
+          ? supabase.from("teams").select("photo_url").eq("id", singleTeamId).maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+      // Matchs (officiels = MATCH, amicaux = FRIENDLY) de la saison en
+      // cours, avec un score déjà enregistré -- un match programmé mais
+      // pas encore joué (ou dont le score a été oublié) ne doit compter
+      // ni dans "joués" ni dans les points. Un tournoi (TOURNAMENT) n'a
+      // pas de score unique opposant deux équipes au sens propre --
+      // volontairement hors de ces deux compteurs.
+      () => {
+        let q = supabase
+          .from("events")
+          .select("event_type, team_score, opponent_score")
+          .in("event_type", ["MATCH", "FRIENDLY"])
+          .gte("start_time", startIso)
+          .lt("start_time", endIso)
+          .not("team_score", "is", null);
+        if (teamIds !== null) q = q.in("team_id", teamIds);
+        return q;
+      },
+      // Retour de Cindy du 14/09 ("plusieurs événements dans la journée,
+      // pouvoir les visualiser") : première étape en deux temps -- juste
+      // la date du tout premier événement à venir, pour ensuite borner la
+      // vraie requête (plus bas) à CETTE journée entière plutôt qu'à une
+      // seule ligne.
+      () => {
+        let q = supabase
+          .from("events")
+          .select("start_time")
+          .gte("start_time", nowIso)
+          .order("start_time", { ascending: true })
+          .limit(1);
+        if (teamIds !== null) q = q.in("team_id", teamIds);
+        return q;
+      },
+    ],
+    semaphore
+  );
 
   const playerCount =
     teamIds === null
@@ -177,10 +205,13 @@ export async function getSpaceDashboardSummary(
 
   const official = { ...EMPTY_MATCH_STATS };
   const friendly = { ...EMPTY_MATCH_STATS };
-  ((matchesRes.data ?? []) as { event_type: string; team_score: number | null }[]).forEach((m) => {
+  (
+    (matchesRes.data ?? []) as { event_type: string; team_score: number | null; opponent_score: number | null }[]
+  ).forEach((m) => {
     const bucket = m.event_type === "MATCH" ? official : friendly;
     bucket.played += 1;
     bucket.points += m.team_score ?? 0;
+    if ((m.team_score ?? 0) > (m.opponent_score ?? 0)) bucket.won += 1;
   });
 
   const firstUpcomingStart = (firstUpcomingRes.data ?? [])[0]?.start_time as string | undefined;
@@ -222,7 +253,7 @@ export async function getSpaceDashboardSummary(
       .lt("start_time", dayEnd)
       .order("start_time", { ascending: true });
     if (teamIds !== null) dayQuery = dayQuery.in("team_id", teamIds);
-    const { data } = await dayQuery;
+    const [{ data }] = await runBatched([() => dayQuery], semaphore);
     dayRows = (data ?? []) as unknown as EventRow[];
   }
 
@@ -233,7 +264,7 @@ export async function getSpaceDashboardSummary(
     // (VolunteerNeedsPanel, calendar-view.tsx...) -- jamais une requête
     // event_volunteer_needs/signups dupliquée ici. Un seul appel pour
     // TOUS les événements du jour plutôt qu'un par carte.
-    const needsByEventId = await getVolunteerNeedsByEventId(supabase, eventIds);
+    const needsByEventId = await getVolunteerNeedsByEventId(supabase, eventIds, semaphore);
 
     // Une seule requête rsvps pour tous les événements du jour à la fois
     // (retour de Cindy du 13/09, "pour les parents pouvoir y répondre
@@ -242,11 +273,17 @@ export async function getSpaceDashboardSummary(
     const candidateIds = rsvpCandidates.map((p) => p.id);
     const statusByEventAndPlayer = new Map<string, string>();
     if (candidateIds.length > 0) {
-      const { data: rsvpRows } = await supabase
-        .from("rsvps")
-        .select("event_id, player_id, status")
-        .in("event_id", eventIds)
-        .in("player_id", candidateIds);
+      const [{ data: rsvpRows }] = await runBatched(
+        [
+          () =>
+            supabase
+              .from("rsvps")
+              .select("event_id, player_id, status")
+              .in("event_id", eventIds)
+              .in("player_id", candidateIds),
+        ],
+        semaphore
+      );
       ((rsvpRows ?? []) as { event_id: string; player_id: string; status: string }[]).forEach((r) => {
         statusByEventAndPlayer.set(`${r.event_id}:${r.player_id}`, r.status);
       });

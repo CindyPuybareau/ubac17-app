@@ -3785,13 +3785,15 @@ export default async function DashboardPage({
     supabase,
     activeTab === "own-team" ? Array.from(new Set(myTeamRsvpPlayers.flatMap((p) => p.teamIds))) : [],
     "family",
-    activeTab === "own-team" ? myTeamRsvpPlayers : []
+    activeTab === "own-team" ? myTeamRsvpPlayers : [],
+    dbLimit
   );
   const familyChildrenDashboardSummary = await getSpaceDashboardSummary(
     supabase,
     activeTab === "children" ? Array.from(new Set(myChildrenRsvpPlayers.flatMap((p) => p.teamIds))) : [],
     "family",
-    activeTab === "children" ? myChildrenRsvpPlayers : []
+    activeTab === "children" ? myChildrenRsvpPlayers : [],
+    dbLimit
   );
 
   function buildFamilyView(
@@ -3849,7 +3851,9 @@ export default async function DashboardPage({
     const adminDashboardSummary = await getSpaceDashboardSummary(
       supabase,
       activeTab === "admin" ? null : [],
-      "bureau"
+      "bureau",
+      [],
+      dbLimit
     );
     tabs.push({
       key: "admin",
@@ -3898,7 +3902,9 @@ export default async function DashboardPage({
     const coachDashboardSummary = await getSpaceDashboardSummary(
       supabase,
       activeTab === "coach" ? coachedTeams.map((t) => t.id) : [],
-      "coach"
+      "coach",
+      [],
+      dbLimit
     );
     tabs.push({
       key: "coach",
