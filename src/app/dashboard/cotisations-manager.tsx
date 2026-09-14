@@ -34,6 +34,7 @@ import CotisationParticipantsTable, {
   roundCents,
 } from "./cotisation-participants-table";
 import type { StatusKey } from "./cotisation-shared";
+import { getCurrentSeasonLabel } from "@/lib/season";
 import PenalitesManager from "./penalites-manager";
 import type {
   AdminCategoryTariff,
@@ -360,6 +361,24 @@ export default function CotisationsManager({
     [cotisations]
   );
 
+  // Retour de Cindy du 14/09 (Cyril Charpenteau, coach sans équipe joueur,
+  // sans aucune ligne Cotisations) : il n'existe ni trigger automatique ni
+  // import qui couvre systématiquement ce cas -- un coach sans catégorie
+  // joueur n'obtient sa ligne (souvent 0€/Offert) que si le Bureau la crée
+  // à la main. Ce bandeau détecte silencieusement les futurs oublis
+  // plutôt que de les découvrir des mois plus tard : tout membre actif
+  // sans aucune ligne pour la saison en cours (hors "Événements payants",
+  // qui n'ont jamais vocation à couvrir tout le monde).
+  const currentSeasonLabel = useMemo(() => getCurrentSeasonLabel(), []);
+  const membersMissingCotisation = useMemo(() => {
+    const covered = new Set(
+      seasonCotisations
+        .filter((c) => c.saison === currentSeasonLabel)
+        .map((c) => c.playerId)
+    );
+    return members.filter((m) => !m.archivedAt && !covered.has(m.id));
+  }, [members, seasonCotisations, currentSeasonLabel]);
+
   const selectedCollecte = collectes.find((c) => c.id === selectedCollecteId) ?? null;
   const collecteCotisations = useMemo(
     () => cotisations.filter((c) => c.collecteId === selectedCollecteId),
@@ -549,6 +568,24 @@ export default function CotisationsManager({
               l'onglet Accueil, avec les autres envois automatiques du
               club — un seul panneau de contrôle plutôt qu'un par onglet. */}
           <CategoryTariffsEditor categories={canonicalTeamRefs} tariffs={categoryTariffs} />
+          {membersMissingCotisation.length > 0 && (
+            <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>
+                <span className="font-semibold">
+                  {membersMissingCotisation.length} membre
+                  {membersMissingCotisation.length > 1 ? "s" : ""} actif
+                  {membersMissingCotisation.length > 1 ? "s" : ""} sans ligne de cotisation
+                  {membersMissingCotisation.length > 1 ? "s" : ""} pour la saison {currentSeasonLabel}
+                </span>{" "}
+                (souvent un coach sans équipe joueur, à ajouter manuellement) :{" "}
+                {membersMissingCotisation
+                  .map((m) => `${m.firstName ?? ""} ${m.lastName ?? ""}`.trim())
+                  .join(", ")}
+                .
+              </p>
+            </div>
+          )}
           <KpiHeader
             cotisations={seasonCotisations}
             statusFilter={mainStatusFilter}
