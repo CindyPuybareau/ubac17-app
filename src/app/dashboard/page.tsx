@@ -650,6 +650,61 @@ function resolvePaidInfo(collectes: unknown): {
   };
 }
 
+// Retour de Cindy du 15/09 ("côté Bureau c'est pareil ! trouve une
+// solution") : même correctif que la requête Cotisations plus haut,
+// appliqué cette fois aux 6 requêtes d'événements (Bureau/Coach/Famille,
+// 2 chacune) qui embarquaient cotisations(players(...)) DANS collectes(...)
+// -- Postgres réévaluait toute la chaîne RLS players/team_players pour
+// chaque ligne d'événement ayant une collecte liée. cotisations récupérées
+// à part, seulement pour les collectes réellement présentes dans le lot
+// d'événements chargé (jamais toute la table) -- resolvePaidInfo ci-dessus
+// ne change pas, reçoit juste sa "cotisations" reconstituée ici plutôt
+// qu'imbriquée par Postgres.
+function collecteIdsFromEvents(events: { collectes: unknown }[]): string[] {
+  const ids = new Set<string>();
+  events.forEach((e) => {
+    const rows = Array.isArray(e.collectes) ? e.collectes : e.collectes ? [e.collectes] : [];
+    (rows as { id: string }[]).forEach((c) => c.id && ids.add(c.id));
+  });
+  return Array.from(ids);
+}
+
+function attachCotisationsToCollectes(
+  collectes: unknown,
+  paidParticipantsByCollecteId: Map<string, { players: unknown }[]>
+): unknown {
+  const rows = Array.isArray(collectes) ? collectes : collectes ? [collectes] : [];
+  return rows.map((c) => ({
+    ...(c as object),
+    cotisations: paidParticipantsByCollecteId.get((c as { id: string }).id) ?? [],
+  }));
+}
+
+async function fetchPaidParticipantsByCollecteId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  collecteIds: string[],
+  dbLimit: Semaphore
+): Promise<Map<string, { players: unknown }[]>> {
+  const map = new Map<string, { players: unknown }[]>();
+  if (collecteIds.length === 0) return map;
+  const [{ data }] = await runBatched(
+    [
+      () =>
+        supabase
+          .from("cotisations")
+          .select("collecte_id, players(id, first_name, last_name)")
+          .in("collecte_id", collecteIds),
+    ],
+    dbLimit
+  );
+  (data ?? []).forEach((row) => {
+    const list = map.get(row.collecte_id) ?? [];
+    list.push({ players: row.players });
+    map.set(row.collecte_id, list);
+  });
+  return map;
+}
+
 // Plain (non-component) helper so the "now" read doesn't happen inside the
 // page component's own render body — matches the existing family-data.ts
 // pattern of computing dates in ordinary functions, not inline in JSX/page
@@ -1564,7 +1619,7 @@ export default async function DashboardPage({
           supabase
             .from("events")
             .select(
-              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
+              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
             )
             .neq("event_type", "TRAINING")
             .gte("start_time", eventsWindowStart)
@@ -1577,7 +1632,7 @@ export default async function DashboardPage({
           supabase
             .from("events")
             .select(
-              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
+              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
             )
             .eq("event_type", "TRAINING")
             .gte("start_time", trainingsWindowStart)
@@ -1803,6 +1858,15 @@ export default async function DashboardPage({
           });
     const rsvpsByEventPromise = fetchRsvpsByEvent(supabase, upcomingEventIds, dbLimit);
     const adminVolunteerNeedsPromise = getVolunteerNeedsByEventId(supabase, upcomingEventIds, dbLimit);
+    // Retour de Cindy du 15/09 ("côté Bureau c'est pareil") : voir
+    // fetchPaidParticipantsByCollecteId plus haut -- remplace l'embed
+    // cotisations(players(...)) retiré des 2 requêtes d'événements
+    // ci-dessus, seulement pour les collectes réellement présentes ici.
+    const adminPaidParticipantsPromise = fetchPaidParticipantsByCollecteId(
+      supabase,
+      collecteIdsFromEvents(adminEventsData),
+      dbLimit
+    );
     const adminNextEventRsvpRes = await adminNextEventRsvpPromise;
     logQueryErrors("Bureau (prochain événement)", { adminNextEventRsvpRes });
     const adminNextEventRsvpRows = adminNextEventRsvpRes.data;
@@ -2239,6 +2303,7 @@ export default async function DashboardPage({
       };
     });
 
+    const adminPaidParticipantsByCollecteId = await adminPaidParticipantsPromise;
     adminUpcomingEvents = adminEventsData.map((e) => {
       const team = e.teams as unknown as {
         id: string;
@@ -2268,7 +2333,9 @@ export default async function DashboardPage({
               ).values()
             )
           : unionRoster(rosterByTeam);
-      const paidInfo = resolvePaidInfo(e.collectes);
+      const paidInfo = resolvePaidInfo(
+        attachCotisationsToCollectes(e.collectes, adminPaidParticipantsByCollecteId)
+      );
       return {
         id: e.id,
         title: e.title,
@@ -2446,7 +2513,7 @@ export default async function DashboardPage({
           supabase
             .from("events")
             .select(
-              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
+              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
             )
             .or(teamOrClubWideFilter(coachedTeamIds))
             .neq("event_type", "TRAINING")
@@ -2457,7 +2524,7 @@ export default async function DashboardPage({
           supabase
             .from("events")
             .select(
-              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
+              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
             )
             .or(teamOrClubWideFilter(coachedTeamIds))
             .eq("event_type", "TRAINING")
@@ -2672,6 +2739,13 @@ export default async function DashboardPage({
     // Besoins d'organisation de TOUS les événements de l'équipe, pas
     // seulement ceux à venir — même raison que côté Bureau juste plus haut.
     const coachVolunteerNeedsPromise = getVolunteerNeedsByEventId(supabase, coachEventIds, dbLimit);
+    // Retour de Cindy du 15/09 ("côté Bureau c'est pareil") : voir
+    // fetchPaidParticipantsByCollecteId plus haut.
+    const coachPaidParticipantsPromise = fetchPaidParticipantsByCollecteId(
+      supabase,
+      collecteIdsFromEvents(coachEventsData),
+      dbLimit
+    );
 
     const [playersRes, coachProfilesRes, parentPlayerRes, coachFichesRes] =
       await runBatched(
@@ -2980,6 +3054,7 @@ export default async function DashboardPage({
       })
       .filter((p): p is { id: string; name: string; teamIds: string[] } => Boolean(p));
 
+    const coachPaidParticipantsByCollecteId = await coachPaidParticipantsPromise;
     coachEvents = coachEventsData.map((e) => {
       const team = e.teams as unknown as {
         id: string;
@@ -3027,7 +3102,9 @@ export default async function DashboardPage({
           ownTeamIds.flatMap((id) => rosterByTeam.get(id) ?? []).map((p) => [p.id, p] as const)
         ).values()
       );
-      const paidInfo = resolvePaidInfo(e.collectes);
+      const paidInfo = resolvePaidInfo(
+        attachCotisationsToCollectes(e.collectes, coachPaidParticipantsByCollecteId)
+      );
       return {
         id: e.id,
         title: e.title,
@@ -3356,7 +3433,7 @@ export default async function DashboardPage({
       supabase
         .from("events")
         .select(
-          "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
+          "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
         )
         .or(teamOrClubWideFilter(allTeamIds))
         .neq("event_type", "TRAINING")
@@ -3366,7 +3443,7 @@ export default async function DashboardPage({
       supabase
         .from("events")
         .select(
-          "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link, cotisations(players(id, first_name, last_name)))"
+          "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
         )
         .or(teamOrClubWideFilter(allTeamIds))
         .eq("event_type", "TRAINING")
@@ -3580,6 +3657,13 @@ export default async function DashboardPage({
     );
     const eventIds = eventsData.map((e) => e.id);
     const familyCotisationRows = familyCotisationRes?.data ?? null;
+    // Retour de Cindy du 15/09 ("côté Bureau c'est pareil") : voir
+    // fetchPaidParticipantsByCollecteId plus haut.
+    const familyPaidParticipantsByCollecteId = await fetchPaidParticipantsByCollecteId(
+      supabase,
+      collecteIdsFromEvents(eventsData),
+      dbLimit
+    );
 
     familyEvents = (eventsData ?? []).map((e) => {
       const team = e.teams as unknown as {
@@ -3587,7 +3671,9 @@ export default async function DashboardPage({
         name: string | null;
         category: string | null;
       } | null;
-      const paidInfo = resolvePaidInfo(e.collectes);
+      const paidInfo = resolvePaidInfo(
+        attachCotisationsToCollectes(e.collectes, familyPaidParticipantsByCollecteId)
+      );
       return {
         id: e.id,
         title: e.title,
