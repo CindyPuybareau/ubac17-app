@@ -18,7 +18,7 @@ export default function MentionsLegalesPage() {
       <section>
         <h2 className="font-semibold text-zinc-900">Éditeur du site et de l&apos;application</h2>
         <p className="mt-2">
-          Union Basket Angoulins Châtelaillon (UBAC)
+          Union Basket Angoulins Châtelaillon Saint-Vivien (UBAC)
           <br />
           Association loi 1901
           <br />

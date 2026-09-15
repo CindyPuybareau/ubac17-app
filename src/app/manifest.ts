@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "UBAC - Union Basket Angoulins Châtelaillon",
+    name: "UBAC - Union Basket Angoulins Châtelaillon Saint-Vivien",
     short_name: "UBAC",
     description:
       "Application du club UBAC : membres, calendrier et convocations.",

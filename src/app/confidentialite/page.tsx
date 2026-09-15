@@ -16,7 +16,7 @@ export default function ConfidentialitePage() {
     <LegalPageLayout title="Politique de confidentialité" updated="25 août 2026">
       <p>
         L&apos;application UBAC (ci-après « l&apos;Application ») est un outil de gestion interne
-        réservé aux membres du club Union Basket Angoulins Châtelaillon (UBAC). Cette page
+        réservé aux membres du club Union Basket Angoulins Châtelaillon Saint-Vivien (UBAC). Cette page
         explique quelles données sont collectées, pourquoi, et comment elles sont protégées —
         en particulier celles concernant les enfants licenciés mineurs.
       </p>

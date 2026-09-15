@@ -42,7 +42,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "UBAC - Union Basket Angoulins Châtelaillon",
+  title: "UBAC - Union Basket Angoulins Châtelaillon Saint-Vivien",
   description: "Application du club UBAC : membres, calendrier et convocations.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {

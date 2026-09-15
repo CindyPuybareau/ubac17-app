@@ -208,7 +208,7 @@ const reglementInterieur: ClubDocument = {
     {
       type: "prose",
       paragraphs: [
-        "L'Union Basket Angoulins Châtelaillon est affiliée à la FFBB, association loi de 1901. Ce règlement s'applique à tous les membres de l'UBAC, ainsi qu'aux représentants légaux des membres mineurs — il définit les droits et devoirs de chacun pour que la pratique du basket se déroule dans les meilleures conditions.",
+        "L'Union Basket Angoulins Châtelaillon Saint-Vivien est affiliée à la FFBB, association loi de 1901. Ce règlement s'applique à tous les membres de l'UBAC, ainsi qu'aux représentants légaux des membres mineurs — il définit les droits et devoirs de chacun pour que la pratique du basket se déroule dans les meilleures conditions.",
         "L'adhésion au club engage le licencié à respecter ce règlement et à participer activement à la vie du club.",
       ],
     },

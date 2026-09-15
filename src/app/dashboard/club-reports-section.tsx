@@ -344,7 +344,7 @@ function ReportLetterhead({
         />
         <div className="min-w-0">
           <p className="font-display truncate text-sm font-bold">
-            Union Basket Angoulins Châtelaillon
+            Union Basket Angoulins Châtelaillon Saint-Vivien
           </p>
           <p className="text-[11px] text-white/60">
             {new Date(reportDate).toLocaleDateString("fr-FR", {
@@ -434,7 +434,7 @@ async function buildReportPdfBase64(report: {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(...PDF_COLORS.white);
-  doc.text("Union Basket Angoulins Châtelaillon", marginX + logoWidth, 13);
+  doc.text("Union Basket Angoulins Châtelaillon Saint-Vivien", marginX + logoWidth, 13);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(...PDF_COLORS.headerSubtext);

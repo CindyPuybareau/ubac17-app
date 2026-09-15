@@ -41,8 +41,14 @@ const roles = [
   {
     icon: Building2,
     title: "Pour le Bureau",
+    // Retour de Cindy du 15/09 ("on ne comprend pas le HUB franchement") :
+    // d'abord juste "hub" -> "tous les groupes WhatsApp... réunis au même
+    // endroit", puis retour "plus concis" -- résumé complet proposé en
+    // amont (membres/équipes/cotisations/licences/événements/WhatsApp/
+    // commissions/sponsors/documents/relances/FFBB, voir la conversation)
+    // condensé en une phrase, sans perdre l'essentiel.
     description:
-      "Une vision globale du club, en un coup d'œil. Membres, cotisations, synchronisation FFBB et hub WhatsApp centralisé.",
+      "Une vision globale du club, en un coup d'œil. Membres, équipes, cotisations, licences et événements du club, tous gérés au même endroit — avec les groupes WhatsApp, les commissions et les relances automatiques.",
   },
   {
     icon: ClipboardList,
@@ -70,8 +76,13 @@ const roles = [
     icon: HandHeart,
     title: "Pour les Bénévoles",
     badge: "Nouveau",
+    // Retour de Cindy du 15/09 ("on peut ajouter aussi un espace bénévoles
+    // (commissions et administration)") : commissions/administration
+    // ajoutées à cette même carte plutôt qu'une carte à part (Cindy a
+    // tranché : la carte Bénévoles existe déjà, pas besoin d'en dupliquer
+    // une).
     description:
-      "Un club qui vit grâce à vous. Inscrivez-vous aux créneaux qui vous conviennent — buvette, table de marque, tournois — et suivez votre engagement sur la saison.",
+      "Un club qui vit grâce à vous. Créneaux (buvette, table de marque, tournois), commissions et administration : proposez-vous et suivez votre engagement sur la saison.",
   },
 ];
 
@@ -376,7 +387,7 @@ export default async function Home() {
             <div className="flex items-center gap-2">
               <Image src="/logo.png" alt="UBAC" width={32} height={32} className="h-8 w-8 object-contain" />
               <span className="text-sm font-semibold text-ubac-blue">
-                Union Basket Angoulins Châtelaillon
+                Union Basket Angoulins Châtelaillon Saint-Vivien
               </span>
             </div>
             <div className="flex items-center gap-4">

@@ -231,7 +231,7 @@ async function buildReceiptPdfBase64(c: AdminCotisation, contactEmail: string | 
   doc.setTextColor(...PDF_COLORS.white);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
-  doc.text("Union Basket Angoulins Châtelaillon", marginX + logoWidth, 13);
+  doc.text("Union Basket Angoulins Châtelaillon Saint-Vivien", marginX + logoWidth, 13);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(...PDF_COLORS.headerSubtext);
@@ -1736,7 +1736,7 @@ export default function CotisationParticipantsTable({
                     />
                     <div className="min-w-0">
                       <p className="font-display truncate text-sm font-bold">
-                        Union Basket Angoulins Châtelaillon
+                        Union Basket Angoulins Châtelaillon Saint-Vivien
                       </p>
                       <p className="text-[11px] text-white/60">
                         Angoulins · Châtelaillon-Plage · Saint-Vivien
