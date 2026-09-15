@@ -1536,7 +1536,17 @@ export default async function DashboardPage({
           supabase
             .from("cotisations")
             .select(
-              "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, collecte_id, created_at, players(first_name, last_name, category, membership_type, fbi_status, team_players(teams(name, category))), collectes(id, name, type)"
+              // Retour de Cindy du 15/09 ("ultra long à charger") : cet
+              // embed players(...team_players(teams(...))) forçait Postgres
+              // à réévaluer toute la chaîne de policies RLS (is_own_player/
+              // is_my_child_team/is_coach_anywhere/...) POUR CHAQUE ligne de
+              // cotisations -- 10,7s mesurées en base pour seulement 132
+              // lignes (~80ms de calcul de permissions par ligne, vu dans
+              // les journaux Postgres). joueurs/équipes déjà chargés par
+              // ailleurs dans ce même lot (playersRes/teamPlayersRes/
+              // teamsRes) : réunis en mémoire juste avant adminCotisations
+              // plus bas, jamais réévalués via un embed imbriqué.
+              "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, collecte_id, created_at, collectes(id, name, type)"
             )
             .order("saison", { ascending: false }),
         () =>
@@ -2101,9 +2111,41 @@ export default async function DashboardPage({
       paymentsByCotisationId.set(p.cotisation_id, list);
     });
 
-    adminCotisations = (cotisationsRes.data ?? []).map((c) =>
-      mapCotisationRow(c, paymentsByCotisationId)
+    // Retour de Cindy du 15/09 : remplace l'embed players(...) retiré de
+    // la requête cotisations plus haut -- mêmes champs, puisés dans
+    // playersRes/teamsByPlayerId déjà chargés pour tout le reste de cette
+    // page, jamais une nouvelle requête. mapCotisationRow lui-même ne
+    // change pas : il continue de recevoir exactement la même forme
+    // (players.team_players[0].teams.category), juste reconstituée en
+    // mémoire plutôt qu'imbriquée par Postgres.
+    const cotisationPlayerFieldsById = new Map(
+      (playersRes.data ?? []).map((p) => [
+        p.id,
+        {
+          first_name: p.first_name,
+          last_name: p.last_name,
+          category: p.category,
+          membership_type: p.membership_type,
+          fbi_status: p.fbi_status,
+        },
+      ])
     );
+    adminCotisations = (cotisationsRes.data ?? []).map((c) => {
+      const playerFields = cotisationPlayerFieldsById.get(c.player_id);
+      const playerTeams = teamsByPlayerId.get(c.player_id) ?? [];
+      return mapCotisationRow(
+        {
+          ...c,
+          players: playerFields
+            ? {
+                ...playerFields,
+                team_players: playerTeams.map((t) => ({ teams: { name: t.name, category: t.category } })),
+              }
+            : null,
+        },
+        paymentsByCotisationId
+      );
+    });
 
     adminCollectes = (collectesRes.data ?? []).map((c) => {
       // Jointure directe (collectes.event_id -> events.id) : un seul objet,
@@ -3107,8 +3149,15 @@ export default async function DashboardPage({
     // Ces trois groupes de requêtes ne dépendent que de allTeamIds /
     // familyPlayerIds, déjà connus ci-dessus — jamais les uns des autres —
     // donc partis ensemble plutôt qu'à la queue leu leu.
-    const [teamsQueryResults, eventsRes, trainingsRes, familyCotisationRes, familyPenaliteRes] =
-      await Promise.all([
+    const [
+      teamsQueryResults,
+      eventsRes,
+      trainingsRes,
+      familyCotisationRes,
+      familyPenaliteRes,
+      cotisationPlayerFieldsRes,
+      cotisationPlayerTeamsRes,
+    ] = await Promise.all([
       allTeamIds.length > 0
         ? runBatched(
             [
@@ -3332,7 +3381,17 @@ export default async function DashboardPage({
         ? supabase
             .from("cotisations")
             .select(
-              "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, collecte_id, created_at, players(first_name, last_name, category, membership_type, fbi_status, team_players(teams(name, category))), collectes(id, name, type)"
+              // Retour de Cindy du 15/09 ("ultra long à charger") : même
+              // correctif que le bloc Bureau plus haut -- l'embed
+              // players(...team_players(teams(...))) forçait Postgres à
+              // réévaluer toute la chaîne RLS pour chaque ligne (10,7s
+              // mesurées en base pour 132 lignes côté Bureau). Ici la
+              // portée est déjà réduite à familyPlayerIds, mais le même
+              // coût par ligne s'applique -- joueurs/équipes récupérés à
+              // part ci-dessous (cotisationPlayerFieldsRes/
+              // cotisationPlayerTeamsRes), jamais réévalués via un embed
+              // imbriqué.
+              "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, collecte_id, created_at, collectes(id, name, type)"
             )
             .in("player_id", familyPlayerIds)
             .order("saison", { ascending: false })
@@ -3347,6 +3406,25 @@ export default async function DashboardPage({
             )
             .in("player_id", familyPlayerIds)
             .order("penalite_date", { ascending: false })
+        : null,
+      // Champs joueur pour reconstituer ce que l'embed retiré ci-dessus
+      // fournissait -- requête plate, jamais imbriquée, donc jamais
+      // réévaluée par ligne de cotisations.
+      familyPlayerIds.length > 0
+        ? supabase
+            .from("players")
+            .select("id, first_name, last_name, category, membership_type, fbi_status")
+            .in("id", familyPlayerIds)
+        : null,
+      // Catégorie de l'équipe réellement affectée (même raison que
+      // realCategory dans mapCotisationRow) -- table teams elle-même sans
+      // RLS coûteuse (policy "select all teams"), donc un embed direct ici
+      // reste bon marché, contrairement à l'ancien embed sur players.
+      familyPlayerIds.length > 0
+        ? supabase
+            .from("team_players")
+            .select("player_id, teams(name, category)")
+            .in("player_id", familyPlayerIds)
         : null,
     ]);
 
@@ -3665,9 +3743,43 @@ export default async function DashboardPage({
         });
         familyPaymentsByCotisationId.set(p.cotisation_id, list);
       });
-      familyCotisations = familyCotisationRows.map((c) =>
-        mapCotisationRow(c, familyPaymentsByCotisationId)
+      // Retour de Cindy du 15/09 : remplace l'embed players(...) retiré de
+      // la requête cotisations plus haut -- mêmes champs, puisés dans
+      // cotisationPlayerFieldsRes/cotisationPlayerTeamsRes chargés à part
+      // juste au-dessus, jamais réévalués par ligne de cotisations.
+      // mapCotisationRow lui-même ne change pas : il continue de recevoir
+      // exactement la même forme (players.team_players[0].teams.category).
+      const familyCotisationPlayerFieldsById = new Map(
+        (cotisationPlayerFieldsRes?.data ?? []).map((p) => [
+          p.id,
+          {
+            first_name: p.first_name,
+            last_name: p.last_name,
+            category: p.category,
+            membership_type: p.membership_type,
+            fbi_status: p.fbi_status,
+          },
+        ])
       );
+      const familyCotisationTeamsByPlayerId = new Map<string, { name: string | null; category: string | null }[]>();
+      (cotisationPlayerTeamsRes?.data ?? []).forEach((tp) => {
+        const team = tp.teams as unknown as { name: string | null; category: string | null } | null;
+        if (!team) return;
+        const list = familyCotisationTeamsByPlayerId.get(tp.player_id) ?? [];
+        list.push(team);
+        familyCotisationTeamsByPlayerId.set(tp.player_id, list);
+      });
+      familyCotisations = familyCotisationRows.map((c) => {
+        const playerFields = familyCotisationPlayerFieldsById.get(c.player_id);
+        const playerTeams = familyCotisationTeamsByPlayerId.get(c.player_id) ?? [];
+        return mapCotisationRow(
+          {
+            ...c,
+            players: playerFields ? { ...playerFields, team_players: playerTeams.map((t) => ({ teams: t })) } : null,
+          },
+          familyPaymentsByCotisationId
+        );
+      });
     }
 
     // eventTasksByEventId (zone prioritaire) n'est fusionné qu'après le
