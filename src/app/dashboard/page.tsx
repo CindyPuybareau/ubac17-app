@@ -9,6 +9,16 @@ import { localDateFromParts } from "@/lib/local-date";
 import { getSpaceDashboardSummary, type SpaceDashboardSummary } from "@/lib/space-dashboard";
 import { getCachedTeams, getCachedCategoryTariffs, getCachedAccessProfiles } from "@/lib/reference-cache";
 import DashboardTabs, { type DashboardTab } from "./dashboard-tabs";
+
+// Retour de Cindy du 15/09 ("This page couldn't load" sur Vercel) : sans
+// budget explicite, cette page tombait sur la limite de durée par défaut
+// de Vercel -- bien avant que les requêtes en base (elles, patientes)
+// n'aient fini de répondre, surtout pour un compte lourd comme Basile
+// pendant un pic de charge partagée. Même correctif que /api/sync-ffbb
+// (route.ts) : ne règle pas la lenteur elle-même, mais laisse la page le
+// temps de répondre au lieu d'être tuée en cours de route par
+// l'hébergeur.
+export const maxDuration = 60;
 import AdminView from "./admin-view";
 import type { RosterPlayer, TeamWithMembers } from "./team-manager";
 import CoachView from "./coach-view";
