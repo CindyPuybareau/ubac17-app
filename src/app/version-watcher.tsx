@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { RefreshCw } from "lucide-react";
 
 // Retour de Cindy du 14/09 ("les enfants n'ont pas à supprimer leur appli
 // sur mobile pour la réinstaller, c'est chiant") : une PWA "ajoutée à
@@ -108,7 +109,17 @@ export default function VersionWatcher() {
   if (!updateAvailable) return null;
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-[100] flex flex-wrap items-center justify-center gap-2.5 bg-navy px-4 py-2.5 text-center text-sm text-white shadow-lg sm:gap-3">
+    // Retour de Cindy du 15/09 ("on ne le voit pas, c'est caché") :
+    // z-[200] (au-dessus de tout le reste de l'appli, y compris les
+    // superpositions plein écran à z-50) + ombre plus marquée pour se
+    // détacher franchement du contenu ; pb-[env(safe-area-inset-bottom)]
+    // laisse la place à la barre de geste des iPhone récents en PWA
+    // "ajoutée à l'écran d'accueil" -- sinon le bouton Recharger se
+    // retrouvait collé sous cette barre, difficile à taper précisément.
+    <div
+      className="animate-version-banner-in fixed inset-x-0 bottom-0 z-[200] flex flex-wrap items-center justify-center gap-2.5 border-t border-white/10 bg-navy px-4 pb-[calc(env(safe-area-inset-bottom)+0.625rem)] pt-2.5 text-center text-sm text-white shadow-[0_-4px_16px_rgba(0,0,0,0.25)] sm:gap-3"
+    >
+      <RefreshCw className="h-4 w-4 shrink-0 text-ubac-yellow" />
       <span>Une nouvelle version de l&apos;appli est disponible.</span>
       <button
         type="button"

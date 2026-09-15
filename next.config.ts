@@ -45,6 +45,15 @@ const nextConfig: NextConfig = {
   // techno utilisée à quiconque inspecte les réponses.
   poweredByHeader: false,
 
+  // Désactivé (retour de Cindy du 15/09, capture montrant l'indicateur de
+  // dev Next.js chevauchant le bandeau "Nouvelle version disponible", voir
+  // version-watcher.tsx) -- le déplacer dans un autre coin ne suffisait
+  // pas (le bandeau occupe toute la largeur de l'écran, il n'y a pas de
+  // coin où les deux ne se croisent jamais sur mobile). Visible seulement
+  // en local (npm run dev), jamais sur le site en ligne : rien à perdre à
+  // le couper complètement.
+  devIndicators: false,
+
   async headers() {
     return [
       {

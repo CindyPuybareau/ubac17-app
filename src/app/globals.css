@@ -177,3 +177,27 @@ h4 {
     animation: none;
   }
 }
+
+/* Bandeau "Nouvelle version disponible" (retour de Cindy du 15/09,
+   "on ne le voit pas, c'est caché") : glisse depuis le bas au lieu
+   d'apparaître brutalement -- même discipline que bell-shake, courte et
+   jamais en boucle, désactivée si l'utilisateur préfère moins
+   d'animations (voir version-watcher.tsx). */
+@keyframes version-banner-in {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.animate-version-banner-in {
+  animation: version-banner-in 0.35s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-version-banner-in {
+    animation: none;
+  }
+}
