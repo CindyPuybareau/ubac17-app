@@ -46,16 +46,28 @@ export default function FfbbManager({ teams }: { teams: TeamRef[] }) {
     // FFBB), un délai de quelques secondes total est largement acceptable
     // pour une action volontaire du Bureau.
     for (const team of syncableTeams) {
+      // Retour de Cindy du 15/09 ("ça tourne dans le vide") : cette boucle
+      // est SÉQUENTIELLE -- une seule équipe bloquée bloquait donc
+      // "Tout synchroniser" indéfiniment, y compris pour toutes les
+      // équipes suivantes jamais atteintes. Même filet de sécurité que
+      // ffbb-sync.tsx (le vrai correctif est le timeout côté serveur,
+      // voir route.ts/ffbb.ts, mais celui-ci garantit que ce bouton
+      // précis ne reste jamais bloqué, quelle que soit la cause).
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 35_000);
       try {
         const res = await fetch("/api/sync-ffbb", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ teamId: team.id }),
+          signal: controller.signal,
         });
         if (res.ok) okCount += 1;
         else failCount += 1;
       } catch {
         failCount += 1;
+      } finally {
+        clearTimeout(timeout);
       }
     }
     setSyncingAll(false);

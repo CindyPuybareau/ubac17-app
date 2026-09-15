@@ -203,11 +203,37 @@ function assertFfbbUrl(url: string): URL {
   return parsed;
 }
 
+// Retour de Cindy du 15/09 ("ça tourne dans le vide") : ce fetch n'avait
+// aucune limite de temps -- si le site FFBB ne répond pas (lenteur
+// ponctuelle, blocage réseau...), la requête restait bloquée
+// indéfiniment, donc la route (route.ts) ne renvoyait jamais rien, donc
+// le bouton "Synchroniser" côté client tournait pour toujours (son propre
+// try/catch/finally ne peut rien arranger : il n'a tout simplement jamais
+// reçu de réponse, ni succès ni erreur). AbortController coupe la requête
+// après 20s -- assez pour une page FFBB normale (vérifié : moins d'1s en
+// temps normal), pas assez pour bloquer l'appelant en cas de souci côté
+// FFBB. Rejette alors une vraie erreur, qui devient un 502 propre côté
+// route.ts au lieu d'un silence total.
+const FFBB_FETCH_TIMEOUT_MS = 20_000;
+
 export async function fetchFfbbTeamCalendar(url: string): Promise<FfbbMatch[]> {
   const validated = assertFfbbUrl(url);
-  const res = await fetch(validated, {
-    headers: { "User-Agent": "Mozilla/5.0 (compatible; UBAC17App/1.0)" },
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FFBB_FETCH_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(validated, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; UBAC17App/1.0)" },
+      signal: controller.signal,
+    });
+  } catch (e) {
+    if (e instanceof Error && e.name === "AbortError") {
+      throw new Error("FFBB request timed out");
+    }
+    throw e;
+  } finally {
+    clearTimeout(timeout);
+  }
   if (!res.ok) {
     throw new Error(`FFBB request failed with status ${res.status}`);
   }

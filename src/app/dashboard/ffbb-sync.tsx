@@ -45,11 +45,21 @@ export default function FfbbSync({
     setError(null);
     setMessage(null);
 
+    // Retour de Cindy du 15/09 ("ça tourne dans le vide") : filet de
+    // sécurité en plus du timeout côté serveur (route.ts/ffbb.ts) -- si la
+    // requête reste malgré tout bloquée quelque part entre le navigateur
+    // et le serveur, ce bouton s'arrête quand même de tourner au bout de
+    // 35s plutôt que d'attendre indéfiniment une réponse qui ne vient
+    // jamais.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 35_000);
+
     try {
       const res = await fetch("/api/sync-ffbb", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ teamId }),
+        signal: controller.signal,
       });
       const data = await res.json();
 
@@ -64,9 +74,14 @@ export default function FfbbSync({
         }.`
       );
       router.refresh();
-    } catch {
-      setError("Échec de la synchronisation FFBB.");
+    } catch (e) {
+      setError(
+        e instanceof Error && e.name === "AbortError"
+          ? "La FFBB n'a pas répondu à temps, réessaie plus tard."
+          : "Échec de la synchronisation FFBB."
+      );
     } finally {
+      clearTimeout(timeout);
       setSyncing(false);
     }
   }

@@ -2,6 +2,15 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { fetchFfbbTeamCalendar } from "@/lib/ffbb";
 
+// Retour de Cindy du 15/09 ("ça tourne dans le vide") : le fetch vers la
+// FFBB a désormais sa propre limite de 20s (voir ffbb.ts), mais sans
+// budget explicite ici, Vercel pouvait couper cette fonction avant ce
+// délai (limite par défaut de la plateforme) -- la coupure brutale d'une
+// fonction ne renvoie pas toujours une réponse propre au client, qui
+// continuait alors d'attendre. 30s laisse une marge confortable au-delà
+// du timeout interne de fetchFfbbTeamCalendar.
+export const maxDuration = 30;
+
 export async function POST(request: Request) {
   const { teamId } = await request.json();
 
