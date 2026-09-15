@@ -7,14 +7,7 @@ import { formatFirstName, formatPersonName } from "@/lib/names";
 import { EMAIL_REPLY_TO } from "@/lib/email";
 import { localDateFromParts } from "@/lib/local-date";
 import { getSpaceDashboardSummary, type SpaceDashboardSummary } from "@/lib/space-dashboard";
-import NotificationBell from "./notification-bell";
-import OrgChartButton from "./org-chart-button";
-import AvatarUpload from "./avatar-upload";
-import { MobileNavProvider } from "./mobile-nav-context";
-import { SectionNavProvider } from "./section-nav-context";
-import { ToastProvider } from "./toast-context";
-import MobileMenuButton from "./mobile-menu-button";
-import RealtimeSync from "./realtime-sync";
+import { getCachedTeams, getCachedCategoryTariffs, getCachedAccessProfiles } from "@/lib/reference-cache";
 import DashboardTabs, { type DashboardTab } from "./dashboard-tabs";
 import AdminView from "./admin-view";
 import type { RosterPlayer, TeamWithMembers } from "./team-manager";
@@ -935,13 +928,8 @@ export default async function DashboardPage({
     redirect("/connexion");
   }
 
-  const [profileResult, adminResult, coachResult, playerLinksResult, ownPlayerRowResult] =
+  const [adminResult, coachResult, playerLinksResult, ownPlayerRowResult] =
     await Promise.all([
-      supabase
-        .from("profiles")
-        .select("first_name, last_name, avatar_url")
-        .eq("id", user.id)
-        .single(),
       // En minuscules : club_administrators.email est désormais toujours
       // stocké en minuscules (voir 20260918010000), mais user.email
       // reflète la casse tapée à l'inscription — un .eq() strict aurait pu
@@ -978,14 +966,12 @@ export default async function DashboardPage({
     ]);
 
   logQueryErrors("détection de rôle", {
-    profileResult,
     adminResult,
     coachResult,
     playerLinksResult,
     ownPlayerRowResult,
   });
 
-  const profile = profileResult.data;
   const isAdmin = Boolean(adminResult.data);
   const clubFunction = adminResult.data?.club_function ?? null;
   const ownPlayerId = ownPlayerRowResult.data?.id ?? null;
@@ -1146,12 +1132,6 @@ export default async function DashboardPage({
   // équipe coachée ni accès Bureau, donc zéro onglet — voir le
   // commentaire sur ownPlayerRowResult plus haut.
   const ownPlayerRow = ownPlayerRowResult.data as PlayerRow | null;
-  // Prénom affiché dans le bandeau "Bonjour" (retour de Cindy du 26/08) :
-  // profile.first_name (compte de connexion) d'abord, puis la propre fiche
-  // joueur si elle existe (ownPlayerRow, cas Basile : coach dont le compte
-  // n'a jamais eu de prénom renseigné, mais dont la fiche joueur si) —
-  // jamais l'e-mail au bout de cette chaîne.
-  const displayFirstName = profile?.first_name ?? ownPlayerRow?.first_name ?? null;
   const playerRows =
     ownPlayerRow && !childPlayerRows.some((p) => p.id === ownPlayerRow.id)
       ? [...childPlayerRows, ownPlayerRow]
@@ -1562,14 +1542,10 @@ export default async function DashboardPage({
       accessProfilesRes,
     ] = await runBatched(
       [
-        () =>
-          supabase
-            .from("teams")
-            .select(
-              "id, name, category, ffbb_url, ffbb_last_synced_at, pending_coach_names, sort_order, photo_url"
-            )
-            .order("sort_order", { ascending: true, nullsFirst: false })
-            .order("category"),
+        // Mis en cache 45s (voir reference-cache.ts) : liste d'équipes
+        // identique pour tout le club, redemandée jusqu'ici à chaque
+        // ouverture de l'onglet Bureau alors qu'elle change rarement.
+        () => getCachedTeams(),
         () =>
           supabase
             .from("players")
@@ -1646,7 +1622,10 @@ export default async function DashboardPage({
             .from("cotisation_payments")
             .select("id, cotisation_id, amount, mode, detail, expected_cash_date, paid_at")
             .order("paid_at", { ascending: false }),
-        () => supabase.from("category_tariffs").select("category, prix").order("category"),
+        // Mis en cache 45s (voir reference-cache.ts) : tarifs par catégorie,
+        // identiques pour tout le club, ajustés seulement quelques fois par
+        // saison.
+        () => getCachedCategoryTariffs(),
         () =>
           supabase
             .from("club_settings")
@@ -1698,11 +1677,9 @@ export default async function DashboardPage({
         // Profils d'accès sur-mesure (retour de Cindy du 05/09) : liste des
         // profils et de leurs briques, pour l'écran de gestion et pour
         // remplir le sélecteur "Étendue de l'accès" dans la fiche membre.
-        () =>
-          supabase
-            .from("access_profiles")
-            .select("id, name, access_profile_briques(brique)")
-            .order("name"),
+        // Mis en cache 45s (voir reference-cache.ts) : profils d'accès,
+        // identiques pour tout le Bureau, créés/modifiés rarement.
+        () => getCachedAccessProfiles(),
       ],
       // dbLimit (voir sa définition plus haut) : UN seul plafond partagé
       // avec tous les autres blocs de cette page (Coach, Famille, les
@@ -2538,16 +2515,15 @@ export default async function DashboardPage({
                 error: null,
               })
             : ownOnlyTeamIds.length > 0
-              ? supabase
-                  .from("teams")
-                  .select("id, name, category, ffbb_url, sort_order, pending_coach_names")
-                  .in("id", ownOnlyTeamIds)
+              ? getCachedTeams().then((res) => ({
+                  data: (res.data ?? []).filter((t) => ownOnlyTeamIds.includes(t.id)) as CoachedTeam[],
+                  error: res.error,
+                }))
               : Promise.resolve({ data: [] as CoachedTeam[], error: null }),
         // Every club team, for the "Changer d'équipe" picker — teams is
-        // readable by anyone (policy `using (true)`), et déjà chargé sans
-        // filtre par le Bureau quand isAdmin (voir plus haut) : re-trié en
-        // mémoire de la même façon (sort_order non nul) plutôt que
-        // redemandé.
+        // readable par tout le monde (policy `using (true)`) et déjà mis
+        // en cache 45s (voir reference-cache.ts) : plus jamais redemandé
+        // à la base directement ici, même quand le Bureau n'a rien chargé.
         () =>
           bureauDataLoaded
             ? Promise.resolve({
@@ -2556,11 +2532,12 @@ export default async function DashboardPage({
                   .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999)),
                 error: null,
               })
-            : supabase
-                .from("teams")
-                .select("id, name, category, sort_order")
-                .not("sort_order", "is", null)
-                .order("sort_order"),
+            : getCachedTeams().then((res) => ({
+                data: (res.data ?? [])
+                  .filter((t) => t.sort_order !== null)
+                  .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999)),
+                error: res.error,
+              })),
         // Retour de Cindy du 13/09 ("les bénévoles invités peuvent être
         // supprimés partout") : plus aucun code ne consomme
         // coachBenevolesRes/coachEventBenevoleInvitesRes (l'invitation d'un
@@ -3238,11 +3215,14 @@ export default async function DashboardPage({
       allTeamIds.length > 0
         ? runBatched(
             [
+              // Mis en cache 45s (voir reference-cache.ts) : mêmes équipes
+              // que partout ailleurs dans le club, filtrées en mémoire
+              // plutôt que redemandées à la base à chaque onglet Famille.
               () =>
-                supabase
-                  .from("teams")
-                  .select("id, name, category, ffbb_url, sort_order, pending_coach_names")
-                  .in("id", allTeamIds),
+                getCachedTeams().then((res) => ({
+                  data: (res.data ?? []).filter((t) => allTeamIds.includes(t.id)),
+                  error: res.error,
+                })),
               // Retour d'audit du 28/08 : un embed direct sur players()
               // ouvrait, via la policy RLS "parent select teammates of own
               // child teams", toute la fiche du coéquipier (notes
@@ -4302,141 +4282,26 @@ export default async function DashboardPage({
     : [];
 
   return (
-    <MobileNavProvider>
-    <SectionNavProvider>
-    <ToastProvider>
-    {/* overflow-x-hidden (retour de Cindy du 2026-08-25, "pas de scroll
-        droite gauche sur grand ecran surtout !... le responsive doit etre
-        nickel") : filet de sécurité au niveau de la page entière — un
-        débordement horizontal ponctuel quelque part à l'intérieur ne doit
-        jamais se répercuter jusqu'à une barre de défilement horizontale
-        sur toute la page. Les zones qui ont vraiment besoin de défiler
-        latéralement (tableaux larges...) gardent leur propre
-        overflow-x-auto local, inchangé. */}
-    <div className="flex flex-1 flex-col overflow-x-hidden">
-      <RealtimeSync />
-      {/* Retour de Cindy du 2026-08-22 : logo seul (plus de texte "UBAC" à
-          côté — la photo de profil ci-dessous porte désormais l'identité
-          de la page). Le débordement de l'avatar façon Facebook, essayé
-          dans un premier temps, est abandonné : avec un logo agrandi et
-          bien centré, les deux se chevauchaient géométriquement (même
-          bord gauche) — l'avatar reste sous la bande bleue, à plat.
-          Bandeau jugé encore trop épais ensuite : remis à sa hauteur
-          d'origine (simple padding). Logo ensuite jugé "tout petit" à 32px
-          — agrandi à 44px, padding vertical resserré à py-2 pour absorber
-          la croissance sans faire gonfler le bandeau ni laisser le logo
-          en déborder. Déconnexion déplacée en toute fin du menu (voir
-          admin-sidebar.tsx, logoutAction). */}
-      {/* Bandeau unifié (direction artistique du 2026-08-23, confirmée
-          avec Cindy via question directe) : avatar + "Bonjour" + prénom
-          à gauche, grand logo en filigrane semi-transparent à droite
-          (derrière les icônes, jamais au-dessus : pointer-events-none),
-          icônes fonctionnelles inchangées par-dessus.
-          Pas d'overflow-hidden ici (retour de Cindy du 2026-08-25,
-          "quand je clique sur les notifications, elles sont masquées") :
-          combiné à position sticky sur ce même élément, overflow-hidden
-          rognait le popover des notifications (position fixed/absolute,
-          voir notification-bell.tsx) dès qu'il dépassait la hauteur de
-          l'en-tête — un piège CSS classique de ce duo sticky+overflow.
-          Le logo en filigrane ci-dessous, lui, ne déborde que de
-          quelques pixels (-right-2) : invisible en pratique sans
-          clipping. */}
-      <header className="sticky top-0 z-10 relative bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-4 shadow-md sm:px-6 sm:py-5">
-        {/* Léger reflet en haut, pour donner un peu de profondeur au
-            dégradé plutôt qu'un aplat totalement plat. */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/[0.06] to-transparent"
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -right-2 top-1/2 h-28 w-28 -translate-y-1/2 bg-contain bg-right bg-no-repeat opacity-25 sm:h-36 sm:w-36"
-          style={{ backgroundImage: "url(/logo.png)" }}
-        />
-        {/* Retour de Cindy du 2026-08-25 ("toujours pas bon tout doit etre
-            aligné") : la grille 1fr/auto/1fr essayée avant ne tombait
-            toujours pas au centre réel. Repris avec une méthode qui ne
-            dépend plus du tout de la largeur de la photo ou des icônes —
-            photo et icônes restent une simple ligne flex justify-between
-            (déjà correcte, elles s'affichaient bien aux deux bords), et le
-            bandeau devient une superposition (absolute, left-1/2
-            -translate-x-1/2) centrée sur ce conteneur relatif lui-même :
-            un centrage géométrique garanti, indépendant de tout calcul de
-            grille/flex fragile. */}
-        {/* Retour de Cindy du 07/09 ("sur tablette, ça se chevauche") :
-            cette réservation de hauteur n'a de sens que quand le bandeau
-            "Cette semaine" juste en dessous passe réellement en position
-            absolue superposée (voir son propre wrapper, repoussé à lg:
-            pour la même raison) -- gardé aligné sur ce même seuil. */}
-        <div className="relative mx-auto flex w-full max-w-[1600px] flex-col gap-3 lg:min-h-[3.5rem]">
-          {/* Retour de Cindy du 28/08 ("le menu hamburger doit se trouver
-              en haut à droite de l'écran sur smartphone") : ce duo
-              photo/icônes vivait auparavant à même le conteneur externe,
-              lequel passait en flex-col sous le seuil sm — le menu se
-              retrouvait alors sur sa PROPRE ligne, empilé sous la
-              photo/le prénom, au milieu de l'en-tête plutôt qu'à son coin
-              supérieur droit. Sorti dans sa propre ligne toujours en
-              flex-row (quelle que soit la largeur d'écran) : le menu est
-              au bord droit de l'écran dès le premier rendu. Le conteneur
-              externe reste en flex-col — c'est lui qui empile cette ligne
-              et le bandeau "Cette semaine" en dessous sur mobile. */}
-          <div className="flex w-full flex-row items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <AvatarUpload userId={user.id} avatarUrl={profile?.avatar_url ?? null} name={displayFirstName} size="lg" />
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">
-                  Bonjour
-                </p>
-                {/* Retour de Cindy du 26/08 ("je vois son adresse mail à la
-                    place de son prénom") : profile.first_name (le COMPTE de
-                    connexion) était vide pour Basile, alors que sa FICHE
-                    joueur (players, vérifié par Cindy — "basile a bien son
-                    prenom") l'avait bien. Deux tables distinctes : ownPlayerRow
-                    (players où profile_id = user.id, déjà chargé plus haut
-                    pour "Mon espace") sert désormais de repli avant le
-                    générique "adhérent·e" — jamais l'e-mail, qui n'a plus sa
-                    place ici. Voir displayFirstName, calculé plus haut. */}
-                <h1 className="truncate text-xl font-bold text-white sm:text-2xl">
-                  {displayFirstName ? formatFirstName(displayFirstName) : "adhérent·e"}
-                </h1>
-              </div>
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
-              <OrgChartButton />
-              <NotificationBell />
-              <MobileMenuButton />
-            </div>
-          </div>
-          {/* Bandeau "Cette semaine" (retour de Cindy/Sandrine Manzelle du
-              2026-08-24, affiné le 2026-09-01 pour le cumul Bureau+coach
-              +joueur) : voir showHeaderWeekBanner plus haut. */}
-          {showHeaderWeekBanner && (
-            // Retour de Cindy du 2026-08-25 : "CETTE SEMAINE" se retrouvait
-            // coupé en haut de l'en-tête — top-1/2 + -translate-y-1/2
-            // centre par rapport au point milieu mathématique du
-            // conteneur, qui peut déborder au-dessus si le bandeau est
-            // plus haut que prévu. inset-y-0 + flex + items-center
-            // centre à l'intérieur de la vraie hauteur du conteneur,
-            // jamais au-delà.
-            // Retour de Cindy du 07/09 ("sur tablette, ça se chevauche
-            // avec Bonjour/Basile") : ce wrapper passait en absolute dès
-            // sm: (640px), pile au moment où WeekStripBanner lui-même
-            // reste maintenant empilé (donc plus haut) jusqu'à lg: (voir
-            // week-strip-banner.tsx) -- un bandeau plus haut que prévu,
-            // superposé et centré verticalement sur toute la hauteur de
-            // l'en-tête, débordait sur la ligne Bonjour/Basile juste
-            // au-dessus. Repoussé à lg: pour rester cohérent : mobile ET
-            // tablette gardent le bandeau dans le flux normal (empilé
-            // sous Bonjour/Basile, jamais en superposition), seul un
-            // écran vraiment large bascule en superposition centrée.
-            <div className="lg:absolute lg:inset-y-0 lg:left-1/2 lg:flex lg:max-w-[calc(100%-18rem)] lg:-translate-x-1/2 lg:items-center">
-              <WeekStripBanner events={headerWeekEvents} />
-            </div>
-          )}
-        </div>
-      </header>
-
+    <>
       <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
+      {/* Bandeau "Cette semaine" (retour de Cindy/Sandrine Manzelle du
+          2026-08-24, affiné le 2026-09-01 pour le cumul Bureau+coach
+          +joueur) : voir showHeaderWeekBanner plus haut. Sorti du header le
+          15/09 (voir layout.tsx du dashboard) : ses données dépendent du
+          calcul Coach/Famille propre à l'onglet actif, donc reste ici plutôt
+          que dans le layout partagé -- ce n'est donc plus une superposition
+          centrée dans le bandeau bleu (changement visuel assumé sur grand
+          écran uniquement, validé avec Cindy), mais un bloc normal au-dessus
+          des onglets. */}
+      {/* WeekStripBanner est stylé en texte blanc/jaune (conçu pour le fond
+          marine du header, voir week-strip-banner.tsx) -- ce fond est donc
+          repris ici à l'identique, sinon le texte serait illisible sur le
+          fond clair de la page. */}
+      {showHeaderWeekBanner && (
+        <div className="rounded-2xl bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-4 shadow-md sm:px-6 sm:py-5">
+          <WeekStripBanner events={headerWeekEvents} />
+        </div>
+      )}
       <DashboardTabs tabs={tabs} activeKey={activeTab} clubFunction={clubFunction} />
 
       {/* Cas normalement rare depuis que "Mon espace" couvre aussi un
@@ -4472,9 +4337,6 @@ export default async function DashboardPage({
         </div>
       )}
       </div>
-    </div>
-    </ToastProvider>
-    </SectionNavProvider>
-    </MobileNavProvider>
+    </>
   );
 }
