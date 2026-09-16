@@ -2351,12 +2351,16 @@ export default async function DashboardPage({
       // else final, effectif vide, rsvpCounts à 0/0/0/0 partout. unionRoster
       // reprend TOUT rosterByTeam (le club entier, ici) plutôt qu'un
       // sous-ensemble d'équipes.
-      // Réunion d'abord (retour de Cindy du 16/09) : team_id et
-      // target_team_ids sont TOUJOURS null pour ce type -- sans ce garde-
-      // fou, elle tomberait dans le else final (unionRoster, effectif =
-      // le club entier), pas bureauRoster.
+      // Réunion Bureau d'abord (retour de Cindy du 16/09) : team_id et
+      // target_team_ids sont TOUJOURS null pour CE cas précis -- sans ce
+      // garde-fou, elle tomberait dans le else final (unionRoster, effectif
+      // = le club entier), pas bureauRoster. Une "Réunion d'équipe" (retour
+      // du même jour, même event_type mais team_id/target_team_ids
+      // renseignés) doit au contraire suivre exactement le même chemin
+      // qu'un entraînement normal -- d'où le `!team && !e.target_team_ids`
+      // ci-dessous, jamais event_type seul.
       const eventRoster: RosterPlayer[] =
-        e.event_type === "REUNION"
+        e.event_type === "REUNION" && !team && !(e.target_team_ids as string[] | null)
           ? bureauRoster
           : team
             ? (rosterByTeam.get(team.id) ?? [])

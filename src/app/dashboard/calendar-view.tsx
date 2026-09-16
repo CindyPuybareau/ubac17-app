@@ -1782,15 +1782,25 @@ export default function CalendarView({
             )}
           </OrganisationCard>
         )}
-        {/* Retour de Cindy du 16/09 ("Réunion Bureau") : le bouton
-            Présent/Absent n'existait jusqu'ici que pour répondre pour
-            AUTRUI (son enfant) -- jamais pour soi-même en tant que membre
-            du Bureau qui gère l'événement (canManageEvent=true ici,
-            branche !canManageEvent plus haut jamais atteinte). selfPlayerId
-            (propre fiche joueur de qui consulte, voir bureau-dashboard.tsx)
-            n'est fourni que côté Bureau -- absent partout ailleurs, ce
-            bloc n'apparaît donc jamais sur les autres espaces. */}
-        {canManageEvent && event.event_type === "REUNION" && selfPlayerId && (() => {
+        {/* Retour de Cindy du 16/09 ("Réunion Bureau" puis "Réunion
+            d'équipe") : le bouton Présent/Absent n'existait jusqu'ici que
+            pour répondre pour AUTRUI (son enfant) -- jamais pour soi-même
+            en tant que personne qui gère l'événement (canManageEvent=true
+            ici, branche !canManageEvent plus haut jamais atteinte).
+            selfPlayerId (propre fiche joueur de qui consulte) est fourni
+            aussi bien côté Bureau (bureauRoster) que côté Coach (son
+            propre profil joueur, coach-view.tsx) -- rsvpVisiblePlayers,
+            déjà filtré sur selfPlayerId dès que canManage est vrai (voir
+            plus haut), garantit en plus que cette fiche fait bien partie
+            du roster de CET événement précis : sans ce garde-fou, un
+            membre du Bureau qui a par ailleurs sa propre fiche joueur sur
+            l'équipe A pourrait se voir proposer "Ta présence" sur une
+            Réunion d'équipe B, sans aucun rapport. */}
+        {canManageEvent &&
+          event.event_type === "REUNION" &&
+          selfPlayerId &&
+          rsvpVisiblePlayers.length > 0 &&
+          (() => {
           const selfStatus = event.presentPlayers?.some((p) => p.id === selfPlayerId)
             ? "PRESENT"
             : event.absentPlayers?.some((p) => p.id === selfPlayerId)

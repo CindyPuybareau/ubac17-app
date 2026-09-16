@@ -121,6 +121,15 @@ const typeChoices: { value: EventType; label: string; active: string }[] = [
   { value: "FRIENDLY", label: "Match amical", active: "border-blue-400 bg-blue-100 text-blue-700" },
   { value: "TOURNAMENT", label: "Tournoi / Plateau", active: "border-amber-400 bg-amber-100 text-amber-800" },
   { value: "OTHER", label: "Événement club", active: "border-purple-400 bg-purple-100 text-purple-700" },
+  // Retour de Cindy du 16/09 ("Réunion d'équipe") : même type REUNION que
+  // la Réunion Bureau (badge violet + cadenas, event-style.ts), mais
+  // rattachée à une équipe (scopeMode "single") ou plusieurs équipes
+  // ciblées (scopeMode "specific") au lieu de team_id/target_team_ids
+  // null -- RLS la montre alors normalement aux coachs/joueurs/parents de
+  // CES équipes, sans passer par is_club_admin(). Le libellé distingue les
+  // deux au premier coup d'œil (voir aussi le bouton "Bureau" plus haut,
+  // qui force ce même type mais sans équipe).
+  { value: "REUNION", label: "Réunion d'équipe", active: "border-plum bg-plum/10 text-plum-dark" },
 ];
 
 export default function CreateEventForm({
@@ -383,6 +392,12 @@ export default function CreateEventForm({
   // une valeur "Match"/"Amical" choisie avant de basculer sur "Bureau" --
   // sans ce garde-fou, is_home serait quand même envoyé pour une Réunion.
   const isMatch = scopeMode !== "bureau" && (eventType === "MATCH" || eventType === "FRIENDLY");
+  // Retour de Cindy du 16/09 ("Réunion d'équipe") : une Réunion, qu'elle
+  // soit Bureau (scopeMode "bureau", type forcé) ou d'équipe (type choisi
+  // dans typeChoices ci-dessus), n'a jamais de Besoins/Commissions/
+  // Événement payant -- ce sont les sections d'organisation, sans rapport
+  // avec une réunion.
+  const isReunion = scopeMode === "bureau" || eventType === "REUNION";
 
   async function computePaidParticipantIds(
     supabase: ReturnType<typeof createClient>,
@@ -1337,60 +1352,62 @@ export default function CreateEventForm({
           12/09 : désactivé pendant que "Répéter" est coché juste au-dessus
           -- une série ne prend pas encore en charge le paiement (voir
           handleSubmit), plutôt que de le laisser cocher pour rien. */}
-      <div
-        className={`flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3 ${
-          repeatOpen ? "opacity-50" : ""
-        }`}
-      >
-        <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
-          <input
-            type="checkbox"
-            checked={isPaid}
-            disabled={repeatOpen}
-            onChange={(e) => setIsPaid(e.target.checked)}
-            className="h-4 w-4 rounded border-zinc-300 text-navy focus:ring-navy disabled:opacity-60"
-          />
-          Événement payant{repeatOpen ? " (indisponible pour une série répétée)" : ""}
-        </label>
-        {isPaid && (
-          <div className="flex flex-col gap-2">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">
-                Tarif (€) *
-              </label>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                required={isPaid}
-                value={paidAmount}
-                onChange={(e) => setPaidAmount(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-              />
+      {!isReunion && (
+        <div
+          className={`flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3 ${
+            repeatOpen ? "opacity-50" : ""
+          }`}
+        >
+          <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
+            <input
+              type="checkbox"
+              checked={isPaid}
+              disabled={repeatOpen}
+              onChange={(e) => setIsPaid(e.target.checked)}
+              className="h-4 w-4 rounded border-zinc-300 text-navy focus:ring-navy disabled:opacity-60"
+            />
+            Événement payant{repeatOpen ? " (indisponible pour une série répétée)" : ""}
+          </label>
+          {isPaid && (
+            <div className="flex flex-col gap-2">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-600">
+                  Tarif (€) *
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  required={isPaid}
+                  value={paidAmount}
+                  onChange={(e) => setPaidAmount(e.target.value)}
+                  className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-600">
+                  Lien HelloAsso (optionnel)
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://www.helloasso.com/..."
+                  value={paidLink}
+                  onChange={(e) => setPaidLink(e.target.value)}
+                  className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                />
+              </div>
+              <p className="text-[11px] text-zinc-400">
+                {isEditing && editingEvent?.collecteId
+                  ? "Le tarif et le lien sont mis à jour sur le suivi de paiement existant (Cotisations → Événements payants) — les participants déjà ajoutés ne sont pas modifiés."
+                  : "Crée automatiquement un suivi de paiement dans Cotisations → Événements payants, avec les familles concernées déjà ajoutées d'après l'équipe (ou les équipes) choisie ci-dessus."}
+                {" "}Le lien, s&apos;il est renseigné, s&apos;affiche directement sur la
+                carte de l&apos;événement pour que chaque famille paie
+                elle-même.
+              </p>
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">
-                Lien HelloAsso (optionnel)
-              </label>
-              <input
-                type="url"
-                placeholder="https://www.helloasso.com/..."
-                value={paidLink}
-                onChange={(e) => setPaidLink(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-              />
-            </div>
-            <p className="text-[11px] text-zinc-400">
-              {isEditing && editingEvent?.collecteId
-                ? "Le tarif et le lien sont mis à jour sur le suivi de paiement existant (Cotisations → Événements payants) — les participants déjà ajoutés ne sont pas modifiés."
-                : "Crée automatiquement un suivi de paiement dans Cotisations → Événements payants, avec les familles concernées déjà ajoutées d'après l'équipe (ou les équipes) choisie ci-dessus."}
-              {" "}Le lien, s&apos;il est renseigné, s&apos;affiche directement sur la
-              carte de l&apos;événement pour que chaque famille paie
-              elle-même.
-            </p>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       <textarea
         placeholder="Notes (optionnel)"
@@ -1400,14 +1417,11 @@ export default function CreateEventForm({
         className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
       />
 
-      {/* Retour de Cindy du 16/09 ("Réunion Bureau", option 1) : ni besoins
-          d'organisation ni commissions concernées pour ce type d'événement
-          -- les deux sections suivantes n'ont d'effet réel que sur les
-          bénévoles externes (accès par jeton, jamais soumis aux mêmes
-          règles de visibilité que ce nouveau type Bureau-only), donc rien
-          à leur montrer ici plutôt qu'un contrôle qui semblerait actif
-          sans l'être. */}
-      {scopeMode !== "bureau" && (
+      {/* Retour de Cindy du 16/09 ("Réunion Bureau" puis "Réunion
+          d'équipe") : ni besoins d'organisation ni commissions concernées
+          pour ce type d'événement, Bureau ou équipe -- rien à montrer ici
+          plutôt qu'un contrôle qui semblerait actif sans l'être. */}
+      {!isReunion && (
         <>
       {/* Même liste standard que sur la carte de l'événement (VolunteerNeedsPanel)
           — les deux lisent/écrivent la même table. Retour de Cindy du 10/09 :
