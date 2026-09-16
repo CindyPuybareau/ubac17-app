@@ -356,9 +356,21 @@ export default function CotisationsManager({
     return map;
   }, [members]);
 
+  // Retour de Cindy du 16/09 ("je supprime un membre, je le vois encore
+  // dans Cotisations") : "Supprimer" un membre l'archive (voir "Archiver
+  // ce membre" dans sa fiche) -- ses données, y compris sa cotisation,
+  // persistent volontairement (règle #1 du projet), mais rien ne les
+  // masquait ici. Uniquement les cotisations de SAISON (celles d'un
+  // "Événement payant", avec collecteId, restent visibles quel que soit le
+  // statut actuel du membre -- un historique de qui a payé un tournoi
+  // passé reste pertinent même après un départ).
+  const archivedPlayerIds = useMemo(
+    () => new Set(members.filter((m) => m.archivedAt).map((m) => m.id)),
+    [members]
+  );
   const seasonCotisations = useMemo(
-    () => cotisations.filter((c) => !c.collecteId),
-    [cotisations]
+    () => cotisations.filter((c) => !c.collecteId && !archivedPlayerIds.has(c.playerId)),
+    [cotisations, archivedPlayerIds]
   );
 
   // Retour de Cindy du 14/09 (Cyril Charpenteau, coach sans équipe joueur,
