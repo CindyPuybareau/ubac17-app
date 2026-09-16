@@ -2725,7 +2725,20 @@ export default async function DashboardPage({
     );
     // Besoins d'organisation de TOUS les événements de l'équipe, pas
     // seulement ceux à venir — même raison que côté Bureau juste plus haut.
-    const coachVolunteerNeedsPromise = getVolunteerNeedsByEventId(supabase, coachEventIds, dbLimit);
+    // Retour de Cindy du 16/09 (dédoublonnage Bureau<->Coach, compte
+    // cumulant les deux comme Basile) : quand bureauDataLoaded,
+    // coachEventIds est un sous-ensemble garanti de upcomingEventIds (même
+    // fenêtre temporelle que le Bureau -- eventsWindowStart/
+    // trainingsWindowStart/End partagés -- jamais filtrée par équipe côté
+    // Bureau) : adminVolunteerNeedsByEventId (déjà résolu juste au-dessus)
+    // couvre donc déjà tous ces événements, sans requête supplémentaire.
+    const coachVolunteerNeedsPromise = bureauDataLoaded
+      ? Promise.resolve(
+          Object.fromEntries(
+            coachEventIds.map((id) => [id, adminVolunteerNeedsByEventId[id] ?? []])
+          )
+        )
+      : getVolunteerNeedsByEventId(supabase, coachEventIds, dbLimit);
     // Retour de Cindy du 15/09 ("côté Bureau c'est pareil") : voir
     // fetchPaidParticipantsByCollecteId plus haut.
     const coachPaidParticipantsPromise = fetchPaidParticipantsByCollecteId(
@@ -3739,7 +3752,18 @@ export default async function DashboardPage({
                   .order("paid_at", { ascending: false })
               : Promise.resolve(null),
           () => getEventTasksByEventId(supabase, upcomingFamilyEventIds, dbLimit),
-          () => getVolunteerNeedsByEventId(supabase, eventIds, dbLimit),
+          // Retour de Cindy du 16/09 (dédoublonnage Bureau<->Famille, même
+          // schéma que Coach juste plus haut) : eventIds ⊆ upcomingEventIds
+          // quand bureauDataLoaded, adminVolunteerNeedsByEventId déjà résolu
+          // couvre donc déjà ces événements.
+          () =>
+            bureauDataLoaded
+              ? Promise.resolve(
+                  Object.fromEntries(
+                    eventIds.map((id) => [id, adminVolunteerNeedsByEventId[id] ?? []])
+                  )
+                )
+              : getVolunteerNeedsByEventId(supabase, eventIds, dbLimit),
         ],
         // dbLimit partagé (voir lib/batch.ts / le bloc Bureau plus haut).
         dbLimit
