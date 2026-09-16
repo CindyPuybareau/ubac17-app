@@ -48,14 +48,15 @@ export async function POST(request: Request) {
   try {
     const { data: eventRow } = await supabase
       .from("events")
-      .select("team_id, target_team_ids, event_type")
+      .select("team_id, target_team_ids, event_type, restricted_audience")
       .eq("id", eventId)
       .maybeSingle();
     // Retour de Cindy du 16/09 ("un parent reçoit la notif d'une réunion
-    // Bureau annulée") : une réunion Bureau a team_id/target_team_ids
-    // null, exactement comme un événement club-wide -- sans ce marqueur,
-    // notifications_for_me() la traiterait comme "pour tout le monde".
-    const isAdminOnlyReunion =
+    // Bureau annulée", puis "Bureau seul"/"Coachs seuls") : une réunion
+    // sans équipe a team_id/target_team_ids null, exactement comme un
+    // événement club-wide -- sans ce marqueur, notifications_for_me() la
+    // traiterait comme "pour tout le monde".
+    const isTeamlessReunion =
       !eventRow?.team_id && !eventRow?.target_team_ids && eventRow?.event_type === "REUNION";
     await supabase.from("notifications").insert({
       team_id: eventRow?.team_id ?? null,
@@ -64,7 +65,7 @@ export async function POST(request: Request) {
       title: title ?? "UBAC",
       body: body ?? "Le coach attend ta réponse.",
       url: url ?? "/dashboard",
-      admin_only: isAdminOnlyReunion,
+      restricted_audience: isTeamlessReunion ? eventRow?.restricted_audience ?? null : null,
     });
   } catch {
     // Silencieux : voir la note plus haut sur les échecs non bloquants.

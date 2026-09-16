@@ -259,16 +259,24 @@ export default function CreateEventForm({
   // qu'une seule équipe (retour de Cindy du 2026-08-20 : "à l'heure
   // actuelle, quand je créer un evenement, je ne peux choisir qu'une
   // equipe"). "specific"/"club" n'ont de sens que si allowClubWide.
-  const [scopeMode, setScopeMode] = useState<"single" | "specific" | "club" | "bureau">(() =>
-    editingEvent?.teamId
-      ? "single"
-      : editingEvent?.targetTeamIds && editingEvent.targetTeamIds.length > 0
-        ? "specific"
-        : editingEvent
-          ? editingEvent.event_type === "REUNION"
-            ? "bureau"
-            : "club"
-          : "single"
+  // Retour de Cindy du 16/09 ("Coachs seuls") : même "Réunion" sans équipe
+  // que "Bureau seul", distinguée par restrictedAudience (voir events,
+  // migration 20260916) -- "bureau" reste le repli par défaut pour une
+  // réunion déjà existante sans ce champ renseigné (créée avant que
+  // "Coachs seuls" existe).
+  const [scopeMode, setScopeMode] = useState<"single" | "specific" | "club" | "bureau" | "coachs">(
+    () =>
+      editingEvent?.teamId
+        ? "single"
+        : editingEvent?.targetTeamIds && editingEvent.targetTeamIds.length > 0
+          ? "specific"
+          : editingEvent
+            ? editingEvent.event_type === "REUNION"
+              ? editingEvent.restrictedAudience === "COACHS"
+                ? "coachs"
+                : "bureau"
+              : "club"
+            : "single"
   );
   const [targetTeamIds, setTargetTeamIds] = useState<string[]>(() => editingEvent?.targetTeamIds ?? []);
   // Retour de Cindy du 12/09 ("Répéter") : uniquement à la création --
@@ -387,17 +395,21 @@ export default function CreateEventForm({
     setTargetTeamIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
   }
 
-  // scopeMode !== "bureau" d'abord : le sélecteur "Type d'événement" est
-  // caché pour cette portée (voir plus bas), eventType peut donc retenir
-  // une valeur "Match"/"Amical" choisie avant de basculer sur "Bureau" --
-  // sans ce garde-fou, is_home serait quand même envoyé pour une Réunion.
-  const isMatch = scopeMode !== "bureau" && (eventType === "MATCH" || eventType === "FRIENDLY");
+  // scopeMode !== "bureau"/"coachs" d'abord : le sélecteur "Type
+  // d'événement" est caché pour ces deux portées (voir plus bas), eventType
+  // peut donc retenir une valeur "Match"/"Amical" choisie avant de
+  // basculer sur "Bureau seul"/"Coachs seuls" -- sans ce garde-fou, is_home
+  // serait quand même envoyé pour une Réunion.
+  const isMatch =
+    scopeMode !== "bureau" &&
+    scopeMode !== "coachs" &&
+    (eventType === "MATCH" || eventType === "FRIENDLY");
   // Retour de Cindy du 16/09 ("Réunion d'équipe") : une Réunion, qu'elle
   // soit Bureau (scopeMode "bureau", type forcé) ou d'équipe (type choisi
   // dans typeChoices ci-dessus), n'a jamais de Besoins/Commissions/
   // Événement payant -- ce sont les sections d'organisation, sans rapport
   // avec une réunion.
-  const isReunion = scopeMode === "bureau" || eventType === "REUNION";
+  const isReunion = scopeMode === "bureau" || scopeMode === "coachs" || eventType === "REUNION";
 
   async function computePaidParticipantIds(
     supabase: ReturnType<typeof createClient>,
@@ -451,7 +463,7 @@ export default function CreateEventForm({
       setError("La date et l'heure de début sont requises.");
       return;
     }
-    if (scopeMode !== "bureau" && eventType === "TRAINING" && !endTime) {
+    if (scopeMode !== "bureau" && scopeMode !== "coachs" && eventType === "TRAINING" && !endTime) {
       setError("L'heure de fin est obligatoire pour un entraînement.");
       return;
     }
@@ -495,7 +507,14 @@ export default function CreateEventForm({
     // `eventType` (le sélecteur "Type d'événement" normal est caché pour
     // cette portée, voir le JSX plus bas -- sa valeur mémorisée n'a alors
     // plus de sens).
-    const effectiveEventType: EventType = scopeMode === "bureau" ? "REUNION" : eventType;
+    const effectiveEventType: EventType =
+      scopeMode === "bureau" || scopeMode === "coachs" ? "REUNION" : eventType;
+    // Retour de Cindy du 16/09 ("Coachs seuls") : ne s'applique qu'à ces
+    // deux portées précises -- null pour tout le reste (réunion d'équipe
+    // incluse, qui n'a pas besoin de ce marqueur, sa visibilité passe déjà
+    // par team_id/target_team_ids).
+    const effectiveRestrictedAudience: "BUREAU" | "COACHS" | null =
+      scopeMode === "bureau" ? "BUREAU" : scopeMode === "coachs" ? "COACHS" : null;
 
     setLoading(true);
     setError(null);
@@ -552,6 +571,7 @@ export default function CreateEventForm({
           commission_group_ids: commissionGroupIds,
           team_id: effectiveTeamId || null,
           target_team_ids: effectiveTargetTeamIds,
+          restricted_audience: effectiveRestrictedAudience,
           series_id: seriesId,
         }))
         .filter((row) => !conflictingStarts.has(row.start_time));
@@ -567,7 +587,7 @@ export default function CreateEventForm({
         .from("events")
         .insert(rows)
         .select(
-          "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, team_id, target_team_ids"
+          "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, team_id, target_team_ids, restricted_audience"
         );
 
       setLoading(false);
@@ -600,6 +620,7 @@ export default function CreateEventForm({
           paidParticipants: [],
           teamId: row.team_id,
           targetTeamIds: row.target_team_ids,
+          restrictedAudience: (row.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
           teamName,
           commissionGroupIds,
           rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
@@ -628,6 +649,7 @@ export default function CreateEventForm({
       notes: string | null;
       team_id?: string | null;
       target_team_ids?: string[] | null;
+      restricted_audience?: "BUREAU" | "COACHS" | null;
       commission_group_ids: string[];
     } = {
       title: eventName,
@@ -671,6 +693,7 @@ export default function CreateEventForm({
     if (!isEditing || allowClubWide || scopeMode === "single") {
       eventPayload.team_id = effectiveTeamId || null;
       eventPayload.target_team_ids = effectiveTargetTeamIds;
+      eventPayload.restricted_audience = effectiveRestrictedAudience;
     }
 
     const query = isEditing
@@ -678,7 +701,7 @@ export default function CreateEventForm({
       : supabase.from("events").insert(eventPayload);
     const { data: inserted, error } = await query
       .select(
-        "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, team_id, target_team_ids"
+        "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, team_id, target_team_ids, restricted_audience"
       )
       .single();
 
@@ -865,6 +888,7 @@ export default function CreateEventForm({
         paidParticipants,
         teamId: inserted.team_id,
         targetTeamIds: inserted.target_team_ids,
+        restrictedAudience: (inserted.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
         teamName,
         commissionGroupIds,
       });
@@ -892,6 +916,7 @@ export default function CreateEventForm({
           paidParticipants,
           teamId: inserted.team_id,
           targetTeamIds: inserted.target_team_ids,
+        restrictedAudience: (inserted.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
           teamName,
           commissionGroupIds,
           rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
@@ -1038,13 +1063,21 @@ export default function CreateEventForm({
               { value: "specific" as const, label: "Équipes spécifiques" },
               { value: "club" as const, label: "Tout le club" },
               // Retour de Cindy du 15/09 ("le bureau doit pouvoir créer un
-              // événement pour lui seul") : même colonnes en base que
-              // "club" (team_id/target_team_ids null, voir
-              // effectiveTeamId/effectiveTargetTeamIds plus haut) -- seul
-              // effectiveEventType change, forcé à "REUNION", ce qui
-              // suffit à la policy RLS "select events for own teams" pour
-              // ne plus jamais le montrer au reste du club.
-              { value: "bureau" as const, label: "Bureau" },
+              // événement pour lui seul"), renommé "Bureau seul" le 16/09
+              // pour ne pas se confondre avec "Coachs seuls" juste après :
+              // même colonnes en base que "club" (team_id/target_team_ids
+              // null, voir effectiveTeamId/effectiveTargetTeamIds plus
+              // haut) -- seuls effectiveEventType (forcé à "REUNION") et
+              // effectiveRestrictedAudience changent, ce qui suffit à la
+              // policy RLS "select events for own teams" pour ne plus
+              // jamais le montrer au reste du club.
+              { value: "bureau" as const, label: "Bureau seul" },
+              // Retour de Cindy du 16/09 ("affecter une réunion aux coachs
+              // seulement") : même principe que "Bureau seul" ci-dessus,
+              // mais avec is_coach_anywhere() en plus de is_club_admin()
+              // côté RLS -- voir restricted_audience (migration
+              // 20260916) et coachRoster (page.tsx) pour la présence.
+              { value: "coachs" as const, label: "Coachs seuls" },
             ]
           ).map((c) => (
             <button
@@ -1062,7 +1095,7 @@ export default function CreateEventForm({
               }}
               className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
                 scopeMode === c.value
-                  ? c.value === "bureau"
+                  ? c.value === "bureau" || c.value === "coachs"
                     ? "border-plum bg-plum/10 text-plum-dark"
                     : "border-navy bg-navy/10 text-navy"
                   : "border-zinc-200 text-zinc-500 hover:bg-white"
@@ -1104,14 +1137,16 @@ export default function CreateEventForm({
         </div>
       )}
 
-      {scopeMode === "bureau" ? (
+      {scopeMode === "bureau" || scopeMode === "coachs" ? (
         // Une Réunion n'a pas de sous-type à choisir (pas de match/
-        // entraînement/tournoi possible pour le Bureau lui-même) --
+        // entraînement/tournoi possible pour ces deux portées) --
         // simple confirmation visuelle plutôt qu'un sélecteur vide de
         // sens, dans le même violet que la carte affichée ensuite au
         // calendrier (voir typeStyles.REUNION, event-style.ts).
         <div className="flex items-center gap-2 rounded-lg border border-plum/30 bg-plum/10 px-3 py-2 text-sm font-semibold text-plum-dark">
-          Réunion Bureau — visible uniquement par le Bureau
+          {scopeMode === "bureau"
+            ? "Réunion Bureau — visible uniquement par le Bureau"
+            : "Réunion Coachs — visible par les coachs et le Bureau"}
         </div>
       ) : (
         <div className="flex flex-col gap-2">
@@ -1208,11 +1243,15 @@ export default function CreateEventForm({
         <div>
           <label className="mb-1 block text-xs font-medium text-zinc-600">
             Heure de fin
-            {scopeMode !== "bureau" && eventType === "TRAINING" ? " *" : " (optionnel)"}
+            {scopeMode !== "bureau" && scopeMode !== "coachs" && eventType === "TRAINING"
+              ? " *"
+              : " (optionnel)"}
           </label>
           <input
             type="time"
-            required={scopeMode !== "bureau" && eventType === "TRAINING"}
+            required={
+              scopeMode !== "bureau" && scopeMode !== "coachs" && eventType === "TRAINING"
+            }
             value={endTime}
             onChange={(e) => setEndTime(e.target.value)}
             className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"

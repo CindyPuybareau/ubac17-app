@@ -482,6 +482,12 @@ export type AdminUpcomingEvent = {
   // groupes". Sert à préremplir le sélecteur de portée en édition et à
   // afficher un badge "Équipes ciblées" au lieu de "Tous les groupes".
   targetTeamIds: string[] | null;
+  // Retour de Cindy du 16/09 ("Bureau seul" / "Coachs seuls") : ne
+  // s'applique qu'à une Réunion sans équipe (team_id et targetTeamIds
+  // tous deux null) -- "BUREAU" ou "COACHS", distingue les deux variantes
+  // qui partagent sinon exactement la même forme. Null pour tout le
+  // reste (réunion d'équipe, ou tout autre type d'événement).
+  restrictedAudience: "BUREAU" | "COACHS" | null;
   // Retour de Cindy du 10/09 ("un seul choix pour l'événement entier") :
   // quelle(s) commission(s) voient TOUS les besoins d'organisation de cet
   // événement sur leur page publique (/commission/[token]) -- porté par
@@ -1613,7 +1619,7 @@ export default async function DashboardPage({
           supabase
             .from("events")
             .select(
-              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
+              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, restricted_audience, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
             )
             .neq("event_type", "TRAINING")
             .gte("start_time", eventsWindowStart)
@@ -1626,7 +1632,7 @@ export default async function DashboardPage({
           supabase
             .from("events")
             .select(
-              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
+              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, restricted_audience, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
             )
             .eq("event_type", "TRAINING")
             .gte("start_time", trainingsWindowStart)
@@ -1850,6 +1856,26 @@ export default async function DashboardPage({
         return roster;
       })
       .filter((p): p is RosterPlayer => p !== null);
+
+    // Retour de Cindy du 16/09 ("Coachs seuls") : même principe que
+    // bureauRoster ci-dessus, mais pour "attendus" = tous les coachs du
+    // club (dédupliqués -- un même coach de plusieurs équipes ne doit
+    // apparaître qu'une fois), via team_coaches.coach_id qui référence
+    // déjà directement profiles.id (pas de détour par l'email comme pour
+    // le Bureau).
+    const coachRoster: RosterPlayer[] = Array.from(
+      new Set((teamCoachesRes.data ?? []).map((tc) => tc.coach_id))
+    )
+      .map((coachId) => playerByProfileId.get(coachId))
+      .filter((player): player is NonNullable<typeof player> => Boolean(player))
+      .map((player) => ({
+        id: player.id,
+        first_name: player.first_name,
+        last_name: player.last_name,
+        position: null,
+        nextEventStatus: null,
+        birthDate: player.birth_date,
+      }));
 
     // Matchs/événements ponctuels (upcomingEventsRes) + entraînements du
     // mois affiché (upcomingTrainingsRes, voir sa requête plus haut) --
@@ -2351,17 +2377,22 @@ export default async function DashboardPage({
       // else final, effectif vide, rsvpCounts à 0/0/0/0 partout. unionRoster
       // reprend TOUT rosterByTeam (le club entier, ici) plutôt qu'un
       // sous-ensemble d'équipes.
-      // Réunion Bureau d'abord (retour de Cindy du 16/09) : team_id et
-      // target_team_ids sont TOUJOURS null pour CE cas précis -- sans ce
-      // garde-fou, elle tomberait dans le else final (unionRoster, effectif
-      // = le club entier), pas bureauRoster. Une "Réunion d'équipe" (retour
+      // Réunion Bureau/Coachs d'abord (retour de Cindy du 16/09) : team_id
+      // et target_team_ids sont TOUJOURS null pour ces deux cas précis --
+      // sans ce garde-fou, elle tomberait dans le else final (unionRoster,
+      // effectif = le club entier), pas bureauRoster/coachRoster.
+      // restricted_audience distingue les deux (COACHS explicite, sinon
+      // Bureau -- couvre aussi les lignes créées avant l'existence de
+      // "Coachs seuls", jamais renseignées). Une "Réunion d'équipe" (retour
       // du même jour, même event_type mais team_id/target_team_ids
       // renseignés) doit au contraire suivre exactement le même chemin
       // qu'un entraînement normal -- d'où le `!team && !e.target_team_ids`
       // ci-dessous, jamais event_type seul.
       const eventRoster: RosterPlayer[] =
         e.event_type === "REUNION" && !team && !(e.target_team_ids as string[] | null)
-          ? bureauRoster
+          ? e.restricted_audience === "COACHS"
+            ? coachRoster
+            : bureauRoster
           : team
             ? (rosterByTeam.get(team.id) ?? [])
             : (e.target_team_ids as string[] | null)
@@ -2398,6 +2429,7 @@ export default async function DashboardPage({
         paidParticipants: paidInfo.paidParticipants,
         teamId: team?.id ?? null,
         targetTeamIds: e.target_team_ids ?? null,
+        restrictedAudience: (e.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
         commissionGroupIds: e.commission_group_ids ?? [],
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, teamsById),
         rsvpCounts: buildRsvpCounts(rsvpsByEvent, e.id, eventRoster),
@@ -2496,8 +2528,8 @@ export default async function DashboardPage({
       trainingsRes,
       ownTeamsRes,
       allClubTeamsRes,
-      coachBenevolesRes,
-      coachEventBenevoleInvitesRes,
+      coachClubTeamCoachesRes,
+      coachClubCoachPlayersRes,
     ] = await runBatched(
       [
         () =>
@@ -2553,7 +2585,7 @@ export default async function DashboardPage({
           supabase
             .from("events")
             .select(
-              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
+              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, restricted_audience, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
             )
             .or(teamOrClubWideFilter(coachedTeamIds))
             .neq("event_type", "TRAINING")
@@ -2564,7 +2596,7 @@ export default async function DashboardPage({
           supabase
             .from("events")
             .select(
-              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
+              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, restricted_audience, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
             )
             .or(teamOrClubWideFilter(coachedTeamIds))
             .eq("event_type", "TRAINING")
@@ -2601,15 +2633,34 @@ export default async function DashboardPage({
                   .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999)),
                 error: res.error,
               })),
-        // Retour de Cindy du 13/09 ("les bénévoles invités peuvent être
-        // supprimés partout") : plus aucun code ne consomme
-        // coachBenevolesRes/coachEventBenevoleInvitesRes (l'invitation d'un
-        // bénévole à un événement précis depuis l'espace Coach a disparu
-        // avec elles) -- gardées en no-op plutôt que retirées du tableau
-        // pour ne jamais décaler la position des résultats suivants
-        // (destructuration positionnelle ci-dessus).
-        () => Promise.resolve({ data: [] as unknown[], error: null }),
-        () => Promise.resolve({ data: [] as unknown[], error: null }),
+        // Retour de Cindy du 16/09 ("les coachs ne peuvent pas donner leur
+        // présence ?" -- en fait ils pouvaient déjà, seul le DÉCOMPTE
+        // affiché depuis l'espace Coach pouvait être sous-évalué pour une
+        // "Réunion Coachs") : reprennent les deux anciens no-op
+        // (coachBenevolesRes/coachEventBenevoleInvitesRes, plus aucun code
+        // ne les consommait -- voir git history) plutôt que d'agrandir ce
+        // tableau, donc aucun décalage des positions ci-dessus. team_coaches
+        // SANS filtre par équipe (contrairement à teamCoachesRes juste
+        // au-dessus) : il faut TOUS les coachs du club, pas seulement ceux
+        // des équipes de CE coach, pour un décompte juste sur un événement
+        // qui n'a justement aucune équipe. Repli sur adminTeamCoachesRaw
+        // (déjà chargé, sans filtre) quand bureauDataLoaded, comme le reste
+        // de ce bloc.
+        () =>
+          bureauDataLoaded
+            ? Promise.resolve({ data: adminTeamCoachesRaw, error: null })
+            : supabase.from("team_coaches").select("team_id, coach_id"),
+        // Fiche joueur de CHAQUE coach du club (via profile_id), pas
+        // seulement ceux de ce coach -- même raison que ci-dessus. Filtré
+        // sur profile_id non nul plutôt que par une liste de coachIds
+        // (qu'on ne connaît qu'après la résolution de CE MÊME lot) : reste
+        // un aller simple, borné au nombre de comptes réellement liés dans
+        // tout le club (quelques dizaines), jamais tout l'effectif.
+        () =>
+          supabase
+            .from("players")
+            .select("id, profile_id, first_name, last_name, birth_date")
+            .not("profile_id", "is", null),
       ],
       // dbLimit partagé (voir lib/batch.ts / le bloc Bureau plus haut).
       dbLimit
@@ -2623,8 +2674,8 @@ export default async function DashboardPage({
       trainingsRes,
       ownTeamsRes,
       allClubTeamsRes,
-      coachBenevolesRes,
-      coachEventBenevoleInvitesRes,
+      coachClubTeamCoachesRes,
+      coachClubCoachPlayersRes,
     });
 
     // Matchs/événements ponctuels (eventsRes) + entraînements du mois
@@ -3107,6 +3158,31 @@ export default async function DashboardPage({
       })
       .filter((p): p is { id: string; name: string; teamIds: string[] } => Boolean(p));
 
+    // Retour de Cindy du 16/09 ("Coachs seuls") : même principe que
+    // coachRoster côté Bureau (page.tsx, bloc admin), mais construit ici à
+    // partir de coachClubTeamCoachesRes/coachClubCoachPlayersRes (portée
+    // club entier, jamais limitée aux équipes de CE coach -- voir leur
+    // commentaire plus haut) pour que le décompte présent/absent d'une
+    // "Réunion Coachs" reste juste même consulté depuis l'espace Coach.
+    const coachClubPlayerByProfileId = new Map(
+      (coachClubCoachPlayersRes.data ?? [])
+        .filter((p) => p.profile_id)
+        .map((p) => [p.profile_id as string, p])
+    );
+    const coachClubRoster: RosterPlayer[] = Array.from(
+      new Set((coachClubTeamCoachesRes.data ?? []).map((tc) => tc.coach_id))
+    )
+      .map((coachId) => coachClubPlayerByProfileId.get(coachId))
+      .filter((player): player is NonNullable<typeof player> => Boolean(player))
+      .map((player) => ({
+        id: player.id,
+        first_name: player.first_name,
+        last_name: player.last_name,
+        position: null,
+        nextEventStatus: null,
+        birthDate: player.birth_date,
+      }));
+
     const coachPaidParticipantsByCollecteId = await coachPaidParticipantsPromise;
     coachEvents = coachEventsData.map((e) => {
       const team = e.teams as unknown as {
@@ -3122,17 +3198,22 @@ export default async function DashboardPage({
       // reprend maintenant TOUT rosterByTeam (ici : les seules équipes que
       // ce coach coache, ce Map n'en contient pas d'autres) plutôt qu'un
       // effectif vide.
-      const eventRoster: RosterPlayer[] = team
-        ? (rosterByTeam.get(team.id) ?? [])
-        : (e.target_team_ids as string[] | null)
-          ? Array.from(
-              new Map<string, RosterPlayer>(
-                (e.target_team_ids as string[])
-                  .flatMap((id: string) => rosterByTeam.get(id) ?? [])
-                  .map((p: RosterPlayer) => [p.id, p] as const)
-              ).values()
-            )
-          : unionRoster(rosterByTeam);
+      const eventRoster: RosterPlayer[] =
+        e.event_type === "REUNION" && !team && !(e.target_team_ids as string[] | null)
+          ? e.restricted_audience === "COACHS"
+            ? coachClubRoster
+            : unionRoster(rosterByTeam)
+          : team
+            ? (rosterByTeam.get(team.id) ?? [])
+            : (e.target_team_ids as string[] | null)
+              ? Array.from(
+                  new Map<string, RosterPlayer>(
+                    (e.target_team_ids as string[])
+                      .flatMap((id: string) => rosterByTeam.get(id) ?? [])
+                      .map((p: RosterPlayer) => [p.id, p] as const)
+                  ).values()
+                )
+              : unionRoster(rosterByTeam);
       // Retour de Cindy du 11/09 ("qui est absent ?") : eventRoster
       // ci-dessus reste l'union COMPLÈTE (toutes les équipes ciblées, même
       // celles que ce coach ne coache pas) -- bon pour rsvpCounts (un
@@ -3180,6 +3261,7 @@ export default async function DashboardPage({
         paidParticipants: paidInfo.paidParticipants,
         teamId: team?.id ?? null,
         targetTeamIds: e.target_team_ids ?? null,
+        restrictedAudience: (e.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
         commissionGroupIds: e.commission_group_ids ?? [],
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, clubTeamById),
         rsvpCounts: buildRsvpCounts(rsvpsByEvent, e.id, eventRoster),
@@ -3489,7 +3571,7 @@ export default async function DashboardPage({
       supabase
         .from("events")
         .select(
-          "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
+          "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, restricted_audience, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
         )
         .or(teamOrClubWideFilter(allTeamIds))
         .neq("event_type", "TRAINING")
@@ -3499,7 +3581,7 @@ export default async function DashboardPage({
       supabase
         .from("events")
         .select(
-          "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
+          "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, restricted_audience, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
         )
         .or(teamOrClubWideFilter(allTeamIds))
         .eq("event_type", "TRAINING")
@@ -3752,6 +3834,7 @@ export default async function DashboardPage({
         paidParticipants: paidInfo.paidParticipants,
         teamId: team?.id ?? null,
         targetTeamIds: e.target_team_ids ?? null,
+        restrictedAudience: (e.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
         commissionGroupIds: e.commission_group_ids ?? [],
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, teamsById),
         rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },

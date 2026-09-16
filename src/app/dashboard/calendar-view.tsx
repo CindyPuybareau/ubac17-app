@@ -752,6 +752,9 @@ export default function CalendarView({
           paidParticipants: [],
           teamId: e.team_id,
           targetTeamIds: null,
+          // Toujours un MATCH ici (voir le .eq plus haut) -- jamais une
+          // Réunion, restrictedAudience ne s'applique donc jamais.
+          restrictedAudience: null,
           commissionGroupIds: [],
           teamName: team?.name ?? "Équipe",
           rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
@@ -1341,6 +1344,19 @@ export default function CalendarView({
   // affichent exactement le meme evenement, avec les memes compteurs.
   function renderEventCard(event: AdminUpcomingEvent) {
     const style = styleFor(event.event_type);
+    // Retour de Cindy du 16/09 ("Bureau seul" / "Coachs seuls") : le badge
+    // "Réunion" restait toujours "Réunion Bureau" (typeStyles.REUNION.label,
+    // event-style.ts), même pour une réunion d'équipe ou "Coachs seuls" --
+    // calculé ici plutôt que dans event-style.ts, qui ne connaît que
+    // event_type, jamais team_id/restrictedAudience.
+    const reunionLabel =
+      event.event_type !== "REUNION"
+        ? style.label
+        : event.teamId || event.targetTeamIds
+          ? "Réunion d'équipe"
+          : event.restrictedAudience === "COACHS"
+            ? "Réunion Coachs"
+            : "Réunion Bureau";
     const rsvpCounts = event.rsvpCounts;
     const hasRoster =
       rsvpCounts.present + rsvpCounts.absent + rsvpCounts.late + rsvpCounts.pending > 0;
@@ -1439,7 +1455,7 @@ export default function CalendarView({
                 className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${style.badge}`}
               >
                 {style.solid && <Lock className="h-2.5 w-2.5 shrink-0" />}
-                {style.label}
+                {reunionLabel}
               </span>
               {homeAway && (
                 <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-bold uppercase text-zinc-600">
