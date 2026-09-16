@@ -83,6 +83,12 @@ const emptyVolunteerNeeds: VolunteerNeed[] = [];
 // proposition de covoiturage affichée de façon optimiste jusqu'au retour
 // serveur suivant.
 const emptyCarpool: CarpoolOffer[] = [];
+// Repli avant que /api/event-organisation ait répondu (voir organisationData
+// plus bas) -- constantes de module pour la même raison que les trois
+// ci-dessus (référence stable, jamais recréée à chaque rendu).
+const emptyOrganisationTasks: Record<string, EventTasksState> = {};
+const emptyOrganisationCarpool: Record<string, CarpoolOffer[]> = {};
+const emptyOrganisationNeeds: Record<string, VolunteerNeed[]> = {};
 
 // Ré-exportés : beaucoup d'écrans les importent historiquement d'ici, et
 // ce fichier reste le point d'entrée naturel du calendrier.
@@ -337,10 +343,7 @@ export default function CalendarView({
   birthdayMembers = [],
   scopeTeams = [],
   scopeTeamRoleById,
-  tasksByEventId = {},
-  carpoolByEventId = {},
   eventRoles = [],
-  volunteerNeedsByEventId = {},
   selfPlayerId = null,
   forcedView,
   resultsTeamSelector = "pills",
@@ -380,17 +383,18 @@ export default function CalendarView({
   // sous un onglet nommé "Équipes coachées". Optionnel : sans lui (Bureau,
   // Famille), le texte reste une simple liste comme avant.
   scopeTeamRoleById?: Record<string, "COACH" | "PLAYER">;
-  // Rôles attribués (voiture, maillots, goûter...) et places de covoiturage,
-  // affichés dans la carte d'un match/tournoi côté famille — seulement là où
-  // ils sont fournis : ni Bureau ni Coach n'en ont besoin sur leur propre
-  // calendrier, ils ont déjà leur onglet Organisation dédié pour ça.
+  // Retour de Cindy du 16/09 (chantier Suspense, "afficher le contenu
+  // principal tout de suite") : ces trois props ne sont plus lues -- ce
+  // composant va lui-même chercher tasks/carpool/besoins via
+  // /api/event-organisation une fois affiché (voir organisationData
+  // plus bas), au lieu d'attendre que l'appelant les ait déjà calculées
+  // côté serveur avant de pouvoir montrer la première case du calendrier.
+  // Laissées ici pour ne pas casser les appelants existants qui les
+  // passent encore (admin-view.tsx, coach-view.tsx...) ; à retirer de ces
+  // appelants une fois ce chantier étendu partout.
   tasksByEventId?: Record<string, EventTasksState>;
   carpoolByEventId?: Record<string, CarpoolOffer[]>;
   eventRoles?: EventRoleType[];
-  // Besoins en bénévoles (buvette, table de marque...) d'un événement club
-  // — auto-serve (Je m'en occupe) partout ; qui gère l'événement peut en
-  // plus définir/ajuster le nombre requis et retirer quelqu'un, mais
-  // n'affecte plus personne à la main (les membres se proposent eux-mêmes).
   volunteerNeedsByEventId?: Record<string, VolunteerNeed[]>;
   // La propre fiche joueur de qui consulte ce calendrier (coach qui joue
   // aussi dans une autre équipe) — jamais fourni côté Bureau/Famille.
@@ -469,6 +473,66 @@ export default function CalendarView({
   useEffect(() => {
     setLocalEvents(events);
   }, [events]);
+
+  // Retour de Cindy du 16/09 (chantier Suspense, "afficher le contenu
+  // principal tout de suite, tasks/carpool/besoins d'organisation après
+  // coup") : ce calendrier affichait jusqu'ici les cases/titres/horaires
+  // seulement une fois que le serveur avait fini de calculer ces trois
+  // données pour TOUS les événements affichés -- exactement ce qui
+  // bloquait toute la page pendant les pics de charge partagée. Ce
+  // composant les redemande maintenant lui-même, une fois déjà affiché,
+  // via /api/event-organisation (même fonctions, même client authentifié
+  // donc mêmes règles RLS que ce que page.tsx calculait avant). null =
+  // en cours de chargement (voir les skeletons plus bas) ; un objet vide
+  // par défaut pour ne jamais planter un accès direct type
+  // tasksByEventId[event.id].
+  const organisationEventIds = useMemo(() => localEvents.map((e) => e.id), [localEvents]);
+  // Clé stable (pas le tableau lui-même, qui change de référence à chaque
+  // mise à jour optimiste présent/absent) : ne redéclenche l'appel que
+  // quand l'ENSEMBLE des événements affichés change réellement (nouveau
+  // mois, création/suppression), jamais sur un simple clic présent/absent.
+  const organisationEventIdsKey = useMemo(
+    () => [...organisationEventIds].sort().join(","),
+    [organisationEventIds]
+  );
+  const [organisationData, setOrganisationData] = useState<{
+    tasksByEventId: Record<string, EventTasksState>;
+    carpoolByEventId: Record<string, CarpoolOffer[]>;
+    volunteerNeedsByEventId: Record<string, VolunteerNeed[]>;
+  } | null>(null);
+  useEffect(() => {
+    // Rien à charger -- pas la peine d'appeler l'API pour renvoyer trois
+    // objets vides (voir organisationLoading/tasksByEventId plus bas, qui
+    // court-circuitent déjà ce cas sans attendre organisationData).
+    if (organisationEventIds.length === 0) return;
+    let cancelled = false;
+    setOrganisationData(null);
+    fetch("/api/event-organisation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventIds: organisationEventIds }),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data) setOrganisationData(data);
+      })
+      .catch(() => {
+        // Best-effort (retour hors-ligne, etc.) : reste en chargement plutôt
+        // que d'afficher des données fausses -- jamais rencontré en pratique,
+        // le calendrier lui-même vient déjà de charger avec succès.
+      });
+    return () => {
+      cancelled = true;
+    };
+    // organisationEventIdsKey (pas organisationEventIds) : voir le commentaire
+    // au-dessus de ce tableau.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organisationEventIdsKey]);
+  const tasksByEventId = organisationData?.tasksByEventId ?? emptyOrganisationTasks;
+  const carpoolByEventId = organisationData?.carpoolByEventId ?? emptyOrganisationCarpool;
+  const volunteerNeedsByEventId =
+    organisationData?.volunteerNeedsByEventId ?? emptyOrganisationNeeds;
+  const organisationLoading = organisationEventIds.length > 0 && organisationData === null;
 
   // Retour de Cindy du 29/08 ("le délai pour afficher '1 présent' est trop
   // long") : rsvpCounts/presentPlayers sont des champs calculés côté
@@ -1609,6 +1673,18 @@ export default function CalendarView({
           const hasTasks = roles.length > 0 || shouldOfferCarpool(event);
           const needs = volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds;
           const hasNeeds = needs.length > 0;
+          // Retour de Cindy du 16/09 : tant que /api/event-organisation n'a
+          // pas répondu, on ne sait pas encore si cet événement aura des
+          // besoins bénévoles (hasTasks, lui, ne dépend que du type
+          // d'événement -- connu tout de suite) -- masquer la carte
+          // maintenant referait apparaître le bandeau "Organisation" d'un
+          // coup une fois les données arrivées, pile ce qu'on veut éviter.
+          // Un simple bloc au repos à la place, avec un pourtour identique
+          // à l'en-tête repliée pour ne quasiment rien faire bouger une
+          // fois résolu.
+          if (organisationLoading) {
+            return <div className="mt-3 h-11 animate-pulse rounded-2xl bg-zinc-100" />;
+          }
           if (!hasTasks && !hasNeeds) return null;
           return (
             <OrganisationCard defaultOpen={event.id === nextEventId}>
@@ -1662,29 +1738,39 @@ export default function CalendarView({
             2026-08-24). */}
         {canManageEvent && event.event_type !== "TRAINING" && (
           <OrganisationCard defaultOpen={event.id === nextEventId}>
-            <VolunteerNeedsPanel
-              eventId={event.id}
-              needs={volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds}
-              myPlayerIds={[]}
-              canManage
-              bare
-              commissionGroups={commissionGroups}
-              commissionGroupIds={event.commissionGroupIds}
-              onCommissionGroupIdsChange={(next) =>
-                updateLocalEventCommissionGroupIds(event.id, next)
-              }
-              onNeedAdded={(n) =>
-                notifyNewVolunteerNeed(createClient(), {
-                  eventId: event.id,
-                  eventTitle: event.title,
-                  startTime: event.start_time,
-                  teamId: event.teamId,
-                  targetTeamIds: event.targetTeamIds,
-                  commissionGroupIds: event.commissionGroupIds,
-                  ...n,
-                })
-              }
-            />
+            {organisationLoading ? (
+              // Retour de Cindy du 16/09 : cette carte s'affiche toujours
+              // (même sans besoin, qui gère l'événement peut en ajouter
+              // un) -- seul son contenu dépend de /api/event-organisation,
+              // jamais sa présence. Un skeleton à la place du panneau
+              // plutôt que de faire croire à "aucun besoin" pendant ce
+              // court instant.
+              <div className="h-16 animate-pulse rounded-xl bg-zinc-100" />
+            ) : (
+              <VolunteerNeedsPanel
+                eventId={event.id}
+                needs={volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds}
+                myPlayerIds={[]}
+                canManage
+                bare
+                commissionGroups={commissionGroups}
+                commissionGroupIds={event.commissionGroupIds}
+                onCommissionGroupIdsChange={(next) =>
+                  updateLocalEventCommissionGroupIds(event.id, next)
+                }
+                onNeedAdded={(n) =>
+                  notifyNewVolunteerNeed(createClient(), {
+                    eventId: event.id,
+                    eventTitle: event.title,
+                    startTime: event.start_time,
+                    teamId: event.teamId,
+                    targetTeamIds: event.targetTeamIds,
+                    commissionGroupIds: event.commissionGroupIds,
+                    ...n,
+                  })
+                }
+              />
+            )}
           </OrganisationCard>
         )}
       </div>
