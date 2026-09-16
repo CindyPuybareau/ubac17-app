@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -76,6 +76,12 @@ const paymentModes = [
   "Virement",
   "Autre",
 ];
+// Retour de Cindy du 16/09 : un règlement importé (ou déjà personnalisé ici
+// via "Autre") porte souvent un mode hors de cette liste ("Chèque CA
+// @Emilie", "HelloAsso + CS") -- sert à détecter ce cas pour présélectionner
+// "Autre" (avec le texte d'origine repris tel quel) plutôt que de laisser le
+// menu déroulant ne matcher aucune option.
+const STANDARD_PAYMENT_MODES = paymentModes.filter((m) => m !== "Autre");
 
 function Modal({
   title,
@@ -115,8 +121,17 @@ function Modal({
   // seulement son HABILLAGE visuel à l'impression, jamais pour les autres
   // Modal de ce fichier.
   const printNeutralBackdrop = portalId ? "print:bg-transparent print:p-0" : "";
+  // print:max-h-none print:overflow-visible (ajouté le 16/09 avec le
+  // max-h-[85vh]/overflow-y-auto ci-dessous) : overflow:auto sur CETTE
+  // carte découperait #receipt-print-area à l'impression même si lui-même
+  // passe en position:absolute -- un ancêtre avec overflow différent de
+  // visible rogne toujours ses descendants positionnés, y compris ceux
+  // dont le containing block réel est plus haut dans l'arbre (le wrapper
+  // fixed juste au-dessus). Sans ce garde-fou, le défilement à l'écran
+  // aurait fait réapparaître exactement le bug d'impression coupée déjà
+  // corrigé le 2026-09-01.
   const printNeutralCard = portalId
-    ? "print:m-0 print:max-w-none print:rounded-none print:p-0 print:shadow-none print:bg-transparent"
+    ? "print:m-0 print:max-w-none print:rounded-none print:p-0 print:shadow-none print:bg-transparent print:max-h-none print:overflow-visible"
     : "";
   const node = (
     <div
@@ -124,7 +139,13 @@ function Modal({
       className={`fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 ${printNeutralBackdrop}`}
     >
       <div
-        className={`w-full ${wide ? "max-w-lg" : "max-w-sm"} rounded-2xl bg-white p-5 shadow-xl ${printNeutralCard}`}
+        // Retour de Cindy du 16/09 ("le bloc n'est pas responsive sur PC,
+        // impossible de sortir ma facture") : sans max-h/overflow-y-auto,
+        // un reçu avec plusieurs règlements dépasse la hauteur d'un écran
+        // de PC portable -- rien ne défile, les boutons Imprimer/
+        // Télécharger en PDF tout en bas restent hors champ, inatteignables.
+        // Même patron que member-detail-modal.tsx (max-h-[85vh]).
+        className={`max-h-[85vh] w-full overflow-y-auto ${wide ? "max-w-lg" : "max-w-sm"} rounded-2xl bg-white p-5 shadow-xl ${printNeutralCard}`}
       >
         {/* print:hidden uniquement quand portalId est posé (le reçu) : le
             titre/la croix n'ont rien à faire sur la page imprimée, mais les
@@ -488,9 +509,19 @@ export default function CotisationParticipantsTable({
   const [paymentIds, setPaymentIds] = useState<string[] | null>(null);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMode, setPaymentMode] = useState(paymentModes[0]);
+  // Retour de Cindy du 16/09 ("Chèque CA @Emilie", "HelloAsso + CS" -- ce
+  // que génère l'import "Suivi des licenciés" pour Mode Paiement, en texte
+  // libre) : "Autre" seul, écrit tel quel comme mode_paiement, ne permet
+  // pas de retrouver la même précision à la main. paymentModeOther,
+  // affiché uniquement quand "Autre" est choisi, remplace alors "Autre"
+  // comme valeur réellement enregistrée (voir effectivePaymentMode plus
+  // bas) -- jamais les deux à la fois.
+  const [paymentModeOther, setPaymentModeOther] = useState("");
   const [paymentDetail, setPaymentDetail] = useState("");
   const [paymentExpectedCashDate, setPaymentExpectedCashDate] = useState("");
   const [paymentSaving, setPaymentSaving] = useState(false);
+  const effectivePaymentMode =
+    paymentMode === "Autre" ? paymentModeOther.trim() || "Autre" : paymentMode;
 
   const [remiseId, setRemiseId] = useState<string | null>(null);
   const [remiseAmount, setRemiseAmount] = useState("");
@@ -501,24 +532,76 @@ export default function CotisationParticipantsTable({
     cotisationId: string;
     amount: string;
     mode: string;
+    // Même principe que paymentModeOther ci-dessus, pour la modale
+    // "Modifier un règlement" -- pré-rempli à l'ouverture quand le
+    // règlement édité porte déjà un mode hors liste standard (import,
+    // ou "Autre" saisi précédemment ici même).
+    modeOther: string;
     detail: string;
     paidAt: string;
     expectedCashDate: string;
   } | null>(null);
   const [editPaymentSaving, setEditPaymentSaving] = useState(false);
+  const editEffectiveMode =
+    editPayment && editPayment.mode === "Autre"
+      ? editPayment.modeOther.trim() || "Autre"
+      : editPayment?.mode ?? "";
 
   const [receiptTarget, setReceiptTarget] = useState<{
     cotisation: AdminCotisation;
     contactEmail: string | null;
   } | null>(null);
 
+  // Retour de Cindy du 16/09 ("tout est très lent" -- ajouter un montant,
+  // supprimer un règlement...) : chaque mutation ci-dessous se contentait
+  // d'écrire en base puis d'appeler router.refresh(), qui recharge TOUT le
+  // bloc Bureau (cotisations, événements, équipes...) avant que la ligne ne
+  // bouge à l'écran -- le même correctif "état local" déjà fait pour le
+  // calendrier (calendar-view.tsx/localEvents), jamais fait ici. localRows
+  // reflète la prop cotisations au montage/à chaque vrai rechargement
+  // serveur, mais chaque mutation le corrige en plus, IMMÉDIATEMENT après
+  // l'écriture réussie, sans attendre router.refresh() pour que la ligne
+  // change à l'écran.
+  const [localRows, setLocalRows] = useState(cotisations);
+  useEffect(() => {
+    setLocalRows(cotisations);
+  }, [cotisations]);
+
+  function patchLocalCotisation(
+    id: string,
+    updater: (c: AdminCotisation) => AdminCotisation
+  ) {
+    setLocalRows((prev) => prev.map((c) => (c.id === id ? updater(c) : c)));
+  }
+
+  // Même logique que recomputeCotisationTotals plus bas (source de vérité
+  // en base), mais appliquée tout de suite à la liste de règlements déjà
+  // connue en mémoire -- jamais un aller-retour serveur supplémentaire pour
+  // ce seul affichage optimiste.
+  function recomputeLocalTotals(
+    c: AdminCotisation,
+    payments: CotisationPayment[]
+  ): AdminCotisation {
+    const total = roundCents(payments.reduce((sum, p) => sum + (p.amount ?? 0), 0));
+    const mostRecent = [...payments].sort(
+      (a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime()
+    )[0];
+    return {
+      ...c,
+      payments,
+      paiement: total,
+      mode_paiement: mostRecent?.mode ?? c.mode_paiement,
+      statut: c.statut === "OFFERT" ? c.statut : total >= due(c) ? "PAYE" : "EN_ATTENTE",
+    };
+  }
+
   const byId = useMemo(
-    () => new Map(cotisations.map((c) => [c.id, c])),
-    [cotisations]
+    () => new Map(localRows.map((c) => [c.id, c])),
+    [localRows]
   );
 
   const filtered = useMemo(() => {
-    let list = cotisations;
+    let list = localRows;
     if (statusFilter !== "ALL") {
       list = list.filter((c) => computeStatus(c) === statusFilter);
     }
@@ -531,7 +614,7 @@ export default function CotisationParticipantsTable({
       const cmp = key(a).localeCompare(key(b), "fr");
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [cotisations, statusFilter, search, sortKey, sortDir]);
+  }, [localRows, statusFilter, search, sortKey, sortDir]);
 
   function toggleSort(key: "lastName" | "firstName") {
     if (sortKey === key) {
@@ -599,7 +682,7 @@ export default function CotisationParticipantsTable({
       const { error: paymentError } = await supabase.from("cotisation_payments").insert({
         cotisation_id: id,
         amount,
-        mode: paymentMode,
+        mode: effectivePaymentMode,
         detail: paymentDetail || null,
         expected_cash_date: paymentExpectedCashDate || null,
       });
@@ -617,7 +700,7 @@ export default function CotisationParticipantsTable({
       // le signale.
       const { error, data } = await supabase
         .from("cotisations")
-        .update({ paiement: newPaid, mode_paiement: paymentMode, statut: newStatut })
+        .update({ paiement: newPaid, mode_paiement: effectivePaymentMode, statut: newStatut })
         .eq("id", id)
         .select("id");
       if (error) {
@@ -633,6 +716,28 @@ export default function CotisationParticipantsTable({
         return;
       }
 
+      // Reflète tout de suite le nouveau règlement dans localRows (retour
+      // de Cindy du 16/09, "délai au clic") -- id/paidAt provisoires, sans
+      // conséquence : router.refresh() ci-dessous remplace cette ligne par
+      // la vraie dès que le rechargement serveur arrive.
+      patchLocalCotisation(id, (prev) => ({
+        ...prev,
+        paiement: newPaid,
+        mode_paiement: effectivePaymentMode,
+        statut: newStatut,
+        payments: [
+          {
+            id: `optimistic-${crypto.randomUUID()}`,
+            amount,
+            mode: effectivePaymentMode,
+            detail: paymentDetail || null,
+            expectedCashDate: paymentExpectedCashDate || null,
+            paidAt: new Date().toISOString(),
+          },
+          ...prev.payments,
+        ],
+      }));
+
       // Deliberately don't close the modal here: the whole point of this
       // dossier-level flow is to let several règlements (Chèque 1, Chèque
       // 2, Pass Sport...) be recorded back-to-back without reopening
@@ -644,6 +749,7 @@ export default function CotisationParticipantsTable({
       setPaymentSaving(false);
       setPaymentAmount(String(newRemaining));
       setPaymentMode(paymentModes[0]);
+      setPaymentModeOther("");
       setPaymentDetail("");
       setPaymentExpectedCashDate("");
       showToast("Règlement ajouté.");
@@ -665,13 +771,13 @@ export default function CotisationParticipantsTable({
             const { error: paymentError } = await supabase.from("cotisation_payments").insert({
               cotisation_id: id,
               amount: remaining,
-              mode: paymentMode,
+              mode: effectivePaymentMode,
             });
             if (paymentError) return { error: paymentError, data: [] as { id: string }[] };
           }
           return supabase
             .from("cotisations")
-            .update({ paiement: due(c), mode_paiement: paymentMode, statut: "PAYE" })
+            .update({ paiement: due(c), mode_paiement: effectivePaymentMode, statut: "PAYE" })
             .eq("id", id)
             .select("id");
         })
@@ -690,10 +796,39 @@ export default function CotisationParticipantsTable({
         );
         return;
       }
+      // Même correctif optimiste que la branche "un seul dossier" ci-dessus,
+      // pour chaque dossier réglé en bloc.
+      paymentIds.forEach((id) => {
+        const c = byId.get(id);
+        if (!c) return;
+        const remaining = balanceDue(c);
+        patchLocalCotisation(id, (prev) => ({
+          ...prev,
+          paiement: due(prev),
+          mode_paiement: effectivePaymentMode,
+          statut: "PAYE",
+          payments:
+            remaining > 0
+              ? [
+                  {
+                    id: `optimistic-${crypto.randomUUID()}`,
+                    amount: remaining,
+                    mode: effectivePaymentMode,
+                    detail: null,
+                    expectedCashDate: null,
+                    paidAt: new Date().toISOString(),
+                  },
+                  ...prev.payments,
+                ]
+              : prev.payments,
+        }));
+      });
     }
 
     setPaymentSaving(false);
     setPaymentIds(null);
+    setPaymentMode(paymentModes[0]);
+    setPaymentModeOther("");
     setPaymentDetail("");
     setPaymentExpectedCashDate("");
     setSelectedIds(new Set());
@@ -743,6 +878,7 @@ export default function CotisationParticipantsTable({
       );
       return;
     }
+    patchLocalCotisation(remiseId, (prev) => ({ ...prev, remise: amount, statut: newStatut }));
     setRemiseId(null);
     router.refresh();
   }
@@ -774,6 +910,7 @@ export default function CotisationParticipantsTable({
       );
       return;
     }
+    patchLocalCotisation(id, (prev) => ({ ...prev, remise: 0, statut: newStatut }));
     showToast("Remise supprimée.");
     router.refresh();
   }
@@ -829,11 +966,13 @@ export default function CotisationParticipantsTable({
 
   function openEditPayment(cotisationId: string, p: CotisationPayment) {
     setActionError(null);
+    const isStandard = STANDARD_PAYMENT_MODES.includes(p.mode);
     setEditPayment({
       id: p.id,
       cotisationId,
       amount: String(p.amount),
-      mode: p.mode,
+      mode: isStandard ? p.mode : "Autre",
+      modeOther: isStandard ? "" : p.mode,
       detail: p.detail ?? "",
       paidAt: p.paidAt.slice(0, 10),
       expectedCashDate: p.expectedCashDate ?? "",
@@ -854,7 +993,7 @@ export default function CotisationParticipantsTable({
       .from("cotisation_payments")
       .update({
         amount,
-        mode: editPayment.mode,
+        mode: editEffectiveMode,
         detail: editPayment.detail || null,
         paid_at: editPayment.paidAt
           ? new Date(`${editPayment.paidAt}T12:00:00`).toISOString()
@@ -875,11 +1014,36 @@ export default function CotisationParticipantsTable({
       );
       return;
     }
-    await recomputeCotisationTotals(editPayment.cotisationId);
+    // Retour de Cindy du 16/09 ("délai au clic") : patch immédiat de
+    // localRows à partir de ce qu'on sait déjà (la ligne de règlement
+    // modifiée), avant même le recalcul serveur -- recomputeCotisationTotals
+    // n'est plus attendu ici (il continue en tâche de fond, avec son propre
+    // setActionError en cas de blocage RLS), pour ne plus retenir la
+    // fermeture de la modale derrière son aller-retour.
+    const editedPaidAt = editPayment.paidAt
+      ? new Date(`${editPayment.paidAt}T12:00:00`).toISOString()
+      : new Date().toISOString();
+    patchLocalCotisation(editPayment.cotisationId, (prev) =>
+      recomputeLocalTotals(
+        prev,
+        prev.payments.map((p) =>
+          p.id === editPayment.id
+            ? {
+                ...p,
+                amount,
+                mode: editEffectiveMode,
+                detail: editPayment.detail || null,
+                expectedCashDate: editPayment.expectedCashDate || null,
+                paidAt: editedPaidAt,
+              }
+            : p
+        )
+      )
+    );
+    recomputeCotisationTotals(editPayment.cotisationId).then(() => router.refresh());
     setEditPaymentSaving(false);
     setEditPayment(null);
     showToast("Règlement modifié.");
-    router.refresh();
   }
 
   // Même correctif que clearRemise ci-dessus.
@@ -902,9 +1066,12 @@ export default function CotisationParticipantsTable({
       );
       return;
     }
-    await recomputeCotisationTotals(cotisationId);
+    // Même correctif optimiste que confirmEditPayment ci-dessus.
+    patchLocalCotisation(cotisationId, (prev) =>
+      recomputeLocalTotals(prev, prev.payments.filter((p) => p.id !== paymentId))
+    );
+    recomputeCotisationTotals(cotisationId).then(() => router.refresh());
     showToast("Règlement supprimé.");
-    router.refresh();
   }
 
   async function exportSelection(ids: string[]) {
@@ -912,7 +1079,7 @@ export default function CotisationParticipantsTable({
     // sert qu'à ce bouton "Exporter", pas de raison qu'il pèse sur le
     // chargement initial du tableau de bord pour tout le monde.
     const XLSX = await import("xlsx");
-    const items = cotisations.filter((c) => ids.includes(c.id));
+    const items = localRows.filter((c) => ids.includes(c.id));
     const header = [
       "Nom & Prénom",
       "Catégorie",
@@ -1566,7 +1733,7 @@ export default function CotisationParticipantsTable({
                   type="number"
                   value={paymentAmount}
                   onChange={(e) => setPaymentAmount(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+                  className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
               </div>
             )}
@@ -1586,6 +1753,19 @@ export default function CotisationParticipantsTable({
                 ))}
               </select>
             </div>
+            {paymentMode === "Autre" && (
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-600">
+                  Précisez le mode de paiement
+                </label>
+                <input
+                  type="text"
+                  value={paymentModeOther}
+                  onChange={(e) => setPaymentModeOther(e.target.value)}
+                  className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+                />
+              </div>
+            )}
             {paymentIds.length === 1 && (
               <>
                 <div>
@@ -1918,7 +2098,7 @@ export default function CotisationParticipantsTable({
               min="0"
               value={remiseAmount}
               onChange={(e) => setRemiseAmount(e.target.value)}
-              className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+              className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
             <button
               onClick={confirmRemise}
@@ -1944,7 +2124,7 @@ export default function CotisationParticipantsTable({
                 onChange={(e) =>
                   setEditPayment((p) => (p ? { ...p, amount: e.target.value } : p))
                 }
-                className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+                className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               />
             </div>
             <div>
@@ -1965,6 +2145,21 @@ export default function CotisationParticipantsTable({
                 ))}
               </select>
             </div>
+            {editPayment.mode === "Autre" && (
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-600">
+                  Précisez le mode de paiement
+                </label>
+                <input
+                  type="text"
+                  value={editPayment.modeOther}
+                  onChange={(e) =>
+                    setEditPayment((p) => (p ? { ...p, modeOther: e.target.value } : p))
+                  }
+                  className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+                />
+              </div>
+            )}
             <div>
               <label className="mb-1 block text-xs font-medium text-zinc-600">
                 Détail (n° chèque, banque...)
