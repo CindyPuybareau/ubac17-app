@@ -3751,7 +3751,30 @@ export default async function DashboardPage({
                   .in("cotisation_id", familyCotisationIds)
                   .order("paid_at", { ascending: false })
               : Promise.resolve(null),
-          () => getEventTasksByEventId(supabase, upcomingFamilyEventIds, dbLimit),
+          // Retour de Cindy du 16/09 (dédoublonnage Coach<->Famille) : pour
+          // un compte qui cumule les deux casquettes sur les MÊMES équipes
+          // (ex. Basile, dont les enfants jouent justement dans les
+          // équipes qu'il coache -- vérifié en base, 188/188 événements en
+          // commun), coachOrganisationTasks (déjà résolu juste au-dessus)
+          // couvre déjà une partie ou la totalité de ces événements. On ne
+          // redemande que ceux qui ne sont pas déjà connus -- si tout est
+          // déjà couvert (cas Basile), getEventTasksByEventId([]) ne fait
+          // même plus d'aller-retour à la base (retour anticipé de la
+          // fonction sur un tableau vide).
+          () => {
+            const uncoveredEventIds = upcomingFamilyEventIds.filter(
+              (id) => !(id in coachOrganisationTasks)
+            );
+            return getEventTasksByEventId(supabase, uncoveredEventIds, dbLimit).then(
+              (fetched) => {
+                const merged: Record<string, EventTasksState> = { ...fetched };
+                upcomingFamilyEventIds.forEach((id) => {
+                  if (id in coachOrganisationTasks) merged[id] = coachOrganisationTasks[id];
+                });
+                return merged;
+              }
+            );
+          },
           // Retour de Cindy du 16/09 (dédoublonnage Bureau<->Famille, même
           // schéma que Coach juste plus haut) : eventIds ⊆ upcomingEventIds
           // quand bureauDataLoaded, adminVolunteerNeedsByEventId déjà résolu
