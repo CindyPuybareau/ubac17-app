@@ -77,6 +77,15 @@ export default function NotificationBell() {
         const { data } = await supabase.rpc("notifications_for_me", { p_limit: 30 });
         setNotifications((data as NotificationRow[] | null) ?? []);
       } while (refreshQueuedRef.current);
+    } catch {
+      // Retour de Cindy du 16/09 : sans ce filet, un échec réseau ici
+      // (coupure, RPC en erreur...) laissait `notifications` bloqué à
+      // `null` pour toujours -- jamais le reste de la page (cette cloche
+      // est indépendante de page.tsx), mais son propre panneau restait
+      // coincé sur "Chargement..." même une fois rouvert. [] plutôt que
+      // ne rien faire : la prochaine minute (l'intervalle plus bas)
+      // retentera de toute façon.
+      setNotifications((prev) => prev ?? []);
     } finally {
       loadingRef.current = false;
     }
