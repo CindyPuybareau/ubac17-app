@@ -18,7 +18,15 @@ import DashboardTabs, { type DashboardTab } from "./dashboard-tabs";
 // (route.ts) : ne règle pas la lenteur elle-même, mais laisse la page le
 // temps de répondre au lieu d'être tuée en cours de route par
 // l'hébergeur.
-export const maxDuration = 60;
+// Relevé à 300s le 16/09 (retour de Cindy, nouvel échec "This page
+// couldn't load" en prod) : 60s ne suffisait pas -- un cas réel mesuré en
+// local (sans cette limite) a mis 107s à réussir, et Postgres lui-même
+// tolère jusqu'à 2 minutes par requête (statement_timeout, réglage de la
+// plateforme Supabase, vérifié directement en base). 300s est le plafond
+// maximum du plan Hobby de Cindy avec Fluid Compute activé (vérifié dans
+// Vercel -- Settings -- Functions -- Advanced Settings) ; au-delà, il
+// faudrait un plan payant.
+export const maxDuration = 300;
 import AdminView from "./admin-view";
 import type { RosterPlayer, TeamWithMembers } from "./team-manager";
 import CoachView from "./coach-view";
