@@ -13,6 +13,7 @@ export const EVENT_TYPE_OPTIONS: { value: string; label: string }[] = [
   { value: "FRIENDLY", label: "Match amical" },
   { value: "TOURNAMENT", label: "Tournoi / Plateau" },
   { value: "OTHER", label: "Événement club" },
+  { value: "REUNION", label: "Réunion Bureau" },
 ];
 
 // Un code couleur par type, repris à l'identique partout (pastilles du
@@ -24,7 +25,22 @@ export const EVENT_TYPE_OPTIONS: { value: string; label: string }[] = [
 // événement club (fourre-tout chaleureux).
 const typeStyles: Record<
   string,
-  { pill: string; border: string; badge: string; label: string; dot: string }
+  {
+    pill: string;
+    border: string;
+    badge: string;
+    label: string;
+    dot: string;
+    // Retour de Cindy du 16/09 ("ce type d'événement doit ressortir des
+    // autres, pas faire l'amalgame") : REUNION seul à ce jour -- badge
+    // plein (fond violet uni, texte blanc) plutôt que la pastille pastel
+    // partagée par tous les autres types, pour qu'il ne se noie pas au
+    // milieu du calendrier même en scannant vite. `badge` ci-dessus reste
+    // renseigné (repli si un appelant l'utilise encore tel quel), mais un
+    // appelant qui affiche le badge doit vérifier `solid` en premier -- voir
+    // son usage dans calendar-view.tsx (renderEventCard).
+    solid?: boolean;
+  }
 > = {
   MATCH: {
     pill: "bg-navy/10 text-navy",
@@ -65,6 +81,16 @@ const typeStyles: Record<
     badge: "bg-court-green/10 text-court-green",
     label: "Entraînement",
     dot: "bg-court-green",
+  },
+  REUNION: {
+    pill: "bg-plum/10 text-plum-dark",
+    border: "border-l-plum",
+    // Fond plein, texte blanc -- volontairement pas le même patron
+    // pastel/texte-de-couleur que les autres (voir `solid` ci-dessus).
+    badge: "bg-plum text-white",
+    label: "Réunion Bureau",
+    dot: "bg-plum",
+    solid: true,
   },
 };
 

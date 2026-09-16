@@ -17,6 +17,7 @@ import {
   ExternalLink,
   LayoutGrid,
   List,
+  Lock,
   Mail,
   MapPin,
   ListOrdered,
@@ -891,7 +892,12 @@ export default function CalendarView({
     if (isTournament) {
       return `${prefix}rounded-2xl border-2 border-dashed border-ubac-yellow bg-white p-4 shadow-sm`;
     }
-    if (event.event_type === "MATCH") {
+    if (event.event_type === "MATCH" || event.event_type === "REUNION") {
+      // Même bordure épaisse qu'un match officiel (retour de Cindy du
+      // 16/09, "ressortir des autres événements") : signale "important",
+      // pas un simple entraînement -- combinée au badge plein (voir
+      // style.badge/typeStyles.REUNION dans event-style.ts) plutôt qu'à la
+      // pastille pastel partagée par les autres types.
       return `${prefix}rounded-2xl border border-navy/15 bg-white p-4 shadow-sm border-l-8 ${style.border}`;
     }
     return `${prefix}rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm border-l-4 ${style.border}`;
@@ -1430,8 +1436,9 @@ export default function CalendarView({
             </span>
             <span className="flex flex-wrap items-center gap-2">
               <span
-                className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${style.badge}`}
+                className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${style.badge}`}
               >
+                {style.solid && <Lock className="h-2.5 w-2.5 shrink-0" />}
                 {style.label}
               </span>
               {homeAway && (
@@ -1668,7 +1675,7 @@ export default function CalendarView({
             aucun espace, même si un rôle/besoin lui est un jour rattaché
             en base — la carte entraînement doit rester sobre par
             construction, pas juste par absence de données. */}
-        {!canManageEvent && !event.readOnlyExternal && event.event_type !== "TRAINING" && (() => {
+        {!canManageEvent && !event.readOnlyExternal && event.event_type !== "TRAINING" && event.event_type !== "REUNION" && (() => {
           const roles = rolesForEventType(eventRoles, event.event_type);
           const hasTasks = roles.length > 0 || shouldOfferCarpool(event);
           const needs = volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds;
@@ -1735,8 +1742,10 @@ export default function CalendarView({
             probablement la plus consultée (retour de Cindy du
             2026-08-21 : "dans le bureau aussi il y en a"). Même règle
             "jamais sur un entraînement" que ci-dessus (retour de Cindy du
-            2026-08-24). */}
-        {canManageEvent && event.event_type !== "TRAINING" && (
+            2026-08-24). Ni entraînement ni Réunion (retour de Cindy du
+            16/09) : une réunion Bureau n'a ni maillots/goûter ni besoin
+            bénévole à gérer. */}
+        {canManageEvent && event.event_type !== "TRAINING" && event.event_type !== "REUNION" && (
           <OrganisationCard defaultOpen={event.id === nextEventId}>
             {organisationLoading ? (
               // Retour de Cindy du 16/09 : cette carte s'affiche toujours
@@ -1773,6 +1782,38 @@ export default function CalendarView({
             )}
           </OrganisationCard>
         )}
+        {/* Retour de Cindy du 16/09 ("Réunion Bureau") : le bouton
+            Présent/Absent n'existait jusqu'ici que pour répondre pour
+            AUTRUI (son enfant) -- jamais pour soi-même en tant que membre
+            du Bureau qui gère l'événement (canManageEvent=true ici,
+            branche !canManageEvent plus haut jamais atteinte). selfPlayerId
+            (propre fiche joueur de qui consulte, voir bureau-dashboard.tsx)
+            n'est fourni que côté Bureau -- absent partout ailleurs, ce
+            bloc n'apparaît donc jamais sur les autres espaces. */}
+        {canManageEvent && event.event_type === "REUNION" && selfPlayerId && (() => {
+          const selfStatus = event.presentPlayers?.some((p) => p.id === selfPlayerId)
+            ? "PRESENT"
+            : event.absentPlayers?.some((p) => p.id === selfPlayerId)
+              ? "ABSENT"
+              : "PENDING";
+          const selfName =
+            event.presentPlayers?.find((p) => p.id === selfPlayerId)?.firstName ??
+            event.absentPlayers?.find((p) => p.id === selfPlayerId)?.firstName ??
+            "";
+          return (
+            <div className="mt-3 flex items-center gap-2">
+              <span className="text-xs font-medium text-zinc-500">Ta présence :</span>
+              <RsvpButtons
+                eventId={event.id}
+                playerId={selfPlayerId}
+                currentStatus={selfStatus}
+                onStatusChange={(previousStatus, newStatus) =>
+                  updateLocalRsvpStatus(event.id, selfPlayerId, selfName, previousStatus, newStatus)
+                }
+              />
+            </div>
+          );
+        })()}
       </div>
     );
   }

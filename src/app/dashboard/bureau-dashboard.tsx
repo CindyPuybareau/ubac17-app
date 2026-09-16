@@ -217,6 +217,7 @@ export default function BureauDashboard({
   sponsors,
   penalites,
   commissionGroups = [],
+  ownPlayerId = null,
 }: {
   cotisations: AdminCotisation[];
   members: AdminMember[];
@@ -240,6 +241,12 @@ export default function BureauDashboard({
   // Retour de Cindy du 10/09 ("Accès Commissions & Administration") :
   // transmis tel quel à DeferredCalendar/VolunteerNeedsPanel plus bas.
   commissionGroups?: { id: string; name: string }[];
+  // Retour de Cindy du 16/09 ("Réunion Bureau") : propre fiche joueur de
+  // qui consulte -- transmis à CalendarView pour qu'un membre du Bureau
+  // puisse répondre présent/absent pour lui-même sur une Réunion (jamais
+  // fourni jusqu'ici pour ce calendrier, qui n'en avait pas besoin avant
+  // ce type d'événement).
+  ownPlayerId?: string | null;
 }) {
   // Même périmètre que l'onglet Cotisations & Licences (KpiHeader) : les
   // stages/événements/boutique (collecteId non nul) ont leur propre suivi
@@ -435,6 +442,7 @@ export default function BureauDashboard({
         // (calendar-view.tsx) pour la raison (Bureau voit déjà tout le
         // club, Coach/Famille non).
         isBureau
+        selfPlayerId={ownPlayerId}
         birthdayMembers={birthdayMembers}
         eventRoles={eventRoles}
         volunteerNeedsByEventId={volunteerNeedsByEventId}

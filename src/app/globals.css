@@ -55,6 +55,15 @@
   --status-pending-dark: var(--parquet-dark);
   --status-urgent: #dc2626;
   --status-urgent-dark: #b91c1c;
+  /* Prune, réservée au type d'événement "Réunion" (Bureau uniquement,
+     retour de Cindy du 16/09) : aucune des couleurs ci-dessus ne convenait
+     -- toutes "sportives/chaleureuses" (vert/or/terracotta/ciel) ou déjà
+     prises (navy=match officiel, corail=Espace Enfant, rouge=urgent). Un
+     violet prune tranche nettement du reste de la palette et porte une
+     connotation "officiel/administratif" plutôt que "sportif", cohérent
+     avec le sens de l'événement.  */
+  --plum: #6b4c8a;
+  --plum-dark: #4f3866;
 }
 
 @theme inline {
@@ -83,6 +92,8 @@
   --color-status-pending-dark: var(--status-pending-dark);
   --color-status-urgent: var(--status-urgent);
   --color-status-urgent-dark: var(--status-urgent-dark);
+  --color-plum: var(--plum);
+  --color-plum-dark: var(--plum-dark);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   /* Trio typographique de la maquette (direction artistique validée le

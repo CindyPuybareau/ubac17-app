@@ -84,6 +84,7 @@ export default function AdminView({
   volunteerNeedsByEventId,
   clubReports,
   dashboardSummary,
+  ownPlayerId = null,
 }: {
   // Profils d'accès sur-mesure (retour de Cindy du 05/09, étape 3) : null
   // pour un Bureau complet (comportement historique, inchangé) ; sinon, la
@@ -120,6 +121,10 @@ export default function AdminView({
   // bord") : résumé club entier (space-dashboard.ts, teamIds null) --
   // jamais scopé à une équipe côté Bureau.
   dashboardSummary: SpaceDashboardSummaryData;
+  // Retour de Cindy du 16/09 ("Réunion Bureau") : transmis tel quel à
+  // BureauDashboard/CalendarView pour le présent/absent en propre nom sur
+  // une Réunion.
+  ownPlayerId?: string | null;
 }) {
   const teamRefs = teams.map((t) => ({
     id: t.id,
@@ -223,6 +228,7 @@ export default function AdminView({
             sponsors={sponsors}
             penalites={penalites}
             commissionGroups={commissionGroups}
+            ownPlayerId={ownPlayerId}
           />
           <SponsorsDisplay sponsors={sponsorDisplay} />
         </div>

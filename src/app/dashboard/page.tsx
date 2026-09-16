@@ -1817,6 +1817,40 @@ export default async function DashboardPage({
       rosterByTeam.set(tp.team_id, list);
     });
 
+    // Réunion (retour de Cindy du 16/09) : "attendus" = tout le Bureau
+    // automatiquement (club_administrators), via sa propre fiche joueur --
+    // jamais une équipe, une Réunion n'en a pas (voir eventRoster plus
+    // bas). Tous les membres actuels du Bureau ont une fiche joueur
+    // (confirmé avec Cindy) ; un futur membre purement administratif
+    // sans fiche n'apparaîtrait simplement pas ici, sans erreur.
+    const playerByProfileId = new Map(
+      (playersRes.data ?? [])
+        .filter((p) => p.profile_id)
+        .map((p) => [p.profile_id as string, p])
+    );
+    const profileIdByEmailLower = new Map(
+      (profilesRes.data ?? []).map((p) => [
+        ((p as { email: string | null }).email ?? "").toLowerCase(),
+        p.id,
+      ])
+    );
+    const bureauRoster: RosterPlayer[] = (clubAdminsRes.data ?? [])
+      .map((admin) => {
+        const profileId = profileIdByEmailLower.get((admin.email ?? "").toLowerCase());
+        const player = profileId ? playerByProfileId.get(profileId) : undefined;
+        if (!player) return null;
+        const roster: RosterPlayer = {
+          id: player.id,
+          first_name: player.first_name,
+          last_name: player.last_name,
+          position: null,
+          nextEventStatus: null,
+          birthDate: player.birth_date,
+        };
+        return roster;
+      })
+      .filter((p): p is RosterPlayer => p !== null);
+
     // Matchs/événements ponctuels (upcomingEventsRes) + entraînements du
     // mois affiché (upcomingTrainingsRes, voir sa requête plus haut) --
     // recombinés ici une fois pour toutes, avant tout calcul qui dépendait
@@ -2317,17 +2351,24 @@ export default async function DashboardPage({
       // else final, effectif vide, rsvpCounts à 0/0/0/0 partout. unionRoster
       // reprend TOUT rosterByTeam (le club entier, ici) plutôt qu'un
       // sous-ensemble d'équipes.
-      const eventRoster: RosterPlayer[] = team
-        ? (rosterByTeam.get(team.id) ?? [])
-        : (e.target_team_ids as string[] | null)
-          ? Array.from(
-              new Map<string, RosterPlayer>(
-                (e.target_team_ids as string[])
-                  .flatMap((id: string) => rosterByTeam.get(id) ?? [])
-                  .map((p: RosterPlayer) => [p.id, p] as const)
-              ).values()
-            )
-          : unionRoster(rosterByTeam);
+      // Réunion d'abord (retour de Cindy du 16/09) : team_id et
+      // target_team_ids sont TOUJOURS null pour ce type -- sans ce garde-
+      // fou, elle tomberait dans le else final (unionRoster, effectif =
+      // le club entier), pas bureauRoster.
+      const eventRoster: RosterPlayer[] =
+        e.event_type === "REUNION"
+          ? bureauRoster
+          : team
+            ? (rosterByTeam.get(team.id) ?? [])
+            : (e.target_team_ids as string[] | null)
+              ? Array.from(
+                  new Map<string, RosterPlayer>(
+                    (e.target_team_ids as string[])
+                      .flatMap((id: string) => rosterByTeam.get(id) ?? [])
+                      .map((p: RosterPlayer) => [p.id, p] as const)
+                  ).values()
+                )
+              : unionRoster(rosterByTeam);
       const paidInfo = resolvePaidInfo(
         attachCotisationsToCollectes(e.collectes, adminPaidParticipantsByCollecteId)
       );
@@ -4130,6 +4171,7 @@ export default async function DashboardPage({
             eventRoles={eventRoleTypes}
             volunteerNeedsByEventId={adminVolunteerNeedsByEventId}
             clubReports={clubReports}
+            ownPlayerId={ownPlayerId}
           />
         ) : null,
     });

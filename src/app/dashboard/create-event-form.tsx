@@ -67,7 +67,7 @@ function generateRecurrenceDateTimes(
 }
 
 type Team = { id: string; name: string | null; category: string | null };
-type EventType = "MATCH" | "FRIENDLY" | "TRAINING" | "OTHER" | "TOURNAMENT";
+type EventType = "MATCH" | "FRIENDLY" | "TRAINING" | "OTHER" | "TOURNAMENT" | "REUNION";
 
 // Même logique que resolveEventTeamName (page.tsx), rejouée côté client
 // pour construire une carte affichable immédiatement — voir onCreated/
@@ -110,6 +110,7 @@ const defaultTitles: Record<EventType, string> = {
   TRAINING: "Entraînement",
   OTHER: "Événement",
   TOURNAMENT: "Tournoi",
+  REUNION: "Réunion",
 };
 
 // Le choix du type se fait en un geste, avec la couleur qu'aura ensuite
@@ -212,23 +213,23 @@ export default function CreateEventForm({
   const [impactTime, setImpactTime] = useState(() =>
     editingEvent?.impactTime ? toTimeLocal(editingEvent.impactTime) : ""
   );
-  // Retour de Cindy du 12/09 (revue du champ) : "15 min avant le début" par
-  // défaut plutôt qu'un menu vide sur "Raccourci..." -- le cas le plus
-  // fréquent s'affiche déjà prêt, à changer seulement si besoin (voir
-  // handleStartTimeChange plus bas, qui recalcule impactTime quand le
-  // début change tant que ce raccourci reste actif). En édition, retrouve
-  // le raccourci déjà utilisé si l'écart correspond exactement à l'un
-  // d'eux, sinon retombe sur 15 min sans toucher à l'heure déjà enregistrée
-  // (impactTime ci-dessus, seule valeur réellement envoyée en base).
+  // Retour de Cindy du 16/09 : "15 min avant le début" par défaut était
+  // "chiant" à retoucher à chaque création -- "0 min" (même heure que le
+  // début) par défaut à la place (voir handleStartTimeChange plus bas, qui
+  // recalcule impactTime quand le début change tant que ce raccourci reste
+  // actif). En édition, retrouve le raccourci déjà utilisé si l'écart
+  // correspond exactement à l'un d'eux, sinon retombe sur 0 min sans
+  // toucher à l'heure déjà enregistrée (impactTime ci-dessus, seule valeur
+  // réellement envoyée en base).
   const [impactMinutesBefore, setImpactMinutesBefore] = useState(() => {
     if (editingEvent?.impactTime) {
       const diffMinutes = Math.round(
         (new Date(editingEvent.start_time).getTime() - new Date(editingEvent.impactTime).getTime()) /
           60000
       );
-      if ([15, 30, 45, 60].includes(diffMinutes)) return String(diffMinutes);
+      if ([0, 15, 30, 45, 60].includes(diffMinutes)) return String(diffMinutes);
     }
-    return "15";
+    return "0";
   });
   const [notes, setNotes] = useState(() => editingEvent?.notes ?? "");
   // Retour de Cindy du 2026-08-25 : remplace "Répéter chaque semaine" (voir
@@ -249,13 +250,15 @@ export default function CreateEventForm({
   // qu'une seule équipe (retour de Cindy du 2026-08-20 : "à l'heure
   // actuelle, quand je créer un evenement, je ne peux choisir qu'une
   // equipe"). "specific"/"club" n'ont de sens que si allowClubWide.
-  const [scopeMode, setScopeMode] = useState<"single" | "specific" | "club">(() =>
+  const [scopeMode, setScopeMode] = useState<"single" | "specific" | "club" | "bureau">(() =>
     editingEvent?.teamId
       ? "single"
       : editingEvent?.targetTeamIds && editingEvent.targetTeamIds.length > 0
         ? "specific"
         : editingEvent
-          ? "club"
+          ? editingEvent.event_type === "REUNION"
+            ? "bureau"
+            : "club"
           : "single"
   );
   const [targetTeamIds, setTargetTeamIds] = useState<string[]>(() => editingEvent?.targetTeamIds ?? []);
@@ -375,7 +378,11 @@ export default function CreateEventForm({
     setTargetTeamIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
   }
 
-  const isMatch = eventType === "MATCH" || eventType === "FRIENDLY";
+  // scopeMode !== "bureau" d'abord : le sélecteur "Type d'événement" est
+  // caché pour cette portée (voir plus bas), eventType peut donc retenir
+  // une valeur "Match"/"Amical" choisie avant de basculer sur "Bureau" --
+  // sans ce garde-fou, is_home serait quand même envoyé pour une Réunion.
+  const isMatch = scopeMode !== "bureau" && (eventType === "MATCH" || eventType === "FRIENDLY");
 
   async function computePaidParticipantIds(
     supabase: ReturnType<typeof createClient>,
@@ -405,12 +412,12 @@ export default function CreateEventForm({
 
   // Retour de Cindy du 12/09 (revue du champ "Heure d'impact") : tant que
   // le raccourci "X min avant" est actif (impactMinutesBefore non vide,
-  // valeur par défaut "15" ci-dessus), l'heure d'arrivée suit le début
-  // choisi -- sans ça, "15 min avant le début" par défaut resterait vide
-  // jusqu'à ce que l'utilisateur retouche le menu après avoir choisi
-  // l'heure. Dès qu'une heure est tapée directement dans le champ heure
-  // d'arrivée, impactMinutesBefore repasse à "" (voir son onChange) et ce
-  // recalcul automatique s'arrête pour cet événement.
+  // valeur par défaut "0" ci-dessus), l'heure d'arrivée suit le début
+  // choisi -- sans ça, le raccourci par défaut resterait vide jusqu'à ce
+  // que l'utilisateur retouche le menu après avoir choisi l'heure. Dès
+  // qu'une heure est tapée directement dans le champ heure d'arrivée,
+  // impactMinutesBefore repasse à "" (voir son onChange) et ce recalcul
+  // automatique s'arrête pour cet événement.
   function handleStartTimeChange(value: string) {
     setStartTime(value);
     if (!impactMinutesBefore || !value) return;
@@ -429,7 +436,7 @@ export default function CreateEventForm({
       setError("La date et l'heure de début sont requises.");
       return;
     }
-    if (eventType === "TRAINING" && !endTime) {
+    if (scopeMode !== "bureau" && eventType === "TRAINING" && !endTime) {
       setError("L'heure de fin est obligatoire pour un entraînement.");
       return;
     }
@@ -468,11 +475,17 @@ export default function CreateEventForm({
     // rempli quand la portée "Équipes spécifiques" est choisie explicitement.
     const effectiveTeamId = scopeMode === "single" ? teamId : "";
     const effectiveTargetTeamIds = scopeMode === "specific" ? targetTeamIds : null;
+    // Retour de Cindy du 16/09 ("Réunion Bureau") : la portée "Bureau"
+    // impose son propre type, indépendamment de ce que porterait encore
+    // `eventType` (le sélecteur "Type d'événement" normal est caché pour
+    // cette portée, voir le JSX plus bas -- sa valeur mémorisée n'a alors
+    // plus de sens).
+    const effectiveEventType: EventType = scopeMode === "bureau" ? "REUNION" : eventType;
 
     setLoading(true);
     setError(null);
     const supabase = createClient();
-    const eventName = title || defaultTitles[eventType];
+    const eventName = title || defaultTitles[effectiveEventType];
 
     // Retour de Cindy du 12/09 ("Répéter") : chemin séparé du insert/update
     // simple plus bas -- chaque occurrence reste une ligne indépendante en
@@ -513,7 +526,7 @@ export default function CreateEventForm({
       const rows = occurrences
         .map((dt) => ({
           title: eventName,
-          event_type: eventType,
+          event_type: effectiveEventType,
           is_home: isMatch && isHome !== "" ? isHome === "true" : null,
           location: location || null,
           salle: salle || null,
@@ -603,7 +616,7 @@ export default function CreateEventForm({
       commission_group_ids: string[];
     } = {
       title: eventName,
-      event_type: eventType,
+      event_type: effectiveEventType,
       is_home: isMatch && isHome !== "" ? isHome === "true" : null,
       location: location || null,
       salle: salle || null,
@@ -1009,6 +1022,14 @@ export default function CreateEventForm({
               { value: "single" as const, label: "Une équipe" },
               { value: "specific" as const, label: "Équipes spécifiques" },
               { value: "club" as const, label: "Tout le club" },
+              // Retour de Cindy du 15/09 ("le bureau doit pouvoir créer un
+              // événement pour lui seul") : même colonnes en base que
+              // "club" (team_id/target_team_ids null, voir
+              // effectiveTeamId/effectiveTargetTeamIds plus haut) -- seul
+              // effectiveEventType change, forcé à "REUNION", ce qui
+              // suffit à la policy RLS "select events for own teams" pour
+              // ne plus jamais le montrer au reste du club.
+              { value: "bureau" as const, label: "Bureau" },
             ]
           ).map((c) => (
             <button
@@ -1026,7 +1047,9 @@ export default function CreateEventForm({
               }}
               className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
                 scopeMode === c.value
-                  ? "border-navy bg-navy/10 text-navy"
+                  ? c.value === "bureau"
+                    ? "border-plum bg-plum/10 text-plum-dark"
+                    : "border-navy bg-navy/10 text-navy"
                   : "border-zinc-200 text-zinc-500 hover:bg-white"
               }`}
             >
@@ -1066,25 +1089,36 @@ export default function CreateEventForm({
         </div>
       )}
 
-      <div className="flex flex-col gap-2">
-        <span className="text-xs font-medium text-zinc-600">Type d&apos;événement</span>
-        <div className="flex flex-wrap gap-1.5">
-          {typeChoices.map((c) => (
-            <button
-              key={c.value}
-              type="button"
-              onClick={() => setEventType(c.value)}
-              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                eventType === c.value
-                  ? c.active
-                  : "border-zinc-200 text-zinc-500 hover:bg-zinc-50"
-              }`}
-            >
-              {c.label}
-            </button>
-          ))}
+      {scopeMode === "bureau" ? (
+        // Une Réunion n'a pas de sous-type à choisir (pas de match/
+        // entraînement/tournoi possible pour le Bureau lui-même) --
+        // simple confirmation visuelle plutôt qu'un sélecteur vide de
+        // sens, dans le même violet que la carte affichée ensuite au
+        // calendrier (voir typeStyles.REUNION, event-style.ts).
+        <div className="flex items-center gap-2 rounded-lg border border-plum/30 bg-plum/10 px-3 py-2 text-sm font-semibold text-plum-dark">
+          Réunion Bureau — visible uniquement par le Bureau
         </div>
-      </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <span className="text-xs font-medium text-zinc-600">Type d&apos;événement</span>
+          <div className="flex flex-wrap gap-1.5">
+            {typeChoices.map((c) => (
+              <button
+                key={c.value}
+                type="button"
+                onClick={() => setEventType(c.value)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  eventType === c.value
+                    ? c.active
+                    : "border-zinc-200 text-zinc-500 hover:bg-zinc-50"
+                }`}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {isMatch && (
         <div className="flex flex-col gap-2">
@@ -1158,11 +1192,12 @@ export default function CreateEventForm({
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-zinc-600">
-            Heure de fin{eventType === "TRAINING" ? " *" : " (optionnel)"}
+            Heure de fin
+            {scopeMode !== "bureau" && eventType === "TRAINING" ? " *" : " (optionnel)"}
           </label>
           <input
             type="time"
-            required={eventType === "TRAINING"}
+            required={scopeMode !== "bureau" && eventType === "TRAINING"}
             value={endTime}
             onChange={(e) => setEndTime(e.target.value)}
             className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
@@ -1196,6 +1231,7 @@ export default function CreateEventForm({
             }}
             className="rounded-lg border border-zinc-200 px-2 py-2 text-sm text-zinc-600"
           >
+            <option value="0">À l&apos;heure du début</option>
             <option value="15">15 min avant le début</option>
             <option value="30">30 min avant le début</option>
             <option value="45">45 min avant le début</option>
@@ -1364,6 +1400,15 @@ export default function CreateEventForm({
         className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
       />
 
+      {/* Retour de Cindy du 16/09 ("Réunion Bureau", option 1) : ni besoins
+          d'organisation ni commissions concernées pour ce type d'événement
+          -- les deux sections suivantes n'ont d'effet réel que sur les
+          bénévoles externes (accès par jeton, jamais soumis aux mêmes
+          règles de visibilité que ce nouveau type Bureau-only), donc rien
+          à leur montrer ici plutôt qu'un contrôle qui semblerait actif
+          sans l'être. */}
+      {scopeMode !== "bureau" && (
+        <>
       {/* Même liste standard que sur la carte de l'événement (VolunteerNeedsPanel)
           — les deux lisent/écrivent la même table. Retour de Cindy du 10/09 :
           maintenant pré-rempli avec les besoins déjà en base en édition
@@ -1450,6 +1495,8 @@ export default function CreateEventForm({
             onChange={setCommissionGroupIds}
           />
         </div>
+      )}
+        </>
       )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
