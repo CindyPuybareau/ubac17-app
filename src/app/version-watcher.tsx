@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
 
 // Retour de Cindy du 14/09 ("les enfants n'ont pas à supprimer leur appli
@@ -30,15 +30,15 @@ import { RefreshCw } from "lucide-react";
 // minutes tant que l'onglet reste au premier plan (sessions longues, ex.
 // suivi d'un match).
 //
-// Bannière plutôt que rechargement automatique tant que quelqu'un regarde
-// l'écran : arracher la page sous les pieds de quelqu'un qui répond
-// présent/absent ou remplit un formulaire serait pire que la version
-// périmée elle-même. Retour de Cindy du 16/09 ("la mise à jour pour tous")
-// : dès que la personne n'est plus sur cet onglet (autre appli, écran
-// éteint, autre onglet du navigateur) -- donc plus aucun risque de lui
-// arracher une saisie en cours -- le rechargement se fait alors seul, sans
-// attendre un clic. Le bouton "Recharger" reste disponible pendant ce
-// temps pour qui veut l'appliquer tout de suite.
+// Bannière plutôt que rechargement automatique : arracher la page sous les
+// pieds de quelqu'un qui répond présent/absent ou remplit un formulaire
+// serait pire que la version périmée elle-même -- toujours un geste
+// volontaire (bouton "Recharger"). Retour de Cindy du 16/09 : une version
+// avec rechargement automatique une fois l'onglet inactif a été tentée
+// puis retirée le même jour (suspectée de bloquer la connexion sur
+// mobile, où changer d'appli/verrouiller l'écran déclenche
+// `visibilitychange` très souvent) -- retour à cette version simple,
+// jamais reprise depuis.
 function scriptPathsFromHtml(html: string): string[] {
   const paths: string[] = [];
   const re = /<script[^>]+src="([^"]+)"/g;
@@ -71,10 +71,6 @@ function fingerprint(paths: string[]): string {
 
 export default function VersionWatcher() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
-  // Miroir de updateAvailable lisible depuis onVisibilityChange (fermeture
-  // posée une seule fois par ce useEffect, donc l'état React lui-même y
-  // resterait figé à sa valeur du premier rendu).
-  const updateAvailableRef = useRef(false);
 
   useEffect(() => {
     const myFingerprint = fingerprint(currentScriptPaths());
@@ -91,18 +87,9 @@ export default function VersionWatcher() {
         });
         const html = await res.text();
         const latestFingerprint = fingerprint(scriptPathsFromHtml(html));
-        if (cancelled || !latestFingerprint || latestFingerprint === myFingerprint) return;
-        // Personne ne regarde cet onglet à cet instant précis (ce contrôle
-        // peut être déclenché par l'intervalle 15 min pendant que l'onglet
-        // est en arrière-plan) -- aucune saisie en cours à protéger, on
-        // recharge directement plutôt que d'afficher une bannière que
-        // personne ne verrait.
-        if (document.visibilityState === "hidden") {
-          window.location.reload();
-          return;
+        if (!cancelled && latestFingerprint && latestFingerprint !== myFingerprint) {
+          setUpdateAvailable(true);
         }
-        updateAvailableRef.current = true;
-        setUpdateAvailable(true);
       } catch {
         // Pas de réseau, ou requête bloquée (mode hors-ligne) : on
         // retentera à la prochaine occasion, jamais bloquant pour l'usage
@@ -111,15 +98,7 @@ export default function VersionWatcher() {
     }
 
     function onVisibilityChange() {
-      if (document.visibilityState === "visible") {
-        checkForUpdate();
-      } else if (updateAvailableRef.current) {
-        // La bannière était déjà affichée (mise à jour connue) et la
-        // personne vient de quitter cet onglet -- plus aucun risque de lui
-        // arracher une saisie en cours, on recharge maintenant sans
-        // attendre qu'elle revienne cliquer.
-        window.location.reload();
-      }
+      if (document.visibilityState === "visible") checkForUpdate();
     }
 
     document.addEventListener("visibilitychange", onVisibilityChange);
