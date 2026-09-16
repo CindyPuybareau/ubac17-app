@@ -32,8 +32,22 @@ export default function ConnexionPage() {
         password,
       });
 
-      if (error) {
+      // Retour de Cindy du 16/09 ("j'ai peur", mot de passe pourtant bon) :
+      // TOUTE erreur ici affichait "mot de passe incorrect", y compris un
+      // simple timeout du service d'authentification lui-même (vécu ce
+      // jour-là, "504 context deadline exceeded" côté Supabase pendant un
+      // pic de charge partagée) -- qui n'a rien à voir avec les
+      // identifiants et n'aurait jamais dû faire douter de sa propre
+      // saisie. Seul "invalid_credentials" (le code Supabase pour un
+      // e-mail/mot de passe réellement refusé) garde ce message ; tout
+      // autre code (timeout, limite de débit...) a droit à un vrai message
+      // technique, même formulation que handleOtpSubmit plus bas.
+      if (error && error.code === "invalid_credentials") {
         setError("Email ou mot de passe incorrect.");
+        return;
+      }
+      if (error) {
+        setError("Un problème est survenu, réessaie dans quelques instants.");
         return;
       }
 
