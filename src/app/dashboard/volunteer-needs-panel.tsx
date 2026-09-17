@@ -341,12 +341,21 @@ export default function VolunteerNeedsPanel({
 
           return (
             <div key={need.id} className="flex flex-col gap-2 rounded-lg bg-white px-3 py-2.5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
+              {/* Retour de Cindy du 17/09 ("le responsive sur téléphone est
+                  bof") : ni le libellé ni le compteur -/+ n'avait de quoi
+                  céder de la place à l'autre -- flex-wrap faisait alors
+                  systématiquement retomber tout le bloc compteur/corbeille
+                  sur sa propre ligne, plaqué à gauche sous le libellé au
+                  lieu de rester aligné à droite sur la même ligne. min-w-0
+                  flex-1 truncate laisse le libellé céder en premier (au
+                  pire tronqué) ; shrink-0 sur le bloc de droite garantit
+                  qu'il reste, lui, toujours entier et sur la même ligne. */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
                   <RoleIcon icon={icon} />
-                  <p className="text-xs font-medium text-zinc-700">{label}</p>
+                  <p className="truncate text-xs font-medium text-zinc-700">{label}</p>
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex shrink-0 items-center gap-1.5">
                   {canManage ? (
                     <div className="flex items-center gap-0.5 rounded-full bg-zinc-100 px-1 py-0.5">
                       <button
