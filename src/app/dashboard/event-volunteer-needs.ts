@@ -121,6 +121,88 @@ export async function notifyNewVolunteerNeed(
   }
 }
 
+// Retour de Cindy du 17/09 ("un petit bouton... côté coach") : relance
+// manuelle, en plus de la relance automatique à J-7 (bureau-alerts/route.ts,
+// runVolunteerNeedReminders) -- même texte, même ciblage, réutilisés à
+// l'identique pour que les deux canaux racontent la même chose. Volontairement
+// indépendante du marqueur reminder_sent_at de l'automatique (jamais lue ni
+// écrite ici) : Basile peut relancer autant de fois qu'il veut sans jamais
+// empêcher (ni être empêché par) le rappel automatique à J-7, décidé avec
+// Cindy plutôt qu'un compteur à gérer. eventId seul ne suffit pas ici
+// (contrairement à notifyNewVolunteerNeed, appelé juste après un insert où
+// l'appelant a déjà tout sous la main) : cette fonction est déclenchée bien
+// plus tard, depuis le panneau qui ne connaît que l'event_id -- va donc
+// chercher elle-même team_id/target_team_ids/commission_group_ids/titre/date.
+export async function notifyVolunteerNeedReminder(
+  supabase: SupabaseClient,
+  eventId: string,
+  needs: VolunteerNeed[]
+): Promise<{ error: string | null }> {
+  const { data: settings } = await supabase
+    .from("club_settings")
+    .select("volunteer_need_alerts_enabled")
+    .eq("id", true)
+    .maybeSingle();
+  if (!settings?.volunteer_need_alerts_enabled) {
+    return {
+      error:
+        "Les notifications de besoins bénévoles sont désactivées (Paramètres → Automatisations).",
+    };
+  }
+
+  const unresolvedNeeds = needs.filter((n) => n.requiredCount - n.signups.length > 0);
+  if (unresolvedNeeds.length === 0) {
+    return { error: null };
+  }
+
+  const { data: event, error: eventError } = await supabase
+    .from("events")
+    .select("title, start_time, team_id, target_team_ids, commission_group_ids")
+    .eq("id", eventId)
+    .maybeSingle();
+  if (eventError || !event) {
+    return { error: "Événement introuvable." };
+  }
+
+  const dateLabel = new Date(event.start_time).toLocaleDateString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "Europe/Paris",
+  });
+  const title = "Besoin bénévole non pourvu";
+
+  for (const need of unresolvedNeeds) {
+    const roleLabel = volunteerRoleLabel(need.roleCode, need.customLabel);
+    const remaining = need.requiredCount - need.signups.length;
+    const body = `${roleLabel} — encore ${remaining} place${remaining > 1 ? "s" : ""} pour ${
+      event.title ?? "un événement"
+    } du ${dateLabel}.`;
+
+    await supabase.from("notifications").insert({
+      team_id: event.team_id,
+      target_team_ids: event.target_team_ids,
+      event_id: eventId,
+      title,
+      body,
+      url: "/dashboard",
+    });
+
+    if ((event.commission_group_ids ?? []).length > 0) {
+      await supabase.from("notifications").insert(
+        (event.commission_group_ids as string[]).map((groupId) => ({
+          commission_group_id: groupId,
+          event_id: eventId,
+          title,
+          body,
+        }))
+      );
+    }
+  }
+
+  return { error: null };
+}
+
 export function volunteerRoleIcon(roleCode: string): RoleIconName {
   return STANDARD_VOLUNTEER_ROLES.find((r) => r.code === roleCode)?.icon ?? "Users";
 }

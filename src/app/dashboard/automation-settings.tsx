@@ -44,7 +44,7 @@ const AUTOMATIONS: { key: AutomationKey; title: string; description: string }[] 
     // alerts) pour le détail de chacune.
     title: "Besoins bénévoles",
     description:
-      "Notification à l'équipe et aux commissions concernées : nouveau besoin créé, besoin non pourvu à J-3, ou événement modifié/annulé.",
+      "Notification à l'équipe et aux commissions concernées : nouveau besoin créé, besoin non pourvu à J-7 puis à J-3, ou événement modifié/annulé.",
   },
 ];
 

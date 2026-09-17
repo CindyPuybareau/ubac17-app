@@ -256,7 +256,9 @@ type VolunteerNeedRow = {
   required_count: number;
 };
 
-// Relance J-3 des besoins bénévoles non pourvus (retour de Cindy du 13/09) :
+// Relance des besoins bénévoles non pourvus, à J-7 PUIS à J-3 (retour de
+// Cindy du 13/09, deux échéances distinctes ajoutées le 17/09 : "le but est
+// que les gens se présentent", un seul rappel n'y suffisait pas toujours) :
 // même interrupteur unique ("Besoins bénévoles") que notify_event_change
 // côté SQL (voir 20261113010000_notify_event_change_trigger.sql) et
 // notifyNewVolunteerNeed côté création — regroupée ici plutôt que dans une
@@ -268,20 +270,24 @@ type VolunteerNeedRow = {
 // une ligne par commission taguée sur l'événement (espace partagé
 // /commission/[token], jamais une personne individuelle — voir le
 // commentaire de notifyNewVolunteerNeed pour le pourquoi).
-async function runVolunteerNeedReminders(supabase: ReturnType<typeof createServiceClient>) {
-  const { data: settings } = await supabase
-    .from("club_settings")
-    .select("volunteer_need_alerts_enabled")
-    .eq("id", true)
-    .maybeSingle();
-  if (!settings?.volunteer_need_alerts_enabled) {
-    return { sent: 0, checked: 0, paused: true };
-  }
+//
+// Deux colonnes de marquage distinctes (reminder_sent_at pour J-7,
+// reminder_sent_at_j3 pour J-3, migration 20260917000000) : une seule aurait
+// empêché la relance à J-3 de se déclencher une fois celle à J-7 déjà
+// envoyée pour ce même besoin.
+type ReminderStage = { daysAhead: number; column: "reminder_sent_at" | "reminder_sent_at_j3" };
 
-  // J+3 en heure de Paris — même construction que match-reminders (J+1),
-  // décalée de deux jours.
+async function runVolunteerNeedRemindersForStage(
+  supabase: ReturnType<typeof createServiceClient>,
+  stage: ReminderStage
+) {
+  // J+N en heure de Paris — même construction que match-reminders (J+1).
   const parisNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" }));
-  const targetDay = new Date(parisNow.getFullYear(), parisNow.getMonth(), parisNow.getDate() + 3);
+  const targetDay = new Date(
+    parisNow.getFullYear(),
+    parisNow.getMonth(),
+    parisNow.getDate() + stage.daysAhead
+  );
   const dayAfter = new Date(targetDay.getFullYear(), targetDay.getMonth(), targetDay.getDate() + 1);
 
   const { data: eventsData, error: eventsError } = await supabase
@@ -301,7 +307,7 @@ async function runVolunteerNeedReminders(supabase: ReturnType<typeof createServi
     .from("event_volunteer_needs")
     .select("id, event_id, role_code, custom_label, required_count")
     .in("event_id", eventIds)
-    .is("reminder_sent_at", null);
+    .is(stage.column, null);
 
   if (needsError || !needsData || needsData.length === 0) {
     return { sent: 0, checked: 0 };
@@ -379,10 +385,10 @@ async function runVolunteerNeedReminders(supabase: ReturnType<typeof createServi
     // relancé indéfiniment tant qu'il resterait non pourvu.
     const { error: markSentError } = await supabase
       .from("event_volunteer_needs")
-      .update({ reminder_sent_at: new Date().toISOString() })
+      .update({ [stage.column]: new Date().toISOString() })
       .eq("id", need.id);
     if (markSentError) {
-      console.error("[bureau-alerts] marquage reminder_sent_at (besoin) échoué:", markSentError);
+      console.error(`[bureau-alerts] marquage ${stage.column} (besoin) échoué:`, markSentError);
     } else {
       sent += 1;
     }
@@ -391,11 +397,29 @@ async function runVolunteerNeedReminders(supabase: ReturnType<typeof createServi
   return { sent, checked: needs.length };
 }
 
+async function runVolunteerNeedReminders(supabase: ReturnType<typeof createServiceClient>) {
+  const { data: settings } = await supabase
+    .from("club_settings")
+    .select("volunteer_need_alerts_enabled")
+    .eq("id", true)
+    .maybeSingle();
+  if (!settings?.volunteer_need_alerts_enabled) {
+    return { sent: 0, checked: 0, paused: true };
+  }
+
+  const [j7, j3] = await Promise.all([
+    runVolunteerNeedRemindersForStage(supabase, { daysAhead: 7, column: "reminder_sent_at" }),
+    runVolunteerNeedRemindersForStage(supabase, { daysAhead: 3, column: "reminder_sent_at_j3" }),
+  ]);
+
+  return { sent: j7.sent + j3.sent, checked: j7.checked + j3.checked };
+}
+
 // Rappels Bureau automatiques, tous regroupés dans une seule tâche
 // planifiée (le plan Vercel Hobby plafonne à 2 crons — /api/cron/match-
 // reminders occupe déjà le premier) : échéances (licence FFBB, certificat
 // médical) + relance des cotisations/pénalités encore impayées + relance
-// J-3 des besoins bénévoles non pourvus (retour de Cindy du 13/09).
+// J-7 puis J-3 des besoins bénévoles non pourvus (retour de Cindy du 13/09).
 // Déclenché une fois par jour (voir vercel.json), protégé par CRON_SECRET.
 // Fermé par défaut (fail closed) : sans la variable posée côté Vercel, la
 // route refuse tout appel plutôt que de rester ouverte à qui la devine.

@@ -1357,6 +1357,17 @@ export default function CalendarView({
           : event.restrictedAudience === "COACHS"
             ? "Réunion Coachs"
             : "Réunion Bureau";
+    // Retour de Cindy du 17/09 ("l'onglet Organisation n'est pas ouvert à
+    // une semaine") : jusqu'ici seul LE prochain événement (nextEventId)
+    // s'ouvrait tout seul -- désormais aligné sur la fenêtre de relance
+    // automatique (J-7, cron/bureau-alerts) plutôt qu'un seuil arbitraire
+    // différent, pour que la carte s'ouvre pile quand la relance existe
+    // déjà. `|| event.id === nextEventId` garde le cas où le tout prochain
+    // événement est plus loin qu'une semaine (creux de saison) : il doit
+    // rester ouvert par défaut malgré tout, personne d'autre à montrer.
+    const withinReminderWindow =
+      new Date(event.start_time).getTime() - Date.now() <= 7 * 24 * 60 * 60 * 1000;
+    const organisationDefaultOpen = withinReminderWindow || event.id === nextEventId;
     const rsvpCounts = event.rsvpCounts;
     const hasRoster =
       rsvpCounts.present + rsvpCounts.absent + rsvpCounts.late + rsvpCounts.pending > 0;
@@ -1710,7 +1721,7 @@ export default function CalendarView({
           }
           if (!hasTasks && !hasNeeds) return null;
           return (
-            <OrganisationCard defaultOpen={event.id === nextEventId}>
+            <OrganisationCard defaultOpen={organisationDefaultOpen}>
               {hasTasks && (
                 <MatchTasksPanel
                   eventId={event.id}
@@ -1762,7 +1773,7 @@ export default function CalendarView({
             16/09) : une réunion Bureau n'a ni maillots/goûter ni besoin
             bénévole à gérer. */}
         {canManageEvent && event.event_type !== "TRAINING" && event.event_type !== "REUNION" && (
-          <OrganisationCard defaultOpen={event.id === nextEventId}>
+          <OrganisationCard defaultOpen={organisationDefaultOpen}>
             {organisationLoading ? (
               // Retour de Cindy du 16/09 : cette carte s'affiche toujours
               // (même sans besoin, qui gère l'événement peut en ajouter

@@ -1,14 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Minus, Plus, Trash2, X } from "lucide-react";
+import { Bell, Check, Minus, Plus, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import RoleIcon from "./role-icon";
 import ConfirmDialog from "./confirm-dialog";
 import CommissionMultiSelect from "./commission-multi-select";
+import { useToast } from "./toast-context";
 import {
   CUSTOM_ROLE_CODE,
   STANDARD_VOLUNTEER_ROLES,
+  notifyVolunteerNeedReminder,
   volunteerRoleIcon,
   volunteerRoleLabel,
   type VolunteerNeed,
@@ -77,6 +79,8 @@ export default function VolunteerNeedsPanel({
   const [newCustomLabel, setNewCustomLabel] = useState("");
   const [newCount, setNewCount] = useState("1");
   const [savingCommissions, setSavingCommissions] = useState(false);
+  const [relancing, setRelancing] = useState(false);
+  const { showToast } = useToast();
 
   // Copie locale affichée immédiatement au clic, plutôt que d'attendre le
   // rafraîchissement temps réel (débounce ~0,8s + un aller-retour serveur
@@ -295,6 +299,27 @@ export default function VolunteerNeedsPanel({
     }
   }
 
+  // Retour de Cindy du 17/09 ("un petit bouton... côté coach") : relance à
+  // la demande, en plus de celle automatique à J-7 (voir
+  // notifyVolunteerNeedReminder) -- jamais désactivé après un premier clic,
+  // décidé avec Cindy plutôt qu'un compteur de relances à gérer.
+  async function relanceNeeds() {
+    setRelancing(true);
+    setError(null);
+    const supabase = createClient();
+    const { error: relanceError } = await notifyVolunteerNeedReminder(
+      supabase,
+      eventId,
+      localNeeds
+    );
+    setRelancing(false);
+    if (relanceError) {
+      setError(relanceError);
+      return;
+    }
+    showToast("Relance envoyée aux personnes concernées.");
+  }
+
   if (localNeeds.length === 0 && !canManage) return null;
 
   return (
@@ -342,21 +367,22 @@ export default function VolunteerNeedsPanel({
           return (
             <div key={need.id} className="flex flex-col gap-2 rounded-lg bg-white px-3 py-2.5">
               {/* Retour de Cindy du 17/09 ("le responsive sur téléphone est
-                  bof") : ni le libellé ni le compteur -/+ n'avait de quoi
-                  céder de la place à l'autre -- flex-wrap faisait alors
-                  systématiquement retomber tout le bloc compteur/corbeille
-                  sur sa propre ligne, plaqué à gauche sous le libellé au
-                  lieu de rester aligné à droite sur la même ligne. min-w-0
-                  flex-1 truncate laisse le libellé céder en premier (au
-                  pire tronqué) ; shrink-0 sur le bloc de droite garantit
-                  qu'il reste, lui, toujours entier et sur la même ligne. */}
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex min-w-0 flex-1 items-center gap-2">
-                  <RoleIcon icon={icon} />
-                  <p className="truncate text-xs font-medium text-zinc-700">{label}</p>
-                </div>
-                <div className="flex shrink-0 items-center gap-1.5">
-                  {canManage ? (
+                  bof", puis "on devrait voir le texte... c'est limite") :
+                  la première tentative (libellé tronqué sur la même ligne
+                  que le compteur) allait jusqu'à ne plus montrer aucune
+                  lettre pour un libellé un peu long ("Table de marque",
+                  "Lavage maillots") sur un téléphone étroit -- illisible.
+                  Repli sur deux lignes distinctes à la place : le libellé
+                  (jamais tronqué, quitte à passer sur 2 lignes lui-même)
+                  au-dessus, le compteur/la corbeille en dessous -- chacun a
+                  alors toute la largeur de la carte pour lui, jamais à se
+                  partager la même ligne. */}
+              <div className="flex items-center gap-2">
+                <RoleIcon icon={icon} />
+                <p className="text-xs font-medium text-zinc-700">{label}</p>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {canManage ? (
                     <div className="flex items-center gap-0.5 rounded-full bg-zinc-100 px-1 py-0.5">
                       <button
                         type="button"
@@ -398,7 +424,6 @@ export default function VolunteerNeedsPanel({
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   )}
-                </div>
               </div>
 
               {/* Confirmation explicite plutôt que la seule jauge
@@ -529,14 +554,29 @@ export default function VolunteerNeedsPanel({
               </div>
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => setAddOpen(true)}
-              className="flex w-fit items-center gap-1 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Ajouter un besoin
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setAddOpen(true)}
+                className="flex w-fit items-center gap-1 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Ajouter un besoin
+              </button>
+              {/* Retour de Cindy du 17/09 : n'a de sens que s'il reste au
+                  moins un besoin non pourvu -- rien à relancer sinon. */}
+              {localNeeds.some((n) => remainingSlots(n) > 0) && (
+                <button
+                  type="button"
+                  disabled={relancing}
+                  onClick={relanceNeeds}
+                  className="flex w-fit items-center gap-1 rounded-full bg-ubac-yellow px-3 py-1.5 text-xs font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+                >
+                  <Bell className="h-3.5 w-3.5" />
+                  {relancing ? "Envoi..." : "Relancer"}
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}
