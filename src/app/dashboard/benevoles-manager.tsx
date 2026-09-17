@@ -631,7 +631,7 @@ export default function BenevolesManager({
                 <button
                   onClick={save}
                   disabled={saving}
-                  className="flex-1 rounded-full bg-ubac-yellow px-4 py-2 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+                  className="min-w-0 flex-1 rounded-full bg-ubac-yellow px-4 py-2 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
                 >
                   {saving ? "Enregistrement..." : "Enregistrer"}
                 </button>

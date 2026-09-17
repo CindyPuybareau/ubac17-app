@@ -8,8 +8,13 @@
 // utilitaire que s'il apparaît littéralement dans une source scannée, une
 // composition dynamique ne produirait aucun style.
 
+// Retour de Cindy du 17/09 ("responsive bof" sur Présent/Absent/Annuler) :
+// ce groupe passe de 2 à 3 boutons dès qu'une réponse existe (Annuler
+// n'apparaît qu'alors) -- sans flex-wrap ni max-w-full, rien ne l'empêchait
+// de dépasser la largeur de la carte sur un téléphone étroit. flex-wrap
+// laisse Annuler retomber sur sa propre ligne plutôt que de déborder.
 export const SEGMENT_GROUP =
-  "inline-flex w-fit items-center gap-1 rounded-lg border border-slate-200/60 bg-slate-100 p-1";
+  "inline-flex w-fit max-w-full flex-wrap items-center gap-1 rounded-lg border border-slate-200/60 bg-slate-100 p-1";
 
 export const SEGMENT_BUTTON =
   "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all disabled:opacity-60";
