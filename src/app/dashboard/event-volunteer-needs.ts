@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { chunkedQuery, type Semaphore } from "@/lib/batch";
 import { formatPersonName } from "@/lib/names";
+import { sendTeamPush } from "@/lib/push-notify-client";
 import type { RoleIconName } from "./role-icon";
 
 // "Besoins d'organisation" d'un événement (buvette, table de marque,
@@ -119,6 +120,16 @@ export async function notifyNewVolunteerNeed(
       console.error("[notifyNewVolunteerNeed] notification commission échouée:", commissionError);
     }
   }
+
+  // Retour de Cindy du 17/09 ("je veux des push réels pour...") : même
+  // titre/corps que la cloche ci-dessus, en plus -- jamais à la place.
+  await sendTeamPush({
+    teamId: params.teamId,
+    targetTeamIds: params.targetTeamIds,
+    title,
+    body,
+    url: "/dashboard",
+  });
 }
 
 // Retour de Cindy du 17/09 ("un petit bouton... côté coach") : relance
@@ -198,6 +209,15 @@ export async function notifyVolunteerNeedReminder(
         }))
       );
     }
+
+    // Retour de Cindy du 17/09 ("je veux des push réels pour...").
+    await sendTeamPush({
+      teamId: event.team_id,
+      targetTeamIds: event.target_team_ids,
+      title,
+      body,
+      url: "/dashboard",
+    });
   }
 
   return { error: null };

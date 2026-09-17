@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { sendEmail } from "@/lib/send-email";
 import { matchAndUpsertPlayer, type RegistrationInput } from "@/lib/inscription-matching";
+import { resolveBureauPushSubscriptions, sendWebPush } from "@/lib/push-targets";
 
 // Reçoit une soumission du formulaire Google de pré-inscription (poussée
 // par un petit script Apps Script côté Google, voir la documentation
@@ -102,6 +103,29 @@ export async function POST(request: Request) {
     });
     if (!bureauEmail.ok) {
       console.error("[inscription-webhook] email nouveau membre échoué:", bureauEmail.error);
+    }
+
+    // Retour de Cindy du 17/09 ("je veux des push réels pour...", formulaire
+    // d'inscription) : même destinataire que l'email ci-dessus (le Bureau),
+    // en plus -- cloche + push réel. restricted_audience "BUREAU" (même
+    // marqueur que les Réunions Bureau seul) : team_id/target_team_ids
+    // n'ont pas de sens pour un nouveau membre, pas encore rattaché à une
+    // équipe à ce stade.
+    try {
+      const title = "Nouveau membre";
+      const body = `${input.firstName} ${input.lastName} vient d'être ajouté(e) via le formulaire d'inscription.`;
+      await supabase.from("notifications").insert({
+        team_id: null,
+        target_team_ids: null,
+        restricted_audience: "BUREAU",
+        title,
+        body,
+        url: "/dashboard",
+      });
+      const targets = await resolveBureauPushSubscriptions(supabase);
+      await sendWebPush(targets, { title, body, url: "/dashboard" });
+    } catch (e) {
+      console.error("[inscription-webhook] notification Bureau échouée:", e);
     }
   }
 

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import webpush from "web-push";
 import { createServiceClient } from "@/lib/supabase/service";
 import { isMatchType, homeAwayLabel } from "@/app/dashboard/event-style";
 import { parseMatchTitle } from "@/lib/match-display";
+import { resolveTeamPushSubscriptions, sendWebPush } from "@/lib/push-targets";
 
 // Rappel automatique la veille d'un match : plus besoin que le coach y
 // pense. Déclenché une fois par jour par Vercel Cron (voir vercel.json).
@@ -83,8 +83,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ sent: 0, matches: 0 });
   }
 
-  webpush.setVapidDetails("mailto:contact@ubac17.fr", publicKey, privateKey);
-
   let totalSent = 0;
   for (const event of matches) {
     const team = event.teams as unknown as { name: string | null } | null;
@@ -128,24 +126,17 @@ export async function GET(request: Request) {
       url: "/dashboard",
     });
 
-    const subs = await pushSubscriptionsForTeam(supabase, event.team_id);
-    if (subs.length > 0) {
-      const payload = JSON.stringify({
-        title,
-        body,
-        url: "/dashboard",
-        tag: `reminder-${event.id}`,
-      });
-      const results = await Promise.allSettled(
-        subs.map((s) =>
-          webpush.sendNotification(
-            { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-            payload
-          )
-        )
-      );
-      totalSent += results.filter((r) => r.status === "fulfilled").length;
-    }
+    const subs = await resolveTeamPushSubscriptions(supabase, {
+      teamId: event.team_id,
+      targetTeamIds: null,
+    });
+    const { sent } = await sendWebPush(subs, {
+      title,
+      body,
+      url: "/dashboard",
+      tag: `reminder-${event.id}`,
+    });
+    totalSent += sent;
 
     // Marqué "envoyé" même si personne n'était abonné aux notifications
     // ce jour-là : ce n'est pas une erreur à réessayer demain, juste un
@@ -162,54 +153,4 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json({ sent: totalSent, matches: matches.length });
-}
-
-// Mêmes destinataires que push_targets_for_event côté app (parents,
-// joueurs avec compte, coachs de l'équipe) — reconstruit ici en requêtes
-// directes plutôt que d'appeler cette fonction SQL : elle exige un
-// appelant authentifié coach/Bureau (is_club_admin()/is_team_coach()), or
-// un cron n'a pas de session — auth.uid() y vaudrait NULL et elle ne
-// renverrait jamais rien. Le client service_role contourne de toute façon
-// la RLS, ces requêtes n'ont donc pas besoin de cette garde ici.
-async function pushSubscriptionsForTeam(
-  supabase: ReturnType<typeof createServiceClient>,
-  teamId: string
-) {
-  const { data: rosterRows } = await supabase
-    .from("team_players")
-    .select("player_id")
-    .eq("team_id", teamId);
-  const playerIds = (rosterRows ?? []).map((r) => r.player_id);
-
-  const profileIds = new Set<string>();
-
-  if (playerIds.length > 0) {
-    const [parentRows, playerAccountRows] = await Promise.all([
-      supabase.from("parent_player").select("parent_id").in("player_id", playerIds),
-      supabase
-        .from("players")
-        .select("profile_id")
-        .in("id", playerIds)
-        .not("profile_id", "is", null),
-    ]);
-    (parentRows.data ?? []).forEach((r) => profileIds.add(r.parent_id));
-    (playerAccountRows.data ?? []).forEach((r) => {
-      if (r.profile_id) profileIds.add(r.profile_id);
-    });
-  }
-
-  const { data: coachRows } = await supabase
-    .from("team_coaches")
-    .select("coach_id")
-    .eq("team_id", teamId);
-  (coachRows ?? []).forEach((r) => profileIds.add(r.coach_id));
-
-  if (profileIds.size === 0) return [];
-
-  const { data: subs } = await supabase
-    .from("push_subscriptions")
-    .select("endpoint, p256dh, auth")
-    .in("profile_id", Array.from(profileIds));
-
-  return (subs ?? []) as { endpoint: string; p256dh: string; auth: string }[];
 }

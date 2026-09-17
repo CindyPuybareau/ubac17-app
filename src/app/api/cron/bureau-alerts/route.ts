@@ -7,6 +7,7 @@ import {
   sendCotisationRelances,
 } from "@/lib/cotisation-relance";
 import { volunteerRoleLabel } from "@/app/dashboard/event-volunteer-needs";
+import { resolveTeamPushSubscriptions, sendWebPush } from "@/lib/push-targets";
 
 // Une pénalité encore due n'est jamais relancée plus souvent que ça — pas
 // de date d'échéance propre à surveiller (contrairement à une licence),
@@ -377,6 +378,17 @@ async function runVolunteerNeedRemindersForStage(
           commissionNotifError
         );
       }
+    }
+
+    // Retour de Cindy du 17/09 ("je veux des push réels pour...").
+    try {
+      const targets = await resolveTeamPushSubscriptions(supabase, {
+        teamId: event.team_id,
+        targetTeamIds: event.target_team_ids,
+      });
+      await sendWebPush(targets, { title, body, url: "/dashboard" });
+    } catch (pushError) {
+      console.error("[bureau-alerts] push relance besoin échoué:", pushError);
     }
 
     // Marqué "relancé" même si l'un des deux inserts ci-dessus a échoué :

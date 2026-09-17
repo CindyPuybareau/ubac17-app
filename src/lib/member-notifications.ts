@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { sendTeamPush } from "./push-notify-client";
 
 // Notifications à l'arrivée d'un joueur (retour de Cindy du 31/08) :
 // - Le Bureau, par email, à chaque nouvelle FICHE créée (un ajout au coup
@@ -21,15 +22,26 @@ export async function notifyCoachesOfNewTeamMember(
   teamId: string,
   message: string
 ): Promise<void> {
+  const title = "Nouveau joueur dans l'équipe";
   const { error } = await supabase.from("notifications").insert({
     team_id: teamId,
-    title: "Nouveau joueur dans l'équipe",
+    title,
     body: message,
     url: "/dashboard",
   });
   if (error) {
     console.error("[member-notifications] notification coach échouée:", error);
   }
+  // Retour de Cindy du 17/09 ("je veux des push réels pour...") :
+  // coachesOnly -- jamais les parents/joueurs pour cette notification-là,
+  // qui ne concerne que qui encadre l'équipe.
+  await sendTeamPush({
+    teamId,
+    coachesOnly: true,
+    title,
+    body: message,
+    url: "/dashboard",
+  });
 }
 
 // Wrapper client uniquement : sendEmail() est un module serveur

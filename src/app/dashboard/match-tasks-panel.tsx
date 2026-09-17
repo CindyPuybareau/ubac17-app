@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Car, Check, Clock, MapPin, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { sendTeamPush } from "@/lib/push-notify-client";
 import TaskSourceBadge from "./task-source-badge";
 import RoleIcon from "./role-icon";
 import type {
@@ -130,6 +131,37 @@ export default function MatchTasksPanel({
       ...prev,
       [taskType]: { playerId, playerName: rosterName(playerId), source: "VOLUNTEER" },
     }));
+    // Retour de Cindy du 17/09 ("je veux des push réels pour...", attribution
+    // maillot/goûter) : coachesOnly -- le coach veut savoir qui apporte
+    // quoi, jamais les autres familles. team_id/target_team_ids pas connus
+    // ici (ce panneau ne reçoit que eventId, voir le commentaire du composant
+    // plus haut) -- un aller simple, seulement au moment réel de l'action.
+    const roleLabel = roles.find((r) => r.code === taskType)?.label ?? taskType;
+    void (async () => {
+      const { data: event } = await supabase
+        .from("events")
+        .select("team_id, target_team_ids")
+        .eq("id", eventId)
+        .maybeSingle();
+      const title = "Rôle attribué";
+      const body = `${rosterName(playerId)} s'occupe de : ${roleLabel}.`;
+      await supabase.from("notifications").insert({
+        team_id: event?.team_id ?? null,
+        target_team_ids: event?.target_team_ids ?? null,
+        event_id: eventId,
+        title,
+        body,
+        url: "/dashboard",
+      });
+      await sendTeamPush({
+        teamId: event?.team_id ?? null,
+        targetTeamIds: event?.target_team_ids ?? null,
+        coachesOnly: true,
+        title,
+        body,
+        url: "/dashboard",
+      });
+    })();
     // Pas de router.refresh() explicite : event_tasks/event_carpool_offers/
     // event_carpool_reservations sont surveillées en temps réel
     // (realtime-sync.tsx) depuis l'audit du 2026-08-20 — le garder ici en
@@ -311,6 +343,20 @@ export default function MatchTasksPanel({
         };
       })
     );
+    // Retour de Cindy du 17/09 ("je veux des push réels pour...",
+    // inscription à un covoiturage) : ici, UNE personne précise (qui
+    // propose le trajet), jamais toute l'équipe -- offer.playerId, pas le
+    // joueur qui réserve. Push seulement, pas de cloche : la cloche
+    // (notifications_for_me) ne sait notifier qu'une équipe/le Bureau/les
+    // coachs, jamais UN individu précis -- lui envoyer le team_id de
+    // l'événement la montrerait à tort à toute l'équipe.
+    void sendTeamPush({
+      audience: "PLAYER",
+      playerId: offer.playerId,
+      title: "Nouvelle réservation covoiturage",
+      body: `${rosterName(myPlayerIds[0])} réserve ${seats} place${seats > 1 ? "s" : ""} pour ton trajet.`,
+      url: "/dashboard",
+    });
   }
 
   // Retour d'audit du 28/08 : prenait toujours myPlayerIds[0], alors que la

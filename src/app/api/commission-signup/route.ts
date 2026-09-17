@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { resolveTeamPushSubscriptions, sendWebPush } from "@/lib/push-targets";
+import { volunteerRoleLabel } from "@/app/dashboard/event-volunteer-needs";
 
 // Seule écriture ouverte au lien public d'une commission (retour de Cindy
 // du 10/09, "Accès Commissions &
@@ -48,10 +50,19 @@ export async function POST(request: Request) {
   // entier, plus par besoin) -- jamais se fier à ce qu'envoie le client seul.
   const { data: needRow } = await supabase
     .from("event_volunteer_needs")
-    .select("id, events(start_time, commission_group_ids)")
+    .select(
+      "id, role_code, custom_label, events(id, title, start_time, commission_group_ids, team_id, target_team_ids)"
+    )
     .eq("id", needId)
     .maybeSingle();
-  const needEvent = needRow?.events as unknown as { start_time: string; commission_group_ids: string[] } | null;
+  const needEvent = needRow?.events as unknown as {
+    id: string;
+    title: string | null;
+    start_time: string;
+    commission_group_ids: string[];
+    team_id: string | null;
+    target_team_ids: string[] | null;
+  } | null;
   if (!needRow || !needEvent || !needEvent.commission_group_ids.includes(group.id)) {
     return NextResponse.json({ error: "Besoin introuvable pour cette commission." }, { status: 404 });
   }
@@ -79,5 +90,33 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
+
+  // Retour de Cindy du 17/09 ("je veux des push réels pour...", inscription
+  // via un lien commission) : coachesOnly -- qui gère l'événement veut
+  // savoir qu'un bénévole vient de se proposer, jamais les familles.
+  // Best-effort, jamais bloquant : l'inscription elle-même est déjà
+  // confirmée juste au-dessus.
+  try {
+    const roleLabel = volunteerRoleLabel(needRow.role_code, needRow.custom_label);
+    const title = "Bénévole inscrit";
+    const body = `${guestName} se propose pour : ${roleLabel} — ${needEvent.title ?? "un événement"}.`;
+    await supabase.from("notifications").insert({
+      team_id: needEvent.team_id,
+      target_team_ids: needEvent.target_team_ids,
+      event_id: needEvent.id,
+      title,
+      body,
+      url: "/dashboard",
+    });
+    const targets = await resolveTeamPushSubscriptions(supabase, {
+      teamId: needEvent.team_id,
+      targetTeamIds: needEvent.target_team_ids,
+      coachesOnly: true,
+    });
+    await sendWebPush(targets, { title, body, url: "/dashboard" });
+  } catch (e) {
+    console.error("[commission-signup] notification bénévole échouée:", e);
+  }
+
   return NextResponse.json({ ok: true });
 }
