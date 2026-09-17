@@ -27,11 +27,28 @@ export const STANDARD_VOLUNTEER_ROLES: StandardVolunteerRole[] = [
   // seulement un match coaché.
   { code: "GOUTER_ENCAS", label: "Goûter / Encas", icon: "Utensils" },
   { code: "BUVETTE", label: "Buvette", icon: "Coffee" },
-  { code: "TABLE_MARQUE", label: "Table de marque", icon: "Timer" },
-  { code: "ARBITRAGE", label: "Arbitrage", icon: "Flag" },
   { code: "INSTALLATION", label: "Installation / Rangement", icon: "KeyRound" },
   { code: "LAVAGE_MAILLOTS", label: "Lavage maillots", icon: "Shirt" },
 ];
+
+// Retirés du choix à la création (retour de Cindy du 17/09) : redondants
+// avec "Organisation match officiel" (match-official-roles.ts) -- Table de
+// marque = Marqueur/Aide marqueur/E-marque, Arbitrage = Arbitre 1/Arbitre 2.
+// Gardés ici UNIQUEMENT pour que les besoins déjà créés avec ces codes
+// (encore présents en base) continuent d'afficher un vrai libellé/icône au
+// lieu du code brut -- jamais proposés pour un nouveau besoin (voir
+// findVolunteerRole plus bas, jamais lu par le menu "Ajouter un besoin").
+const LEGACY_VOLUNTEER_ROLES: StandardVolunteerRole[] = [
+  { code: "TABLE_MARQUE", label: "Table de marque", icon: "Timer" },
+  { code: "ARBITRAGE", label: "Arbitrage", icon: "Flag" },
+];
+
+function findVolunteerRole(roleCode: string): StandardVolunteerRole | undefined {
+  return (
+    STANDARD_VOLUNTEER_ROLES.find((r) => r.code === roleCode) ??
+    LEGACY_VOLUNTEER_ROLES.find((r) => r.code === roleCode)
+  );
+}
 
 // Un besoin hors liste standard : le code reste stable ("AUTRE"), le
 // libellé réel vit dans VolunteerNeed.customLabel.
@@ -39,7 +56,7 @@ export const CUSTOM_ROLE_CODE = "AUTRE";
 
 export function volunteerRoleLabel(roleCode: string, customLabel: string | null): string {
   if (roleCode === CUSTOM_ROLE_CODE) return customLabel || "Autre";
-  return STANDARD_VOLUNTEER_ROLES.find((r) => r.code === roleCode)?.label ?? roleCode;
+  return findVolunteerRole(roleCode)?.label ?? roleCode;
 }
 
 // Retour de Cindy du 13/09 ("notifier les personnes concernées dès qu'une
@@ -224,7 +241,7 @@ export async function notifyVolunteerNeedReminder(
 }
 
 export function volunteerRoleIcon(roleCode: string): RoleIconName {
-  return STANDARD_VOLUNTEER_ROLES.find((r) => r.code === roleCode)?.icon ?? "Users";
+  return findVolunteerRole(roleCode)?.icon ?? "Users";
 }
 
 export type VolunteerSignupSource = "VOLUNTEER" | "ADMIN";

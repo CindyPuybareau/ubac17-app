@@ -54,6 +54,7 @@ import {
   type SeasonTaskTally,
 } from "./event-tasks";
 import { getVolunteerNeedsByEventId, type VolunteerNeed } from "./event-volunteer-needs";
+import { getMatchOfficialRolesByEventId, type MatchOfficialAssignment } from "./match-official-roles";
 import { shouldOfferCarpool } from "./salles";
 
 type PlayerRow = {
@@ -1477,6 +1478,7 @@ export default async function DashboardPage({
   let adminCategoryTariffs: AdminCategoryTariff[] = [];
   let adminUpcomingEvents: AdminUpcomingEvent[] = [];
   let adminVolunteerNeedsByEventId: Record<string, VolunteerNeed[]> = {};
+  let adminMatchOfficialRolesByEventId: Record<string, MatchOfficialAssignment[]> = {};
   let adminMembers: AdminMember[] = [];
   let adminSponsors: AdminSponsor[] = [];
   let adminBenevoles: AdminBenevole[] = [];
@@ -1913,6 +1915,9 @@ export default async function DashboardPage({
           });
     const rsvpsByEventPromise = fetchRsvpsByEvent(supabase, upcomingEventIds, dbLimit);
     const adminVolunteerNeedsPromise = getVolunteerNeedsByEventId(supabase, upcomingEventIds, dbLimit);
+    // "Organisation match à domicile" (retour de Cindy du 17/09) : même
+    // schéma que adminVolunteerNeedsPromise juste au-dessus.
+    const adminMatchOfficialRolesPromise = getMatchOfficialRolesByEventId(supabase, upcomingEventIds, dbLimit);
     // Retour de Cindy du 15/09 ("côté Bureau c'est pareil") : voir
     // fetchPaidParticipantsByCollecteId plus haut -- remplace l'embed
     // cotisations(players(...)) retiré des 2 requêtes d'événements
@@ -2454,6 +2459,7 @@ export default async function DashboardPage({
     // fraîchement créé (retour de Cindy du 2026-08-19 : besoins ajoutés à
     // la création, introuvables juste après).
     adminVolunteerNeedsByEventId = await adminVolunteerNeedsPromise;
+    adminMatchOfficialRolesByEventId = await adminMatchOfficialRolesPromise;
   }
   })();
 
@@ -2465,6 +2471,7 @@ export default async function DashboardPage({
   let coachClubTeams: AdminMemberTeam[] = [];
   let coachOrganisationTasks: Record<string, EventTasksState> = {};
   let coachVolunteerNeedsByEventId: Record<string, VolunteerNeed[]> = {};
+  let coachMatchOfficialRolesByEventId: Record<string, MatchOfficialAssignment[]> = {};
   // Lecture seule (retour de Cindy du 2026-08-22) : le coach voit les
   // pénalités des joueurs de ses équipes, mais ne peut ni en créer ni en
   // modifier — seul le Bureau saisit une pénalité.
@@ -2843,6 +2850,15 @@ export default async function DashboardPage({
           )
         )
       : getVolunteerNeedsByEventId(supabase, coachEventIds, dbLimit);
+    // "Organisation match à domicile" (retour de Cindy du 17/09) : même
+    // dédoublonnage Bureau<->Coach que coachVolunteerNeedsPromise ci-dessus.
+    const coachMatchOfficialRolesPromise = bureauDataLoaded
+      ? Promise.resolve(
+          Object.fromEntries(
+            coachEventIds.map((id) => [id, adminMatchOfficialRolesByEventId[id] ?? []])
+          )
+        )
+      : getMatchOfficialRolesByEventId(supabase, coachEventIds, dbLimit);
     // Retour de Cindy du 15/09 ("côté Bureau c'est pareil") : voir
     // fetchPaidParticipantsByCollecteId plus haut.
     const coachPaidParticipantsPromise = fetchPaidParticipantsByCollecteId(
@@ -3284,6 +3300,7 @@ export default async function DashboardPage({
     // Besoins d'organisation de TOUS les événements de l'équipe, pas
     // seulement ceux à venir — même raison que côté Bureau juste plus haut.
     coachVolunteerNeedsByEventId = await coachVolunteerNeedsPromise;
+    coachMatchOfficialRolesByEventId = await coachMatchOfficialRolesPromise;
   }
   })();
 
@@ -3291,6 +3308,7 @@ export default async function DashboardPage({
   let familyEvents: AdminUpcomingEvent[] = [];
   let familyOrganisationTasks: Record<string, EventTasksState> = {};
   let familyVolunteerNeedsByEventId: Record<string, VolunteerNeed[]> = {};
+  let familyMatchOfficialRolesByEventId: Record<string, MatchOfficialAssignment[]> = {};
   let familyRsvpPlayers: {
     id: string;
     name: string;
@@ -3868,7 +3886,7 @@ export default async function DashboardPage({
     // Ne dépend que de eventIds (déjà connu ci-dessus) : parti dans ce
     // même Promise.all au lieu d'un aller-retour séquentiel à part après
     // coup — même correctif que adminPromise/coachPromise plus haut.
-    const [rsvpRowsRes, familyPaymentRes, extraFamilyTasks, familyVolunteerNeedsData] =
+    const [rsvpRowsRes, familyPaymentRes, extraFamilyTasks, familyVolunteerNeedsData, familyMatchOfficialRolesData] =
       await runBatched(
         [
           () =>
@@ -3923,12 +3941,23 @@ export default async function DashboardPage({
                   )
                 )
               : getVolunteerNeedsByEventId(supabase, eventIds, dbLimit),
+          // "Organisation match à domicile" (retour de Cindy du 17/09) :
+          // même dédoublonnage Bureau<->Famille que juste au-dessus.
+          () =>
+            bureauDataLoaded
+              ? Promise.resolve(
+                  Object.fromEntries(
+                    eventIds.map((id) => [id, adminMatchOfficialRolesByEventId[id] ?? []])
+                  )
+                )
+              : getMatchOfficialRolesByEventId(supabase, eventIds, dbLimit),
         ],
         // dbLimit partagé (voir lib/batch.ts / le bloc Bureau plus haut).
         dbLimit
       );
     logQueryErrors("Famille (rsvps/paiements)", { rsvpRowsRes, familyPaymentRes });
     familyVolunteerNeedsByEventId = familyVolunteerNeedsData;
+    familyMatchOfficialRolesByEventId = familyMatchOfficialRolesData;
 
     // familyRsvpStatusByKey (boutons Présent/Absent de ses propres enfants)
     // reste construit directement ici — un usage différent (statut d'UN
@@ -4411,6 +4440,7 @@ export default async function DashboardPage({
       salle: e.salle,
       isHome: e.isHome,
       teamName: e.teamName,
+      teamId: e.teamId,
       source: "coach",
       rsvpPlayers: [],
       rsvpCounts: e.rsvpCounts,
@@ -4421,6 +4451,8 @@ export default async function DashboardPage({
       carpool: [],
       showCarpool: false,
       needs: coachVolunteerNeedsByEventId[e.id] ?? [],
+      matchOfficials: coachMatchOfficialRolesByEventId[e.id] ?? [],
+      matchOfficialsEnabled: true,
     };
   }
   function buildFamilyWeekEvent(e: AdminUpcomingEvent): WeekStripEvent {
@@ -4439,6 +4471,7 @@ export default async function DashboardPage({
       salle: e.salle,
       isHome: e.isHome,
       teamName: e.teamName,
+      teamId: e.teamId,
       source: "family",
       rsvpPlayers: respondingPlayers.map((p) => ({
         id: p.id,
@@ -4453,6 +4486,8 @@ export default async function DashboardPage({
       carpool: carpoolOffersByEventId[e.id] ?? [],
       showCarpool: shouldOfferCarpool(e),
       needs: familyVolunteerNeedsByEventId[e.id] ?? [],
+      matchOfficials: familyMatchOfficialRolesByEventId[e.id] ?? [],
+      matchOfficialsEnabled: true,
     };
   }
   // Retour de Cindy du 2026-09-01 (capture d'écran de Basile — Bureau ET

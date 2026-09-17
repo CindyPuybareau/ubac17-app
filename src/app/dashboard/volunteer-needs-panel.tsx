@@ -326,12 +326,28 @@ export default function VolunteerNeedsPanel({
     <div
       className={
         bare
-          ? "flex flex-col gap-2.5"
-          : "mt-3 flex flex-col gap-2.5 rounded-xl border border-zinc-100 bg-zinc-50/60 p-3"
+          ? "flex flex-col gap-1.5"
+          : "mt-3 flex flex-col gap-1.5 rounded-xl border border-zinc-100 bg-zinc-50/60 p-3"
       }
     >
       {(!bare || canManage) && (
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Retour de Cindy du 17/09 ("en haut à gauche à l'intérieur des
+              onglets concernés") : déplacé depuis le bas de la carte,
+              premier élément du rang pour rester en haut à GAUCHE (pas de
+              ml-auto/justify-between, qui l'auraient poussé à droite) --
+              n'a de sens que s'il reste au moins un besoin non pourvu. */}
+          {canManage && localNeeds.some((n) => remainingSlots(n) > 0) && (
+            <button
+              type="button"
+              disabled={relancing}
+              onClick={relanceNeeds}
+              className="flex w-fit items-center gap-1 rounded-full bg-ubac-yellow px-3 py-1.5 text-xs font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+            >
+              <Bell className="h-3.5 w-3.5" />
+              {relancing ? "Envoi..." : "Relancer"}
+            </button>
+          )}
           {!bare && (
             <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
               Besoins d&apos;organisation
@@ -342,7 +358,10 @@ export default function VolunteerNeedsPanel({
               ici sans repasser par "Modifier l'événement". Absent en
               lecture seule (canManage=false) : ce choix reste une décision
               de gestion, jamais du ressort d'un simple joueur/parent. */}
-          {canManage && (
+          {/* Masqué temporairement (retour de Cindy du 17/09, "je pense que
+              j'en aurai pas besoin pour le moment") -- composant/props
+              gardés intacts, juste `false &&` à retirer pour réactiver. */}
+          {false && canManage && (
             <CommissionMultiSelect
               commissions={commissionGroups}
               selectedIds={commissionGroupIds}
@@ -563,19 +582,6 @@ export default function VolunteerNeedsPanel({
                 <Plus className="h-3.5 w-3.5" />
                 Ajouter un besoin
               </button>
-              {/* Retour de Cindy du 17/09 : n'a de sens que s'il reste au
-                  moins un besoin non pourvu -- rien à relancer sinon. */}
-              {localNeeds.some((n) => remainingSlots(n) > 0) && (
-                <button
-                  type="button"
-                  disabled={relancing}
-                  onClick={relanceNeeds}
-                  className="flex w-fit items-center gap-1 rounded-full bg-ubac-yellow px-3 py-1.5 text-xs font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
-                >
-                  <Bell className="h-3.5 w-3.5" />
-                  {relancing ? "Envoi..." : "Relancer"}
-                </button>
-              )}
             </div>
           )}
         </div>

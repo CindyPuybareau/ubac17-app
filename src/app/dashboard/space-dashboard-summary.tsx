@@ -111,6 +111,7 @@ export default function SpaceDashboardSummary({
     salle: e.salle,
     isHome: e.isHome,
     teamName: e.teamName,
+    teamId: e.teamId,
     source: e.source,
     rsvpPlayers: e.rsvpPlayers,
     rsvpCounts: e.rsvpCounts,
@@ -121,6 +122,8 @@ export default function SpaceDashboardSummary({
     carpool: [],
     showCarpool: false,
     needs: e.needs,
+    matchOfficials: e.matchOfficials,
+    matchOfficialsEnabled: e.matchOfficialsEnabled,
   }));
 
   // "Aujourd'hui" plutôt qu'une date qu'on doit lire et comparer soi-même

@@ -194,6 +194,7 @@ export default function ChildDashboard({
     salle: e.salle,
     isHome: e.isHome,
     teamName: e.teamName,
+    teamId: null,
     source: "coach",
     rsvpPlayers: [],
     // Retour de Cindy du 14/09 ("les enfants n'ont pas les présents/
@@ -209,6 +210,11 @@ export default function ChildDashboard({
     carpool: [],
     showCarpool: false,
     needs: [],
+    matchOfficials: [],
+    // Même frontière de sécurité que needs=[] ci-dessus (voir le
+    // commentaire en tête de fonction) : jamais de panneau "Organisation
+    // match à domicile" gérable dans l'Espace Enfant.
+    matchOfficialsEnabled: false,
   }));
 
   const thisMonth = new Date().getMonth();

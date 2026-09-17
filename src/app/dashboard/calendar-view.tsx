@@ -71,12 +71,15 @@ import {
 } from "./event-tasks";
 import VolunteerNeedsPanel from "./volunteer-needs-panel";
 import { notifyNewVolunteerNeed, type VolunteerNeed } from "./event-volunteer-needs";
+import type { MatchOfficialAssignment } from "./match-official-roles";
+import MatchOfficialsPanel from "./match-officials-panel";
 import ConfirmDialog from "./confirm-dialog";
 import OrganisationCard from "./organisation-card";
 import MatchResultCelebration from "@/components/match-result-celebration";
 
 const emptyEventTasks: EventTasksState = {};
 const emptyVolunteerNeeds: VolunteerNeed[] = [];
+const emptyMatchOfficials: MatchOfficialAssignment[] = [];
 // Constante de module, comme les deux ci-dessus — retour d'audit du 28/08 :
 // `carpoolByEventId[event.id] ?? []` recréait un tableau neuf à chaque
 // rendu de CalendarView, ce qui redéclenchait l'effet de synchronisation
@@ -90,6 +93,7 @@ const emptyCarpool: CarpoolOffer[] = [];
 const emptyOrganisationTasks: Record<string, EventTasksState> = {};
 const emptyOrganisationCarpool: Record<string, CarpoolOffer[]> = {};
 const emptyOrganisationNeeds: Record<string, VolunteerNeed[]> = {};
+const emptyMatchOfficialRoles: Record<string, MatchOfficialAssignment[]> = {};
 
 // Ré-exportés : beaucoup d'écrans les importent historiquement d'ici, et
 // ce fichier reste le point d'entrée naturel du calendrier.
@@ -500,6 +504,7 @@ export default function CalendarView({
     tasksByEventId: Record<string, EventTasksState>;
     carpoolByEventId: Record<string, CarpoolOffer[]>;
     volunteerNeedsByEventId: Record<string, VolunteerNeed[]>;
+    matchOfficialRolesByEventId: Record<string, MatchOfficialAssignment[]>;
   } | null>(null);
   useEffect(() => {
     // Rien à charger -- pas la peine d'appeler l'API pour renvoyer trois
@@ -533,6 +538,8 @@ export default function CalendarView({
   const carpoolByEventId = organisationData?.carpoolByEventId ?? emptyOrganisationCarpool;
   const volunteerNeedsByEventId =
     organisationData?.volunteerNeedsByEventId ?? emptyOrganisationNeeds;
+  const matchOfficialRolesByEventId =
+    organisationData?.matchOfficialRolesByEventId ?? emptyMatchOfficialRoles;
   const organisationLoading = organisationEventIds.length > 0 && organisationData === null;
 
   // Retour de Cindy du 29/08 ("le délai pour afficher '1 présent' est trop
@@ -1707,6 +1714,16 @@ export default function CalendarView({
           const hasTasks = roles.length > 0 || shouldOfferCarpool(event);
           const needs = volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds;
           const hasNeeds = needs.length > 0;
+          // "Organisation match à domicile" (retour de Cindy du 17/09) :
+          // match officiel/amical à domicile seulement, jamais tournoi
+          // (isMatchType exclut déjà TOURNAMENT) ni un match à l'extérieur.
+          // event.isHome ?? parseMatchTitle(...).isHome -- même repli que
+          // week-strip-banner.tsx/OpponentDisplay : la colonne events.is_home
+          // reste souvent null (matchs synchronisés FFBB), le badge "DOM/EXT"
+          // affiché juste au-dessus vient déjà de ce même repli sur le titre.
+          const isHomeMatch =
+            isMatchType(event.event_type) &&
+            (event.isHome ?? parseMatchTitle(event.title).isHome) === true;
           // Retour de Cindy du 16/09 : tant que /api/event-organisation n'a
           // pas répondu, on ne sait pas encore si cet événement aura des
           // besoins bénévoles (hasTasks, lui, ne dépend que du type
@@ -1719,47 +1736,63 @@ export default function CalendarView({
           if (organisationLoading) {
             return <div className="mt-3 h-11 animate-pulse rounded-2xl bg-zinc-100" />;
           }
-          if (!hasTasks && !hasNeeds) return null;
+          if (!hasTasks && !hasNeeds && !isHomeMatch) return null;
           return (
-            <OrganisationCard defaultOpen={organisationDefaultOpen}>
-              {hasTasks && (
-                <MatchTasksPanel
-                  eventId={event.id}
-                  eventDate={event.start_time}
-                  // rsvpVisiblePlayers plutôt que [] (audit du 31/08) :
-                  // vide, l'affichage optimiste d'un engagement montrait un
-                  // nom blanc jusqu'au prochain rafraîchissement temps réel
-                  // — myPlayerIds ci-dessous vient déjà de ce même tableau,
-                  // donc aucun risque d'exposer plus que "SA propre fiche".
-                  roster={rsvpVisiblePlayers}
-                  // rsvpVisiblePlayers, pas respondingPlayers : un coach
-                  // qui gère au moins une équipe (canManage) mais pas
-                  // celle-ci (!canManageEvent) ne doit voir que SA propre
-                  // fiche ici, pas tout l'effectif de l'équipe.
-                  // respondingPlayers contient tout le roster côté Coach
-                  // (coachRsvpPlayers, page.tsx) — l'utiliser tel quel
-                  // ferait écrire volunteer()/reserve() sur
-                  // myPlayerIds[0], c'est-à-dire un coéquipier arbitraire,
-                  // pas le coach lui-même.
-                  myPlayerIds={rsvpVisiblePlayers.map((p) => p.id)}
-                  canAssignAnyone={false}
-                  initialTasks={tasksByEventId[event.id] ?? emptyEventTasks}
-                  initialCarpool={carpoolByEventId[event.id] ?? emptyCarpool}
-                  roles={roles}
-                  showCarpool={shouldOfferCarpool(event)}
-                  bare
-                />
+            <>
+              {(hasTasks || hasNeeds) && (
+                <OrganisationCard defaultOpen={organisationDefaultOpen}>
+                  {hasTasks && (
+                    <MatchTasksPanel
+                      eventId={event.id}
+                      eventDate={event.start_time}
+                      // rsvpVisiblePlayers plutôt que [] (audit du 31/08) :
+                      // vide, l'affichage optimiste d'un engagement montrait un
+                      // nom blanc jusqu'au prochain rafraîchissement temps réel
+                      // — myPlayerIds ci-dessous vient déjà de ce même tableau,
+                      // donc aucun risque d'exposer plus que "SA propre fiche".
+                      roster={rsvpVisiblePlayers}
+                      // rsvpVisiblePlayers, pas respondingPlayers : un coach
+                      // qui gère au moins une équipe (canManage) mais pas
+                      // celle-ci (!canManageEvent) ne doit voir que SA propre
+                      // fiche ici, pas tout l'effectif de l'équipe.
+                      // respondingPlayers contient tout le roster côté Coach
+                      // (coachRsvpPlayers, page.tsx) — l'utiliser tel quel
+                      // ferait écrire volunteer()/reserve() sur
+                      // myPlayerIds[0], c'est-à-dire un coéquipier arbitraire,
+                      // pas le coach lui-même.
+                      myPlayerIds={rsvpVisiblePlayers.map((p) => p.id)}
+                      canAssignAnyone={false}
+                      initialTasks={tasksByEventId[event.id] ?? emptyEventTasks}
+                      initialCarpool={carpoolByEventId[event.id] ?? emptyCarpool}
+                      roles={roles}
+                      showCarpool={shouldOfferCarpool(event)}
+                      bare
+                    />
+                  )}
+                  {hasNeeds && (
+                    <VolunteerNeedsPanel
+                      eventId={event.id}
+                      needs={needs}
+                      myPlayerIds={rsvpVisiblePlayers.map((p) => p.id)}
+                      canManage={false}
+                      bare
+                    />
+                  )}
+                </OrganisationCard>
               )}
-              {hasNeeds && (
-                <VolunteerNeedsPanel
-                  eventId={event.id}
-                  needs={needs}
-                  myPlayerIds={rsvpVisiblePlayers.map((p) => p.id)}
-                  canManage={false}
-                  bare
-                />
+              {isHomeMatch && (
+                <OrganisationCard defaultOpen={organisationDefaultOpen} variant="terracotta">
+                  <MatchOfficialsPanel
+                    eventId={event.id}
+                    eventTitle={event.title}
+                    startTime={event.start_time}
+                    teamId={event.teamId}
+                    assignments={matchOfficialRolesByEventId[event.id] ?? emptyMatchOfficials}
+                    canManage={false}
+                  />
+                </OrganisationCard>
               )}
-            </OrganisationCard>
+            </>
           );
         })()}
         {/* Même boîte "Organisation" rétractable que la branche
@@ -1809,6 +1842,23 @@ export default function CalendarView({
             )}
           </OrganisationCard>
         )}
+        {canManageEvent &&
+          event.event_type !== "TRAINING" &&
+          event.event_type !== "REUNION" &&
+          !organisationLoading &&
+          isMatchType(event.event_type) &&
+          (event.isHome ?? parseMatchTitle(event.title).isHome) === true && (
+            <OrganisationCard defaultOpen={organisationDefaultOpen} variant="terracotta">
+              <MatchOfficialsPanel
+                eventId={event.id}
+                eventTitle={event.title}
+                startTime={event.start_time}
+                teamId={event.teamId}
+                assignments={matchOfficialRolesByEventId[event.id] ?? emptyMatchOfficials}
+                canManage
+              />
+            </OrganisationCard>
+          )}
         {/* Retour de Cindy du 16/09 ("Réunion Bureau" puis "Réunion
             d'équipe") : le bouton Présent/Absent n'existait jusqu'ici que
             pour répondre pour AUTRUI (son enfant) -- jamais pour soi-même

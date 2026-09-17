@@ -37,6 +37,7 @@ const WATCHED_TABLES = [
   "event_volunteer_needs",
   "event_volunteer_signups",
   "club_reports", // comptes rendus mairies/Bureau/coachs (audit du 01/09)
+  "match_official_roles", // Organisation match à domicile (retour du 17/09)
 ] as const;
 
 // Mounted once at the dashboard root (src/app/dashboard/page.tsx) so it

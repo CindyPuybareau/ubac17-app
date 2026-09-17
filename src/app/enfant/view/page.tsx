@@ -159,7 +159,17 @@ export default async function ChildViewPage() {
   ]);
   const dashboardSummary = {
     ...rawDashboardSummary,
-    nextEvents: rawDashboardSummary.nextEvents.map((e) => ({ ...e, needs: [], paymentLink: null })),
+    nextEvents: rawDashboardSummary.nextEvents.map((e) => ({
+      ...e,
+      needs: [],
+      paymentLink: null,
+      // Même frontière de sécurité que needs/paymentLink ci-dessus : sans
+      // ce false, un match à domicile de l'enfant afficherait un vrai
+      // panneau "Organisation match à domicile" gérable (voir
+      // week-strip-banner.tsx, matchOfficialsEnabled).
+      matchOfficials: [],
+      matchOfficialsEnabled: false,
+    })),
   };
   logQueryErrors("Enfant", { teamsRes, teammatesRes, coachesRes, eventsRes, notifRes });
 

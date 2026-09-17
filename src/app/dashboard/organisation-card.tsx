@@ -1,8 +1,30 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ClipboardList } from "lucide-react";
+import { ChevronDown, ClipboardList, ShieldCheck } from "lucide-react";
 import type { ReactNode } from "react";
+
+// Retour de Cindy du 17/09 ("faire le distingo... un autre onglet peut
+// être ?") : "Organisation match officiel" (MatchOfficialsPanel) vivait
+// jusqu'ici DANS cette même carte, juste séparé par un libellé -- pas assez
+// visible. Deux cartes empilées plutôt qu'un onglet à cliquer (les deux
+// restent visibles d'un coup d'œil, jamais besoin de choisir laquelle
+// regarder). "yellow" (défaut) couvre tous les appelants existants sans
+// rien changer pour eux ; "terracotta" est réservé à la nouvelle carte.
+const VARIANTS = {
+  yellow: {
+    icon: ClipboardList,
+    title: "Organisation",
+    header: "bg-ubac-yellow/15 hover:bg-ubac-yellow/25",
+    iconBadge: "bg-ubac-yellow text-navy",
+  },
+  terracotta: {
+    icon: ShieldCheck,
+    title: "Organisation match officiel",
+    header: "bg-terracotta/15 hover:bg-terracotta/25",
+    iconBadge: "bg-terracotta text-white",
+  },
+} as const;
 
 // Boîte partagée "Organisation" (Maillots/Table de marque + Besoins
 // d'organisation) — jusqu'ici un simple <div> répété à l'identique dans
@@ -27,11 +49,15 @@ export default function OrganisationCard({
   // (calendar-view.tsx) et par coach-next-match-card.tsx, qui n'affiche de
   // toute façon jamais que celui-là.
   defaultOpen = false,
+  variant = "yellow",
 }: {
   children: ReactNode;
   defaultOpen?: boolean;
+  variant?: keyof typeof VARIANTS;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const v = VARIANTS[variant];
+  const Icon = v.icon;
 
   return (
     // Retour de Cindy du 13/09 ("l'onglet déroulant des commissions n'est
@@ -47,15 +73,15 @@ export default function OrganisationCard({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`flex w-full items-center justify-between gap-2 bg-ubac-yellow/15 px-3 py-2 text-left transition-colors hover:bg-ubac-yellow/25 ${
+        className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors ${v.header} ${
           open ? "rounded-t-2xl" : "rounded-2xl"
         }`}
       >
         <span className="flex min-w-0 items-center gap-2">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-ubac-yellow text-navy">
-            <ClipboardList className="h-3.5 w-3.5" />
+          <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${v.iconBadge}`}>
+            <Icon className="h-3.5 w-3.5" />
           </span>
-          <span className="truncate text-sm font-bold text-navy">Organisation</span>
+          <span className="truncate text-sm font-bold text-navy">{v.title}</span>
         </span>
         <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-navy/15 bg-white text-navy">
           <ChevronDown

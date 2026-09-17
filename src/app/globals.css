@@ -64,6 +64,13 @@
      avec le sens de l'événement.  */
   --plum: #6b4c8a;
   --plum-dark: #4f3866;
+  /* Corail-rouge, réservée à "Organisation match à domicile" (retour de
+     Cindy du 17/09, "corail-rouge... une autre couleur"). Distincte à la
+     fois de --coral (réservée à l'Espace Enfant, règle du 2026-08-23) et
+     de --status-urgent (rouge sémantique "urgent/impayé") -- un ton brique
+     entre les deux, jamais utilisé ailleurs. */
+  --terracotta: #c1440e;
+  --terracotta-dark: #8f3209;
 }
 
 @theme inline {
@@ -94,6 +101,8 @@
   --color-status-urgent-dark: var(--status-urgent-dark);
   --color-plum: var(--plum);
   --color-plum-dark: var(--plum-dark);
+  --color-terracotta: var(--terracotta);
+  --color-terracotta-dark: var(--terracotta-dark);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   /* Trio typographique de la maquette (direction artistique validée le

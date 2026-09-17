@@ -15,11 +15,13 @@ import RsvpControl from "./rsvp-control";
 import MatchTasksPanel from "./match-tasks-panel";
 import VolunteerNeedsPanel from "./volunteer-needs-panel";
 import OrganisationCard from "./organisation-card";
+import MatchOfficialsPanel from "./match-officials-panel";
 import SalleBadge from "./salle-badge";
 import ItineraryButton from "./itinerary-button";
 import { venueQuery } from "./salles";
 import type { EventRoleType, EventTasksState, CarpoolOffer } from "./event-tasks";
 import type { VolunteerNeed } from "./event-volunteer-needs";
+import type { MatchOfficialAssignment } from "./match-official-roles";
 
 // Bandeau "Cette semaine" intégré directement dans l'en-tête bleu marine
 // (direction artistique validée par Cindy le 2026-08-24, sur maquette :
@@ -67,6 +69,10 @@ export type WeekStripEvent = {
   salle: string | null;
   isHome: boolean | null;
   teamName: string | null;
+  // "Organisation match à domicile" (retour de Cindy du 17/09) : cible la
+  // notification (bell/push coachesOnly) sur l'équipe du match, même champ
+  // que calendar-view.tsx (event.teamId).
+  teamId: string | null;
   // Retour de Cindy du 2026-09-01 ("pouvoir dire présent ou absent et les
   // besoins en organisation, comme les autres cartes") : le bandeau
   // mélangeait jusqu'ici Coach + Famille en un seul tableau plat (perte de
@@ -107,6 +113,16 @@ export type WeekStripEvent = {
   carpool: CarpoolOffer[];
   showCarpool: boolean;
   needs: VolunteerNeed[];
+  // "Organisation match à domicile" (retour de Cindy du 17/09) : même bloc
+  // que calendar-view.tsx (MatchOfficialsPanel), gaté sur isMatchType +
+  // isHome dans DayEventCard plus bas.
+  matchOfficials: MatchOfficialAssignment[];
+  // false UNIQUEMENT côté Espace Enfant (même frontière de sécurité que
+  // needs=[]/paymentLink=null, voir enfant/view/page.tsx) : sans lui,
+  // isHomeMatch resterait vrai sur un match à domicile de l'enfant et
+  // afficherait un vrai panneau gérable (canManage=true côté source
+  // "coach", réutilisé ici pour l'affichage lecture seule) à un enfant.
+  matchOfficialsEnabled: boolean;
 };
 
 function startOfDay(d: Date) {
@@ -196,6 +212,12 @@ export function DayEventCard({ event }: { event: WeekStripEvent }) {
   const isTraining = event.eventType === "TRAINING";
   const hasTasks = !isTraining && (event.roles.length > 0 || event.showCarpool);
   const hasNeeds = !isTraining && event.needs.length > 0;
+  // "Organisation match à domicile" (retour de Cindy du 17/09) : match
+  // officiel/amical à domicile seulement, même règle que calendar-view.tsx
+  // (isHomeMatch). `home` ci-dessus retombe sur parseMatchTitle si isHome
+  // n'est pas encore renseigné en base -- ce repli reste voulu ici comme
+  // pour le badge Domicile/Extérieur juste au-dessus.
+  const isHomeMatch = event.matchOfficialsEnabled && isMatchType(event.eventType) && home === true;
   // Même règle que renderEventCard (calendar-view.tsx) : indépendant de
   // `source` (Bureau/Coach/Famille voient tous ce bloc dès qu'un effectif
   // existe), pas réservé à la Famille comme le bouton Présent/Absent
@@ -355,9 +377,33 @@ export function DayEventCard({ event }: { event: WeekStripEvent }) {
           )}
         </OrganisationCard>
       )}
+      {event.source === "family" && isHomeMatch && (
+        <OrganisationCard variant="terracotta">
+          <MatchOfficialsPanel
+            eventId={event.id}
+            eventTitle={event.title}
+            startTime={event.startTime}
+            teamId={event.teamId}
+            assignments={event.matchOfficials}
+            canManage={false}
+          />
+        </OrganisationCard>
+      )}
       {(event.source === "coach" || event.source === "bureau") && hasNeeds && (
         <OrganisationCard>
           <VolunteerNeedsPanel eventId={event.id} needs={event.needs} myPlayerIds={[]} canManage bare />
+        </OrganisationCard>
+      )}
+      {(event.source === "coach" || event.source === "bureau") && isHomeMatch && (
+        <OrganisationCard variant="terracotta">
+          <MatchOfficialsPanel
+            eventId={event.id}
+            eventTitle={event.title}
+            startTime={event.startTime}
+            teamId={event.teamId}
+            assignments={event.matchOfficials}
+            canManage
+          />
         </OrganisationCard>
       )}
     </div>

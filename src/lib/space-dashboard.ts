@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCurrentSeasonLabel, getCurrentSeasonWindow } from "./season";
 import { getVolunteerNeedsByEventId, type VolunteerNeed } from "@/app/dashboard/event-volunteer-needs";
+import { getMatchOfficialRolesByEventId, type MatchOfficialAssignment } from "@/app/dashboard/match-official-roles";
 import { runBatched, Semaphore } from "./batch";
 
 // "Tableau de bord" (retour de Cindy du 13/09, "ce que tu mettrais dans le
@@ -46,6 +47,9 @@ export type SpaceDashboardNextEvent = {
   salle: string | null;
   isHome: boolean | null;
   teamName: string | null;
+  // "Organisation match à domicile" (retour de Cindy du 17/09) : cible la
+  // notification (bell/push coachesOnly) sur l'équipe du match.
+  teamId: string | null;
   source: NextEventSource;
   rsvpPlayers: NextEventRsvpPlayer[];
   // Ajoutés le 14/09 (retour de Cindy, "les coachs voient les présents/
@@ -56,6 +60,13 @@ export type SpaceDashboardNextEvent = {
   presentPlayers: { id: string; firstName: string | null; lastName: string | null }[];
   absentPlayers: { id: string; firstName: string | null; lastName: string | null }[];
   needs: VolunteerNeed[];
+  // "Organisation match à domicile" (retour de Cindy du 17/09) : même bloc
+  // que WeekStripEvent (week-strip-banner.tsx), la carte étant partagée.
+  matchOfficials: MatchOfficialAssignment[];
+  // Toujours true ici (vraie donnée) -- neutralisé à false uniquement côté
+  // Espace Enfant, juste après cet appel (voir enfant/view/page.tsx, même
+  // frontière que needs=[]/paymentLink=null).
+  matchOfficialsEnabled: boolean;
 };
 
 export type SpaceDashboardSummary = {
@@ -320,6 +331,9 @@ export async function getSpaceDashboardSummary(
     // event_volunteer_needs/signups dupliquée ici. Un seul appel pour
     // TOUS les événements du jour plutôt qu'un par carte.
     const needsByEventId = await getVolunteerNeedsByEventId(supabase, eventIds, semaphore);
+    // "Organisation match à domicile" (retour de Cindy du 17/09) : même
+    // principe que needsByEventId juste au-dessus.
+    const matchOfficialsByEventId = await getMatchOfficialRolesByEventId(supabase, eventIds, semaphore);
 
     // Retour de Cindy du 14/09 ("les coachs voient les présents/absents...
     // duplication de l'événement à venir") : même bloc compteurs +
@@ -444,6 +458,7 @@ export async function getSpaceDashboardSummary(
         salle: row.salle,
         isHome: row.is_home,
         teamName: row.teams?.name ?? null,
+        teamId: row.team_id,
         source,
         rsvpPlayers: rsvpCandidates
           .filter((p) => isConcernedByEvent(p, row))
@@ -456,6 +471,8 @@ export async function getSpaceDashboardSummary(
         presentPlayers,
         absentPlayers,
         needs: needsByEventId[row.id] ?? [],
+        matchOfficials: matchOfficialsByEventId[row.id] ?? [],
+        matchOfficialsEnabled: true,
       };
     });
   }
