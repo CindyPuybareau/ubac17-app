@@ -112,7 +112,7 @@ export default function AutomationSettings({
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center justify-between gap-2 text-sm font-semibold text-zinc-900 transition-colors hover:text-navy"
       >
-        Envois automatiques
+        Notifications et rappels automatiques
         <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-navy/10 text-navy">
           <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
         </span>
