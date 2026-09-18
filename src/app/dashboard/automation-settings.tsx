@@ -9,7 +9,8 @@ export type AutomationKey =
   | "match_reminder_enabled"
   | "expiry_alert_enabled"
   | "cotisation_relance_enabled"
-  | "volunteer_need_alerts_enabled";
+  | "volunteer_need_alerts_enabled"
+  | "bureau_sees_all_organisation_needs";
 
 const AUTOMATIONS: { key: AutomationKey; title: string; description: string }[] = [
   {
@@ -45,6 +46,22 @@ const AUTOMATIONS: { key: AutomationKey; title: string; description: string }[] 
     title: "Besoins bénévoles",
     description:
       "Notification à l'équipe et aux commissions concernées : nouveau besoin créé, besoin non pourvu à J-7 puis à J-3, ou événement modifié/annulé.",
+  },
+  {
+    key: "bureau_sees_all_organisation_needs",
+    // Retour de Cindy du 18/09 ("possible de désactiver les besoins en
+    // organisation, ils reçoivent tous de toutes les équipes ?") : le
+    // Bureau voit par construction toutes les notifications du club
+    // (notifications_for_me, is_club_admin()), y compris les besoins
+    // d'organisation d'équipes qu'il ne gère pas -- ce réglage retire
+    // spécifiquement cette catégorie de ce "filet qui attrape tout".
+    // Coché = comportement déjà en place (jamais un défaut "à activer"
+    // comme les 4 crons ci-dessus). Un membre du Bureau qui est aussi
+    // coach/parent d'une équipe garde ses propres notifications de cette
+    // équipe, décoché ou pas.
+    title: "Le Bureau reçoit aussi les besoins de toutes les équipes",
+    description:
+      "Cloche et push pour les besoins bénévoles et l'organisation match officiel des équipes que le Bureau ne gère pas lui-même.",
   },
 ];
 

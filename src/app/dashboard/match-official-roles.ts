@@ -161,13 +161,25 @@ export async function notifyMatchOfficialAssigned(
     title,
     body,
     url: "/dashboard",
+    category: "ORGANISATION_NEED",
   });
   if (error) {
     console.error("[notifyMatchOfficialAssigned] notification équipe échouée:", error);
   }
 
   await sendTeamPush({ teamId: params.teamId, coachesOnly: true, title, body, url: "/dashboard" });
-  await sendTeamPush({ audience: "BUREAU", title, body, url: "/dashboard" });
+  // Retour de Cindy du 18/09 ("possible de désactiver... ils reçoivent
+  // tous de toutes les équipes ?") : le push Bureau, lui, reste explicite
+  // (contrairement à la cloche, filtrée via notifications_for_me) --
+  // même réglage, vérifié ici avant de l'envoyer.
+  const { data: settings } = await supabase
+    .from("club_settings")
+    .select("bureau_sees_all_organisation_needs")
+    .eq("id", true)
+    .maybeSingle();
+  if (settings?.bureau_sees_all_organisation_needs ?? true) {
+    await sendTeamPush({ audience: "BUREAU", title, body, url: "/dashboard" });
+  }
 }
 
 // "Relancer" (retour de Cindy du 17/09, "également comme besoin classique
@@ -190,7 +202,7 @@ export async function notifyMatchOfficialReminder(
 ): Promise<{ error: string | null }> {
   const { data: settings } = await supabase
     .from("club_settings")
-    .select("volunteer_need_alerts_enabled")
+    .select("volunteer_need_alerts_enabled, bureau_sees_all_organisation_needs")
     .eq("id", true)
     .maybeSingle();
   if (!settings?.volunteer_need_alerts_enabled) {
@@ -223,13 +235,16 @@ export async function notifyMatchOfficialReminder(
     title,
     body,
     url: "/dashboard",
+    category: "ORGANISATION_NEED",
   });
   if (error) {
     console.error("[notifyMatchOfficialReminder] notification équipe échouée:", error);
   }
 
   await sendTeamPush({ teamId: params.teamId, coachesOnly: true, title, body, url: "/dashboard" });
-  await sendTeamPush({ audience: "BUREAU", title, body, url: "/dashboard" });
+  if (settings.bureau_sees_all_organisation_needs) {
+    await sendTeamPush({ audience: "BUREAU", title, body, url: "/dashboard" });
+  }
 
   return { error: null };
 }

@@ -1507,6 +1507,10 @@ export default async function DashboardPage({
     expiry_alert_enabled: false,
     cotisation_relance_enabled: false,
     volunteer_need_alerts_enabled: false,
+    // true par défaut (contrairement aux autres) : c'est le comportement
+    // déjà en place pour tout le monde avant ce réglage -- jamais un
+    // opt-in comme les crons ci-dessus, un opt-out explicite du Bureau.
+    bureau_sees_all_organisation_needs: true,
   };
 
   // Les trois blocs ci-dessous (Bureau, Coach, Famille) tournaient jusqu'ici
@@ -1656,7 +1660,7 @@ export default async function DashboardPage({
           supabase
             .from("club_settings")
             .select(
-              "match_reminder_enabled, expiry_alert_enabled, cotisation_relance_enabled, volunteer_need_alerts_enabled"
+              "match_reminder_enabled, expiry_alert_enabled, cotisation_relance_enabled, volunteer_need_alerts_enabled, bureau_sees_all_organisation_needs"
             )
             .eq("id", true)
             .maybeSingle(),
@@ -1751,6 +1755,7 @@ export default async function DashboardPage({
       expiry_alert_enabled: Boolean(clubSettingsRow?.expiry_alert_enabled),
       cotisation_relance_enabled: Boolean(clubSettingsRow?.cotisation_relance_enabled),
       volunteer_need_alerts_enabled: Boolean(clubSettingsRow?.volunteer_need_alerts_enabled),
+      bureau_sees_all_organisation_needs: clubSettingsRow?.bureau_sees_all_organisation_needs ?? true,
     };
 
     const bureauRoleByEmailLower = new Map(

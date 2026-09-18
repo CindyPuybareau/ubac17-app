@@ -119,6 +119,10 @@ export async function notifyNewVolunteerNeed(
     title,
     body,
     url: "/dashboard",
+    // Retour de Cindy du 18/09 ("le Bureau reçoit tout de toutes les
+    // équipes") : catégorise pour permettre au Bureau de retirer cette
+    // catégorie de son "filet qui attrape tout" (notifications_for_me).
+    category: "ORGANISATION_NEED",
   });
   if (teamError) {
     console.error("[notifyNewVolunteerNeed] notification équipe échouée:", teamError);
@@ -214,6 +218,7 @@ export async function notifyVolunteerNeedReminder(
       title,
       body,
       url: "/dashboard",
+      category: "ORGANISATION_NEED",
     });
 
     if ((event.commission_group_ids ?? []).length > 0) {
