@@ -759,6 +759,8 @@ export default function CalendarView({
           paidParticipants: [],
           teamId: e.team_id,
           targetTeamIds: null,
+          targetProfileIds: null,
+          targetProfileNotes: null,
           // Toujours un MATCH ici (voir le .eq plus haut) -- jamais une
           // Réunion, restrictedAudience ne s'applique donc jamais.
           restrictedAudience: null,
@@ -1351,6 +1353,22 @@ export default function CalendarView({
   // affichent exactement le meme evenement, avec les memes compteurs.
   function renderEventCard(event: AdminUpcomingEvent) {
     const style = styleFor(event.event_type);
+    // "À faire" (retour de Cindy du 18/09, portée "Personnes spécifiques")
+    // : un événement sans équipe, de type "Événement club" (OTHER, forcé
+    // par create-event-form pour cette portée) mais avec des personnes
+    // ciblées directement (targetProfileIds) -- jamais le cas d'un
+    // événement "Tous les groupes" classique, qui n'a pas ce tableau
+    // rempli. Badge bleu dédié plutôt que le parquet générique d'OTHER,
+    // pour qu'il ressorte comme une consigne personnelle, pas un
+    // événement club ordinaire.
+    const isPersonalTaskEvent =
+      event.event_type === "OTHER" &&
+      !event.teamId &&
+      (!event.targetTeamIds || event.targetTeamIds.length === 0) &&
+      Boolean(event.targetProfileIds && event.targetProfileIds.length > 0);
+    const effectiveStyle = isPersonalTaskEvent
+      ? { ...style, badge: "bg-blue-600 text-white", border: "border-l-blue-600" }
+      : style;
     // Retour de Cindy du 16/09 ("Bureau seul" / "Coachs seuls") : le badge
     // "Réunion" restait toujours "Réunion Bureau" (typeStyles.REUNION.label,
     // event-style.ts), même pour une réunion d'équipe ou "Coachs seuls" --
@@ -1358,7 +1376,9 @@ export default function CalendarView({
     // event_type, jamais team_id/restrictedAudience.
     const reunionLabel =
       event.event_type !== "REUNION"
-        ? style.label
+        ? isPersonalTaskEvent
+          ? "À faire"
+          : style.label
         : event.teamId || event.targetTeamIds
           ? "Réunion d'équipe"
           : event.restrictedAudience === "COACHS"
@@ -1429,7 +1449,7 @@ export default function CalendarView({
     // demandé de recolorer chaque élément interne un par un, bien plus
     // risqué qu'un simple accent de bordure pour le même effet de lecture
     // rapide.
-    const cardShellClass = eventCardShellClass(event, style, "upcoming");
+    const cardShellClass = eventCardShellClass(event, effectiveStyle, "upcoming");
     // Toujours utile plus bas (fanion "Spécial") même si le calcul de
     // cardShellClass ci-dessus est maintenant partagé.
     const isTournament = event.event_type === "TOURNAMENT";
@@ -1470,9 +1490,9 @@ export default function CalendarView({
             </span>
             <span className="flex flex-wrap items-center gap-2">
               <span
-                className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${style.badge}`}
+                className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${effectiveStyle.badge}`}
               >
-                {style.solid && <Lock className="h-2.5 w-2.5 shrink-0" />}
+                {effectiveStyle.solid && <Lock className="h-2.5 w-2.5 shrink-0" />}
                 {reunionLabel}
               </span>
               {homeAway && (
@@ -1586,6 +1606,26 @@ export default function CalendarView({
             <StickyNote className="h-3.5 w-3.5 shrink-0 translate-y-0.5" />
             {event.notes}
           </p>
+        )}
+
+        {/* Consigne par personne pour les "Personnes spécifiques"/
+            "Inclure aussi..." (retour de Cindy du 18/09, "préparer la
+            salle pour l'un, ranger la salle pour l'autre") : distincte de
+            `notes` ci-dessus (couleur/icône différentes) -- une ligne par
+            personne ayant reçu une consigne, visible par quiconque voit
+            déjà la carte (même règle que l'événement lui-même, la
+            personne ciblée comprise). */}
+        {event.targetProfileNotes && event.targetProfileNotes.length > 0 && (
+          <div className="flex flex-col gap-1 rounded-lg bg-terracotta/10 px-2.5 py-2 text-xs text-terracotta-dark">
+            {event.targetProfileNotes.map((n) => (
+              <p key={n.id} className="flex items-start gap-1.5">
+                <StickyNote className="h-3.5 w-3.5 shrink-0 translate-y-0.5" />
+                <span>
+                  <span className="font-semibold">{n.name} :</span> {n.note}
+                </span>
+              </p>
+            ))}
+          </div>
         )}
 
         {/* Bouton "Payer" (retour de Cindy du 2026-08-25) : accessible à

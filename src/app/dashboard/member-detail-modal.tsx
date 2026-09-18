@@ -330,6 +330,12 @@ export default function MemberDetailModal({
     if (!checked) setCoachTeamIds(new Set());
   }
   const [bureauRole, setBureauRole] = useState(initialBureauRole ?? "");
+  // "Salarié" (retour de Cindy du 18/09) : repère direct sur la fiche,
+  // indépendant du rôle Bureau (ne donne aucun droit d'administration,
+  // contrairement à un rôle Bureau) -- fait remonter la personne en tête
+  // des sélecteurs "Personnes spécifiques"/"Choisir un membre" (voir
+  // club_member_names/club_profile_names.is_salarie).
+  const [isSalarie, setIsSalarie] = useState(member.isSalarie);
   // Guard against the classic controlled-<select> pitfall (already hit
   // once with the Équipe picker): if a legacy row's club_function doesn't
   // match any of the current options, surface it as an extra option so
@@ -472,6 +478,7 @@ export default function MemberDetailModal({
         license_number: form.licenseNumber || null,
         license_expires_at: form.licenseExpiresAt || null,
         medical_certificate_expires_at: form.medicalCertificateExpiresAt || null,
+        is_salarie: isSalarie,
         ...(licenseExpiryChanged ? { license_expiry_alert_sent_at: null } : {}),
         ...(medicalExpiryChanged ? { medical_expiry_alert_sent_at: null } : {}),
       })
@@ -515,6 +522,7 @@ export default function MemberDetailModal({
       otherNotes: form.otherNotes || null,
       imageRights: form.imageRights || null,
       licenseNumber: form.licenseNumber || null,
+      isSalarie,
       licenseExpiresAt: form.licenseExpiresAt || null,
       medicalCertificateExpiresAt: form.medicalCertificateExpiresAt || null,
       email: form.registrationEmail || member.registrationEmail || null,
@@ -1166,7 +1174,7 @@ export default function MemberDetailModal({
                 <div className="flex flex-col gap-1.5 rounded-xl border border-zinc-100 bg-zinc-50 p-3 sm:col-span-2">
                   <label className="flex items-center justify-between gap-3">
                     <span className="text-sm font-medium text-zinc-700">
-                      Ce membre est Entraîneur / Coach
+                      Entraîneur/coach
                     </span>
                     <button
                       type="button"
@@ -1216,6 +1224,25 @@ export default function MemberDetailModal({
                     </div>
                   )}
                 </div>
+              )}
+
+              {/* "Salarié" (retour de Cindy du 18/09) : repère indépendant
+                  du rôle Bureau ci-dessous -- ne donne aucun droit
+                  d'administration, sert seulement à faire remonter la
+                  personne en tête des sélecteurs "Personnes
+                  spécifiques"/"Choisir un membre" ailleurs dans l'appli.
+                  Placé juste sous "Entraîneur/coach" (retour de Cindy du
+                  18/09), avant le rôle au Bureau. */}
+              {editable && canManageTeamAndRoles && (
+                <label className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50/60 p-3 text-sm font-medium text-zinc-700 sm:col-span-2">
+                  <input
+                    type="checkbox"
+                    checked={isSalarie}
+                    onChange={(e) => setIsSalarie(e.target.checked)}
+                    className="h-4 w-4 rounded border-zinc-300 text-navy focus:ring-navy"
+                  />
+                  Salarié du club
+                </label>
               )}
 
               {editable && canManageTeamAndRoles && (

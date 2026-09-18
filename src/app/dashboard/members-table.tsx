@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import * as XLSX from "xlsx";
 import {
   Archive,
+  Briefcase,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
@@ -291,7 +292,10 @@ export default function MembersTable({
     // partout ailleurs dans l'appli (listes d'équipe, trombinoscope...).
     const sortGroup = (group: typeof list) => {
       const sorted = sortByLastName(group, (m) => m.lastName);
-      return sortDir === "asc" ? sorted : sorted.reverse();
+      const ordered = sortDir === "asc" ? sorted : sorted.reverse();
+      // Retour de Cindy du 18/09 : les salariés remontent en tête de liste
+      // (dans chaque groupe) pour ne pas avoir à les chercher.
+      return [...ordered].sort((a, b) => Number(b.isSalarie) - Number(a.isSalarie));
     };
     return [
       ...sortGroup(list.filter((m) => m.archivedAt)),
@@ -988,6 +992,12 @@ export default function MembersTable({
                     {m.bureauRole && (
                       <Shield className="h-3.5 w-3.5 shrink-0 text-ubac-yellow-dark" />
                     )}
+                    {m.isSalarie && (
+                      <Briefcase
+                        className="h-3.5 w-3.5 shrink-0 text-blue-600"
+                        aria-label="Salarié du club"
+                      />
+                    )}
                   </span>
                   {m.archivedAt && (
                     <span className="ml-1.5 inline-flex items-center justify-center whitespace-nowrap rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none text-zinc-500">
@@ -1144,6 +1154,12 @@ export default function MembersTable({
                     </span>
                     {m.bureauRole && (
                       <Shield className="h-3.5 w-3.5 shrink-0 text-ubac-yellow-dark" />
+                    )}
+                    {m.isSalarie && (
+                      <Briefcase
+                        className="h-3.5 w-3.5 shrink-0 text-blue-600"
+                        aria-label="Salarié du club"
+                      />
                     )}
                     {m.archivedAt && (
                       <span className="inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none text-zinc-500">

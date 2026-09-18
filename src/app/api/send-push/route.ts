@@ -48,7 +48,7 @@ export async function POST(request: Request) {
   try {
     const { data: eventRow } = await supabase
       .from("events")
-      .select("team_id, target_team_ids, event_type, restricted_audience")
+      .select("team_id, target_team_ids, target_profile_ids, event_type, restricted_audience")
       .eq("id", eventId)
       .maybeSingle();
     // Retour de Cindy du 16/09 ("un parent reçoit la notif d'une réunion
@@ -61,6 +61,7 @@ export async function POST(request: Request) {
     await supabase.from("notifications").insert({
       team_id: eventRow?.team_id ?? null,
       target_team_ids: eventRow?.target_team_ids ?? null,
+      target_profile_ids: eventRow?.target_profile_ids ?? null,
       event_id: eventId,
       title: title ?? "UBAC",
       body: body ?? "Le coach attend ta réponse.",

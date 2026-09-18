@@ -41,7 +41,7 @@ import {
   getPlayerTeamIds,
   getRsvpCounts,
   getTeamRoster,
-  teamOrClubWideFilter,
+  teamOrClubWideOrProfileFilter,
   unionRoster,
 } from "./family-data";
 import {
@@ -211,6 +211,10 @@ export type MemberDetail = {
   playerCharterAccepted: string | null;
   parentCharterAccepted: string | null;
   licenseNumber: string | null;
+  // "Salarié" (retour de Cindy du 18/09) : repère indépendant du rôle
+  // Bureau, ne donne aucun droit -- fait remonter la personne en tête des
+  // sélecteurs "Personnes spécifiques"/"Choisir un membre" ailleurs.
+  isSalarie: boolean;
   // Alertes d'expiration (voir /api/cron/expiry-alerts) : dates saisies à
   // la main par le Bureau, absentes de tout import existant — le club n'a
   // jamais suivi ces échéances de façon structurée jusqu'ici.
@@ -483,6 +487,17 @@ export type AdminUpcomingEvent = {
   // groupes". Sert à préremplir le sélecteur de portée en édition et à
   // afficher un badge "Équipes ciblées" au lieu de "Tous les groupes".
   targetTeamIds: string[] | null;
+  // "Personnes spécifiques" (retour de Cindy du 18/09, cas Jean
+  // BOUYER-POINOT/Jules DARNIS) : comptes ciblés directement, additif à
+  // team_id/targetTeamIds (jamais un remplacement) -- voir create-event-
+  // form.tsx, scopeMode "profiles" et le champ "+ Inclure aussi...".
+  targetProfileIds: string[] | null;
+  // Consigne pour les personnes ci-dessus (retour de Cindy du 18/09,
+  // "pouvoir mettre une note sur ce que doit faire la personne
+  // spécifique choisie", ex. "préparer la salle") -- distincte de `notes`
+  // (générale, visible par tout le monde) ; sans effet si
+  // targetProfileIds est vide.
+  targetProfileNotes: { id: string; name: string; note: string }[] | null;
   // Retour de Cindy du 16/09 ("Bureau seul" / "Coachs seuls") : ne
   // s'applique qu'à une Réunion sans équipe (team_id et targetTeamIds
   // tous deux null) -- "BUREAU" ou "COACHS", distingue les deux variantes
@@ -1580,7 +1595,7 @@ export default async function DashboardPage({
           supabase
             .from("players")
             .select(
-              "id, first_name, last_name, profile_id, pending_parent_email, birth_date, category, sex, registration_email, registration_phone, address, postal_code, city, secondary_email, mother_phone, father_phone, other_phones, secondary_address, license_type, membership_type, fbi_status, medical_notes, other_notes, image_rights, player_charter_accepted, parent_charter_accepted, license_number, license_expires_at, medical_certificate_expires_at, archived_at, last_child_login_at"
+              "id, first_name, last_name, profile_id, pending_parent_email, birth_date, category, sex, registration_email, registration_phone, address, postal_code, city, secondary_email, mother_phone, father_phone, other_phones, secondary_address, license_type, membership_type, fbi_status, medical_notes, other_notes, image_rights, player_charter_accepted, parent_charter_accepted, license_number, license_expires_at, medical_certificate_expires_at, archived_at, last_child_login_at, is_salarie"
             )
             .order("first_name"),
         () =>
@@ -1625,7 +1640,7 @@ export default async function DashboardPage({
           supabase
             .from("events")
             .select(
-              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, restricted_audience, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
+              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
             )
             .neq("event_type", "TRAINING")
             .gte("start_time", eventsWindowStart)
@@ -1638,7 +1653,7 @@ export default async function DashboardPage({
           supabase
             .from("events")
             .select(
-              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, restricted_audience, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
+              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
             )
             .eq("event_type", "TRAINING")
             .gte("start_time", trainingsWindowStart)
@@ -2101,6 +2116,7 @@ export default async function DashboardPage({
         medical_certificate_expires_at: string | null;
         archived_at: string | null;
         last_child_login_at: string | null;
+        is_salarie: boolean | null;
       };
       // Exclude self-link rows: a self-registered adult player is linked to
       // their own parent_player row, which isn't a "parent" for display.
@@ -2145,6 +2161,7 @@ export default async function DashboardPage({
         playerCharterAccepted: player.player_charter_accepted,
         parentCharterAccepted: player.parent_charter_accepted,
         licenseNumber: player.license_number,
+        isSalarie: player.is_salarie ?? false,
         licenseExpiresAt: player.license_expires_at,
         medicalCertificateExpiresAt: player.medical_certificate_expires_at,
         archivedAt: player.archived_at,
@@ -2439,6 +2456,8 @@ export default async function DashboardPage({
         paidParticipants: paidInfo.paidParticipants,
         teamId: team?.id ?? null,
         targetTeamIds: e.target_team_ids ?? null,
+        targetProfileIds: e.target_profile_ids ?? null,
+        targetProfileNotes: e.target_profile_notes ?? null,
         restrictedAudience: (e.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
         commissionGroupIds: e.commission_group_ids ?? [],
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, teamsById),
@@ -2597,9 +2616,9 @@ export default async function DashboardPage({
           supabase
             .from("events")
             .select(
-              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, restricted_audience, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
+              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
             )
-            .or(teamOrClubWideFilter(coachedTeamIds))
+            .or(teamOrClubWideOrProfileFilter(coachedTeamIds, user.id))
             .neq("event_type", "TRAINING")
             .gte("start_time", eventsWindowStart)
             .order("start_time", { ascending: true }),
@@ -2608,9 +2627,9 @@ export default async function DashboardPage({
           supabase
             .from("events")
             .select(
-              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, restricted_audience, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
+              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
             )
-            .or(teamOrClubWideFilter(coachedTeamIds))
+            .or(teamOrClubWideOrProfileFilter(coachedTeamIds, user.id))
             .eq("event_type", "TRAINING")
             .gte("start_time", trainingsWindowStart)
             .lte("start_time", trainingsWindowEnd)
@@ -2734,7 +2753,7 @@ export default async function DashboardPage({
     );
 
     const playerColumns =
-      "id, profile_id, first_name, last_name, birth_date, category, sex, registration_email, registration_phone, address, postal_code, city, secondary_email, mother_phone, father_phone, other_phones, secondary_address, license_type, membership_type, fbi_status, medical_notes, other_notes, image_rights, player_charter_accepted, parent_charter_accepted, license_number, license_expires_at, medical_certificate_expires_at, archived_at, pending_parent_email";
+      "id, profile_id, first_name, last_name, birth_date, category, sex, registration_email, registration_phone, address, postal_code, city, secondary_email, mother_phone, father_phone, other_phones, secondary_address, license_type, membership_type, fbi_status, medical_notes, other_notes, image_rights, player_charter_accepted, parent_charter_accepted, license_number, license_expires_at, medical_certificate_expires_at, archived_at, pending_parent_email, is_salarie";
 
     // Retour de Cindy du 2026-08-23 : "les connexions qui sont lentes,
     // surtout celle de Basile" (coach de plusieurs équipes ET joueur —
@@ -3060,6 +3079,7 @@ export default async function DashboardPage({
         medical_certificate_expires_at: string | null;
         archived_at: string | null;
         pending_parent_email: string | null;
+        is_salarie: boolean | null;
       };
       coachMemberDetailsByPlayerId[player.id] = {
         id: player.id,
@@ -3088,6 +3108,7 @@ export default async function DashboardPage({
         playerCharterAccepted: player.player_charter_accepted,
         parentCharterAccepted: player.parent_charter_accepted,
         licenseNumber: player.license_number,
+        isSalarie: player.is_salarie ?? false,
         licenseExpiresAt: player.license_expires_at,
         medicalCertificateExpiresAt: player.medical_certificate_expires_at,
         teams: coachTeamRefsByPlayerId.get(player.id) ?? [],
@@ -3282,6 +3303,8 @@ export default async function DashboardPage({
         paidParticipants: paidInfo.paidParticipants,
         teamId: team?.id ?? null,
         targetTeamIds: e.target_team_ids ?? null,
+        targetProfileIds: e.target_profile_ids ?? null,
+        targetProfileNotes: e.target_profile_notes ?? null,
         restrictedAudience: (e.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
         commissionGroupIds: e.commission_group_ids ?? [],
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, clubTeamById),
@@ -3594,9 +3617,9 @@ export default async function DashboardPage({
       supabase
         .from("events")
         .select(
-          "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, restricted_audience, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
+          "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
         )
-        .or(teamOrClubWideFilter(allTeamIds))
+        .or(teamOrClubWideOrProfileFilter(allTeamIds, user.id))
         .neq("event_type", "TRAINING")
         .gte("start_time", eventsWindowStart)
         .order("start_time", { ascending: true }),
@@ -3604,9 +3627,9 @@ export default async function DashboardPage({
       supabase
         .from("events")
         .select(
-          "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, restricted_audience, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
+          "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
         )
-        .or(teamOrClubWideFilter(allTeamIds))
+        .or(teamOrClubWideOrProfileFilter(allTeamIds, user.id))
         .eq("event_type", "TRAINING")
         .gte("start_time", trainingsWindowStart)
         .lte("start_time", trainingsWindowEnd)
@@ -3857,6 +3880,8 @@ export default async function DashboardPage({
         paidParticipants: paidInfo.paidParticipants,
         teamId: team?.id ?? null,
         targetTeamIds: e.target_team_ids ?? null,
+        targetProfileIds: e.target_profile_ids ?? null,
+        targetProfileNotes: e.target_profile_notes ?? null,
         restrictedAudience: (e.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
         commissionGroupIds: e.commission_group_ids ?? [],
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, teamsById),

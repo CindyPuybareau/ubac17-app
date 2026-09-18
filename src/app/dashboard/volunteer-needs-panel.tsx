@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, Check, Minus, Plus, Trash2, X } from "lucide-react";
+import { Bell, Briefcase, Check, Minus, Plus, Trash2, UserPlus, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import RoleIcon from "./role-icon";
 import ConfirmDialog from "./confirm-dialog";
 import CommissionMultiSelect from "./commission-multi-select";
 import { useToast } from "./toast-context";
+import { formatPersonName } from "@/lib/names";
 import {
   CUSTOM_ROLE_CODE,
   STANDARD_VOLUNTEER_ROLES,
@@ -15,6 +16,8 @@ import {
   volunteerRoleLabel,
   type VolunteerNeed,
 } from "./event-volunteer-needs";
+
+type AssignableMember = { id: string; name: string; isSalarie: boolean };
 
 function remainingSlots(need: VolunteerNeed) {
   return Math.max(0, need.requiredCount - need.signups.length);
@@ -81,6 +84,102 @@ export default function VolunteerNeedsPanel({
   const [savingCommissions, setSavingCommissions] = useState(false);
   const [relancing, setRelancing] = useState(false);
   const { showToast } = useToast();
+
+  // Retour de Cindy du 18/09 ("les coachs et le bureau puissent rechercher
+  // un membre et l'attribuer... si un message WhatsApp envoyé je fais la
+  // buvette et que le parent a oublié de le mettre dans l'appli") : même
+  // principe que ProfilePicker (create-event-form.tsx) et "Choisir un
+  // membre" (match-officials-panel.tsx) -- chargé une seule fois à la
+  // première ouverture, jamais au montage du panneau (club_member_names
+  // couvre tout le club, inutile de la charger sur chaque carte affichée).
+  const [assignMembers, setAssignMembers] = useState<AssignableMember[] | null>(null);
+  const [assignOpenNeedId, setAssignOpenNeedId] = useState<string | null>(null);
+  const [assignSearch, setAssignSearch] = useState("");
+
+  async function loadAssignMembers() {
+    if (assignMembers) return;
+    const supabase = createClient();
+    const { data, error: fetchError } = await supabase
+      .from("club_member_names")
+      .select("id, first_name, last_name, archived_at, is_salarie")
+      .is("archived_at", null)
+      .order("last_name", { ascending: true });
+    if (fetchError) {
+      setError(`Chargement des membres impossible : ${fetchError.message}`);
+      return;
+    }
+    setAssignMembers(
+      (data ?? []).map((row) => ({
+        id: row.id as string,
+        name: formatPersonName(row.first_name, row.last_name),
+        isSalarie: Boolean(row.is_salarie),
+      }))
+    );
+  }
+
+  function toggleAssignOpen(needId: string) {
+    if (assignOpenNeedId === needId) {
+      setAssignOpenNeedId(null);
+      return;
+    }
+    setAssignOpenNeedId(needId);
+    setAssignSearch("");
+    void loadAssignMembers();
+  }
+
+  // Case cochée = présent (retour de Cindy) : coche pour attribuer, décoche
+  // pour retirer -- même geste, un seul contrôle, pas un bouton "Ajouter"
+  // séparé d'un bouton "Retirer" (déjà porté par le X sur chaque pastille
+  // plus bas, laissé pour la cohérence avec le reste de la carte).
+  async function toggleAssignMember(need: VolunteerNeed, member: AssignableMember) {
+    const existing = need.signups.find((s) => s.playerId === member.id);
+    if (existing) {
+      await withdraw(existing.id);
+      return;
+    }
+    setPending(`assign-${need.id}-${member.id}`);
+    setError(null);
+    const supabase = createClient();
+    const { data, error: insertError } = await supabase
+      .from("event_volunteer_signups")
+      .insert({
+        need_id: need.id,
+        player_id: member.id,
+        source: "ADMIN",
+      })
+      .select("id")
+      .single();
+    setPending(null);
+    if (insertError) {
+      setError(
+        insertError.code === "23505"
+          ? "Ce créneau est déjà complet."
+          : `Attribution impossible : ${insertError.message}`
+      );
+      return;
+    }
+    setLocalNeeds((prev) =>
+      prev.map((n) =>
+        n.id === need.id
+          ? {
+              ...n,
+              signups: [
+                ...n.signups,
+                {
+                  id: data.id,
+                  playerId: member.id,
+                  benevoleId: null,
+                  commissionGroupId: null,
+                  guestName: null,
+                  playerName: member.name,
+                  source: "ADMIN" as const,
+                },
+              ],
+            }
+          : n
+      )
+    );
+  }
 
   // Copie locale affichée immédiatement au clic, plutôt que d'attendre le
   // rafraîchissement temps réel (débounce ~0,8s + un aller-retour serveur
@@ -484,6 +583,79 @@ export default function VolunteerNeedsPanel({
                   ))}
                 </div>
               )}
+
+              {/* Retour de Cindy du 18/09 ("si un message WhatsApp envoyé je
+                  fais la buvette et que le parent a oublié de le mettre
+                  dans l'appli") : le Bureau/Coach attribue directement un
+                  besoin classique à un membre, même principe que
+                  "Personnes spécifiques" -- recherche + cases à cocher,
+                  jamais un simple bouton "Ajouter" qui rouvrirait un
+                  formulaire séparé. */}
+              {canManage && (
+                <div className="flex flex-col gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => toggleAssignOpen(need.id)}
+                    className="flex w-fit items-center gap-1 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                  >
+                    <UserPlus className="h-3.5 w-3.5" />
+                    Attribuer un membre
+                  </button>
+                  {assignOpenNeedId === need.id && (
+                    <div className="flex flex-col gap-1.5 rounded-lg border border-zinc-200 bg-white p-2">
+                      <input
+                        type="text"
+                        placeholder="Rechercher un membre..."
+                        value={assignSearch}
+                        onChange={(e) => setAssignSearch(e.target.value)}
+                        className="rounded-lg border border-zinc-200 px-2 py-1.5 text-xs"
+                      />
+                      <div className="max-h-40 overflow-y-auto">
+                        {assignMembers === null ? (
+                          <p className="px-1 py-1 text-xs text-zinc-400">Chargement...</p>
+                        ) : (
+                          (() => {
+                            const filtered = assignMembers
+                              .map((m, index) => ({ ...m, index }))
+                              .filter((m) =>
+                                m.name.toLowerCase().includes(assignSearch.trim().toLowerCase())
+                              )
+                              .sort(
+                                (a, b) => Number(b.isSalarie) - Number(a.isSalarie) || a.index - b.index
+                              );
+                            return filtered.length === 0 ? (
+                              <p className="px-1 py-1 text-xs text-zinc-400">Aucun membre trouvé.</p>
+                            ) : (
+                              filtered.map((m) => {
+                                const checked = need.signups.some((s) => s.playerId === m.id);
+                                return (
+                                  <label
+                                    key={m.id}
+                                    className={`flex items-center gap-1.5 px-1 py-1 text-xs ${
+                                      m.isSalarie ? "font-semibold text-blue-700" : "text-zinc-700"
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      disabled={pending === `assign-${need.id}-${m.id}`}
+                                      onChange={() => toggleAssignMember(need, m)}
+                                      className="h-3.5 w-3.5 rounded border-zinc-300 text-terracotta focus:ring-terracotta"
+                                    />
+                                    {m.isSalarie && <Briefcase className="h-3 w-3 shrink-0" />}
+                                    {m.name}
+                                  </label>
+                                );
+                              })
+                            );
+                          })()
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {!canManage &&
                 (mySignup ? (
                   // Vert plutôt qu'un gris neutre : une fois inscrit, le

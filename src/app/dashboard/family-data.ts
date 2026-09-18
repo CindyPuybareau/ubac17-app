@@ -81,6 +81,19 @@ export function teamOrClubWideFilter(teamIds: string[]): string {
   return `and(team_id.is.null,target_team_ids.is.null),team_id.in.(${idList}),target_team_ids.ov.{${idList}}`;
 }
 
+// "Personnes spécifiques" (retour de Cindy du 18/09, cas Jean BOUYER-POINOT
+// / Jules DARNIS) : même filtre que ci-dessus, avec une branche de plus
+// pour un événement qui ne cible AUCUNE des équipes de qui consulte mais
+// LE COMPTE lui-même directement (target_profile_ids, additif à
+// team_id/target_team_ids -- voir events, migration du 18/09). La RLS
+// ("select events for own teams") laisserait déjà passer la ligne, mais
+// sans cette branche la requête elle-même (filtrée par équipe) ne
+// l'aurait jamais demandée. myProfileId toujours fourni (auth.uid() déjà
+// connu de l'appelant, jamais null dans ces contextes authentifiés).
+export function teamOrClubWideOrProfileFilter(teamIds: string[], myProfileId: string): string {
+  return `${teamOrClubWideFilter(teamIds)},target_profile_ids.cs.{${myProfileId}}`;
+}
+
 // Audit du 31/08 : malgré son nom, ce fichier ne sert plus l'espace
 // Famille — son propre calcul de présences a été unifié dans page.tsx
 // (buildRsvpStatusByEvent/buildRsvpCounts, voir le commentaire "Retour de

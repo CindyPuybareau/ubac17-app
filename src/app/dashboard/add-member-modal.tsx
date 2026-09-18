@@ -337,7 +337,7 @@ export default function AddMemberModal({
               <div className="flex flex-col gap-1.5 rounded-xl border border-zinc-100 bg-zinc-50 p-3 sm:col-span-2">
                 <label className="flex items-center justify-between gap-3">
                   <span className="text-sm font-medium text-zinc-700">
-                    Ce membre est Entraîneur / Coach
+                    Entraîneur/coach
                   </span>
                   <button
                     type="button"

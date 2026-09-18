@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { teamLabel } from "@/lib/teams";
+import { formatPersonName } from "@/lib/names";
 import { SALLES } from "./salles";
 import { sendEventPush } from "./event-push";
 import DateTimePicker from "./date-time-picker";
 import RoleIcon from "./role-icon";
 import CommissionMultiSelect from "./commission-multi-select";
-import { CalendarSync, Plus, X } from "lucide-react";
+import { Briefcase, CalendarSync, Euro, Plus, X } from "lucide-react";
 import {
   CUSTOM_ROLE_CODE,
   STANDARD_VOLUNTEER_ROLES,
@@ -121,15 +122,12 @@ const typeChoices: { value: EventType; label: string; active: string }[] = [
   { value: "FRIENDLY", label: "Match amical", active: "border-blue-400 bg-blue-100 text-blue-700" },
   { value: "TOURNAMENT", label: "Tournoi / Plateau", active: "border-amber-400 bg-amber-100 text-amber-800" },
   { value: "OTHER", label: "Événement club", active: "border-purple-400 bg-purple-100 text-purple-700" },
-  // Retour de Cindy du 16/09 ("Réunion d'équipe") : même type REUNION que
-  // la Réunion Bureau (badge violet + cadenas, event-style.ts), mais
-  // rattachée à une équipe (scopeMode "single") ou plusieurs équipes
-  // ciblées (scopeMode "specific") au lieu de team_id/target_team_ids
-  // null -- RLS la montre alors normalement aux coachs/joueurs/parents de
-  // CES équipes, sans passer par is_club_admin(). Le libellé distingue les
-  // deux au premier coup d'œil (voir aussi le bouton "Bureau" plus haut,
-  // qui force ce même type mais sans équipe).
-  { value: "REUNION", label: "Réunion d'équipe", active: "border-plum bg-plum/10 text-plum-dark" },
+  // "Réunion d'équipe" retirée (retour de Cindy du 18/09, "plus nécessaire
+  // avec les boutons Coachs seuls et Bureau seul") : ces deux portées
+  // couvrent déjà le besoin de réunion, ce choix-ci restait redondant.
+  // Les événements déjà créés avec ce type (REUNION + team_id/
+  // target_team_ids renseignés) continuent de s'afficher normalement,
+  // juste plus proposé à la création.
 ];
 
 export default function CreateEventForm({
@@ -264,7 +262,7 @@ export default function CreateEventForm({
   // migration 20260916) -- "bureau" reste le repli par défaut pour une
   // réunion déjà existante sans ce champ renseigné (créée avant que
   // "Coachs seuls" existe).
-  const [scopeMode, setScopeMode] = useState<"single" | "specific" | "club" | "bureau" | "coachs">(
+  const [scopeMode, setScopeMode] = useState<"single" | "specific" | "club" | "bureau" | "coachs" | "profiles">(
     () =>
       editingEvent?.teamId
         ? "single"
@@ -275,10 +273,31 @@ export default function CreateEventForm({
               ? editingEvent.restrictedAudience === "COACHS"
                 ? "coachs"
                 : "bureau"
-              : "club"
+              // "Personnes spécifiques" (retour de Cindy du 18/09) : ni
+              // équipe ni Réunion Bureau/Coachs, mais des comptes ciblés --
+              // reconnu ICI plutôt que retomber sur "club" par erreur.
+              : editingEvent.targetProfileIds && editingEvent.targetProfileIds.length > 0
+                ? "profiles"
+                : "club"
             : "single"
   );
   const [targetTeamIds, setTargetTeamIds] = useState<string[]>(() => editingEvent?.targetTeamIds ?? []);
+  // "Personnes spécifiques" / "+ Inclure aussi..." (retour de Cindy du
+  // 18/09, cas Jean BOUYER-POINOT/Jules DARNIS) : UN seul état, que ce
+  // champ serve de portée principale (scopeMode "profiles") ou de simple
+  // ajout par-dessus une équipe/tout le club -- toujours additif, jamais
+  // exclusif des autres champs de portée (voir eventPayload plus bas,
+  // envoyé indépendamment de scopeMode).
+  const [targetProfileIds, setTargetProfileIds] = useState<string[]>(
+    () => editingEvent?.targetProfileIds ?? []
+  );
+  // Une consigne PAR personne (retour de Cindy du 18/09, "préparer la
+  // salle pour l'un, ranger la salle pour l'autre"), pas une note
+  // partagée -- id de profil -> texte, résolu en {id, name, note}[] au
+  // moment d'enregistrer (voir effectiveTargetProfileNotes plus bas).
+  const [targetProfileNotes, setTargetProfileNotes] = useState<Record<string, string>>(() =>
+    Object.fromEntries((editingEvent?.targetProfileNotes ?? []).map((n) => [n.id, n.note]))
+  );
   // Retour de Cindy du 12/09 ("Répéter") : uniquement à la création --
   // repeatOpen reste toujours false en édition (voir le bouton plus bas,
   // masqué si isEditing), une occurrence déjà en base ne peut jamais
@@ -335,6 +354,54 @@ export default function CreateEventForm({
   );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // "Personnes spécifiques" / "+ Inclure aussi..." : liste club entière,
+  // chargée à la demande (jamais tant que ce champ n'est pas ouvert) --
+  // même principe que match-officials-panel.tsx (loadClubMembers).
+  const [clubMembers, setClubMembers] = useState<
+    { id: string; name: string; isSalarie: boolean }[] | null
+  >(null);
+  async function loadClubMembers() {
+    if (clubMembers) return;
+    const supabase = createClient();
+    // Correction du 18/09 ("Jean/Jules introuvables dans la recherche") :
+    // club_member_names part des fiches joueur (players), or un coach sans
+    // fiche joueur reliée (players.profile_id resté vide -- cas réel de
+    // Jean BOUYER-POINOT/Jules DARNIS, dont seule la casquette coach est
+    // rattachée à leur compte) n'y apparaissait jamais. club_profile_names
+    // part directement des comptes (profiles) -- coach, joueur, parent,
+    // Bureau confondus, id déjà le bon (auth.uid()), plus de distinction
+    // fiche/compte à faire ici.
+    const { data, error: fetchError } = await supabase
+      .from("club_profile_names")
+      .select("id, first_name, last_name, is_salarie")
+      .order("last_name", { ascending: true });
+    // Retour d'audit du 18/09 : un échec ici retombait silencieusement sur
+    // une liste vide ("Aucun membre trouvé"), impossible à distinguer d'un
+    // vrai club sans membre -- même correctif que withdraw/removeNeed
+    // (volunteer-needs-panel.tsx).
+    if (fetchError) {
+      console.error("[CreateEventForm] chargement des membres échoué:", fetchError);
+    }
+    setClubMembers(
+      (data ?? []).map((row) => ({
+        id: row.id as string,
+        name: formatPersonName(row.first_name, row.last_name),
+        // Retour de Cindy du 18/09 ("mettre les salariés en haut de la
+        // liste... pour ne pas avoir à les chercher") : triés en tête
+        // côté ProfilePicker, pas ici -- l'ordre alphabétique de la
+        // requête reste la source de vérité pour le reste.
+        isSalarie: Boolean(row.is_salarie),
+      }))
+    );
+  }
+  function toggleTargetProfile(id: string) {
+    setTargetProfileIds((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]));
+  }
+  // Filtre texte : la liste couvre tout le club (150+ membres), une simple
+  // grille comme pour les équipes (une quinzaine, voir targetTeamIds plus
+  // haut) serait illisible sans lui.
+  const [profileSearch, setProfileSearch] = useState("");
+  const [showIncludeProfiles, setShowIncludeProfiles] = useState(false);
 
   function resetFields() {
     setTeamId(teams[0]?.id ?? "");
@@ -351,6 +418,8 @@ export default function CreateEventForm({
     setPaidLink("");
     setScopeMode("single");
     setTargetTeamIds([]);
+    setTargetProfileIds([]);
+    setTargetProfileNotes({});
     setDraftNeeds([]);
     setError(null);
   }
@@ -410,6 +479,10 @@ export default function CreateEventForm({
   // Événement payant -- ce sont les sections d'organisation, sans rapport
   // avec une réunion.
   const isReunion = scopeMode === "bureau" || scopeMode === "coachs" || eventType === "REUNION";
+  // Retour de Cindy du 18/09 ("À faire") : personne/note/date-lieu
+  // seulement -- ni Type d'événement, ni Répéter, ni Événement payant, ni
+  // Besoins/Commissions, ni Heure d'arrivée (voir le JSX plus bas).
+  const isPersonalTask = scopeMode === "profiles";
 
   async function computePaidParticipantIds(
     supabase: ReturnType<typeof createClient>,
@@ -471,6 +544,10 @@ export default function CreateEventForm({
       setError("Choisis au moins une équipe pour un événement réservé.");
       return;
     }
+    if (scopeMode === "profiles" && targetProfileIds.length === 0) {
+      setError("Choisis au moins une personne.");
+      return;
+    }
     const missingCustomLabel = draftNeeds.some(
       (n) => n.roleCode === CUSTOM_ROLE_CODE && !n.customLabel.trim()
     );
@@ -508,18 +585,44 @@ export default function CreateEventForm({
     // cette portée, voir le JSX plus bas -- sa valeur mémorisée n'a alors
     // plus de sens).
     const effectiveEventType: EventType =
-      scopeMode === "bureau" || scopeMode === "coachs" ? "REUNION" : eventType;
+      scopeMode === "bureau" || scopeMode === "coachs"
+        ? "REUNION"
+        : scopeMode === "profiles"
+          ? "OTHER"
+          : eventType;
     // Retour de Cindy du 16/09 ("Coachs seuls") : ne s'applique qu'à ces
     // deux portées précises -- null pour tout le reste (réunion d'équipe
     // incluse, qui n'a pas besoin de ce marqueur, sa visibilité passe déjà
     // par team_id/target_team_ids).
     const effectiveRestrictedAudience: "BUREAU" | "COACHS" | null =
       scopeMode === "bureau" ? "BUREAU" : scopeMode === "coachs" ? "COACHS" : null;
+    // "Personnes spécifiques" / "+ Inclure aussi..." (retour de Cindy du
+    // 18/09) : toujours additif, jamais gated par scopeMode -- envoyé quel
+    // que soit team_id/target_team_ids/restricted_audience choisis
+    // au-dessus.
+    const effectiveTargetProfileIds = targetProfileIds.length > 0 ? targetProfileIds : null;
+    // Une consigne par personne (retour de Cindy du 18/09) : {id, name,
+    // note}[], une entrée seulement pour qui a vraiment reçu une consigne
+    // -- name figé ici (jamais recalculé après coup), même principe que
+    // guestName ailleurs dans l'appli (match-official-roles.ts).
+    const targetProfileNotesArray = effectiveTargetProfileIds
+      ? targetProfileIds
+          .map((id) => {
+            const note = (targetProfileNotes[id] ?? "").trim();
+            const member = clubMembers?.find((m) => m.id === id);
+            return note && member ? { id, name: member.name, note } : null;
+          })
+          .filter((n): n is { id: string; name: string; note: string } => n !== null)
+      : [];
+    const effectiveTargetProfileNotes = targetProfileNotesArray.length > 0 ? targetProfileNotesArray : null;
 
     setLoading(true);
     setError(null);
     const supabase = createClient();
-    const eventName = title || defaultTitles[effectiveEventType];
+    // Retour de Cindy du 18/09 ("À faire") : cette portée n'a pas de
+    // sélecteur "Type d'événement" (voir le JSX plus bas), donc pas de
+    // defaultTitles[effectiveEventType] pertinent à utiliser en secours.
+    const eventName = title || (scopeMode === "profiles" ? "À faire" : defaultTitles[effectiveEventType]);
 
     // Retour de Cindy du 12/09 ("Répéter") : chemin séparé du insert/update
     // simple plus bas -- chaque occurrence reste une ligne indépendante en
@@ -571,6 +674,8 @@ export default function CreateEventForm({
           commission_group_ids: commissionGroupIds,
           team_id: effectiveTeamId || null,
           target_team_ids: effectiveTargetTeamIds,
+          target_profile_ids: effectiveTargetProfileIds,
+          target_profile_notes: effectiveTargetProfileNotes,
           restricted_audience: effectiveRestrictedAudience,
           series_id: seriesId,
         }))
@@ -587,7 +692,7 @@ export default function CreateEventForm({
         .from("events")
         .insert(rows)
         .select(
-          "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, team_id, target_team_ids, restricted_audience"
+          "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience"
         );
 
       setLoading(false);
@@ -620,6 +725,8 @@ export default function CreateEventForm({
           paidParticipants: [],
           teamId: row.team_id,
           targetTeamIds: row.target_team_ids,
+          targetProfileIds: row.target_profile_ids,
+          targetProfileNotes: row.target_profile_notes,
           restrictedAudience: (row.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
           teamName,
           commissionGroupIds,
@@ -649,6 +756,8 @@ export default function CreateEventForm({
       notes: string | null;
       team_id?: string | null;
       target_team_ids?: string[] | null;
+      target_profile_ids: string[] | null;
+      target_profile_notes: { id: string; name: string; note: string }[] | null;
       restricted_audience?: "BUREAU" | "COACHS" | null;
       commission_group_ids: string[];
     } = {
@@ -671,6 +780,14 @@ export default function CreateEventForm({
       // team_id/target_team_ids plus bas (ça ne change jamais la portée de
       // l'événement, juste qui est informé des besoins d'organisation).
       commission_group_ids: commissionGroupIds,
+      // "Personnes spécifiques" / "+ Inclure aussi..." (retour de Cindy du
+      // 18/09) : toujours envoyé, comme commission_group_ids ci-dessus --
+      // additif, jamais restreint par scopeMode (contrairement à
+      // team_id/target_team_ids/restricted_audience juste en dessous).
+      // Toujours null pour un coach (le champ n'est même pas affiché sans
+      // allowClubWide, targetProfileIds reste alors [] côté état).
+      target_profile_ids: effectiveTargetProfileIds,
+      target_profile_notes: effectiveTargetProfileNotes,
     };
     // La portée club-wide/équipes spécifiques n'est modifiable que par qui
     // peut créer un événement club (allowClubWide) — un coach n'a même pas
@@ -701,7 +818,7 @@ export default function CreateEventForm({
       : supabase.from("events").insert(eventPayload);
     const { data: inserted, error } = await query
       .select(
-        "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, team_id, target_team_ids, restricted_audience"
+        "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience"
       )
       .single();
 
@@ -856,9 +973,14 @@ export default function CreateEventForm({
     } else {
       const team = teams.find((t) => t.id === effectiveTeamId);
       const label = typeChoices.find((c) => c.value === eventType)?.label ?? "Événement";
+      // "Personnes spécifiques" (retour de Cindy du 18/09) : jamais "Tous
+      // les groupes", qui laisserait croire à un envoi club entier alors
+      // que seules les personnes choisies sont réellement visées.
+      const scopeLabel =
+        scopeMode === "profiles" ? "Planning personnel" : team ? teamLabel(team) : "Tous les groupes";
       sendEventPush(
         inserted.id,
-        `UBAC — ${team ? teamLabel(team) : "Tous les groupes"}`,
+        `UBAC — ${scopeLabel}`,
         `Nouveau : ${label}, ${when} à ${heure}${lieu ? ` · ${lieu}` : ""}.`
       );
     }
@@ -888,6 +1010,8 @@ export default function CreateEventForm({
         paidParticipants,
         teamId: inserted.team_id,
         targetTeamIds: inserted.target_team_ids,
+        targetProfileIds: inserted.target_profile_ids,
+        targetProfileNotes: inserted.target_profile_notes,
         restrictedAudience: (inserted.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
         teamName,
         commissionGroupIds,
@@ -916,6 +1040,8 @@ export default function CreateEventForm({
           paidParticipants,
           teamId: inserted.team_id,
           targetTeamIds: inserted.target_team_ids,
+          targetProfileIds: inserted.target_profile_ids,
+        targetProfileNotes: inserted.target_profile_notes,
         restrictedAudience: (inserted.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
           teamName,
           commissionGroupIds,
@@ -1078,6 +1204,13 @@ export default function CreateEventForm({
               // côté RLS -- voir restricted_audience (migration
               // 20260916) et coachRoster (page.tsx) pour la présence.
               { value: "coachs" as const, label: "Coachs seuls" },
+              // Retour de Cindy du 18/09 (cas Jean BOUYER-POINOT/Jules
+              // DARNIS, salariés en plus de coach/joueur) : cible un
+              // événement sur une ou plusieurs fiches précises,
+              // indépendamment de toute équipe -- "planning personnel",
+              // point mensuel... Le sélecteur de personnes s'affiche plus
+              // bas (targetProfileIds), commun avec "+ Inclure aussi...".
+              { value: "profiles" as const, label: "Personnes spécifiques" },
             ]
           ).map((c) => (
             <button
@@ -1092,12 +1225,17 @@ export default function CreateEventForm({
                 if (c.value === "single" && !teamId) {
                   setTeamId(teams[0]?.id ?? "");
                 }
+                if (c.value === "profiles") {
+                  void loadClubMembers();
+                }
               }}
               className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
                 scopeMode === c.value
                   ? c.value === "bureau" || c.value === "coachs"
                     ? "border-plum bg-plum/10 text-plum-dark"
-                    : "border-navy bg-navy/10 text-navy"
+                    : c.value === "profiles"
+                      ? "border-terracotta bg-terracotta/10 text-terracotta-dark"
+                      : "border-navy bg-navy/10 text-navy"
                   : "border-zinc-200 text-zinc-500 hover:bg-white"
               }`}
             >
@@ -1137,7 +1275,21 @@ export default function CreateEventForm({
         </div>
       )}
 
-      {scopeMode === "bureau" || scopeMode === "coachs" ? (
+      {/* "Personnes spécifiques" : sélecteur requis, toujours ouvert pour
+          cette portée -- retour de Cindy du 18/09. */}
+      {allowClubWide && scopeMode === "profiles" && (
+        <ProfilePicker
+          members={clubMembers}
+          selectedIds={targetProfileIds}
+          search={profileSearch}
+          onSearchChange={setProfileSearch}
+          onToggle={toggleTargetProfile}
+          notes={targetProfileNotes}
+          onNoteChange={(id, value) => setTargetProfileNotes((prev) => ({ ...prev, [id]: value }))}
+        />
+      )}
+
+      {isPersonalTask ? null : scopeMode === "bureau" || scopeMode === "coachs" ? (
         // Une Réunion n'a pas de sous-type à choisir (pas de match/
         // entraînement/tournoi possible pour ces deux portées) --
         // simple confirmation visuelle plutôt qu'un sélecteur vide de
@@ -1266,7 +1418,10 @@ export default function CreateEventForm({
           heure ci-contre : la valeur réellement envoyée reste toujours
           cette heure absolue (impactTime), jamais un delta -- une saisie
           directe dans le champ heure garde donc la main, sans jamais être
-          recalculée en silence si startTime change ensuite. */}
+          recalculée en silence si startTime change ensuite. Retour de
+          Cindy du 18/09 ("À faire") : sans objet pour cette portée, qui
+          n'a que Début/Fin. */}
+      {!isPersonalTask && (
       <div>
         <label className="mb-1 block text-xs font-medium text-zinc-600">
           Heure d&apos;arrivée (optionnel)
@@ -1314,14 +1469,16 @@ export default function CreateEventForm({
           )}
         </div>
       </div>
+      )}
 
       {/* Retour de Cindy du 12/09 ("Répéter") : uniquement à la création
           (jamais en édition, voir !isEditing) -- une occurrence déjà en
           base ne redevient pas le point de départ d'une nouvelle série.
           Mutuellement exclusif avec "Événement payant" juste en dessous
           (voir la validation dans handleSubmit) : une série ne prend en
-          charge que les champs de base pour l'instant. */}
-      {!isEditing && (
+          charge que les champs de base pour l'instant. Retour de Cindy du
+          18/09 ("À faire") : sans objet pour cette portée. */}
+      {!isEditing && !isPersonalTask && (
         <div className="flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3">
           <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
             <input
@@ -1390,8 +1547,10 @@ export default function CreateEventForm({
           (voir le commentaire sur isPaid plus haut). Retour de Cindy du
           12/09 : désactivé pendant que "Répéter" est coché juste au-dessus
           -- une série ne prend pas encore en charge le paiement (voir
-          handleSubmit), plutôt que de le laisser cocher pour rien. */}
-      {!isReunion && (
+          handleSubmit), plutôt que de le laisser cocher pour rien. Retour
+          de Cindy du 18/09 ("À faire") : sans objet pour cette portée
+          (!isPersonalTask, même raison qu'une Réunion). */}
+      {!isReunion && !isPersonalTask && (
         <div
           className={`flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3 ${
             repeatOpen ? "opacity-50" : ""
@@ -1405,6 +1564,7 @@ export default function CreateEventForm({
               onChange={(e) => setIsPaid(e.target.checked)}
               className="h-4 w-4 rounded border-zinc-300 text-navy focus:ring-navy disabled:opacity-60"
             />
+            <Euro className="h-3.5 w-3.5 shrink-0 text-amber-600" />
             Événement payant{repeatOpen ? " (indisponible pour une série répétée)" : ""}
           </label>
           {isPaid && (
@@ -1456,11 +1616,57 @@ export default function CreateEventForm({
         className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
       />
 
+      {/* "+ Inclure aussi..." : ajout facultatif par-dessus n'importe
+          quelle autre portée (équipe, tout le club, Réunion...) -- retour
+          de Cindy du 18/09 ("les inclure dans des événements") : le coach
+          crée son entraînement comme d'habitude, et ajoute Jean/Jules même
+          s'ils ne jouent/coachent pas cette équipe-là. Déplacé ici (retour
+          de Cindy du 18/09, "perdu au milieu de nulle part" entre le
+          sélecteur d'équipe et le type d'événement) -- présenté comme un
+          vrai champ (libellé + cadre) plutôt qu'un simple lien, pour ne
+          plus se confondre avec du texte d'aide. Repliable (jamais ouvert
+          par défaut) pour ne pas alourdir le formulaire quand personne
+          n'en a besoin. */}
+      {allowClubWide && scopeMode !== "profiles" && (
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-zinc-600">
+            Inclure des personnes en plus (optionnel)
+          </span>
+          {showIncludeProfiles ? (
+            <ProfilePicker
+              members={clubMembers}
+              selectedIds={targetProfileIds}
+              search={profileSearch}
+              onSearchChange={setProfileSearch}
+              onToggle={toggleTargetProfile}
+              notes={targetProfileNotes}
+              onNoteChange={(id, value) => setTargetProfileNotes((prev) => ({ ...prev, [id]: value }))}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setShowIncludeProfiles(true);
+                void loadClubMembers();
+              }}
+              className="flex w-fit items-center gap-1 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {targetProfileIds.length > 0
+                ? `${targetProfileIds.length} personne${targetProfileIds.length > 1 ? "s" : ""} incluse${targetProfileIds.length > 1 ? "s" : ""}`
+                : "Ajouter des personnes"}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Retour de Cindy du 16/09 ("Réunion Bureau" puis "Réunion
           d'équipe") : ni besoins d'organisation ni commissions concernées
           pour ce type d'événement, Bureau ou équipe -- rien à montrer ici
-          plutôt qu'un contrôle qui semblerait actif sans l'être. */}
-      {!isReunion && (
+          plutôt qu'un contrôle qui semblerait actif sans l'être. Retour de
+          Cindy du 18/09 ("À faire") : sans objet pour cette portée non
+          plus. */}
+      {!isReunion && !isPersonalTask && (
         <>
       {/* Même liste standard que sur la carte de l'événement (VolunteerNeedsPanel)
           — les deux lisent/écrivent la même table. Retour de Cindy du 10/09 :
@@ -1580,5 +1786,107 @@ export default function CreateEventForm({
         </button>
       </div>
     </form>
+  );
+}
+
+// "Personnes spécifiques" / "+ Inclure aussi..." (retour de Cindy du
+// 18/09) : club entier avec un filtre texte -- une simple grille comme
+// pour les équipes (targetTeamIds, une quinzaine) serait illisible pour
+// 150+ membres. members=null pendant le chargement (voir loadClubMembers).
+function ProfilePicker({
+  members,
+  selectedIds,
+  search,
+  onSearchChange,
+  onToggle,
+  notes,
+  onNoteChange,
+}: {
+  members: { id: string; name: string; isSalarie: boolean }[] | null;
+  selectedIds: string[];
+  search: string;
+  onSearchChange: (value: string) => void;
+  onToggle: (id: string) => void;
+  // Une consigne par personne (retour de Cindy du 18/09, "préparer la
+  // salle pour l'un, ranger la salle pour l'autre") : id -> texte, jamais
+  // une note unique partagée.
+  notes: Record<string, string>;
+  onNoteChange: (id: string, value: string) => void;
+}) {
+  // Retour de Cindy du 18/09 ("mettre les salariés en haut de la liste
+  // pour ne pas avoir à les chercher") : tri stable, salariés d'abord --
+  // l'ordre alphabétique (déjà porté par la requête, loadClubMembers)
+  // reste inchangé à l'intérieur de chacun des deux groupes.
+  const sorted = (members ?? [])
+    .map((m, index) => ({ ...m, index }))
+    .sort((a, b) => Number(b.isSalarie) - Number(a.isSalarie) || a.index - b.index);
+  const filtered = sorted.filter((m) => m.name.toLowerCase().includes(search.trim().toLowerCase()));
+  const selectedMembers = sorted.filter((m) => selectedIds.includes(m.id));
+
+  return (
+    <div className="flex flex-col gap-1.5 rounded-lg border border-zinc-200 bg-white p-2">
+      {/* Une consigne PAR personne (retour de Cindy du 18/09, "préparer la
+          salle pour l'un, ranger la salle pour l'autre") : un petit champ
+          texte sous chaque nom coché, jamais une note partagée -- visible
+          sur le calendrier de la personne concernée une fois enregistré. */}
+      {selectedMembers.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          {selectedMembers.map((m) => (
+            <div key={m.id} className="flex flex-col gap-1 rounded-lg bg-terracotta/10 p-1.5">
+              <span className="flex items-center gap-1 text-[11px] font-medium text-terracotta-dark">
+                {m.isSalarie && <Briefcase className="h-3 w-3 shrink-0" />}
+                {m.name}
+                <button
+                  type="button"
+                  onClick={() => onToggle(m.id)}
+                  className="text-terracotta-dark/60 hover:text-terracotta-dark"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+              <input
+                type="text"
+                placeholder="Sa consigne (optionnel) — ex. préparer la salle"
+                value={notes[m.id] ?? ""}
+                onChange={(e) => onNoteChange(m.id, e.target.value)}
+                className="rounded-lg border border-zinc-200 px-2 py-1 text-xs"
+              />
+            </div>
+          ))}
+        </div>
+      )}
+      <input
+        type="text"
+        placeholder="Rechercher un membre..."
+        value={search}
+        onChange={(e) => onSearchChange(e.target.value)}
+        className="rounded-lg border border-zinc-200 px-2 py-1.5 text-xs"
+      />
+      <div className="max-h-40 overflow-y-auto">
+        {members === null ? (
+          <p className="px-1 py-1 text-xs text-zinc-400">Chargement...</p>
+        ) : filtered.length === 0 ? (
+          <p className="px-1 py-1 text-xs text-zinc-400">Aucun membre trouvé.</p>
+        ) : (
+          filtered.map((m) => (
+            <label
+              key={m.id}
+              className={`flex items-center gap-1.5 px-1 py-1 text-xs ${
+                m.isSalarie ? "font-semibold text-blue-700" : "text-zinc-700"
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={selectedIds.includes(m.id)}
+                onChange={() => onToggle(m.id)}
+                className="h-3.5 w-3.5 rounded border-zinc-300 text-terracotta focus:ring-terracotta"
+              />
+              {m.isSalarie && <Briefcase className="h-3 w-3 shrink-0" />}
+              {m.name}
+            </label>
+          ))
+        )}
+      </div>
+    </div>
   );
 }

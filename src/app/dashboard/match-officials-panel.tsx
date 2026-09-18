@@ -16,7 +16,7 @@ import {
   type MatchOfficialRoleCode,
 } from "./match-official-roles";
 
-type ClubMember = { id: string; name: string };
+type ClubMember = { id: string; name: string; isSalarie: boolean };
 
 // "Organisation match à domicile" (retour de Cindy du 17/09) : palette
 // corail-rouge --terracotta (voir globals.css), volontairement distincte de
@@ -59,15 +59,21 @@ export default function MatchOfficialsPanel({
   async function loadClubMembers() {
     if (clubMembers) return;
     const supabase = createClient();
-    const { data } = await supabase
+    const { data, error: fetchError } = await supabase
       .from("club_member_names")
-      .select("id, first_name, last_name, archived_at")
+      .select("id, first_name, last_name, archived_at, is_salarie")
       .is("archived_at", null)
       .order("last_name", { ascending: true });
+    // Retour d'audit du 18/09 : voir le même correctif dans
+    // create-event-form.tsx (échec silencieux -> "Aucun membre trouvé").
+    if (fetchError) {
+      console.error("[MatchOfficialsPanel] chargement des membres échoué:", fetchError);
+    }
     setClubMembers(
       (data ?? []).map((row) => ({
         id: row.id as string,
         name: formatPersonName(row.first_name, row.last_name),
+        isSalarie: Boolean(row.is_salarie),
       }))
     );
   }
@@ -370,6 +376,11 @@ function RoleSlotManage({
   const [mode, setMode] = useState<"NONE" | "MEMBER" | "GUEST">("NONE");
   const [guestName, setGuestName] = useState("");
   const options = clubMembers ?? [];
+  // Retour de Cindy du 18/09 ("Choisir un membre") : salariés en tête,
+  // en bleu -- même règle que ProfilePicker (create-event-form.tsx).
+  const sortedOptions = options
+    .map((m, index) => ({ ...m, index }))
+    .sort((a, b) => Number(b.isSalarie) - Number(a.isSalarie) || a.index - b.index);
 
   if (mode === "MEMBER") {
     return (
@@ -386,9 +397,9 @@ function RoleSlotManage({
           <option value="" disabled>
             {clubMembers === null ? "Chargement..." : "Choisir..."}
           </option>
-          {options.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
+          {sortedOptions.map((m) => (
+            <option key={m.id} value={m.id} style={m.isSalarie ? { color: "#1d4ed8" } : undefined}>
+              {m.isSalarie ? `${m.name} (Salarié)` : m.name}
             </option>
           ))}
         </select>
