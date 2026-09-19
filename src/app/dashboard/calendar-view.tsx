@@ -292,6 +292,55 @@ export function AbsentPlayersList({
   );
 }
 
+// Retour de Cindy du 18/09 ("voir aussi les joueurs en attente, partout où
+// c'est nécessaire") : même principe que PresentPlayersList/
+// AbsentPlayersList ci-dessus, en gris neutre (zinc) plutôt qu'une couleur
+// sémantique -- ne pas répondre n'est ni "bien" (vert) ni "mal" (rouge),
+// juste pas encore fait. Même teinte que le badge "X en attente" du
+// résumé juste au-dessus sur la carte.
+// Exportée, même raison que PresentPlayersList/AbsentPlayersList ci-dessus
+// (réutilisée par DayEventCard, week-strip-banner.tsx).
+export function PendingPlayersList({
+  players,
+}: {
+  players: { id: string; firstName: string | null; lastName: string | null }[];
+}) {
+  const [open, setOpen] = useState(false);
+
+  if (players.length === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-1.5 border-t border-zinc-100 pt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:text-zinc-900"
+      >
+        <Users className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+        {players.length} {players.length > 1 ? "joueurs/joueuses en attente" : "joueur/joueuse en attente"}
+        {open ? (
+          <ChevronUp className="h-3.5 w-3.5 shrink-0" />
+        ) : (
+          <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+        )}
+      </button>
+      {open && (
+        <div className="flex flex-wrap gap-1.5">
+          {sortByLastName(players, (p) => p.lastName).map((p) => (
+            <span
+              key={p.id}
+              className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-600"
+            >
+              {formatFirstName(p.firstName)}{" "}
+              <span className="font-bold uppercase">{formatLastName(p.lastName)}</span>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Même principe que PresentPlayersList ci-dessus, en ambre plutôt qu'en
 // émeraude pour ne jamais se confondre avec "Qui sera là ?" (retour de
 // Cindy du 2026-08-25, "il faut que l'on comprenne le stage concerné") :
@@ -1685,6 +1734,10 @@ export default function CalendarView({
         {/* Retour de Cindy du 11/09 ("qui est absent ?") : même endroit,
             juste après "Qui sera là ?". */}
         <AbsentPlayersList players={event.absentPlayers ?? []} />
+
+        {/* Retour de Cindy du 18/09 ("voir aussi les joueurs en attente") :
+            même endroit, juste après "Qui est absent ?". */}
+        <PendingPlayersList players={event.pendingPlayers ?? []} />
 
         {/* Plus d'appel express ici pour une équipe gérée : le coach ne
             répond pas à la place des familles, il leur demande de le

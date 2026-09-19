@@ -96,8 +96,28 @@ export default function NotificationBell() {
     // Rafraîchi périodiquement plutôt qu'en temps réel (pas d'abonnement
     // Realtime dédié pour ce premier jet) : un décalage d'une minute sur
     // le compteur non-lu est sans conséquence pour ce genre d'alerte.
-    const interval = setInterval(load, 60000);
-    return () => clearInterval(interval);
+    const interval = setInterval(() => {
+      // Retour de Cindy du 19/09 (soirée d'incident Supabase, "des onglets
+      // oubliés ouverts continuent d'appeler la base") : un onglet en
+      // arrière-plan (changé d'onglet, appli minimisée, écran verrouillé...)
+      // n'a aucune raison d'interroger le serveur toutes les 60s -- personne
+      // ne regarde le badge à ce moment-là. On rattrape en un seul appel
+      // (`load()` juste en dessous) dès que l'onglet redevient visible,
+      // donc rien n'est jamais raté, juste différé.
+      if (document.visibilityState !== "visible") return;
+      load();
+    }, 60000);
+    // Même logique à l'instant où l'onglet redevient visible : reprendre
+    // tout de suite plutôt qu'attendre jusqu'à 60s de plus, pour que le
+    // badge soit à jour dès qu'on regarde à nouveau l'écran.
+    function onVisibilityChange() {
+      if (document.visibilityState === "visible") load();
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [load]);
 
   useEffect(() => {

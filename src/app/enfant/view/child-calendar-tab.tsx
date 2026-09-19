@@ -515,6 +515,9 @@ function AttendanceSummary({ attendance }: { attendance: { name: string | null; 
   // Retour de Cindy du 11/09 ("qui est absent ?") : état séparé, pour que
   // déplier les absents ne déplie pas aussi les présents et vice versa.
   const [absentOpen, setAbsentOpen] = useState(false);
+  // Retour de Cindy du 18/09 ("voir aussi les joueurs en attente, partout
+  // où c'est nécessaire") : même principe que absentOpen ci-dessus.
+  const [pendingOpen, setPendingOpen] = useState(false);
   const present = attendance.filter((a) => a.status === "PRESENT");
   const late = attendance.filter((a) => a.status === "LATE");
   const absent = attendance.filter((a) => a.status === "ABSENT");
@@ -601,6 +604,41 @@ function AttendanceSummary({ attendance }: { attendance: { name: string | null; 
                   <span
                     key={i}
                     className="inline-flex items-center gap-1 rounded-full bg-status-urgent/10 px-2.5 py-1 text-xs font-medium text-status-urgent-dark"
+                  >
+                    {formatFirstName(a.name)}
+                  </span>
+                ))}
+            </div>
+          )}
+        </div>
+      )}
+      {/* Retour de Cindy du 18/09 ("voir aussi les joueurs en attente") :
+          même principe que présent/absent ci-dessus, en gris neutre --
+          même teinte que le badge "X en attente" plus haut. */}
+      {pending.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <button
+            type="button"
+            onClick={() => setPendingOpen((v) => !v)}
+            className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:text-zinc-900"
+          >
+            <Users className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+            {pending.length}{" "}
+            {pending.length > 1 ? "joueurs/joueuses en attente" : "joueur/joueuse en attente"}
+            {pendingOpen ? (
+              <ChevronUp className="h-3.5 w-3.5 shrink-0" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+            )}
+          </button>
+          {pendingOpen && (
+            <div className="flex flex-wrap gap-1.5">
+              {[...pending]
+                .sort((a, b) => formatFirstName(a.name).localeCompare(formatFirstName(b.name), "fr"))
+                .map((a, i) => (
+                  <span
+                    key={i}
+                    className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-600"
                   >
                     {formatFirstName(a.name)}
                   </span>

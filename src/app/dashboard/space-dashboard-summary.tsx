@@ -117,6 +117,7 @@ export default function SpaceDashboardSummary({
     rsvpCounts: e.rsvpCounts,
     presentPlayers: e.presentPlayers,
     absentPlayers: e.absentPlayers,
+    pendingPlayers: e.pendingPlayers,
     roles: [],
     tasks: {},
     carpool: [],

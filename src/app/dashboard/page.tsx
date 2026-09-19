@@ -537,6 +537,15 @@ export type AdminUpcomingEvent = {
     firstName: string | null;
     lastName: string | null;
   }[];
+  // Retour de Cindy du 18/09 ("voir aussi les joueurs en attente, partout
+  // où c'est nécessaire") : même principe que presentPlayers/absentPlayers
+  // ci-dessus, voir buildPendingPlayers -- qui n'a encore aucun statut
+  // enregistré pour cet événement.
+  pendingPlayers?: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+  }[];
   // Retour de Cindy du 12/09 ("Matchs officiels du club") : jamais construit
   // ici (page.tsx) -- injecté uniquement côté client (calendar-view.tsx,
   // toggle "Matchs officiels du club") pour un match d'une AUTRE équipe,
@@ -845,6 +854,26 @@ function buildAbsentPlayers(
   if (!statuses) return [];
   return roster
     .filter((p) => statuses.get(p.id)?.status === "ABSENT")
+    .map((p) => ({
+      id: p.id,
+      firstName: p.first_name,
+      lastName: p.last_name,
+    }));
+}
+
+// Retour de Cindy du 18/09 ("voir aussi les joueurs en attente, partout où
+// c'est nécessaire") : même principe que buildPresentPlayers/
+// buildAbsentPlayers ci-dessus -- ici, personne du roster qui n'a encore
+// aucune ligne de statut du tout (ni PRESENT, ni ABSENT, ni LATE), même
+// définition que le compteur `pending` de buildRsvpCounts ci-dessus.
+function buildPendingPlayers(
+  statusByEvent: Map<string, Map<string, RsvpEntry>>,
+  eventId: string,
+  roster: { id: string; first_name: string | null; last_name: string | null }[]
+) {
+  const statuses = statusByEvent.get(eventId);
+  return roster
+    .filter((p) => !statuses?.get(p.id)?.status)
     .map((p) => ({
       id: p.id,
       firstName: p.first_name,
@@ -2467,6 +2496,7 @@ export default async function DashboardPage({
         // le bug des présences plus tôt aujourd'hui, cette fois une
         // fonctionnalité jamais reportée sur Bureau/Coach plutôt qu'un bug.
         presentPlayers: buildPresentPlayers(rsvpsByEvent, e.id, eventRoster),
+        pendingPlayers: buildPendingPlayers(rsvpsByEvent, e.id, eventRoster),
         // Retour de Cindy du 11/09 ("qui est absent ?") : le Bureau voit
         // tout le club, eventRoster (déjà l'union complète pour un
         // événement multi-équipes) est donc le bon effectif ici sans
@@ -3314,6 +3344,7 @@ export default async function DashboardPage({
         // ownTeamRoster (pas eventRoster) depuis le 11/09 : voir son
         // commentaire plus haut.
         presentPlayers: buildPresentPlayers(rsvpsByEvent, e.id, ownTeamRoster),
+        pendingPlayers: buildPendingPlayers(rsvpsByEvent, e.id, ownTeamRoster),
         absentPlayers: buildAbsentPlayers(rsvpsByEvent, e.id, ownTeamRoster),
       };
     });
@@ -4045,6 +4076,7 @@ export default async function DashboardPage({
       );
       e.presentPlayers = buildPresentPlayers(rsvpsByEvent, e.id, ownFamilyRoster);
       e.absentPlayers = buildAbsentPlayers(rsvpsByEvent, e.id, ownFamilyRoster);
+      e.pendingPlayers = buildPendingPlayers(rsvpsByEvent, e.id, ownFamilyRoster);
     });
 
     if (familyCotisationRows) {
@@ -4476,6 +4508,7 @@ export default async function DashboardPage({
       rsvpCounts: e.rsvpCounts,
       presentPlayers: e.presentPlayers ?? [],
       absentPlayers: e.absentPlayers ?? [],
+      pendingPlayers: e.pendingPlayers ?? [],
       roles: [],
       tasks: {},
       carpool: [],
@@ -4511,6 +4544,7 @@ export default async function DashboardPage({
       rsvpCounts: e.rsvpCounts,
       presentPlayers: e.presentPlayers ?? [],
       absentPlayers: e.absentPlayers ?? [],
+      pendingPlayers: e.pendingPlayers ?? [],
       roles: rolesForEventType(eventRoleTypes, e.event_type),
       tasks: familyOrganisationTasks[e.id] ?? {},
       carpool: carpoolOffersByEventId[e.id] ?? [],

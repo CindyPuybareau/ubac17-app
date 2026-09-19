@@ -357,6 +357,13 @@ export default async function ChildViewPage() {
     string,
     { id: string; firstName: string | null; lastName: string | null }[]
   > = {};
+  // Retour de Cindy du 18/09 ("voir aussi les joueurs en attente, partout
+  // où c'est nécessaire") : même principe que presentPlayersByEventId/
+  // absentPlayersByEventId ci-dessus.
+  const pendingPlayersByEventId: Record<
+    string,
+    { id: string; firstName: string | null; lastName: string | null }[]
+  > = {};
   events.forEach((e) => {
     const eventRoster = fullTeammateRoster.filter((p) => isConcernedByChildEvent(p, e));
     let present = 0;
@@ -365,9 +372,13 @@ export default async function ChildViewPage() {
     let answered = 0;
     const presentPlayers: { id: string; firstName: string | null; lastName: string | null }[] = [];
     const absentPlayers: { id: string; firstName: string | null; lastName: string | null }[] = [];
+    const pendingPlayers: { id: string; firstName: string | null; lastName: string | null }[] = [];
     eventRoster.forEach((p) => {
       const status = rsvpStatusByKey.get(`${e.id}:${p.id}`);
-      if (!status) return;
+      if (!status) {
+        pendingPlayers.push(p);
+        return;
+      }
       answered += 1;
       if (status === "PRESENT") {
         present += 1;
@@ -382,6 +393,7 @@ export default async function ChildViewPage() {
     rsvpCountsByEventId[e.id] = { present, absent, late, pending: Math.max(0, eventRoster.length - answered) };
     presentPlayersByEventId[e.id] = presentPlayers;
     absentPlayersByEventId[e.id] = absentPlayers;
+    pendingPlayersByEventId[e.id] = pendingPlayers;
   });
 
   // "Mes Présences" : un vrai bilan d'assiduité, pas un badge à débloquer
@@ -489,6 +501,7 @@ export default async function ChildViewPage() {
       rsvpCountsByEventId={rsvpCountsByEventId}
       presentPlayersByEventId={presentPlayersByEventId}
       absentPlayersByEventId={absentPlayersByEventId}
+      pendingPlayersByEventId={pendingPlayersByEventId}
     />
   );
 }

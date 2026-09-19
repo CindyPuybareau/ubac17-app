@@ -9,7 +9,7 @@ import {
   formatEventTime,
   formatImpactTime,
 } from "@/app/dashboard/event-style";
-import { PresentPlayersList, AbsentPlayersList } from "@/app/dashboard/calendar-view";
+import { PresentPlayersList, AbsentPlayersList, PendingPlayersList } from "@/app/dashboard/calendar-view";
 import { parseMatchTitle } from "@/lib/match-display";
 import RsvpControl from "./rsvp-control";
 import MatchTasksPanel from "./match-tasks-panel";
@@ -108,6 +108,10 @@ export type WeekStripEvent = {
   rsvpCounts: { present: number; absent: number; late: number; pending: number };
   presentPlayers: { id: string; firstName: string | null; lastName: string | null }[];
   absentPlayers: { id: string; firstName: string | null; lastName: string | null }[];
+  // Retour de Cindy du 18/09 ("voir aussi les joueurs en attente, partout
+  // où c'est nécessaire") : même principe que presentPlayers/absentPlayers
+  // ci-dessus, voir PendingPlayersList (calendar-view.tsx).
+  pendingPlayers: { id: string; firstName: string | null; lastName: string | null }[];
   roles: EventRoleType[];
   tasks: EventTasksState;
   carpool: CarpoolOffer[];
@@ -330,6 +334,7 @@ export function DayEventCard({ event }: { event: WeekStripEvent }) {
       )}
       <PresentPlayersList players={event.presentPlayers} />
       <AbsentPlayersList players={event.absentPlayers} />
+      <PendingPlayersList players={event.pendingPlayers} />
 
       {/* Présent/Absent : uniquement côté Famille, un enfant à la fois
           (même composant que family-attendance-requests.tsx). */}

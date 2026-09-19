@@ -123,6 +123,7 @@ export default function ChildDashboard({
   rsvpCountsByEventId,
   presentPlayersByEventId,
   absentPlayersByEventId,
+  pendingPlayersByEventId,
 }: {
   firstName: string | null;
   avatarUrl: string | null;
@@ -166,6 +167,7 @@ export default function ChildDashboard({
   rsvpCountsByEventId: Record<string, { present: number; absent: number; late: number; pending: number }>;
   presentPlayersByEventId: Record<string, { id: string; firstName: string | null; lastName: string | null }[]>;
   absentPlayersByEventId: Record<string, { id: string; firstName: string | null; lastName: string | null }[]>;
+  pendingPlayersByEventId: Record<string, { id: string; firstName: string | null; lastName: string | null }[]>;
 }) {
   const teammatesOnly = teammates.filter((t) => !t.isSelf);
 
@@ -205,6 +207,7 @@ export default function ChildDashboard({
     rsvpCounts: rsvpCountsByEventId[e.id] ?? { present: 0, absent: 0, late: 0, pending: 0 },
     presentPlayers: presentPlayersByEventId[e.id] ?? [],
     absentPlayers: absentPlayersByEventId[e.id] ?? [],
+    pendingPlayers: pendingPlayersByEventId[e.id] ?? [],
     roles: [],
     tasks: {},
     carpool: [],

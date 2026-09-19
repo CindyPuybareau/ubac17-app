@@ -59,6 +59,10 @@ export type SpaceDashboardNextEvent = {
   rsvpCounts: { present: number; absent: number; late: number; pending: number };
   presentPlayers: { id: string; firstName: string | null; lastName: string | null }[];
   absentPlayers: { id: string; firstName: string | null; lastName: string | null }[];
+  // Retour de Cindy du 18/09 ("voir aussi les joueurs en attente, partout
+  // où c'est nécessaire") : même principe que presentPlayers/absentPlayers
+  // ci-dessus.
+  pendingPlayers: { id: string; firstName: string | null; lastName: string | null }[];
   needs: VolunteerNeed[];
   // "Organisation match à domicile" (retour de Cindy du 17/09) : même bloc
   // que WeekStripEvent (week-strip-banner.tsx), la carte étant partagée.
@@ -430,9 +434,13 @@ export async function getSpaceDashboardSummary(
       let answered = 0;
       const presentPlayers: { id: string; firstName: string | null; lastName: string | null }[] = [];
       const absentPlayers: { id: string; firstName: string | null; lastName: string | null }[] = [];
+      const pendingPlayers: { id: string; firstName: string | null; lastName: string | null }[] = [];
       eventRoster.forEach((p) => {
         const status = statusByEventAndPlayer.get(`${row.id}:${p.id}`);
-        if (!status) return;
+        if (!status) {
+          pendingPlayers.push(p);
+          return;
+        }
         answered += 1;
         if (status === "PRESENT") {
           present += 1;
@@ -470,6 +478,7 @@ export async function getSpaceDashboardSummary(
         rsvpCounts: { present, absent, late, pending: Math.max(0, eventRoster.length - answered) },
         presentPlayers,
         absentPlayers,
+        pendingPlayers,
         needs: needsByEventId[row.id] ?? [],
         matchOfficials: matchOfficialsByEventId[row.id] ?? [],
         matchOfficialsEnabled: true,
