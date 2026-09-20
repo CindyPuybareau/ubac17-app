@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { unstable_cache } from "next/cache";
-import { chunkedQuery, type Semaphore } from "@/lib/batch";
+import { chunkedQuery, runBatched, Semaphore } from "@/lib/batch";
 import { formatPersonName } from "@/lib/names";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -287,7 +287,12 @@ export async function getCarpoolOffersByEventId(
 
 export async function getSeasonTaskTallyByTeamIds(
   supabase: SupabaseClient,
-  teamIds: string[]
+  teamIds: string[],
+  // Retour de Cindy du 20/09 (panne de connexions) : ces 3 requêtes
+  // internes échappaient au Semaphore(9) partagé de page.tsx -- optionnel
+  // pour ne rien casser côté appelants qui n'ont pas de dbLimit sous la
+  // main (comportement inchangé dans ce cas).
+  dbLimit?: Semaphore
 ): Promise<Record<string, SeasonTaskTally>> {
   const result: Record<string, SeasonTaskTally> = {};
   if (teamIds.length === 0) return result;
@@ -298,23 +303,32 @@ export async function getSeasonTaskTallyByTeamIds(
     byRole[code] = (byRole[code] ?? 0) + 1;
   }
 
-  const [{ data: teamScoped }, { data: clubWide }, { data: rosterRows }] = await Promise.all([
-    supabase
-      .from("event_tasks")
-      .select("task_type, player_id, events!inner(team_id)")
-      .in("events.team_id", teamIds),
-    // Un rôle pris sur un événement club (events.team_id null) n'est
-    // rattaché à aucune équipe par l'événement lui-même — seulement par
-    // l'équipe du joueur qui l'a pris. "Prochains événements" l'affiche
-    // déjà (pas filtré par équipe), mais le Bilan de saison, lui, l'a
-    // toujours ignoré : les deux écrans se contredisaient pour le même
-    // rôle sur le même événement.
-    supabase
-      .from("event_tasks")
-      .select("task_type, player_id, events!inner(team_id)")
-      .is("events.team_id", null),
-    supabase.from("team_players").select("team_id, player_id").in("team_id", teamIds),
-  ]);
+  // Semaphore(3) de repli si aucun dbLimit partagé n'est fourni par
+  // l'appelant (comportement toujours borné, jamais un Promise.all brut) —
+  // même valeur de repli que chunkedQuery ailleurs dans ce fichier.
+  const semaphore = dbLimit ?? new Semaphore(3);
+  const [{ data: teamScoped }, { data: clubWide }, { data: rosterRows }] = await runBatched(
+    [
+      () =>
+        supabase
+          .from("event_tasks")
+          .select("task_type, player_id, events!inner(team_id)")
+          .in("events.team_id", teamIds),
+      // Un rôle pris sur un événement club (events.team_id null) n'est
+      // rattaché à aucune équipe par l'événement lui-même — seulement par
+      // l'équipe du joueur qui l'a pris. "Prochains événements" l'affiche
+      // déjà (pas filtré par équipe), mais le Bilan de saison, lui, l'a
+      // toujours ignoré : les deux écrans se contredisaient pour le même
+      // rôle sur le même événement.
+      () =>
+        supabase
+          .from("event_tasks")
+          .select("task_type, player_id, events!inner(team_id)")
+          .is("events.team_id", null),
+      () => supabase.from("team_players").select("team_id, player_id").in("team_id", teamIds),
+    ],
+    semaphore
+  );
 
   (teamScoped ?? []).forEach((row) => {
     const event = row.events as unknown as { team_id: string } | null;

@@ -1004,28 +1004,37 @@ export default async function DashboardPage({
     redirect("/connexion");
   }
 
+  // Retour de Cindy du 20/09 (panne de connexions) : ce petit groupe de 4
+  // requêtes échappait au Semaphore(9) partagé (dbLimit, défini juste
+  // au-dessus) -- passé par runBatched pour rester cohérent avec le reste
+  // de la page, même s'il est individuellement peu risqué (toujours 4
+  // requêtes, jamais un fan-out).
   const [adminResult, coachResult, playerLinksResult, ownPlayerRowResult] =
-    await Promise.all([
+    await runBatched(
+      [
       // En minuscules : club_administrators.email est désormais toujours
       // stocké en minuscules (voir 20260918010000), mais user.email
       // reflète la casse tapée à l'inscription — un .eq() strict aurait pu
       // ne jamais trouver la ligne pour quelqu'un qui s'est inscrit avec
       // une majuscule, et le rendre invisible au Bureau sans aucune erreur.
-      supabase
-        .from("club_administrators")
-        .select("role, club_function, access_profile_id")
-        .eq("email", (user.email ?? "").toLowerCase())
-        .maybeSingle(),
-      supabase
-        .from("team_coaches")
-        .select(
-          "teams(id, name, category, ffbb_url, sort_order, pending_coach_names)"
-        )
-        .eq("coach_id", user.id),
-      supabase
-        .from("parent_player")
-        .select("players(id, first_name, last_name, category, profile_id, avatar_url)")
-        .eq("parent_id", user.id),
+      () =>
+        supabase
+          .from("club_administrators")
+          .select("role, club_function, access_profile_id")
+          .eq("email", (user.email ?? "").toLowerCase())
+          .maybeSingle(),
+      () =>
+        supabase
+          .from("team_coaches")
+          .select(
+            "teams(id, name, category, ffbb_url, sort_order, pending_coach_names)"
+          )
+          .eq("coach_id", user.id),
+      () =>
+        supabase
+          .from("parent_player")
+          .select("players(id, first_name, last_name, category, profile_id, avatar_url)")
+          .eq("parent_id", user.id),
       // This user's own player row, if any (players.profile_id = user.id) —
       // reused below both to also surface teams where THEY are only a
       // pending (not-yet-linked-account) coach, to merge their own
@@ -1034,12 +1043,15 @@ export default async function DashboardPage({
       // player registered under their own account — Séniors, Loisirs...
       // — was previously invisible to every branch below and landed on
       // the empty "Aucun espace" message despite being validly linked).
-      supabase
-        .from("players")
-        .select("id, first_name, last_name, category, profile_id, avatar_url")
-        .eq("profile_id", user.id)
-        .maybeSingle(),
-    ]);
+      () =>
+        supabase
+          .from("players")
+          .select("id, first_name, last_name, category, profile_id, avatar_url")
+          .eq("profile_id", user.id)
+          .maybeSingle(),
+      ],
+      dbLimit
+    );
 
   logQueryErrors("détection de rôle", {
     adminResult,
@@ -1133,10 +1145,19 @@ export default async function DashboardPage({
   let clubReports: ClubReport[] = [];
   const clubReportsPromise = (async () => {
     if (!isAdmin && !isCoach) return;
-    const { data: clubReportsData, error: clubReportsError } = await supabase
-      .from("club_reports")
-      .select("id, category, title, report_date, body, created_by, file_path, updated_at")
-      .order("report_date", { ascending: false });
+    // Retour de Cindy du 20/09 (panne de connexions) : cette requête et le
+    // petit groupe juste en dessous échappaient au Semaphore(9) partagé.
+    const releaseClubReports = await dbLimit.acquire();
+    let clubReportsResult;
+    try {
+      clubReportsResult = await supabase
+        .from("club_reports")
+        .select("id, category, title, report_date, body, created_by, file_path, updated_at")
+        .order("report_date", { ascending: false });
+    } finally {
+      releaseClubReports();
+    }
+    const { data: clubReportsData, error: clubReportsError } = clubReportsResult;
     if (clubReportsError) {
       console.error("[dashboard] lecture club_reports échouée:", clubReportsError);
     }
@@ -1146,14 +1167,19 @@ export default async function DashboardPage({
     const authorIds = Array.from(
       new Set((clubReportsData ?? []).map((r) => r.created_by).filter((id): id is string => Boolean(id)))
     );
-    const [signedUrlsResult, authorProfilesResult] = await Promise.all([
-      filePaths.length > 0
-        ? supabase.storage.from("club-report-files").createSignedUrls(filePaths, 3600)
-        : Promise.resolve({ data: [] as { path: string | null; signedUrl: string }[], error: null }),
-      authorIds.length > 0
-        ? supabase.from("profiles").select("id, first_name, last_name").in("id", authorIds)
-        : Promise.resolve({ data: [] as { id: string; first_name: string | null; last_name: string | null }[], error: null }),
-    ]);
+    const [signedUrlsResult, authorProfilesResult] = await runBatched(
+      [
+        () =>
+          filePaths.length > 0
+            ? supabase.storage.from("club-report-files").createSignedUrls(filePaths, 3600)
+            : Promise.resolve({ data: [] as { path: string | null; signedUrl: string }[], error: null }),
+        () =>
+          authorIds.length > 0
+            ? supabase.from("profiles").select("id, first_name, last_name").in("id", authorIds)
+            : Promise.resolve({ data: [] as { id: string; first_name: string | null; last_name: string | null }[], error: null }),
+      ],
+      dbLimit
+    );
     if (signedUrlsResult.error) {
       console.error("[dashboard] génération des liens club-report-files échouée:", signedUrlsResult.error);
     }
@@ -1258,8 +1284,12 @@ export default async function DashboardPage({
   const childCandidates = players.filter((p) => !p.isSelf);
   let hasChildrenTab = false;
   if (childCandidates.length > 0) {
-    const childCandidateTeamIdsList = await Promise.all(
-      childCandidates.map((p) => getPlayerTeamIds(supabase, p.id))
+    // Retour de Cindy du 20/09 (panne de connexions) : un fan-out en
+    // Promise.all brut, une requête par enfant candidat, échappait au
+    // Semaphore(9) partagé.
+    const childCandidateTeamIdsList = await runBatched(
+      childCandidates.map((p) => () => getPlayerTeamIds(supabase, p.id)),
+      dbLimit
     );
     hasChildrenTab = childCandidates.some((_, i) => {
       const teamIds = childCandidateTeamIdsList[i];
@@ -1364,68 +1394,87 @@ export default async function DashboardPage({
   // "await Promise.all(...)" plus bas) au lieu de les faire toutes
   // attendre son tour.
   const priorityZonePromise = (async () => {
+  // Retour de Cindy du 20/09 (panne de connexions, "corrige le nombre de
+  // requêtes envoyées") : ce bloc tourne pour TOUT compte, sans garde de
+  // rôle, et ses deux fan-outs (un par enfant lié, un par équipe coachée)
+  // envoyaient jusqu'ici chacun 2-3 requêtes PAR élément en Promise.all
+  // brut, hors du Semaphore(9) partagé (dbLimit) -- pour un compte à
+  // plusieurs enfants/équipes, largement de quoi dépasser le nombre de
+  // connexions disponibles à lui seul. runBatched(..., dbLimit) plafonne
+  // maintenant le nombre d'enfants/équipes traités en même temps, exactement
+  // comme les autres gros lots de cette page -- même résultat, mêmes
+  // données, juste borné.
   const [
     whatsappGroupsRes,
     convocationCardsRaw,
     coachCards,
     eventRoleTypes,
     sponsorDisplayRes,
-  ] = await Promise.all([
+  ] = await runBatched(
+    [
     // A single query, unconditional on role: RLS already narrows the
     // result to exactly what this user may see (everything for Bureau,
     // their own team's + own memberships for a Coach, only their own
     // family's memberships for everyone else) — see
     // is_whatsapp_group_member() / is_whatsapp_group_team_coach() in the
     // whatsapp_groups migration.
-    supabase
-      .from("whatsapp_groups")
-      .select(
-        "id, name, category, team_id, invite_link, sort_order, access_token, access_profile_id, whatsapp_group_members(player_id, players(id, first_name, last_name))"
-      )
-      .order("sort_order", { ascending: true }),
+    () =>
+      supabase
+        .from("whatsapp_groups")
+        .select(
+          "id, name, category, team_id, invite_link, sort_order, access_token, access_profile_id, whatsapp_group_members(player_id, players(id, first_name, last_name))"
+        )
+        .order("sort_order", { ascending: true }),
     // Priority zone: next convocation per linked player.
-    Promise.all(
-      players.map(async (p) => {
-        const teamIds = await getPlayerTeamIds(supabase, p.id);
-        const event = await getNextEventForTeams(supabase, teamIds);
-        if (!event) return null;
-        const status = await getPlayerRsvpStatus(supabase, event.id, p.id);
-        return { player: p, event, status };
-      })
-    ),
+    () =>
+      runBatched(
+        players.map((p) => async () => {
+          const teamIds = await getPlayerTeamIds(supabase, p.id);
+          const event = await getNextEventForTeams(supabase, teamIds);
+          if (!event) return null;
+          const status = await getPlayerRsvpStatus(supabase, event.id, p.id);
+          return { player: p, event, status };
+        }),
+        dbLimit
+      ),
     // Priority zone: next match status per coached team. event et roster
     // ne dépendent l'un de l'autre en rien (deux requêtes indépendantes
     // sur le même team.id) — seul counts a besoin des deux résolus, donc
     // lui seul reste après le couple plutôt que d'enchaîner les trois à
     // la queue leu leu (retour de Cindy du 2026-08-21 sur la lenteur au
     // chargement, même famille de correctif que les clics d'Organisation).
-    Promise.all(
-      coachedTeams.map(async (team) => {
-        const [event, roster] = await Promise.all([
-          getNextEventForTeams(supabase, [team.id]),
-          getTeamRoster(supabase, team.id),
-        ]);
-        const counts = event
-          ? await getRsvpCounts(supabase, event.id, roster.length)
-          : null;
-        return { team, event, counts, roster };
-      })
-    ),
+    () =>
+      runBatched(
+        coachedTeams.map((team) => async () => {
+          const [event, roster] = await Promise.all([
+            getNextEventForTeams(supabase, [team.id]),
+            getTeamRoster(supabase, team.id),
+          ]);
+          const counts = event
+            ? await getRsvpCounts(supabase, event.id, roster.length)
+            : null;
+          return { team, event, counts, roster };
+        }),
+        dbLimit
+      ),
     // Catalogue des roles d organisation, commun au club et lu par les
     // trois espaces. Version mise en cache 60s (voir getEventRoleTypesCached,
     // event-tasks.ts) : identique pour tout le monde, pas la peine de la
     // redemander à Supabase à chaque chargement.
-    getEventRoleTypesCached(),
+    () => getEventRoleTypesCached(),
     // Retour de Cindy du 29/08 : logo+nom+lien affichés dans tous les
     // espaces (jamais le contrat ni les coordonnées de contact, réservés à
     // la table sponsors elle-même, Bureau uniquement) — vue dédiée
     // (sponsor_display) plutôt qu'une policy RLS plus étroite sur la table
     // complète, même principe que family_teammate_roster.
-    supabase
-      .from("sponsor_display")
-      .select("id, name, logo_url, website_url")
-      .order("sort_order", { ascending: true }),
-  ]);
+    () =>
+      supabase
+        .from("sponsor_display")
+        .select("id, name, logo_url, website_url")
+        .order("sort_order", { ascending: true }),
+    ],
+    dbLimit
+  );
 
   logQueryErrors("commun (whatsapp/sponsors)", { whatsappGroupsRes, sponsorDisplayRes });
 
@@ -1960,12 +2009,22 @@ export default async function DashboardPage({
     // creusé suite au retour de Cindy sur la lenteur de connexion.
     const upcomingEventIds = adminEventsData.map((e) => e.id);
     const upcomingEventIdSet = new Set(upcomingEventIds);
+    // Retour de Cindy du 20/09 (panne de connexions) : requête brute hors
+    // Semaphore(9) partagé -- acquire/release manuels puisque sa promesse
+    // est réutilisée plus loin (pas un simple élément de groupe).
     const adminNextEventRsvpPromise =
       adminNextEventIds.length > 0
-        ? supabase
-            .from("rsvps")
-            .select("player_id, status, event_id")
-            .in("event_id", adminNextEventIds)
+        ? (async () => {
+            const release = await dbLimit.acquire();
+            try {
+              return await supabase
+                .from("rsvps")
+                .select("player_id, status, event_id")
+                .in("event_id", adminNextEventIds);
+            } finally {
+              release();
+            }
+          })()
         : Promise.resolve({
             data: [] as { player_id: string; status: string; event_id: string }[],
             error: null,
@@ -2576,15 +2635,20 @@ export default async function DashboardPage({
   if (coachDataActive) {
     const coachedTeamIds = coachedTeams.map((t) => t.id);
     // Les deux ne dépendent pas l'une de l'autre — parties ensemble
-    // plutôt qu'à la queue leu leu.
-    const [taskTally, ownTeamIds] = await Promise.all([
-      getSeasonTaskTallyByTeamIds(supabase, coachedTeamIds),
-      // A coach who's also a registered player (players.profile_id linked
-      // to their own account) gets their own team on top of the ones they
-      // coach — in the calendar, and in the Équipe(s) tab, where it shows
-      // up as a separate "Joueur" entry (see coachTeamRoleById below).
-      ownPlayerId ? getPlayerTeamIds(supabase, ownPlayerId) : Promise.resolve([]),
-    ]);
+    // plutôt qu'à la queue leu leu. Retour de Cindy du 20/09 (panne de
+    // connexions) : passées par runBatched(dbLimit) plutôt qu'un
+    // Promise.all brut.
+    const [taskTally, ownTeamIds] = await runBatched(
+      [
+        () => getSeasonTaskTallyByTeamIds(supabase, coachedTeamIds, dbLimit),
+        // A coach who's also a registered player (players.profile_id linked
+        // to their own account) gets their own team on top of the ones they
+        // coach — in the calendar, and in the Équipe(s) tab, where it shows
+        // up as a separate "Joueur" entry (see coachTeamRoleById below).
+        () => (ownPlayerId ? getPlayerTeamIds(supabase, ownPlayerId) : Promise.resolve([])),
+      ],
+      dbLimit
+    );
     coachTaskTallyByTeamId = taskTally;
     const coachCalendarTeamIds = Array.from(
       new Set([...coachedTeamIds, ...ownTeamIds])
@@ -2865,12 +2929,28 @@ export default async function DashboardPage({
       .filter((e) => new Date(e.start_time).getTime() >= Date.now())
       .map((e) => e.id);
 
+    // Retour de Cindy du 20/09 (panne de connexions) : ces 4 promesses
+    // (coachNextEventRsvpPromise/allMembershipsPromise/coachRsvpRowsPromise/
+    // coachPenalitePromise) étaient des requêtes brutes hors Semaphore(9)
+    // partagé -- acquire/release manuels puisque chacune est réutilisée
+    // plus loin, jamais un simple élément de groupe.
+    const withDbLimit = <T,>(fn: () => PromiseLike<T>): Promise<T> =>
+      (async () => {
+        const release = await dbLimit.acquire();
+        try {
+          return await fn();
+        } finally {
+          release();
+        }
+      })();
     const coachNextEventRsvpPromise =
       coachNextEventIds.length > 0
-        ? supabase
-            .from("rsvps")
-            .select("player_id, status, event_id")
-            .in("event_id", coachNextEventIds)
+        ? withDbLimit(() =>
+            supabase
+              .from("rsvps")
+              .select("player_id, status, event_id")
+              .in("event_id", coachNextEventIds)
+          )
         : Promise.resolve({
             data: [] as { player_id: string; status: string; event_id: string }[],
             error: null,
@@ -2882,15 +2962,19 @@ export default async function DashboardPage({
     // players" policy.
     const allMembershipsPromise =
       playerIds.length > 0
-        ? supabase.from("team_players").select("team_id, player_id").in("player_id", playerIds)
+        ? withDbLimit(() =>
+            supabase.from("team_players").select("team_id, player_id").in("player_id", playerIds)
+          )
         : Promise.resolve({ data: [] as { team_id: string; player_id: string }[], error: null });
     const rsvpsByEventPromise = fetchRsvpsByEvent(supabase, coachEventIds, dbLimit);
     const coachRsvpRowsPromise =
       coachEventIds.length > 0
-        ? supabase
-            .from("rsvps")
-            .select("event_id, player_id, status, reason")
-            .in("event_id", coachEventIds)
+        ? withDbLimit(() =>
+            supabase
+              .from("rsvps")
+              .select("event_id, player_id, status, reason")
+              .in("event_id", coachEventIds)
+          )
         : Promise.resolve({
             data: [] as {
               event_id: string;
@@ -2902,12 +2986,14 @@ export default async function DashboardPage({
           });
     const coachPenalitePromise =
       coachPenaliteScope.length > 0
-        ? supabase
-            .from("penalites")
-            .select(
-              "id, player_id, amount, notes, penalite_date, statut, paid_at, payment_link, players(first_name, last_name)"
-            )
-            .in("player_id", coachPenaliteScope)
+        ? withDbLimit(() =>
+            supabase
+              .from("penalites")
+              .select(
+                "id, player_id, amount, notes, penalite_date, statut, paid_at, payment_link, players(first_name, last_name)"
+              )
+              .in("player_id", coachPenaliteScope)
+          )
         : Promise.resolve({ data: [] as unknown[], error: null });
     // Les rôles (maillots/goûter) de TOUS les événements à venir, pas
     // seulement du prochain match : l'onglet "Planning & Rôles" les liste
@@ -3188,7 +3274,9 @@ export default async function DashboardPage({
     );
     const parentProfilesRes =
       parentIds.length > 0
-        ? await supabase.from("profiles").select("id, phone, email").in("id", parentIds)
+        ? await withDbLimit(() =>
+            supabase.from("profiles").select("id, phone, email").in("id", parentIds)
+          )
         : { data: [] as { id: string; phone: string | null; email: string | null }[], error: null };
     logQueryErrors("Coach (contacts parents)", { parentProfilesRes });
     const parentProfiles = parentProfilesRes.data;
@@ -3419,8 +3507,12 @@ export default async function DashboardPage({
 
   const familyPromise = (async () => {
   if (familyDataActive) {
-    const playerTeamIdsList = await Promise.all(
-      players.map((p) => getPlayerTeamIds(supabase, p.id))
+    // Retour de Cindy du 20/09 (panne de connexions) : fan-out en
+    // Promise.all brut, une requête par enfant, échappait au Semaphore(9)
+    // partagé.
+    const playerTeamIdsList = await runBatched(
+      players.map((p) => () => getPlayerTeamIds(supabase, p.id)),
+      dbLimit
     );
     familyRsvpPlayers = players.map((p, i) => ({
       id: p.id,
@@ -3475,7 +3567,13 @@ export default async function DashboardPage({
       familyPenaliteRes,
       cotisationPlayerFieldsRes,
       cotisationPlayerTeamsRes,
-    ] = await Promise.all([
+      // Retour de Cindy du 20/09 (panne de connexions) : les 6 requêtes
+      // brutes ci-dessous (événements, cotisations, pénalités, joueurs,
+      // équipes) échappaient au Semaphore(9) partagé -- Promise.all brut
+      // remplacé par runBatched(dbLimit), chaque élément passé en thunk.
+    ] = await runBatched(
+      [
+      () =>
       allTeamIds.length > 0
         ? runBatched(
             [
@@ -3674,6 +3772,7 @@ export default async function DashboardPage({
         : null,
       // Matchs/événements ponctuels, chargés en entier comme avant — voir
       // upcomingTrainingsRes (bloc Bureau) pour la raison de ce découpage.
+      () =>
       supabase
         .from("events")
         .select(
@@ -3684,6 +3783,7 @@ export default async function DashboardPage({
         .gte("start_time", eventsWindowStart)
         .order("start_time", { ascending: true }),
       // Entraînements récurrents de ces équipes, bornés au mois affiché.
+      () =>
       supabase
         .from("events")
         .select(
@@ -3698,6 +3798,7 @@ export default async function DashboardPage({
       // RLS : Cindy elle-même est Bureau ET parente, et la policy admin sur
       // cotisations laisserait passer TOUTES les lignes du club pour son
       // compte si cette requête-ci ne filtrait pas elle-même.
+      () =>
       familyPlayerIds.length > 0
         ? supabase
             .from("cotisations")
@@ -3719,6 +3820,7 @@ export default async function DashboardPage({
         : null,
       // Même garde-fou que la requête cotisations juste au-dessus (Cindy
       // Bureau + parente) : filtre explicite plutôt que la seule RLS.
+      () =>
       familyPlayerIds.length > 0
         ? supabase
             .from("penalites")
@@ -3731,6 +3833,7 @@ export default async function DashboardPage({
       // Champs joueur pour reconstituer ce que l'embed retiré ci-dessus
       // fournissait -- requête plate, jamais imbriquée, donc jamais
       // réévaluée par ligne de cotisations.
+      () =>
       familyPlayerIds.length > 0
         ? supabase
             .from("players")
@@ -3741,13 +3844,16 @@ export default async function DashboardPage({
       // realCategory dans mapCotisationRow) -- table teams elle-même sans
       // RLS coûteuse (policy "select all teams"), donc un embed direct ici
       // reste bon marché, contrairement à l'ancien embed sur players.
+      () =>
       familyPlayerIds.length > 0
         ? supabase
             .from("team_players")
             .select("player_id, teams(name, category)")
             .in("player_id", familyPlayerIds)
         : null,
-    ]);
+      ],
+      dbLimit
+    );
 
     logQueryErrors("Famille", { eventsRes, trainingsRes, familyCotisationRes, familyPenaliteRes });
 

@@ -25,3 +25,9 @@ Toute modification apportée par un rôle (ex: attribution d'un maillot/goûter,
 - Icônes : Utiliser EXCLUSIVEMENT les icônes vectorielles SVG Lucide (`Cake`, `LogOut`, `Eye`, `EyeOff`, etc.).
 - AUCUN emoji système dans les boutons ou la navigation.
 - Le bouton "Se Déconnecter" doit rester accessible en permanence sur Mobile et PC.
+
+## 6. PERFORMANCE — REQUÊTES RÉSEAU / API / BASE DE DONNÉES
+- Ne JAMAIS faire d'appels réseau, API ou requêtes base de données à l'intérieur d'une boucle.
+- Toujours privilégier les appels groupés (batch), la pagination ou le fetching en parallèle contrôlé (ex: `Promise.all` avec limite de concurrence — voir `dbLimit`/`Semaphore` dans `page.tsx`).
+- Si un batch n'est pas possible côté API, expliquer pourquoi avant d'écrire le code.
+- Incident du 20/09 : `sync-ffbb` faisait 1 lecture + 1 écriture par match en boucle (jusqu'à ~60 allers-retours pour une seule équipe), suffisant à saturer le pool de connexions du palier Micro et à bloquer tout le monde — voir `src/app/api/sync-ffbb/route.ts` pour le correctif (lecture groupée + écriture groupée).
