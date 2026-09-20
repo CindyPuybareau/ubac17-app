@@ -85,7 +85,7 @@ function resolveTeamNameClient(
       .filter((n): n is string => Boolean(n));
     return names.length > 0 ? names.join(", ") : "Équipes sélectionnées";
   }
-  return "Tous les groupes";
+  return "Tout le club";
 }
 
 // "YYYY-MM-DDTHH:MM" (valeur d'un <input datetime-local> / DateTimePicker)
@@ -484,32 +484,6 @@ export default function CreateEventForm({
   // Besoins/Commissions, ni Heure d'arrivée (voir le JSX plus bas).
   const isPersonalTask = scopeMode === "profiles";
 
-  async function computePaidParticipantIds(
-    supabase: ReturnType<typeof createClient>,
-    effectiveTeamId: string,
-    effectiveTargetTeamIds: string[] | null
-  ): Promise<string[]> {
-    if (effectiveTeamId) {
-      const { data: rosterRows } = await supabase
-        .from("team_players")
-        .select("player_id")
-        .eq("team_id", effectiveTeamId);
-      return (rosterRows ?? []).map((r) => r.player_id);
-    }
-    if (effectiveTargetTeamIds && effectiveTargetTeamIds.length > 0) {
-      const { data: rosterRows } = await supabase
-        .from("team_players")
-        .select("player_id")
-        .in("team_id", effectiveTargetTeamIds);
-      return Array.from(new Set((rosterRows ?? []).map((r) => r.player_id)));
-    }
-    // "Tout le club" : tous les membres actifs (retour de Cindy — un
-    // événement payant sans équipe précise, ex. une AG ou un loto, concerne
-    // tout le monde).
-    const { data: allPlayers } = await supabase.from("players").select("id").is("archived_at", null);
-    return (allPlayers ?? []).map((p) => p.id);
-  }
-
   // Retour de Cindy du 12/09 (revue du champ "Heure d'impact") : tant que
   // le raccourci "X min avant" est actif (impactMinutesBefore non vide,
   // valeur par défaut "0" ci-dessus), l'heure d'arrivée suit le début
@@ -894,31 +868,13 @@ export default function CreateEventForm({
         }
         collecteId = collecte.id;
 
-        const participantIds = await computePaidParticipantIds(
-          supabase,
-          effectiveTeamId,
-          effectiveTargetTeamIds
-        );
-        if (participantIds.length > 0) {
-          const { error: cotisationsError } = await supabase.from("cotisations").insert(
-            participantIds.map((playerId) => ({
-              player_id: playerId,
-              collecte_id: collecte.id,
-              saison: eventName,
-              prix: amountNum,
-              remise: 0,
-              paiement: 0,
-              statut: null,
-            }))
-          );
-          if (cotisationsError) {
-            setLoading(false);
-            setError(
-              `Événement payant enregistré, mais l'ajout des participants a échoué : ${cotisationsError.message}`
-            );
-            return;
-          }
-        }
+        // Retour de Cindy du 20/09 ("les événements payants ne sont pas
+        // obligatoires... n'ajouter à la collecte que les personnes qui
+        // répondent présent") : plus de remplissage en bloc ici -- tout
+        // événement payant est désormais en inscription libre, une ligne
+        // de cotisation n'apparaît que lorsque le joueur répond PRESENT
+        // (déclencheur sync_paid_event_cotisation_on_rsvp, base de
+        // données), jamais à la création.
         // Liste vide ici : les noms des participants arrivent au prochain
         // rafraîchissement temps réel (cotisations/collectes sont
         // surveillées, voir realtime-sync.tsx).
@@ -977,7 +933,7 @@ export default function CreateEventForm({
       // les groupes", qui laisserait croire à un envoi club entier alors
       // que seules les personnes choisies sont réellement visées.
       const scopeLabel =
-        scopeMode === "profiles" ? "Planning personnel" : team ? teamLabel(team) : "Tous les groupes";
+        scopeMode === "profiles" ? "Planning personnel" : team ? teamLabel(team) : "Tout le club";
       sendEventPush(
         inserted.id,
         `UBAC — ${scopeLabel}`,

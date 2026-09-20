@@ -9,7 +9,6 @@ import {
   Clock,
   ExternalLink,
   Gavel,
-  Link2,
   Pencil,
   Plus,
   Search,
@@ -19,6 +18,7 @@ import {
   Ticket,
   Trash2,
   TrendingUp,
+  Users,
   Wallet,
   X,
 } from "lucide-react";
@@ -50,6 +50,17 @@ const collecteTypeLabels: Record<CollecteType, string> = {
   STAGE: "Stage",
   EVENEMENT: "Événement",
   BOUTIQUE: "Boutique",
+};
+
+// Retour de Cindy du 20/09 ("la carte peut-elle être plus sexy... tout est
+// gris") : une icône + un accent de couleur par type, au lieu d'une carte
+// entièrement en niveaux de gris -- même principe que les pastilles de
+// type d'événement (event-style.ts) ou les tuiles KPI du tableau de bord
+// (space-dashboard-summary.tsx), jamais réinventé, juste appliqué ici.
+const collecteTypeStyle: Record<CollecteType, { icon: typeof Ticket; iconClass: string; iconBgClass: string; barClass: string }> = {
+  STAGE: { icon: Target, iconClass: "text-navy", iconBgClass: "bg-navy/10", barClass: "bg-navy" },
+  EVENEMENT: { icon: Ticket, iconClass: "text-ubac-yellow-dark", iconBgClass: "bg-ubac-yellow/15", barClass: "bg-ubac-yellow" },
+  BOUTIQUE: { icon: Wallet, iconClass: "text-court-green", iconBgClass: "bg-court-green/10", barClass: "bg-court-green" },
 };
 
 // Matches the club's own Statut Club vocabulary exactly: Payé/Payé (-) →
@@ -87,6 +98,23 @@ function computeKpis(list: AdminCotisation[]) {
     totalCollected,
     percentage,
   };
+}
+
+// Retour de Cindy du 20/09 ("les membres... doivent apparaitre dans la
+// carte seulement s'ils cliquent présent") : filtre partagé entre le détail
+// d'une collecte (collecteCotisations) et le compteur affiché sur sa petite
+// carte (visibleCountByCollecteId) -- jamais deux logiques différentes pour
+// la même règle. presentPlayerIds vient de rsvpsByEvent (page.tsx) ; un
+// paiement réel ou un "Offert" reste toujours visible même hors RSVP
+// présent, même garde-fou que le déclencheur
+// sync_paid_event_cotisation_on_rsvp (jamais caché, jamais perdu).
+function visibleCollecteCotisations(collecte: AdminCollecte | undefined, all: AdminCotisation[]) {
+  const list = all.filter((c) => c.collecteId === collecte?.id);
+  if (!collecte?.presentPlayerIds) return list;
+  const presentIds = new Set(collecte.presentPlayerIds);
+  return list.filter(
+    (c) => presentIds.has(c.playerId) || (c.paiement ?? 0) > 0 || c.statut === "OFFERT"
+  );
 }
 
 // One card shape for all seven KPIs — same height, padding and radius, so
@@ -392,9 +420,13 @@ export default function CotisationsManager({
   }, [members, seasonCotisations, currentSeasonLabel]);
 
   const selectedCollecte = collectes.find((c) => c.id === selectedCollecteId) ?? null;
+  // Retour de Cindy du 20/09 ("les membres... doivent apparaitre dans la
+  // carte seulement s'ils cliquent présent") : la liste affichée suit en
+  // direct le RSVP de l'événement lié -- présentPlayerIds vient de
+  // rsvpsByEvent (page.tsx), jamais figé, aucune ligne supprimée en base.
   const collecteCotisations = useMemo(
-    () => cotisations.filter((c) => c.collecteId === selectedCollecteId),
-    [cotisations, selectedCollecteId]
+    () => visibleCollecteCotisations(selectedCollecte ?? undefined, cotisations),
+    [cotisations, selectedCollecte]
   );
 
   // Un mini-résumé (collecté/attendu) par carte, pour qu'on voie d'un coup
@@ -408,6 +440,31 @@ export default function CotisationsManager({
     });
     return map;
   }, [collectes, cotisations]);
+
+  // Retour de Cindy du 20/09 ("aucun participant doit etre relié dans la
+  // carte") : même compteur que collecteCotisations (visibleCollecteCotisations
+  // ci-dessus), affiché sur chaque petite carte pour rester cohérent avec ce
+  // qu'on voit une fois la collecte ouverte -- jamais le nombre brut de
+  // lignes cotisations (qui inclurait les anciens participants en attente
+  // ajoutés en masse avant l'inscription libre).
+  const visibleCountByCollecteId = useMemo(() => {
+    const map = new Map<string, number>();
+    collectes.forEach((c) => {
+      map.set(c.id, visibleCollecteCotisations(c, cotisations).length);
+    });
+    return map;
+  }, [collectes, cotisations]);
+
+  // Retour de Cindy du 20/09 ("total collecté doit etre en haut de page...
+  // ce sera le total collecter de tous les evenement payant") : somme du
+  // "Total collecté" de chaque collecte (kpisByCollecteId ci-dessus, déjà
+  // basé sur TOUS les paiements réels, jamais filtré par présence RSVP) --
+  // visible en tête de l'onglet, avant même d'ouvrir une collecte.
+  const totalCollectedAllCollectes = useMemo(
+    () =>
+      Array.from(kpisByCollecteId.values()).reduce((sum, k) => sum + k.totalCollected, 0),
+    [kpisByCollecteId]
+  );
 
   const availableMembers = useMemo(() => {
     const existingIds = new Set(collecteCotisations.map((c) => c.playerId));
@@ -615,6 +672,15 @@ export default function CotisationsManager({
 
       {shownTab === "collectes" && (
         <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-1 gap-3 sm:max-w-xs">
+            <KpiCard
+              icon={Wallet}
+              iconClass="text-amber-700"
+              value={totalCollectedAllCollectes}
+              kind="amount"
+              label="Total collecté"
+            />
+          </div>
           {/* Retour de Cindy du 29/08 ("un truc ne va pas niveau visibilité
               et clarté") : de simples pastilles de nom ne montraient ni le
               lien vers l'événement du calendrier, ni un moyen de supprimer
@@ -629,20 +695,37 @@ export default function CotisationsManager({
             {collectes.map((c) => {
               const kpis = kpisByCollecteId.get(c.id);
               const isOrphaned = c.type === "EVENEMENT" && !c.eventId;
+              const typeStyle = collecteTypeStyle[c.type];
+              const TypeIcon = typeStyle.icon;
               return (
                 <div
                   key={c.id}
                   onClick={() => setSelectedCollecteId(c.id)}
-                  className={`flex cursor-pointer flex-col gap-2 rounded-2xl border p-4 text-left shadow-sm transition-colors ${
+                  className={`flex cursor-pointer flex-col gap-2.5 rounded-2xl border border-l-4 p-4 text-left shadow-sm transition-colors ${
                     selectedCollecteId === c.id
-                      ? "border-navy bg-blue-50/40"
-                      : "border-zinc-200 bg-white hover:bg-zinc-50"
+                      ? "border-navy border-l-navy bg-blue-50/40"
+                      : `border-zinc-200 bg-white hover:bg-zinc-50 ${
+                          c.type === "STAGE"
+                            ? "border-l-navy"
+                            : c.type === "BOUTIQUE"
+                              ? "border-l-court-green"
+                              : "border-l-ubac-yellow"
+                        }`
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div className="flex min-w-0 flex-col">
-                      <span className="truncate font-semibold text-zinc-900">{c.name}</span>
-                      <span className="text-xs text-zinc-500">{collecteTypeLabels[c.type]}</span>
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <span
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${typeStyle.iconBgClass}`}
+                      >
+                        <TypeIcon className={`h-4 w-4 ${typeStyle.iconClass}`} />
+                      </span>
+                      <div className="flex min-w-0 flex-col">
+                        <span className="truncate font-semibold text-zinc-900">{c.name}</span>
+                        <span className={`text-xs font-medium ${typeStyle.iconClass}`}>
+                          {collecteTypeLabels[c.type]}
+                        </span>
+                      </div>
                     </div>
                     <button
                       type="button"
@@ -666,7 +749,7 @@ export default function CotisationsManager({
                       "Événement supprimé". */}
                   {(c.eventStartTime || c.eventDate) && (
                     <span className="flex items-center gap-1 text-xs text-zinc-500">
-                      <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+                      <CalendarDays className="h-3.5 w-3.5 shrink-0 text-navy" />
                       {new Date(c.eventStartTime ?? c.eventDate ?? "").toLocaleDateString(
                         "fr-FR",
                         { day: "numeric", month: "short", year: "numeric" }
@@ -679,14 +762,117 @@ export default function CotisationsManager({
                       Événement supprimé
                     </span>
                   )}
+                  {/* Retour de Cindy du 20/09 ("aucun participants doit etre
+                      relié dans la carte") : même compteur que la liste du
+                      détail (visibleCollecteCotisations), présent uniquement
+                      si un événement est lié -- une collecte Stage/Boutique
+                      sans RSVP possible n'a pas ce filtre, donc pas ce
+                      compteur (son nombre de lignes est déjà fiable tel quel). */}
+                  {c.eventId && (
+                    <span className="flex items-center gap-1 text-xs text-zinc-500">
+                      <Users className="h-3.5 w-3.5 shrink-0" />
+                      {visibleCountByCollecteId.get(c.id) ?? 0} participant
+                      {(visibleCountByCollecteId.get(c.id) ?? 0) > 1 ? "s" : ""}
+                    </span>
+                  )}
+                  {/* Retour de Cindy du 20/09 ("le lien de paiement hello
+                      asso... doit etre visible dans la carte et pas au
+                      milieu de la page" puis "supprimer le lien hello asso
+                      qui est tout seul dans une carte") : lecture ET
+                      édition directement ici, plus de bloc séparé au milieu
+                      de la page -- stopPropagation partout pour ne pas
+                      interférer avec la sélection de la collecte au clic
+                      sur la carte. Auto-rempli à la création de l'événement
+                      payant (create-event-form.tsx, champ "Lien HelloAsso")
+                      -- l'édition ici ne sert qu'à corriger ou compléter. */}
+                  {selectedCollecteId === c.id && editingLink ? (
+                    <div
+                      className="flex flex-col gap-1.5"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="url"
+                        autoFocus
+                        placeholder="https://www.helloasso.com/..."
+                        value={linkDraft}
+                        onChange={(e) => setLinkDraft(e.target.value)}
+                        className="min-w-0 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs"
+                      />
+                      <div className="flex shrink-0 gap-3">
+                        <button
+                          onClick={saveLink}
+                          disabled={savingLink}
+                          className="rounded-full bg-ubac-yellow px-3 py-1 text-xs font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+                        >
+                          {savingLink ? "Enregistrement..." : "Enregistrer"}
+                        </button>
+                        <button
+                          onClick={() => setEditingLink(false)}
+                          className="text-xs text-zinc-500 hover:underline"
+                        >
+                          Annuler
+                        </button>
+                      </div>
+                    </div>
+                  ) : c.paymentLink ? (
+                    <div className="flex w-fit items-center gap-1">
+                      <a
+                        href={c.paymentLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex w-fit items-center gap-1.5 truncate rounded-full border border-navy/20 bg-navy/5 px-2.5 py-1 text-xs font-medium text-navy hover:bg-navy/10"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                        Lien de paiement
+                      </a>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedCollecteId(c.id);
+                          setLinkDraft(c.paymentLink ?? "");
+                          setEditingLink(true);
+                        }}
+                        title="Modifier le lien"
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedCollecteId(c.id);
+                        setLinkDraft("");
+                        setEditingLink(true);
+                      }}
+                      className="flex w-fit items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Ajouter un lien de paiement
+                    </button>
+                  )}
                   {kpis && kpis.total > 0 && (
-                    <div className="flex items-baseline justify-between text-sm">
-                      <span className="font-semibold text-zinc-900">
-                        {formatAmount(kpis.totalCollected)}
-                      </span>
-                      <span className="text-xs text-zinc-500">
-                        sur {formatAmount(kpis.totalDue)} attendu
-                      </span>
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-baseline justify-between text-sm">
+                        <span className="font-bold text-court-green">
+                          {formatAmount(kpis.totalCollected)}
+                        </span>
+                        <span className="text-xs text-zinc-500">
+                          sur {formatAmount(kpis.totalDue)} attendu
+                        </span>
+                      </div>
+                      {/* Barre de progression (retour de Cindy du 20/09) :
+                          même pourcentage déjà calculé pour le grand
+                          KpiHeader (kpis.percentage, computeKpis plus haut)
+                          -- juste réutilisé ici en version compacte. */}
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
+                        <div
+                          className={`h-full rounded-full ${typeStyle.barClass} transition-all`}
+                          style={{ width: `${Math.min(100, kpis.percentage)}%` }}
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
@@ -764,134 +950,74 @@ export default function CotisationsManager({
 
           {selectedCollecte ? (
             <div className="flex flex-col gap-4">
-              <KpiHeader cotisations={collecteCotisations} />
-
-              {/* Lien HelloAsso (retour de Cindy du 2026-08-25) : affiché
-                  ici même pour une collecte non liée à un événement (ex.
-                  Stage) — un lien de paiement externe peut être utile pour
-                  n'importe quel type de collecte, pas seulement un
-                  "Événement". Éditable après coup si absent ou à corriger. */}
-              <div className="flex flex-col gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
-                <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                  <Link2 className="h-3.5 w-3.5 text-navy" />
-                  Lien de paiement (HelloAsso...)
-                </p>
-                {editingLink ? (
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <input
-                      type="url"
-                      autoFocus
-                      placeholder="https://www.helloasso.com/..."
-                      value={linkDraft}
-                      onChange={(e) => setLinkDraft(e.target.value)}
-                      className="min-w-0 flex-1 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
-                    />
-                    <div className="flex shrink-0 gap-2">
-                      <button
-                        onClick={saveLink}
-                        disabled={savingLink}
-                        className="rounded-full bg-ubac-yellow px-3.5 py-1.5 text-xs font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
-                      >
-                        {savingLink ? "Enregistrement..." : "Enregistrer"}
-                      </button>
-                      <button
-                        onClick={() => setEditingLink(false)}
-                        className="text-xs text-zinc-500 hover:underline"
-                      >
-                        Annuler
-                      </button>
-                    </div>
-                  </div>
-                ) : selectedCollecte.paymentLink ? (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <a
-                      href={selectedCollecte.paymentLink}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex min-w-0 items-center gap-1.5 truncate text-sm text-navy hover:underline"
-                    >
-                      <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                      <span className="truncate">{selectedCollecte.paymentLink}</span>
-                    </a>
-                    <button
-                      onClick={() => {
-                        setLinkDraft(selectedCollecte.paymentLink ?? "");
-                        setEditingLink(true);
-                      }}
-                      title="Modifier le lien"
-                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ) : (
+              {/* Retour de Cindy du 20/09 ("total collecté est deux fois
+                  présent, je ne veux que celui du haut") : le "Total
+                  collecté" agrégé en tête de page (totalCollectedAllCollectes
+                  plus haut) suffit -- plus de doublon ici au niveau du
+                  détail d'une collecte. */}
+              {/* Retour de Cindy du 20/09 ("les participants seront ajoutés
+                  automatiquement... quand ils tapent présent") : pour une
+                  collecte "Événement" avec RSVP actif (presentPlayerIds non
+                  null), l'ajout manuel n'a plus lieu d'être -- il reste
+                  disponible pour Stage/Boutique (pas de RSVP possible) et
+                  pour un événement orphelin ou hors fenêtre RSVP, seuls cas
+                  où l'inscription automatique ne peut pas s'appliquer. */}
+              {selectedCollecte.presentPlayerIds === null && (
+                <div className="flex flex-col gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
                   <button
-                    onClick={() => {
-                      setLinkDraft("");
-                      setEditingLink(true);
-                    }}
-                    className="flex w-fit items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                    onClick={() => setAddingParticipants((v) => !v)}
+                    className="flex w-fit items-center gap-1.5 rounded-full bg-ubac-yellow px-3 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark"
                   >
                     <Plus className="h-3.5 w-3.5" />
-                    Ajouter un lien de paiement
+                    Ajouter des participants
                   </button>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
-                <button
-                  onClick={() => setAddingParticipants((v) => !v)}
-                  className="flex w-fit items-center gap-1.5 rounded-full bg-ubac-yellow px-3 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Ajouter des participants
-                </button>
-                {addingParticipants && (
-                  <div className="flex flex-col gap-2">
-                    <div className="relative">
-                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-                      <input
-                        value={participantSearch}
-                        onChange={(e) => setParticipantSearch(e.target.value)}
-                        placeholder="Rechercher un membre..."
-                        className="w-full rounded-full border border-zinc-200 bg-white py-1.5 pl-9 pr-3 text-sm focus:border-ubac-yellow focus:outline-none"
-                      />
+                  {addingParticipants && (
+                    <div className="flex flex-col gap-2">
+                      <div className="relative">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                        <input
+                          value={participantSearch}
+                          onChange={(e) => setParticipantSearch(e.target.value)}
+                          placeholder="Rechercher un membre..."
+                          className="w-full rounded-full border border-zinc-200 bg-white py-1.5 pl-9 pr-3 text-sm focus:border-ubac-yellow focus:outline-none"
+                        />
+                      </div>
+                      <ul className="flex max-h-56 flex-col gap-0.5 overflow-y-auto rounded-lg bg-zinc-50 p-2">
+                        {availableMembers.map((m) => (
+                          <li key={m.id}>
+                            <label className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-white">
+                              <input
+                                type="checkbox"
+                                checked={selectedNewIds.has(m.id)}
+                                onChange={() => toggleNewParticipant(m.id)}
+                                className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
+                              />
+                              {formatPersonName(m.firstName, m.lastName)}
+                              {m.category ? (
+                                <span className="text-xs text-zinc-400">· {m.category}</span>
+                              ) : null}
+                            </label>
+                          </li>
+                        ))}
+                        {availableMembers.length === 0 && (
+                          <li className="px-2 py-1.5 text-sm text-zinc-400">
+                            Tous les membres sont déjà dans cette collecte.
+                          </li>
+                        )}
+                      </ul>
+                      <button
+                        onClick={addParticipants}
+                        disabled={addingSaving || selectedNewIds.size === 0}
+                        className="w-fit rounded-full bg-ubac-yellow px-3.5 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+                      >
+                        {addingSaving
+                          ? "Ajout..."
+                          : `Ajouter (${selectedNewIds.size})`}
+                      </button>
                     </div>
-                    <ul className="flex max-h-56 flex-col gap-0.5 overflow-y-auto rounded-lg bg-zinc-50 p-2">
-                      {availableMembers.map((m) => (
-                        <li key={m.id}>
-                          <label className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-white">
-                            <input
-                              type="checkbox"
-                              checked={selectedNewIds.has(m.id)}
-                              onChange={() => toggleNewParticipant(m.id)}
-                              className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
-                            />
-                            {formatPersonName(m.firstName, m.lastName)}
-                            {m.category ? (
-                              <span className="text-xs text-zinc-400">· {m.category}</span>
-                            ) : null}
-                          </label>
-                        </li>
-                      ))}
-                      {availableMembers.length === 0 && (
-                        <li className="px-2 py-1.5 text-sm text-zinc-400">
-                          Tous les membres sont déjà dans cette collecte.
-                        </li>
-                      )}
-                    </ul>
-                    <button
-                      onClick={addParticipants}
-                      disabled={addingSaving || selectedNewIds.size === 0}
-                      className="w-fit rounded-full bg-ubac-yellow px-3.5 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
-                    >
-                      {addingSaving
-                        ? "Ajout..."
-                        : `Ajouter (${selectedNewIds.size})`}
-                    </button>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
 
               <CotisationParticipantsTable
                 cotisations={collecteCotisations}

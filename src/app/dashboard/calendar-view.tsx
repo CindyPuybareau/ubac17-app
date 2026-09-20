@@ -31,6 +31,7 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { formatAmount } from "./cotisation-shared";
 import { buildGmailComposeLink } from "@/lib/email";
 import EmptyState from "./empty-state";
 import { formatFirstName, formatLastName, sortByLastName } from "@/lib/names";
@@ -1488,6 +1489,17 @@ export default function CalendarView({
     const rsvpVisiblePlayers = canManage
       ? respondingPlayers.filter((p) => p.id === selfPlayerId)
       : respondingPlayers;
+    // Retour de Cindy du 20/09 ("le lien HelloAsso même si je n'ai pas
+    // cliqué sur présent... le prix pas visible") : les événements payants
+    // sont désormais en inscription libre (déclencheur
+    // sync_paid_event_cotisation_on_rsvp, base de données) -- le bouton
+    // "Payer" n'a de sens que pour qui est déjà inscrit (a répondu
+    // présent, donc déjà dans event.paidParticipants) ; les autres ne
+    // voient que le tarif, pour savoir combien ça coûte SI ils répondent
+    // présent, sans lien de paiement à côté.
+    const myPaidParticipation = event.isPaid
+      ? rsvpVisiblePlayers.some((p) => event.paidParticipants?.some((pp) => pp.id === p.id))
+      : false;
     // Différenciation visuelle par nature d'événement (direction
     // artistique validée le 2026-08-23) : un match officiel doit peser un
     // peu plus qu'un entraînement ordinaire, un tournoi doit sauter aux
@@ -1677,12 +1689,27 @@ export default function CalendarView({
           </div>
         )}
 
-        {/* Bouton "Payer" (retour de Cindy du 2026-08-25) : accessible à
-            qui voit la carte (Bureau/Coach/Famille — jamais côté Enfant,
-            qui n'a que le badge "Payant" ci-dessus), pas seulement à
-            canManageEvent — chaque famille paie elle-même, sans envoi
-            groupé à faire à la main. */}
-        {event.isPaid && event.paymentLink && (
+        {/* Retour de Cindy du 20/09 ("le prix pas visible... inscription
+            libre") : tarif toujours visible pour qui voit la carte, à
+            titre d'information -- personne n'est engagé tant qu'il n'a pas
+            répondu présent. */}
+        {event.isPaid && event.paidAmount != null && (
+          <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-800">
+            <Euro className="h-3.5 w-3.5 shrink-0" />
+            Tarif : {formatAmount(event.paidAmount)}
+          </p>
+        )}
+
+        {/* Bouton "Payer" (retour de Cindy du 2026-08-25, restreint le
+            20/09 à l'inscription libre) : accessible à qui voit la carte
+            (Bureau/Coach/Famille — jamais côté Enfant, qui n'a que le
+            badge "Payant" ci-dessus), pas seulement à canManageEvent —
+            chaque famille paie elle-même, sans envoi groupé à faire à la
+            main. N'apparaît plus que pour qui a déjà répondu présent (donc
+            déjà dans la collecte) -- avant ça, seul le tarif ci-dessus est
+            montré, jamais un lien de paiement pour quelqu'un qui n'a pas
+            encore confirmé sa venue. */}
+        {event.isPaid && event.paymentLink && myPaidParticipation && (
           <a
             href={event.paymentLink}
             target="_blank"

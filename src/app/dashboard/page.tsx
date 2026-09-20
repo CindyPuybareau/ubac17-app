@@ -288,6 +288,13 @@ export type AdminCollecte = {
   // direct vers events et redevient donc null dans ces deux cas.
   eventDate: string | null;
   paymentLink: string | null;
+  // Retour de Cindy du 20/09 ("les membres... doivent apparaitre dans la
+  // carte concerné seulement s'ils cliquent présent") : ids des joueurs
+  // actuellement "présent" au RSVP de l'événement lié -- lecture seule,
+  // dérivé de rsvpsByEvent (déjà chargé pour tout le tableau de bord, pas
+  // de requête en plus). null pour une collecte sans événement (Stage,
+  // Boutique) : pas de filtrage applicable dans ce cas.
+  presentPlayerIds: string[] | null;
 };
 
 // Default season price per team category (Bureau-editable, see
@@ -648,7 +655,7 @@ function resolveEventTeamName<T extends { name: string | null }>(
       .filter((n): n is string => Boolean(n));
     return names.length > 0 ? names.join(", ") : "Équipes sélectionnées";
   }
-  return "Tous les groupes";
+  return "Tout le club";
 }
 
 // Retour de Cindy du 2026-08-25 ("Créer un événement" -> "Événement
@@ -1952,6 +1959,7 @@ export default async function DashboardPage({
     // calculs synchrones. Même correctif que coachPromise (Stage D),
     // creusé suite au retour de Cindy sur la lenteur de connexion.
     const upcomingEventIds = adminEventsData.map((e) => e.id);
+    const upcomingEventIdSet = new Set(upcomingEventIds);
     const adminNextEventRsvpPromise =
       adminNextEventIds.length > 0
         ? supabase
@@ -2327,6 +2335,26 @@ export default async function DashboardPage({
       // pas un tableau, contrairement à resolvePaidInfo plus haut qui lit
       // la relation dans l'autre sens.
       const event = c.events as unknown as { start_time: string } | null;
+      // null = pas de filtrage possible (pas d'événement lié, ou événement
+      // hors de la fenêtre déjà chargée pour rsvpsByEvent -- voir
+      // upcomingEventIdSet) : mieux vaut tout montrer que de cacher à tort
+      // des participants réels par manque de données RSVP.
+      const eventRsvps = c.event_id ? rsvpsByEvent.get(c.event_id) : undefined;
+      // LATE ("retard annoncé") compte comme "vient quand même", même
+      // convention que partout ailleurs dans l'app (attendance-badges.tsx,
+      // coach-organisation.tsx, present/late plus haut dans ce fichier) et
+      // que le déclencheur sync_paid_event_cotisation_on_rsvp (base de
+      // données) -- oublié une première fois le 20/09, corrigé ici pour
+      // rester cohérent des deux côtés.
+      const presentPlayerIds = !c.event_id
+        ? null
+        : eventRsvps
+          ? Array.from(eventRsvps.entries())
+              .filter(([, r]) => r.status === "PRESENT" || r.status === "LATE")
+              .map(([playerId]) => playerId)
+          : upcomingEventIdSet.has(c.event_id)
+            ? []
+            : null;
       return {
         id: c.id,
         name: c.name,
@@ -2336,6 +2364,7 @@ export default async function DashboardPage({
         eventStartTime: event?.start_time ?? null,
         eventDate: c.event_date ?? null,
         paymentLink: c.payment_link ?? null,
+        presentPlayerIds,
       };
     });
 
