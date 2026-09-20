@@ -1668,7 +1668,6 @@ export default async function DashboardPage({
       sponsorsRes,
       penalitesRes,
       benevolesRes,
-      eventBenevoleInvitesRes,
       accessProfilesRes,
     ] = await runBatched(
       [
@@ -1798,12 +1797,6 @@ export default async function DashboardPage({
               "id, first_name, last_name, phone, email, notes, access_token, archived_at, access_profile_id, benevole_whatsapp_groups(whatsapp_group_id)"
             )
             .order("last_name"),
-        // Retour de Cindy du 13/09 ("les bénévoles invités peuvent être
-        // supprimés partout") : plus aucun code ne consomme
-        // eventBenevoleInvitesRes -- gardé en no-op plutôt que retiré du
-        // tableau pour ne jamais décaler la position des résultats
-        // suivants (destructuration positionnelle ci-dessus).
-        () => Promise.resolve({ data: [] as unknown[], error: null }),
         // Profils d'accès sur-mesure (retour de Cindy du 05/09) : liste des
         // profils et de leurs briques, pour l'écran de gestion et pour
         // remplir le sélecteur "Étendue de l'accès" dans la fiche membre.
@@ -1845,7 +1838,6 @@ export default async function DashboardPage({
       sponsorsRes,
       penalitesRes,
       benevolesRes,
-      eventBenevoleInvitesRes,
       accessProfilesRes,
     });
 
@@ -4128,25 +4120,73 @@ export default async function DashboardPage({
           // Retour de Cindy du 16/09 (dédoublonnage Bureau<->Famille, même
           // schéma que Coach juste plus haut) : eventIds ⊆ upcomingEventIds
           // quand bureauDataLoaded, adminVolunteerNeedsByEventId déjà résolu
-          // couvre donc déjà ces événements.
-          () =>
-            bureauDataLoaded
-              ? Promise.resolve(
-                  Object.fromEntries(
-                    eventIds.map((id) => [id, adminVolunteerNeedsByEventId[id] ?? []])
-                  )
+          // couvre donc déjà ces événements. Retour de Cindy du 20/09
+          // ("réduire le nombre de requêtes") : ce dédoublonnage s'arrêtait
+          // à Bureau, jamais étendu à Coach alors que
+          // coachVolunteerNeedsByEventId (déjà résolu juste au-dessus, même
+          // fichier) couvre le même recouvrement d'événements que pour
+          // getEventTasksByEventId/coachOrganisationTasks quelques lignes
+          // plus haut -- même patron "uncoveredEventIds" repris ici.
+          () => {
+            if (bureauDataLoaded) {
+              return Promise.resolve(
+                Object.fromEntries(
+                  eventIds.map((id) => [id, adminVolunteerNeedsByEventId[id] ?? []])
                 )
-              : getVolunteerNeedsByEventId(supabase, eventIds, dbLimit),
+              );
+            }
+            const uncoveredEventIds = eventIds.filter(
+              (id) => !(id in coachVolunteerNeedsByEventId)
+            );
+            if (uncoveredEventIds.length === 0) {
+              return Promise.resolve(
+                Object.fromEntries(
+                  eventIds.map((id) => [id, coachVolunteerNeedsByEventId[id] ?? []])
+                )
+              );
+            }
+            return getVolunteerNeedsByEventId(supabase, uncoveredEventIds, dbLimit).then(
+              (fetched) => {
+                const merged = { ...fetched };
+                eventIds.forEach((id) => {
+                  if (id in coachVolunteerNeedsByEventId) merged[id] = coachVolunteerNeedsByEventId[id];
+                });
+                return merged;
+              }
+            );
+          },
           // "Organisation match à domicile" (retour de Cindy du 17/09) :
-          // même dédoublonnage Bureau<->Famille que juste au-dessus.
-          () =>
-            bureauDataLoaded
-              ? Promise.resolve(
-                  Object.fromEntries(
-                    eventIds.map((id) => [id, adminMatchOfficialRolesByEventId[id] ?? []])
-                  )
+          // même dédoublonnage Bureau<->Famille que juste au-dessus, étendu
+          // à Coach le 20/09 pour la même raison.
+          () => {
+            if (bureauDataLoaded) {
+              return Promise.resolve(
+                Object.fromEntries(
+                  eventIds.map((id) => [id, adminMatchOfficialRolesByEventId[id] ?? []])
                 )
-              : getMatchOfficialRolesByEventId(supabase, eventIds, dbLimit),
+              );
+            }
+            const uncoveredEventIds = eventIds.filter(
+              (id) => !(id in coachMatchOfficialRolesByEventId)
+            );
+            if (uncoveredEventIds.length === 0) {
+              return Promise.resolve(
+                Object.fromEntries(
+                  eventIds.map((id) => [id, coachMatchOfficialRolesByEventId[id] ?? []])
+                )
+              );
+            }
+            return getMatchOfficialRolesByEventId(supabase, uncoveredEventIds, dbLimit).then(
+              (fetched) => {
+                const merged = { ...fetched };
+                eventIds.forEach((id) => {
+                  if (id in coachMatchOfficialRolesByEventId)
+                    merged[id] = coachMatchOfficialRolesByEventId[id];
+                });
+                return merged;
+              }
+            );
+          },
         ],
         // dbLimit partagé (voir lib/batch.ts / le bloc Bureau plus haut).
         dbLimit
