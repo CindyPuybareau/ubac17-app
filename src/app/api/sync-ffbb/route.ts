@@ -94,44 +94,87 @@ export async function POST(request: Request) {
   let updated = 0;
   let skipped = 0;
 
-  for (const match of matches) {
-    if (!match.startTime) {
-      skipped += 1;
-      continue;
+  // Retour de Cindy du 20/09 ("une synchro FFBB fait tout planter") : cette
+  // boucle faisait jusqu'ici 1 SELECT + 1 INSERT/UPDATE PAR match, en
+  // séquence -- jusqu'à une soixantaine d'allers-retours base de données
+  // pour une seule synchro d'équipe, chacun gardant une connexion ouverte
+  // le temps de sa réponse. Combiné à un double-clic sur "Synchroniser"
+  // après une "erreur" (réflexe naturel) et au trafic normal du tableau de
+  // bord (~90 requêtes par chargement), ça suffit à saturer le pool de
+  // connexions limité du palier Micro. Remplacé par : un seul SELECT groupé
+  // (tous les external_uid de cette synchro en une requête), un seul INSERT
+  // groupé pour tous les nouveaux matchs, et une UPDATE par match SEULEMENT
+  // s'il a vraiment changé (le cas courant d'une re-synchro sans rien de
+  // neuf ne fait plus AUCUN aller-retour d'écriture).
+  const candidates = matches
+    .filter((m) => {
+      if (!m.startTime) {
+        skipped += 1;
+        return false;
+      }
+      return true;
+    })
+    .map((m) => ({
+      externalUid: `ffbb-${m.matchNumber}`,
+      title: m.opponent ? `${m.isHome ? "vs" : "@"} ${m.opponent}` : `Match ${m.journee}`,
+      location: m.isHome ? "Domicile" : "Extérieur",
+      startTime: m.startTime as string,
+    }));
+
+  if (candidates.length > 0) {
+    const { data: existingRows, error: existingError } = await supabase
+      .from("events")
+      .select("id, external_uid, title, location, start_time")
+      .eq("team_id", teamId)
+      .in(
+        "external_uid",
+        candidates.map((c) => c.externalUid)
+      );
+
+    if (existingError) {
+      console.error("[sync-ffbb] select events existants échoué:", existingError);
+      return NextResponse.json({ error: "La synchronisation a échoué." }, { status: 500 });
     }
 
-    const externalUid = `ffbb-${match.matchNumber}`;
-    const title = match.opponent
-      ? `${match.isHome ? "vs" : "@"} ${match.opponent}`
-      : `Match ${match.journee}`;
+    const existingByUid = new Map((existingRows ?? []).map((r) => [r.external_uid, r]));
 
-    const { data: existing } = await supabase
-      .from("events")
-      .select("id")
-      .eq("team_id", teamId)
-      .eq("external_uid", externalUid)
-      .maybeSingle();
+    const toInsert = candidates.filter((c) => !existingByUid.has(c.externalUid));
+    const toUpdate = candidates.filter((c) => {
+      const existing = existingByUid.get(c.externalUid);
+      if (!existing) return false;
+      return (
+        existing.title !== c.title ||
+        existing.location !== c.location ||
+        existing.start_time !== c.startTime
+      );
+    });
 
-    const payload = {
-      title,
-      event_type: "MATCH" as const,
-      location: match.isHome ? "Domicile" : "Extérieur",
-      start_time: match.startTime,
-    };
+    if (toInsert.length > 0) {
+      const { error } = await supabase.from("events").insert(
+        toInsert.map((c) => ({
+          title: c.title,
+          event_type: "MATCH" as const,
+          location: c.location,
+          start_time: c.startTime,
+          team_id: teamId,
+          external_uid: c.externalUid,
+        }))
+      );
+      if (!error) inserted += toInsert.length;
+    }
 
-    if (existing) {
+    for (const c of toUpdate) {
+      const existing = existingByUid.get(c.externalUid)!;
       const { error } = await supabase
         .from("events")
-        .update(payload)
+        .update({
+          title: c.title,
+          event_type: "MATCH" as const,
+          location: c.location,
+          start_time: c.startTime,
+        })
         .eq("id", existing.id);
       if (!error) updated += 1;
-    } else {
-      const { error } = await supabase.from("events").insert({
-        ...payload,
-        team_id: teamId,
-        external_uid: externalUid,
-      });
-      if (!error) inserted += 1;
     }
   }
 
