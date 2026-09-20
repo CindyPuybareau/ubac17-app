@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { resizeImageForTeamPhoto } from "@/lib/image-resize";
 import AnimatedNumber from "./animated-number";
 import { DayEventCard, type WeekStripEvent } from "./week-strip-banner";
+import TeamSelectorPills from "./team-selector-pills";
 import type { SpaceDashboardSummary as SpaceDashboardSummaryData } from "@/lib/space-dashboard";
 
 type MatchFilter = "official" | "friendly" | "all";
@@ -29,26 +30,50 @@ export default function SpaceDashboardSummary({
   canManagePhoto: boolean;
 }) {
   const [filter, setFilter] = useState<MatchFilter>("official");
-  const [photoUrl, setPhotoUrl] = useState(summary.photoUrl);
+  // Retour de Cindy du 20/09 ("mes deux enfants sont mélangés... un coach
+  // qui coache plusieurs équipes, il lui faut des données séparées pour
+  // chaque équipe") : summary.byTeam (space-dashboard.ts) porte une entrée
+  // par équipe dès qu'il y en a plusieurs -- jamais de vue "Toutes"
+  // fusionnée (retour explicite de Cindy), une seule équipe affichée à la
+  // fois via ce sélecteur, la première par défaut. byTeam reste vide pour
+  // le Bureau (club entier) et pour une seule équipe : dans ces deux cas,
+  // hasMultipleTeams est faux et tout se comporte exactement comme avant.
+  const hasMultipleTeams = summary.byTeam.length > 1;
+  const [selectedTeamId, setSelectedTeamId] = useState(summary.byTeam[0]?.teamId);
+  const activeTeam = hasMultipleTeams
+    ? (summary.byTeam.find((t) => t.teamId === selectedTeamId) ?? summary.byTeam[0])
+    : null;
+  const effectiveTeamId = activeTeam ? activeTeam.teamId : summary.singleTeamId;
+  const effectivePlayerCount = activeTeam ? activeTeam.playerCount : summary.playerCount;
+  const effectiveOfficialStats = activeTeam ? activeTeam.official : summary.official;
+  const effectiveFriendlyStats = activeTeam ? activeTeam.friendly : summary.friendly;
+  const effectiveBasePhotoUrl = activeTeam ? activeTeam.photoUrl : summary.photoUrl;
+  // Photo envoyée pendant cette visite, par équipe -- remplace l'ancien
+  // état unique (photoUrl) devenu insuffisant dès qu'on peut changer
+  // d'équipe affichée sans recharger la page : sans cette clé par équipe,
+  // la photo tout juste envoyée pour l'équipe A "collait" aussi à l'équipe
+  // B après un changement de pastille.
+  const [uploadedPhotoByTeam, setUploadedPhotoByTeam] = useState<Record<string, string>>({});
+  const photoUrl = effectiveTeamId ? (uploadedPhotoByTeam[effectiveTeamId] ?? effectiveBasePhotoUrl) : null;
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const stats =
     filter === "official"
-      ? summary.official
+      ? effectiveOfficialStats
       : filter === "friendly"
-        ? summary.friendly
+        ? effectiveFriendlyStats
         : {
-            played: summary.official.played + summary.friendly.played,
-            points: summary.official.points + summary.friendly.points,
-            won: summary.official.won + summary.friendly.won,
+            played: effectiveOfficialStats.played + effectiveFriendlyStats.played,
+            points: effectiveOfficialStats.points + effectiveFriendlyStats.points,
+            won: effectiveOfficialStats.won + effectiveFriendlyStats.won,
           };
 
   async function onPhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (!file || !summary.singleTeamId) return;
+    if (!file || !effectiveTeamId) return;
     if (!file.type.startsWith("image/")) {
       setUploadError("Choisis une image.");
       return;
@@ -58,7 +83,7 @@ export default function SpaceDashboardSummary({
     try {
       const { blob, ext } = await resizeImageForTeamPhoto(file);
       const supabase = createClient();
-      const path = `${summary.singleTeamId}/photo.${ext}`;
+      const path = `${effectiveTeamId}/photo.${ext}`;
       const { error: uploadErr } = await supabase.storage
         .from("team-photos")
         .upload(path, blob, { upsert: true, cacheControl: "3600", contentType: blob.type || file.type });
@@ -71,12 +96,12 @@ export default function SpaceDashboardSummary({
       const { error: updateErr } = await supabase
         .from("teams")
         .update({ photo_url: bustedUrl })
-        .eq("id", summary.singleTeamId);
+        .eq("id", effectiveTeamId);
       if (updateErr) {
         setUploadError("Enregistrement impossible, réessaie.");
         return;
       }
-      setPhotoUrl(bustedUrl);
+      setUploadedPhotoByTeam((prev) => ({ ...prev, [effectiveTeamId]: bustedUrl }));
     } catch {
       setUploadError("Image illisible, réessaie avec une autre photo.");
     } finally {
@@ -97,7 +122,15 @@ export default function SpaceDashboardSummary({
   // visualiser") : summary.nextEvents porte déjà TOUS les événements du
   // jour le plus proche (space-dashboard.ts) -- une carte par événement,
   // jamais une seule tronquée.
-  const nextEventsForCards: WeekStripEvent[] = summary.nextEvents.map((e) => ({
+  // Retour de Cindy du 20/09 ("je n'ai pas les prochains événements des
+  // U13M ni des U13M-1") : chaque entrée de summary.byTeam porte déjà SES
+  // PROPRES prochains événements (son propre jour le plus proche à elle,
+  // voir space-dashboard.ts) -- jamais un filtre après coup sur la liste
+  // partagée summary.nextEvents, qui ne couvre que le jour de l'équipe
+  // globalement la plus proche et aurait laissé les autres équipes vides
+  // dès que leur prochain événement tombait un autre jour.
+  const nextEventsSource = activeTeam ? activeTeam.nextEvents : summary.nextEvents;
+  const nextEventsForCards: WeekStripEvent[] = nextEventsSource.map((e) => ({
     id: e.id,
     title: e.title,
     eventType: e.eventType,
@@ -155,6 +188,21 @@ export default function SpaceDashboardSummary({
         Saison {summary.seasonLabel}
       </span>
 
+      {/* Retour de Cindy du 20/09 ("mes deux enfants sont mélangés...
+          données séparées pour chaque équipe") : même sélecteur par
+          pastilles que "Mes Équipes"/"Résultats" (team-selector-pills.tsx)
+          -- se cache déjà tout seul s'il n'y a qu'une équipe/qu'un enfant
+          (voir son garde-fou interne, teams.length <= 1). Jamais de
+          pastille "Toutes" fusionnée (retour explicite de Cindy) : une
+          seule équipe affichée à la fois, la première par défaut. */}
+      {hasMultipleTeams && (
+        <TeamSelectorPills
+          teams={summary.byTeam.map((t) => ({ id: t.teamId, name: t.teamName, category: t.category }))}
+          activeId={activeTeam?.teamId}
+          onSelect={setSelectedTeamId}
+        />
+      )}
+
       {/* Retour de Cindy du 13/09 ("statistique matchs amicaux aussi...
           onglet déroulant pour pouvoir choisir") : 3 positions plutôt
           qu'un simple on/off, "Tous" cumule les deux -- même style de
@@ -191,7 +239,7 @@ export default function SpaceDashboardSummary({
           de recadrage sur une photo de groupe déjà large. */}
       <div className="flex flex-col gap-3 sm:flex-row">
         <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden rounded-2xl border border-zinc-100 bg-navy shadow-sm sm:w-[58%]">
-          {summary.singleTeamId && photoUrl ? (
+          {effectiveTeamId && photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={photoUrl} alt="" className="h-full w-full object-cover" />
           ) : (
@@ -204,7 +252,7 @@ export default function SpaceDashboardSummary({
               transparent... sans jamais recouvrir de visages") -- jamais
               au centre d'une photo de groupe, contrairement au repli
               ci-dessus (aucune photo, rien à recouvrir). */}
-          {summary.singleTeamId && photoUrl && (
+          {effectiveTeamId && photoUrl && (
             <Image
               src="/logo.png"
               alt=""
@@ -214,7 +262,7 @@ export default function SpaceDashboardSummary({
               className="absolute bottom-2 right-2 h-7 w-7 object-contain opacity-60"
             />
           )}
-          {canManagePhoto && summary.singleTeamId && (
+          {canManagePhoto && effectiveTeamId && (
             <>
               <button
                 type="button"
@@ -231,7 +279,7 @@ export default function SpaceDashboardSummary({
         </div>
 
         <div className="grid grid-cols-2 gap-2.5 sm:flex-1 sm:grid-cols-2">
-          <KpiTile icon={Users} iconClass="text-navy" iconBgClass="bg-navy/10" value={summary.playerCount} label="Joueurs" />
+          <KpiTile icon={Users} iconClass="text-navy" iconBgClass="bg-navy/10" value={effectivePlayerCount} label="Joueurs" />
           <KpiTile
             icon={Trophy}
             iconClass="text-ubac-yellow-dark"

@@ -73,7 +73,34 @@ export type SpaceDashboardNextEvent = {
   matchOfficialsEnabled: boolean;
 };
 
+// Retour de Cindy du 20/09 ("mes deux enfants sont mélangés... un coach qui
+// coache plusieurs équipes, il lui faut des données séparées pour chaque
+// équipe") : une entrée par équipe de teamIds, calculée à partir des MÊMES
+// requêtes déjà groupées (roster/matchs), jamais une requête de plus par
+// équipe -- juste regroupées par team_id au lieu d'être sommées en un seul
+// total. Toujours vide quand teamIds est null (Bureau, club entier :
+// aucune séparation par équipe n'a de sens là) ou contient une seule
+// équipe (le résumé plat existant suffit déjà, voir singleTeamId/photoUrl/
+// playerCount/official/friendly ci-dessous, inchangés pour ce cas).
+export type SpaceDashboardTeamStats = {
+  teamId: string;
+  teamName: string | null;
+  category: string | null;
+  photoUrl: string | null;
+  playerCount: number;
+  official: { played: number; points: number; won: number };
+  friendly: { played: number; points: number; won: number };
+  // Retour de Cindy du 20/09 ("je n'ai pas les prochains événements des
+  // U13M ni des U13M-1") : le prochain événement de CETTE équipe
+  // précisément (son propre jour le plus proche, pas celui, partagé, de
+  // l'équipe globalement la plus proche -- voir son calcul dans
+  // space-dashboard.ts).
+  nextEvents: SpaceDashboardNextEvent[];
+};
+
 export type SpaceDashboardSummary = {
+  // Retour de Cindy du 20/09 : voir SpaceDashboardTeamStats ci-dessus.
+  byTeam: SpaceDashboardTeamStats[];
   // Non-null seulement quand teamIds contient EXACTEMENT une équipe : une
   // photo unique n'a de sens que pour une seule équipe à la fois (voir son
   // commentaire dans space-dashboard-summary.tsx pour le repli visuel).
@@ -169,6 +196,7 @@ export async function getSpaceDashboardSummary(
   // clairement).
   if (teamIds !== null && teamIds.length === 0) {
     return {
+      byTeam: [],
       photoUrl: null,
       singleTeamId: null,
       playerCount: 0,
@@ -189,19 +217,25 @@ export async function getSpaceDashboardSummary(
   const semaphore = dbLimit instanceof Semaphore ? dbLimit : new Semaphore(dbLimit);
 
   const nowIso = new Date().toISOString();
-  const [rosterRes, teamCountRes, photoRes, matchesRes, firstUpcomingRes] = await runBatched(
+  const [rosterRes, teamCountRes, teamsMetaRes, matchesRes, upcomingRes] = await runBatched(
     [
       () =>
         teamIds === null
           ? supabase.from("players").select("id", { count: "exact", head: true }).is("archived_at", null)
-          : supabase.from("team_players").select("player_id").in("team_id", teamIds),
+          : supabase.from("team_players").select("player_id, team_id").in("team_id", teamIds),
       () =>
         teamIds === null
           ? supabase.from("teams").select("id", { count: "exact", head: true })
           : Promise.resolve({ count: null, data: null, error: null }),
+      // Retour de Cindy du 20/09 ("données séparées pour chaque équipe") :
+      // élargie de "juste la photo de l'équipe unique" à "nom/catégorie/
+      // photo de CHAQUE équipe de teamIds", en une seule requête -- sert à
+      // la fois au repli plat existant (singleTeamId) et au détail par
+      // équipe (byTeam) juste en dessous. Toujours vide pour le club
+      // entier (teamIds null), comme avant.
       () =>
-        singleTeamId
-          ? supabase.from("teams").select("photo_url").eq("id", singleTeamId).maybeSingle()
+        teamIds && teamIds.length > 0
+          ? supabase.from("teams").select("id, name, category, photo_url").in("id", teamIds)
           : Promise.resolve({ data: null, error: null }),
       // Matchs (officiels = MATCH, amicaux = FRIENDLY) de la saison en
       // cours, avec un score déjà enregistré -- un match programmé mais
@@ -212,7 +246,7 @@ export async function getSpaceDashboardSummary(
       () => {
         let q = supabase
           .from("events")
-          .select("event_type, team_score, opponent_score")
+          .select("event_type, team_score, opponent_score, team_id")
           .in("event_type", ["MATCH", "FRIENDLY"])
           .gte("start_time", startIso)
           .lt("start_time", endIso)
@@ -220,18 +254,27 @@ export async function getSpaceDashboardSummary(
         if (teamIds !== null) q = q.in("team_id", teamIds);
         return q;
       },
-      // Retour de Cindy du 14/09 ("plusieurs événements dans la journée,
-      // pouvoir les visualiser") : première étape en deux temps -- juste
-      // la date du tout premier événement à venir, pour ensuite borner la
-      // vraie requête (plus bas) à CETTE journée entière plutôt qu'à une
-      // seule ligne.
+      // Retour de Cindy du 20/09 ("je n'ai pas les prochains événements des
+      // U13M ni des U13M-1") : remplace l'ancienne sonde en deux temps
+      // (juste la date du tout premier événement, puis une deuxième
+      // requête bornée à CETTE seule journée) -- fondée sur une seule
+      // journée PARTAGÉE, elle ne pouvait montrer que les équipes dont le
+      // prochain événement tombait pile le même jour que la toute première
+      // équipe. Une seule requête plus large (60 jours, plafonnée) à la
+      // place : moins d'aller-retours qu'avant (une requête en moins), le
+      // détail par équipe (jour propre à CHAQUE équipe) se calcule ensuite
+      // en mémoire, voir byTeam plus bas.
       () => {
+        const horizonIso = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
         let q = supabase
           .from("events")
-          .select("start_time")
+          .select(
+            "id, title, event_type, start_time, end_time, impact_time, notes, location, salle, is_home, team_id, target_team_ids, teams(name), collectes(payment_link)"
+          )
           .gte("start_time", nowIso)
+          .lt("start_time", horizonIso)
           .order("start_time", { ascending: true })
-          .limit(1);
+          .limit(300);
         if (teamIds !== null) q = q.in("team_id", teamIds);
         return q;
       },
@@ -257,7 +300,69 @@ export async function getSpaceDashboardSummary(
     if ((m.team_score ?? 0) > (m.opponent_score ?? 0)) bucket.won += 1;
   });
 
-  const firstUpcomingStart = (firstUpcomingRes.data ?? [])[0]?.start_time as string | undefined;
+  // Retour de Cindy du 20/09 ("mes deux enfants sont mélangés... données
+  // séparées pour chaque équipe") : même lignes que playerCount/official/
+  // friendly juste au-dessus, simplement regroupées par team_id au lieu
+  // d'être sommées ensemble -- aucune requête supplémentaire, juste une
+  // deuxième lecture en mémoire des mêmes résultats déjà reçus.
+  const teamsMetaById = new Map(
+    (
+      (teamsMetaRes.data ?? []) as {
+        id: string;
+        name: string | null;
+        category: string | null;
+        photo_url: string | null;
+      }[]
+    ).map((t) => [t.id, t])
+  );
+  const rosterPlayerIdsByTeam = new Map<string, Set<string>>();
+  ((rosterRes as { data: { player_id: string; team_id: string }[] | null }).data ?? []).forEach((r) => {
+    const set = rosterPlayerIdsByTeam.get(r.team_id) ?? new Set<string>();
+    set.add(r.player_id);
+    rosterPlayerIdsByTeam.set(r.team_id, set);
+  });
+  const matchStatsByTeam = new Map<
+    string,
+    { official: typeof EMPTY_MATCH_STATS; friendly: typeof EMPTY_MATCH_STATS }
+  >();
+  (
+    (matchesRes.data ?? []) as {
+      event_type: string;
+      team_score: number | null;
+      opponent_score: number | null;
+      team_id: string | null;
+    }[]
+  ).forEach((m) => {
+    if (!m.team_id) return;
+    const entry =
+      matchStatsByTeam.get(m.team_id) ??
+      { official: { ...EMPTY_MATCH_STATS }, friendly: { ...EMPTY_MATCH_STATS } };
+    const bucket = m.event_type === "MATCH" ? entry.official : entry.friendly;
+    bucket.played += 1;
+    bucket.points += m.team_score ?? 0;
+    if ((m.team_score ?? 0) > (m.opponent_score ?? 0)) bucket.won += 1;
+    matchStatsByTeam.set(m.team_id, entry);
+  });
+  const byTeam: SpaceDashboardTeamStats[] =
+    teamIds === null
+      ? []
+      : teamIds.map((id) => {
+          const meta = teamsMetaById.get(id);
+          const stats = matchStatsByTeam.get(id);
+          return {
+            teamId: id,
+            teamName: meta?.name ?? null,
+            category: meta?.category ?? null,
+            photoUrl: meta?.photo_url ?? null,
+            playerCount: rosterPlayerIdsByTeam.get(id)?.size ?? 0,
+            official: stats?.official ?? { ...EMPTY_MATCH_STATS },
+            friendly: stats?.friendly ?? { ...EMPTY_MATCH_STATS },
+            // Rempli plus bas (nextEventsByTeamId), une fois le jour propre
+            // à CETTE équipe calculé -- voir le retour de Cindy du 20/09
+            // au-dessus de SpaceDashboardTeamStats.
+            nextEvents: [] as SpaceDashboardNextEvent[],
+          };
+        });
 
   type EventRow = {
     id: string;
@@ -299,37 +404,54 @@ export async function getSpaceDashboardSummary(
       : { isPaid: false, paymentLink: null };
   }
 
-  let dayRows: EventRow[] = [];
-  if (firstUpcomingStart) {
-    // Bornes du jour du tout premier événement à venir, en heure de Paris
-    // -- même idiome que /api/cron/match-reminders (jamais le fuseau du
-    // runtime, UTC sur Vercel, qui ferait glisser la frontière du jour).
-    const parisRef = new Date(new Date(firstUpcomingStart).toLocaleString("en-US", { timeZone: "Europe/Paris" }));
-    const dayEnd = new Date(
-      parisRef.getFullYear(),
-      parisRef.getMonth(),
-      parisRef.getDate() + 1
-    ).toISOString();
-
-    // nowIso comme seule borne basse (pas le début du jour) : exclut un
-    // entraînement du matin déjà passé sans exclure ceux encore à venir
-    // plus tard cette même journée.
-    let dayQuery = supabase
-      .from("events")
-      .select(
-        "id, title, event_type, start_time, end_time, impact_time, notes, location, salle, is_home, team_id, target_team_ids, teams(name), collectes(payment_link)"
-      )
-      .gte("start_time", nowIso)
-      .lt("start_time", dayEnd)
-      .order("start_time", { ascending: true });
-    if (teamIds !== null) dayQuery = dayQuery.in("team_id", teamIds);
-    const [{ data }] = await runBatched([() => dayQuery], semaphore);
-    dayRows = (data ?? []) as unknown as EventRow[];
+  // Bornes du jour d'un événement donné, en heure de Paris -- même idiome
+  // que /api/cron/match-reminders (jamais le fuseau du runtime, UTC sur
+  // Vercel, qui ferait glisser la frontière du jour).
+  function dayEndFor(startIso: string): string {
+    const parisRef = new Date(new Date(startIso).toLocaleString("en-US", { timeZone: "Europe/Paris" }));
+    return new Date(parisRef.getFullYear(), parisRef.getMonth(), parisRef.getDate() + 1).toISOString();
   }
 
+  const allUpcoming = ((upcomingRes.data ?? []) as unknown as EventRow[]).slice();
+
+  // Retour de Cindy du 20/09 ("je n'ai pas les prochains événements des
+  // U13M ni des U13M-1") : plus une seule fenêtre "jour" partagée par
+  // toutes les équipes (celle de l'équipe globalement la plus proche),
+  // mais une fenêtre PAR équipe -- son propre jour le plus proche à elle.
+  // allUpcoming est déjà trié par start_time croissant (voir la requête
+  // plus haut), donc le premier élément rencontré pour chaque équipe est
+  // forcément son plus proche.
+  const dayRows: EventRow[] = allUpcoming.length > 0 ? allUpcoming.filter((r) => r.start_time < dayEndFor(allUpcoming[0].start_time)) : [];
+  const dayRowsByTeam = new Map<string, EventRow[]>();
+  if (teamIds !== null) {
+    const dayEndByTeam = new Map<string, string>();
+    allUpcoming.forEach((r) => {
+      if (!r.team_id) return;
+      if (!dayEndByTeam.has(r.team_id)) dayEndByTeam.set(r.team_id, dayEndFor(r.start_time));
+    });
+    allUpcoming.forEach((r) => {
+      if (!r.team_id) return;
+      const end = dayEndByTeam.get(r.team_id);
+      if (end && r.start_time < end) {
+        const list = dayRowsByTeam.get(r.team_id) ?? [];
+        list.push(r);
+        dayRowsByTeam.set(r.team_id, list);
+      }
+    });
+  }
+
+  // Union des deux jeux d'événements ci-dessus (jour partagé + jour propre
+  // à chaque équipe) : une seule série de requêtes needs/matchOfficials/
+  // roster/rsvps pour tout le monde, jamais une par équipe.
+  const relevantRowsById = new Map<string, EventRow>();
+  dayRows.forEach((r) => relevantRowsById.set(r.id, r));
+  dayRowsByTeam.forEach((rows) => rows.forEach((r) => relevantRowsById.set(r.id, r)));
+  const relevantRows = Array.from(relevantRowsById.values());
+
   let nextEvents: SpaceDashboardNextEvent[] = [];
-  if (dayRows.length > 0) {
-    const eventIds = dayRows.map((r) => r.id);
+  const nextEventsByTeamId = new Map<string, SpaceDashboardNextEvent[]>();
+  if (relevantRows.length > 0) {
+    const eventIds = relevantRows.map((r) => r.id);
     // Réutilise telle quelle la même fonction que le reste de l'appli
     // (VolunteerNeedsPanel, calendar-view.tsx...) -- jamais une requête
     // event_volunteer_needs/signups dupliquée ici. Un seul appel pour
@@ -425,7 +547,7 @@ export async function getSpaceDashboardSummary(
       statusByEventAndPlayer.set(`${r.event_id}:${r.player_id}`, r.status);
     });
 
-    nextEvents = dayRows.map((row) => {
+    function buildNextEvent(row: EventRow): SpaceDashboardNextEvent {
       const paidFields = resolvePaidFields(row.collectes);
       const eventRoster = fullRoster.filter((p) => isConcernedByEvent(p, row));
       let present = 0;
@@ -483,11 +605,21 @@ export async function getSpaceDashboardSummary(
         matchOfficials: matchOfficialsByEventId[row.id] ?? [],
         matchOfficialsEnabled: true,
       };
+    }
+
+    nextEvents = dayRows.map(buildNextEvent);
+    dayRowsByTeam.forEach((rows, teamId) => {
+      nextEventsByTeamId.set(teamId, rows.map(buildNextEvent));
     });
   }
 
+  byTeam.forEach((t) => {
+    t.nextEvents = nextEventsByTeamId.get(t.teamId) ?? [];
+  });
+
   return {
-    photoUrl: (photoRes.data as { photo_url: string | null } | null)?.photo_url ?? null,
+    byTeam,
+    photoUrl: (singleTeamId && teamsMetaById.get(singleTeamId)?.photo_url) ?? null,
     singleTeamId,
     playerCount,
     teamCount: teamIds === null ? (teamCountRes as { count: number | null }).count ?? 0 : null,
