@@ -66,7 +66,11 @@ export type MatchOfficialAssignment = {
 export async function getMatchOfficialRolesByEventId(
   supabase: SupabaseClient,
   eventIds: string[],
-  dbLimit?: Semaphore
+  dbLimit?: Semaphore,
+  // Retour de Cindy du 21/09 ("réduire le nombre de requêtes") : voir
+  // sharedNameByPlayerId dans getEventTasksByEventId (event-tasks.ts), même
+  // principe.
+  sharedNameByPlayerId?: Map<string, string>
 ): Promise<Record<string, MatchOfficialAssignment[]>> {
   const result: Record<string, MatchOfficialAssignment[]> = {};
   if (eventIds.length === 0) return result;
@@ -96,15 +100,18 @@ export async function getMatchOfficialRolesByEventId(
   const playerIds = [
     ...new Set((rows ?? []).map((r) => r.player_id as string | null).filter((id): id is string => Boolean(id))),
   ];
-  const nameByPlayerId = new Map<string, string>();
-  if (playerIds.length > 0) {
-    const { data: nameRows } = await supabase
-      .from("club_member_names")
-      .select("id, first_name, last_name")
-      .in("id", playerIds);
-    (nameRows ?? []).forEach((row) => {
-      nameByPlayerId.set(row.id as string, formatPersonName(row.first_name, row.last_name));
-    });
+  let nameByPlayerId = sharedNameByPlayerId;
+  if (!nameByPlayerId) {
+    nameByPlayerId = new Map<string, string>();
+    if (playerIds.length > 0) {
+      const { data: nameRows } = await supabase
+        .from("club_member_names")
+        .select("id, first_name, last_name")
+        .in("id", playerIds);
+      (nameRows ?? []).forEach((row) => {
+        nameByPlayerId!.set(row.id as string, formatPersonName(row.first_name, row.last_name));
+      });
+    }
   }
 
   (rows ?? []).forEach((row) => {

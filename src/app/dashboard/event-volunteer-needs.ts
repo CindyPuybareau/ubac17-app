@@ -286,7 +286,13 @@ export type VolunteerNeed = {
 export async function getVolunteerNeedsByEventId(
   supabase: SupabaseClient,
   eventIds: string[],
-  dbLimit?: Semaphore
+  dbLimit?: Semaphore,
+  // Retour de Cindy du 21/09 ("réduire le nombre de requêtes") : voir
+  // sharedNameByPlayerId dans getEventTasksByEventId (event-tasks.ts), même
+  // principe étendu ici aux bénévoles (club_benevole_names). Optionnel :
+  // tout appelant qui n'en a pas sous la main garde le comportement inchangé.
+  sharedNameByPlayerId?: Map<string, string>,
+  sharedNameByBenevoleId?: Map<string, string>
 ): Promise<Record<string, VolunteerNeed[]>> {
   const result: Record<string, VolunteerNeed[]> = {};
   if (eventIds.length === 0) return result;
@@ -352,15 +358,18 @@ export async function getVolunteerNeedsByEventId(
           .filter((id): id is string => Boolean(id))
       ),
     ];
-    const nameByPlayerId = new Map<string, string>();
-    if (signupPlayerIds.length > 0) {
-      const { data: nameRows } = await supabase
-        .from("club_member_names")
-        .select("id, first_name, last_name")
-        .in("id", signupPlayerIds);
-      (nameRows ?? []).forEach((row) => {
-        nameByPlayerId.set(row.id as string, formatPersonName(row.first_name, row.last_name));
-      });
+    let nameByPlayerId = sharedNameByPlayerId;
+    if (!nameByPlayerId) {
+      nameByPlayerId = new Map<string, string>();
+      if (signupPlayerIds.length > 0) {
+        const { data: nameRows } = await supabase
+          .from("club_member_names")
+          .select("id, first_name, last_name")
+          .in("id", signupPlayerIds);
+        (nameRows ?? []).forEach((row) => {
+          nameByPlayerId!.set(row.id as string, formatPersonName(row.first_name, row.last_name));
+        });
+      }
     }
 
     // Même principe côté bénévoles (retour d'audit du 28/08, même bug déjà
@@ -377,15 +386,18 @@ export async function getVolunteerNeedsByEventId(
           .filter((id): id is string => Boolean(id))
       ),
     ];
-    const nameByBenevoleId = new Map<string, string>();
-    if (signupBenevoleIds.length > 0) {
-      const { data: benevoleRows } = await supabase
-        .from("club_benevole_names")
-        .select("id, first_name, last_name")
-        .in("id", signupBenevoleIds);
-      (benevoleRows ?? []).forEach((row) => {
-        nameByBenevoleId.set(row.id as string, formatPersonName(row.first_name, row.last_name));
-      });
+    let nameByBenevoleId = sharedNameByBenevoleId;
+    if (!nameByBenevoleId) {
+      nameByBenevoleId = new Map<string, string>();
+      if (signupBenevoleIds.length > 0) {
+        const { data: benevoleRows } = await supabase
+          .from("club_benevole_names")
+          .select("id, first_name, last_name")
+          .in("id", signupBenevoleIds);
+        (benevoleRows ?? []).forEach((row) => {
+          nameByBenevoleId!.set(row.id as string, formatPersonName(row.first_name, row.last_name));
+        });
+      }
     }
 
     (signupRows ?? []).forEach((row) => {

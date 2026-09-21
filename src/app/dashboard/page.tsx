@@ -974,6 +974,43 @@ export default async function DashboardPage({
   //    ce soir (tranches à 150 comprises). Ne pas remonter au-delà sans
   //    revalider par le même test réseau avant/après.
   const dbLimit = new Semaphore(9);
+  // Retour de Cindy du 21/09 ("réduire le nombre de requêtes", suite à
+  // l'incident de connexions du 20/09) : club_member_names/club_benevole_names
+  // (prénom/nom club entier) étaient interrogées séparément par
+  // getEventTasksByEventId (x2, priorityZone + coachOrganisationTasksExtra),
+  // getCarpoolOffersByEventId, getVolunteerNeedsByEventId et
+  // getMatchOfficialRolesByEventId -- jusqu'à 5 requêtes quasi-identiques
+  // par chargement pour le même compte. Résolues UNE fois ici et passées en
+  // paramètre partagé à chaque appel (sharedNameByPlayerId/
+  // sharedNameByBenevoleId) -- volontairement PAS un cache module-level
+  // (unstable_cache) comme celui de getEventRoleTypesCached : cette
+  // approche-là avait fait fuiter du code serveur (next/cache,
+  // createServiceClient) dans le bundle client via event-volunteer-needs.ts/
+  // match-official-roles.ts (aussi importés par des composants client),
+  // cassé le site, et été intégralement annulée le 21/09. Une simple
+  // promesse locale à ce rendu, jamais importée nulle part, n'a pas ce
+  // risque.
+  const clubDirectoryPromise: Promise<{
+    nameByPlayerId: Map<string, string>;
+    nameByBenevoleId: Map<string, string>;
+  }> = (async () => {
+    const [{ data: memberRows }, { data: benevoleRows }] = await runBatched(
+      [
+        () => supabase.from("club_member_names").select("id, first_name, last_name"),
+        () => supabase.from("club_benevole_names").select("id, first_name, last_name"),
+      ],
+      dbLimit
+    );
+    const nameByPlayerId = new Map<string, string>();
+    (memberRows ?? []).forEach((row) => {
+      nameByPlayerId.set(row.id as string, formatPersonName(row.first_name, row.last_name));
+    });
+    const nameByBenevoleId = new Map<string, string>();
+    (benevoleRows ?? []).forEach((row) => {
+      nameByBenevoleId.set(row.id as string, formatPersonName(row.first_name, row.last_name));
+    });
+    return { nameByPlayerId, nameByBenevoleId };
+  })();
   // Retour de Cindy du 03/09 (dernier round de la soirée, "content download"
   // à 30s malgré des requêtes individuelles redevenues rapides) : les 3
   // requêtes "events" de cette page (Bureau/Coach/Famille) n'avaient AUCUN
@@ -1555,9 +1592,10 @@ export default async function DashboardPage({
   // le visuel") : plus aucun appelant n'en avait besoin, autant ne plus
   // faire l'appel getTeamRoster correspondant à chaque chargement du
   // tableau de bord.
+  const { nameByPlayerId: priorityZoneNameByPlayerId } = await clubDirectoryPromise;
   const [eventTasksByEventId, carpoolOffersByEventId] = await Promise.all([
-    getEventTasksByEventId(supabase, priorityEventIds, dbLimit),
-    getCarpoolOffersByEventId(supabase, priorityEventIds, dbLimit),
+    getEventTasksByEventId(supabase, priorityEventIds, dbLimit, priorityZoneNameByPlayerId),
+    getCarpoolOffersByEventId(supabase, priorityEventIds, dbLimit, priorityZoneNameByPlayerId),
   ]);
 
   return {
@@ -2022,10 +2060,14 @@ export default async function DashboardPage({
             error: null,
           });
     const rsvpsByEventPromise = fetchRsvpsByEvent(supabase, upcomingEventIds, dbLimit);
-    const adminVolunteerNeedsPromise = getVolunteerNeedsByEventId(supabase, upcomingEventIds, dbLimit);
+    const adminVolunteerNeedsPromise = clubDirectoryPromise.then(({ nameByPlayerId, nameByBenevoleId }) =>
+      getVolunteerNeedsByEventId(supabase, upcomingEventIds, dbLimit, nameByPlayerId, nameByBenevoleId)
+    );
     // "Organisation match à domicile" (retour de Cindy du 17/09) : même
     // schéma que adminVolunteerNeedsPromise juste au-dessus.
-    const adminMatchOfficialRolesPromise = getMatchOfficialRolesByEventId(supabase, upcomingEventIds, dbLimit);
+    const adminMatchOfficialRolesPromise = clubDirectoryPromise.then(({ nameByPlayerId }) =>
+      getMatchOfficialRolesByEventId(supabase, upcomingEventIds, dbLimit, nameByPlayerId)
+    );
     // Retour de Cindy du 15/09 ("côté Bureau c'est pareil") : voir
     // fetchPaidParticipantsByCollecteId plus haut -- remplace l'embed
     // cotisations(players(...)) retiré des 2 requêtes d'événements
@@ -2990,10 +3032,8 @@ export default async function DashboardPage({
     // Les rôles (maillots/goûter) de TOUS les événements à venir, pas
     // seulement du prochain match : l'onglet "Planning & Rôles" les liste
     // date par date.
-    const coachOrganisationTasksExtraPromise = getEventTasksByEventId(
-      supabase,
-      upcomingCoachEventIds,
-      dbLimit
+    const coachOrganisationTasksExtraPromise = clubDirectoryPromise.then(({ nameByPlayerId }) =>
+      getEventTasksByEventId(supabase, upcomingCoachEventIds, dbLimit, nameByPlayerId)
     );
     // Besoins d'organisation de TOUS les événements de l'équipe, pas
     // seulement ceux à venir — même raison que côté Bureau juste plus haut.
@@ -3010,7 +3050,9 @@ export default async function DashboardPage({
             coachEventIds.map((id) => [id, adminVolunteerNeedsByEventId[id] ?? []])
           )
         )
-      : getVolunteerNeedsByEventId(supabase, coachEventIds, dbLimit);
+      : clubDirectoryPromise.then(({ nameByPlayerId, nameByBenevoleId }) =>
+          getVolunteerNeedsByEventId(supabase, coachEventIds, dbLimit, nameByPlayerId, nameByBenevoleId)
+        );
     // "Organisation match à domicile" (retour de Cindy du 17/09) : même
     // dédoublonnage Bureau<->Coach que coachVolunteerNeedsPromise ci-dessus.
     const coachMatchOfficialRolesPromise = bureauDataLoaded
@@ -3019,7 +3061,9 @@ export default async function DashboardPage({
             coachEventIds.map((id) => [id, adminMatchOfficialRolesByEventId[id] ?? []])
           )
         )
-      : getMatchOfficialRolesByEventId(supabase, coachEventIds, dbLimit);
+      : clubDirectoryPromise.then(({ nameByPlayerId }) =>
+          getMatchOfficialRolesByEventId(supabase, coachEventIds, dbLimit, nameByPlayerId)
+        );
     // Retour de Cindy du 15/09 ("côté Bureau c'est pareil") : voir
     // fetchPaidParticipantsByCollecteId plus haut.
     const coachPaidParticipantsPromise = fetchPaidParticipantsByCollecteId(
@@ -4107,15 +4151,17 @@ export default async function DashboardPage({
             const uncoveredEventIds = upcomingFamilyEventIds.filter(
               (id) => !(id in coachOrganisationTasks)
             );
-            return getEventTasksByEventId(supabase, uncoveredEventIds, dbLimit).then(
-              (fetched) => {
+            return clubDirectoryPromise
+              .then(({ nameByPlayerId }) =>
+                getEventTasksByEventId(supabase, uncoveredEventIds, dbLimit, nameByPlayerId)
+              )
+              .then((fetched) => {
                 const merged: Record<string, EventTasksState> = { ...fetched };
                 upcomingFamilyEventIds.forEach((id) => {
                   if (id in coachOrganisationTasks) merged[id] = coachOrganisationTasks[id];
                 });
                 return merged;
-              }
-            );
+              });
           },
           // Retour de Cindy du 16/09 (dédoublonnage Bureau<->Famille, même
           // schéma que Coach juste plus haut) : eventIds ⊆ upcomingEventIds
@@ -4145,15 +4191,17 @@ export default async function DashboardPage({
                 )
               );
             }
-            return getVolunteerNeedsByEventId(supabase, uncoveredEventIds, dbLimit).then(
-              (fetched) => {
+            return clubDirectoryPromise
+              .then(({ nameByPlayerId, nameByBenevoleId }) =>
+                getVolunteerNeedsByEventId(supabase, uncoveredEventIds, dbLimit, nameByPlayerId, nameByBenevoleId)
+              )
+              .then((fetched) => {
                 const merged = { ...fetched };
                 eventIds.forEach((id) => {
                   if (id in coachVolunteerNeedsByEventId) merged[id] = coachVolunteerNeedsByEventId[id];
                 });
                 return merged;
-              }
-            );
+              });
           },
           // "Organisation match à domicile" (retour de Cindy du 17/09) :
           // même dédoublonnage Bureau<->Famille que juste au-dessus, étendu
@@ -4176,16 +4224,18 @@ export default async function DashboardPage({
                 )
               );
             }
-            return getMatchOfficialRolesByEventId(supabase, uncoveredEventIds, dbLimit).then(
-              (fetched) => {
+            return clubDirectoryPromise
+              .then(({ nameByPlayerId }) =>
+                getMatchOfficialRolesByEventId(supabase, uncoveredEventIds, dbLimit, nameByPlayerId)
+              )
+              .then((fetched) => {
                 const merged = { ...fetched };
                 eventIds.forEach((id) => {
                   if (id in coachMatchOfficialRolesByEventId)
                     merged[id] = coachMatchOfficialRolesByEventId[id];
                 });
                 return merged;
-              }
-            );
+              });
           },
         ],
         // dbLimit partagé (voir lib/batch.ts / le bloc Bureau plus haut).

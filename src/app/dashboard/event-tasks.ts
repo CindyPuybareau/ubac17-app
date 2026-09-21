@@ -123,7 +123,15 @@ export function rolesForEventType(
 export async function getEventTasksByEventId(
   supabase: SupabaseClient,
   eventIds: string[],
-  dbLimit?: Semaphore
+  dbLimit?: Semaphore,
+  // Retour de Cindy du 21/09 ("réduire le nombre de requêtes") : quand
+  // l'appelant (page.tsx) a déjà résolu le club_member_names club-wide UNE
+  // fois pour tout le chargement, on l'utilise directement au lieu de
+  // relancer une requête filtrée ici -- jusqu'à 4 requêtes club_member_names
+  // quasi-identiques par chargement (event-tasks x2, event-volunteer-needs,
+  // match-official-roles) ramenées à une seule. Optionnel : tout appelant
+  // qui n'en a pas sous la main garde le comportement inchangé.
+  sharedNameByPlayerId?: Map<string, string>
 ): Promise<Record<string, EventTasksState>> {
   const result: Record<string, EventTasksState> = {};
   if (eventIds.length === 0) return result;
@@ -164,15 +172,18 @@ export async function getEventTasksByEventId(
   // retour de Cindy : "Bénévole" au lieu d'un vrai nom pour quelqu'un
   // hors de l'équipe de qui consulte).
   const playerIds = [...new Set((data ?? []).map((row) => row.player_id as string))];
-  const nameByPlayerId = new Map<string, string>();
-  if (playerIds.length > 0) {
-    const { data: nameRows } = await supabase
-      .from("club_member_names")
-      .select("id, first_name, last_name")
-      .in("id", playerIds);
-    (nameRows ?? []).forEach((row) => {
-      nameByPlayerId.set(row.id as string, fullName(row));
-    });
+  let nameByPlayerId = sharedNameByPlayerId;
+  if (!nameByPlayerId) {
+    nameByPlayerId = new Map<string, string>();
+    if (playerIds.length > 0) {
+      const { data: nameRows } = await supabase
+        .from("club_member_names")
+        .select("id, first_name, last_name")
+        .in("id", playerIds);
+      (nameRows ?? []).forEach((row) => {
+        nameByPlayerId!.set(row.id as string, fullName(row));
+      });
+    }
   }
 
   (data ?? []).forEach((row) => {
@@ -195,7 +206,10 @@ export async function getEventTasksByEventId(
 export async function getCarpoolOffersByEventId(
   supabase: SupabaseClient,
   eventIds: string[],
-  dbLimit?: Semaphore
+  dbLimit?: Semaphore,
+  // Voir sharedNameByPlayerId dans getEventTasksByEventId ci-dessus, même
+  // principe.
+  sharedNameByPlayerId?: Map<string, string>
 ): Promise<Record<string, CarpoolOffer[]>> {
   const result: Record<string, CarpoolOffer[]> = {};
   if (eventIds.length === 0) return result;
@@ -245,15 +259,18 @@ export async function getCarpoolOffersByEventId(
       ...(reservationRows ?? []).map((row) => row.player_id as string),
     ]),
   ];
-  const nameByPlayerId = new Map<string, string>();
-  if (carpoolPlayerIds.length > 0) {
-    const { data: nameRows } = await supabase
-      .from("club_member_names")
-      .select("id, first_name, last_name")
-      .in("id", carpoolPlayerIds);
-    (nameRows ?? []).forEach((row) => {
-      nameByPlayerId.set(row.id as string, fullName(row));
-    });
+  let nameByPlayerId = sharedNameByPlayerId;
+  if (!nameByPlayerId) {
+    nameByPlayerId = new Map<string, string>();
+    if (carpoolPlayerIds.length > 0) {
+      const { data: nameRows } = await supabase
+        .from("club_member_names")
+        .select("id, first_name, last_name")
+        .in("id", carpoolPlayerIds);
+      (nameRows ?? []).forEach((row) => {
+        nameByPlayerId!.set(row.id as string, fullName(row));
+      });
+    }
   }
 
   (reservationRows ?? []).forEach((row) => {
