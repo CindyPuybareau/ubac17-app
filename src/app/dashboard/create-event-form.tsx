@@ -9,7 +9,8 @@ import { sendEventPush } from "./event-push";
 import DateTimePicker from "./date-time-picker";
 import RoleIcon from "./role-icon";
 import CommissionMultiSelect from "./commission-multi-select";
-import { Briefcase, CalendarSync, Euro, Plus, X } from "lucide-react";
+import { Briefcase, Calendar, CalendarSync, ChevronDown, ChevronUp, Clock, Euro, Plus, X } from "lucide-react";
+import { EVENT_TYPE_OPTIONS, styleFor } from "./event-style";
 import {
   CUSTOM_ROLE_CODE,
   STANDARD_VOLUNTEER_ROLES,
@@ -115,20 +116,30 @@ const defaultTitles: Record<EventType, string> = {
 };
 
 // Le choix du type se fait en un geste, avec la couleur qu'aura ensuite
-// l'événement dans le calendrier : on voit ce qu'on crée.
-const typeChoices: { value: EventType; label: string; active: string }[] = [
-  { value: "TRAINING", label: "Entraînement", active: "border-green-400 bg-green-100 text-green-700" },
-  { value: "MATCH", label: "Match officiel", active: "border-red-400 bg-red-100 text-red-700" },
-  { value: "FRIENDLY", label: "Match amical", active: "border-blue-400 bg-blue-100 text-blue-700" },
-  { value: "TOURNAMENT", label: "Tournoi / Plateau", active: "border-amber-400 bg-amber-100 text-amber-800" },
-  { value: "OTHER", label: "Événement club", active: "border-purple-400 bg-purple-100 text-purple-700" },
-  // "Réunion d'équipe" retirée (retour de Cindy du 18/09, "plus nécessaire
-  // avec les boutons Coachs seuls et Bureau seul") : ces deux portées
-  // couvrent déjà le besoin de réunion, ce choix-ci restait redondant.
-  // Les événements déjà créés avec ce type (REUNION + team_id/
-  // target_team_ids renseignés) continuent de s'afficher normalement,
-  // juste plus proposé à la création.
-];
+// l'événement dans le calendrier : on voit ce qu'on crée. Retour de Cindy
+// du 20/09 : les couleurs étaient jusqu'ici une liste propre à ce
+// formulaire (rouge/bleu/ambre/violet), qui ne correspondait pas aux
+// couleurs réellement utilisées dans le calendrier pour ces mêmes types
+// (styleFor/typeStyles, event-style.ts) -- dérivé de la même source
+// unique désormais, pour que "ce qu'on voit en créant" soit vraiment "ce
+// qu'on aura dans le calendrier". `dot` (toujours une teinte pleine, ex.
+// bg-navy) donne la couleur de bordure ; `pill` (fond pastel + texte)
+// reste inchangé.
+const typeChoices: { value: EventType; label: string; active: string }[] =
+  EVENT_TYPE_OPTIONS.filter((o) => o.value !== "REUNION").map((o) => {
+    const style = styleFor(o.value);
+    return {
+      value: o.value as EventType,
+      label: o.label,
+      active: `${style.dot.replace("bg-", "border-")} ${style.pill}`,
+    };
+  });
+// "Réunion d'équipe" retirée (retour de Cindy du 18/09, "plus nécessaire
+// avec les boutons Coachs seuls et Bureau seul") : ces deux portées
+// couvrent déjà le besoin de réunion, ce choix-ci restait redondant. Les
+// événements déjà créés avec ce type (REUNION + team_id/target_team_ids
+// renseignés) continuent de s'afficher normalement, juste plus proposé à
+// la création.
 
 export default function CreateEventForm({
   teams,
@@ -307,6 +318,12 @@ export default function CreateEventForm({
   // est le seul lien entre elles, pour "cette occurrence uniquement" vs
   // "cette occurrence et les suivantes" à la modification/suppression
   // (calendar-view.tsx).
+  // Retour de Cindy du 20/09 ("disposition 2 colonnes... options avancées
+  // fermées par défaut") : un seul accordéon regroupe Répéter/Événement
+  // payant/Inclure des personnes/Besoins/Commissions -- fermé au premier
+  // affichage, y compris en modification (rouvrir n'importe laquelle de ces
+  // sections déjà remplies reste à un clic).
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [repeatOpen, setRepeatOpen] = useState(false);
   const [repeatFrequency, setRepeatFrequency] = useState<"weekly" | "biweekly" | "monthly">("weekly");
   const [repeatUntil, setRepeatUntil] = useState("");
@@ -483,6 +500,16 @@ export default function CreateEventForm({
   // seulement -- ni Type d'événement, ni Répéter, ni Événement payant, ni
   // Besoins/Commissions, ni Heure d'arrivée (voir le JSX plus bas).
   const isPersonalTask = scopeMode === "profiles";
+  // Retour de Cindy du 20/09 ("options avancées... fermées par défaut") :
+  // l'en-tête de l'accordéon ne doit s'afficher que si au moins une des
+  // sections qu'il regroupe (Répéter/Événement payant/Inclure des
+  // personnes/Besoins/Commissions) est pertinente pour la portée courante
+  // -- mêmes conditions que chacune plus bas, jamais un accordéon vide à
+  // déplier.
+  const hasAdvancedOptions =
+    (!isEditing && !isPersonalTask) ||
+    (!isReunion && !isPersonalTask) ||
+    (allowClubWide && scopeMode !== "profiles");
 
   // Retour de Cindy du 12/09 (revue du champ "Heure d'impact") : tant que
   // le raccourci "X min avant" est actif (impactMinutesBefore non vide,
@@ -1131,14 +1158,32 @@ export default function CreateEventForm({
         {isEditing ? "Modifier l'événement" : "Créer un événement"}
       </h3>
 
+      {/* Retour de Cindy du 20/09 ("disposition 2 colonnes sur desktop") :
+          colonne principale (audience, équipe, type, titre, adresse/salle,
+          dates/heures, notes) à gauche, "Options avancées" repliées à
+          droite -- md:grid-cols-2 ne s'applique qu'à partir de md, en
+          dessous les deux colonnes s'empilent dans l'ordre du DOM
+          (comportement par défaut de flex-col, rien de spécifique à écrire
+          pour mobile). */}
+      <div className="flex flex-col gap-3 md:grid md:grid-cols-2 md:items-start md:gap-6">
+      <div className="flex flex-col gap-3">
+
       {/* Portée : un choix à plat, direct, plutôt qu'un détour par "Tous
           les groupes" pour arriver à "équipes spécifiques" (retour de
           Cindy du 2026-08-20 — voir le commentaire sur scopeMode plus
           haut). "Équipes spécifiques"/"Tout le club" n'ont de sens que
           pour qui peut créer un événement club (allowClubWide) ; sinon,
-          un simple menu déroulant suffit comme avant. */}
+          un simple menu déroulant suffit comme avant. Retour de Cindy du
+          20/09 ("l'œil doit comprendre immédiatement qu'il s'agit de deux
+          questions différentes") : style tabs soulignées, pas des pilules
+          pleines comme "Type d'événement" juste en dessous -- même famille
+          de couleurs de marque (navy/plum/terracotta déjà utilisées ici),
+          juste une forme différente pour ne pas se confondre au premier
+          coup d'œil. */}
       {allowClubWide && (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-zinc-600">Destinataires</span>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 border-b border-zinc-200">
           {(
             [
               { value: "single" as const, label: "Une équipe" },
@@ -1185,23 +1230,41 @@ export default function CreateEventForm({
                   void loadClubMembers();
                 }
               }}
-              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+              className={`border-b-2 px-0.5 pb-1.5 text-xs font-semibold transition-colors ${
                 scopeMode === c.value
                   ? c.value === "bureau" || c.value === "coachs"
-                    ? "border-plum bg-plum/10 text-plum-dark"
+                    ? "border-plum text-plum-dark"
                     : c.value === "profiles"
-                      ? "border-terracotta bg-terracotta/10 text-terracotta-dark"
-                      : "border-navy bg-navy/10 text-navy"
-                  : "border-zinc-200 text-zinc-500 hover:bg-white"
+                      ? "border-terracotta text-terracotta-dark"
+                      : "border-navy text-navy"
+                  : "border-transparent text-zinc-500 hover:text-zinc-700"
               }`}
             >
               {c.label}
             </button>
           ))}
+          </div>
         </div>
       )}
 
-      {(!allowClubWide ? teams.length > 1 : scopeMode === "single") && (
+      {!allowClubWide && teams.length > 1 && (
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-zinc-600">Destinataires</span>
+          <select
+            value={teamId}
+            onChange={(e) => setTeamId(e.target.value)}
+            className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+          >
+            {teams.map((t) => (
+              <option key={t.id} value={t.id}>
+                {teamLabel(t)}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {allowClubWide && scopeMode === "single" && (
         <select
           value={teamId}
           onChange={(e) => setTeamId(e.target.value)}
@@ -1304,7 +1367,7 @@ export default function CreateEventForm({
       )}
 
       <input
-        placeholder="Titre (optionnel)"
+        placeholder="Titre"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
@@ -1332,7 +1395,7 @@ export default function CreateEventForm({
           onChange={(e) => setSalle(e.target.value)}
           className="h-fit rounded-lg border border-zinc-200 px-3 py-2 text-sm"
         >
-          <option value="">Salle (optionnel)</option>
+          <option value="">Salle</option>
           {SALLES.map((s) => (
             <option key={s} value={s}>
               {s}
@@ -1343,17 +1406,19 @@ export default function CreateEventForm({
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="mb-1 block text-xs font-medium text-zinc-600">
-            Début
+          <label className="mb-1 flex items-center gap-1 text-xs font-medium text-zinc-600">
+            <Calendar className="h-3.5 w-3.5 shrink-0 text-court-green" />
+            Début<span className="text-amber-600">*</span>
           </label>
           <DateTimePicker value={startTime} onChange={handleStartTimeChange} />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-zinc-600">
+          <label className="mb-1 flex items-center gap-1 text-xs font-medium text-zinc-600">
+            <Clock className="h-3.5 w-3.5 shrink-0 text-sky-500" />
             Heure de fin
-            {scopeMode !== "bureau" && scopeMode !== "coachs" && eventType === "TRAINING"
-              ? " *"
-              : " (optionnel)"}
+            {scopeMode !== "bureau" && scopeMode !== "coachs" && eventType === "TRAINING" && (
+              <span className="text-amber-600">*</span>
+            )}
           </label>
           <input
             type="time"
@@ -1362,7 +1427,7 @@ export default function CreateEventForm({
             }
             value={endTime}
             onChange={(e) => setEndTime(e.target.value)}
-            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm [&::-webkit-calendar-picker-indicator]:hidden"
           />
         </div>
       </div>
@@ -1379,8 +1444,9 @@ export default function CreateEventForm({
           n'a que Début/Fin. */}
       {!isPersonalTask && (
       <div>
-        <label className="mb-1 block text-xs font-medium text-zinc-600">
-          Heure d&apos;arrivée (optionnel)
+        <label className="mb-1 flex items-center gap-1 text-xs font-medium text-zinc-600">
+          <Clock className="h-3.5 w-3.5 shrink-0 text-sky-500" />
+          Heure d&apos;arrivée
         </label>
         <div className="flex flex-wrap items-center gap-2">
           <select
@@ -1409,7 +1475,7 @@ export default function CreateEventForm({
               setImpactTime(e.target.value);
               setImpactMinutesBefore("");
             }}
-            className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+            className="rounded-lg border border-zinc-200 px-3 py-2 text-sm [&::-webkit-calendar-picker-indicator]:hidden"
           />
           {impactTime && (
             <button
@@ -1426,6 +1492,42 @@ export default function CreateEventForm({
         </div>
       </div>
       )}
+
+      <textarea
+        placeholder="Notes"
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        rows={2}
+        className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+      />
+
+      </div>
+
+      {/* Retour de Cindy du 20/09 ("options avancées fermées par défaut,
+          un simple toggle/chevron pour l'ouvrir") : même patron que le
+          bandeau repliable "Tarifs par catégorie" (category-tariffs-editor.tsx)
+          -- bouton pleine largeur, chevron dans un cercle, contenu affiché
+          seulement si ouvert. Regroupe Répéter/Événement payant/Inclure des
+          personnes/Besoins/Commissions, chacune gardant sa propre condition
+          d'affichage interne (inchangée) -- seul l'emballage change. */}
+      {hasAdvancedOptions && (
+        // Retour de Cindy du 21/09 ("plus visible aussi, couleur de fond") :
+        // bg-zinc-50/60 se confondait avec le fond crème de la page --
+        // teinte navy légère, même principe que le bandeau repliable
+        // "Tarifs par catégorie" (category-tariffs-editor.tsx, bg-ubac-yellow/15).
+        <div className="overflow-hidden rounded-2xl border border-navy/15 bg-navy/5">
+          <button
+            type="button"
+            onClick={() => setAdvancedOpen((v) => !v)}
+            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-navy/10"
+          >
+            <span className="text-sm font-semibold text-navy">Options avancées</span>
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-navy/20 bg-white text-navy">
+              {advancedOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </span>
+          </button>
+          {advancedOpen && (
+            <div className="flex flex-col gap-3 border-t border-navy/15 bg-white p-3">
 
       {/* Retour de Cindy du 12/09 ("Répéter") : uniquement à la création
           (jamais en édition, voir !isEditing) -- une occurrence déjà en
@@ -1527,7 +1629,7 @@ export default function CreateEventForm({
             <div className="flex flex-col gap-2">
               <div>
                 <label className="mb-1 block text-xs font-medium text-zinc-600">
-                  Tarif (€) *
+                  Tarif (€)<span className="ml-0.5 text-amber-600">*</span>
                 </label>
                 <input
                   type="number"
@@ -1541,7 +1643,7 @@ export default function CreateEventForm({
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-zinc-600">
-                  Lien HelloAsso (optionnel)
+                  Lien HelloAsso
                 </label>
                 <input
                   type="url"
@@ -1564,14 +1666,6 @@ export default function CreateEventForm({
         </div>
       )}
 
-      <textarea
-        placeholder="Notes (optionnel)"
-        value={notes}
-        onChange={(e) => setNotes(e.target.value)}
-        rows={2}
-        className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-      />
-
       {/* "+ Inclure aussi..." : ajout facultatif par-dessus n'importe
           quelle autre portée (équipe, tout le club, Réunion...) -- retour
           de Cindy du 18/09 ("les inclure dans des événements") : le coach
@@ -1582,11 +1676,15 @@ export default function CreateEventForm({
           vrai champ (libellé + cadre) plutôt qu'un simple lien, pour ne
           plus se confondre avec du texte d'aide. Repliable (jamais ouvert
           par défaut) pour ne pas alourdir le formulaire quand personne
-          n'en a besoin. */}
-      {allowClubWide && scopeMode !== "profiles" && (
+          n'en a besoin. Retour de Cindy du 20/09 (accordéon "Options
+          avancées") : ce bloc vit désormais dans l'accordéon, dont l'en-tête
+          (hasAdvancedOptions) exige déjà scopeMode !== "profiles" pour
+          s'afficher (chacune de ses trois clauses l'exige) -- la revérifier
+          ici est devenu redondant (TypeScript le prouve, TS2367), retirée. */}
+      {allowClubWide && (
         <div className="flex flex-col gap-1.5">
           <span className="text-xs font-medium text-zinc-600">
-            Inclure des personnes en plus (optionnel)
+            Inclure des personnes en plus
           </span>
           {showIncludeProfiles ? (
             <ProfilePicker
@@ -1630,7 +1728,7 @@ export default function CreateEventForm({
           (existingNeeds), modifiables/supprimables ici comme sur la carte. */}
       <div className="flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3">
           <p className="text-xs font-medium text-zinc-600">
-            Besoins d&apos;organisation (optionnel)
+            Besoins d&apos;organisation
           </p>
           {draftNeeds.length > 0 && (
             <div className="flex flex-col gap-1.5">
@@ -1703,7 +1801,7 @@ export default function CreateEventForm({
           cache tout seul, mais pas le libellé qui l'entoure ici). */}
       {commissionGroups.length > 0 && (
         <div className="flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3">
-          <p className="text-xs font-medium text-zinc-600">Commissions concernées (optionnel)</p>
+          <p className="text-xs font-medium text-zinc-600">Commissions concernées</p>
           <CommissionMultiSelect
             commissions={commissionGroups}
             selectedIds={commissionGroupIds}
@@ -1714,32 +1812,47 @@ export default function CreateEventForm({
         </>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+            </div>
+          )}
+        </div>
+      )}
 
-      <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={loading}
-          className="rounded-full bg-ubac-yellow px-4 py-2 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
-        >
-          {loading
-            ? isEditing
-              ? "Enregistrement..."
-              : "Création..."
-            : isEditing
-              ? "Enregistrer"
-              : "Créer"}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            resetFields();
-            onClose();
-          }}
-          className="rounded-full border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
-        >
-          Annuler
-        </button>
+      </div>
+
+      {/* Retour de Cindy du 20/09 ("barre sticky en bas, pour qu'elle reste
+          visible sans avoir à scroller") : le formulaire n'est pas dans une
+          modale avec son propre scroll (rendu en ligne dans la page), donc
+          sticky s'accroche naturellement au bas du VIEWPORT pendant le
+          défilement de la page -- les marges négatives compensent le
+          padding du <form> pour que la barre touche les bords de la carte. */}
+      <div className="sticky bottom-0 -mx-5 -mb-5 flex flex-col gap-2 rounded-b-2xl border-t border-zinc-100 bg-white px-5 py-3">
+        {error && <p className="text-sm text-red-600">{error}</p>}
+
+        <div className="flex gap-2">
+          <button
+            type="submit"
+            disabled={loading}
+            className="rounded-full bg-ubac-yellow px-4 py-2 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+          >
+            {loading
+              ? isEditing
+                ? "Enregistrement..."
+                : "Création..."
+              : isEditing
+                ? "Enregistrer"
+                : "Créer"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              resetFields();
+              onClose();
+            }}
+            className="rounded-full border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+          >
+            Annuler
+          </button>
+        </div>
       </div>
     </form>
   );

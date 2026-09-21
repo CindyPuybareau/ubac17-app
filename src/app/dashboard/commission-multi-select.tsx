@@ -38,17 +38,15 @@ export default function CommissionMultiSelect({
         type="button"
         onClick={() => setOpen((o) => !o)}
         className={`flex items-center gap-1.5 rounded-full border px-2 py-1.5 text-xs font-medium transition-colors ${
-          // Retour de Cindy du 12/09 ("l'onglet déroulant commissions et
-          // administration devrait être d'une autre couleur", puis "pas
-          // violet, un contour sympa en rapport avec la maquette ubac") :
-          // même contour or que les autres pastilles de marque de l'appli
-          // (bouton "Aujourd'hui", toggle "Matchs officiels du club") --
-          // reconnaissable au premier coup d'œil parmi les autres dropdowns
-          // de la carte (TeamFilterDropdown/EventTypeFilterDropdown, tous en
-          // navy/blanc/zinc), sans sortir de la charte graphique du club.
+          // Retour de Cindy du 20/09 ("il apparaît en pilule orange pleine
+          // même quand rien n'est sélectionné, ce qui donne l'impression
+          // trompeuse qu'une option est déjà active") : l'état vide reprend
+          // désormais le même gris neutre que les autres contrôles non
+          // actifs du formulaire (ex. boutons "Ajouter...") -- seul l'état
+          // avec sélection garde l'accent or de marque.
           selectedIds.length > 0
             ? "border-transparent bg-ubac-yellow text-navy"
-            : "border-ubac-yellow bg-ubac-yellow/10 text-ubac-yellow-dark hover:bg-ubac-yellow/20"
+            : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
         }`}
       >
         {label}
