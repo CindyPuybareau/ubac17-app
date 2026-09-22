@@ -42,8 +42,17 @@ export default function TeamSelectorPills({
         // Couleur de la pastille dérivée du rôle — même logique que le
         // badge Coach/Joueur juste à droite, pour que les deux se
         // répondent visuellement au lieu de choisir une teinte au hasard.
-        const badgeColor =
-          t.role === "PLAYER" ? "bg-emerald-500" : t.role === "COACH" ? "bg-navy" : "bg-zinc-400";
+        // Retour de Cindy du 21/09 ("icône des équipes en bleu quand
+        // sélectionnée") : l'état actif prime sur la couleur de rôle --
+        // surtout visible côté Bureau (pas de rôle, pastille grise même
+        // sélectionnée jusqu'ici).
+        const badgeColor = isActive
+          ? "bg-navy"
+          : t.role === "PLAYER"
+            ? "bg-emerald-500"
+            : t.role === "COACH"
+              ? "bg-navy"
+              : "bg-zinc-400";
         return (
           <button
             key={t.id}

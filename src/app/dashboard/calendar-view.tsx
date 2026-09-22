@@ -21,12 +21,15 @@ import {
   Mail,
   MapPin,
   ListOrdered,
+  Minus,
   Pencil,
   PartyPopper,
   Plus,
   Sparkles,
   StickyNote,
   Trash2,
+  TrendingDown,
+  TrendingUp,
   Users,
   X,
 } from "lucide-react";
@@ -77,6 +80,7 @@ import MatchOfficialsPanel from "./match-officials-panel";
 import ConfirmDialog from "./confirm-dialog";
 import OrganisationCard from "./organisation-card";
 import MatchResultCelebration from "@/components/match-result-celebration";
+import type { FfbbRankingEntry } from "@/lib/ffbb";
 
 const emptyEventTasks: EventTasksState = {};
 const emptyVolunteerNeeds: VolunteerNeed[] = [];
@@ -902,6 +906,68 @@ export default function CalendarView({
   const activeMemberTeamIds =
     sortedResultsTeams.find((t) => t.id === activeResultsTeamIdResolved)?.memberTeamIds ??
     (activeResultsTeamIdResolved != null ? [activeResultsTeamIdResolved] : []);
+
+  // Carte "Classement" (retour de Cindy du 21/09) : chargée à part, côté
+  // client, plutôt que dans le gros payload serveur de page.tsx -- ne
+  // sert qu'à cet endroit précis (vues Résultats/Matchs officiels), pas à
+  // chaque chargement du tableau de bord. Un fetch direct vers la FFBB
+  // depuis le navigateur se heurterait à sa politique CORS (déjà vu sur
+  // notifications_for_me) : /api/ffbb-ranking relaie donc la demande côté
+  // serveur.
+  //
+  // Retour de Cindy du 21/09 ("U13M, Séniors M, U18M n'auront jamais de
+  // match officiel ni de lien FFBB -- seules leurs déclinaisons en ont un,
+  // U13M-1/U13M-2, Séniors 1/Séniors 2...") : l'onglet actif peut fusionner
+  // une équipe mère SANS lien FFBB avec une ou plusieurs déclinaisons qui
+  // EN ONT un, chacune dans sa PROPRE poule (voir activeMemberTeamIds
+  // ci-dessus) -- un classement par équipe fusionnée ne suffit donc pas.
+  // On interroge chaque vraie équipe représentée par l'onglet (1 à 2-3
+  // selon les cas, jamais plus -- pas une vraie "boucle" au sens de la
+  // règle de performance du CLAUDE.md, borné par le nombre d'équipes que
+  // CE coach gère) et on ne garde que celles qui répondent avec un vrai
+  // classement -- la mère sans lien FFBB configuré ressort vide en
+  // silence (déjà géré par /api/ffbb-ranking), donc n'affiche simplement
+  // rien plutôt qu'une carte "pas encore publié" en trop.
+  const [ffbbRanking, setFfbbRanking] = useState<{
+    status: "idle" | "loading" | "loaded" | "error";
+    forKey: string | null;
+    results: { teamId: string; entries: FfbbRankingEntry[] }[];
+  }>({ status: "idle", forKey: null, results: [] });
+
+  const showRankingCard =
+    resultsTeamSelector !== "dropdown" &&
+    (view === "results" || view === "officialMatches" || view === "officialResults") &&
+    sortedResultsTeams.length > 0 &&
+    Boolean(activeResultsTeamIdResolved);
+
+  const activeMemberTeamIdsKey = activeMemberTeamIds.join(",");
+  useEffect(() => {
+    if (!showRankingCard || activeMemberTeamIdsKey === "") return;
+    const teamIds = activeMemberTeamIdsKey.split(",");
+    let cancelled = false;
+    setFfbbRanking({ status: "loading", forKey: activeMemberTeamIdsKey, results: [] });
+    Promise.all(
+      teamIds.map((teamId) =>
+        fetch(`/api/ffbb-ranking?teamId=${teamId}`)
+          .then((res) => res.json())
+          .then((data: { ranking?: FfbbRankingEntry[] }) => ({
+            teamId,
+            entries: data.ranking ?? [],
+          }))
+          .catch(() => ({ teamId, entries: [] as FfbbRankingEntry[] }))
+      )
+    ).then((results) => {
+      if (cancelled) return;
+      setFfbbRanking({
+        status: "loaded",
+        forKey: activeMemberTeamIdsKey,
+        results: results.filter((r) => r.entries.length > 0),
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeMemberTeamIdsKey, showRankingCard]);
 
   function matchesTeamFilter(e: AdminUpcomingEvent) {
     if (!resultsTeams || resultsTeams.length <= 1) return true;
@@ -2075,27 +2141,20 @@ export default function CalendarView({
                 month: "short",
               })}
             </span>
+            {/* Retour de Cindy du 21/09 ("une erreur pourrait être commise")
+                : pas de bouton Supprimer ici -- ces matchs viennent de la
+                synchro FFBB, les effacer par erreur n'a rien d'anodin
+                (contrairement à "Modifier", gardé pour corriger un score).
+                Toujours possible de vraiment les supprimer depuis le
+                Calendrier normal si un jour il le faut vraiment. */}
             {canManageEvent && (
-              <>
-                <button
-                  onClick={() => startEditingEvent(event)}
-                  title="Modifier"
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
-                >
-                  <Pencil className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => {
-                    setDeleteEventTarget(event);
-                    setDeleteCollecteToo(false);
-                    setDeleteSeriesScope("one");
-                  }}
-                  title="Supprimer"
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-red-400 hover:bg-red-50 hover:text-red-600"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </>
+              <button
+                onClick={() => startEditingEvent(event)}
+                title="Modifier"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
             )}
           </div>
         </div>
@@ -2192,7 +2251,11 @@ export default function CalendarView({
           {/* Retour de Cindy du 2026-08-22 : l'action principale de l'écran
               passe avant la navigation de date (flèches + mois), pas
               après. */}
-          {canManage && (
+          {/* Retour de Cindy du 21/09 : rien à créer manuellement depuis
+              "Matchs officiels"/"Résultats" -- ces événements viennent de
+              la synchro FFBB (onglet FFBB), pas d'une création à la main
+              ici. */}
+          {canManage && view !== "officialMatches" && view !== "officialResults" && (
             <button
               onClick={() => setCreateOpen((v) => !v)}
               className="flex items-center gap-1.5 rounded-full bg-ubac-yellow px-4 py-2 text-sm font-semibold text-navy shadow-sm transition-colors hover:bg-ubac-yellow-dark"
@@ -2594,34 +2657,115 @@ export default function CalendarView({
               onSelect={setActiveResultsTeamId}
             />
           )}
-          {/* Emplacement réservé du classement officiel FFBB, propre à une
-              équipe précise (chaque équipe joue dans sa propre poule) —
-              n'a donc de sens qu'avec le sélecteur "une équipe active à la
-              fois", jamais en mode case à cocher (plusieurs équipes en
-              même temps) ni pour les vues qui ne sont pas centrées sur les
-              matchs officiels. Pas encore de données à afficher : la FFBB
-              ne publie le classement qu'une fois les premiers résultats de
-              la saison tombés. Cette carte disparaît d'elle-même le jour
-              où le classement réel prend sa place ici — même
-              emplacement, pas de nouvel onglet à chercher. */}
-          {resultsTeamSelector !== "dropdown" &&
-            (view === "results" || view === "officialMatches" || view === "officialResults") &&
-            sortedResultsTeams.length > 0 && (
-              <div className="flex items-start gap-2 rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/60 px-4 py-3">
-                <ListOrdered className="h-4 w-4 shrink-0 text-zinc-400" />
-                <p className="text-sm text-zinc-500">
-                  <span className="font-semibold text-zinc-600">Classement</span>
-                  {(() => {
-                    const activeTeam = sortedResultsTeams.find(
-                      (t) => t.id === activeResultsTeamIdResolved
+          {/* Classement officiel FFBB, propre à une équipe précise (chaque
+              équipe joue dans sa propre poule) — n'a donc de sens qu'avec
+              le sélecteur "une équipe active à la fois", jamais en mode
+              case à cocher (plusieurs équipes en même temps) ni pour les
+              vues qui ne sont pas centrées sur les matchs officiels.
+              Retour de Cindy du 21/09 : chargé via /api/ffbb-ranking
+              (voir ffbbRanking plus haut) — l'équipe elle-même et les
+              quelques équipes autour d'elle dans sa poule, jamais la
+              poule entière (limite du widget FFBB source, acceptée par
+              Cindy : "je ne veux que l'équipe concernée"). */}
+          {showRankingCard &&
+            (() => {
+              const activeTeam = sortedResultsTeams.find(
+                (t) => t.id === activeResultsTeamIdResolved
+              );
+              const label = activeTeam ? ` — ${teamLabel(activeTeam)}` : "";
+              const isCurrent = ffbbRanking.forKey === activeMemberTeamIdsKey;
+
+              if (!isCurrent || ffbbRanking.status === "loading") {
+                return (
+                  <div className="flex items-center gap-2 rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/60 px-4 py-3">
+                    <ListOrdered className="h-4 w-4 shrink-0 animate-pulse text-navy" />
+                    <p className="text-sm text-zinc-500">
+                      <span className="font-semibold text-zinc-600">Classement{label}</span> :
+                      chargement…
+                    </p>
+                  </div>
+                );
+              }
+
+              // Aucune des vraies équipes représentées par cet onglet n'a de
+              // classement FFBB (lien non configuré, ou -- cas normal pour
+              // une équipe mère comme U13M/U18M/Séniors M -- pas de lien du
+              // tout puisqu'elle ne joue jamais elle-même, voir commentaire
+              // de ffbbRanking plus haut).
+              if (ffbbRanking.results.length === 0) {
+                return (
+                  <div className="flex items-start gap-2 rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/60 px-4 py-3">
+                    <ListOrdered className="h-4 w-4 shrink-0 text-navy" />
+                    <p className="text-sm text-zinc-500">
+                      <span className="font-semibold text-zinc-600">Classement{label}</span> :
+                      pas encore publié par la FFBB — apparaîtra ici automatiquement dès les
+                      premiers résultats de la saison.
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="flex flex-col gap-3">
+                  {ffbbRanking.results.map(({ teamId, entries }) => {
+                    // Le nom affiché ici vient de la FFBB elle-même (ligne
+                    // "isOwnTeam" du classement) plutôt que du nom interne
+                    // U13M-1/U13M-2 : la déclinaison qu'on interroge n'est
+                    // pas connue par son nom à cet endroit (seul son id
+                    // l'est, via memberTeamIds), et la FFBB distingue déjà
+                    // clairement ses propres équipes d'un même club (ex.
+                    // "... - 2").
+                    const ownEntry = entries.find((e) => e.isOwnTeam);
+                    const cardLabel = ownEntry ? ` — ${ownEntry.label}` : label;
+                    return (
+                      <div
+                        key={teamId}
+                        className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm"
+                      >
+                        <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-900">
+                          <ListOrdered className="h-4 w-4 shrink-0 text-navy" />
+                          Classement{cardLabel}
+                        </p>
+                        <div className="flex flex-col gap-1">
+                          {entries.map((entry) => {
+                            const positionNumber = Number(entry.position);
+                            const trend =
+                              entry.previousRanking != null && !Number.isNaN(positionNumber)
+                                ? entry.previousRanking - positionNumber
+                                : 0;
+                            return (
+                              <div
+                                key={`${entry.position}-${entry.label}`}
+                                className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm ${
+                                  entry.isOwnTeam
+                                    ? "bg-court-green/10 font-semibold text-court-green"
+                                    : "text-zinc-700"
+                                }`}
+                              >
+                                <span className="w-5 shrink-0 text-center tabular-nums text-zinc-500">
+                                  {entry.position}
+                                </span>
+                                {trend > 0 ? (
+                                  <TrendingUp className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                                ) : trend < 0 ? (
+                                  <TrendingDown className="h-3.5 w-3.5 shrink-0 text-red-500" />
+                                ) : (
+                                  <Minus className="h-3.5 w-3.5 shrink-0 text-zinc-300" />
+                                )}
+                                <span className="flex-1 truncate">{entry.label}</span>
+                                <span className="shrink-0 tabular-nums text-zinc-500">
+                                  {entry.points} pts
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
                     );
-                    return activeTeam ? ` — ${teamLabel(activeTeam)}` : "";
-                  })()}{" "}
-                  : pas encore publié par la FFBB — apparaîtra ici automatiquement dès les
-                  premiers résultats de la saison.
-                </p>
-              </div>
-            )}
+                  })}
+                </div>
+              );
+            })()}
           {seasonListEvents.length === 0 ? (
             <EmptyState
               icon={CalendarDays}

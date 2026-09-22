@@ -174,3 +174,46 @@ export function groupTeamsByPrimarySecondary<
     secondaries: secondariesByPrimaryId.get(t.id) ?? [],
   }));
 }
+
+// Retour de Cindy du 21/09 ("jamais un match officiel ou résultats
+// n'apparaîtra chez les U13M ni les U18M ni les Séniors M -- les
+// concernées sont toujours les déclinaisons, U13M-1/U13M-2, Séniors
+// 1/Séniors 2") : contrairement au Calendrier (où fusionner mère +
+// déclinaisons en un seul onglet a du sens -- un entraînement peut être
+// commun), les vues Matchs officiels/Résultats n'ont rien à faire d'un
+// onglet pour une mère qui, dans les faits, ne joue jamais elle-même. Une
+// catégorie non scindée (ex. "U13F", pas de "-1"/"-2") garde son propre
+// onglet, elle -- elle joue directement sous son nom.
+// Constaté en test réel du 21/09 : "Séniors M" restait affichée à côté de
+// "Séniors 1"/"Séniors 2" -- groupTeamsByPrimarySecondary (texte exact)
+// ne les voit PAS comme le même groupe, contrairement à "U13M"/"U13M-1"
+// (le "M" du genre est répété dans les DEUX cas pour U13M, mais retiré
+// des déclinaisons côté Séniors -- "Séniors 1", pas "Séniors M-1"). Repli
+// ici sur une clé plus tolérante (numéro de déclinaison ET lettre de
+// genre finale retirés) plutôt que de toucher splitTeamName/
+// groupTeamsByPrimarySecondary eux-mêmes, utilisés ailleurs (Calendrier)
+// où ce cas n'a jamais été signalé comme un problème.
+function looseFamilyKey(label: string): string {
+  return label
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toUpperCase()
+    .replace(/[\s_-]*\d+$/, "")
+    .replace(/\s+[MF]$/, "")
+    .trim();
+}
+
+export function listTeamsForOfficialMatches<
+  T extends { id: string; name?: string | null; category?: string | null },
+>(teams: T[]): T[] {
+  const withRank = teams.map((t) => {
+    const label = t.name ?? t.category ?? "";
+    return { team: t, base: looseFamilyKey(label), rank: splitTeamName(label).rank };
+  });
+  const basesWithDeclinaison = new Set(
+    withRank.filter((e) => e.rank > 0).map((e) => e.base)
+  );
+  return withRank
+    .filter((e) => e.rank > 0 || !basesWithDeclinaison.has(e.base))
+    .map((e) => e.team);
+}

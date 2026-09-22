@@ -30,6 +30,7 @@ import ImportPlanning from "./import-planning";
 import ImportCoaches from "./import-coaches";
 import CotisationsManager from "./cotisations-manager";
 import CalendarView from "./calendar-view";
+import { listTeamsForOfficialMatches, splitTeamName } from "@/lib/teams";
 import MembersTable from "./members-table";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import FfbbManager from "./ffbb-manager";
@@ -131,6 +132,46 @@ export default function AdminView({
     name: t.name,
     category: t.category,
   }));
+
+  // Retour de Cindy du 21/09 ("Matchs officiels" côté Bureau, scroller un
+  // tas de matchs mélangés n'est pas pratique) : onglets cliquables (une
+  // équipe à la fois, comme côté Coach) au lieu du menu déroulant à cases
+  // à cocher -- et les équipes mères (U13M, U18M, Séniors M...) qui ne
+  // joueront jamais elles-mêmes sont retirées de la liste (voir
+  // listTeamsForOfficialMatches, lib/teams.ts). Limité à "Matchs
+  // officiels" seulement (voir plus bas) : "Résultats" garde le
+  // dropdown/teamRefs habituels, pas demandé ici.
+  // Retour de Cindy du 21/09 : ordre par ancienneté plutôt que l'ordre
+  // d'apparition habituel (sortTeamsByGroup) -- Séniors d'abord, puis U18,
+  // U15, U13, U11, U9, Babys, et Loisirs tout à la fin. Propre à cette
+  // liste (Bureau, Matchs officiels) : sortTeamsByGroup garde son
+  // comportement habituel partout ailleurs.
+  function seniorityBucket(label: string): number {
+    const upper = label
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .toUpperCase();
+    if (/SENIOR/.test(upper)) return 0;
+    const youth = upper.match(/^U(\d{1,2})/);
+    if (youth) {
+      const age = Number(youth[1]);
+      if (age >= 18) return 1;
+      if (age >= 15) return 2;
+      if (age >= 13) return 3;
+      if (age >= 11) return 4;
+      return 5; // U9 et en-dessous
+    }
+    if (/BABY/.test(upper)) return 6;
+    if (/LOISIR/.test(upper)) return 7;
+    return 8;
+  }
+  const teamRefsForOfficialMatches = listTeamsForOfficialMatches(teamRefs).sort((a, b) => {
+    const labelA = a.name ?? a.category ?? "";
+    const labelB = b.name ?? b.category ?? "";
+    const bucketDiff = seniorityBucket(labelA) - seniorityBucket(labelB);
+    if (bucketDiff !== 0) return bucketDiff;
+    return splitTeamName(labelA).rank - splitTeamName(labelB).rank;
+  });
 
   // Retour de Cindy du 10/09 ("Accès Commissions & Administration") :
   // liste des commissions pour rattacher un besoin en bénévoles à la
@@ -351,8 +392,7 @@ export default function AdminView({
               createTeams={teamRefs}
               allowClubWide
               forcedView="officialMatches"
-              resultsTeams={teamRefs}
-              resultsTeamSelector="dropdown"
+              resultsTeams={teamRefsForOfficialMatches}
               eventRoles={eventRoles}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
               commissionGroups={commissionGroups}
@@ -387,7 +427,11 @@ export default function AdminView({
           icon: <RefreshCw className={iconClass} />,
           content: (
             <div className="flex flex-col gap-4">
-              <FfbbManager teams={teams} />
+              {/* Retour de Cindy du 21/09 ("même chose dans l'onglet FFBB") :
+                  même filtre que Matchs officiels -- une mère (U13M, U18M,
+                  Séniors M...) n'a jamais de lien FFBB à gérer, elle ne
+                  joue jamais elle-même. */}
+              <FfbbManager teams={listTeamsForOfficialMatches(teams)} />
               <ImportInscriptions />
               <ImportPlanning existingTeams={teamRefs} />
               <ImportCoaches existingTeams={teamRefs} />

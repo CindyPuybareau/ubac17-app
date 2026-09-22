@@ -119,17 +119,34 @@ export async function POST(request: Request) {
       title: m.opponent ? `${m.isHome ? "vs" : "@"} ${m.opponent}` : `Match ${m.journee}`,
       location: m.isHome ? "Domicile" : "Extérieur",
       startTime: m.startTime as string,
+      // Retour de Cindy du 21/09 ("les résultats ne s'affichent pas en
+      // automatique dans les cartes") : voir ownScore/opponentScore dans
+      // FfbbMatch (lib/ffbb.ts) -- null tant que la FFBB n'a pas encore
+      // publié le score.
+      ownScore: m.ownScore,
+      opponentScore: m.opponentScore,
     }));
 
   if (candidates.length > 0) {
+    // Retour de Cindy du 21/09 ("un match qui s'ajoute à celui réel à la
+    // même date, je ne le vois même pas sur la FFBB") : la FFBB renumérote
+    // parfois un match déjà synchronisé (constaté en direct : le match
+    // UBAC/SAINT ROGATIEN du 19/09 portait le numéro 693 lors de sa
+    // première synchro, la FFBB le sert maintenant sous le numéro 691 --
+    // 693 n'existe même plus sur leur page). external_uid ("ffbb-693")
+    // reste donc figé sur l'ancien numéro : sans repli, "ffbb-691" ne
+    // correspond à aucune ligne connue, la synchro le prend pour un TOUT
+    // NOUVEAU match et le crée en double à côté du vrai (cette route ne
+    // supprime jamais rien). D'où l'élargissement de la lecture à tout
+    // l'historique de matchs de l'équipe (une seule requête, toujours) et
+    // le repli par (team_id, start_time) : une équipe ne joue qu'un seul
+    // match à un instant donné, une correspondance ici veut donc dire
+    // "même match renuméroté", pas un second match.
     const { data: existingRows, error: existingError } = await supabase
       .from("events")
-      .select("id, external_uid, title, location, start_time")
+      .select("id, external_uid, title, location, start_time, team_score, opponent_score")
       .eq("team_id", teamId)
-      .in(
-        "external_uid",
-        candidates.map((c) => c.externalUid)
-      );
+      .eq("event_type", "MATCH");
 
     if (existingError) {
       console.error("[sync-ffbb] select events existants échoué:", existingError);
@@ -137,17 +154,44 @@ export async function POST(request: Request) {
     }
 
     const existingByUid = new Map((existingRows ?? []).map((r) => [r.external_uid, r]));
+    // Clé numérique (epoch), pas la chaîne brute : Supabase ne renvoie pas
+    // forcément start_time dans le même format ISO que celui produit ici
+    // (toISOString(), voir ffbb.ts) -- une comparaison de chaînes ratait
+    // silencieusement des horaires pourtant identiques.
+    const existingByStartTime = new Map(
+      (existingRows ?? []).map((r) => [new Date(r.start_time).getTime(), r])
+    );
 
-    const toInsert = candidates.filter((c) => !existingByUid.has(c.externalUid));
-    const toUpdate = candidates.filter((c) => {
-      const existing = existingByUid.get(c.externalUid);
-      if (!existing) return false;
-      return (
-        existing.title !== c.title ||
-        existing.location !== c.location ||
-        existing.start_time !== c.startTime
-      );
-    });
+    const toInsert: typeof candidates = [];
+    const toUpdate: { id: string; candidate: (typeof candidates)[number] }[] = [];
+
+    for (const c of candidates) {
+      const byUid = existingByUid.get(c.externalUid);
+      if (byUid) {
+        // start_time comparé en epoch, pas en chaîne (voir commentaire sur
+        // existingByStartTime) : sinon une re-synchro sans rien de neuf
+        // réécrivait quand même la ligne à chaque fois, juste parce que le
+        // format ISO renvoyé par Supabase diffère de celui produit ici.
+        const scoreChanged =
+          c.ownScore != null &&
+          (byUid.team_score !== c.ownScore || byUid.opponent_score !== c.opponentScore);
+        if (
+          byUid.title !== c.title ||
+          byUid.location !== c.location ||
+          new Date(byUid.start_time).getTime() !== new Date(c.startTime).getTime() ||
+          scoreChanged
+        ) {
+          toUpdate.push({ id: byUid.id, candidate: c });
+        }
+        continue;
+      }
+      const byStartTime = existingByStartTime.get(new Date(c.startTime).getTime());
+      if (byStartTime) {
+        toUpdate.push({ id: byStartTime.id, candidate: c });
+        continue;
+      }
+      toInsert.push(c);
+    }
 
     if (toInsert.length > 0) {
       const { error } = await supabase.from("events").insert(
@@ -158,13 +202,14 @@ export async function POST(request: Request) {
           start_time: c.startTime,
           team_id: teamId,
           external_uid: c.externalUid,
+          team_score: c.ownScore,
+          opponent_score: c.opponentScore,
         }))
       );
       if (!error) inserted += toInsert.length;
     }
 
-    for (const c of toUpdate) {
-      const existing = existingByUid.get(c.externalUid)!;
+    for (const { id, candidate: c } of toUpdate) {
       const { error } = await supabase
         .from("events")
         .update({
@@ -172,8 +217,20 @@ export async function POST(request: Request) {
           event_type: "MATCH" as const,
           location: c.location,
           start_time: c.startTime,
+          // Adopte le nouveau numéro FFBB sur la ligne déjà là (cas du
+          // repli par start_time) -- les prochaines synchros la
+          // retrouveront directement par external_uid, plus par repli.
+          external_uid: c.externalUid,
+          // Retour de Cindy du 21/09 ("les résultats ne s'affichent pas en
+          // automatique") : uniquement quand la FFBB a réellement publié
+          // un score (jamais null) -- sinon un score déjà saisi à la main
+          // avant que la FFBB publie le sien se ferait écraser par du vide
+          // à chaque re-synchro.
+          ...(c.ownScore != null
+            ? { team_score: c.ownScore, opponent_score: c.opponentScore }
+            : {}),
         })
-        .eq("id", existing.id);
+        .eq("id", id);
       if (!error) updated += 1;
     }
   }

@@ -6,6 +6,32 @@ export type FfbbMatch = {
   isHome: boolean;
   opponent: string | null;
   startTime: string | null;
+  // Retour de Cindy du 21/09 ("les résultats ne s'affichent pas en
+  // automatique dans les cartes") : la synchro n'importait jusqu'ici que
+  // le calendrier (adversaire/date), jamais le score une fois le match
+  // joué -- à saisir à la main via "Ajouter le score". La FFBB publie
+  // pourtant déjà le score dans le même bloc JSON que la date (voir
+  // parseScoresByMatchNumber plus bas) : null tant que le match n'est pas
+  // joué, ou que son score n'a pas encore été saisi côté FFBB.
+  ownScore: number | null;
+  opponentScore: number | null;
+};
+
+// Retour de Cindy du 21/09 : la carte "Classement" du calendrier
+// (Résultats/Matchs officiels) était un texte statique en dur, jamais
+// branché à une vraie donnée. La page FFBB d'une équipe embarque un
+// widget "Classement officiel de l'équipe" -- l'équipe elle-même et les
+// quelques équipes autour d'elle dans sa poule (jamais la poule entière :
+// pas trouvé de source exploitable côté serveur pour ça, et retour de
+// Cindy explicite -- "je ne veux que l'équipe concernée, les autres
+// poules ne m'intéressent pas").
+export type FfbbRankingEntry = {
+  position: string;
+  label: string;
+  points: string;
+  previousRanking: number | null;
+  isOwnTeam: boolean;
+  logo: string | null;
 };
 
 const FRENCH_MONTHS: Record<string, number> = {
@@ -122,6 +148,49 @@ function parseDateRencontreMap(html: string): Map<string, string> {
   return map;
 }
 
+// Même bloc JSON que dateRencontreByMatchNumber (voir son commentaire),
+// avec en plus resultatEquipe1/resultatEquipe2 ("null" tant que le match
+// n'est pas joué) et l'identifiant FFBB de chaque équipe -- indispensable
+// pour savoir LAQUELLE des deux est la nôtre (resultatEquipe1 n'est pas
+// toujours "nous", ça dépend de qui la FFBB liste en premier pour ce
+// match précis, pas de domicile/extérieur). [\s\S]*? (pas [^{}]*?) entre
+// les deux id : le contenu entre les deux est un objet imbriqué à
+// plusieurs niveaux (idOrganisme, logo...), qu'un simple "tout sauf
+// accolade" ne saurait pas traverser -- validé en direct sur la page
+// FFBB réelle (5 matchs, joués et à venir, tous correctement extraits)
+// avant d'être posé ici.
+function parseScoresByMatchNumber(
+  html: string,
+  ownTeamFfbbId: string
+): Map<string, { ownScore: number; opponentScore: number }> {
+  const normalized = html.replace(/\\"/g, '"');
+  const re =
+    /"date_rencontre":"[^"]+","joue":(?:true|false),"numero":"(\d+)","numeroJournee":"[^"]*","resultatEquipe1":(null|"\d+"),"resultatEquipe2":(null|"\d+")[\s\S]*?"idEngagementEquipe1":\{"id":"(\d+)"[\s\S]*?"idEngagementEquipe2":\{"id":"(\d+)"/g;
+  const map = new Map<string, { ownScore: number; opponentScore: number }>();
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(normalized)) !== null) {
+    const [, matchNumber, r1Raw, r2Raw, id1, id2] = m;
+    if (r1Raw === "null" || r2Raw === "null") continue;
+    const score1 = Number(r1Raw.replace(/"/g, ""));
+    const score2 = Number(r2Raw.replace(/"/g, ""));
+    if (id1 === ownTeamFfbbId) {
+      map.set(matchNumber, { ownScore: score1, opponentScore: score2 });
+    } else if (id2 === ownTeamFfbbId) {
+      map.set(matchNumber, { ownScore: score2, opponentScore: score1 });
+    }
+  }
+  return map;
+}
+
+// Dernier segment numérique de teams.ffbb_url (.../equipes/200000005377830)
+// -- l'identifiant FFBB de l'ÉQUIPE elle-même (pas du club), indispensable
+// à parseScoresByMatchNumber pour distinguer notre score du score adverse.
+function extractOwnTeamFfbbId(url: URL): string | null {
+  const segments = url.pathname.split("/").filter(Boolean);
+  const last = segments[segments.length - 1];
+  return last && /^\d+$/.test(last) ? last : null;
+}
+
 // "2026-09-20T15:00:00" (naïf, sans fuseau) — c'est l'heure murale de
 // Paris telle qu'affichée aux joueurs après hydratation côté FFBB, donc la
 // même conversion que le texte scrappé (parisWallTimeToUtc).
@@ -141,7 +210,10 @@ function parseDateRencontre(value: string): string | null {
 
 // Pas exportée (nettoyage du 31/08) : utilisée uniquement par
 // fetchFfbbTeamCalendar ci-dessous, jamais ailleurs dans le repo.
-function parseFfbbTeamPage(html: string): FfbbMatch[] {
+function parseFfbbTeamPage(
+  html: string,
+  scoresByMatchNumber: Map<string, { ownScore: number; opponentScore: number }>
+): FfbbMatch[] {
   const $ = cheerio.load(html);
   const matches: FfbbMatch[] = [];
   const dateRencontreByMatchNumber = parseDateRencontreMap(html);
@@ -164,16 +236,79 @@ function parseFfbbTeamPage(html: string): FfbbMatch[] {
       ? (parseDateRencontre(dateRencontre) ?? parseFrenchMatchDate(dateHeure))
       : parseFrenchMatchDate(dateHeure);
 
+    const score = scoresByMatchNumber.get(matchNumber);
     matches.push({
       matchNumber,
       journee,
       isHome: /domicile/i.test(domExt),
       opponent,
       startTime,
+      ownScore: score?.ownScore ?? null,
+      opponentScore: score?.opponentScore ?? null,
     });
   });
 
   return matches;
+}
+
+// Même bloc d'hydratation React que parseDateRencontreMap (guillemets
+// échappés en "\"" par endroits selon où Next.js l'a sérialisé) : un
+// tableau JSON "rankings" complet, imbriqué (objets "url"/"logo" par
+// ligne) -- une regex à plat ne suffit pas ici, contrairement à
+// dateRencontreByMatchNumber, d'où ce petit scanner à parenthésage qui
+// respecte les guillemets pour trouver la fin exacte du tableau avant de
+// le confier à JSON.parse.
+function parseFfbbRankings(html: string): FfbbRankingEntry[] {
+  const normalized = html.replace(/\\"/g, '"');
+  const marker = '"rankings":[';
+  const markerIndex = normalized.indexOf(marker);
+  if (markerIndex === -1) return [];
+
+  const arrayStart = markerIndex + marker.length - 1;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  let arrayEnd = -1;
+  for (let i = arrayStart; i < normalized.length; i++) {
+    const ch = normalized[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === "[") depth++;
+    else if (ch === "]") {
+      depth--;
+      if (depth === 0) {
+        arrayEnd = i;
+        break;
+      }
+    }
+  }
+  if (arrayEnd === -1) return [];
+
+  try {
+    const raw = JSON.parse(normalized.slice(arrayStart, arrayEnd + 1)) as {
+      position: string;
+      label: string;
+      points: string;
+      previousRanking: number | null;
+      selected: boolean;
+      logo: string | null;
+    }[];
+    return raw.map((r) => ({
+      position: r.position,
+      label: r.label,
+      points: r.points,
+      previousRanking: r.previousRanking ?? null,
+      isOwnTeam: Boolean(r.selected),
+      logo: r.logo ?? null,
+    }));
+  } catch {
+    return [];
+  }
 }
 
 // teams.ffbb_url est un champ texte libre que n'importe quel coach peut
@@ -216,7 +351,12 @@ function assertFfbbUrl(url: string): URL {
 // route.ts au lieu d'un silence total.
 const FFBB_FETCH_TIMEOUT_MS = 20_000;
 
-export async function fetchFfbbTeamCalendar(url: string): Promise<FfbbMatch[]> {
+// Extrait pour être réutilisé par fetchFfbbTeamRanking (retour de Cindy du
+// 21/09, carte "Classement") : même page FFBB, même garde-fous
+// (validation d'URL, délai, message d'erreur) -- comportement de
+// fetchFfbbTeamCalendar inchangé, juste sorti de la fonction pour ne pas
+// dupliquer ces garde-fous une deuxième fois.
+async function fetchFfbbHtml(url: string): Promise<string> {
   const validated = assertFfbbUrl(url);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FFBB_FETCH_TIMEOUT_MS);
@@ -237,6 +377,19 @@ export async function fetchFfbbTeamCalendar(url: string): Promise<FfbbMatch[]> {
   if (!res.ok) {
     throw new Error(`FFBB request failed with status ${res.status}`);
   }
-  const html = await res.text();
-  return parseFfbbTeamPage(html);
+  return res.text();
+}
+
+export async function fetchFfbbTeamCalendar(url: string): Promise<FfbbMatch[]> {
+  const html = await fetchFfbbHtml(url);
+  const ownTeamFfbbId = extractOwnTeamFfbbId(assertFfbbUrl(url));
+  const scoresByMatchNumber = ownTeamFfbbId
+    ? parseScoresByMatchNumber(html, ownTeamFfbbId)
+    : new Map<string, { ownScore: number; opponentScore: number }>();
+  return parseFfbbTeamPage(html, scoresByMatchNumber);
+}
+
+export async function fetchFfbbTeamRanking(url: string): Promise<FfbbRankingEntry[]> {
+  const html = await fetchFfbbHtml(url);
+  return parseFfbbRankings(html);
 }

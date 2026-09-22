@@ -17,7 +17,7 @@ import DocumentsPanel from "@/components/club-documents";
 import ClubReportsSection from "./club-reports-section";
 import Cd17LigueSection from "./cd17-ligue-section";
 import { BOUTIQUE_URL } from "./boutique";
-import { groupTeamsByPrimarySecondary } from "@/lib/teams";
+import { groupTeamsByPrimarySecondary, listTeamsForOfficialMatches } from "@/lib/teams";
 import CalendarView from "./calendar-view";
 import CalendarSubscribe from "./calendar-subscribe";
 import SpaceDashboardSummary from "./space-dashboard-summary";
@@ -181,6 +181,22 @@ export default function CoachView({
     role: teamRoleByTeamId[primary.id] ?? "COACH",
     memberTeamIds:
       secondaries.length > 0 ? [primary.id, ...secondaries.map((s) => s.id)] : undefined,
+  }));
+
+  // Retour de Cindy du 21/09 : les onglets "Matchs officiels"/"Résultats"
+  // ci-dessous utilisent cette liste-ci plutôt que resultsTeamsForCalendar
+  // -- une mère (U13M, U18M, Séniors M...) ne joue jamais elle-même,
+  // seules ses déclinaisons (U13M-1, U13M-2...) ont de vrais matchs/liens
+  // FFBB (voir listTeamsForOfficialMatches, lib/teams.ts). Le Calendrier
+  // garde lui la fusion habituelle (resultsTeamsForCalendar) -- un
+  // entraînement peut très bien être commun aux deux déclinaisons.
+  const resultsTeamsForOfficialMatches = listTeamsForOfficialMatches(
+    teams.filter((t) => teamRoleByTeamId[t.id] !== "PLAYER")
+  ).map((t) => ({
+    id: t.id,
+    name: t.name,
+    category: t.category,
+    role: teamRoleByTeamId[t.id] ?? "COACH",
   }));
 
   const iconClass = "h-4 w-4 shrink-0";
@@ -358,7 +374,7 @@ export default function CoachView({
               scopeTeams={createTeams}
               scopeTeamRoleById={teamRoleByTeamId}
               forcedView="officialMatches"
-              resultsTeams={resultsTeamsForCalendar}
+              resultsTeams={resultsTeamsForOfficialMatches}
               selfPlayerId={ownPlayerId}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
               celebrateWins
@@ -380,7 +396,7 @@ export default function CoachView({
               scopeTeams={createTeams}
               scopeTeamRoleById={teamRoleByTeamId}
               forcedView="officialResults"
-              resultsTeams={resultsTeamsForCalendar}
+              resultsTeams={resultsTeamsForOfficialMatches}
               selfPlayerId={ownPlayerId}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
               celebrateWins
@@ -393,7 +409,15 @@ export default function CoachView({
           key: "ffbb",
           label: "FFBB",
           icon: <RefreshCw className={iconClass} />,
-          content: <CoachFfbb teams={teams} teamRoleByTeamId={teamRoleByTeamId} />,
+          // Retour de Cindy du 21/09 ("même chose dans l'onglet FFBB") : même
+      // filtre que Matchs officiels -- une mère (U13M, U18M, Séniors M...)
+      // n'a jamais de lien FFBB à gérer, elle ne joue jamais elle-même.
+      content: (
+        <CoachFfbb
+          teams={listTeamsForOfficialMatches(teams)}
+          teamRoleByTeamId={teamRoleByTeamId}
+        />
+      ),
         },
       ],
     },
