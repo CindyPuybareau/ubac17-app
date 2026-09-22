@@ -31,7 +31,6 @@ export const MATCH_OFFICIAL_ROLES: { code: MatchOfficialRoleCode; label: string;
   { code: "ARBITRE_1", label: "Arbitre 1", icon: "Flag" },
   { code: "ARBITRE_2", label: "Arbitre 2", icon: "Flag" },
   { code: "EMARQUE", label: "E-marque", icon: "ClipboardList" },
-  { code: "MARQUEUR", label: "Marqueur", icon: "Timer" },
   { code: "AIDE_MARQUEUR", label: "Aide marqueur", icon: "Timer" },
   { code: "CHRONOMETREUR", label: "Chronométreur", icon: "Timer" },
   { code: "DELEGUE_CLUB", label: "Délégué de club", icon: "Users" },

@@ -1508,8 +1508,15 @@ export default function CalendarView({
     // déjà. `|| event.id === nextEventId` garde le cas où le tout prochain
     // événement est plus loin qu'une semaine (creux de saison) : il doit
     // rester ouvert par défaut malgré tout, personne d'autre à montrer.
-    const withinReminderWindow =
-      new Date(event.start_time).getTime() - Date.now() <= 7 * 24 * 60 * 60 * 1000;
+    // Retour de Cindy du 21/09 ("une fois un événement passé, les onglets
+    // des organisations doivent se replier") : la comparaison n'avait
+    // qu'une borne haute ("dans moins de 7 jours"), toujours vraie aussi
+    // pour un événement déjà PASSÉ (différence négative, donc "≤ 7 jours"
+    // par construction) -- l'onglet Organisation d'un match d'il y a un
+    // mois restait donc ouvert par défaut indéfiniment. Bornée aussi en
+    // bas (l'événement doit être à venir, pas déjà passé).
+    const msUntilStart = new Date(event.start_time).getTime() - Date.now();
+    const withinReminderWindow = msUntilStart >= 0 && msUntilStart <= 7 * 24 * 60 * 60 * 1000;
     const organisationDefaultOpen = withinReminderWindow || event.id === nextEventId;
     const rsvpCounts = event.rsvpCounts;
     const hasRoster =

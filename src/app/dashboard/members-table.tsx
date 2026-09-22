@@ -127,9 +127,19 @@ export default function MembersTable({
   // corrigé plus tôt aujourd'hui pour la même raison). Coordonnées
   // (top/right, relatives au VRAI viewport) calculées au clic sur le
   // bouton ⋮, le menu lui-même sort du tableau via un portail vers
-  // document.body -- ne peut plus jamais être coupé, quel que soit le
-  // défilement du tableau ou la largeur de l'écran.
-  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
+  // document.body -- ne peut plus jamais être coupé horizontalement, quel
+  // que soit le défilement du tableau ou la largeur de l'écran.
+  // Retour de Cindy du 21/09 ("mon bloc reste coincé en fixe... je ne
+  // peux plus archiver") : la partie verticale, elle, s'ouvrait toujours
+  // vers le BAS (top: ...) -- pour une ligne déjà proche du bas de
+  // l'écran (liste courte, filtrée...), le menu débordait sous la
+  // fenêtre, coupant ses derniers éléments (dont "Archiver le membre",
+  // toujours le dernier). `bottom` (repli vers le HAUT) en plus de `top`
+  // : le clic choisit lequel utiliser selon la place réellement
+  // disponible en dessous.
+  const [menuPosition, setMenuPosition] = useState<
+    ({ top: number; right: number } | { bottom: number; right: number }) | null
+  >(null);
 
   // Deep-link support: "?openMember=<id>" (see buildAppDeepLink) opens
   // that member's fiche straight away — the one-click "come back here"
@@ -635,7 +645,17 @@ export default function MembersTable({
           <button
             onClick={(e) => {
               const rect = e.currentTarget.getBoundingClientRect();
-              setMenuPosition({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+              const right = window.innerWidth - rect.right;
+              // 4 entrées + séparateurs possibles (Réactiver/Supprimer si
+              // déjà archivé) ~220px, marge généreuse plutôt que mesurer
+              // le menu avant qu'il n'existe dans le DOM.
+              const estimatedMenuHeight = 220;
+              const spaceBelow = window.innerHeight - rect.bottom;
+              setMenuPosition(
+                spaceBelow < estimatedMenuHeight
+                  ? { bottom: window.innerHeight - rect.top + 4, right }
+                  : { top: rect.bottom + 4, right }
+              );
               setOpenMenuId((cur) => (cur === m.id ? null : m.id));
             }}
             className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
@@ -650,7 +670,11 @@ export default function MembersTable({
               <div className="fixed inset-0 z-30" onClick={() => setOpenMenuId(null)} />
               <div
                 className="fixed z-40 w-56 rounded-xl border border-zinc-100 bg-white p-1.5 text-left shadow-lg"
-                style={{ top: menuPosition.top, right: menuPosition.right }}
+                style={
+                  "top" in menuPosition
+                    ? { top: menuPosition.top, right: menuPosition.right }
+                    : { bottom: menuPosition.bottom, right: menuPosition.right }
+                }
               >
                 <button
                   onClick={() => {

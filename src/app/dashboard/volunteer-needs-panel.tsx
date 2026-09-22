@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bell, Briefcase, Check, Minus, Plus, Trash2, UserPlus, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import RoleIcon from "./role-icon";
@@ -190,8 +190,29 @@ export default function VolunteerNeedsPanel({
   // arrière-plan et resynchroniser les autres onglets/appareils, la copie
   // locale ci-dessous étant écrasée par les props fraîches à son arrivée.
   const [localNeeds, setLocalNeeds] = useState(needs);
+  // Retour de Cindy du 21/09 ("Basile a mis Buvette, ça n'apparaissait
+  // pas... à 4 reprises et le besoin est apparu 4 fois") : cet effet
+  // écrasait aveuglément l'état local dès que `needs` changeait de
+  // référence -- y compris quand cette nouvelle valeur vient d'un fetch
+  // parti AVANT l'ajout (voir organisationData, calendar-view.tsx : un
+  // seul aller-retour /api/event-organisation par chargement, potentiellement
+  // encore en vol au moment du clic sur "Ajouter"). Ce fetch-là ne connaît
+  // pas encore le besoin qu'on vient de créer : une fois résolu, il
+  // écrasait la copie locale et le besoin disparaissait de l'écran --
+  // donnant l'impression que l'ajout avait échoué. Nouveau clic sur
+  // "Ajouter" -> nouvel ajout RÉEL en base -> même souci -> jusqu'à 4 fois
+  // de suite, chacun bien réel en base. Repli : un besoin ajouté ici même
+  // dans les 20 dernières secondes ne disparaît plus juste parce qu'une
+  // prop plus récente (mais pas forcément plus À JOUR) ne le connaît pas
+  // encore -- fusion plutôt que remplacement pur.
+  const recentlyAddedIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    setLocalNeeds(needs);
+    setLocalNeeds((prevLocal) => {
+      const missingButRecent = prevLocal.filter(
+        (n) => recentlyAddedIdsRef.current.has(n.id) && !needs.some((fresh) => fresh.id === n.id)
+      );
+      return missingButRecent.length > 0 ? [...needs, ...missingButRecent] : needs;
+    });
   }, [needs]);
 
   // Un popup de confirmation bloquait ce geste jusqu'ici ; "Annuler" juste
@@ -355,6 +376,12 @@ export default function VolunteerNeedsPanel({
       setError(`Ajout impossible : ${insertError.message}`);
       return;
     }
+    // Voir le commentaire sur recentlyAddedIdsRef plus haut : protège ce
+    // besoin contre un écrasement par une réponse /api/event-organisation
+    // partie avant sa création, pendant 20s (large marge par rapport aux
+    // temps de réponse observés).
+    recentlyAddedIdsRef.current.add(data.id);
+    setTimeout(() => recentlyAddedIdsRef.current.delete(data.id), 20_000);
     setLocalNeeds((prev) => [
       ...prev,
       {
