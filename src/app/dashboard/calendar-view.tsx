@@ -8,6 +8,7 @@ import {
   ChevronRight,
   ChevronUp,
   AlarmClock,
+  AlertTriangle,
   CalendarDays,
   Cake,
   Check,
@@ -15,6 +16,7 @@ import {
   Euro,
   Eye,
   ExternalLink,
+  Home,
   LayoutGrid,
   List,
   Lock,
@@ -75,7 +77,7 @@ import {
 } from "./event-tasks";
 import VolunteerNeedsPanel from "./volunteer-needs-panel";
 import { notifyNewVolunteerNeed, type VolunteerNeed } from "./event-volunteer-needs";
-import type { MatchOfficialAssignment } from "./match-official-roles";
+import { MATCH_OFFICIAL_ROLES, type MatchOfficialAssignment } from "./match-official-roles";
 import MatchOfficialsPanel from "./match-officials-panel";
 import ConfirmDialog from "./confirm-dialog";
 import OrganisationCard from "./organisation-card";
@@ -109,6 +111,32 @@ function pillLabel(event: AdminUpcomingEvent) {
     return parseMatchTitle(event.title).opponent;
   }
   return event.title ?? styleFor(event.event_type).label;
+}
+
+// Match officiel/amical à domicile (jamais tournoi, isMatchType les exclut
+// déjà) -- extrait le 24/09 (retour de Cindy, filtre "Domicile seulement")
+// des deux endroits qui le calculaient chacun de son côté (Organisation
+// match à domicile, plus bas). event.isHome ?? parseMatchTitle(...).isHome :
+// la colonne events.is_home reste souvent null (matchs synchronisés FFBB),
+// même repli que week-strip-banner.tsx/OpponentDisplay.
+function isHomeMatch(event: Pick<AdminUpcomingEvent, "event_type" | "title" | "isHome">) {
+  return isMatchType(event.event_type) && (event.isHome ?? parseMatchTitle(event.title).isHome) === true;
+}
+
+// "Besoin non pourvu" (retour de Cindy du 24/09, "avoir les besoins en
+// organisation en visuel sur le calendrier") : même prédicat que
+// event-volunteer-needs.ts (notifyNewVolunteerNeed, unresolvedNeeds) pour
+// les besoins bénévoles, + rôles officiels manquants sur les 8 fixes
+// (match-official-roles.ts) -- jamais l'ancien catalogue Maillots/Table de
+// marque (MatchTasksPanel), qui n'a plus de rôle actif en base (voir
+// season-bilan-panel.tsx, même exclusion).
+function hasUnmetOrganisationNeeds(
+  needs: VolunteerNeed[],
+  officialAssignments: MatchOfficialAssignment[]
+) {
+  const hasUnmetVolunteerNeed = needs.some((n) => n.requiredCount - n.signups.length > 0);
+  const hasUnfilledOfficialRole = officialAssignments.length < MATCH_OFFICIAL_ROLES.length;
+  return hasUnmetVolunteerNeed || hasUnfilledOfficialRole;
 }
 
 // Fonction ordinaire et non calcul en plein rendu : la lecture de l'heure
@@ -596,6 +624,19 @@ export default function CalendarView({
     organisationData?.matchOfficialRolesByEventId ?? emptyMatchOfficialRoles;
   const organisationLoading = organisationEventIds.length > 0 && organisationData === null;
 
+  // "Besoins d'organisation en visuel sur le calendrier" (retour de Cindy
+  // du 24/09) : un match à domicile dont il manque au moins un bénévole ou
+  // un rôle officiel -- réutilise organisationData déjà chargé plus haut,
+  // aucune requête de plus. false tant que organisationLoading (on ne sait
+  // pas encore), jamais un faux "tout est pourvu" pendant le chargement.
+  function needsOrganizing(e: AdminUpcomingEvent) {
+    if (organisationLoading || !isHomeMatch(e)) return false;
+    return hasUnmetOrganisationNeeds(
+      volunteerNeedsByEventId[e.id] ?? emptyVolunteerNeeds,
+      matchOfficialRolesByEventId[e.id] ?? emptyMatchOfficials
+    );
+  }
+
   // Retour de Cindy du 29/08 ("le délai pour afficher '1 présent' est trop
   // long") : rsvpCounts/presentPlayers sont des champs calculés côté
   // serveur, embarqués dans `event` — jusqu'ici seul le rafraîchissement
@@ -745,6 +786,15 @@ export default function CalendarView({
         }
       });
   }
+  // "Domicile seulement" (retour de Cindy du 24/09, "voir les matchs à
+  // domicile seulement pour avoir les besoins en organisation en visuel
+  // sur le calendrier") : simple filtre d'affichage, comme hiddenEventTypes
+  // ci-dessus, mais jamais persisté (pas de demande explicite pour ça) --
+  // réinitialisé à chaque ouverture. Réservé au Bureau (isBureau, voir le
+  // bouton plus bas) : lui seul voit tout le club et a besoin de filtrer
+  // pour repérer les matchs à organiser, Coach/Famille n'ont déjà que
+  // leurs propres matchs sous les yeux.
+  const [homeOnly, setHomeOnly] = useState(false);
   // Retour de Cindy du 12/09 ("Matchs officiels du club") : masqué par
   // défaut (showClubMatches=false) -- un adhérent/parent ne voit alors que
   // son propre calendrier, inchangé. Chargé UNE SEULE FOIS au premier clic
@@ -1245,7 +1295,12 @@ export default function CalendarView({
   const visibleEvents = useMemo(() => {
     const base = localEvents
       .filter((e) => !hiddenEventTypes.has(e.event_type ?? "OTHER"))
-      .filter(matchesTeamFilter);
+      .filter(matchesTeamFilter)
+      // "Domicile seulement" (retour de Cindy du 24/09) : ne garde que les
+      // matchs à domicile -- masque donc aussi entraînements, tournois,
+      // réunions, événements club et matchs à l'extérieur, pas seulement
+      // ces derniers.
+      .filter((e) => !homeOnly || isHomeMatch(e));
     // Retour de Cindy du 12/09 ("Matchs officiels du club") : ajoutés APRÈS
     // matchesTeamFilter, jamais soumis à ce filtre-là -- celui-ci ne parle
     // que "parmi MES équipes, lesquelles afficher", alors que ces matchs-là
@@ -1275,6 +1330,7 @@ export default function CalendarView({
     activeResultsTeamIdResolved,
     showClubMatches,
     clubMatches,
+    homeOnly,
   ]);
 
   const eventsByDate = useMemo(() => {
@@ -1634,6 +1690,16 @@ export default function CalendarView({
                   {homeAway}
                 </span>
               )}
+              {/* "Besoins d'organisation en visuel" (retour de Cindy du
+                  24/09) : même prédicat que le calendrier Mois
+                  (needsOrganizing) -- réutilise organisationData déjà
+                  chargé, aucune requête de plus. */}
+              {needsOrganizing(event) && (
+                <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-800">
+                  <AlertTriangle className="h-3 w-3 shrink-0" />
+                  Besoin non pourvu
+                </span>
+              )}
               {/* Retour de Cindy du 2026-08-25 ("Créer un événement" ->
                   "Événement payant") : badge visible sur tous les espaces
                   (y compris Enfant, en lecture seule) — voir
@@ -1914,9 +1980,7 @@ export default function CalendarView({
           // week-strip-banner.tsx/OpponentDisplay : la colonne events.is_home
           // reste souvent null (matchs synchronisés FFBB), le badge "DOM/EXT"
           // affiché juste au-dessus vient déjà de ce même repli sur le titre.
-          const isHomeMatch =
-            isMatchType(event.event_type) &&
-            (event.isHome ?? parseMatchTitle(event.title).isHome) === true;
+          const isHomeMatchEvent = isHomeMatch(event);
           // Retour de Cindy du 16/09 : tant que /api/event-organisation n'a
           // pas répondu, on ne sait pas encore si cet événement aura des
           // besoins bénévoles (hasTasks, lui, ne dépend que du type
@@ -1929,7 +1993,7 @@ export default function CalendarView({
           if (organisationLoading) {
             return <div className="mt-3 h-11 animate-pulse rounded-2xl bg-zinc-100" />;
           }
-          if (!hasTasks && !hasNeeds && !isHomeMatch) return null;
+          if (!hasTasks && !hasNeeds && !isHomeMatchEvent) return null;
           return (
             <>
               {(hasTasks || hasNeeds) && (
@@ -1973,7 +2037,7 @@ export default function CalendarView({
                   )}
                 </OrganisationCard>
               )}
-              {isHomeMatch && (
+              {isHomeMatchEvent && (
                 <OrganisationCard defaultOpen={organisationDefaultOpen} variant="terracotta">
                   <MatchOfficialsPanel
                     eventId={event.id}
@@ -2070,8 +2134,7 @@ export default function CalendarView({
           event.event_type !== "TRAINING" &&
           event.event_type !== "REUNION" &&
           !organisationLoading &&
-          isMatchType(event.event_type) &&
-          (event.isHome ?? parseMatchTitle(event.title).isHome) === true && (
+          isHomeMatch(event) && (
             <OrganisationCard defaultOpen={organisationDefaultOpen} variant="terracotta">
               <MatchOfficialsPanel
                 eventId={event.id}
@@ -2412,6 +2475,30 @@ export default function CalendarView({
             </button>
           )}
 
+          {/* "Domicile seulement" (retour de Cindy du 24/09, "voir les
+              matchs à domicile seulement pour avoir les besoins en
+              organisation en visuel sur le calendrier") : réservé au
+              Bureau (isBureau) -- symétrique du pill "Matchs officiels du
+              club" juste au-dessus, réservé lui à !isBureau. Masqué sur
+              les pages dédiées (forcedView), même raison que le pill
+              précédent. Ne touche jamais hiddenEventTypes/matchesTeamFilter,
+              simple filtre de plus dans visibleEvents (voir isHomeMatch). */}
+          {!forcedView && isBureau && (
+            <button
+              type="button"
+              onClick={() => setHomeOnly((v) => !v)}
+              title="N'afficher que les matchs à domicile, pour repérer les besoins d'organisation non pourvus"
+              className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+                homeOnly
+                  ? "border-transparent bg-ubac-yellow text-navy"
+                  : "border-ubac-yellow bg-ubac-yellow/10 text-ubac-yellow-dark hover:bg-ubac-yellow/20"
+              }`}
+            >
+              <Home className="h-3.5 w-3.5 shrink-0" />
+              Domicile seulement
+            </button>
+          )}
+
           {/* Remplace "Masquer les entraînements" (retour de Cindy du
               10/09) : filtre par type d'événement plutôt qu'un seul
               interrupteur entraînements/reste -- visible sur le Calendrier
@@ -2601,7 +2688,10 @@ export default function CalendarView({
                     {visible.map((e) => (
                       <span
                         key={e.id}
-                        className={`h-1.5 w-1.5 shrink-0 rounded-full ${styleFor(e.event_type).dot}`}
+                        title={needsOrganizing(e) ? "Besoin d'organisation non pourvu" : undefined}
+                        className={`h-1.5 w-1.5 shrink-0 rounded-full ${styleFor(e.event_type).dot} ${
+                          needsOrganizing(e) ? "ring-2 ring-amber-500 ring-offset-1" : ""
+                        }`}
                       />
                     ))}
                     {dayBirthdays.length > 0 && (
@@ -2612,8 +2702,12 @@ export default function CalendarView({
                     {visible.map((e) => (
                       <span
                         key={e.id}
-                        className={`inline-flex items-center justify-center truncate whitespace-nowrap rounded px-1 py-0.5 text-[10px] font-semibold leading-none ${styleFor(e.event_type).pill}`}
+                        title={needsOrganizing(e) ? "Besoin d'organisation non pourvu" : undefined}
+                        className={`inline-flex items-center justify-center gap-0.5 truncate whitespace-nowrap rounded px-1 py-0.5 text-[10px] font-semibold leading-none ${styleFor(e.event_type).pill}`}
                       >
+                        {needsOrganizing(e) && (
+                          <AlertTriangle className="h-2.5 w-2.5 shrink-0 text-amber-600" />
+                        )}
                         {pillLabel(e)}
                       </span>
                     ))}
