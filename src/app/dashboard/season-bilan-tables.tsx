@@ -1,18 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import {
-  Activity,
-  Award,
-  Car,
-  CalendarDays,
-  HandHeart,
-  Handshake,
-  ShieldCheck,
-  Sparkles,
-  Trophy,
-} from "lucide-react";
+import { Activity, Car, CalendarDays, Handshake, Sparkles, Trophy } from "lucide-react";
 import { formatPersonName } from "@/lib/names";
+import RoleIcon from "./role-icon";
+import { CUSTOM_ROLE_CODE, STANDARD_VOLUNTEER_ROLES } from "./event-volunteer-needs";
+import { MATCH_OFFICIAL_ROLES } from "./match-official-roles";
 import type { RosterPlayer } from "./team-manager";
 import type { SeasonParticipationTally, SeasonVolunteerTally } from "./season-bilan";
 
@@ -64,20 +57,6 @@ function CountChip({
       {count}
     </span>
   );
-}
-
-// Médaille pour le podium (retour de Cindy, "une maquette sympa") -- Lucide
-// uniquement (règle du club, jamais d'emoji système), couleur or/argent/
-// bronze pour les 3 premiers d'un classement déjà trié par l'appelant.
-function PodiumMedal({ rank }: { rank: number }) {
-  if (rank > 3) return null;
-  const colorClass =
-    rank === 1
-      ? "text-amber-500"
-      : rank === 2
-        ? "text-zinc-400"
-        : "text-orange-700";
-  return <Award className={`h-4 w-4 shrink-0 ${colorClass}`} />;
 }
 
 type SortDir = "asc" | "desc";
@@ -256,24 +235,54 @@ export function ParticipationTable({
   );
 }
 
-// Onglet "Bénévoles" : classement par total décroissant par défaut (retour
-// de Cindy, esprit "podium") -- Buvette/Goûter/Lavage maillots/besoins
-// personnalisés, rôles officiels de match, covoiturage proposé.
-type VolunteerSortKey = "name" | "classique" | "officiel" | "covoiturage" | "total";
+// Onglet "Bénévoles" : un compteur par rôle, jamais regroupés (retour de
+// Cindy du 24/09, "une colonne buvette, une colonne goûter, une colonne
+// maillot, une colonne covoiturage... les rôles officiels même chose, ils
+// doivent être tous visibles pas regroupés ensemble") -- le catalogue
+// classique (event-volunteer-needs.ts) + "Autre", puis le catalogue
+// officiel (match-official-roles.ts) au complet, puis covoiturage. Table
+// large par construction (13 colonnes de compteur) : overflow-x-auto porte
+// déjà le défilement horizontal, mêmes icônes que partout ailleurs dans
+// l'appli (RoleIcon) plutôt que d'en inventer de nouvelles.
+const CLASSIQUE_COLUMNS = [
+  ...STANDARD_VOLUNTEER_ROLES,
+  { code: CUSTOM_ROLE_CODE, label: "Autre", icon: "Users" as const },
+];
+const OFFICIAL_COLUMNS = MATCH_OFFICIAL_ROLES;
+
+type VolunteerRow = {
+  id: string;
+  name: string;
+  tally: SeasonVolunteerTally;
+  total: number;
+  // Bénévole qui a écrit son propre nom, ou choisi par le Bureau/Coach sans
+  // compte club (retour de Cindy du 24/09, "Greg Martin... il n'apparaît
+  // pas ?") -- doit faire partie de CE tableau, juste repéré par un badge
+  // pour rester lisible côté coach (pas un vrai membre du roster).
+  isGuest: boolean;
+};
+
+function volunteerTotal(tally: SeasonVolunteerTally): number {
+  const classiqueTotal = Object.values(tally.byRoleCode).reduce((sum, n) => sum + n, 0);
+  const officielTotal = Object.values(tally.byOfficialCode).reduce((sum, n) => sum + n, 0);
+  return classiqueTotal + officielTotal + tally.covoiturage;
+}
 
 export function VolunteerTable({
   roster,
   tallyByPlayerId,
+  guestTallies = [],
   teamNameByPlayerId,
 }: {
   roster: RosterPlayer[];
   tallyByPlayerId: Record<string, SeasonVolunteerTally>;
+  guestTallies?: { name: string; tally: SeasonVolunteerTally }[];
   teamNameByPlayerId?: Record<string, string>;
 }) {
-  const [sortKey, setSortKey] = useState<VolunteerSortKey>("total");
+  const [sortKey, setSortKey] = useState<string>("total");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
-  function toggleSort(key: VolunteerSortKey) {
+  function toggleSort(key: string) {
     if (key === sortKey) {
       setSortDir(sortDir === "asc" ? "desc" : "asc");
       return;
@@ -282,34 +291,36 @@ export function VolunteerTable({
     setSortDir(key === "name" ? "asc" : "desc");
   }
 
+  function sortValue(row: VolunteerRow, key: string): number {
+    if (key === "total") return row.total;
+    if (key === "covoiturage") return row.tally.covoiturage;
+    if (key.startsWith("role:")) return row.tally.byRoleCode[key.slice(5)] ?? 0;
+    if (key.startsWith("official:")) return row.tally.byOfficialCode[key.slice(9)] ?? 0;
+    return 0;
+  }
+
   const rows = useMemo(() => {
-    const list = roster.map((p) => {
-      const tally = tallyByPlayerId[p.id] ?? { classique: 0, officiel: 0, covoiturage: 0 };
-      const total = tally.classique + tally.officiel + tally.covoiturage;
-      return { id: p.id, name: fullName(p), tally, total };
+    const rosterRows: VolunteerRow[] = roster.map((p) => {
+      const tally = tallyByPlayerId[p.id] ?? { byRoleCode: {}, byOfficialCode: {}, covoiturage: 0 };
+      return { id: p.id, name: fullName(p), tally, total: volunteerTotal(tally), isGuest: false };
     });
+    const guestRows: VolunteerRow[] = guestTallies.map(({ name, tally }) => ({
+      id: `guest:${name}`,
+      name,
+      tally,
+      total: volunteerTotal(tally),
+      isGuest: true,
+    }));
+    const list = [...rosterRows, ...guestRows];
     const dir = sortDir === "asc" ? 1 : -1;
-    const sorted = list.sort((a, b) => {
+    return list.sort((a, b) => {
       if (sortKey === "name") return a.name.localeCompare(b.name, "fr") * dir;
-      const key = sortKey === "total" ? "total" : sortKey;
-      const diff = ((a as unknown as Record<string, number>)[key] - (b as unknown as Record<string, number>)[key]) * dir;
+      const diff = (sortValue(a, sortKey) - sortValue(b, sortKey)) * dir;
       return diff !== 0 ? diff : a.name.localeCompare(b.name, "fr");
     });
-    return sorted;
-  }, [roster, tallyByPlayerId, sortKey, sortDir]);
+  }, [roster, tallyByPlayerId, guestTallies, sortKey, sortDir]);
 
-  // Le podium (médailles) ne s'applique qu'au classement RÉEL par total
-  // décroissant, jamais quand on trie sur autre chose (une médaille sur le
-  // 3e du tri "Covoiturage" alors qu'il n'est pas dans le top 3 réel serait
-  // trompeuse) -- calculé une fois, indépendamment du tri affiché.
-  const rankByPlayerId = useMemo(() => {
-    const byTotal = [...rows].sort((a, b) => b.total - a.total);
-    const map = new Map<string, number>();
-    byTotal.forEach((r, i) => {
-      if (r.total > 0) map.set(r.id, i + 1);
-    });
-    return map;
-  }, [rows]);
+  const columnCount = CLASSIQUE_COLUMNS.length + OFFICIAL_COLUMNS.length + 2 /* covoiturage, total */ + 1 /* nom */;
 
   return (
     <div className="w-full overflow-x-auto rounded-xl border border-zinc-100">
@@ -317,22 +328,28 @@ export function VolunteerTable({
         <thead>
           <tr className="border-b border-zinc-100 bg-zinc-50 text-left text-xs font-semibold text-zinc-400">
             <SortableHeader sortKey="name" currentKey={sortKey} currentDir={sortDir} label="Famille / Joueur" onSort={toggleSort} />
-            <SortableHeader
-              sortKey="classique"
-              currentKey={sortKey}
-              currentDir={sortDir}
-              label="Buvette / Goûter / Maillots"
-              icon={<HandHeart className="h-3.5 w-3.5 shrink-0" />}
-              onSort={toggleSort}
-            />
-            <SortableHeader
-              sortKey="officiel"
-              currentKey={sortKey}
-              currentDir={sortDir}
-              label="Rôles officiels"
-              icon={<ShieldCheck className="h-3.5 w-3.5 shrink-0" />}
-              onSort={toggleSort}
-            />
+            {CLASSIQUE_COLUMNS.map((role) => (
+              <SortableHeader
+                key={role.code}
+                sortKey={`role:${role.code}`}
+                currentKey={sortKey}
+                currentDir={sortDir}
+                label={role.label}
+                icon={<RoleIcon icon={role.icon} className="h-3.5 w-3.5 shrink-0" />}
+                onSort={toggleSort}
+              />
+            ))}
+            {OFFICIAL_COLUMNS.map((role) => (
+              <SortableHeader
+                key={role.code}
+                sortKey={`official:${role.code}`}
+                currentKey={sortKey}
+                currentDir={sortDir}
+                label={role.label}
+                icon={<RoleIcon icon={role.icon} className="h-3.5 w-3.5 shrink-0" />}
+                onSort={toggleSort}
+              />
+            ))}
             <SortableHeader
               sortKey="covoiturage"
               currentKey={sortKey}
@@ -345,41 +362,50 @@ export function VolunteerTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => {
-            const rank = rankByPlayerId.get(r.id);
-            return (
-              <tr key={r.id} className="border-b border-zinc-50 last:border-0">
-                <td className="w-auto px-3 py-2.5 font-semibold text-zinc-800">
-                  <span className="flex items-center gap-1.5">
-                    {rank && <PodiumMedal rank={rank} />}
-                    {r.name}
-                    {teamNameByPlayerId?.[r.id] && (
-                      <span className="text-xs font-normal text-zinc-400">
-                        · {teamNameByPlayerId[r.id]}
-                      </span>
-                    )}
+          {rows.map((r) => (
+            <tr key={r.id} className="border-b border-zinc-50 last:border-0">
+              <td className="w-auto px-3 py-2.5 font-semibold text-zinc-800">
+                <span className="flex items-center gap-1.5">
+                  {r.name}
+                  {r.isGuest && (
+                    <span className="rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                      Invité·e
+                    </span>
+                  )}
+                  {!r.isGuest && teamNameByPlayerId?.[r.id] && (
+                    <span className="text-xs font-normal text-zinc-400">
+                      · {teamNameByPlayerId[r.id]}
+                    </span>
+                  )}
+                </span>
+              </td>
+              {CLASSIQUE_COLUMNS.map((role) => (
+                <td key={role.code} className="whitespace-nowrap px-3 py-2.5">
+                  <span className={`text-xs font-semibold tabular-nums ${(r.tally.byRoleCode[role.code] ?? 0) === 0 ? "text-zinc-300" : "text-emerald-700"}`}>
+                    {r.tally.byRoleCode[role.code] ?? 0}
                   </span>
                 </td>
-                <td className="whitespace-nowrap px-3 py-2.5">
-                  <CountChip icon={<HandHeart className="h-3 w-3" />} count={r.tally.classique} colorClass="bg-emerald-50 text-emerald-700" />
-                </td>
-                <td className="whitespace-nowrap px-3 py-2.5">
-                  <CountChip icon={<ShieldCheck className="h-3 w-3" />} count={r.tally.officiel} colorClass="bg-terracotta/10 text-terracotta-dark" />
-                </td>
-                <td className="whitespace-nowrap px-3 py-2.5">
-                  <CountChip icon={<Car className="h-3 w-3" />} count={r.tally.covoiturage} colorClass="bg-blue-50 text-blue-700" />
-                </td>
-                <td className="whitespace-nowrap px-3 py-2.5">
-                  <span className={`font-semibold tabular-nums ${r.total === 0 ? "text-zinc-300" : "text-zinc-900"}`}>
-                    {r.total}
+              ))}
+              {OFFICIAL_COLUMNS.map((role) => (
+                <td key={role.code} className="whitespace-nowrap px-3 py-2.5">
+                  <span className={`text-xs font-semibold tabular-nums ${(r.tally.byOfficialCode[role.code] ?? 0) === 0 ? "text-zinc-300" : "text-terracotta-dark"}`}>
+                    {r.tally.byOfficialCode[role.code] ?? 0}
                   </span>
                 </td>
-              </tr>
-            );
-          })}
+              ))}
+              <td className="whitespace-nowrap px-3 py-2.5">
+                <CountChip icon={<Car className="h-3 w-3" />} count={r.tally.covoiturage} colorClass="bg-blue-50 text-blue-700" />
+              </td>
+              <td className="whitespace-nowrap px-3 py-2.5">
+                <span className={`font-semibold tabular-nums ${r.total === 0 ? "text-zinc-300" : "text-zinc-900"}`}>
+                  {r.total}
+                </span>
+              </td>
+            </tr>
+          ))}
           {rows.length === 0 && (
             <tr>
-              <td colSpan={5} className="px-3 py-4 text-center text-sm text-zinc-400">
+              <td colSpan={columnCount} className="px-3 py-4 text-center text-sm text-zinc-400">
                 Aucun joueur dans cette équipe
               </td>
             </tr>

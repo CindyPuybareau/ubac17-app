@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { chunkedQuery, type Semaphore } from "@/lib/batch";
+import { REFEREE_CONFIRMED_LABEL } from "./match-official-roles";
 import type { AdminUpcomingEvent } from "./page";
 
 // Refonte "Organisation & Bilan" (retour de Cindy du 24/09) : "Planning &
@@ -98,39 +99,64 @@ export function computeSeasonParticipation(
 }
 
 // Bilan bénévoles de la saison : besoins classiques (event_volunteer_
-// signups -- Buvette/Goûter/Lavage maillots/Autre), rôles officiels
-// (match_official_roles -- E-marque/Arbitres/Chronométreur/Délégués) et
-// covoiturage proposé (event_carpool_offers), comptés par joueur sur les
-// eventIds donnés. Même principe que getEventTasksByEventId/
+// signups -- Goûter/Buvette/Installation/Lavage maillots/Autre, un compteur
+// PAR CODE, jamais regroupés -- retour de Cindy du 24/09, "ils doivent être
+// tous visible pas regroupé ensemble"), rôles officiels (match_official_
+// roles -- Arbitre 1/2, E-marque, Aide marqueur, Chronométreur, Délégués,
+// idem un par code) et covoiturage proposé (event_carpool_offers), comptés
+// sur les eventIds donnés. Même principe que getEventTasksByEventId/
 // getCarpoolOffersByEventId (event-tasks.ts) : un .in("event_id", chunk)
 // par tranche de 150 événements, JAMAIS une requête par joueur -- et
 // surtout jamais de filtre par joueur non plus (playerIds peut valoir tout
 // le club côté Bureau, potentiellement aussi grand que eventIds) : on
-// récupère toutes les lignes des événements concernés, agrégées par
-// player_id en mémoire une fois reçues, puis l'appelant ne garde que les
-// joueurs qui l'intéressent (déjà en mémoire, sans requête de plus).
+// récupère toutes les lignes des événements concernés, agrégées en mémoire
+// une fois reçues, puis l'appelant ne garde que les joueurs qui
+// l'intéressent (déjà en mémoire, sans requête de plus).
 export type SeasonVolunteerTally = {
-  classique: number;
-  officiel: number;
+  // Un compteur par code de rôle classique (GOUTER_ENCAS, BUVETTE,
+  // INSTALLATION, LAVAGE_MAILLOTS, AUTRE -- CUSTOM_ROLE_CODE), clé absente =
+  // jamais fait.
+  byRoleCode: Record<string, number>;
+  // Idem pour les rôles officiels (ARBITRE_1, ARBITRE_2, EMARQUE,
+  // AIDE_MARQUEUR, CHRONOMETREUR, DELEGUE_CLUB, DELEGUE_FAIRPLAY).
+  byOfficialCode: Record<string, number>;
   covoiturage: number;
 };
 
+// Un bénévole qui écrit son propre nom (ou que le Bureau/Coach saisit sans
+// choisir un membre du club, guest_name) n'a pas de player_id -- retour de
+// Cindy du 24/09 ("Greg Martin a voté pour le goûter... il n'apparaît
+// pas ?") : ces inscriptions étaient jusqu'ici silencieusement ignorées
+// (bump() les sautait faute de player_id). Elles doivent "faire partie du
+// tableau bénévoles" (retour de Cindy) -- portées ici séparément (pas de
+// ligne de roster où les rattacher), à l'appelant de les agréger par nom et
+// de les rattacher à la bonne équipe via l'event_id (déjà en mémoire, comme
+// pour l'assiduité entraînements ci-dessus).
+export type SeasonGuestVolunteer = {
+  name: string;
+  eventId: string;
+  category: "classique" | "officiel";
+  code: string;
+};
+
 function emptyVolunteerTally(): SeasonVolunteerTally {
-  return { classique: 0, officiel: 0, covoiturage: 0 };
+  return { byRoleCode: {}, byOfficialCode: {}, covoiturage: 0 };
 }
 
 export async function getSeasonVolunteerTallyByEventIds(
   supabase: SupabaseClient,
   eventIds: string[],
   dbLimit?: Semaphore
-): Promise<Record<string, SeasonVolunteerTally>> {
-  const result: Record<string, SeasonVolunteerTally> = {};
-  if (eventIds.length === 0) return result;
+): Promise<{
+  tallyByPlayerId: Record<string, SeasonVolunteerTally>;
+  guestEntries: SeasonGuestVolunteer[];
+}> {
+  const tallyByPlayerId: Record<string, SeasonVolunteerTally> = {};
+  const guestEntries: SeasonGuestVolunteer[] = [];
+  if (eventIds.length === 0) return { tallyByPlayerId, guestEntries };
 
-  function bump(playerId: string | null | undefined, key: keyof SeasonVolunteerTally) {
-    if (!playerId) return;
-    const tally = (result[playerId] ??= emptyVolunteerTally());
-    tally[key] += 1;
+  function ensure(playerId: string): SeasonVolunteerTally {
+    return (tallyByPlayerId[playerId] ??= emptyVolunteerTally());
   }
 
   const [signups, officials, carpools] = await Promise.all([
@@ -140,7 +166,7 @@ export async function getSeasonVolunteerTallyByEventIds(
       (chunk) =>
         supabase
           .from("event_volunteer_signups")
-          .select("player_id, event_volunteer_needs!inner(event_id)")
+          .select("player_id, guest_name, event_volunteer_needs!inner(event_id, role_code)")
           .in("event_volunteer_needs.event_id", chunk),
       dbLimit ?? 4
     ),
@@ -148,7 +174,10 @@ export async function getSeasonVolunteerTallyByEventIds(
       eventIds,
       150,
       (chunk) =>
-        supabase.from("match_official_roles").select("player_id, event_id").in("event_id", chunk),
+        supabase
+          .from("match_official_roles")
+          .select("player_id, guest_name, role_code, event_id")
+          .in("event_id", chunk),
       dbLimit ?? 4
     ),
     chunkedQuery(
@@ -174,9 +203,42 @@ export async function getSeasonVolunteerTallyByEventIds(
     )
   );
 
-  signups.data.forEach((row) => bump(row.player_id as string | null, "classique"));
-  officials.data.forEach((row) => bump(row.player_id as string | null, "officiel"));
-  carpools.data.forEach((row) => bump(row.player_id as string | null, "covoiturage"));
+  signups.data.forEach((row) => {
+    const need = row.event_volunteer_needs as unknown as { event_id: string; role_code: string } | null;
+    if (!need) return;
+    const playerId = row.player_id as string | null;
+    const guestName = row.guest_name as string | null;
+    if (playerId) {
+      const tally = ensure(playerId);
+      tally.byRoleCode[need.role_code] = (tally.byRoleCode[need.role_code] ?? 0) + 1;
+    } else if (guestName) {
+      guestEntries.push({ name: guestName, eventId: need.event_id, category: "classique", code: need.role_code });
+    }
+  });
 
-  return result;
+  officials.data.forEach((row) => {
+    const playerId = row.player_id as string | null;
+    const guestName = row.guest_name as string | null;
+    const roleCode = row.role_code as string;
+    // "Arbitre officiel" (retour de Cindy du 18/09) : confirmation en un
+    // clic que la ligue a désigné l'arbitre, jamais une vraie personne --
+    // ni compté dans un tally, ni affiché comme "invité" dans le bilan.
+    if (guestName === REFEREE_CONFIRMED_LABEL) return;
+    if (playerId) {
+      const tally = ensure(playerId);
+      tally.byOfficialCode[roleCode] = (tally.byOfficialCode[roleCode] ?? 0) + 1;
+    } else if (guestName) {
+      guestEntries.push({ name: guestName, eventId: row.event_id as string, category: "officiel", code: roleCode });
+    }
+  });
+
+  carpools.data.forEach((row) => {
+    const playerId = row.player_id as string | null;
+    // Le covoiturage est toujours proposé depuis le compte d'une famille
+    // (player_id) -- pas de mode "invité" pour ce système, rien à ajouter à
+    // guestEntries ici.
+    if (playerId) ensure(playerId).covoiturage += 1;
+  });
+
+  return { tallyByPlayerId, guestEntries };
 }

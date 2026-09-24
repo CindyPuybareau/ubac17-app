@@ -5,7 +5,7 @@ import { sortTeamsByGroup } from "@/lib/teams";
 import TeamSelectorPills from "./team-selector-pills";
 import { ParticipationTable, VolunteerTable } from "./season-bilan-tables";
 import { computeSeasonParticipation } from "./season-bilan";
-import type { SeasonVolunteerTally } from "./season-bilan";
+import type { SeasonGuestVolunteer, SeasonVolunteerTally } from "./season-bilan";
 import type { RosterPlayer } from "./team-manager";
 import type { AdminUpcomingEvent } from "./page";
 
@@ -34,12 +34,19 @@ export default function SeasonBilanPanel({
   events,
   rsvpStatusByKey,
   volunteerTallyByPlayerId,
+  volunteerGuestEntries,
   forcedTab,
 }: {
   teams: BilanTeamRoster[];
   events: AdminUpcomingEvent[];
   rsvpStatusByKey: Record<string, string>;
   volunteerTallyByPlayerId: Record<string, SeasonVolunteerTally>;
+  // Bénévoles qui écrivent leur propre nom (ou choisis par le Bureau/Coach
+  // sans compte club) -- retour de Cindy du 24/09 ("Greg Martin a voté pour
+  // le goûter... il n'apparaît pas ?") : rattachés à leur équipe ci-dessous
+  // via l'event_id de chaque inscription, pas de player_id pour les
+  // indexer autrement.
+  volunteerGuestEntries: SeasonGuestVolunteer[];
   // Retour de Cindy du 2026-08-22 : "Organisation et Bilan" éclatée en
   // entrées du menu latéral ("Joueurs" / "Bénévoles") plutôt qu'un choix
   // d'onglet en haut de page — même convention que `forcedView` sur
@@ -48,6 +55,12 @@ export default function SeasonBilanPanel({
 }) {
   const [tab, setTab] = useState<SubTab>(forcedTab ?? "joueurs");
   const shownTab = forcedTab ?? tab;
+
+  // Retrouver l'équipe d'un bénévole "invité" à partir de l'event_id de son
+  // inscription (guestEntries n'a pas de player_id à rattacher à un
+  // roster) -- construit une seule fois, réutilisé pour chaque équipe
+  // affichée ci-dessous, aucune requête de plus.
+  const eventById = useMemo(() => new Map(events.map((e) => [e.id, e])), [events]);
 
   const sortedTeams = useMemo(() => sortTeamsByGroup(teams.map((t) => t.team)), [teams]);
   const [activeTeamId, setActiveTeamId] = useState<string | undefined>(sortedTeams[0]?.id);
@@ -69,6 +82,27 @@ export default function SeasonBilanPanel({
     `flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${
       active ? "bg-navy text-white" : "text-navy hover:bg-blue-50"
     }`;
+
+  // Bénévoles "invités" de CETTE équipe (retour de Cindy du 24/09) :
+  // guestEntries n'a pas de player_id à rattacher à un roster -- on
+  // retrouve l'équipe de chaque inscription via son event_id (eventById),
+  // puis on regroupe par nom (un même invité peut s'être proposé plusieurs
+  // fois cette saison) pour obtenir une ligne par personne, même forme que
+  // tallyByPlayerId pour être affichée par le même composant.
+  function guestTalliesForTeam(teamId: string): { name: string; tally: SeasonVolunteerTally }[] {
+    const byName = new Map<string, SeasonVolunteerTally>();
+    volunteerGuestEntries.forEach((entry) => {
+      const event = eventById.get(entry.eventId);
+      if (!event) return;
+      const concerned = event.teamId === teamId || (event.targetTeamIds?.includes(teamId) ?? false);
+      if (!concerned) return;
+      const tally = byName.get(entry.name) ?? { byRoleCode: {}, byOfficialCode: {}, covoiturage: 0 };
+      const bucket = entry.category === "classique" ? tally.byRoleCode : tally.byOfficialCode;
+      bucket[entry.code] = (bucket[entry.code] ?? 0) + 1;
+      byName.set(entry.name, tally);
+    });
+    return Array.from(byName, ([name, tally]) => ({ name, tally }));
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -115,7 +149,11 @@ export default function SeasonBilanPanel({
                   tallyByPlayerId={participationByPlayerId}
                 />
               ) : (
-                <VolunteerTable roster={roster} tallyByPlayerId={volunteerTallyByPlayerId} />
+                <VolunteerTable
+                  roster={roster}
+                  tallyByPlayerId={volunteerTallyByPlayerId}
+                  guestTallies={guestTalliesForTeam(team.id)}
+                />
               )}
             </div>
           );

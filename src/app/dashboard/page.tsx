@@ -52,7 +52,11 @@ import {
 import { getVolunteerNeedsByEventId, type VolunteerNeed } from "./event-volunteer-needs";
 import { getMatchOfficialRolesByEventId, type MatchOfficialAssignment } from "./match-official-roles";
 import { shouldOfferCarpool } from "./salles";
-import { getSeasonVolunteerTallyByEventIds, type SeasonVolunteerTally } from "./season-bilan";
+import {
+  getSeasonVolunteerTallyByEventIds,
+  type SeasonGuestVolunteer,
+  type SeasonVolunteerTally,
+} from "./season-bilan";
 
 type PlayerRow = {
   id: string;
@@ -1589,6 +1593,7 @@ export default async function DashboardPage({
   // jamais réaffectée en bloc.
   const adminRsvpStatusByKey: Record<string, string> = {};
   let adminSeasonVolunteerTallyByPlayerId: Record<string, SeasonVolunteerTally> = {};
+  let adminSeasonVolunteerGuestEntries: SeasonGuestVolunteer[] = [];
   let adminMembers: AdminMember[] = [];
   let adminSponsors: AdminSponsor[] = [];
   let adminBenevoles: AdminBenevole[] = [];
@@ -2626,7 +2631,10 @@ export default async function DashboardPage({
     // la création, introuvables juste après).
     adminVolunteerNeedsByEventId = await adminVolunteerNeedsPromise;
     adminMatchOfficialRolesByEventId = await adminMatchOfficialRolesPromise;
-    adminSeasonVolunteerTallyByPlayerId = await adminSeasonVolunteerTallyPromise;
+    ({
+      tallyByPlayerId: adminSeasonVolunteerTallyByPlayerId,
+      guestEntries: adminSeasonVolunteerGuestEntries,
+    } = await adminSeasonVolunteerTallyPromise);
   }
   })();
 
@@ -2634,6 +2642,7 @@ export default async function DashboardPage({
   let coachEvents: AdminUpcomingEvent[] = [];
   let coachRsvpPlayers: { id: string; name: string; teamIds: string[] }[] = [];
   let coachSeasonVolunteerTallyByPlayerId: Record<string, SeasonVolunteerTally> = {};
+  let coachSeasonVolunteerGuestEntries: SeasonGuestVolunteer[] = [];
   let coachTeamRoleByTeamId: Record<string, "COACH" | "PLAYER"> = {};
   let coachClubTeams: AdminMemberTeam[] = [];
   let coachOrganisationTasks: Record<string, EventTasksState> = {};
@@ -3510,7 +3519,10 @@ export default async function DashboardPage({
     // seulement ceux à venir — même raison que côté Bureau juste plus haut.
     coachVolunteerNeedsByEventId = await coachVolunteerNeedsPromise;
     coachMatchOfficialRolesByEventId = await coachMatchOfficialRolesPromise;
-    coachSeasonVolunteerTallyByPlayerId = await coachSeasonVolunteerTallyPromise;
+    ({
+      tallyByPlayerId: coachSeasonVolunteerTallyByPlayerId,
+      guestEntries: coachSeasonVolunteerGuestEntries,
+    } = await coachSeasonVolunteerTallyPromise);
   }
   })();
 
@@ -4575,6 +4587,7 @@ export default async function DashboardPage({
             volunteerNeedsByEventId={adminVolunteerNeedsByEventId}
             rsvpStatusByKey={adminRsvpStatusByKey}
             seasonVolunteerTallyByPlayerId={adminSeasonVolunteerTallyByPlayerId}
+            seasonVolunteerGuestEntries={adminSeasonVolunteerGuestEntries}
             clubReports={clubReports}
             ownPlayerId={ownPlayerId}
           />
@@ -4622,6 +4635,7 @@ export default async function DashboardPage({
             clubTeams={coachClubTeams}
             birthdayMembers={coachBirthdayMembers}
             seasonVolunteerTallyByPlayerId={coachSeasonVolunteerTallyByPlayerId}
+            seasonVolunteerGuestEntries={coachSeasonVolunteerGuestEntries}
             whatsappGroups={whatsappGroups}
             eventRoles={eventRoleTypes}
             volunteerNeedsByEventId={coachVolunteerNeedsByEventId}

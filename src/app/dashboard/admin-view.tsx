@@ -61,7 +61,7 @@ import type { BirthdaySource } from "./birthdays";
 import type { EventRoleType } from "./event-tasks";
 import type { VolunteerNeed } from "./event-volunteer-needs";
 import SeasonBilanPanel, { type BilanTeamRoster } from "./season-bilan-panel";
-import type { SeasonVolunteerTally } from "./season-bilan";
+import type { SeasonGuestVolunteer, SeasonVolunteerTally } from "./season-bilan";
 
 export default function AdminView({
   allowedBriques = null,
@@ -87,6 +87,7 @@ export default function AdminView({
   volunteerNeedsByEventId,
   rsvpStatusByKey,
   seasonVolunteerTallyByPlayerId,
+  seasonVolunteerGuestEntries,
   clubReports,
   dashboardSummary,
   ownPlayerId = null,
@@ -125,6 +126,10 @@ export default function AdminView({
   // (event:player -> statut) et bénévolat cumulé par joueur, club entier.
   rsvpStatusByKey: Record<string, string>;
   seasonVolunteerTallyByPlayerId: Record<string, SeasonVolunteerTally>;
+  // Bénévoles qui écrivent leur propre nom (ou choisis par le Bureau/Coach
+  // sans compte club) -- retour de Cindy du 24/09, doivent apparaître dans
+  // le même tableau.
+  seasonVolunteerGuestEntries: SeasonGuestVolunteer[];
   clubReports: ClubReport[];
   // Retour de Cindy du 13/09 ("ce que tu mettrais dans le tableau de
   // bord") : résumé club entier (space-dashboard.ts, teamIds null) --
@@ -339,6 +344,7 @@ export default function AdminView({
               events={upcomingEvents}
               rsvpStatusByKey={rsvpStatusByKey}
               volunteerTallyByPlayerId={seasonVolunteerTallyByPlayerId}
+              volunteerGuestEntries={seasonVolunteerGuestEntries}
               forcedTab="joueurs"
             />
           ),
@@ -353,6 +359,7 @@ export default function AdminView({
               events={upcomingEvents}
               rsvpStatusByKey={rsvpStatusByKey}
               volunteerTallyByPlayerId={seasonVolunteerTallyByPlayerId}
+              volunteerGuestEntries={seasonVolunteerGuestEntries}
               forcedTab="benevoles"
             />
           ),

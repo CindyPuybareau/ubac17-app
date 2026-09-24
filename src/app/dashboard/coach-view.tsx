@@ -40,7 +40,7 @@ import type {
 } from "./page";
 import type { EventRoleType } from "./event-tasks";
 import type { VolunteerNeed } from "./event-volunteer-needs";
-import type { SeasonVolunteerTally } from "./season-bilan";
+import type { SeasonGuestVolunteer, SeasonVolunteerTally } from "./season-bilan";
 import type { BirthdaySource } from "./birthdays";
 
 export default function CoachView({
@@ -55,6 +55,7 @@ export default function CoachView({
   clubTeams,
   birthdayMembers,
   seasonVolunteerTallyByPlayerId,
+  seasonVolunteerGuestEntries,
   whatsappGroups,
   eventRoles,
   volunteerNeedsByEventId = {},
@@ -82,6 +83,10 @@ export default function CoachView({
   // Buvette/Goûter/Lavage maillots, rôles officiels, covoiturage proposé,
   // cumulés par joueur sur la saison.
   seasonVolunteerTallyByPlayerId: Record<string, SeasonVolunteerTally>;
+  // Bénévoles qui écrivent leur propre nom (ou choisis par le Bureau/Coach
+  // sans compte club) -- retour de Cindy du 24/09, doivent apparaître dans
+  // le même tableau.
+  seasonVolunteerGuestEntries: SeasonGuestVolunteer[];
   whatsappGroups: WhatsAppGroup[];
   // Catalogue des roles d organisation (event_role_types).
   eventRoles: EventRoleType[];
@@ -320,6 +325,7 @@ export default function CoachView({
               events={events}
               rsvpStatusByKey={rsvpStatusByKey}
               volunteerTallyByPlayerId={seasonVolunteerTallyByPlayerId}
+              volunteerGuestEntries={seasonVolunteerGuestEntries}
               forcedTab="joueurs"
             />
           ),
@@ -334,6 +340,7 @@ export default function CoachView({
               events={events}
               rsvpStatusByKey={rsvpStatusByKey}
               volunteerTallyByPlayerId={seasonVolunteerTallyByPlayerId}
+              volunteerGuestEntries={seasonVolunteerGuestEntries}
               forcedTab="benevoles"
             />
           ),
