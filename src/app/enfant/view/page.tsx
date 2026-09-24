@@ -6,8 +6,8 @@ import { computePlayerYearStatus } from "@/lib/season";
 import { teamOrClubWideFilter } from "@/app/dashboard/family-data";
 import { getClubOfficialMatches } from "@/lib/club-official-matches";
 import { getSpaceDashboardSummary } from "@/lib/space-dashboard";
+import { computeSeasonParticipation } from "@/app/dashboard/season-bilan";
 import ChildDashboard, {
-  type ChildAttendanceStats,
   type ChildCoach,
   type ChildEvent,
   type ChildTeammate,
@@ -396,27 +396,37 @@ export default async function ChildViewPage() {
     pendingPlayersByEventId[e.id] = pendingPlayers;
   });
 
-  // "Mes Présences" : un vrai bilan d'assiduité, pas un badge à débloquer
-  // — pour chaque famille de types (entraînements / matchs-tournois), le
-  // nombre de rendez-vous passés où l'enfant était Présent/En retard sur
-  // le total de rendez-vous passés (répondu ou non : un rendez-vous
-  // manqué sans réponse compte quand même contre le total, honnêtement).
   const now = Date.now();
-  const ownPastEvents = events.filter((e) => new Date(e.startTime).getTime() < now);
 
-  function attendanceFor(predicate: (eventType: string | null) => boolean): ChildAttendanceStats {
-    const relevant = ownPastEvents.filter((e) => predicate(e.eventType));
-    let present = 0;
-    for (const e of relevant) {
-      const status = rsvpStatusByKey.get(`${e.id}:${playerId}`);
-      if (status === "PRESENT" || status === "LATE") present += 1;
-    }
-    return { present, total: relevant.length };
-  }
+  // "Mes Présences" : un vrai bilan d'assiduité, pas un badge à débloquer
+  // — pour chaque type de rendez-vous, le nombre de fois où l'enfant était
+  // Présent/En retard sur le total de rendez-vous passés (répondu ou non :
+  // un rendez-vous manqué sans réponse compte quand même contre le total,
+  // honnêtement). Retour de Cindy du 24/09 ("et côté enfant aussi") : même
+  // calcul que Bureau/Coach (computeSeasonParticipation, season-bilan.ts)
+  // plutôt qu'une version bespoke qui mélangeait matchs officiels/amicaux/
+  // tournois en un seul chiffre -- une seule vérité "présence" dans toute
+  // l'appli. events porte déjà teamId/targetTeamIds (camelCase) : reformaté
+  // ici en event_type/start_time (snake_case) pour matcher la signature
+  // partagée avec Bureau/Coach (AdminUpcomingEvent), sans requête de plus.
+  const { attendanceByPlayerId, participationByPlayerId } = computeSeasonParticipation(
+    events.map((e) => ({
+      id: e.id,
+      event_type: e.eventType,
+      start_time: e.startTime,
+      teamId: e.teamId,
+      targetTeamIds: e.targetTeamIds,
+    })),
+    (eventId, pid) => rsvpStatusByKey.get(`${eventId}:${pid}`),
+    [playerId],
+    teamIds
+  );
 
   const presence = {
-    trainings: attendanceFor((t) => t === "TRAINING"),
-    matches: attendanceFor((t) => t === "MATCH" || t === "FRIENDLY" || t === "TOURNAMENT"),
+    trainings: attendanceByPlayerId[playerId],
+    official: participationByPlayerId[playerId].official,
+    friendly: participationByPlayerId[playerId].friendly,
+    tournament: participationByPlayerId[playerId].tournament,
   };
 
   // Prochain rendez-vous : qui de l'équipe a déjà répondu, pour l'onglet

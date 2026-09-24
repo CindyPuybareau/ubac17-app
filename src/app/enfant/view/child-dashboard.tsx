@@ -137,7 +137,16 @@ export default function ChildDashboard({
   clubOfficialMatches?: ChildEvent[];
   teammates: ChildTeammate[];
   coaches: ChildCoach[];
-  presence: { trainings: ChildAttendanceStats; matches: ChildAttendanceStats };
+  // Retour de Cindy du 24/09 ("et côté enfant aussi dans leur onglet
+  // présence") : matchs officiels/amicaux/tournois désormais séparés
+  // (même détail que Bureau/Coach) plutôt qu'un seul chiffre "matches" qui
+  // les mélangeait.
+  presence: {
+    trainings: ChildAttendanceStats;
+    official: ChildAttendanceStats;
+    friendly: ChildAttendanceStats;
+    tournament: ChildAttendanceStats;
+  };
   // Calculé côté serveur (page.tsx), source unique — plus recalculé ici
   // en double (retour de Cindy du 2026-08-25 : les présences quittent
   // l'onglet "Mon Équipe" pour rejoindre "Événements"/"Matchs officiels",
@@ -302,7 +311,12 @@ export default function ChildDashboard({
       icon: <BarChart3 className={iconClass} />,
       content: (
         <div className="flex flex-col gap-4">
-          <ChildPresenceTab trainings={presence.trainings} matches={presence.matches} />
+          <ChildPresenceTab
+            trainings={presence.trainings}
+            official={presence.official}
+            friendly={presence.friendly}
+            tournament={presence.tournament}
+          />
           <PenalitesCard
             title="Mes pénalités"
             penalites={penalites}

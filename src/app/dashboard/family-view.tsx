@@ -324,6 +324,33 @@ export default function FamilyView({
               team-photos), jamais à un parent ou un joueur. */}
           <SpaceDashboardSummary summary={dashboardSummary} canManagePhoto={false} />
           <ChildAccessManager />
+
+          {/* Retour de Cindy du 24/09 ("il serait pas mal que les parents
+              ait le bilan d'assiduité de leurs enfants aussi... dans le
+              tableau de bord") puis ("ma cotisation, mes pénalités dans le
+              tableau de bord aussi") : les 3 encarts qui vivaient en pied de
+              page de "Mon équipe"/"Mes enfants" (situation administrative)
+              rejoignent ici la vraie vue d'ensemble de l'espace, plutôt
+              qu'un onglet dédié au planning d'équipe. Cotisation juste sous
+              le bilan de présence (retour de Cindy du 24/09). */}
+          <div className="grid grid-cols-1 gap-4 border-t border-zinc-100 pt-4 sm:grid-cols-2 lg:grid-cols-3">
+            <FamilyAttendanceSummary
+              events={visibleEvents}
+              players={visiblePlayers}
+              rsvpStatusByKey={rsvpStatusByKey}
+            />
+            <FamilyCotisationCard cotisations={visibleCotisations} />
+            <PenalitesCard
+              title="Mes pénalités"
+              penalites={visiblePenalites}
+              showPlayerName={hasSeveralChildren}
+              emptyLabel="Aucune pénalité."
+            />
+          </div>
+
+          {/* Retour de Cindy du 24/09 ("Calendrier UBAC dans ton agenda en
+              dernier") : reste tout en bas, après la situation
+              administrative. */}
           <CalendarSubscribe />
         </div>
       ),
@@ -392,24 +419,6 @@ export default function FamilyView({
               Discussions WhatsApp
             </p>
             <WhatsAppGroupsFamily groups={visibleWhatsappGroups} />
-          </div>
-
-          {/* Deux encarts discrets, en pied de page : la situation
-              administrative n'a rien à faire mêlée au planning, mais
-              reste à portée d'un scroll depuis l'écran "identité". */}
-          <div className="grid grid-cols-1 gap-4 border-t border-zinc-100 pt-4 sm:grid-cols-2 lg:grid-cols-3">
-            <FamilyCotisationCard cotisations={visibleCotisations} />
-            <FamilyAttendanceSummary
-              events={visibleEvents}
-              players={visiblePlayers}
-              rsvpStatusByKey={rsvpStatusByKey}
-            />
-            <PenalitesCard
-              title="Mes pénalités"
-              penalites={visiblePenalites}
-              showPlayerName={hasSeveralChildren}
-              emptyLabel="Aucune pénalité."
-            />
           </div>
         </div>
       ),

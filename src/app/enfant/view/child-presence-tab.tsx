@@ -1,32 +1,50 @@
 import type { ReactNode } from "react";
-import { Dumbbell, Trophy } from "lucide-react";
+import { Activity, Handshake, Sparkles, Trophy } from "lucide-react";
 import type { ChildAttendanceStats } from "./child-dashboard";
 
 // Remplace l'ancien onglet "Défis" (badges à débloquer, jugé trop
-// enfantin) : deux vrais compteurs d'assiduité, calculés côté serveur à
+// enfantin) : de vrais compteurs d'assiduité, calculés côté serveur à
 // partir des RSVP passés de l'enfant (page.tsx) — mêmes données que
 // l'ancien badge "Assidu", juste présentées comme un bilan plutôt qu'un
-// jeu.
+// jeu. Matchs officiels/amicaux/tournois séparés (retour de Cindy du
+// 24/09, même détail que Bureau/Coach) plutôt qu'un seul chiffre "Présence
+// aux matchs" qui les mélangeait.
 export default function ChildPresenceTab({
   trainings,
-  matches,
+  official,
+  friendly,
+  tournament,
 }: {
   trainings: ChildAttendanceStats;
-  matches: ChildAttendanceStats;
+  official: ChildAttendanceStats;
+  friendly: ChildAttendanceStats;
+  tournament: ChildAttendanceStats;
 }) {
   return (
     <div className="flex flex-col gap-4">
       <StatCard
-        icon={<Dumbbell className="h-5 w-5" />}
+        icon={<Activity className="h-5 w-5" />}
         label="Présence aux entraînements"
         stats={trainings}
         emptyLabel="Aucun entraînement passé pour le moment."
       />
       <StatCard
         icon={<Trophy className="h-5 w-5" />}
-        label="Présence aux matchs"
-        stats={matches}
-        emptyLabel="Aucun match passé pour le moment."
+        label="Présence aux matchs officiels"
+        stats={official}
+        emptyLabel="Aucun match officiel passé pour le moment."
+      />
+      <StatCard
+        icon={<Handshake className="h-5 w-5" />}
+        label="Présence aux matchs amicaux"
+        stats={friendly}
+        emptyLabel="Aucun match amical passé pour le moment."
+      />
+      <StatCard
+        icon={<Sparkles className="h-5 w-5" />}
+        label="Présence aux tournois"
+        stats={tournament}
+        emptyLabel="Aucun tournoi passé pour le moment."
       />
     </div>
   );

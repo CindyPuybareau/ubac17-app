@@ -22,17 +22,27 @@ const PARTICIPATION_TYPES: Record<string, keyof SeasonParticipationTally> = {
   OTHER: "other",
 };
 
-export type SeasonParticipationTally = {
-  official: number;
-  friendly: number;
-  tournament: number;
-  other: number;
-};
-
 export type SeasonAttendance = { present: number; total: number };
 
+// Chaque type porte présent ET total (retour de Cindy du 24/09, "et côté
+// enfant aussi dans leur onglet présence") : le Bureau/Coach n'affiche que
+// le nombre de présences (CountChip), mais l'espace Enfant/Famille veut un
+// vrai "X/Y" avec pourcentage, comme pour les entraînements -- même forme
+// partout plutôt qu'un cas particulier par écran.
+export type SeasonParticipationTally = {
+  official: SeasonAttendance;
+  friendly: SeasonAttendance;
+  tournament: SeasonAttendance;
+  other: SeasonAttendance;
+};
+
 function emptyParticipationTally(): SeasonParticipationTally {
-  return { official: 0, friendly: 0, tournament: 0, other: 0 };
+  return {
+    official: { present: 0, total: 0 },
+    friendly: { present: 0, total: 0 },
+    tournament: { present: 0, total: 0 },
+    other: { present: 0, total: 0 },
+  };
 }
 
 // Pure, sans requête : events/getStatus sont déjà chargés par l'appelant
@@ -45,17 +55,22 @@ function emptyParticipationTally(): SeasonParticipationTally {
 // différent par joueur (celui qui répond toujours vs. celui qui ne répond
 // jamais), pourtant les mêmes entraînements ont eu lieu pour toute
 // l'équipe. Le total est maintenant celui des entraînements PASSÉS DE
-// L'ÉQUIPE (teamId, même filtre que l'ancien BilanTeamTable), identique
+// L'ÉQUIPE (teamIds, même filtre que l'ancien BilanTeamTable), identique
 // pour tout le roster ; un joueur qui n'a jamais répondu y apparaît
 // toujours, juste sans "présent" compté. getStatus reste un accesseur (pas
-// un Record déjà à plat) pour accepter aussi bien coachRsvpStatusByKey
-// (Record) que la Map imbriquée du Bureau (rsvpsByEvent) sans jamais
-// reformater l'un en l'autre.
+// un Record déjà à plat) pour accepter coachRsvpStatusByKey (Record), la
+// Map imbriquée du Bureau (rsvpsByEvent) ou la Map à plat de l'espace
+// Enfant, sans jamais reformater l'une en l'autre. teamIds (retour de
+// Cindy du 24/09, réutilisation côté Enfant/Famille) : un tableau plutôt
+// qu'une seule équipe -- un joueur qui coche plusieurs équipes (cas rare
+// mais réel) voit ses entraînements/matchs de CHACUNE comptés, pas
+// seulement de la première ; les appels Coach/Bureau existants passent
+// simplement un tableau à un seul élément.
 export function computeSeasonParticipation(
   events: Pick<AdminUpcomingEvent, "id" | "event_type" | "start_time" | "teamId" | "targetTeamIds">[],
   getStatus: (eventId: string, playerId: string) => string | null | undefined,
   playerIds: string[],
-  teamId: string
+  teamIds: string[]
 ): {
   attendanceByPlayerId: Record<string, SeasonAttendance>;
   participationByPlayerId: Record<string, SeasonParticipationTally>;
@@ -72,7 +87,8 @@ export function computeSeasonParticipation(
   const pastEvents = events.filter(
     (e) =>
       new Date(e.start_time).getTime() < nowMs &&
-      (e.teamId === teamId || (e.targetTeamIds?.includes(teamId) ?? false))
+      ((e.teamId !== null && teamIds.includes(e.teamId)) ||
+        (e.targetTeamIds?.some((id) => teamIds.includes(id)) ?? false))
   );
   const bucketByType = PARTICIPATION_TYPES;
 
@@ -83,15 +99,11 @@ export function computeSeasonParticipation(
     playerIds.forEach((playerId) => {
       const status = getStatus(e.id, playerId);
       const present = status === "PRESENT" || status === "LATE";
-      if (isTraining) {
-        // Même dénominateur pour tout le roster : chaque entraînement passé
-        // de l'équipe compte, réponse donnée ou non.
-        const attendance = attendanceByPlayerId[playerId];
-        attendance.total += 1;
-        if (present) attendance.present += 1;
-      } else if (present && bucket) {
-        participationByPlayerId[playerId][bucket] += 1;
-      }
+      // Même dénominateur pour tout le roster : chaque entraînement/match
+      // passé de l'équipe compte, réponse donnée ou non.
+      const stat = isTraining ? attendanceByPlayerId[playerId] : participationByPlayerId[playerId][bucket!];
+      stat.total += 1;
+      if (present) stat.present += 1;
     });
   });
 

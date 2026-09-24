@@ -132,7 +132,7 @@ export default function SeasonBilanPanel({
             events,
             (eventId, playerId) => rsvpStatusByKey[`${eventId}:${playerId}`],
             playerIds,
-            team.id
+            [team.id]
           );
           return (
             <div key={team.id} className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm sm:p-5">

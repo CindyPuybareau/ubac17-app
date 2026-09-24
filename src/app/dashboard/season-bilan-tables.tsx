@@ -126,7 +126,13 @@ export function ParticipationTable({
   const rows = useMemo(() => {
     const list = roster.map((p) => {
       const attendance = attendanceByPlayerId[p.id] ?? { present: 0, total: 0 };
-      const tally = tallyByPlayerId[p.id] ?? { official: 0, friendly: 0, tournament: 0, other: 0 };
+      const empty = { present: 0, total: 0 };
+      const tally = tallyByPlayerId[p.id] ?? {
+        official: empty,
+        friendly: empty,
+        tournament: empty,
+        other: empty,
+      };
       return { id: p.id, name: fullName(p), attendance, tally };
     });
     const dir = sortDir === "asc" ? 1 : -1;
@@ -141,7 +147,10 @@ export function ParticipationTable({
         const diff = (rateA - rateB) * dir;
         return diff !== 0 ? diff : a.name.localeCompare(b.name, "fr");
       }
-      const diff = (a.tally[sortKey] - b.tally[sortKey]) * dir;
+      // Bureau/Coach : tri sur le nombre de présences (raison d'être de ce
+      // classement), pas sur le total de matchs de ce type -- rester
+      // cohérent avec l'affichage CountChip juste en dessous.
+      const diff = (a.tally[sortKey].present - b.tally[sortKey].present) * dir;
       return diff !== 0 ? diff : a.name.localeCompare(b.name, "fr");
     });
   }, [roster, attendanceByPlayerId, tallyByPlayerId, sortKey, sortDir]);
@@ -209,16 +218,16 @@ export function ParticipationTable({
                 <AttendanceBar present={r.attendance.present} total={r.attendance.total} />
               </td>
               <td className="whitespace-nowrap px-3 py-2.5">
-                <CountChip icon={<Trophy className="h-3 w-3" />} count={r.tally.official} colorClass="bg-navy/10 text-navy" />
+                <CountChip icon={<Trophy className="h-3 w-3" />} count={r.tally.official.present} colorClass="bg-navy/10 text-navy" />
               </td>
               <td className="whitespace-nowrap px-3 py-2.5">
-                <CountChip icon={<Handshake className="h-3 w-3" />} count={r.tally.friendly} colorClass="bg-blue-50 text-blue-700" />
+                <CountChip icon={<Handshake className="h-3 w-3" />} count={r.tally.friendly.present} colorClass="bg-blue-50 text-blue-700" />
               </td>
               <td className="whitespace-nowrap px-3 py-2.5">
-                <CountChip icon={<Sparkles className="h-3 w-3" />} count={r.tally.tournament} colorClass="bg-ubac-yellow/20 text-ubac-yellow-dark" />
+                <CountChip icon={<Sparkles className="h-3 w-3" />} count={r.tally.tournament.present} colorClass="bg-ubac-yellow/20 text-ubac-yellow-dark" />
               </td>
               <td className="whitespace-nowrap px-3 py-2.5">
-                <CountChip icon={<CalendarDays className="h-3 w-3" />} count={r.tally.other} colorClass="bg-zinc-100 text-zinc-600" />
+                <CountChip icon={<CalendarDays className="h-3 w-3" />} count={r.tally.other.present} colorClass="bg-zinc-100 text-zinc-600" />
               </td>
             </tr>
           ))}
