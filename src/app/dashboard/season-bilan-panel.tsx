@@ -121,7 +121,7 @@ export default function SeasonBilanPanel({
 
       <p className="text-xs text-zinc-500">
         {shownTab === "joueurs"
-          ? "Présence aux entraînements et participation aux matchs/tournois depuis le début de la saison. Cliquez sur une colonne pour trier — par défaut, la présence aux entraînements la plus faible apparaît en premier."
+          ? "Présence aux entraînements et participation aux matchs/tournois depuis le début de la saison. Cliquez sur une colonne pour trier — par défaut, la présence aux entraînements la plus forte apparaît en premier."
           : "Bénévolat depuis le début de la saison, classé du plus au moins actif."}
       </p>
 

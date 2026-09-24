@@ -112,7 +112,11 @@ export function ParticipationTable({
   teamNameByPlayerId?: Record<string, string>;
 }) {
   const [sortKey, setSortKey] = useState<ParticipationSortKey>("attendance");
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  // desc (retour de Cindy du 24/09, "mettre ceux qui viennent le plus...
+  // en premier") : la présence aux entraînements la PLUS FORTE apparaît en
+  // premier par défaut -- inverse du choix initial (la plus faible en
+  // premier, pour repérer qui manque le plus).
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   function toggleSort(key: ParticipationSortKey) {
     if (key === sortKey) {
