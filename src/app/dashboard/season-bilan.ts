@@ -36,21 +36,25 @@ function emptyParticipationTally(): SeasonParticipationTally {
 
 // Pure, sans requête : events/getStatus sont déjà chargés par l'appelant
 // (même source que l'assiduité de l'ancien BilanTeamTable). Retour de Cindy
-// du 24/09 ("pour joueur dans assiduité tu parles de quoi, on ne comprend
-// pas") : l'assiduité mélangeait TOUS les événements (entraînements compris)
-// alors qu'elle vivait juste à côté des 4 colonnes par type de match --
-// deux mesures différentes, confondues. attendanceByPlayerId ne porte plus
-// que les ENTRAÎNEMENTS (retour de Cindy, "remplacer assiduité par
-// entraînement"), participationByPlayerId les matchs officiels/amicaux/
-// tournois/autres -- chaque colonne du tableau compte désormais un seul
-// type d'événement, plus de mélange. getStatus reste un accesseur (pas un
-// Record déjà à plat) pour accepter aussi bien coachRsvpStatusByKey
+// du 24/09 ("le nombre d'entraînement devrait être le même pour tout le
+// monde") : la table `rsvps` ne stocke jamais "PENDING" (vérifié en base --
+// seuls PRESENT/ABSENT existent), donc rien ne distingue "jamais répondu"
+// de "pas concerné par cet entraînement" via le statut seul -- compter le
+// total à partir des seules réponses données produisait un dénominateur
+// différent par joueur (celui qui répond toujours vs. celui qui ne répond
+// jamais), pourtant les mêmes entraînements ont eu lieu pour toute
+// l'équipe. Le total est maintenant celui des entraînements PASSÉS DE
+// L'ÉQUIPE (teamId, même filtre que l'ancien BilanTeamTable), identique
+// pour tout le roster ; un joueur qui n'a jamais répondu y apparaît
+// toujours, juste sans "présent" compté. getStatus reste un accesseur (pas
+// un Record déjà à plat) pour accepter aussi bien coachRsvpStatusByKey
 // (Record) que la Map imbriquée du Bureau (rsvpsByEvent) sans jamais
 // reformater l'un en l'autre.
 export function computeSeasonParticipation(
-  events: Pick<AdminUpcomingEvent, "id" | "event_type" | "start_time">[],
+  events: Pick<AdminUpcomingEvent, "id" | "event_type" | "start_time" | "teamId" | "targetTeamIds">[],
   getStatus: (eventId: string, playerId: string) => string | null | undefined,
-  playerIds: string[]
+  playerIds: string[],
+  teamId: string
 ): {
   attendanceByPlayerId: Record<string, SeasonAttendance>;
   participationByPlayerId: Record<string, SeasonParticipationTally>;
@@ -64,7 +68,11 @@ export function computeSeasonParticipation(
   if (playerIds.length === 0) return { attendanceByPlayerId, participationByPlayerId };
 
   const nowMs = Date.now();
-  const pastEvents = events.filter((e) => new Date(e.start_time).getTime() < nowMs);
+  const pastEvents = events.filter(
+    (e) =>
+      new Date(e.start_time).getTime() < nowMs &&
+      (e.teamId === teamId || (e.targetTeamIds?.includes(teamId) ?? false))
+  );
   const bucketByType = PARTICIPATION_TYPES;
 
   pastEvents.forEach((e) => {
@@ -73,9 +81,10 @@ export function computeSeasonParticipation(
     if (!isTraining && !bucket) return;
     playerIds.forEach((playerId) => {
       const status = getStatus(e.id, playerId);
-      if (!status || status === "PENDING") return;
       const present = status === "PRESENT" || status === "LATE";
       if (isTraining) {
+        // Même dénominateur pour tout le roster : chaque entraînement passé
+        // de l'équipe compte, réponse donnée ou non.
         const attendance = attendanceByPlayerId[playerId];
         attendance.total += 1;
         if (present) attendance.present += 1;

@@ -2,10 +2,10 @@
 
 import { useMemo, useState } from "react";
 import {
+  Activity,
   Award,
   Car,
   CalendarDays,
-  Dumbbell,
   HandHeart,
   Handshake,
   ShieldCheck,
@@ -172,13 +172,13 @@ export function ParticipationTable({
       <table className="w-full table-auto border-collapse text-sm">
         <thead>
           <tr className="border-b border-zinc-100 bg-zinc-50 text-left text-xs font-semibold text-zinc-400">
-            <SortableHeader sortKey="name" currentKey={sortKey} currentDir={sortDir} label="Famille / Joueur" onSort={toggleSort} />
+            <SortableHeader sortKey="name" currentKey={sortKey} currentDir={sortDir} label="Joueur" onSort={toggleSort} />
             <SortableHeader
               sortKey="attendance"
               currentKey={sortKey}
               currentDir={sortDir}
               label="Entraînements"
-              icon={<Dumbbell className="h-3.5 w-3.5 shrink-0" />}
+              icon={<Activity className="h-3.5 w-3.5 shrink-0" />}
               onSort={toggleSort}
             />
             <SortableHeader
