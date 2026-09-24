@@ -3966,12 +3966,17 @@ export default async function DashboardPage({
 
         if (seenTeammateIds.has(p.id)) return;
         seenTeammateIds.add(p.id);
+        // category : teamsById (team_players -> teams, déjà rempli plus
+        // haut) plutôt que p.category, même correctif que
+        // adminBirthdayMembers/coachBirthdayMembers plus bas (retour de
+        // Cindy du 24/09) -- p.category reste le champ figé à l'import.
+        const rowTeam = teamsById.get(row.team_id);
         familyBirthdayMembers.push({
           id: p.id,
           firstName: p.first_name,
           lastName: p.last_name,
           birthDate: p.birth_date,
-          category: p.category,
+          category: rowTeam?.category ?? rowTeam?.name ?? p.category,
           teamIds: [],
         });
       });
@@ -4405,6 +4410,14 @@ export default async function DashboardPage({
   // dans une variable Coach devenue sans lecteur.
   familyOrganisationTasks = { ...eventTasksByEventId, ...familyOrganisationTasks };
 
+  // category: m.teams[0]?.category ?? m.teams[0]?.name (retour de Cindy du
+  // 24/09, "U13 ou Senior Z mal nommé... prendre en compte le tableau des
+  // membres") : m.category est le même champ figé que players.category
+  // (mapCotisationRow, ligne ~408 plus haut) -- rempli une fois à l'import,
+  // jamais mis à jour ensuite par un changement d'équipe. m.teams vient de
+  // teamsByPlayerId (team_players -> teams), la même donnée que la colonne
+  // "Équipe(s)" de Membres -- m.category en dernier repli seulement (aucune
+  // équipe affectée du tout).
   const adminBirthdayMembers: BirthdaySource[] = isAdmin
     ? adminMembers
         .filter((m) => !m.archivedAt)
@@ -4413,7 +4426,7 @@ export default async function DashboardPage({
           firstName: m.firstName,
           lastName: m.lastName,
           birthDate: m.birthDate,
-          category: m.category,
+          category: m.teams[0]?.category ?? m.teams[0]?.name ?? m.category,
         }))
     : [];
 
@@ -4430,6 +4443,8 @@ export default async function DashboardPage({
       // sans ça, l'anniversaire d'un coéquipier de Basile à Séniors M
       // apparaissait dans SON widget de coach, alors que "Mon équipe" a
       // déjà le sien.
+      // category : même correctif que adminBirthdayMembers juste au-dessus
+      // (m.category figé, m.teams à jour).
       Array.from(new Map(Object.values(coachMemberDetailsByPlayerId).map((m) => [m.id, m])).values())
         .filter((m) => !m.archivedAt && coachScopedMemberIds.has(m.id))
         .map((m) => ({
@@ -4437,7 +4452,7 @@ export default async function DashboardPage({
         firstName: m.firstName,
         lastName: m.lastName,
         birthDate: m.birthDate,
-        category: m.category,
+        category: m.teams[0]?.category ?? m.teams[0]?.name ?? m.category,
       }))
     : [];
 
