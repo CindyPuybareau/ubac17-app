@@ -4,8 +4,8 @@ import { useMemo, useState } from "react";
 import {
   Award,
   Car,
-  CalendarCheck2,
   CalendarDays,
+  Dumbbell,
   HandHeart,
   Handshake,
   ShieldCheck,
@@ -177,8 +177,8 @@ export function ParticipationTable({
               sortKey="attendance"
               currentKey={sortKey}
               currentDir={sortDir}
-              label="Assiduité"
-              icon={<CalendarCheck2 className="h-3.5 w-3.5 shrink-0" />}
+              label="Entraînements"
+              icon={<Dumbbell className="h-3.5 w-3.5 shrink-0" />}
               onSort={toggleSort}
             />
             <SortableHeader

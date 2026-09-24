@@ -12,9 +12,8 @@ import type { AdminUpcomingEvent } from "./page";
 // covoiturage proposé), calculés depuis les tables réellement vivantes.
 
 // Types d'événement qui comptent comme "participation" au sens de ce
-// bilan -- jamais l'entraînement (déjà couvert par l'assiduité globale,
-// une colonne à part) ni la réunion/l'événement club générique classé
-// ailleurs.
+// bilan -- jamais l'entraînement (compté à part, voir attendanceByPlayerId
+// plus bas) ni la réunion/l'événement club générique classé ailleurs.
 const PARTICIPATION_TYPES: Record<string, keyof SeasonParticipationTally> = {
   MATCH: "official",
   FRIENDLY: "friendly",
@@ -36,14 +35,18 @@ function emptyParticipationTally(): SeasonParticipationTally {
 }
 
 // Pure, sans requête : events/getStatus sont déjà chargés par l'appelant
-// pour l'assiduité existante (voir l'ancien BilanTeamTable) -- une seule
-// passe sur les événements passés calcule à la fois l'assiduité globale
-// (toujours affichée) ET sa répartition par type de rencontre (retour de
-// Cindy du 24/09 -- l'ancien tableau ne comptait que des rôles Maillots/
-// Table de marque, un catalogue archivé depuis longtemps). getStatus reste
-// un accesseur (pas un Record déjà à plat) pour accepter aussi bien
-// coachRsvpStatusByKey (Record) que la Map imbriquée du Bureau
-// (rsvpsByEvent) sans jamais reformater l'un en l'autre.
+// (même source que l'assiduité de l'ancien BilanTeamTable). Retour de Cindy
+// du 24/09 ("pour joueur dans assiduité tu parles de quoi, on ne comprend
+// pas") : l'assiduité mélangeait TOUS les événements (entraînements compris)
+// alors qu'elle vivait juste à côté des 4 colonnes par type de match --
+// deux mesures différentes, confondues. attendanceByPlayerId ne porte plus
+// que les ENTRAÎNEMENTS (retour de Cindy, "remplacer assiduité par
+// entraînement"), participationByPlayerId les matchs officiels/amicaux/
+// tournois/autres -- chaque colonne du tableau compte désormais un seul
+// type d'événement, plus de mélange. getStatus reste un accesseur (pas un
+// Record déjà à plat) pour accepter aussi bien coachRsvpStatusByKey
+// (Record) que la Map imbriquée du Bureau (rsvpsByEvent) sans jamais
+// reformater l'un en l'autre.
 export function computeSeasonParticipation(
   events: Pick<AdminUpcomingEvent, "id" | "event_type" | "start_time">[],
   getStatus: (eventId: string, playerId: string) => string | null | undefined,
@@ -65,15 +68,20 @@ export function computeSeasonParticipation(
   const bucketByType = PARTICIPATION_TYPES;
 
   pastEvents.forEach((e) => {
+    const isTraining = e.event_type === "TRAINING";
     const bucket = bucketByType[e.event_type ?? ""];
+    if (!isTraining && !bucket) return;
     playerIds.forEach((playerId) => {
       const status = getStatus(e.id, playerId);
       if (!status || status === "PENDING") return;
-      const attendance = attendanceByPlayerId[playerId];
-      attendance.total += 1;
       const present = status === "PRESENT" || status === "LATE";
-      if (present) attendance.present += 1;
-      if (present && bucket) participationByPlayerId[playerId][bucket] += 1;
+      if (isTraining) {
+        const attendance = attendanceByPlayerId[playerId];
+        attendance.total += 1;
+        if (present) attendance.present += 1;
+      } else if (present && bucket) {
+        participationByPlayerId[playerId][bucket] += 1;
+      }
     });
   });
 
