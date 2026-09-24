@@ -77,7 +77,7 @@ export default function EventTypeFilterDropdown({
                     onChange={() => onHomeOnlyChange(!homeOnly)}
                     className="h-4 w-4 shrink-0 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
                   />
-                  <Home className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                  <Home className="h-3.5 w-3.5 shrink-0 text-ubac-yellow-dark" />
                   <span>Domicile seulement</span>
                 </label>
                 <div className="my-2 border-t border-zinc-100" />
