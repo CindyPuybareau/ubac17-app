@@ -16,7 +16,6 @@ import {
   Euro,
   Eye,
   ExternalLink,
-  Home,
   LayoutGrid,
   List,
   Lock,
@@ -790,10 +789,11 @@ export default function CalendarView({
   // domicile seulement pour avoir les besoins en organisation en visuel
   // sur le calendrier") : simple filtre d'affichage, comme hiddenEventTypes
   // ci-dessus, mais jamais persisté (pas de demande explicite pour ça) --
-  // réinitialisé à chaque ouverture. Réservé au Bureau (isBureau, voir le
-  // bouton plus bas) : lui seul voit tout le club et a besoin de filtrer
-  // pour repérer les matchs à organiser, Coach/Famille n'ont déjà que
-  // leurs propres matchs sous les yeux.
+  // réinitialisé à chaque ouverture. Réservé au Bureau (isBureau, voir son
+  // passage à EventTypeFilterDropdown plus bas -- case à cocher dans "Filtrer
+  // par", pas son propre pill) : lui seul voit tout le club et a besoin de
+  // filtrer pour repérer les matchs à organiser, Coach/Famille n'ont déjà
+  // que leurs propres matchs sous les yeux.
   const [homeOnly, setHomeOnly] = useState(false);
   // Retour de Cindy du 12/09 ("Matchs officiels du club") : masqué par
   // défaut (showClubMatches=false) -- un adhérent/parent ne voit alors que
@@ -2475,30 +2475,6 @@ export default function CalendarView({
             </button>
           )}
 
-          {/* "Domicile seulement" (retour de Cindy du 24/09, "voir les
-              matchs à domicile seulement pour avoir les besoins en
-              organisation en visuel sur le calendrier") : réservé au
-              Bureau (isBureau) -- symétrique du pill "Matchs officiels du
-              club" juste au-dessus, réservé lui à !isBureau. Masqué sur
-              les pages dédiées (forcedView), même raison que le pill
-              précédent. Ne touche jamais hiddenEventTypes/matchesTeamFilter,
-              simple filtre de plus dans visibleEvents (voir isHomeMatch). */}
-          {!forcedView && isBureau && (
-            <button
-              type="button"
-              onClick={() => setHomeOnly((v) => !v)}
-              title="N'afficher que les matchs à domicile, pour repérer les besoins d'organisation non pourvus"
-              className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
-                homeOnly
-                  ? "border-transparent bg-ubac-yellow text-navy"
-                  : "border-ubac-yellow bg-ubac-yellow/10 text-ubac-yellow-dark hover:bg-ubac-yellow/20"
-              }`}
-            >
-              <Home className="h-3.5 w-3.5 shrink-0" />
-              Domicile seulement
-            </button>
-          )}
-
           {/* Remplace "Masquer les entraînements" (retour de Cindy du
               10/09) : filtre par type d'événement plutôt qu'un seul
               interrupteur entraînements/reste -- visible sur le Calendrier
@@ -2509,11 +2485,17 @@ export default function CalendarView({
               filtre par équipe -- puis juste après "Matchs officiels du
               club" (deuxième retour du 12/09, ce dernier passe devant) --
               vérifié sur les 3 espaces (Bureau/Coach/Famille), un seul
-              composant partagé ici. */}
+              composant partagé ici. "Domicile seulement" (retour de Cindy
+              du 24/09, "doit se trouver dans l'onglet déroulant 'filtrer
+              par'") : rejoint ce même menu plutôt qu'un pill séparé,
+              réservé au Bureau (isBureau) -- ce filtre n'a de sens que
+              pour qui voit tout le club. */}
           {(!forcedView || forcedView === "clubEvents") && (
             <EventTypeFilterDropdown
               hiddenTypes={hiddenEventTypes}
               onChange={updateHiddenEventTypes}
+              homeOnly={isBureau ? homeOnly : undefined}
+              onHomeOnlyChange={isBureau ? setHomeOnly : undefined}
             />
           )}
 
@@ -2684,13 +2666,20 @@ export default function CalendarView({
                   {d.getDate()}
                 </span>
                 <div className="flex w-full min-w-0 flex-col gap-0.5">
-                  <div className="flex flex-wrap gap-0.5 sm:hidden">
+                  {/* gap-1 plutôt que gap-0.5 (retour de Cindy du 24/09,
+                      "écarter un peu les points") : laisse un peu de place
+                      à l'anneau des pastilles "besoin non pourvu" juste en
+                      dessous, sans quoi il collait aux pastilles voisines. */}
+                  <div className="flex flex-wrap gap-1 sm:hidden">
                     {visible.map((e) => (
                       <span
                         key={e.id}
                         title={needsOrganizing(e) ? "Besoin d'organisation non pourvu" : undefined}
                         className={`h-1.5 w-1.5 shrink-0 rounded-full ${styleFor(e.event_type).dot} ${
-                          needsOrganizing(e) ? "ring-2 ring-amber-500 ring-offset-1" : ""
+                          // ring-1, jamais ring-2 (retour de Cindy du 24/09,
+                          // "trop épais, le faire fin") : un simple trait,
+                          // pas un halo épais autour d'une pastille de 6px.
+                          needsOrganizing(e) ? "ring-1 ring-amber-500" : ""
                         }`}
                       />
                     ))}
