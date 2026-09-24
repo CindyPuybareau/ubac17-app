@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bell, Briefcase, Check, Minus, Plus, Trash2, UserPlus, X } from "lucide-react";
+import { Bell, Check, Minus, Plus, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import RoleIcon from "./role-icon";
 import ConfirmDialog from "./confirm-dialog";
@@ -93,8 +93,6 @@ export default function VolunteerNeedsPanel({
   // première ouverture, jamais au montage du panneau (club_member_names
   // couvre tout le club, inutile de la charger sur chaque carte affichée).
   const [assignMembers, setAssignMembers] = useState<AssignableMember[] | null>(null);
-  const [assignOpenNeedId, setAssignOpenNeedId] = useState<string | null>(null);
-  const [assignSearch, setAssignSearch] = useState("");
 
   async function loadAssignMembers() {
     if (assignMembers) return;
@@ -117,27 +115,16 @@ export default function VolunteerNeedsPanel({
     );
   }
 
-  function toggleAssignOpen(needId: string) {
-    if (assignOpenNeedId === needId) {
-      setAssignOpenNeedId(null);
-      return;
-    }
-    setAssignOpenNeedId(needId);
-    setAssignSearch("");
-    void loadAssignMembers();
-  }
-
-  // Case cochée = présent (retour de Cindy) : coche pour attribuer, décoche
-  // pour retirer -- même geste, un seul contrôle, pas un bouton "Ajouter"
-  // séparé d'un bouton "Retirer" (déjà porté par le X sur chaque pastille
-  // plus bas, laissé pour la cohérence avec le reste de la carte).
-  async function toggleAssignMember(need: VolunteerNeed, member: AssignableMember) {
-    const existing = need.signups.find((s) => s.playerId === member.id);
-    if (existing) {
-      await withdraw(existing.id);
-      return;
-    }
-    setPending(`assign-${need.id}-${member.id}`);
+  // Retour de Cindy du 21/09 ("que ces besoins classiques fonctionnent
+  // EXACTEMENT comme... Organisation match officiel") : deux façons
+  // d'attribuer, comme assignMember/assignGuest (match-officials-panel.tsx)
+  // -- seule différence, un besoin classique accepte PLUSIEURS bénévoles
+  // (voir NeedSlotManage plus bas, ré-affiché tant que remaining > 0),
+  // là où un rôle officiel n'en accepte qu'un seul. Jamais de filtre
+  // "adultes uniquement" (retour de Cindy : "erreur de ma part") -- tout le
+  // club reste sélectionnable via club_member_names, sans distinction.
+  async function assignMember(need: VolunteerNeed, member: AssignableMember) {
+    setPending(need.id);
     setError(null);
     const supabase = createClient();
     const { data, error: insertError } = await supabase
@@ -172,6 +159,47 @@ export default function VolunteerNeedsPanel({
                   commissionGroupId: null,
                   guestName: null,
                   playerName: member.name,
+                  source: "ADMIN" as const,
+                },
+              ],
+            }
+          : n
+      )
+    );
+  }
+
+  async function assignGuest(need: VolunteerNeed, name: string) {
+    setPending(need.id);
+    setError(null);
+    const supabase = createClient();
+    const { data, error: insertError } = await supabase
+      .from("event_volunteer_signups")
+      .insert({
+        need_id: need.id,
+        guest_name: name,
+        source: "ADMIN",
+      })
+      .select("id")
+      .single();
+    setPending(null);
+    if (insertError) {
+      setError(`Attribution impossible : ${insertError.message}`);
+      return;
+    }
+    setLocalNeeds((prev) =>
+      prev.map((n) =>
+        n.id === need.id
+          ? {
+              ...n,
+              signups: [
+                ...n.signups,
+                {
+                  id: data.id,
+                  playerId: null,
+                  benevoleId: null,
+                  commissionGroupId: null,
+                  guestName: name,
+                  playerName: name,
                   source: "ADMIN" as const,
                 },
               ],
@@ -611,76 +639,22 @@ export default function VolunteerNeedsPanel({
                 </div>
               )}
 
-              {/* Retour de Cindy du 18/09 ("si un message WhatsApp envoyé je
-                  fais la buvette et que le parent a oublié de le mettre
-                  dans l'appli") : le Bureau/Coach attribue directement un
-                  besoin classique à un membre, même principe que
-                  "Personnes spécifiques" -- recherche + cases à cocher,
-                  jamais un simple bouton "Ajouter" qui rouvrirait un
-                  formulaire séparé. */}
-              {canManage && (
-                <div className="flex flex-col gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => toggleAssignOpen(need.id)}
-                    className="flex w-fit items-center gap-1 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
-                  >
-                    <UserPlus className="h-3.5 w-3.5" />
-                    Attribuer un membre
-                  </button>
-                  {assignOpenNeedId === need.id && (
-                    <div className="flex flex-col gap-1.5 rounded-lg border border-zinc-200 bg-white p-2">
-                      <input
-                        type="text"
-                        placeholder="Rechercher un membre..."
-                        value={assignSearch}
-                        onChange={(e) => setAssignSearch(e.target.value)}
-                        className="rounded-lg border border-zinc-200 px-2 py-1.5 text-xs"
-                      />
-                      <div className="max-h-40 overflow-y-auto">
-                        {assignMembers === null ? (
-                          <p className="px-1 py-1 text-xs text-zinc-400">Chargement...</p>
-                        ) : (
-                          (() => {
-                            const filtered = assignMembers
-                              .map((m, index) => ({ ...m, index }))
-                              .filter((m) =>
-                                m.name.toLowerCase().includes(assignSearch.trim().toLowerCase())
-                              )
-                              .sort(
-                                (a, b) => Number(b.isSalarie) - Number(a.isSalarie) || a.index - b.index
-                              );
-                            return filtered.length === 0 ? (
-                              <p className="px-1 py-1 text-xs text-zinc-400">Aucun membre trouvé.</p>
-                            ) : (
-                              filtered.map((m) => {
-                                const checked = need.signups.some((s) => s.playerId === m.id);
-                                return (
-                                  <label
-                                    key={m.id}
-                                    className={`flex items-center gap-1.5 px-1 py-1 text-xs ${
-                                      m.isSalarie ? "font-semibold text-blue-700" : "text-zinc-700"
-                                    }`}
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={checked}
-                                      disabled={pending === `assign-${need.id}-${m.id}`}
-                                      onChange={() => toggleAssignMember(need, m)}
-                                      className="h-3.5 w-3.5 rounded border-zinc-300 text-terracotta focus:ring-terracotta"
-                                    />
-                                    {m.isSalarie && <Briefcase className="h-3 w-3 shrink-0" />}
-                                    {m.name}
-                                  </label>
-                                );
-                              })
-                            );
-                          })()
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
+              {/* Retour de Cindy du 21/09 ("que ces besoins classiques
+                  fonctionnent EXACTEMENT comme... Organisation match
+                  officiel") : deux boutons "Choisir un membre" / "Écrire un
+                  nom", identiques à RoleSlotManage (match-officials-panel.tsx)
+                  -- seule différence, réaffiché tant qu'il reste des places
+                  (remaining > 0) plutôt que masqué dès la première
+                  attribution, un besoin classique acceptant plusieurs
+                  bénévoles. */}
+              {canManage && remaining > 0 && (
+                <NeedSlotManage
+                  clubMembers={assignMembers}
+                  onOpen={loadAssignMembers}
+                  pending={pending === need.id}
+                  onAssignMember={(playerId, name) => assignMember(need, { id: playerId, name, isSalarie: false })}
+                  onAssignGuest={(name) => assignGuest(need, name)}
+                />
               )}
 
               {!canManage &&
@@ -794,6 +768,129 @@ export default function VolunteerNeedsPanel({
         onConfirm={() => removeNeedTarget && removeNeed(removeNeedTarget)}
         onCancel={() => setRemoveNeedTarget(null)}
       />
+    </div>
+  );
+}
+
+// Deux façons d'attribuer un besoin classique côté Bureau/Coach, en miroir
+// exact de RoleSlotManage (match-officials-panel.tsx) : un membre du club ou
+// un nom tapé pour quelqu'un hors club -- jamais les deux en même temps, un
+// seul mode ouvert à la fois. Contrairement à RoleSlotManage (un seul
+// assignment par rôle, le composant disparaît une fois pourvu), l'appelant
+// réaffiche celui-ci tant qu'il reste des places -- setMode("NONE") après
+// chaque attribution pour redonner accès aux deux boutons plutôt que rester
+// bloqué sur le select/l'input déjà utilisé.
+function NeedSlotManage({
+  clubMembers,
+  onOpen,
+  pending,
+  onAssignMember,
+  onAssignGuest,
+}: {
+  clubMembers: AssignableMember[] | null;
+  onOpen: () => void;
+  pending: boolean;
+  onAssignMember: (playerId: string, name: string) => void;
+  onAssignGuest: (name: string) => void;
+}) {
+  const [mode, setMode] = useState<"NONE" | "MEMBER" | "GUEST">("NONE");
+  const [guestName, setGuestName] = useState("");
+  const options = clubMembers ?? [];
+  // Retour de Cindy du 18/09 ("Choisir un membre") : salariés en tête, en
+  // bleu -- même règle que ProfilePicker (create-event-form.tsx) et
+  // RoleSlotManage (match-officials-panel.tsx).
+  const sortedOptions = options
+    .map((m, index) => ({ ...m, index }))
+    .sort((a, b) => Number(b.isSalarie) - Number(a.isSalarie) || a.index - b.index);
+
+  if (mode === "MEMBER") {
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          disabled={pending}
+          defaultValue=""
+          onChange={(e) => {
+            const member = options.find((m) => m.id === e.target.value);
+            if (member) {
+              onAssignMember(member.id, member.name);
+              setMode("NONE");
+            }
+          }}
+          className="rounded-lg border border-zinc-200 px-2 py-1.5 text-xs"
+        >
+          <option value="" disabled>
+            {clubMembers === null ? "Chargement..." : "Choisir..."}
+          </option>
+          {sortedOptions.map((m) => (
+            <option key={m.id} value={m.id} style={m.isSalarie ? { color: "#1d4ed8" } : undefined}>
+              {m.isSalarie ? `${m.name} (Salarié)` : m.name}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={() => setMode("NONE")}
+          className="text-xs font-medium text-zinc-500 hover:text-zinc-700"
+        >
+          Annuler
+        </button>
+      </div>
+    );
+  }
+
+  if (mode === "GUEST") {
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="text"
+          autoFocus
+          placeholder="Nom et prénom"
+          value={guestName}
+          onChange={(e) => setGuestName(e.target.value)}
+          className="flex-1 rounded-lg border border-zinc-200 px-2 py-1.5 text-xs"
+        />
+        <button
+          type="button"
+          disabled={pending || !guestName.trim()}
+          onClick={() => {
+            onAssignGuest(guestName.trim());
+            setGuestName("");
+            setMode("NONE");
+          }}
+          className="rounded-full bg-navy px-3 py-1.5 text-xs font-semibold text-white hover:bg-navy-dark disabled:opacity-60"
+        >
+          Valider
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("NONE")}
+          className="text-xs font-medium text-zinc-500 hover:text-zinc-700"
+        >
+          Annuler
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      <button
+        type="button"
+        onClick={() => {
+          setMode("MEMBER");
+          onOpen();
+        }}
+        className="flex w-fit items-center gap-1 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+      >
+        Choisir un membre
+      </button>
+      <button
+        type="button"
+        onClick={() => setMode("GUEST")}
+        className="flex w-fit items-center gap-1 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+      >
+        Écrire un nom
+      </button>
     </div>
   );
 }
