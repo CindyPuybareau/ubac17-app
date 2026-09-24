@@ -2009,7 +2009,37 @@ export default function CalendarView({
               // court instant.
               <div className="h-16 animate-pulse rounded-xl bg-zinc-100" />
             ) : (
-              <VolunteerNeedsPanel
+              <>
+                {/* Retour de Cindy du 24/09 ("le coach des Séniors M et
+                    Séniors M-1 ne voit pas apparaître les besoins en
+                    covoiturage pour les matchs extérieur") : ce panneau
+                    n'incluait jusqu'ici que VolunteerNeedsPanel -- jamais
+                    MatchTasksPanel (Maillots/Table de marque ET
+                    Covoiturage & trajet), contrairement à la branche
+                    !canManageEvent juste au-dessus et à CoachNextMatchCard
+                    ("Prochain match", même carte). Un coach qui gère son
+                    équipe voyait donc son propre match à l'extérieur sans
+                    jamais la moindre trace de covoiturage en parcourant le
+                    calendrier -- uniquement visible sur LE tout prochain
+                    match (CoachNextMatchCard), jamais au-delà. roster/
+                    myPlayerIds repris de CoachNextMatchCard : le roster
+                    complet de l'équipe (respondingPlayers, pas
+                    rsvpVisiblePlayers qui se limite à sa propre fiche) et
+                    canAssignAnyone pour que le coach affecte maillots/
+                    goûter à n'importe quel joueur, pas seulement lui-même. */}
+                <MatchTasksPanel
+                  eventId={event.id}
+                  eventDate={event.start_time}
+                  roster={respondingPlayers}
+                  myPlayerIds={selfPlayerId ? [selfPlayerId] : []}
+                  canAssignAnyone
+                  initialTasks={tasksByEventId[event.id] ?? emptyEventTasks}
+                  initialCarpool={carpoolByEventId[event.id] ?? emptyCarpool}
+                  roles={rolesForEventType(eventRoles, event.event_type)}
+                  showCarpool={shouldOfferCarpool(event)}
+                  bare
+                />
+                <VolunteerNeedsPanel
                 eventId={event.id}
                 needs={volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds}
                 myPlayerIds={[]}
@@ -2031,7 +2061,8 @@ export default function CalendarView({
                     ...n,
                   })
                 }
-              />
+                />
+              </>
             )}
           </OrganisationCard>
         )}

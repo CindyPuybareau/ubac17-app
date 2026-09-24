@@ -1,3 +1,5 @@
+import { parseMatchTitle } from "@/lib/match-display";
+
 // Matches ubac17.fr's "Légende des lieux" exactly (colors pulled from the
 // site's own legend dots) so the app's salle badges look consistent with
 // the public planning page.
@@ -21,12 +23,23 @@ export function shouldOfferCarpool(event: {
   salle: string | null;
   location: string | null;
   isHome?: boolean | null;
+  title?: string | null;
 }) {
   if (event.event_type === "TRAINING") return false;
   // Le coach a explicitement coché domicile ou extérieur : sa réponse prime
-  // sur ce qu'on devinerait du nom de la salle.
-  if (event.isHome === true) return false;
-  if (event.isHome === false) return true;
+  // sur ce qu'on devinerait du nom de la salle. Repli sur le titre du
+  // match ("vs "/"@ ", même lecture que isHomeMatch dans calendar-view.tsx)
+  // quand isHome reste NULL en base -- retour de Cindy du 24/09 ("le coach
+  // des Séniors M... ne voit pas apparaître les besoins en covoiturage pour
+  // les matchs extérieur") : is_home n'est renseigné que pour une poignée
+  // de matchs, et location/salle valent ici "Domicile"/"Extérieur" (jamais
+  // le nom d'une salle) -- l'ancien repli tombait donc systématiquement
+  // dans le cas "lieu inconnu = covoiturage proposé", y compris à
+  // domicile, masquant l'inverse (repli correct côté extérieur, mais aussi
+  // affiché à tort à domicile).
+  const resolvedIsHome = event.isHome ?? parseMatchTitle(event.title ?? null).isHome;
+  if (resolvedIsHome === true) return false;
+  if (resolvedIsHome === false) return true;
   const venue = normalize(`${event.salle ?? ""} ${event.location ?? ""}`);
   if (!venue.trim()) return true;
   return !SALLES.some((s) => venue.includes(normalize(s)));
