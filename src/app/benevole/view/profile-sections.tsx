@@ -284,6 +284,7 @@ const iconClass = "h-4 w-4 shrink-0";
 export function buildProfileSections({
   allowedBriques,
   teams,
+  teamRefs,
   members,
   events,
   sponsors,
@@ -294,7 +295,18 @@ export function buildProfileSections({
   attendanceByEventId,
 }: {
   allowedBriques: string[];
+  // Réservé à la section "Équipes" (roster + coachs) -- gouverné par la
+  // brique "equipes" (read-only-briques-data.ts), donc souvent vide (voir
+  // teamRefs juste en dessous pour le sélecteur de Calendrier/Matchs, qui
+  // ne doit PAS dépendre de cette même brique).
   teams: ProfileTeam[];
+  // Retour de Cindy du 24/09 ("masquer/voir les entraînements et Toutes
+  // les équipes ne fonctionnent pas sur ces espaces") : sélecteur
+  // d'équipe DE Calendrier/Matchs -- indépendant de la brique "equipes"
+  // (profileTeamRefs, read-only-briques-data.ts), pour qu'un profil qui
+  // n'a que "calendrier" coché garde un filtre par équipe fonctionnel au
+  // lieu d'un menu vide qui masquait presque tous les événements.
+  teamRefs: { id: string; name: string | null; category: string | null }[];
   members: ProfileMember[];
   // Un seul jeu de données pour "evenements" ET "matchs_resultats" : les
   // deux composants ci-dessous filtrent déjà chacun de leur côté par
@@ -326,7 +338,6 @@ export function buildProfileSections({
   attendanceByEventId: Record<string, { name: string | null; status: string }[]>;
 }): AdminSection[] {
   const has = (b: string) => allowedBriques.includes(b);
-  const teamRefs = teams.map((t) => ({ id: t.id, name: t.name, category: t.category }));
   const sections: AdminSection[] = [];
 
   // Retour de Cindy du 10/09 (fusion Calendrier/Événements) : une seule

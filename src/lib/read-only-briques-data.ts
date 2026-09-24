@@ -12,6 +12,19 @@ import { upcomingBirthdays, type BirthdaySource } from "@/app/dashboard/birthday
 // que matchesTeamFilter dans calendar-view.tsx).
 export type ReadOnlyBriquesData = {
   profileTeams: ProfileTeam[];
+  // Retour de Cindy du 24/09 ("masquer/voir les entraînements et Toutes
+  // les équipes ne fonctionnent pas sur ces espaces") : le sélecteur
+  // d'équipe DE Calendrier/Matchs (CalendarSection/MatchsSection,
+  // profile-sections.tsx) réutilisait profileTeams -- vide dès qu'une
+  // commission n'avait pas la brique "equipes" cochée (le cas normal
+  // pour "Animation & Événements", qui n'a que calendrier/tableau_de_bord),
+  // ce qui non seulement videait le menu déroulant mais filtrait aussi
+  // presque tous les événements (selectedIds initialisé sur un tableau
+  // vide de teams). Juste id/name/category, jamais coaches/teammates
+  // (aucune donnée nominative) : peut donc être renvoyé indépendamment
+  // de la brique "equipes", qui elle reste réservée aux vraies fiches
+  // d'équipe (roster + coachs).
+  profileTeamRefs: { id: string; name: string | null; category: string | null }[];
   profileMembers: ProfileMember[];
   profileEvents: ChildEvent[];
   profileSponsors: SponsorDisplay[];
@@ -47,6 +60,7 @@ export async function getReadOnlyBriquesData(
   const has = (b: string) => allowedBriques.includes(b);
 
   let profileTeams: ProfileTeam[] = [];
+  let profileTeamRefs: ReadOnlyBriquesData["profileTeamRefs"] = [];
   let profileMembers: ProfileMember[] = [];
   let profileEvents: ChildEvent[] = [];
   let profileSponsors: SponsorDisplay[] = [];
@@ -55,12 +69,23 @@ export async function getReadOnlyBriquesData(
   let profileWhatsappGroups: ReadOnlyBriquesData["profileWhatsappGroups"] = [];
   const attendanceByEventId: Record<string, { name: string | null; status: string }[]> = {};
 
-  if (has("equipes")) {
-    const { data: teamsData } = await supabase
+  // Team refs légers (id/name/category, jamais roster/coachs) pour le
+  // sélecteur d'équipe de Calendrier/Matchs -- indépendant de "equipes",
+  // voir le commentaire sur profileTeamRefs plus haut. teamsData réutilisé
+  // tel quel juste après si "equipes" est cochée, pour ne jamais lancer
+  // cette requête deux fois.
+  let teamsData: { id: string; name: string | null; category: string | null; sort_order: number | null }[] = [];
+  if (has("calendrier") || has("evenements") || has("matchs_resultats") || has("equipes")) {
+    const { data } = await supabase
       .from("teams")
       .select("id, name, category, sort_order")
       .order("sort_order", { ascending: true });
-    const teamIds = (teamsData ?? []).map((t) => t.id);
+    teamsData = data ?? [];
+    profileTeamRefs = teamsData.map((t) => ({ id: t.id, name: t.name, category: t.category }));
+  }
+
+  if (has("equipes")) {
+    const teamIds = teamsData.map((t) => t.id);
 
     const [teamPlayersRes, teamCoachesRes] = await Promise.all([
       teamIds.length > 0
@@ -95,7 +120,7 @@ export async function getReadOnlyBriquesData(
       );
     });
 
-    profileTeams = (teamsData ?? []).map((t) => ({
+    profileTeams = teamsData.map((t) => ({
       id: t.id,
       name: t.name,
       category: t.category,
@@ -330,6 +355,7 @@ export async function getReadOnlyBriquesData(
 
   return {
     profileTeams,
+    profileTeamRefs,
     profileMembers,
     profileEvents,
     profileSponsors,

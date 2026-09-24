@@ -90,6 +90,7 @@ export default async function BenevoleViewPage() {
 
   const {
     profileTeams,
+    profileTeamRefs,
     profileMembers,
     profileEvents,
     profileSponsors,
@@ -136,6 +137,7 @@ export default async function BenevoleViewPage() {
       firstName={benevole.first_name}
       allowedBriques={allowedBriques}
       profileTeams={profileTeams}
+      profileTeamRefs={profileTeamRefs}
       profileMembers={profileMembers}
       profileEvents={profileEvents}
       profileSponsors={profileSponsors}

@@ -52,6 +52,7 @@ export default async function CommissionPage({
 
   const {
     profileTeams,
+    profileTeamRefs,
     profileMembers,
     profileEvents,
     profileSponsors,
@@ -126,6 +127,7 @@ export default async function CommissionPage({
       notifications={notifications}
       allowedBriques={allowedBriques}
       profileTeams={profileTeams}
+      profileTeamRefs={profileTeamRefs}
       profileMembers={profileMembers}
       profileEvents={profileEvents}
       profileSponsors={profileSponsors}

@@ -240,6 +240,7 @@ export default function CommissionView({
   notifications,
   allowedBriques,
   profileTeams,
+  profileTeamRefs,
   profileMembers,
   profileEvents,
   profileSponsors,
@@ -260,6 +261,9 @@ export default function CommissionView({
   notifications: CommissionNotification[];
   allowedBriques: string[];
   profileTeams: ProfileTeam[];
+  // Retour de Cindy du 24/09 : sélecteur d'équipe de Calendrier/Matchs,
+  // voir son commentaire dans profile-sections.tsx/read-only-briques-data.ts.
+  profileTeamRefs: { id: string; name: string | null; category: string | null }[];
   profileMembers: ProfileMember[];
   profileEvents: ChildEvent[];
   profileSponsors: SponsorDisplay[];
@@ -313,6 +317,7 @@ export default function CommissionView({
     ...buildProfileSections({
       allowedBriques,
       teams: profileTeams,
+      teamRefs: profileTeamRefs,
       members: profileMembers,
       events: profileEvents,
       sponsors: profileSponsors,
@@ -333,7 +338,16 @@ export default function CommissionView({
               <Image src="/logo.png" alt="UBAC" width={44} height={44} className="h-11 w-11 object-contain" priority />
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">Bonjour</p>
-                <h1 className="truncate text-xl font-bold text-white">l&apos;équipe {commissionLabel}</h1>
+                {/* Retour de Cindy du 24/09 ("l'équipe Événement... coupé sur
+                    téléphone") : un nom de commission peut être long
+                    ("Calendrier et dates à retenir") -- au lieu de tronquer
+                    en ellipse sur mobile (perdait le nom en cours de mot),
+                    le titre passe sur 2 lignes avec une taille un cran plus
+                    petite avant sm:, la même largeur que le reste de
+                    l'en-tête restant garantie par min-w-0 sur ce conteneur. */}
+                <h1 className="line-clamp-2 break-words text-sm font-bold leading-tight text-white sm:text-xl">
+                  l&apos;équipe {commissionLabel}
+                </h1>
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-1">

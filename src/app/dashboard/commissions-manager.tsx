@@ -342,9 +342,15 @@ export default function CommissionsManager({
 }) {
   const [individualOpen, setIndividualOpen] = useState(false);
 
+  // hideFromCommissionAccess (retour de Cindy du 24/09) : Bureau/Coachs/
+  // Salariés restent des groupes WhatsApp normaux (whatsapp-groups-
+  // manager.tsx, jamais touché ici) -- seul LEUR lien public "accès en
+  // lecture seule" n'a pas de sens, chacun ayant déjà son propre accès
+  // (compte Bureau/Coach, ou accès individuel pour un salarié).
   const commissions = whatsappGroups
     .filter((g) => g.category === "COMMISSION")
     .map((g) => ({ group: g, ...commissionMeta(g.name) }))
+    .filter((c) => !c.hideFromCommissionAccess)
     .sort((a, b) => a.rank - b.rank);
 
   return (

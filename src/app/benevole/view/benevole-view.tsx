@@ -28,6 +28,7 @@ export default function BenevoleView({
   firstName,
   allowedBriques,
   profileTeams,
+  profileTeamRefs,
   profileMembers,
   profileEvents,
   profileSponsors,
@@ -45,6 +46,9 @@ export default function BenevoleView({
   // historique, aucun profil assigné) -> aucune entrée de menu en plus.
   allowedBriques: string[];
   profileTeams: ProfileTeam[];
+  // Retour de Cindy du 24/09 : sélecteur d'équipe de Calendrier/Matchs,
+  // voir son commentaire dans profile-sections.tsx/read-only-briques-data.ts.
+  profileTeamRefs: { id: string; name: string | null; category: string | null }[];
   profileMembers: ProfileMember[];
   profileEvents: ChildEvent[];
   profileSponsors: SponsorDisplay[];
@@ -83,6 +87,7 @@ export default function BenevoleView({
   const builtSections = buildProfileSections({
     allowedBriques,
     teams: profileTeams,
+    teamRefs: profileTeamRefs,
     members: profileMembers,
     events: profileEvents,
     sponsors: profileSponsors,
