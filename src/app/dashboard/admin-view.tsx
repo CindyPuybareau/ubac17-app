@@ -60,6 +60,8 @@ import type {
 import type { BirthdaySource } from "./birthdays";
 import type { EventRoleType } from "./event-tasks";
 import type { VolunteerNeed } from "./event-volunteer-needs";
+import SeasonBilanPanel, { type BilanTeamRoster } from "./season-bilan-panel";
+import type { SeasonVolunteerTally } from "./season-bilan";
 
 export default function AdminView({
   allowedBriques = null,
@@ -83,6 +85,8 @@ export default function AdminView({
   automationSettings,
   eventRoles,
   volunteerNeedsByEventId,
+  rsvpStatusByKey,
+  seasonVolunteerTallyByPlayerId,
   clubReports,
   dashboardSummary,
   ownPlayerId = null,
@@ -117,6 +121,10 @@ export default function AdminView({
   // bénévoles directement depuis la carte de l'événement.
   eventRoles: EventRoleType[];
   volunteerNeedsByEventId: Record<string, VolunteerNeed[]>;
+  // "Bilan de la saison" (retour de Cindy du 24/09) : présences à plat
+  // (event:player -> statut) et bénévolat cumulé par joueur, club entier.
+  rsvpStatusByKey: Record<string, string>;
+  seasonVolunteerTallyByPlayerId: Record<string, SeasonVolunteerTally>;
   clubReports: ClubReport[];
   // Retour de Cindy du 13/09 ("ce que tu mettrais dans le tableau de
   // bord") : résumé club entier (space-dashboard.ts, teamIds null) --
@@ -131,6 +139,16 @@ export default function AdminView({
     id: t.id,
     name: t.name,
     category: t.category,
+  }));
+
+  // "Bilan de la saison" (retour de Cindy du 24/09, refonte "Organisation &
+  // Bilan") : club entier -- contrairement à côté Coach (season-bilan-
+  // panel.tsx via coach-view.tsx), aucun filtre "coach/joueur" ici, toutes
+  // les équipes du club. Dérivé de `teams`, déjà chargé pour l'onglet
+  // Équipes -- aucune requête de plus.
+  const bilanTeams: BilanTeamRoster[] = teams.map((t) => ({
+    team: { id: t.id, name: t.name, category: t.category },
+    roster: t.players,
   }));
 
   // Retour de Cindy du 21/09 ("Matchs officiels" côté Bureau, scroller un
@@ -299,6 +317,47 @@ export default function AdminView({
           whatsappGroups={whatsappGroups}
         />
       ),
+    },
+    {
+      // "Bilan de la saison" (retour de Cindy du 24/09) : nouveauté côté
+      // Bureau -- rien de comparable n'existait jusqu'ici (l'ancien
+      // "Organisation & Bilan" du Coach reposait sur un catalogue de rôles
+      // archivé, jamais dupliqué ici). Club entier, même composant que
+      // côté Coach (season-bilan-panel.tsx) -- voir bilanTeams plus haut.
+      key: "season-bilan",
+      label: "Bilan de la saison",
+      icon: <ListOrdered className={iconClass} />,
+      content: null,
+      children: [
+        {
+          key: "season-bilan-joueurs",
+          label: "Joueurs",
+          icon: <Trophy className={iconClass} />,
+          content: (
+            <SeasonBilanPanel
+              teams={bilanTeams}
+              events={upcomingEvents}
+              rsvpStatusByKey={rsvpStatusByKey}
+              volunteerTallyByPlayerId={seasonVolunteerTallyByPlayerId}
+              forcedTab="joueurs"
+            />
+          ),
+        },
+        {
+          key: "season-bilan-benevoles",
+          label: "Bénévoles",
+          icon: <HandHeart className={iconClass} />,
+          content: (
+            <SeasonBilanPanel
+              teams={bilanTeams}
+              events={upcomingEvents}
+              rsvpStatusByKey={rsvpStatusByKey}
+              volunteerTallyByPlayerId={seasonVolunteerTallyByPlayerId}
+              forcedTab="benevoles"
+            />
+          ),
+        },
+      ],
     },
     {
       // Sous-menu (retour de Cindy du 2026-08-22) : "cotisations et

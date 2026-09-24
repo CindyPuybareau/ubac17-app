@@ -1,7 +1,7 @@
 import {
   Building2,
   CalendarDays,
-  ClipboardList,
+  HandHeart,
   LayoutDashboard,
   ListOrdered,
   LogOut,
@@ -24,7 +24,7 @@ import SpaceDashboardSummary from "./space-dashboard-summary";
 import type { SpaceDashboardSummary as SpaceDashboardSummaryData } from "@/lib/space-dashboard";
 import CoachTeams from "./coach-teams";
 import CoachFfbb from "./coach-ffbb";
-import CoachOrganisation, { type CoachTeamMatchCard } from "./coach-organisation";
+import SeasonBilanPanel, { type BilanTeamRoster } from "./season-bilan-panel";
 import WhatsAppGroupsManager from "./whatsapp-groups-manager";
 import SponsorsDisplay from "./sponsors-display";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
@@ -38,13 +38,9 @@ import type {
   SponsorDisplay,
   WhatsAppGroup,
 } from "./page";
-import type {
-  CarpoolOffer,
-  EventRoleType,
-  EventTasksState,
-  SeasonTaskTally,
-} from "./event-tasks";
+import type { EventRoleType } from "./event-tasks";
 import type { VolunteerNeed } from "./event-volunteer-needs";
+import type { SeasonVolunteerTally } from "./season-bilan";
 import type { BirthdaySource } from "./birthdays";
 
 export default function CoachView({
@@ -55,14 +51,10 @@ export default function CoachView({
   memberDetailsByPlayerId,
   rsvpPlayers,
   rsvpStatusByKey,
-  rsvpReasonByKey,
-  taskTallyByTeamId,
   teamRoleByTeamId,
   clubTeams,
   birthdayMembers,
-  organisationCards,
-  tasksByEventId,
-  carpoolByEventId,
+  seasonVolunteerTallyByPlayerId,
   whatsappGroups,
   eventRoles,
   volunteerNeedsByEventId = {},
@@ -80,18 +72,16 @@ export default function CoachView({
   memberDetailsByPlayerId: Record<string, MemberDetail>;
   rsvpPlayers: { id: string; name: string; teamIds: string[] }[];
   rsvpStatusByKey: Record<string, string>;
-  // Motif d'absence saisi par la famille, affiché sur les cartes.
-  rsvpReasonByKey: Record<string, string | null>;
-  taskTallyByTeamId: Record<string, SeasonTaskTally>;
   // "COACH" for a team they coach, "PLAYER" for one they only play in —
   // drives both the team selector's badge and the read-only mode.
   teamRoleByTeamId: Record<string, "COACH" | "PLAYER">;
   // Every club team, for the roster's "Changer d'équipe" picker.
   clubTeams: AdminMemberTeam[];
   birthdayMembers: BirthdaySource[];
-  organisationCards: CoachTeamMatchCard[];
-  tasksByEventId: Record<string, EventTasksState>;
-  carpoolByEventId: Record<string, CarpoolOffer[]>;
+  // "Bilan de la saison" -> onglet Bénévoles (retour de Cindy du 24/09) :
+  // Buvette/Goûter/Lavage maillots, rôles officiels, covoiturage proposé,
+  // cumulés par joueur sur la saison.
+  seasonVolunteerTallyByPlayerId: Record<string, SeasonVolunteerTally>;
   whatsappGroups: WhatsAppGroup[];
   // Catalogue des roles d organisation (event_role_types).
   eventRoles: EventRoleType[];
@@ -130,6 +120,19 @@ export default function CoachView({
       id: t.id,
       name: t.name,
       category: t.category,
+    }));
+
+  // "Bilan de la saison" (retour de Cindy du 24/09) : équipes réellement
+  // coachées uniquement, même filtre que createTeams ci-dessus -- jamais
+  // celle où ce coach n'est que joueur (déjà couverte par "Mon équipe").
+  // Dérivé de `teams`, déjà chargé pour le reste de l'espace -- aucune
+  // requête de plus (remplace organisationCards, qui ne portait que ça en
+  // plus du "prochain match" désormais retiré avec "Planning & Rôles").
+  const bilanTeams: BilanTeamRoster[] = teams
+    .filter((t) => teamRoleByTeamId[t.id] !== "PLAYER")
+    .map((t) => ({
+      team: { id: t.id, name: t.name, category: t.category },
+      roster: t.players,
     }));
 
   // Retour de Cindy du 12/09 : manquait ici alors que le sélecteur
@@ -294,51 +297,44 @@ export default function CoachView({
       ),
     },
     {
-      // "Suivi" (retour de Cindy du 2026-08-21) redevient "Organisation et
-      // Bilan" (retour de Cindy du 2026-08-22), maintenant en sous-menu
-      // (retour de Cindy du 2026-08-22) plutôt qu'en bascule interne.
+      // "Organisation & Bilan" devient "Bilan de la saison" (retour de
+      // Cindy du 24/09) : "Planning & Rôles" a disparu -- la carte
+      // "prochain match" et la liste "prochains événements" étaient déjà
+      // couvertes par Calendrier, et son tableau de rôles Maillots/Table
+      // de marque reposait sur un catalogue archivé (0 rôle actif en
+      // base), donc vide depuis longtemps. Les deux sous-onglets qui
+      // restent sont réellement vivants : participation aux événements et
+      // bénévolat -- voir coach-organisation.tsx/season-bilan.ts.
       key: "organisation",
-      label: "Organisation & Bilan",
-      icon: <ClipboardList className={iconClass} />,
+      label: "Bilan de la saison",
+      icon: <ListOrdered className={iconClass} />,
       content: null,
       children: [
         {
-          key: "organisation-planning",
-          label: "Planning & Rôles",
-          icon: <ClipboardList className={iconClass} />,
+          key: "organisation-joueurs",
+          label: "Joueurs",
+          icon: <Trophy className={iconClass} />,
           content: (
-            <CoachOrganisation
-              cards={organisationCards}
-              tasksByEventId={tasksByEventId}
-              carpoolByEventId={carpoolByEventId}
-              volunteerNeedsByEventId={volunteerNeedsByEventId}
+            <SeasonBilanPanel
+              teams={bilanTeams}
               events={events}
-              taskTallyByTeamId={taskTallyByTeamId}
               rsvpStatusByKey={rsvpStatusByKey}
-              rsvpReasonByKey={rsvpReasonByKey}
-              roles={eventRoles}
-              ownPlayerId={ownPlayerId}
-              forcedTab="planning"
+              volunteerTallyByPlayerId={seasonVolunteerTallyByPlayerId}
+              forcedTab="joueurs"
             />
           ),
         },
         {
-          key: "organisation-bilan",
-          label: "Bilan de la saison",
-          icon: <ListOrdered className={iconClass} />,
+          key: "organisation-benevoles",
+          label: "Bénévoles",
+          icon: <HandHeart className={iconClass} />,
           content: (
-            <CoachOrganisation
-              cards={organisationCards}
-              tasksByEventId={tasksByEventId}
-              carpoolByEventId={carpoolByEventId}
-              volunteerNeedsByEventId={volunteerNeedsByEventId}
+            <SeasonBilanPanel
+              teams={bilanTeams}
               events={events}
-              taskTallyByTeamId={taskTallyByTeamId}
               rsvpStatusByKey={rsvpStatusByKey}
-              rsvpReasonByKey={rsvpReasonByKey}
-              roles={eventRoles}
-              ownPlayerId={ownPlayerId}
-              forcedTab="bilan"
+              volunteerTallyByPlayerId={seasonVolunteerTallyByPlayerId}
+              forcedTab="benevoles"
             />
           ),
         },

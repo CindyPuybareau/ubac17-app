@@ -39,8 +39,6 @@ import {
   getNextEventForTeams,
   getPlayerRsvpStatus,
   getPlayerTeamIds,
-  getRsvpCounts,
-  getTeamRoster,
   teamOrClubWideOrProfileFilter,
   unionRoster,
 } from "./family-data";
@@ -48,14 +46,13 @@ import {
   getCarpoolOffersByEventId,
   getEventRoleTypesCached,
   getEventTasksByEventId,
-  getSeasonTaskTallyByTeamIds,
   rolesForEventType,
   type EventTasksState,
-  type SeasonTaskTally,
 } from "./event-tasks";
 import { getVolunteerNeedsByEventId, type VolunteerNeed } from "./event-volunteer-needs";
 import { getMatchOfficialRolesByEventId, type MatchOfficialAssignment } from "./match-official-roles";
 import { shouldOfferCarpool } from "./salles";
+import { getSeasonVolunteerTallyByEventIds, type SeasonVolunteerTally } from "./season-bilan";
 
 type PlayerRow = {
   id: string;
@@ -1444,7 +1441,6 @@ export default async function DashboardPage({
   const [
     whatsappGroupsRes,
     convocationCardsRaw,
-    coachCards,
     eventRoleTypes,
     sponsorDisplayRes,
   ] = await runBatched(
@@ -1471,26 +1467,6 @@ export default async function DashboardPage({
           if (!event) return null;
           const status = await getPlayerRsvpStatus(supabase, event.id, p.id);
           return { player: p, event, status };
-        }),
-        dbLimit
-      ),
-    // Priority zone: next match status per coached team. event et roster
-    // ne dépendent l'un de l'autre en rien (deux requêtes indépendantes
-    // sur le même team.id) — seul counts a besoin des deux résolus, donc
-    // lui seul reste après le couple plutôt que d'enchaîner les trois à
-    // la queue leu leu (retour de Cindy du 2026-08-21 sur la lenteur au
-    // chargement, même famille de correctif que les clics d'Organisation).
-    () =>
-      runBatched(
-        coachedTeams.map((team) => async () => {
-          const [event, roster] = await Promise.all([
-            getNextEventForTeams(supabase, [team.id]),
-            getTeamRoster(supabase, team.id),
-          ]);
-          const counts = event
-            ? await getRsvpCounts(supabase, event.id, roster.length)
-            : null;
-          return { team, event, counts, roster };
         }),
         dbLimit
       ),
@@ -1572,16 +1548,7 @@ export default async function DashboardPage({
 
   // Match-day parent tasks (jerseys/snacks/carpool) for every event shown
   // in the priority zone above.
-  const priorityEventIds = Array.from(
-    new Set(
-      [
-        ...convocationCards.map((c) => c.event.id),
-        ...coachCards
-          .map((c) => c.event?.id)
-          .filter((id): id is string => Boolean(id)),
-      ]
-    )
-  );
+  const priorityEventIds = Array.from(new Set(convocationCards.map((c) => c.event.id)));
 
   // Les deux ne dépendent que de priorityEventIds, déjà résolu juste
   // au-dessus.
@@ -1600,7 +1567,6 @@ export default async function DashboardPage({
 
   return {
     convocationCards,
-    coachCards,
     whatsappGroups,
     eventRoleTypes,
     sponsorDisplay,
@@ -1617,6 +1583,12 @@ export default async function DashboardPage({
   let adminUpcomingEvents: AdminUpcomingEvent[] = [];
   let adminVolunteerNeedsByEventId: Record<string, VolunteerNeed[]> = {};
   let adminMatchOfficialRolesByEventId: Record<string, MatchOfficialAssignment[]> = {};
+  // "Bilan de la saison" (retour de Cindy du 24/09) : présences à plat
+  // (event:player -> statut) et bénévolat cumulé par joueur, club entier.
+  // const, pas let : remplie par mutation (bracket assignment) plus bas,
+  // jamais réaffectée en bloc.
+  const adminRsvpStatusByKey: Record<string, string> = {};
+  let adminSeasonVolunteerTallyByPlayerId: Record<string, SeasonVolunteerTally> = {};
   let adminMembers: AdminMember[] = [];
   let adminSponsors: AdminSponsor[] = [];
   let adminBenevoles: AdminBenevole[] = [];
@@ -2060,6 +2032,15 @@ export default async function DashboardPage({
             error: null,
           });
     const rsvpsByEventPromise = fetchRsvpsByEvent(supabase, upcomingEventIds, dbLimit);
+    // "Bilan de la saison" vue Bureau (retour de Cindy du 24/09, refonte
+    // "Organisation & Bilan") : club entier, sur les mêmes eventIds que le
+    // reste de ce bloc -- aucune requête de plus que celles déjà prévues
+    // pour les besoins/rôles officiels juste en dessous.
+    const adminSeasonVolunteerTallyPromise = getSeasonVolunteerTallyByEventIds(
+      supabase,
+      upcomingEventIds,
+      dbLimit
+    );
     const adminVolunteerNeedsPromise = clubDirectoryPromise.then(({ nameByPlayerId, nameByBenevoleId }) =>
       getVolunteerNeedsByEventId(supabase, upcomingEventIds, dbLimit, nameByPlayerId, nameByBenevoleId)
     );
@@ -2369,6 +2350,15 @@ export default async function DashboardPage({
     });
 
     const rsvpsByEvent = await rsvpsByEventPromise;
+    // "Bilan de la saison" (retour de Cindy du 24/09) : à plat plutôt que
+    // la Map imbriquée ci-dessus -- même format que coachRsvpStatusByKey,
+    // pur reformatage en mémoire d'une donnée déjà chargée, aucune requête
+    // de plus.
+    rsvpsByEvent.forEach((byPlayer, eventId) => {
+      byPlayer.forEach((entry, playerId) => {
+        if (entry.status) adminRsvpStatusByKey[`${eventId}:${playerId}`] = entry.status;
+      });
+    });
 
     // paid_at desc order from the query above is preserved here (most
     // recent payment first per cotisation), which is what the payment
@@ -2636,13 +2626,14 @@ export default async function DashboardPage({
     // la création, introuvables juste après).
     adminVolunteerNeedsByEventId = await adminVolunteerNeedsPromise;
     adminMatchOfficialRolesByEventId = await adminMatchOfficialRolesPromise;
+    adminSeasonVolunteerTallyByPlayerId = await adminSeasonVolunteerTallyPromise;
   }
   })();
 
   let coachTeamsWithRoster: TeamWithMembers[] = [];
   let coachEvents: AdminUpcomingEvent[] = [];
   let coachRsvpPlayers: { id: string; name: string; teamIds: string[] }[] = [];
-  let coachTaskTallyByTeamId: Record<string, SeasonTaskTally> = {};
+  let coachSeasonVolunteerTallyByPlayerId: Record<string, SeasonVolunteerTally> = {};
   let coachTeamRoleByTeamId: Record<string, "COACH" | "PLAYER"> = {};
   let coachClubTeams: AdminMemberTeam[] = [];
   let coachOrganisationTasks: Record<string, EventTasksState> = {};
@@ -2668,22 +2659,15 @@ export default async function DashboardPage({
   const coachPromise = (async () => {
   if (coachDataActive) {
     const coachedTeamIds = coachedTeams.map((t) => t.id);
-    // Les deux ne dépendent pas l'une de l'autre — parties ensemble
-    // plutôt qu'à la queue leu leu. Retour de Cindy du 20/09 (panne de
-    // connexions) : passées par runBatched(dbLimit) plutôt qu'un
-    // Promise.all brut.
-    const [taskTally, ownTeamIds] = await runBatched(
-      [
-        () => getSeasonTaskTallyByTeamIds(supabase, coachedTeamIds, dbLimit),
-        // A coach who's also a registered player (players.profile_id linked
-        // to their own account) gets their own team on top of the ones they
-        // coach — in the calendar, and in the Équipe(s) tab, where it shows
-        // up as a separate "Joueur" entry (see coachTeamRoleById below).
-        () => (ownPlayerId ? getPlayerTeamIds(supabase, ownPlayerId) : Promise.resolve([])),
-      ],
-      dbLimit
-    );
-    coachTaskTallyByTeamId = taskTally;
+    // A coach who's also a registered player (players.profile_id linked
+    // to their own account) gets their own team on top of the ones they
+    // coach — in the calendar, and in the Équipe(s) tab, where it shows
+    // up as a separate "Joueur" entry (see coachTeamRoleById below). Plus
+    // de getSeasonTaskTallyByTeamIds ici (retour de Cindy du 24/09, refonte
+    // "Organisation & Bilan") : le bilan bénévoles a besoin des eventIds de
+    // la saison (coachEventIds), pas encore connus à ce stade -- calculé
+    // plus bas, une fois coachEventIds résolu.
+    const ownTeamIds = ownPlayerId ? await getPlayerTeamIds(supabase, ownPlayerId) : [];
     const coachCalendarTeamIds = Array.from(
       new Set([...coachedTeamIds, ...ownTeamIds])
     );
@@ -3034,6 +3018,19 @@ export default async function DashboardPage({
     // date par date.
     const coachOrganisationTasksExtraPromise = clubDirectoryPromise.then(({ nameByPlayerId }) =>
       getEventTasksByEventId(supabase, upcomingCoachEventIds, dbLimit, nameByPlayerId)
+    );
+    // "Bilan de la saison" -> onglet Bénévoles (retour de Cindy du 24/09,
+    // refonte "Organisation & Bilan") : sur TOUS les événements de la
+    // saison de l'équipe (coachEventIds, pas seulement à venir), même
+    // raison que coachVolunteerNeedsPromise juste en dessous. Pas de repli
+    // "bureauDataLoaded" ici : le résultat de getSeasonVolunteerTallyByEventIds
+    // est déjà agrégé PAR JOUEUR, pas par événement -- impossible d'en
+    // extraire un sous-ensemble club-wide sans requête, contrairement aux
+    // deux Object.fromEntries ci-dessous qui piochent par eventId.
+    const coachSeasonVolunteerTallyPromise = getSeasonVolunteerTallyByEventIds(
+      supabase,
+      coachEventIds,
+      dbLimit
     );
     // Besoins d'organisation de TOUS les événements de l'équipe, pas
     // seulement ceux à venir — même raison que côté Bureau juste plus haut.
@@ -3513,6 +3510,7 @@ export default async function DashboardPage({
     // seulement ceux à venir — même raison que côté Bureau juste plus haut.
     coachVolunteerNeedsByEventId = await coachVolunteerNeedsPromise;
     coachMatchOfficialRolesByEventId = await coachMatchOfficialRolesPromise;
+    coachSeasonVolunteerTallyByPlayerId = await coachSeasonVolunteerTallyPromise;
   }
   })();
 
@@ -4378,19 +4376,21 @@ export default async function DashboardPage({
     priorityZonePromise,
   ]);
   const {
-    coachCards,
     whatsappGroups,
     eventRoleTypes,
     sponsorDisplay,
     eventTasksByEventId,
     carpoolOffersByEventId,
   } = priorityZone;
-  // Fusionnés seulement maintenant (voir les commentaires dans
-  // coachPromise/familyPromise plus haut) : les deux blocs avaient déjà
-  // fini de construire leur propre "extra" avant que priorityZonePromise
-  // soit forcément résolue, donc pas besoin d'un await de plus à
-  // l'intérieur d'eux — juste ce merge une fois tout le monde revenu.
-  coachOrganisationTasks = { ...eventTasksByEventId, ...coachOrganisationTasks };
+  // Fusionné seulement maintenant (voir les commentaires dans
+  // familyPromise plus haut) : ce bloc avait déjà fini de construire son
+  // propre "extra" avant que priorityZonePromise soit forcément résolue,
+  // donc pas besoin d'un await de plus à l'intérieur — juste ce merge une
+  // fois tout le monde revenu. Plus de merge côté coach ici (retour de
+  // Cindy du 24/09, refonte "Organisation & Bilan") : coachOrganisationTasks
+  // n'alimentait plus que "Planning & Rôles" (supprimé) -- eventTasksByEventId
+  // reste calculé pour Famille (convocationCards), simplement plus fusionné
+  // dans une variable Coach devenue sans lecteur.
   familyOrganisationTasks = { ...eventTasksByEventId, ...familyOrganisationTasks };
 
   const adminBirthdayMembers: BirthdaySource[] = isAdmin
@@ -4573,6 +4573,8 @@ export default async function DashboardPage({
             automationSettings={adminAutomationSettings}
             eventRoles={eventRoleTypes}
             volunteerNeedsByEventId={adminVolunteerNeedsByEventId}
+            rsvpStatusByKey={adminRsvpStatusByKey}
+            seasonVolunteerTallyByPlayerId={adminSeasonVolunteerTallyByPlayerId}
             clubReports={clubReports}
             ownPlayerId={ownPlayerId}
           />
@@ -4616,16 +4618,10 @@ export default async function DashboardPage({
             memberDetailsByPlayerId={coachMemberDetailsByPlayerId}
             rsvpPlayers={coachRsvpPlayers}
             rsvpStatusByKey={coachRsvpStatusByKey}
-            rsvpReasonByKey={coachRsvpReasonByKey}
-            taskTallyByTeamId={coachTaskTallyByTeamId}
             teamRoleByTeamId={coachTeamRoleByTeamId}
             clubTeams={coachClubTeams}
             birthdayMembers={coachBirthdayMembers}
-            organisationCards={coachCards}
-            // Couvre le prochain match de chaque équipe ET tous les
-            // événements à venir listés dans "Planning & Rôles".
-            tasksByEventId={coachOrganisationTasks}
-            carpoolByEventId={carpoolOffersByEventId}
+            seasonVolunteerTallyByPlayerId={coachSeasonVolunteerTallyByPlayerId}
             whatsappGroups={whatsappGroups}
             eventRoles={eventRoleTypes}
             volunteerNeedsByEventId={coachVolunteerNeedsByEventId}
