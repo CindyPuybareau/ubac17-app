@@ -43,10 +43,30 @@ export default function FamilyAttendanceSummary({
                 <p className="truncate text-sm font-semibold text-zinc-800">{p.name}</p>
               )}
               <div className="flex flex-wrap gap-1.5">
-                <StatPill icon={<Activity className="h-3 w-3" />} label="Entraînements" stat={trainings} />
-                <StatPill icon={<Trophy className="h-3 w-3" />} label="Officiels" stat={tally.official} />
-                <StatPill icon={<Handshake className="h-3 w-3" />} label="Amicaux" stat={tally.friendly} />
-                <StatPill icon={<Sparkles className="h-3 w-3" />} label="Tournois" stat={tally.tournament} />
+                <StatPill
+                  icon={<Activity className="h-3 w-3" />}
+                  label="Entraînements"
+                  stat={trainings}
+                  colorClass="bg-emerald-50 text-emerald-700"
+                />
+                <StatPill
+                  icon={<Trophy className="h-3 w-3" />}
+                  label="Officiels"
+                  stat={tally.official}
+                  colorClass="bg-navy/10 text-navy"
+                />
+                <StatPill
+                  icon={<Handshake className="h-3 w-3" />}
+                  label="Amicaux"
+                  stat={tally.friendly}
+                  colorClass="bg-blue-50 text-blue-700"
+                />
+                <StatPill
+                  icon={<Sparkles className="h-3 w-3" />}
+                  label="Tournois"
+                  stat={tally.tournament}
+                  colorClass="bg-ubac-yellow/20 text-ubac-yellow-dark"
+                />
               </div>
             </div>
           );
@@ -63,19 +83,27 @@ function StatPill({
   icon,
   label,
   stat,
+  colorClass,
 }: {
   icon: ReactNode;
   label: string;
   stat: { present: number; total: number } | undefined;
+  // Même palette que les compteurs Coach/Bureau (CountChip, season-bilan-tables.tsx)
+  // -- retour de Cindy du 24/09 ("des icônes colorés comme pour les coachs et
+  // le bureau"), plutôt qu'un gris neutre pour les 4 types.
+  colorClass: string;
 }) {
   const total = stat?.total ?? 0;
   const present = stat?.present ?? 0;
-  if (total === 0) return null;
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-zinc-50 px-2.5 py-1 text-xs font-medium text-zinc-600">
-      <span className="text-zinc-400">{icon}</span>
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
+        total === 0 ? "bg-zinc-50 text-zinc-300" : colorClass
+      }`}
+    >
+      {icon}
       {label}
-      <span className="font-semibold tabular-nums text-zinc-900">
+      <span className="font-semibold tabular-nums">
         {present}/{total}
       </span>
     </span>

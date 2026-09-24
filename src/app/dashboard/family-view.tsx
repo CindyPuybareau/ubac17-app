@@ -323,7 +323,6 @@ export default function FamilyView({
               réservé au Bureau/coach (voir la policy du bucket
               team-photos), jamais à un parent ou un joueur. */}
           <SpaceDashboardSummary summary={dashboardSummary} canManagePhoto={false} />
-          <ChildAccessManager />
 
           {/* Retour de Cindy du 24/09 ("il serait pas mal que les parents
               ait le bilan d'assiduité de leurs enfants aussi... dans le
@@ -348,9 +347,9 @@ export default function FamilyView({
             />
           </div>
 
-          {/* Retour de Cindy du 24/09 ("Calendrier UBAC dans ton agenda en
-              dernier") : reste tout en bas, après la situation
-              administrative. */}
+          {/* Retour de Cindy du 24/09 ("Accès enfant au dessus du calendrier
+              UBAC") : les deux réglages restent groupés tout en bas. */}
+          <ChildAccessManager />
           <CalendarSubscribe />
         </div>
       ),
