@@ -25,6 +25,7 @@ import RsvpButtons from "./rsvp-buttons";
 import FamilyAttendanceSummary from "./family-attendance-summary";
 import CalendarSubscribe from "./calendar-subscribe";
 import FamilyCotisationCard from "./family-cotisation-card";
+import EventCotisationsCard from "./event-cotisations-card";
 import PenalitesCard from "./penalites-card";
 import ChildAccessManager from "./child-access-manager";
 import SpaceDashboardSummary from "./space-dashboard-summary";
@@ -339,6 +340,7 @@ export default function FamilyView({
               rsvpStatusByKey={rsvpStatusByKey}
             />
             <FamilyCotisationCard cotisations={visibleCotisations} />
+            <EventCotisationsCard cotisations={visibleCotisations} />
             <PenalitesCard
               title="Mes pénalités"
               penalites={visiblePenalites}

@@ -47,7 +47,7 @@ export default async function ChildViewPage() {
   // Enfant perceptiblement lent (retour de Cindy du 02/09, ~10s) — même
   // famille de correctif que le "chargement de ton espace" côté
   // Bureau/Coach/Famille (page.tsx, 2026-08-20/22).
-  const [playerRes, ownTeamLinksRes, penaliteRes] = await Promise.all([
+  const [playerRes, ownTeamLinksRes, penaliteRes, cotisationRes] = await Promise.all([
     supabase
       .from("players")
       .select("id, first_name, category, notifications_enabled, avatar_url")
@@ -62,8 +62,20 @@ export default async function ChildViewPage() {
       .select("id, amount, notes, penalite_date, statut, paid_at")
       .eq("player_id", playerId)
       .order("penalite_date", { ascending: false }),
+    // "Cotisation & Licence" / "Événements payants" (retour de Cindy du
+    // 24/09, "vérifier que ce soit visible pour tout les espaces") : même
+    // table que côté Bureau/Famille (mapCotisationRow, dashboard/page.tsx),
+    // mais un seul enfant ici -- l'embed collectes(...) direct (évité côté
+    // Bureau pour cause de RLS réévaluée par ligne, voir son commentaire)
+    // ne coûte rien en service_role, qui ne passe jamais par RLS.
+    supabase
+      .from("cotisations")
+      .select(
+        "id, saison, prix, remise, paiement, statut, mode_paiement, collecte_id, created_at, collectes(id, name, type)"
+      )
+      .eq("player_id", playerId),
   ]);
-  logQueryErrors("Enfant", { playerRes, ownTeamLinksRes, penaliteRes });
+  logQueryErrors("Enfant", { playerRes, ownTeamLinksRes, penaliteRes, cotisationRes });
   const player = playerRes.data;
 
   if (!player) {
@@ -492,6 +504,61 @@ export default async function ChildViewPage() {
     paidAt: p.paid_at,
   }));
 
+  // Suite de cotisationRes ci-dessus : les règlements dépendent des ids de
+  // cotisations qu'on vient de lire, un seul aller-retour de plus (jamais en
+  // boucle -- une poignée de lignes pour un seul enfant).
+  const cotisationRows = cotisationRes.data ?? [];
+  const cotisationIds = cotisationRows.map((c) => c.id);
+  const paymentRes =
+    cotisationIds.length > 0
+      ? await supabase
+          .from("cotisation_payments")
+          .select("id, cotisation_id, amount, mode, detail, expected_cash_date, paid_at")
+          .in("cotisation_id", cotisationIds)
+      : null;
+  logQueryErrors("Enfant", { paymentRes });
+  const paymentsByCotisationId = new Map<
+    string,
+    { id: string; amount: number; mode: string; detail: string | null; expectedCashDate: string | null; paidAt: string }[]
+  >();
+  (paymentRes?.data ?? []).forEach((p) => {
+    const list = paymentsByCotisationId.get(p.cotisation_id) ?? [];
+    list.push({
+      id: p.id,
+      amount: p.amount,
+      mode: p.mode,
+      detail: p.detail,
+      expectedCashDate: p.expected_cash_date,
+      paidAt: p.paid_at,
+    });
+    paymentsByCotisationId.set(p.cotisation_id, list);
+  });
+  const playerFullName = [player.first_name].filter(Boolean).join(" ") || "Moi";
+  const cotisations = cotisationRows.map((c) => {
+    const collecte = c.collectes as unknown as { id: string; name: string; type: "STAGE" | "EVENEMENT" | "BOUTIQUE" } | null;
+    return {
+      id: c.id,
+      saison: c.saison,
+      prix: c.prix,
+      remise: c.remise,
+      paiement: c.paiement,
+      statut: c.statut,
+      mode_paiement: c.mode_paiement,
+      playerId,
+      playerName: playerFullName,
+      firstName: player.first_name,
+      lastName: null,
+      category: player.category,
+      membershipType: null,
+      fbiStatus: null,
+      collecteId: c.collecte_id,
+      collecteType: collecte?.type ?? null,
+      collecteName: collecte?.name ?? null,
+      payments: paymentsByCotisationId.get(c.id) ?? [],
+      createdAt: c.created_at,
+    };
+  });
+
   return (
     <ChildDashboard
       firstName={player.first_name}
@@ -507,6 +574,7 @@ export default async function ChildViewPage() {
       notifications={notifications}
       notificationsEnabled={notificationsEnabled}
       penalites={penalites}
+      cotisations={cotisations}
       dashboardSummary={dashboardSummary}
       rsvpCountsByEventId={rsvpCountsByEventId}
       presentPlayersByEventId={presentPlayersByEventId}
