@@ -121,7 +121,11 @@ export default function BenevoleView({
 
   return (
     <MobileNavProvider>
-      <div className="flex flex-1 flex-col overflow-x-hidden bg-zinc-50">
+      {/* Retour de Cindy du 25/09 ("le fond qui manque, un peu crème") :
+          bg-zinc-50 peignait un gris opaque par-dessus le fond crème
+          (--background, globals.css) que body porte déjà -- retiré, comme
+          child-dashboard.tsx (Espace Enfant) qui ne l'a jamais eu. */}
+      <div className="flex flex-1 flex-col overflow-x-hidden">
         <header className="bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-5 shadow-md sm:px-6">
           <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">

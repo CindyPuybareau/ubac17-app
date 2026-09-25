@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Users } from "lucide-react";
 import { teamLabel } from "@/lib/teams";
 
 export type TeamOption = {
@@ -50,12 +50,20 @@ export default function TeamFilterDropdown({
 
   return (
     <div className="relative">
+      {/* Retour de Cindy du 25/09 ("plus sympa aussi") : icône Users +
+          accent doré dès qu'un filtre est actif (comme "Commissions (N)",
+          commission-multi-select.tsx) -- neutre gris uniquement quand tout
+          est coché, comme avant, pour ne pas donner l'impression trompeuse
+          qu'un filtre est déjà appliqué par défaut. */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className={`flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white font-medium text-zinc-700 hover:bg-zinc-50 ${
-          compact ? "px-3 py-1 text-xs" : "px-3 py-1.5 text-sm"
-        }`}
+        className={`flex items-center gap-1.5 rounded-full border font-medium transition-colors ${
+          allSelected
+            ? "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
+            : "border-transparent bg-ubac-yellow text-navy hover:bg-ubac-yellow-dark"
+        } ${compact ? "px-3 py-1 text-xs" : "px-3 py-1.5 text-sm"}`}
       >
+        <Users className={compact ? "h-3.5 w-3.5 shrink-0" : "h-4 w-4 shrink-0"} />
         {label}
         <ChevronDown className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
       </button>
@@ -70,7 +78,7 @@ export default function TeamFilterDropdown({
             <div className="mb-2 flex gap-2">
               <button
                 onClick={() => onChange(new Set(teams.map((t) => t.id)))}
-                className="rounded-full border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                className="rounded-full border border-navy/20 bg-navy/5 px-2.5 py-1 text-xs font-medium text-navy hover:bg-navy/10"
               >
                 Tout sélectionner
               </button>

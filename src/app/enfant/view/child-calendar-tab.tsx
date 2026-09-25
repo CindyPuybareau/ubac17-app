@@ -12,6 +12,7 @@ import {
   Clock,
   Euro,
   Eye,
+  Home,
   LayoutGrid,
   List,
   MapPin,
@@ -32,6 +33,7 @@ import EmptyState from "@/app/dashboard/empty-state";
 import { parseMatchTitle } from "@/lib/match-display";
 import { formatFirstName } from "@/lib/names";
 import { groupTeamsByPrimarySecondary, teamLabel } from "@/lib/teams";
+import { schoolHolidayFor } from "@/lib/school-holidays";
 import type { ChildEvent, ChildTeammate } from "./child-dashboard";
 
 // Même grille mensuelle que le calendrier Parent (calendar-view.tsx) —
@@ -84,6 +86,17 @@ function pillLabel(event: ChildEvent) {
     return parseMatchTitle(event.title).opponent;
   }
   return event.title ?? styleFor(event.eventType).label;
+}
+
+// Retour de Cindy du 25/09 ("pastilles rondes dorées pour les matchs à
+// domicile, pouvoir filtrer comme le Bureau") : même définition que
+// isHomeMatch (calendar-view.tsx, Bureau) -- event.isHome reste souvent
+// null (matchs synchronisés FFBB), même repli sur le titre parsé que
+// week-strip-banner.tsx/OpponentDisplay. Exportée : CalendarSection
+// (profile-sections.tsx) filtre "Domicile seulement" avec la même fonction,
+// jamais une deuxième définition qui pourrait diverger.
+export function isHomeMatch(event: Pick<ChildEvent, "eventType" | "title" | "isHome">) {
+  return isMatchType(event.eventType) && (event.isHome ?? parseMatchTitle(event.title).isHome) === true;
 }
 
 const weekdayLabels = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
@@ -187,12 +200,23 @@ export default function ChildCalendarTab({
   // ceux des AUTRES équipes. Dédoublonnés contre `events` (pas seulement
   // `filteredEvents`) : un match qui concerne déjà cet enfant ne doit
   // jamais s'afficher deux fois.
+  // Retour de Cindy du 25/09 ("le bouton matchs officiels est obsolète à
+  // leur niveau puisque déjà affichés non ?") : côté commission/bénévole,
+  // `events` contient déjà TOUS les matchs du club sans filtre équipe (voir
+  // read-only-briques-data.ts) -- ce bouton n'y révèle jamais rien de neuf,
+  // contrairement à l'Espace Enfant (dont `events` est restreint à ses
+  // propres équipes). ownIds/extra calculés une fois, réutilisés à la fois
+  // pour ce constat et pour displayedEvents ci-dessous -- jamais deux fois
+  // le même calcul.
+  const ownIds = useMemo(() => new Set(events.map((e) => e.id)), [events]);
+  const extraClubMatches = useMemo(
+    () => clubOfficialMatches.filter((e) => !ownIds.has(e.id)),
+    [clubOfficialMatches, ownIds]
+  );
   const displayedEvents = useMemo(() => {
     if (!showClubMatches) return filteredEvents;
-    const ownIds = new Set(events.map((e) => e.id));
-    const extra = clubOfficialMatches.filter((e) => !ownIds.has(e.id));
-    return [...filteredEvents, ...extra];
-  }, [filteredEvents, events, clubOfficialMatches, showClubMatches]);
+    return [...filteredEvents, ...extraClubMatches];
+  }, [filteredEvents, extraClubMatches, showClubMatches]);
 
   // Filtre par type d'événement retiré (retour de Cindy du 2026-08-24,
   // "supprimer ça sur le haut du calendrier ... pas necessaire") : le
@@ -302,20 +326,24 @@ export default function ChildCalendarTab({
               oeil") : même bouton que calendar-view.tsx (Bureau exclu là-
               bas, jamais montré ici de toute façon puisque cet écran-ci
               n'est jamais utilisé côté Bureau). Style volontairement
-              distinct (doré) des autres pills de cette ligne. */}
-          <button
-            type="button"
-            onClick={() => setShowClubMatches((v) => !v)}
-            title="Afficher aussi les matchs officiels des autres équipes du club"
-            className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
-              showClubMatches
-                ? "border-transparent bg-ubac-yellow text-navy"
-                : "border-ubac-yellow bg-ubac-yellow/10 text-ubac-yellow-dark hover:bg-ubac-yellow/20"
-            }`}
-          >
-            <Eye className="h-3.5 w-3.5 shrink-0" />
-            Matchs officiels du club
-          </button>
+              distinct (doré) des autres pills de cette ligne. Retour du
+              25/09 : masqué si extraClubMatches est vide (rien à révéler,
+              voir son commentaire) -- reste visible côté Espace Enfant. */}
+          {extraClubMatches.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowClubMatches((v) => !v)}
+              title="Afficher aussi les matchs officiels des autres équipes du club"
+              className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+                showClubMatches
+                  ? "border-transparent bg-ubac-yellow text-navy"
+                  : "border-ubac-yellow bg-ubac-yellow/10 text-ubac-yellow-dark hover:bg-ubac-yellow/20"
+              }`}
+            >
+              <Eye className="h-3.5 w-3.5 shrink-0" />
+              Matchs officiels du club
+            </button>
+          )}
           {view === "month" && (
             <button
               onClick={goToday}
@@ -374,13 +402,24 @@ export default function ChildCalendarTab({
               const isSelected = key === selectedKey;
               const visible = dayEvents.slice(0, 3);
               const overflow = dayEvents.length - visible.length;
+              // Retour de Cindy du 25/09 ("même design que les autres
+              // espaces") : même teinte des jours de vacances scolaires que
+              // calendar-view.tsx (Bureau/Coach/Famille), fonction pure sur
+              // la date -- aucune donnée de plus. La sélection prime
+              // toujours sur la teinte, même règle que là-bas.
+              const holiday = schoolHolidayFor(d);
 
               return (
                 <button
                   key={key}
                   onClick={() => setSelectedDate(d)}
+                  title={holiday ?? undefined}
                   className={`flex min-h-[52px] w-full min-w-0 flex-col items-start gap-1 rounded-lg border p-1 text-left transition-colors sm:min-h-[104px] sm:rounded-xl sm:p-2 ${
-                    isSelected ? "border-navy bg-navy/5" : "border-zinc-100 bg-white hover:border-ubac-yellow/50"
+                    isSelected
+                      ? "border-navy bg-navy/5"
+                      : holiday
+                        ? "border-orange-300 bg-orange-200 hover:border-ubac-yellow/50"
+                        : "border-zinc-100 bg-white hover:border-ubac-yellow/50"
                   } ${!isCurrentMonth ? "opacity-40" : ""}`}
                 >
                   <span
@@ -391,11 +430,21 @@ export default function ChildCalendarTab({
                     {d.getDate()}
                   </span>
                   <div className="flex w-full min-w-0 flex-col gap-0.5">
-                    <div className="flex flex-wrap gap-0.5 sm:hidden">
+                    <div className="flex flex-wrap gap-1 sm:hidden">
                       {visible.map((e) => (
                         <span
                           key={e.id}
-                          className={`h-1.5 w-1.5 shrink-0 rounded-full ${styleFor(e.eventType).dot}`}
+                          title={isHomeMatch(e) ? "Match à domicile" : undefined}
+                          className={`h-1.5 w-1.5 shrink-0 rounded-full ${styleFor(e.eventType).dot} ${
+                            // Retour de Cindy du 25/09 ("pastilles rondes
+                            // dorées pour les matchs à domicile") : anneau
+                            // fin, même esprit que le "besoin non pourvu"
+                            // ambré côté Bureau (calendar-view.tsx), mais en
+                            // doré et sur une autre condition -- jamais les
+                            // deux en même temps ici (pas de données de
+                            // besoins sur ce calendrier).
+                            isHomeMatch(e) ? "ring-1 ring-ubac-yellow" : ""
+                          }`}
                         />
                       ))}
                       {dayBirthdays.length > 0 && (
@@ -406,8 +455,12 @@ export default function ChildCalendarTab({
                       {visible.map((e) => (
                         <span
                           key={e.id}
-                          className={`inline-flex items-center justify-center truncate whitespace-nowrap rounded px-1 py-0.5 text-[10px] font-semibold leading-none ${styleFor(e.eventType).pill}`}
+                          title={isHomeMatch(e) ? "Match à domicile" : undefined}
+                          className={`inline-flex items-center justify-center gap-0.5 truncate whitespace-nowrap rounded px-1 py-0.5 text-[10px] font-semibold leading-none ${styleFor(e.eventType).pill} ${
+                            isHomeMatch(e) ? "ring-1 ring-ubac-yellow" : ""
+                          }`}
                         >
+                          {isHomeMatch(e) && <Home className="h-2.5 w-2.5 shrink-0" />}
                           {pillLabel(e)}
                         </span>
                       ))}

@@ -9,6 +9,7 @@ import {
   EyeOff,
   ExternalLink,
   Handshake,
+  Home,
   LayoutDashboard,
   ListOrdered,
   MessageCircle,
@@ -23,7 +24,7 @@ import {
 import { formatPersonName, sortByLastName } from "@/lib/names";
 import type { AdminSection } from "@/app/dashboard/admin-sidebar";
 import type { ChildCoach, ChildEvent, ChildTeammate } from "@/app/enfant/view/child-dashboard";
-import ChildCalendarTab from "@/app/enfant/view/child-calendar-tab";
+import ChildCalendarTab, { isHomeMatch } from "@/app/enfant/view/child-calendar-tab";
 import ChildTeamTab from "@/app/enfant/view/child-team-tab";
 import ChildResultsTab from "@/app/enfant/view/child-results-tab";
 import SponsorsDisplay from "@/app/dashboard/sponsors-display";
@@ -149,14 +150,26 @@ function CalendarSection({
   // individuel, comme commissionContext ci-dessus.
   volunteerNeedsByEventId?: Record<string, VolunteerNeed[]>;
 }) {
-  const [hideTrainings, setHideTrainings] = useState(false);
+  // Retour de Cindy du 25/09 ("masquer les entraînements en automatique à
+  // l'ouverture") : par défaut coché ici (commission/bénévole seulement,
+  // jamais touché côté Espace Enfant qui gère son propre état dans
+  // child-dashboard.tsx) -- une commission/un bénévole veut d'abord voir
+  // les événements qui le concernent, pas la longue liste d'entraînements.
+  const [hideTrainings, setHideTrainings] = useState(true);
+  // Retour de Cindy du 25/09 ("pastilles rondes dorées pour les matchs à
+  // domicile, pouvoir filtrer comme le Bureau") : même principe que
+  // "Domicile seulement" côté Bureau (calendar-view.tsx), même prédicat
+  // (isHomeMatch, exporté par child-calendar-tab.tsx) -- jamais une
+  // deuxième définition.
+  const [homeOnly, setHomeOnly] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(teams.map((t) => t.id)));
   const visibleEvents = useMemo(
     () =>
       events
         .filter((e) => !hideTrainings || e.eventType !== "TRAINING")
+        .filter((e) => !homeOnly || isHomeMatch(e))
         .filter((e) => eventMatchesTeams(e, selectedIds)),
-    [events, hideTrainings, selectedIds]
+    [events, hideTrainings, homeOnly, selectedIds]
   );
   // Retour de Cindy du 12/09 ("Matchs officiels du club", "il faut que
   // tout espace qui ne soit pas bureau puisse avoir ce petit oeil") :
@@ -208,7 +221,11 @@ function CalendarSection({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <TeamFilterDropdown teams={teams} selectedIds={selectedIds} onChange={setSelectedIds} />
+        {/* compact (retour de Cindy du 25/09, "un peu gros comparé aux
+            autres espaces") : même taille que calendar-view.tsx côté
+            Bureau dans ce même contexte (barre de filtre calendrier, à
+            côté de "Masquer les entraînements"), jamais passé ici jusqu'ici. */}
+        <TeamFilterDropdown teams={teams} selectedIds={selectedIds} onChange={setSelectedIds} compact />
         <button
           type="button"
           onClick={() => setHideTrainings((v) => !v)}
@@ -220,6 +237,22 @@ function CalendarSection({
         >
           {hideTrainings ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
           {hideTrainings ? "Entraînements masqués" : "Masquer les entraînements"}
+        </button>
+        {/* Retour de Cindy du 25/09 ("pouvoir filtrer comme le Bureau") :
+            même esprit doré que "Domicile seulement" côté Bureau
+            (event-type-filter-dropdown.tsx), ici en pastille directe --
+            pas de sous-menu à dérouler pour un seul filtre. */}
+        <button
+          type="button"
+          onClick={() => setHomeOnly((v) => !v)}
+          className={`flex w-fit items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+            homeOnly
+              ? "border-transparent bg-ubac-yellow text-navy"
+              : "border-ubac-yellow bg-ubac-yellow/10 text-ubac-yellow-dark hover:bg-ubac-yellow/20"
+          }`}
+        >
+          <Home className="h-3.5 w-3.5" />
+          Domicile seulement
         </button>
       </div>
       <ChildCalendarTab

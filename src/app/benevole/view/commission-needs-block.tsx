@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { HandHeart } from "lucide-react";
 import RoleIcon from "@/app/dashboard/role-icon";
 import {
   volunteerRoleIcon,
@@ -178,8 +179,16 @@ export default function CommissionNeedsBlock({
   token: string;
 }) {
   return (
-    <div className="mt-3 flex flex-col gap-2 rounded-xl border border-zinc-100 bg-zinc-50/60 p-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Besoins d&apos;organisation</p>
+    // Retour de Cindy du 25/09 ("tout gris ! un peu de couleurs") : teinte
+    // ambrée (même esprit "entraide" que le HandHeart de l'en-tête Tableau
+    // de bord, commission-view.tsx) au lieu du gris neutre -- les lignes
+    // elles-mêmes gardent leur fond blanc, déjà colorées via RoleIcon et
+    // les pastilles ambré/émeraude, pas de surcharge.
+    <div className="mt-3 flex flex-col gap-2 rounded-xl border border-amber-100 bg-amber-50/70 p-3">
+      <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-amber-800">
+        <HandHeart className="h-3.5 w-3.5 shrink-0" />
+        Besoins d&apos;organisation
+      </p>
       {needs.length === 0 ? (
         <p className="text-xs text-zinc-400">Aucun besoin pour le moment.</p>
       ) : (
