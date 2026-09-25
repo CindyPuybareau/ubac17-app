@@ -149,7 +149,11 @@ export default function BenevoleView({
           </div>
         </header>
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">
-          <AdminSidebar sections={sections} />
+          {/* Retour de Cindy du 25/09 ("on ouvre sur le calendrier aussi
+              pour toutes les commissions et administrations") : repli
+              automatique sur le premier onglet si "calendrier" n'existe
+              pas pour ce bénévole (brique non cochée), voir AdminSidebar. */}
+          <AdminSidebar sections={sections} defaultActiveKey="calendrier" />
         </main>
       </div>
     </MobileNavProvider>

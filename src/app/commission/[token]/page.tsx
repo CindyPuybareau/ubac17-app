@@ -58,7 +58,6 @@ export default async function CommissionPage({
     profileSponsors,
     profileClubReports,
     attendanceByEventId,
-    profileDashboardCounts,
     profileWhatsappGroups,
   } = await getReadOnlyBriquesData(supabase, allowedBriques);
 
@@ -133,7 +132,6 @@ export default async function CommissionPage({
       profileSponsors={profileSponsors}
       profileClubReports={profileClubReports}
       attendanceByEventId={attendanceByEventId}
-      profileDashboardCounts={profileDashboardCounts}
       profileWhatsappGroups={profileWhatsappGroups}
     />
   );

@@ -246,7 +246,6 @@ export default function CommissionView({
   profileSponsors,
   profileClubReports,
   attendanceByEventId,
-  profileDashboardCounts,
   profileWhatsappGroups,
 }: {
   token: string;
@@ -271,49 +270,53 @@ export default function CommissionView({
   // Retour de Cindy du 11/09 ("qui est présent/absent ?") : voir
   // read-only-briques-data.ts, gouverné par la brique "membres".
   attendanceByEventId: Record<string, { name: string | null; status: string }[]>;
-  // Retour de Cindy du 12/09 : voir read-only-briques-data.ts.
-  profileDashboardCounts: {
-    memberCount: number;
-    teamCount: number;
-    upcomingEventCount: number;
-    birthdaysThisWeekCount: number;
-  } | null;
   profileWhatsappGroups: { id: string; name: string; inviteLink: string | null }[];
 }) {
-  // Même structure de menu que benevole-view.tsx (même famille d'espace en
-  // lecture seule) : "Besoins bénévoles" toujours en premier, puis une
-  // entrée par brique cochée pour cette commission. whatsappGroups=[] : le
-  // groupe WhatsApp de CETTE commission n'a pas sa place ici, la personne
-  // y est déjà, contrairement à un bénévole qui découvre son rattachement.
-  const sections: AdminSection[] = [
-    {
-      key: "besoins",
-      label: "Besoins bénévoles",
-      icon: <HandHeart className="h-4 w-4 shrink-0" />,
-      content: (
-        <div className="flex flex-col gap-4">
-          <p className="text-sm text-zinc-500">
-            Merci de votre aide ! Voici les événements où le Bureau et les coachs ont besoin de vous
-            — cliquez sur un besoin pour vous proposer.
-          </p>
-          {events.length === 0 ? (
-            <EmptyState
-              icon={Check}
-              message="Aucun besoin pour le moment. Le Bureau et les coachs vous préviendront dès qu'ils auront besoin de vous."
+  // Retour de Cindy du 25/09 ("ordre : tableau de bord, calendrier, besoin
+  // bénévole dans le tableau de bord... on supprime les KPI du tableau de
+  // bord pour eux") : "Besoins bénévoles" n'est plus sa propre entrée de
+  // menu -- il devient le contenu de "Tableau de bord", à la place des 4
+  // compteurs (DashboardSection, profile-sections.tsx) qui n'ont plus leur
+  // place ici. Construit à la main (pas via buildProfileSections) et
+  // TOUJOURS présent en premier, quelle que soit la brique "tableau_de_bord"
+  // : c'était déjà le cas de "Besoins bénévoles" avant (jamais conditionné
+  // par une brique), ça doit le rester une fois fondu dans Tableau de bord.
+  // dashboardCounts omis dans l'appel à buildProfileSections plus bas :
+  // sans lui, sa propre entrée "Tableau de bord" (les compteurs) ne se
+  // construit jamais, évitant un doublon.
+  const tableauDeBordSection: AdminSection = {
+    key: "tableau-de-bord",
+    label: "Tableau de bord",
+    icon: <HandHeart className="h-4 w-4 shrink-0" />,
+    content: (
+      <div className="flex flex-col gap-4">
+        <p className="text-sm text-zinc-500">
+          Merci de votre aide ! Voici les événements où le Bureau et les coachs ont besoin de vous
+          — cliquez sur un besoin pour vous proposer.
+        </p>
+        {events.length === 0 ? (
+          <EmptyState
+            icon={Check}
+            message="Aucun besoin pour le moment. Le Bureau et les coachs vous préviendront dès qu'ils auront besoin de vous."
+          />
+        ) : (
+          events.map((event) => (
+            <EventCard
+              key={event.id}
+              event={event}
+              needs={volunteerNeedsByEventId[event.id] ?? []}
+              token={token}
             />
-          ) : (
-            events.map((event) => (
-              <EventCard
-                key={event.id}
-                event={event}
-                needs={volunteerNeedsByEventId[event.id] ?? []}
-                token={token}
-              />
-            ))
-          )}
-        </div>
-      ),
-    },
+          ))
+        )}
+      </div>
+    ),
+  };
+  // whatsappGroups=[] : le groupe WhatsApp de CETTE commission n'a pas sa
+  // place ici, la personne y est déjà, contrairement à un bénévole qui
+  // découvre son rattachement.
+  const sections: AdminSection[] = [
+    tableauDeBordSection,
     ...buildProfileSections({
       allowedBriques,
       teams: profileTeams,
@@ -324,7 +327,6 @@ export default function CommissionView({
       clubReports: profileClubReports,
       whatsappGroups: [],
       whatsappDirectory: profileWhatsappGroups,
-      dashboardCounts: profileDashboardCounts,
       attendanceByEventId,
     }),
   ];
@@ -338,14 +340,17 @@ export default function CommissionView({
               <Image src="/logo.png" alt="UBAC" width={44} height={44} className="h-11 w-11 object-contain" priority />
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">Bonjour</p>
-                {/* Retour de Cindy du 24/09 ("l'équipe Événement... coupé sur
-                    téléphone") : un nom de commission peut être long
-                    ("Calendrier et dates à retenir") -- au lieu de tronquer
-                    en ellipse sur mobile (perdait le nom en cours de mot),
-                    le titre passe sur 2 lignes avec une taille un cran plus
-                    petite avant sm:, la même largeur que le reste de
-                    l'en-tête restant garantie par min-w-0 sur ce conteneur. */}
-                <h1 className="line-clamp-2 break-words text-sm font-bold leading-tight text-white sm:text-xl">
+                {/* Retour de Cindy du 24/09 puis du 25/09 ("toujours coupé",
+                    "mot coupé") : un nom de commission peut être long
+                    ("Calendrier et dates à retenir"). D'abord essayé avec
+                    line-clamp-2 (coupait en ellipse dès que 2 lignes ne
+                    suffisaient pas) puis break-words (coupait un MOT en
+                    plein milieu, "Animatio-n") -- ni l'un ni l'autre n'est
+                    propre. Reste ici : ni limite de lignes, ni coupure dans
+                    un mot -- le retour à la ligne ne se fait plus qu'entre
+                    deux mots entiers (comportement par défaut du
+                    navigateur), sur autant de lignes que nécessaire. */}
+                <h1 className="text-sm font-bold leading-tight text-white sm:text-xl">
                   l&apos;équipe {commissionLabel}
                 </h1>
               </div>
@@ -358,7 +363,14 @@ export default function CommissionView({
           </div>
         </header>
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">
-          <AdminSidebar sections={sections} />
+          {/* Retour de Cindy du 25/09 ("on ouvre sur le calendrier aussi
+              pour toutes les commissions et administrations") : Tableau de
+              bord reste premier dans le MENU (voir sections plus haut),
+              mais l'espace continue de s'ouvrir sur Calendrier -- même
+              principe que les 4 autres espaces (Bureau/Coach/Famille/
+              Enfant), tous ouverts sur leur calendrier malgré Tableau de
+              bord en position une dans leur propre menu. */}
+          <AdminSidebar sections={sections} defaultActiveKey="calendrier" />
         </main>
       </div>
     </MobileNavProvider>
