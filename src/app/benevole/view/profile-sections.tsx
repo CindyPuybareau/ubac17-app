@@ -36,6 +36,8 @@ import { BOUTIQUE_URL } from "@/app/dashboard/boutique";
 import type { ClubReport, SponsorDisplay } from "@/app/dashboard/page";
 import type { ProfileCalendarEvent } from "@/lib/read-only-briques-data";
 import GuestRsvpPaidEventCard from "./guest-rsvp-card";
+import CommissionNeedsBlock from "./commission-needs-block";
+import type { VolunteerNeed } from "@/app/dashboard/event-volunteer-needs";
 
 // Retour de Cindy du 05/09 ("profil et bénévoles doivent être fusionnés"),
 // puis du 06/09 ("un menu comme les autres espaces, pas tout les uns à la
@@ -126,6 +128,7 @@ function CalendarSection({
   teams,
   attendanceByEventId,
   commissionContext,
+  volunteerNeedsByEventId,
 }: {
   events: ProfileCalendarEvent[];
   teams: { id: string; name: string | null; category: string | null }[];
@@ -140,6 +143,11 @@ function CalendarSection({
   // commission_group_ids n'a pas de sens pour un lien qui n'est rattaché à
   // aucune commission précise). Seule CommissionView le fournit.
   commissionContext?: { token: string; groupId: string };
+  // Retour de Cindy du 25/09 (suite, "regrouper les besoins en organisation
+  // avec les présences") : mêmes besoins déjà calculés une fois pour
+  // "Tableau de bord" (commission-view.tsx) -- undefined côté bénévole
+  // individuel, comme commissionContext ci-dessus.
+  volunteerNeedsByEventId?: Record<string, VolunteerNeed[]>;
 }) {
   const [hideTrainings, setHideTrainings] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(teams.map((t) => t.id)));
@@ -175,15 +183,25 @@ function CalendarSection({
     ? (baseEvent: ChildEvent) => {
         const full = eventsById.get(baseEvent.id);
         if (!full || !full.commissionGroupIds.includes(commissionContext.groupId)) return null;
+        // Retour de Cindy du 25/09 ("regrouper les besoins en organisation
+        // avec les présences, comme les autres espaces") : besoins affichés
+        // SOUS la carte présent/absent, même ordre que calendar-view.tsx
+        // côté Bureau/Coach (RsvpButtons puis Organisation) -- jamais de
+        // bloc "Aucun besoin" vide en plus de la carte présent/absent
+        // (contrairement à Tableau de bord, qui le montre toujours).
+        const needs = volunteerNeedsByEventId?.[full.id] ?? [];
         return (
-          <GuestRsvpPaidEventCard
-            eventId={full.id}
-            token={commissionContext.token}
-            isPaid={full.isPaid}
-            paidAmount={full.paidAmount}
-            paymentLink={full.paymentLink}
-            paidParticipants={full.paidParticipants}
-          />
+          <>
+            <GuestRsvpPaidEventCard
+              eventId={full.id}
+              token={commissionContext.token}
+              isPaid={full.isPaid}
+              paidAmount={full.paidAmount}
+              paymentLink={full.paymentLink}
+              paidParticipants={full.paidParticipants}
+            />
+            {needs.length > 0 && <CommissionNeedsBlock needs={needs} token={commissionContext.token} />}
+          </>
         );
       }
     : undefined;
@@ -325,6 +343,7 @@ export function buildProfileSections({
   dashboardCounts = null,
   attendanceByEventId,
   commissionContext,
+  volunteerNeedsByEventId,
 }: {
   allowedBriques: string[];
   // Réservé à la section "Équipes" (roster + coachs) -- gouverné par la
@@ -372,6 +391,9 @@ export function buildProfileSections({
   // undefined pour un bénévole individuel (benevole-view.tsx), fourni
   // uniquement par CommissionView.
   commissionContext?: { token: string; groupId: string };
+  // Retour de Cindy du 25/09 (suite) : voir son commentaire sur
+  // CalendarSection -- undefined côté bénévole individuel.
+  volunteerNeedsByEventId?: Record<string, VolunteerNeed[]>;
 }): AdminSection[] {
   const has = (b: string) => allowedBriques.includes(b);
   const sections: AdminSection[] = [];
@@ -394,6 +416,7 @@ export function buildProfileSections({
           teams={teamRefs}
           attendanceByEventId={attendanceByEventId}
           commissionContext={commissionContext}
+          volunteerNeedsByEventId={volunteerNeedsByEventId}
         />
       ),
     });

@@ -73,7 +73,11 @@ export type ReadOnlyBriquesData = {
 // que la version Bureau ne connaît pas. Ne coûte rien de plus ici : les
 // collectes/cotisations sont déjà embarquées dans le même select events()
 // (service_role, aucun risque RLS), jamais une requête à part.
-function resolveGuestPaidInfo(collectes: unknown): {
+// Exportée depuis le 25/09 (suite) : commission/[token]/page.tsx en a
+// besoin pour SA propre requête events() (Tableau de bord, "Besoins
+// bénévoles"/EventCard) -- même fonction pure réutilisée telle quelle,
+// jamais un second calcul dupliqué.
+export function resolveGuestPaidInfo(collectes: unknown): {
   isPaid: boolean;
   paidAmount: number | null;
   paymentLink: string | null;

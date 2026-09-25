@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getVolunteerNeedsByEventId, type VolunteerNeed } from "@/app/dashboard/event-volunteer-needs";
-import { getReadOnlyBriquesData } from "@/lib/read-only-briques-data";
+import { getReadOnlyBriquesData, resolveGuestPaidInfo } from "@/lib/read-only-briques-data";
 import { commissionMeta } from "@/lib/commission-labels";
 import CommissionView, { type CommissionEvent } from "./commission-view";
 import type { CommissionNotification } from "./commission-notification-bell";
@@ -67,23 +67,38 @@ export default async function CommissionPage({
   // rattachement se fait maintenant sur l'événement (events.
   // commission_group_ids), plus par besoin individuellement : TOUS les
   // besoins d'un événement rattaché à cette commission lui sont montrés.
+  // Retour de Cindy du 25/09 ("la carte du tableau de bord doit être active
+  // avec les présences et absences, même carte que le Calendrier") :
+  // collectes/cotisations embarquées dans cette même requête (comme
+  // profileEvents, read-only-briques-data.ts) -- aucune requête de plus,
+  // resolveGuestPaidInfo (même fonction, exportée) calcule isPaid/paymentLink/
+  // paidAmount/paidParticipants pour chaque événement.
   const { data: eventRows } = await supabase
     .from("events")
-    .select("id, title, event_type, location, salle, start_time, end_time, teams(name)")
+    .select(
+      "id, title, event_type, location, salle, start_time, end_time, teams(name), collectes(id, prix, payment_link, type, cotisations(player_id, guest_name, players(id, first_name, last_name)))"
+    )
     .contains("commission_group_ids", [group.id])
     .gte("start_time", new Date().toISOString())
     .order("start_time", { ascending: true });
 
-  const events: CommissionEvent[] = (eventRows ?? []).map((e) => ({
-    id: e.id,
-    title: e.title,
-    eventType: e.event_type,
-    location: e.location,
-    salle: e.salle,
-    startTime: e.start_time,
-    endTime: e.end_time,
-    teamName: (e.teams as unknown as { name: string | null } | null)?.name ?? null,
-  }));
+  const events: CommissionEvent[] = (eventRows ?? []).map((e) => {
+    const paidInfo = resolveGuestPaidInfo(e.collectes);
+    return {
+      id: e.id,
+      title: e.title,
+      eventType: e.event_type,
+      location: e.location,
+      salle: e.salle,
+      startTime: e.start_time,
+      endTime: e.end_time,
+      teamName: (e.teams as unknown as { name: string | null } | null)?.name ?? null,
+      isPaid: paidInfo.isPaid,
+      paidAmount: paidInfo.paidAmount,
+      paymentLink: paidInfo.paymentLink,
+      paidParticipants: paidInfo.paidParticipants,
+    };
+  });
 
   const eventIds = events.map((e) => e.id);
   const volunteerNeedsByEventId: Record<string, VolunteerNeed[]> =

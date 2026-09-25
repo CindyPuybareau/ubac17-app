@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 
 // Retour de Cindy du 10/09 (suite) : "Commissions concernées" sur un besoin
@@ -50,6 +50,22 @@ export default function CommissionMultiSelect({
     }
     setOpen((o) => !o);
   }
+
+  // Retour de Cindy du 25/09 ("attention responsive sur les commissions") :
+  // menuPos est calculée UNE FOIS à l'ouverture -- un défilement de la page
+  // pendant que le menu reste ouvert (ce formulaire n'est pas une modale,
+  // voir create-event-form.tsx) le laissait figé à l'écran, décroché du
+  // bouton, recouvrant alors n'importe quel contenu qui se trouvait là
+  // (le calendrier derrière, dans le cas remonté). Comme la plupart des
+  // menus déroulants : on referme plutôt que de le laisser dériver.
+  useEffect(() => {
+    if (!open) return;
+    function handleScroll() {
+      setOpen(false);
+    }
+    window.addEventListener("scroll", handleScroll, { capture: true, passive: true });
+    return () => window.removeEventListener("scroll", handleScroll, { capture: true });
+  }, [open]);
 
   if (commissions.length === 0) return null;
 
