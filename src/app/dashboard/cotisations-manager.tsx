@@ -113,7 +113,16 @@ function visibleCollecteCotisations(collecte: AdminCollecte | undefined, all: Ad
   if (!collecte?.presentPlayerIds) return list;
   const presentIds = new Set(collecte.presentPlayerIds);
   return list.filter(
-    (c) => presentIds.has(c.playerId) || (c.paiement ?? 0) > 0 || c.statut === "OFFERT"
+    (c) =>
+      // Un bénévole invité (retour de Cindy du 25/09) n'a pas de playerId à
+      // chercher dans presentPlayerIds (qui ne connaît que des joueurs
+      // réels) -- sa seule existence ici veut déjà dire "a répondu
+      // présent" (c'est le déclencheur sync_paid_event_cotisation_on_rsvp
+      // qui l'a créé), toujours visible.
+      c.isGuest ||
+      (c.playerId !== null && presentIds.has(c.playerId)) ||
+      (c.paiement ?? 0) > 0 ||
+      c.statut === "OFFERT"
   );
 }
 
@@ -397,7 +406,7 @@ export default function CotisationsManager({
     [members]
   );
   const seasonCotisations = useMemo(
-    () => cotisations.filter((c) => !c.collecteId && !archivedPlayerIds.has(c.playerId)),
+    () => cotisations.filter((c) => !c.collecteId && !(c.playerId && archivedPlayerIds.has(c.playerId))),
     [cotisations, archivedPlayerIds]
   );
 

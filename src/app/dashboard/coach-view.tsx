@@ -13,6 +13,7 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
+import { commissionMeta } from "@/lib/commission-labels";
 import DocumentsPanel from "@/components/club-documents";
 import ClubReportsSection from "./club-reports-section";
 import Cd17LigueSection from "./cd17-ligue-section";
@@ -144,10 +145,14 @@ export default function CoachView({
   // "Commissions concernées" (create-event-form.tsx/volunteer-needs-
   // panel.tsx) l'attend depuis le 10/09 -- un coach ne l'a donc jamais vu
   // s'afficher (CommissionMultiSelect se cache tout seul si la liste est
-  // vide). Même calcul que admin-view.tsx (commissionGroups).
+  // vide). Même calcul et même filtre hideFromCommissionAccess que
+  // admin-view.tsx (commissionGroups, retour du 25/09).
   const commissionGroups = whatsappGroups
     .filter((g) => g.category === "COMMISSION")
-    .map((g) => ({ id: g.id, name: g.name }));
+    .map((g) => ({ id: g.id, ...commissionMeta(g.name) }))
+    .filter((c) => !c.hideFromCommissionAccess)
+    .sort((a, b) => a.rank - b.rank)
+    .map((c) => ({ id: c.id, name: c.label }));
 
   // Retour d'audit du 28/08 : un événement ciblant plusieurs équipes
   // précises (targetTeamIds) n'a pas de teamId — il n'apparaissait dans

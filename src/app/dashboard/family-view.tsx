@@ -253,7 +253,7 @@ export default function FamilyView({
 
   const visiblePlayerIds = useMemo(() => visiblePlayers.map((p) => p.id), [visiblePlayers]);
   const visibleCotisations = useMemo(
-    () => cotisations.filter((c) => visiblePlayerIds.includes(c.playerId)),
+    () => cotisations.filter((c) => c.playerId !== null && visiblePlayerIds.includes(c.playerId)),
     [cotisations, visiblePlayerIds]
   );
   const visiblePenalites = useMemo(

@@ -554,6 +554,7 @@ export default async function ChildViewPage() {
       collecteId: c.collecte_id,
       collecteType: collecte?.type ?? null,
       collecteName: collecte?.name ?? null,
+      isGuest: false,
       payments: paymentsByCotisationId.get(c.id) ?? [],
       createdAt: c.created_at,
     };

@@ -120,6 +120,7 @@ export async function sendCotisationRelances(
       lastName: player.last_name,
       category: null,
       playerId: row.player_id,
+      isGuest: false,
       membershipType: null,
       fbiStatus: null,
       collecteId: null,

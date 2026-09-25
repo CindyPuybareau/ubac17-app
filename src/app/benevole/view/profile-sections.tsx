@@ -34,6 +34,8 @@ import TeamFilterDropdown from "@/app/dashboard/team-filter-dropdown";
 import DocumentsPanel, { type ClubDocumentId } from "@/components/club-documents";
 import { BOUTIQUE_URL } from "@/app/dashboard/boutique";
 import type { ClubReport, SponsorDisplay } from "@/app/dashboard/page";
+import type { ProfileCalendarEvent } from "@/lib/read-only-briques-data";
+import GuestRsvpPaidEventCard from "./guest-rsvp-card";
 
 // Retour de Cindy du 05/09 ("profil et bénévoles doivent être fusionnés"),
 // puis du 06/09 ("un menu comme les autres espaces, pas tout les uns à la
@@ -123,14 +125,21 @@ function CalendarSection({
   events,
   teams,
   attendanceByEventId,
+  commissionContext,
 }: {
-  events: ChildEvent[];
+  events: ProfileCalendarEvent[];
   teams: { id: string; name: string | null; category: string | null }[];
   // Retour de Cindy du 11/09 ("qui est présent/absent ?") : voir
   // read-only-briques-data.ts, gouverné par la brique "membres" -- objet
   // vide si cette brique n'est pas cochée pour cette commission/ce
   // bénévole, ChildCalendarTab n'affiche alors ni présent ni absent.
   attendanceByEventId: Record<string, { name: string | null; status: string }[]>;
+  // Retour de Cindy du 25/09 ("les bénévoles doivent pouvoir cliquer sur
+  // présent ou absent... quand la commission est sélectionnée") : undefined
+  // côté bénévole individuel (voir benevole-view.tsx, jamais fourni --
+  // commission_group_ids n'a pas de sens pour un lien qui n'est rattaché à
+  // aucune commission précise). Seule CommissionView le fournit.
+  commissionContext?: { token: string; groupId: string };
 }) {
   const [hideTrainings, setHideTrainings] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(teams.map((t) => t.id)));
@@ -157,6 +166,27 @@ function CalendarSection({
     () => events.filter((e) => e.eventType === "MATCH"),
     [events]
   );
+  // Retour de Cindy du 25/09 : ChildCalendarTab ne connaît que ChildEvent
+  // (jamais commissionGroupIds/paymentLink) -- on retrouve ici la ligne
+  // complète par id pour savoir si CETTE commission est concernée par CET
+  // événement précis, avant d'injecter la carte Présent/Absent + HelloAsso.
+  const eventsById = useMemo(() => new Map(events.map((e) => [e.id, e])), [events]);
+  const renderEventExtra = commissionContext
+    ? (baseEvent: ChildEvent) => {
+        const full = eventsById.get(baseEvent.id);
+        if (!full || !full.commissionGroupIds.includes(commissionContext.groupId)) return null;
+        return (
+          <GuestRsvpPaidEventCard
+            eventId={full.id}
+            token={commissionContext.token}
+            isPaid={full.isPaid}
+            paidAmount={full.paidAmount}
+            paymentLink={full.paymentLink}
+            paidParticipants={full.paidParticipants}
+          />
+        );
+      }
+    : undefined;
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -179,6 +209,7 @@ function CalendarSection({
         clubOfficialMatches={clubOfficialMatches}
         teams={[]}
         attendanceByEventId={attendanceByEventId}
+        renderEventExtra={renderEventExtra}
       />
     </div>
   );
@@ -293,6 +324,7 @@ export function buildProfileSections({
   whatsappDirectory = [],
   dashboardCounts = null,
   attendanceByEventId,
+  commissionContext,
 }: {
   allowedBriques: string[];
   // Réservé à la section "Équipes" (roster + coachs) -- gouverné par la
@@ -312,7 +344,7 @@ export function buildProfileSections({
   // deux composants ci-dessous filtrent déjà chacun de leur côté par
   // eventType (voir child-calendar-tab.tsx/child-results-tab.tsx), même
   // convention que côté Espace Enfant.
-  events: ChildEvent[];
+  events: ProfileCalendarEvent[];
   sponsors: SponsorDisplay[];
   clubReports: ClubReport[];
   // Retour de Cindy du 06/09 ("je ne vois pas dans Vie du club son groupe
@@ -336,6 +368,10 @@ export function buildProfileSections({
   // Retour de Cindy du 11/09 ("qui est présent/absent ?") : voir
   // read-only-briques-data.ts, gouverné par la brique "membres".
   attendanceByEventId: Record<string, { name: string | null; status: string }[]>;
+  // Retour de Cindy du 25/09 : voir son commentaire sur CalendarSection --
+  // undefined pour un bénévole individuel (benevole-view.tsx), fourni
+  // uniquement par CommissionView.
+  commissionContext?: { token: string; groupId: string };
 }): AdminSection[] {
   const has = (b: string) => allowedBriques.includes(b);
   const sections: AdminSection[] = [];
@@ -353,7 +389,12 @@ export function buildProfileSections({
       label: "Calendrier",
       icon: <CalendarDays className={iconClass} />,
       content: (
-        <CalendarSection events={events} teams={teamRefs} attendanceByEventId={attendanceByEventId} />
+        <CalendarSection
+          events={events}
+          teams={teamRefs}
+          attendanceByEventId={attendanceByEventId}
+          commissionContext={commissionContext}
+        />
       ),
     });
   }

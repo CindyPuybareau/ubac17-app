@@ -1152,7 +1152,7 @@ export default function CotisationParticipantsTable({
       // chance d'être joint, pas la peine de lui laisser prendre la place
       // d'un "Envoyer à N" trompeur.
       setRelancePreview({
-        ids: targets.filter((c) => contactEmailByPlayerId[c.playerId]).map((c) => c.id),
+        ids: targets.filter((c) => c.playerId && contactEmailByPlayerId[c.playerId]).map((c) => c.id),
         allIds,
         subject: tpl.subject,
         body: withReceiptMention(tpl.body, true),
@@ -1178,7 +1178,7 @@ export default function CotisationParticipantsTable({
     const targets = ids
       .map((id) => byId.get(id))
       .filter((c): c is AdminCotisation => Boolean(c))
-      .map((c) => ({ c, email: contactEmailByPlayerId[c.playerId] ?? null }))
+      .map((c) => ({ c, email: (c.playerId ? contactEmailByPlayerId[c.playerId] : undefined) ?? null }))
       .filter((t): t is { c: AdminCotisation; email: string } => Boolean(t.email));
 
     if (targets.length === 0) {
@@ -1199,7 +1199,7 @@ export default function CotisationParticipantsTable({
       targets.map(async ({ c, email }) => {
         try {
           const attachment = attachReceipt
-            ? await buildReceiptPdfBase64(c, contactEmailByPlayerId[c.playerId] ?? null)
+            ? await buildReceiptPdfBase64(c, (c.playerId ? contactEmailByPlayerId[c.playerId] : undefined) ?? null)
             : null;
           const res = await fetch("/api/send-email", {
             method: "POST",
@@ -1473,7 +1473,7 @@ export default function CotisationParticipantsTable({
           <tbody>
             {filtered.map((c) => {
               const status = statusBadge[computeStatus(c)];
-              const contactEmail = contactEmailByPlayerId[c.playerId] ?? null;
+              const contactEmail = (c.playerId ? contactEmailByPlayerId[c.playerId] : undefined) ?? null;
               return (
                 <tr
                   key={c.id}
@@ -1550,7 +1550,7 @@ export default function CotisationParticipantsTable({
         )}
         {filtered.map((c) => {
           const status = statusBadge[computeStatus(c)];
-          const contactEmail = contactEmailByPlayerId[c.playerId] ?? null;
+          const contactEmail = (c.playerId ? contactEmailByPlayerId[c.playerId] : undefined) ?? null;
           return (
             <div
               key={c.id}
@@ -1624,7 +1624,7 @@ export default function CotisationParticipantsTable({
               (() => {
                 const c = byId.get(paymentIds[0]);
                 if (!c) return null;
-                const contactEmail = contactEmailByPlayerId[c.playerId] ?? null;
+                const contactEmail = (c.playerId ? contactEmailByPlayerId[c.playerId] : undefined) ?? null;
                 return (
                   <div className="rounded-lg border border-zinc-100 bg-zinc-50 p-2 text-xs text-zinc-600">
                     <div className="flex items-center justify-between">
@@ -2239,7 +2239,7 @@ export default function CotisationParticipantsTable({
                         if (!p) return p;
                         const emailableIds = p.allIds.filter((id) => {
                           const c = byId.get(id);
-                          return c && contactEmailByPlayerId[c.playerId];
+                          return c && c.playerId && contactEmailByPlayerId[c.playerId];
                         });
                         return {
                           ...p,
@@ -2256,7 +2256,7 @@ export default function CotisationParticipantsTable({
                   {relancePreview.allIds.map((id) => {
                     const c = byId.get(id);
                     if (!c) return null;
-                    const email = contactEmailByPlayerId[c.playerId] ?? null;
+                    const email = (c.playerId ? contactEmailByPlayerId[c.playerId] : undefined) ?? null;
                     const checked = relancePreview.ids.includes(id);
                     return (
                       <label
@@ -2358,7 +2358,7 @@ export default function CotisationParticipantsTable({
               {mailServiceConfigured === false && relancePreview.allIds.length === 1
                 ? (() => {
                     const c = byId.get(relancePreview.allIds[0]);
-                    const email = c ? contactEmailByPlayerId[c.playerId] ?? null : null;
+                    const email = c && c.playerId ? contactEmailByPlayerId[c.playerId] ?? null : null;
                     if (!c || !email) return null;
                     return (
                       <a

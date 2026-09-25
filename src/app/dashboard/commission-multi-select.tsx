@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 
 // Retour de Cindy du 10/09 (suite) : "Commissions concernées" sur un besoin
@@ -11,6 +11,17 @@ import { ChevronDown } from "lucide-react";
 // l'appli). Utilisé à la fois dans create-event-form.tsx (par besoin, à la
 // création) et volunteer-needs-panel.tsx (à l'ajout sur un événement déjà
 // créé) -- un seul composant plutôt que deux copies.
+//
+// Retour de Cindy du 25/09 ("rien ne se passe au clic") : dans
+// create-event-form.tsx, ce sélecteur vit dans le bandeau repliable
+// "Options avancées" (overflow-hidden rounded-2xl, pour les coins arrondis
+// du panneau) -- un menu en position absolute s'y faisait couper net dès
+// qu'il dépassait la hauteur du bandeau, invisible au-delà malgré un clic
+// qui l'ouvrait bien (confirmé en direct : les commissions étaient toutes
+// là dans le DOM, juste rognées à l'écran). position: fixed, calculée à
+// l'ouverture depuis la position réelle du bouton, échappe à N'IMPORTE quel
+// ancêtre en overflow-hidden -- même principe que le panneau de
+// notification-bell.tsx (fixed, hors du flux de la carte qui le contient).
 export default function CommissionMultiSelect({
   commissions,
   selectedIds,
@@ -20,7 +31,9 @@ export default function CommissionMultiSelect({
   selectedIds: string[];
   onChange: (next: string[]) => void;
 }) {
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const label =
     selectedIds.length === 0
       ? "Commissions concernées"
@@ -30,13 +43,22 @@ export default function CommissionMultiSelect({
     onChange(selectedIds.includes(id) ? selectedIds.filter((x) => x !== id) : [...selectedIds, id]);
   }
 
+  function handleToggleOpen() {
+    if (!open && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setMenuPos({ top: rect.bottom + 8, left: rect.left });
+    }
+    setOpen((o) => !o);
+  }
+
   if (commissions.length === 0) return null;
 
   return (
     <div className="relative">
       <button
+        ref={buttonRef}
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={handleToggleOpen}
         className={`flex items-center gap-1.5 rounded-full border px-2 py-1.5 text-xs font-medium transition-colors ${
           // Retour de Cindy du 20/09 ("il apparaît en pilule orange pleine
           // même quand rien n'est sélectionné, ce qui donne l'impression
@@ -53,7 +75,7 @@ export default function CommissionMultiSelect({
         <ChevronDown className="h-3.5 w-3.5" />
       </button>
 
-      {open && (
+      {open && menuPos && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
           {/* Retour de Cindy du 13/09 ("on ne voit pas toutes les
@@ -61,7 +83,10 @@ export default function CommissionMultiSelect({
               commissions du club sans défiler -- max-h-[26rem] en montre la
               quasi-totalité d'un coup, le scroll reste là pour les
               profils sur-mesure qui s'ajouteraient plus tard. */}
-          <div className="absolute left-0 z-40 mt-2 max-h-[26rem] w-64 overflow-y-auto rounded-2xl border border-zinc-100 bg-white p-3 shadow-lg">
+          <div
+            className="fixed z-40 max-h-[26rem] w-64 overflow-y-auto rounded-2xl border border-zinc-100 bg-white p-3 shadow-lg"
+            style={{ top: menuPos.top, left: menuPos.left }}
+          >
             <ul className="flex flex-col gap-0.5">
               {commissions.map((c) => (
                 <li key={c.id}>

@@ -4,6 +4,21 @@ import type { ClubReport, SponsorDisplay } from "@/app/dashboard/page";
 import type { ProfileMember, ProfileTeam } from "@/app/benevole/view/profile-sections";
 import { upcomingBirthdays, type BirthdaySource } from "@/app/dashboard/birthdays";
 
+// Retour de Cindy du 25/09 ("les bénévoles doivent pouvoir cliquer sur
+// présent ou absent... et payer via HelloAsso") : ChildEvent + de quoi
+// afficher/activer la carte "Présent/Absent + Payer via HelloAsso" pour un
+// événement où LA commission (commissionGroupIds) est concernée. Étendu
+// UNIQUEMENT ici, jamais mélangé au ChildEvent que lit l'Espace Enfant
+// (paymentLink/paidParticipants n'existent tout simplement pas dans son
+// propre pipeline, enfant/view/page.tsx) -- aucun risque de fuite côté
+// Enfant.
+export type ProfileCalendarEvent = ChildEvent & {
+  commissionGroupIds: string[];
+  paidAmount: number | null;
+  paymentLink: string | null;
+  paidParticipants: { name: string }[];
+};
+
 // Extrait de /benevole/view/page.tsx (retour de Cindy du 10/09, "Accès
 // Commissions & Administration") : /commission/[token] a exactement besoin
 // des mêmes données en lecture seule, gouvernées par les mêmes briques
@@ -26,7 +41,7 @@ export type ReadOnlyBriquesData = {
   // d'équipe (roster + coachs).
   profileTeamRefs: { id: string; name: string | null; category: string | null }[];
   profileMembers: ProfileMember[];
-  profileEvents: ChildEvent[];
+  profileEvents: ProfileCalendarEvent[];
   profileSponsors: SponsorDisplay[];
   profileClubReports: ClubReport[];
   // Retour de Cindy du 11/09 ("qui est présent/absent ?") : résumé de
@@ -53,6 +68,42 @@ export type ReadOnlyBriquesData = {
   profileWhatsappGroups: { id: string; name: string; inviteLink: string | null }[];
 };
 
+// Retour de Cindy du 25/09 : équivalent local de resolvePaidInfo (page.tsx),
+// avec en plus la résolution du nom pour un bénévole invité (guest_name),
+// que la version Bureau ne connaît pas. Ne coûte rien de plus ici : les
+// collectes/cotisations sont déjà embarquées dans le même select events()
+// (service_role, aucun risque RLS), jamais une requête à part.
+function resolveGuestPaidInfo(collectes: unknown): {
+  isPaid: boolean;
+  paidAmount: number | null;
+  paymentLink: string | null;
+  paidParticipants: { name: string }[];
+} {
+  const rows = (Array.isArray(collectes) ? collectes : collectes ? [collectes] : []) as {
+    id: string;
+    prix: number | null;
+    payment_link: string | null;
+    type: string;
+    cotisations: unknown;
+  }[];
+  const row = rows.find((r) => r.type === "EVENEMENT");
+  if (!row) {
+    return { isPaid: false, paidAmount: null, paymentLink: null, paidParticipants: [] };
+  }
+  const cotisationRows = (Array.isArray(row.cotisations) ? row.cotisations : []) as {
+    guest_name: string | null;
+    players: unknown;
+  }[];
+  const paidParticipants = cotisationRows.map((c) => {
+    const player = c.players as { first_name: string | null; last_name: string | null } | null;
+    const name = player
+      ? [player.first_name, player.last_name].filter(Boolean).join(" ")
+      : c.guest_name;
+    return { name: name || "Membre" };
+  });
+  return { isPaid: true, paidAmount: row.prix, paymentLink: row.payment_link, paidParticipants };
+}
+
 export async function getReadOnlyBriquesData(
   supabase: SupabaseClient,
   allowedBriques: string[]
@@ -62,7 +113,7 @@ export async function getReadOnlyBriquesData(
   let profileTeams: ProfileTeam[] = [];
   let profileTeamRefs: ReadOnlyBriquesData["profileTeamRefs"] = [];
   let profileMembers: ProfileMember[] = [];
-  let profileEvents: ChildEvent[] = [];
+  let profileEvents: ProfileCalendarEvent[] = [];
   let profileSponsors: SponsorDisplay[] = [];
   let profileClubReports: ClubReport[] = [];
   let profileDashboardCounts: ReadOnlyBriquesData["profileDashboardCounts"] = null;
@@ -165,30 +216,43 @@ export async function getReadOnlyBriquesData(
   // cette seule ancienne brique (voir access-briques.ts).
   if (has("calendrier") || has("evenements") || has("matchs_resultats")) {
     const eventsWindowStart = new Date(Date.now() - 183 * 24 * 60 * 60 * 1000).toISOString();
+    // commission_group_ids + collectes(...) (retour de Cindy du 25/09, "les
+    // bénévoles doivent pouvoir cliquer sur présent ou absent... quand la
+    // commission est sélectionnée") : embed imbriqué jusqu'à cotisations
+    // sans risque de coût RLS ici (service_role, jamais de policy évaluée) --
+    // contrairement au même embed évité côté Bureau (voir resolvePaidInfo,
+    // page.tsx), qui lui tourne avec la session de l'utilisateur.
     const { data: eventsData } = await supabase
       .from("events")
       .select(
-        "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, team_id, target_team_ids, team_score, opponent_score, teams(name)"
+        "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, team_id, target_team_ids, commission_group_ids, team_score, opponent_score, teams(name), collectes(id, prix, payment_link, type, cotisations(player_id, guest_name, players(id, first_name, last_name)))"
       )
       .gte("start_time", eventsWindowStart)
       .order("start_time", { ascending: true });
-    profileEvents = (eventsData ?? []).map((e) => ({
-      id: e.id,
-      title: e.title,
-      eventType: e.event_type,
-      isHome: e.is_home,
-      location: e.location,
-      salle: e.salle,
-      startTime: e.start_time,
-      endTime: e.end_time,
-      impactTime: e.impact_time,
-      teamId: e.team_id,
-      targetTeamIds: e.target_team_ids,
-      teamName: (e.teams as unknown as { name: string | null } | null)?.name ?? null,
-      teamScore: e.team_score,
-      opponentScore: e.opponent_score,
-      isPaid: false,
-    }));
+    profileEvents = (eventsData ?? []).map((e) => {
+      const paidInfo = resolveGuestPaidInfo(e.collectes);
+      return {
+        id: e.id,
+        title: e.title,
+        eventType: e.event_type,
+        isHome: e.is_home,
+        location: e.location,
+        salle: e.salle,
+        startTime: e.start_time,
+        endTime: e.end_time,
+        impactTime: e.impact_time,
+        teamId: e.team_id,
+        targetTeamIds: e.target_team_ids,
+        commissionGroupIds: e.commission_group_ids ?? [],
+        teamName: (e.teams as unknown as { name: string | null } | null)?.name ?? null,
+        teamScore: e.team_score,
+        opponentScore: e.opponent_score,
+        isPaid: paidInfo.isPaid,
+        paidAmount: paidInfo.paidAmount,
+        paymentLink: paidInfo.paymentLink,
+        paidParticipants: paidInfo.paidParticipants,
+      };
+    });
   }
 
   // Retour de Cindy du 11/09 ("qui est présent/absent ?", Accès

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   AlarmClock,
   Cake,
@@ -113,6 +113,14 @@ export default function ChildCalendarTab({
   // via nextEventId/nextEventAttendance ci-dessus. Prioritaire sur ces
   // deux-là quand fourni pour un événement donné.
   attendanceByEventId,
+  // Retour de Cindy du 25/09 ("les bénévoles doivent pouvoir cliquer sur
+  // présent ou absent... et payer via HelloAsso") : point d'extension
+  // optionnel, jamais fourni côté Espace Enfant (qui doit rester
+  // strictement lecture seule) -- seul CalendarSection (profile-sections.tsx,
+  // commission) l'utilise pour injecter une carte Présent/Absent + HelloAsso
+  // sous un événement précis, sans que ce composant partagé ait besoin de
+  // connaître quoi que ce soit sur les commissions/le paiement.
+  renderEventExtra,
 }: {
   events: ChildEvent[];
   // Retour de Cindy du 12/09 ("Matchs officiels du club", "il faut que
@@ -128,6 +136,7 @@ export default function ChildCalendarTab({
   nextEventId?: string | null;
   nextEventAttendance?: { name: string | null; status: string }[];
   attendanceByEventId?: Record<string, { name: string | null; status: string }[]>;
+  renderEventExtra?: (event: ChildEvent) => ReactNode;
 }) {
   const [view, setView] = useState<"month" | "list">("month");
   const [viewMonth, setViewMonth] = useState<Date>(today);
@@ -448,6 +457,7 @@ export default function ChildCalendarTab({
                   key={e.id}
                   event={e}
                   attendance={attendanceFor(e.id)}
+                  extra={renderEventExtra?.(e)}
                 />
               ))}
             </div>
@@ -469,6 +479,7 @@ export default function ChildCalendarTab({
                     key={e.id}
                     event={e}
                     attendance={attendanceFor(e.id)}
+                    extra={renderEventExtra?.(e)}
                   />
                 ))}
               </div>
@@ -666,10 +677,19 @@ export function EventRow({
   event,
   faded,
   attendance,
+  // Retour de Cindy du 25/09 ("intégrer la carte présent/absent + paiement
+  // dans la carte de l'événement") : la carte GuestRsvpPaidEventCard
+  // vivait jusqu'ici juste EN DESSOUS de cette carte (sibling, via
+  // renderEventExtra dans le div englobant) -- rendue maintenant DANS la
+  // même carte, comme AttendanceSummary juste en dessous. Optionnel,
+  // jamais fourni côté Espace Enfant (qui reste strictement lecture seule)
+  // ni par les deux autres appelants (EventRow "Passés"/child-results-tab.tsx).
+  extra,
 }: {
   event: ChildEvent;
   faded?: boolean;
   attendance?: { name: string | null; status: string }[];
+  extra?: ReactNode;
 }) {
   const style = styleFor(event.eventType);
   const parsed = parseMatchTitle(event.title);
@@ -742,6 +762,7 @@ export function EventRow({
         )}
       </div>
       {attendance && attendance.length > 0 && <AttendanceSummary attendance={attendance} />}
+      {extra}
     </div>
   );
 }

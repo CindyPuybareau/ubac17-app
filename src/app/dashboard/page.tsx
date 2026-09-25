@@ -353,7 +353,13 @@ export type AdminCotisation = {
   firstName: string | null;
   lastName: string | null;
   category: string | null;
-  playerId: string;
+  // Retour de Cindy du 25/09 ("les bénévoles doivent pouvoir... présent ou
+  // absent... payer via HelloAsso") : une ligne peut désormais représenter
+  // un bénévole invité sur un événement payant (jamais de fiche membre),
+  // playerId devient alors null et isGuest vrai -- même convention que
+  // SeasonGuestVolunteer/VolunteerTable (season-bilan-tables.tsx).
+  playerId: string | null;
+  isGuest: boolean;
   membershipType: string | null;
   fbiStatus: string | null;
   collecteId: string | null;
@@ -381,7 +387,8 @@ function mapCotisationRow(
     paiement: number | null;
     statut: string | null;
     mode_paiement: string | null;
-    player_id: string;
+    player_id: string | null;
+    guest_name: string | null;
     collecte_id: string | null;
     created_at: string | null;
     players: unknown;
@@ -420,6 +427,7 @@ function mapCotisationRow(
     statut: c.statut,
     mode_paiement: c.mode_paiement,
     playerId: c.player_id,
+    isGuest: c.player_id === null,
     createdAt: c.created_at,
     payments: paymentsByCotisationId.get(c.id) ?? [],
     membershipType: player?.membership_type ?? null,
@@ -427,7 +435,13 @@ function mapCotisationRow(
     collecteId: c.collecte_id,
     collecteType: collecte?.type ?? null,
     collecteName: collecte?.name ?? null,
-    playerName: formatPersonName(player?.first_name, player?.last_name, "Joueur"),
+    // guest_name en repli (retour de Cindy du 25/09) : un bénévole invité
+    // n'a pas de fiche players, juste le nom tapé au moment de répondre
+    // présent (comme Greg Martin pour "Je me propose", event-volunteer-
+    // needs.ts) -- jamais splitté en prénom/nom, contrairement à un membre.
+    playerName: player
+      ? formatPersonName(player.first_name, player.last_name, "Joueur")
+      : (c.guest_name ?? "Invité·e"),
     firstName: player?.first_name ?? null,
     lastName: player?.last_name ?? null,
     category: realCategory ?? player?.category ?? null,
@@ -1721,7 +1735,7 @@ export default async function DashboardPage({
               // ailleurs dans ce même lot (playersRes/teamPlayersRes/
               // teamsRes) : réunis en mémoire juste avant adminCotisations
               // plus bas, jamais réévalués via un embed imbriqué.
-              "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, collecte_id, created_at, collectes(id, name, type)"
+              "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, guest_name, collecte_id, created_at, collectes(id, name, type)"
             )
             .order("saison", { ascending: false }),
         () =>
@@ -3859,7 +3873,7 @@ export default async function DashboardPage({
               // part ci-dessous (cotisationPlayerFieldsRes/
               // cotisationPlayerTeamsRes), jamais réévalués via un embed
               // imbriqué.
-              "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, collecte_id, created_at, collectes(id, name, type)"
+              "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, guest_name, collecte_id, created_at, collectes(id, name, type)"
             )
             .in("player_id", familyPlayerIds)
             .order("saison", { ascending: false })

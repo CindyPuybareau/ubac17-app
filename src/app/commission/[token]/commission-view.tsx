@@ -18,9 +18,9 @@ import OrgChartButton from "@/app/dashboard/org-chart-button";
 import CommissionNotificationBell, {
   type CommissionNotification,
 } from "./commission-notification-bell";
-import type { ChildEvent } from "@/app/enfant/view/child-dashboard";
 import type { ClubReport, SponsorDisplay } from "@/app/dashboard/page";
 import { buildProfileSections, type ProfileMember, type ProfileTeam } from "@/app/benevole/view/profile-sections";
+import type { ProfileCalendarEvent } from "@/lib/read-only-briques-data";
 
 // Événement tel que vu depuis le lien d'une commission : date/heure/lieu
 // et les besoins d'organisation seulement -- sans "status" : personne
@@ -264,7 +264,7 @@ export default function CommissionView({
   // voir son commentaire dans profile-sections.tsx/read-only-briques-data.ts.
   profileTeamRefs: { id: string; name: string | null; category: string | null }[];
   profileMembers: ProfileMember[];
-  profileEvents: ChildEvent[];
+  profileEvents: ProfileCalendarEvent[];
   profileSponsors: SponsorDisplay[];
   profileClubReports: ClubReport[];
   // Retour de Cindy du 11/09 ("qui est présent/absent ?") : voir
@@ -328,6 +328,7 @@ export default function CommissionView({
       whatsappGroups: [],
       whatsappDirectory: profileWhatsappGroups,
       attendanceByEventId,
+      commissionContext: { token, groupId },
     }),
   ];
 

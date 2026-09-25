@@ -441,17 +441,24 @@ export default function CreateEventForm({
     setError(null);
   }
 
-  // Réaffiche le formulaire à l'écran dès qu'une édition démarre : le
-  // crayon peut être cliqué sur une carte loin en bas de la liste, alors
-  // que le formulaire, lui, s'affiche toujours en haut (retour de Cindy :
+  // Réaffiche le formulaire à l'écran dès qu'il s'ouvre : le crayon peut
+  // être cliqué sur une carte loin en bas de la liste (retour de Cindy :
   // "il faudrait qu'il se réouvre comme lors d'une création, meme
-  // visuel"). Pas de setState ici, seulement un défilement — aucun conflit
-  // avec le remontage par key ci-dessus.
+  // visuel"), et "Créer un événement" est tout aussi susceptible d'être
+  // cliqué après avoir déjà défilé dans le calendrier -- le formulaire
+  // s'insère alors au même endroit fixe du DOM, hors du champ de vision,
+  // sans ce défilement (retour de Cindy du 25/09, "rien ne se passe au
+  // clic" : ce n'était pas "Commissions concernées" qui était cassé, mais
+  // le formulaire entier qui s'ouvrait invisible faute de scrollIntoView
+  // en mode création -- key={editingEvent?.id ?? "create"} ne remonte pas
+  // le composant entre deux ouvertures en création, donc un effet limité à
+  // [editingEvent] ne se redéclenchait jamais). Pas de setState ici,
+  // seulement un défilement — aucun conflit avec le remontage par key.
   useEffect(() => {
-    if (editingEvent) {
+    if (open) {
       formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-  }, [editingEvent]);
+  }, [open, editingEvent]);
 
   function addDraftNeed() {
     setDraftNeeds((rows) => [

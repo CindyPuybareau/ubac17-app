@@ -20,6 +20,7 @@ import {
   Wallet,
   RefreshCw,
 } from "lucide-react";
+import { commissionMeta } from "@/lib/commission-labels";
 import DocumentsPanel from "@/components/club-documents";
 import ClubReportsSection from "./club-reports-section";
 import Cd17LigueSection from "./cd17-ligue-section";
@@ -197,12 +198,22 @@ export default function AdminView({
   });
 
   // Retour de Cindy du 10/09 ("Accès Commissions & Administration") :
-  // liste des commissions pour rattacher un besoin en bénévoles à la
-  // création (voir VolunteerNeedsPanel/commissionGroups) -- mêmes groupes
-  // que whatsapp-groups-manager.tsx, jamais une nouvelle liste.
+  // liste des commissions pour rattacher un besoin en bénévoles ou cibler
+  // "Commissions concernées" à la création d'un événement (voir
+  // VolunteerNeedsPanel/CommissionMultiSelect/commissionGroups) -- mêmes
+  // groupes que whatsapp-groups-manager.tsx, jamais une nouvelle liste.
+  // Retour de Cindy du 25/09 ("ces deux points doivent être reliés") :
+  // même filtre hideFromCommissionAccess que commissions-manager.tsx
+  // (Bureau/Coachs/Salariés ont déjà leur propre espace connecté, jamais
+  // via un lien de commission -- les cibler ici n'aurait aucun effet, le
+  // futur bouton présent/absent n'y répondrait jamais). Même tableau
+  // whatsappGroups déjà chargé, filtré en mémoire -- aucune requête de plus.
   const commissionGroups = whatsappGroups
     .filter((g) => g.category === "COMMISSION")
-    .map((g) => ({ id: g.id, name: g.name }));
+    .map((g) => ({ id: g.id, ...commissionMeta(g.name) }))
+    .filter((c) => !c.hideFromCommissionAccess)
+    .sort((a, b) => a.rank - b.rank)
+    .map((c) => ({ id: c.id, name: c.label }));
 
   // Retour d'audit du 28/08 : un événement ciblant plusieurs équipes
   // précises (targetTeamIds) n'a pas de teamId — il n'apparaissait dans
