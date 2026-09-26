@@ -34,6 +34,7 @@ import { parseMatchTitle } from "@/lib/match-display";
 import { formatFirstName } from "@/lib/names";
 import { groupTeamsByPrimarySecondary, teamLabel } from "@/lib/teams";
 import { schoolHolidayFor } from "@/lib/school-holidays";
+import MatchResultCelebration from "@/components/match-result-celebration";
 import type { ChildEvent, ChildTeammate } from "./child-dashboard";
 
 // Même grille mensuelle que le calendrier Parent (calendar-view.tsx) —
@@ -99,6 +100,20 @@ export function isHomeMatch(event: Pick<ChildEvent, "eventType" | "title" | "isH
   return isMatchType(event.eventType) && (event.isHome ?? parseMatchTitle(event.title).isHome) === true;
 }
 
+// Retour de Cindy du 26/09 ("confettis à l'ouverture des espaces") : même
+// règle que calendar-view.tsx (Bureau/Coach/Famille) et child-results-tab.tsx
+// -- victoire dans les 5 derniers jours. Réécrite ici (pas importée) pour
+// rester une fonction pure au niveau du module (react-hooks/purity,
+// Date.now() n'est pas pur dans un corps de composant).
+function isRecentWin(event: Pick<ChildEvent, "teamScore" | "opponentScore" | "startTime">) {
+  return (
+    event.teamScore !== null &&
+    event.opponentScore !== null &&
+    event.teamScore > event.opponentScore &&
+    Date.now() - new Date(event.startTime).getTime() < 5 * 24 * 60 * 60 * 1000
+  );
+}
+
 const weekdayLabels = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 const today = new Date();
 const todayKey = toKey(today);
@@ -134,6 +149,12 @@ export default function ChildCalendarTab({
   // sous un événement précis, sans que ce composant partagé ait besoin de
   // connaître quoi que ce soit sur les commissions/le paiement.
   renderEventExtra,
+  // Retour de Cindy du 26/09 ("confettis à l'ouverture des espaces, sauf
+  // bénévoles") : passé à `true` uniquement par child-dashboard.tsx (Espace
+  // Enfant) -- CalendarSection (profile-sections.tsx, commission/bénévole)
+  // ne le passe jamais, gardant son comportement actuel (confettis
+  // seulement sous "Matchs officiels"/"Résultats", jamais sur ce Calendrier).
+  celebrateWins = false,
 }: {
   events: ChildEvent[];
   // Retour de Cindy du 12/09 ("Matchs officiels du club", "il faut que
@@ -150,6 +171,7 @@ export default function ChildCalendarTab({
   nextEventAttendance?: { name: string | null; status: string }[];
   attendanceByEventId?: Record<string, { name: string | null; status: string }[]>;
   renderEventExtra?: (event: ChildEvent) => ReactNode;
+  celebrateWins?: boolean;
 }) {
   const [view, setView] = useState<"month" | "list">("month");
   const [viewMonth, setViewMonth] = useState<Date>(today);
@@ -511,6 +533,7 @@ export default function ChildCalendarTab({
                   event={e}
                   attendance={attendanceFor(e.id)}
                   extra={renderEventExtra?.(e)}
+                  celebrateWins={celebrateWins}
                 />
               ))}
             </div>
@@ -533,6 +556,7 @@ export default function ChildCalendarTab({
                     event={e}
                     attendance={attendanceFor(e.id)}
                     extra={renderEventExtra?.(e)}
+                    celebrateWins={celebrateWins}
                   />
                 ))}
               </div>
@@ -543,7 +567,13 @@ export default function ChildCalendarTab({
               <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Passés</p>
               <div className="flex flex-col gap-4">
                 {past.map((e) => (
-                  <EventRow key={e.id} event={e} faded attendance={attendanceFor(e.id)} />
+                  <EventRow
+                    key={e.id}
+                    event={e}
+                    faded
+                    attendance={attendanceFor(e.id)}
+                    celebrateWins={celebrateWins}
+                  />
                 ))}
               </div>
             </div>
@@ -738,11 +768,21 @@ export function EventRow({
   // jamais fourni côté Espace Enfant (qui reste strictement lecture seule)
   // ni par les deux autres appelants (EventRow "Passés"/child-results-tab.tsx).
   extra,
+  // Retour de Cindy du 26/09 ("confettis à l'ouverture des espaces, sauf
+  // bénévoles, on garde comme ça pour eux") : Espace Enfant seul le passe
+  // (child-dashboard.tsx) -- jamais CalendarSection (profile-sections.tsx,
+  // commission/bénévole), qui garde son comportement actuel (confettis
+  // uniquement sous "Matchs officiels"/"Résultats", jamais sur ce
+  // Calendrier). Optionnel, `false` par défaut : ni child-results-tab.tsx
+  // (sa propre carte "prochain match", jamais encore jouée) ni aucun autre
+  // appelant existant n'est donc affecté par cet ajout.
+  celebrateWins = false,
 }: {
   event: ChildEvent;
   faded?: boolean;
   attendance?: { name: string | null; status: string }[];
   extra?: ReactNode;
+  celebrateWins?: boolean;
 }) {
   const style = styleFor(event.eventType);
   const parsed = parseMatchTitle(event.title);
@@ -762,8 +802,17 @@ export function EventRow({
       ? `rounded-2xl border border-navy/15 bg-white p-3.5 shadow-sm border-l-8 ${style.border}`
       : `rounded-2xl border border-zinc-100 bg-white p-3.5 shadow-sm border-l-4 ${style.border}`;
 
+  const alreadyPlayed = new Date(event.startTime).getTime() < new Date().getTime();
+
   return (
     <div className={`${shellClass} ${faded ? "opacity-60" : ""}`}>
+      {celebrateWins && isMatchType(event.eventType) && alreadyPlayed && (
+        <MatchResultCelebration
+          resultKey={`${event.id}:${event.teamScore}-${event.opponentScore}`}
+          isWin={isRecentWin(event)}
+          enabled
+        />
+      )}
       {isTournament && (
         <span className="absolute -top-2.5 right-3 flex items-center gap-1 rounded-full bg-ubac-yellow px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-navy shadow-sm">
           <Sparkles className="h-3 w-3" />

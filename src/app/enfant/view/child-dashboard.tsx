@@ -316,6 +316,11 @@ export default function ChildDashboard({
             teams={teams}
             nextEventId={nextEvent?.id ?? null}
             nextEventAttendance={nextEventAttendance}
+            // Retour de Cindy du 26/09 ("confettis à l'ouverture des
+            // espaces, sauf bénévoles") : comme Coachs/Famille sur leur
+            // propre Calendrier (calendar-view.tsx) -- jamais passé côté
+            // CalendarSection (profile-sections.tsx, commission/bénévole).
+            celebrateWins
           />
         </div>
       ),
