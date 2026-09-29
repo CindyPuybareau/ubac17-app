@@ -16,6 +16,7 @@ import type { ClubReport, SponsorDisplay } from "@/app/dashboard/page";
 import { buildProfileSections, type ProfileMember, type ProfileTeam } from "@/app/benevole/view/profile-sections";
 import GuestRsvpPaidEventCard from "@/app/benevole/view/guest-rsvp-card";
 import CommissionNeedsBlock from "@/app/benevole/view/commission-needs-block";
+import TokenPageAutoRefresh from "@/app/benevole/view/token-page-auto-refresh";
 import type { ProfileCalendarEvent } from "@/lib/read-only-briques-data";
 
 // Événement tel que vu depuis le lien d'une commission : date/heure/lieu,
@@ -208,6 +209,7 @@ export default function CommissionView({
 
   return (
     <MobileNavProvider>
+      <TokenPageAutoRefresh />
       {/* Retour de Cindy du 25/09 ("le fond qui manque, un peu crème") :
           bg-zinc-50 peignait un gris opaque par-dessus le fond crème
           (--background, globals.css) que body porte déjà -- retiré, comme

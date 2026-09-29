@@ -11,6 +11,7 @@ import type { ClubReport, SponsorDisplay } from "@/app/dashboard/page";
 import type { ProfileCalendarEvent } from "@/lib/read-only-briques-data";
 import { buildProfileSections, type ProfileMember, type ProfileTeam } from "./profile-sections";
 import BenevoleNotificationBell, { type BenevoleNotification } from "./benevole-notification-bell";
+import TokenPageAutoRefresh from "./token-page-auto-refresh";
 
 // Retour de Cindy du 13/09 ("les bénévoles invités peuvent être supprimés
 // partout... un bénévole fait partie d'une commission quoi qu'il arrive") :
@@ -121,6 +122,7 @@ export default function BenevoleView({
 
   return (
     <MobileNavProvider>
+      <TokenPageAutoRefresh />
       {/* Retour de Cindy du 25/09 ("le fond qui manque, un peu crème") :
           bg-zinc-50 peignait un gris opaque par-dessus le fond crème
           (--background, globals.css) que body porte déjà -- retiré, comme
