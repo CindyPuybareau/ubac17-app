@@ -72,6 +72,14 @@ export type SpaceDashboardNextEvent = {
   // Espace Enfant, juste après cet appel (voir enfant/view/page.tsx, même
   // frontière que needs=[]/paymentLink=null).
   matchOfficialsEnabled: boolean;
+  // Retour de Cindy du 30/09 ("équipes sœurs") -- corrigé après coup (audit
+  // du 30/09, "boutons de gestion actifs sur un match d'équipe sœur") :
+  // vrai quand row.team_id fait partie de siblingTeamIds (paramètre de
+  // getSpaceDashboardSummary) -- même marqueur que AdminUpcomingEvent
+  // (page.tsx)/WeekStripEvent (week-strip-banner.tsx), pour que la carte
+  // "Prochain événement" du Tableau de bord reste elle aussi lecture seule
+  // sur un match sœur.
+  readOnlyExternal?: boolean;
 };
 
 // Retour de Cindy du 20/09 ("mes deux enfants sont mélangés... un coach qui
@@ -184,7 +192,14 @@ export async function getSpaceDashboardSummary(
   // sur players) -- toujours côté serveur, jamais un client authentifié
   // classique (Bureau/Coach/Famille gardent la vue, seul rempart contre
   // la fuite corrigée le 28/08 pour EUX).
-  trustedRosterAccess = false
+  trustedRosterAccess = false,
+  // Retour de Cindy du 30/09 ("équipes sœurs") -- corrigé après coup (audit
+  // du 30/09) : ids des équipes sœurs déjà mêlées à `teamIds` par
+  // l'appelant (page.tsx) pour que leurs matchs/stats remontent -- ce
+  // paramètre-ci sert UNIQUEMENT à marquer readOnlyExternal sur les
+  // entrées nextEvents correspondantes, jamais à filtrer quoi que ce soit
+  // (teamIds reste la seule source de vérité pour "quels matchs charger").
+  siblingTeamIds: string[] = []
 ): Promise<SpaceDashboardSummary> {
   const seasonLabel = getCurrentSeasonLabel();
 
@@ -568,6 +583,7 @@ export async function getSpaceDashboardSummary(
       statusByEventAndPlayer.set(`${r.event_id}:${r.player_id}`, r.status);
     });
 
+    const siblingTeamIdSet = new Set(siblingTeamIds);
     function buildNextEvent(row: EventRow): SpaceDashboardNextEvent {
       const paidFields = resolvePaidFields(row.collectes);
       const eventRoster = fullRoster.filter((p) => isConcernedByEvent(p, row));
@@ -625,6 +641,7 @@ export async function getSpaceDashboardSummary(
         needs: needsByEventId[row.id] ?? [],
         matchOfficials: matchOfficialsByEventId[row.id] ?? [],
         matchOfficialsEnabled: true,
+        readOnlyExternal: Boolean(row.team_id && siblingTeamIdSet.has(row.team_id)),
       };
     }
 

@@ -217,3 +217,98 @@ export function listTeamsForOfficialMatches<
     .filter((e) => e.rank > 0 || !basesWithDeclinaison.has(e.base))
     .map((e) => e.team);
 }
+
+// Retour de Cindy du 30/09 ("équipes sœurs", U13M-1↔U13M-2, Séniors
+// 1↔Séniors 2...) : à partir d'une équipe précise, renvoie les ids de ses
+// vraies déclinaisons sœurs numérotées dans le catalogue COMPLET passé en
+// `allTeams` -- jamais l'équipe mère (rank 0, "U13M" elle-même), jamais une
+// catégorie sans rapport. Même repli `looseFamilyKey` que
+// `listTeamsForOfficialMatches` juste au-dessus (le "M" du genre est retiré
+// des déclinaisons côté Séniors, "Séniors 1" pas "Séniors M-1") plutôt que
+// `sameCategoryFamily`/`categoryKey` (pensés pour la réaffectation
+// manuelle, volontairement permissifs -- une catégorie inconnue "ne masque
+// rien" là-bas, ce qui donnerait ici de fausses sœurs). Une équipe sans
+// suffixe numéroté (rank 0, ex. "U13F" jouant directement sous son nom)
+// n'a par construction aucune sœur.
+export function getSiblingTeamIds<
+  T extends { id: string; name?: string | null; category?: string | null },
+>(team: T, allTeams: T[]): string[] {
+  const label = team.name ?? team.category ?? "";
+  const { rank } = splitTeamName(label);
+  if (rank === 0) return [];
+  const base = looseFamilyKey(label);
+  return allTeams
+    .filter((t) => t.id !== team.id)
+    .filter((t) => {
+      const tLabel = t.name ?? t.category ?? "";
+      const tSplit = splitTeamName(tLabel);
+      return tSplit.rank > 0 && looseFamilyKey(tLabel) === base;
+    })
+    .map((t) => t.id);
+}
+
+// Retour de Cindy du 30/09, précisé le même jour ("en équipe 2, il n'y a
+// jamais de brûlé") : le statut ne peut vivre QUE sur la déclinaison la
+// plus petite d'une paire sœur (ex. U13M-1, jamais U13M-2) -- un joueur de
+// la "2" n'a personne contre qui être brûlé, la règle n'a de sens que dans
+// ce sens-là. Sert à la fois à décider si la case doit s'afficher et à
+// choisir la bonne ligne team_players à écrire (member-detail-modal.tsx).
+export function isLowestRankSiblingTeam<
+  T extends { id: string; name?: string | null; category?: string | null },
+>(team: T, allTeams: T[]): boolean {
+  const label = team.name ?? team.category ?? "";
+  const { rank } = splitTeamName(label);
+  if (rank === 0) return false;
+  const siblingIds = getSiblingTeamIds(team, allTeams);
+  if (siblingIds.length === 0) return false;
+  const siblingRanks = allTeams
+    .filter((t) => siblingIds.includes(t.id))
+    .map((t) => splitTeamName(t.name ?? t.category ?? "").rank);
+  return siblingRanks.every((r) => rank < r);
+}
+
+// Retour de Cindy du 30/09 ("pour les U18M seulement") : contrairement aux
+// autres paires sœurs (U13M-1/U13M-2, Séniors 1/Séniors 2...), en
+// consultation seule, U18M-1 et U18M-2 partagent en pratique le même groupe
+// de joueurs -- n'importe quel joueur U18M doit pouvoir se déclarer
+// présent/absent sur les matchs officiels/amicaux des DEUX déclinaisons, et
+// un coach de l'une gère aussi l'autre comme la sienne. Restreint
+// explicitement à "U18M" (looseFamilyKey) -- jamais étendu à une autre
+// catégorie sans demande explicite de Cindy (pas une règle générale des
+// équipes sœurs).
+export function isSharedRsvpTeamGroup(label: string): boolean {
+  return looseFamilyKey(label) === "U18M";
+}
+
+// Élargit les ids d'équipe d'UN joueur à tout le groupe U18M
+// (isSharedRsvpTeamGroup ci-dessus) -- utilisée là où "les équipes de ce
+// joueur" pilote à la fois l'éligibilité au bouton Présent/Absent
+// (respondingPlayers, calendar-view.tsx) ET le bilan de présence personnel
+// (computeSeasonParticipation, season-bilan.ts, qui lit ce même tableau) :
+// un seul élargissement à la source profite aux deux sans dupliquer la
+// règle. N'importe quelle autre catégorie ressort inchangée.
+// Vérifié en base le 30/09 : les 22 joueurs U18M sont TOUS inscrits sur
+// l'équipe mère "U18M" (rank 0) -- U18M-1/U18M-2 n'ont aucun effectif
+// propre, elles ne portent que les matchs FFBB. getSiblingTeamIds (rang>0
+// à rang>0 seulement, exclut la mère par construction) ne suffit donc pas
+// ici : il faut tout le groupe famille (looseFamilyKey), mère incluse.
+export function widenTeamIdsForSharedRsvpGroups<
+  T extends { id: string; name?: string | null; category?: string | null },
+>(teamIds: string[], allTeams: T[]): string[] {
+  const widened = new Set(teamIds);
+  teamIds.forEach((id) => {
+    const team = allTeams.find((t) => t.id === id);
+    if (!team) return;
+    const label = team.name ?? team.category ?? "";
+    if (!isSharedRsvpTeamGroup(label)) return;
+    const base = looseFamilyKey(label);
+    allTeams
+      .filter((t) => t.id !== id)
+      .filter((t) => {
+        const tLabel = t.name ?? t.category ?? "";
+        return isSharedRsvpTeamGroup(tLabel) && looseFamilyKey(tLabel) === base;
+      })
+      .forEach((t) => widened.add(t.id));
+  });
+  return Array.from(widened);
+}

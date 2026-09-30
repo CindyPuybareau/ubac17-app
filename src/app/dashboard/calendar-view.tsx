@@ -1910,8 +1910,13 @@ export default function CalendarView({
             faire depuis sa carte d'événement (Organisation & Bilan).
             Mais sur une équipe qu'il ne gère pas (ex. sa propre équipe de
             joueur), personne d'autre ne répond pour lui : il doit voir
-            son propre bouton, comme n'importe quel joueur. */}
-        {!canManageEvent && rsvpVisiblePlayers.length > 0 && (
+            son propre bouton, comme n'importe quel joueur.
+            Audit du 30/09 ("équipes sœurs") : !event.readOnlyExternal en
+            plus, symétrique du bloc Organisation juste plus bas -- même
+            rempart de sécurité supplémentaire (rsvpVisiblePlayers est déjà
+            normalement vide sur un match sœur, mais readOnlyExternal
+            garantit qu'aucun bouton de réponse n'apparaît jamais dessus). */}
+        {!canManageEvent && !event.readOnlyExternal && rsvpVisiblePlayers.length > 0 && (
           <div className="flex flex-col gap-2 border-t border-zinc-100 pt-2">
             {rsvpVisiblePlayers.map((p) => {
               const playerStatus =
@@ -1967,8 +1972,21 @@ export default function CalendarView({
             2026-08-24 : un entraînement ne montre JAMAIS cet onglet, sur
             aucun espace, même si un rôle/besoin lui est un jour rattaché
             en base — la carte entraînement doit rester sobre par
-            construction, pas juste par absence de données. */}
-        {!canManageEvent && !event.readOnlyExternal && event.event_type !== "TRAINING" && event.event_type !== "REUNION" && (() => {
+            construction, pas juste par absence de données.
+            Retour de Cindy du 30/09 ("un Séniors M1 doit pouvoir se
+            proposer à l'e-marque ou la buvette de Séniors M2") :
+            event.volunteeringOpen rouvre cette carte pour une paire sœur
+            précisément (jamais pour le toggle "Matchs officiels du club",
+            qui ne porte jamais ce champ) -- canManage reste false plus bas
+            (VolunteerNeedsPanel/MatchOfficialsPanel), donc "je me propose"
+            seulement, jamais la gestion complète. Le bouton Présent/Absent
+            juste au-dessus reste lui strictement gardé par
+            !event.readOnlyExternal, inchangé. */}
+        {!canManageEvent &&
+          (!event.readOnlyExternal || event.volunteeringOpen) &&
+          event.event_type !== "TRAINING" &&
+          event.event_type !== "REUNION" &&
+          (() => {
           const roles = rolesForEventType(eventRoles, event.event_type);
           const hasTasks = roles.length > 0 || shouldOfferCarpool(event);
           const needs = volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds;

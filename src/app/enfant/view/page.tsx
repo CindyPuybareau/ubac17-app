@@ -7,6 +7,8 @@ import { teamOrClubWideFilter } from "@/app/dashboard/family-data";
 import { getClubOfficialMatches } from "@/lib/club-official-matches";
 import { getSpaceDashboardSummary } from "@/lib/space-dashboard";
 import { computeSeasonParticipation } from "@/app/dashboard/season-bilan";
+import { getCachedTeams } from "@/lib/reference-cache";
+import { getSiblingTeamIds } from "@/lib/teams";
 import ChildDashboard, {
   type ChildCoach,
   type ChildEvent,
@@ -95,8 +97,16 @@ export default async function ChildViewPage() {
   // forcer un aller-retour séquentiel de plus juste pour la lire.
   const notificationsEnabled = player.notifications_enabled ?? true;
 
-  const [teamsRes, teammatesRes, coachesRes, eventsRes, notifRes, clubOfficialMatches, rawDashboardSummary] =
-    await Promise.all([
+  const [
+    teamsRes,
+    teammatesRes,
+    coachesRes,
+    eventsRes,
+    allClubTeamsForSiblingsRes,
+    notifRes,
+    clubOfficialMatches,
+    rawDashboardSummary,
+  ] = await Promise.all([
     teamIds.length > 0
       ? supabase.from("teams").select("id, name, category").in("id", teamIds)
       : Promise.resolve({
@@ -126,6 +136,12 @@ export default async function ChildViewPage() {
           .or(teamOrClubWideFilter(teamIds))
           .order("start_time", { ascending: true })
       : Promise.resolve({ data: [] as never[], error: null }),
+    // Retour de Cindy du 30/09 ("équipes sœurs") -- corrigé le 30/09 après
+    // coup (retour de Cindy, "chargement trop long") : catalogue complet du
+    // club, parti ICI en parallèle avec le reste du lot (jamais en série
+    // avant lui comme la première version de ce correctif) -- utilisé plus
+    // bas pour calculer siblingTeamIds une fois ce lot résolu.
+    getCachedTeams(),
     // Cloche de notifications (voir plus bas pour le détail) : ne dépend
     // que de teamIds et de notificationsEnabled, tous deux déjà connus —
     // partie ici avec le reste plutôt qu'après coup, à la queue leu leu.
@@ -183,7 +199,34 @@ export default async function ChildViewPage() {
       matchOfficialsEnabled: false,
     })),
   };
-  logQueryErrors("Enfant", { teamsRes, teammatesRes, coachesRes, eventsRes, notifRes });
+  logQueryErrors("Enfant", { teamsRes, teammatesRes, coachesRes, eventsRes, allClubTeamsForSiblingsRes, notifRes });
+
+  // Retour de Cindy du 30/09 ("équipes sœurs") : calculé ICI, une fois
+  // allClubTeamsForSiblingsRes déjà résolu par le lot ci-dessus (en
+  // mémoire, aucun coût réseau) -- jamais avant le lot comme la première
+  // version de ce correctif.
+  const allClubTeamsForSiblings = allClubTeamsForSiblingsRes.data ?? [];
+  const siblingTeamIds = Array.from(
+    new Set(
+      allClubTeamsForSiblings
+        .filter((t) => teamIds.includes(t.id))
+        .flatMap((t) => getSiblingTeamIds(t, allClubTeamsForSiblings))
+    )
+  ).filter((id) => !teamIds.includes(id));
+  // Une seule requête de plus, SEULEMENT si cet enfant a réellement une
+  // équipe sœur (cas rare) -- jamais pour tout le monde.
+  const siblingMatchesRes =
+    siblingTeamIds.length > 0
+      ? await supabase
+          .from("events")
+          .select(
+            "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, team_id, target_team_ids, team_score, opponent_score, teams(name), collectes(id)"
+          )
+          .in("team_id", siblingTeamIds)
+          .in("event_type", ["MATCH", "FRIENDLY"])
+          .order("start_time", { ascending: true })
+      : { data: [] as typeof eventsRes.data, error: null };
+  logQueryErrors("Enfant (équipes sœurs)", { siblingMatchesRes });
 
   const teams = (teamsRes.data ?? []) as { id: string; name: string | null; category: string | null }[];
   // Catégorie propre à l'équipe de chaque ligne (retour de Cindy du
@@ -246,7 +289,7 @@ export default async function ChildViewPage() {
   }
   const coaches = Array.from(coachesByProfileId.values());
 
-  const eventRows = (eventsRes.data ?? []) as unknown as {
+  type EnfantEventRow = {
     id: string;
     title: string | null;
     event_type: string | null;
@@ -262,7 +305,15 @@ export default async function ChildViewPage() {
     opponent_score: number | null;
     teams: { name: string | null } | null;
     collectes: unknown;
-  }[];
+  };
+  const eventRows = [
+    ...((eventsRes.data ?? []) as unknown as EnfantEventRow[]),
+    // Retour de Cindy du 30/09 ("équipes sœurs") : mêmes colonnes que la
+    // requête events ci-dessus -- fusionnées ici, exclues naturellement des
+    // statistiques d'assiduité plus bas (teamIds, jamais élargi aux
+    // équipes sœurs, voir leur commentaire).
+    ...((siblingMatchesRes.data ?? []) as unknown as EnfantEventRow[]),
+  ].sort((a, b) => a.start_time.localeCompare(b.start_time));
   const events: ChildEvent[] = eventRows.map((e) => ({
     id: e.id,
     title: e.title,

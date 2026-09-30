@@ -5,6 +5,7 @@ import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
 import {
   AlertTriangle,
   Copy,
+  Flame,
   Shield,
   Trash2,
   User,
@@ -17,7 +18,12 @@ import { formatLocalDateFr } from "@/lib/local-date";
 import { teamLabel } from "@/lib/teams";
 import { notifyCoachesOfNewTeamMember } from "@/lib/member-notifications";
 import { buildAppDeepLink } from "@/lib/whatsapp";
-import { sameCategoryFamily, teamCategoryLabel } from "@/lib/teams";
+import {
+  getSiblingTeamIds,
+  isLowestRankSiblingTeam,
+  sameCategoryFamily,
+  teamCategoryLabel,
+} from "@/lib/teams";
 import ConfirmDialog from "./confirm-dialog";
 import ParentLinkManager from "./parent-link-manager";
 import { COMMITTEE_BRIQUE_GROUPS } from "./access-briques";
@@ -162,6 +168,14 @@ export default function MemberDetailModal({
   // ce prop-ci ne fait qu'aligner l'écran sur ce qui sera de toute façon
   // accepté ou non à l'enregistrement.
   canEditFullProfile = true,
+  // Retour de Cindy du 30/09 ("brûlé") : ni canManageTeamAndRoles (toujours
+  // faux pour un coach, et même pour le Bureau depuis l'onglet "Équipes",
+  // team-card.tsx:1394) ni canEditFullProfile (coupé pour un coach,
+  // coach-teams.tsx) ne conviennent -- ce statut doit rester modifiable par
+  // le Bureau ET le coach de l'équipe, sur TOUS les onglets d'ouverture de
+  // cette fiche. Jamais coupé par coach-teams.tsx (contrairement à
+  // canManageTeamAndRoles), défaut true comme les autres droits Bureau.
+  canMarkBurned = true,
 }: {
   member: MemberDetail;
   readOnly: boolean;
@@ -195,6 +209,7 @@ export default function MemberDetailModal({
   canManageTeamAndRoles?: boolean;
   canManageParentLinks?: boolean;
   canEditFullProfile?: boolean;
+  canMarkBurned?: boolean;
 }) {
   const [tab, setTab] = useState<TabKey>("identity");
   const [linkCopied, setLinkCopied] = useState(false);
@@ -220,10 +235,6 @@ export default function MemberDetailModal({
   // shows selected, and switching away from it (including to "Aucune
   // équipe") actually fires onChange.
   const currentTeam = member.teams[0];
-  const teamOptions =
-    currentTeam && !teams.some((t) => t.id === currentTeam.id)
-      ? [...teams, currentTeam]
-      : teams;
 
   // Équipes "en plus" de la principale (affectations additives, voir team-card.tsx
   // "Affecter à une autre équipe") — retour de Cindy du 02/09 : ce même
@@ -244,13 +255,49 @@ export default function MemberDetailModal({
   const assignedTeamIds = new Set(
     [currentTeam, ...extraTeams].filter((t): t is AdminMemberTeam => Boolean(t)).map((t) => t.id)
   );
+  // Retour de Cindy du 30/09 ("brûlé") : un joueur brûlé ne peut pas être
+  // réaffecté vers son équipe SŒUR précisément (getSiblingTeamIds, jamais
+  // sameCategoryFamily -- plus large, engloberait aussi l'équipe mère et
+  // d'autres déclinaisons sans rapport avec la règle du brûlé).
+  // Audit du 30/09 : la paire sœur peut vivre sur une équipe SECONDAIRE du
+  // joueur (ex. Raphaël LAMOURET, principal U13M sans sœur, secondaire
+  // U13M-1 dont la sœur est U13M-2) -- chercher parmi TOUTES ses équipes,
+  // jamais seulement currentTeam (member.teams[0]).
+  // Précisé par Cindy le 30/09 ("en équipe 2, il n'y a jamais de brûlé") :
+  // isLowestRankSiblingTeam, jamais un simple "a une sœur" -- seule la
+  // déclinaison la plus petite de la paire (ex. U13M-1) peut porter ce
+  // statut ; un joueur qui n'est que sur la "2" (ex. U13M-2) n'a donc pas
+  // de burnedTeam du tout, la case ne doit jamais lui être proposée.
+  const burnedTeam = member.teams.find((t) => isLowestRankSiblingTeam(t, teams));
+  const siblingTeamIdsOfCurrentTeam = new Set(burnedTeam ? getSiblingTeamIds(burnedTeam, teams) : []);
+  // Retour de Cindy du 30/09 ("brûlé") : porté par team_players (équipe
+  // principale, currentTeamId plus bas), pas players -- déclaré ICI (avant
+  // teamOptions/addableExtraTeams, qui le lisent juste en dessous), pas
+  // plus bas dans le fichier comme la première version de ce correctif --
+  // un `const` lu avant sa propre déclaration plante immédiatement au
+  // rendu ("Cannot access 'isBurned' before initialization").
+  const [isBurned, setIsBurned] = useState(member.isBurned);
+  // Audit du 30/09 : le sélecteur "Équipe" principal (members-table.tsx,
+  // canManageTeamAndRoles=true) n'avait AUCUNE exclusion -- un Bureau
+  // pouvait réaffecter un joueur brûlé vers son équipe sœur en le
+  // sélectionnant directement ici, contournant totalement le blocage déjà
+  // en place sur "Affecter à une autre équipe" (team-card.tsx) et
+  // "Autre(s) équipe(s)" (addableExtraTeams ci-dessous) -- même filtre
+  // qu'eux, sur le même state local isBurned (réactif si on décoche la
+  // case dans la même session).
+  const teamOptions = (
+    currentTeam && !teams.some((t) => t.id === currentTeam.id)
+      ? [...teams, currentTeam]
+      : teams
+  ).filter((t) => !(isBurned && siblingTeamIdsOfCurrentTeam.has(t.id)));
   const addableExtraTeams = teams.filter(
     (t) =>
       !assignedTeamIds.has(t.id) &&
       sameCategoryFamily(
         teamCategoryLabel(currentTeam ?? { name: null, category: member.category }),
         teamCategoryLabel(t)
-      )
+      ) &&
+      !(isBurned && siblingTeamIdsOfCurrentTeam.has(t.id))
   );
 
   function openAddExtraTeam() {
@@ -523,6 +570,7 @@ export default function MemberDetailModal({
       imageRights: form.imageRights || null,
       licenseNumber: form.licenseNumber || null,
       isSalarie,
+      isBurned,
       licenseExpiresAt: form.licenseExpiresAt || null,
       medicalCertificateExpiresAt: form.medicalCertificateExpiresAt || null,
       email: form.registrationEmail || member.registrationEmail || null,
@@ -567,6 +615,33 @@ export default function MemberDetailModal({
           teamId,
           `${form.firstName} ${form.lastName} vient d'être affecté(e) à ${newTeam ? teamLabel(newTeam) : "cette équipe"}.`
         );
+      }
+    }
+
+    // Retour de Cindy du 30/09 ("brûlé") : porté par team_players, gardée
+    // par canMarkBurned (jamais canManageTeamAndRoles, voir sa définition
+    // plus haut) -- APRÈS le bloc de réaffectation ci-dessus (audit du
+    // 30/09, pas avant) : si burnedTeam est justement l'équipe principale
+    // qui vient d'être réaffectée, sa ligne team_players a déjà été
+    // supprimée puis recréée sous teamId -- écrire sur l'ancien id
+    // n'affecterait plus aucune ligne et perdrait silencieusement la coche.
+    // burnedTeam (trouvé plus haut parmi TOUTES les équipes du joueur,
+    // jamais seulement team[0], voir sa définition) reste inchangé par ce
+    // bloc dans tous les autres cas (équipe secondaire, ou pas de
+    // réaffectation du tout).
+    const burnedTeamWasReassigned =
+      canManageTeamAndRoles && teamId !== currentTeamId && burnedTeam?.id === currentTeamId;
+    const burnedTeamIdForWrite = burnedTeamWasReassigned ? teamId : (burnedTeam?.id ?? "");
+    if (canMarkBurned && burnedTeamIdForWrite && isBurned !== member.isBurned) {
+      const { error: burnedError } = await supabase
+        .from("team_players")
+        .update({ is_burned: isBurned })
+        .eq("player_id", member.id)
+        .eq("team_id", burnedTeamIdForWrite);
+      if (burnedError) {
+        setSaving(false);
+        setError(burnedError.message);
+        return;
       }
     }
 
@@ -1069,6 +1144,29 @@ export default function MemberDetailModal({
                   </select>
                 </div>
               ) : null}
+
+              {/* Retour de Cindy du 30/09 ("brûlé") : canMarkBurned, jamais
+                  canManageTeamAndRoles -- doit rester modifiable par le
+                  Bureau ET le coach de l'équipe, contrairement au bloc
+                  "Autre(s) équipe(s)" juste en dessous, réservé au Bureau.
+                  Uniquement quand une équipe sœur existe réellement : sans
+                  elle, la case n'aurait aucun effet observable. */}
+              {editable && canMarkBurned && burnedTeam && siblingTeamIdsOfCurrentTeam.size > 0 && (
+                <label className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50/60 p-3 text-sm font-medium text-zinc-700 sm:col-span-2">
+                  <input
+                    type="checkbox"
+                    checked={isBurned}
+                    onChange={(e) => setIsBurned(e.target.checked)}
+                    className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
+                  />
+                  <Flame className="h-4 w-4 shrink-0 text-orange-500" />
+                  Brûlé pour{" "}
+                  {teams
+                    .filter((t) => siblingTeamIdsOfCurrentTeam.has(t.id))
+                    .map((t) => teamLabel(t))
+                    .join(", ")}
+                </label>
+              )}
 
               {/* Équipes "en plus" de la principale (U13M ET U13M-1, par
                   exemple) : même geste additif que "Affecter à une autre

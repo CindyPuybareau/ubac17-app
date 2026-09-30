@@ -127,6 +127,15 @@ export type WeekStripEvent = {
   // afficherait un vrai panneau gérable (canManage=true côté source
   // "coach", réutilisé ici pour l'affichage lecture seule) à un enfant.
   matchOfficialsEnabled: boolean;
+  // Retour de Cindy du 30/09 ("équipes sœurs") -- corrigé après coup
+  // (audit du 30/09, "boutons de gestion actifs sur un match d'équipe
+  // sœur") : un match "coach"/"bureau" dont la source est en fait un
+  // événement lecture-seule (équipe sœur, readOnlyExternal côté
+  // AdminUpcomingEvent, page.tsx) affichait quand même les vrais
+  // panneaux gérables ci-dessous (canManage codé en dur à true), faute
+  // de porter ce marqueur jusqu'ici -- même champ que calendar-view.tsx,
+  // faux par défaut pour ne rien changer aux appelants existants.
+  readOnlyExternal?: boolean;
 };
 
 function startOfDay(d: Date) {
@@ -396,7 +405,13 @@ export function DayEventCard({ event }: { event: WeekStripEvent }) {
       )}
       {(event.source === "coach" || event.source === "bureau") && hasNeeds && (
         <OrganisationCard>
-          <VolunteerNeedsPanel eventId={event.id} needs={event.needs} myPlayerIds={[]} canManage bare />
+          <VolunteerNeedsPanel
+            eventId={event.id}
+            needs={event.needs}
+            myPlayerIds={[]}
+            canManage={!event.readOnlyExternal}
+            bare
+          />
         </OrganisationCard>
       )}
       {(event.source === "coach" || event.source === "bureau") && isHomeMatch && (
@@ -407,7 +422,7 @@ export function DayEventCard({ event }: { event: WeekStripEvent }) {
             startTime={event.startTime}
             teamId={event.teamId}
             assignments={event.matchOfficials}
-            canManage
+            canManage={!event.readOnlyExternal}
           />
         </OrganisationCard>
       )}

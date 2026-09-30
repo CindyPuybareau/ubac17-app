@@ -16,7 +16,7 @@ import {
 import DocumentsPanel from "@/components/club-documents";
 import { BOUTIQUE_URL } from "./boutique";
 import { avatarColor } from "@/lib/avatar-color";
-import { sortTeamsByGroup, groupTeamsByPrimarySecondary } from "@/lib/teams";
+import { sortTeamsByGroup, groupTeamsByPrimarySecondary, getSiblingTeamIds } from "@/lib/teams";
 import CalendarView, { type CalendarRsvpPlayer } from "./calendar-view";
 import FamilyTeamCard, { type FamilyTeamCardData } from "./family-team-card";
 import FamilyAttendanceRequests from "./family-attendance-requests";
@@ -36,6 +36,7 @@ import WhatsAppGroupsManager from "./whatsapp-groups-manager";
 import SponsorsDisplay from "./sponsors-display";
 import type {
   AdminCotisation,
+  AdminMemberTeam,
   AdminPenalite,
   AdminUpcomingEvent,
   SponsorDisplay,
@@ -105,6 +106,7 @@ export default function FamilyView({
   rsvpStatusByKey,
   birthdayMembers,
   teamCards,
+  clubTeams,
   tasksByEventId,
   carpoolByEventId,
   whatsappGroups,
@@ -120,6 +122,10 @@ export default function FamilyView({
   rsvpStatusByKey: Record<string, string>;
   birthdayMembers: BirthdaySource[];
   teamCards: FamilyTeamCardData[];
+  // Retour de Cindy du 30/09 ("équipes sœurs") : catalogue complet du club
+  // -- nécessaire pour résoudre nom/catégorie des équipes sœurs (jamais
+  // dans teamCards, qui ne porte que les équipes réelles de la famille).
+  clubTeams: AdminMemberTeam[];
   tasksByEventId: Record<string, EventTasksState>;
   carpoolByEventId: Record<string, CarpoolOffer[]>;
   whatsappGroups: WhatsAppGroup[];
@@ -251,6 +257,41 @@ export default function FamilyView({
     );
   }, [visibleTeamCards]);
 
+  // Retour de Cindy du 30/09 ("équipes sœurs", U13M-1↔U13M-2...) :
+  // consultation seule des matchs officiels/amicaux de la déclinaison
+  // sœur. clubTeams porte le catalogue complet du club (nouveau prop) --
+  // aucune requête de plus ici, purement en mémoire.
+  // Précisé par Cindy le 30/09 ("si sur calendrier aussi !") : d'abord
+  // limité à Matchs officiels/Résultats, désormais utilisé aussi par le
+  // Calendrier général ci-dessous (matchesVisibleEvents/matchesResultsTeams,
+  // réutilisés tels quels -- visibleEvents/visibleResultsTeams restent
+  // définis au-dessus pour FamilyAttendanceSummary, qui ne doit lui JAMAIS
+  // compter un match sœur dans l'assiduité de la famille).
+  const siblingTeamIds = useMemo(() => {
+    const ownTeams = Array.from(visibleTeamIds)
+      .map((id) => clubTeams.find((t) => t.id === id))
+      .filter((t): t is AdminMemberTeam => Boolean(t));
+    return Array.from(new Set(ownTeams.flatMap((t) => getSiblingTeamIds(t, clubTeams)))).filter(
+      (id) => !visibleTeamIds.has(id)
+    );
+  }, [visibleTeamIds, clubTeams]);
+  const matchesResultsTeams = useMemo(() => {
+    const siblingResultsTeams = siblingTeamIds
+      .map((id) => clubTeams.find((t) => t.id === id))
+      .filter((t): t is AdminMemberTeam => Boolean(t))
+      .map((t) => ({ id: t.id, name: t.name, category: t.category }));
+    return [...visibleResultsTeams, ...siblingResultsTeams];
+  }, [visibleResultsTeams, siblingTeamIds, clubTeams]);
+  const matchesVisibleEvents = useMemo(() => {
+    if (siblingTeamIds.length === 0) return visibleEvents;
+    const siblingIdSet = new Set(siblingTeamIds);
+    return events.filter((e) => {
+      if (e.teamId) return visibleTeamIds.has(e.teamId) || siblingIdSet.has(e.teamId);
+      if (e.targetTeamIds) return e.targetTeamIds.some((id) => visibleTeamIds.has(id));
+      return true;
+    });
+  }, [events, visibleEvents, siblingTeamIds, visibleTeamIds]);
+
   const visiblePlayerIds = useMemo(() => visiblePlayers.map((p) => p.id), [visiblePlayers]);
   const visibleCotisations = useMemo(
     () => cotisations.filter((c) => c.playerId !== null && visiblePlayerIds.includes(c.playerId)),
@@ -376,7 +417,7 @@ export default function FamilyView({
               retiré à son tour (retour de Cindy du 2026-08-24, "pas
               necessaire") — CalendarView seul suffit. */}
           <CalendarView
-            events={visibleEvents}
+            events={matchesVisibleEvents}
             rsvp={{ players: visiblePlayers, statusByKey: rsvpStatusByKey }}
             birthdayMembers={visibleBirthdayMembers}
             tasksByEventId={tasksByEventId}
@@ -388,7 +429,7 @@ export default function FamilyView({
             // déjà -- une famille avec plusieurs enfants dans des équipes
             // différentes n'avait aucun filtre par équipe sur son
             // Calendrier, seulement sur "Événements".
-            resultsTeams={visibleResultsTeams}
+            resultsTeams={matchesResultsTeams}
             celebrateWins
           />
           <SponsorsDisplay sponsors={sponsorDisplay} />
@@ -444,10 +485,10 @@ export default function FamilyView({
           icon: <Shield className={iconClass} />,
           content: (
             <CalendarView
-              events={visibleEvents}
+              events={matchesVisibleEvents}
               rsvp={{ players: visiblePlayers, statusByKey: rsvpStatusByKey }}
               forcedView="officialMatches"
-              resultsTeams={visibleResultsTeams}
+              resultsTeams={matchesResultsTeams}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
               celebrateWins
             />
@@ -459,10 +500,10 @@ export default function FamilyView({
           icon: <ListOrdered className={iconClass} />,
           content: (
             <CalendarView
-              events={visibleEvents}
+              events={matchesVisibleEvents}
               rsvp={{ players: visiblePlayers, statusByKey: rsvpStatusByKey }}
               forcedView="officialResults"
-              resultsTeams={visibleResultsTeams}
+              resultsTeams={matchesResultsTeams}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
               celebrateWins
             />

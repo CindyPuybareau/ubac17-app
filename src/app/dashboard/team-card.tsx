@@ -8,6 +8,7 @@ import {
   CalendarDays,
   Clock,
   ExternalLink,
+  Flame,
   Mail,
   MapPin,
   Phone,
@@ -18,7 +19,7 @@ import { createClient } from "@/lib/supabase/client";
 import { resizeImageForTeamPhoto } from "@/lib/image-resize";
 import { formatFirstName, formatLastName, formatPersonName, sortByLastName } from "@/lib/names";
 import { computePlayerYearStatus, getCurrentSeasonLabel } from "@/lib/season";
-import { sameCategoryFamily, teamCategoryLabel, teamLabel } from "@/lib/teams";
+import { getSiblingTeamIds, sameCategoryFamily, teamCategoryLabel, teamLabel } from "@/lib/teams";
 import { notifyBureauNewMemberFromClient, notifyCoachesOfNewTeamMember } from "@/lib/member-notifications";
 import { formatEventTime, isMatchType, styleFor } from "./calendar-view";
 import OpponentDisplay from "./opponent-display";
@@ -417,7 +418,16 @@ export default function TeamCard({
       (t) => t.id
     )
   );
-  const switchableTeams = sameFamilyTeams.filter((t) => !switchTargetTeamIds.has(t.id));
+  // Retour de Cindy du 30/09 ("brûlé") : un joueur brûlé ne peut pas être
+  // réaffecté vers son équipe SŒUR précisément (getSiblingTeamIds, jamais
+  // sameFamilyTeams/sameCategoryFamily -- plus large, engloberait aussi
+  // l'équipe mère et d'autres déclinaisons sans rapport avec la règle du
+  // brûlé). Les autres réaffectations de la même catégorie restent
+  // proposées normalement.
+  const siblingTeamIdsOfThisTeam = new Set(getSiblingTeamIds(team, clubTeams ?? []));
+  const switchableTeams = sameFamilyTeams
+    .filter((t) => !switchTargetTeamIds.has(t.id))
+    .filter((t) => !(switchTarget?.isBurned && siblingTeamIdsOfThisTeam.has(t.id)));
 
   function openSwitch(p: RosterPlayer) {
     setSwitchTarget(p);
@@ -769,7 +779,18 @@ export default function TeamCard({
                 {formatLastName(m.lastName) || "—"}
               </td>
               <td className="w-auto whitespace-nowrap px-3 py-2.5 text-zinc-700">
-                {m.firstName ? formatFirstName(m.firstName) : "—"}
+                <span className="inline-flex items-center gap-1">
+                  {m.firstName ? formatFirstName(m.firstName) : "—"}
+                  {/* Retour de Cindy du 30/09 ("brûlé") : après le nom, pas
+                      avant -- pour que tous les noms restent alignés dans
+                      la colonne. */}
+                  {m.player?.isBurned && (
+                    <Flame
+                      className="h-3.5 w-3.5 shrink-0 text-orange-500"
+                      aria-label="Brûlé"
+                    />
+                  )}
+                </span>
               </td>
               <td className="whitespace-nowrap px-3 py-2.5">
                 <span className="flex flex-wrap items-center gap-1">
@@ -907,9 +928,15 @@ export default function TeamCard({
       >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="truncate font-semibold text-zinc-900">
-              {formatLastName(m.lastName) || "—"}{" "}
-              {m.firstName ? formatFirstName(m.firstName) : ""}
+            <p className="flex items-center gap-1 truncate font-semibold text-zinc-900">
+              <span className="truncate">
+                {formatLastName(m.lastName) || "—"}{" "}
+                {m.firstName ? formatFirstName(m.firstName) : ""}
+              </span>
+              {/* Retour de Cindy du 30/09 ("brûlé") : après le nom. */}
+              {m.player?.isBurned && (
+                <Flame className="h-3.5 w-3.5 shrink-0 text-orange-500" aria-label="Brûlé" />
+              )}
             </p>
             <span className="mt-1 flex flex-wrap items-center gap-1">
               <span
@@ -1394,6 +1421,10 @@ export default function TeamCard({
               canManageTeamAndRoles={false}
               canManageParentLinks={canManageParentLinks}
               canEditFullProfile={canEditFullProfile}
+              // Audit du 30/09 : sans ce prop, getSiblingTeamIds(currentTeam, [])
+              // renvoie toujours [] dans la modale -- la case "Brûlé" ne
+              // s'affichait jamais depuis l'onglet "Équipes" (Bureau ni Coach).
+              teams={clubTeams ?? []}
               onClose={() => setDetailPlayerId(null)}
             />
           );

@@ -8,6 +8,11 @@ import { EMAIL_REPLY_TO } from "@/lib/email";
 import { localDateFromParts } from "@/lib/local-date";
 import { getSpaceDashboardSummary, type SpaceDashboardSummary } from "@/lib/space-dashboard";
 import { getCachedTeams, getCachedCategoryTariffs, getCachedAccessProfiles } from "@/lib/reference-cache";
+import {
+  getSiblingTeamIds,
+  isSharedRsvpTeamGroup,
+  widenTeamIdsForSharedRsvpGroups,
+} from "@/lib/teams";
 import DashboardTabs, { type DashboardTab } from "./dashboard-tabs";
 
 // Retour de Cindy du 15/09 ("This page couldn't load" sur Vercel) : sans
@@ -216,6 +221,11 @@ export type MemberDetail = {
   // Bureau, ne donne aucun droit -- fait remonter la personne en tête des
   // sélecteurs "Personnes spécifiques"/"Choisir un membre" ailleurs.
   isSalarie: boolean;
+  // Retour de Cindy du 30/09 ("brûlé") : porté par la ligne team_players de
+  // l'équipe PRINCIPALE (teams[0]) -- verrouillé définitivement sur cette
+  // équipe cette saison, ne pourra jamais être réaffecté vers son équipe
+  // sœur (member-detail-modal.tsx, addableExtraTeams).
+  isBurned: boolean;
   // Alertes d'expiration (voir /api/cron/expiry-alerts) : dates saisies à
   // la main par le Bureau, absentes de tout import existant — le club n'a
   // jamais suivi ces échéances de façon structurée jusqu'ici.
@@ -576,6 +586,17 @@ export type AdminUpcomingEvent = {
   // "Ajouter le score" sont déjà masquées par canManageEvent (toujours faux
   // pour ce genre d'événement de toute façon, voir canManageThisEvent).
   readOnlyExternal?: boolean;
+  // Retour de Cindy du 30/09 ("les besoins d'organisation... un Séniors M1
+  // doit pouvoir se proposer à l'e-marque ou la buvette de Séniors M2")
+  // : distinct de readOnlyExternal -- celui-ci reste vrai (présent/absent
+  // bloqué), mais ce match-ci autorise quand même le "je me propose" sur
+  // les besoins classiques/officiels (calendar-view.tsx, renderEventCard).
+  // Vrai UNIQUEMENT pour une paire sœur (siblingTeamIdSet plus bas) --
+  // jamais pour le toggle "Matchs officiels du club" (calendar-view.tsx,
+  // readOnlyExternal:true côté purement client, ne porte jamais ce champ),
+  // pour ne pas ouvrir le bénévolat à n'importe quel match du club parcouru
+  // via ce bouton.
+  volunteeringOpen?: boolean;
 };
 
 // Un mineur ne peut jamais afficher le badge Bureau (voir bureauRole
@@ -1714,7 +1735,7 @@ export default async function DashboardPage({
     sort_order: number | null;
     pending_coach_names: string | null;
   }[] = [];
-  let adminTeamPlayersRaw: { team_id: string; player_id: string; position: string | null }[] = [];
+  let adminTeamPlayersRaw: { team_id: string; player_id: string; position: string | null; is_burned: boolean }[] = [];
   let adminTeamCoachesRaw: { team_id: string; coach_id: string }[] = [];
   let adminTeamPendingCoachesRaw: { team_id: string; player_id: string }[] = [];
 
@@ -1761,7 +1782,7 @@ export default async function DashboardPage({
         () =>
           supabase
             .from("team_players")
-            .select("team_id, player_id, position"),
+            .select("team_id, player_id, position, is_burned"),
         () => supabase.from("team_coaches").select("team_id, coach_id"),
         () =>
           supabase
@@ -1989,6 +2010,7 @@ export default async function DashboardPage({
         position: tp.position,
         nextEventStatus: null,
         birthDate: player.birth_date,
+        isBurned: tp.is_burned,
       });
       rosterByTeam.set(tp.team_id, list);
     });
@@ -2194,12 +2216,22 @@ export default async function DashboardPage({
       ])
     );
     const teamsByPlayerId = new Map<string, AdminMemberTeam[]>();
+    // Retour de Cindy du 30/09 ("brûlé"), corrigé le même jour (cas réel
+    // Raphaël LAMOURET) : NE JAMAIS se fier à "la première ligne
+    // rencontrée" (teams[0]/équipe principale) -- is_burned vit sur la
+    // ligne team_players de l'équipe "1" précisément (jamais l'équipe mère
+    // sans suffixe, jamais l'équipe "2", voir la règle du 30/09 "en équipe
+    // 2 il n'y a jamais de brûlé"), qui n'est pas forcément la première
+    // équipe du joueur dans cette liste. Un simple OU logique sur TOUTES
+    // ses lignes évite d'avoir à deviner laquelle est "la bonne" ici.
+    const burnedByPlayerId = new Map<string, boolean>();
     (teamPlayersRes.data ?? []).forEach((tp) => {
       const team = teamsById.get(tp.team_id);
       if (!team) return;
       const list = teamsByPlayerId.get(tp.player_id) ?? [];
       list.push(team);
       teamsByPlayerId.set(tp.player_id, list);
+      if (tp.is_burned) burnedByPlayerId.set(tp.player_id, true);
     });
     const parentIdsByPlayerId = new Map<string, string[]>();
     (parentPlayerRes.data ?? []).forEach((pp) => {
@@ -2334,6 +2366,7 @@ export default async function DashboardPage({
         parentCharterAccepted: player.parent_charter_accepted,
         licenseNumber: player.license_number,
         isSalarie: player.is_salarie ?? false,
+        isBurned: burnedByPlayerId.get(player.id) ?? false,
         licenseExpiresAt: player.license_expires_at,
         medicalCertificateExpiresAt: player.medical_certificate_expires_at,
         archivedAt: player.archived_at,
@@ -2696,6 +2729,11 @@ export default async function DashboardPage({
 
   let coachTeamsWithRoster: TeamWithMembers[] = [];
   let coachEvents: AdminUpcomingEvent[] = [];
+  // Retour de Cindy du 30/09 ("équipes sœurs") : ids des déclinaisons
+  // sœurs des équipes coachées (U13M-1↔U13M-2...) -- réutilisé à la fois
+  // pour la requête matchs dédiée ci-dessous ET pour élargir le Tableau de
+  // bord (getSpaceDashboardSummary, plus bas dans ce fichier).
+  let coachSiblingTeamIds: string[] = [];
   let coachRsvpPlayers: { id: string; name: string; teamIds: string[] }[] = [];
   let coachSeasonVolunteerTallyByPlayerId: Record<string, SeasonVolunteerTally> = {};
   let coachSeasonVolunteerGuestEntries: SeasonGuestVolunteer[] = [];
@@ -2777,7 +2815,7 @@ export default async function DashboardPage({
               })
             : supabase
                 .from("team_players")
-                .select("team_id, player_id, position")
+                .select("team_id, player_id, position, is_burned")
                 .in("team_id", coachCalendarTeamIds),
         () =>
           bureauDataLoaded
@@ -2915,11 +2953,58 @@ export default async function DashboardPage({
       coachClubCoachPlayersRes,
     });
 
+    // Retour de Cindy du 30/09 ("équipes sœurs", U13M-1↔U13M-2...) --
+    // corrigé le 30/09 après coup (retour de Cindy, "chargement trop long") :
+    // calculé ICI, une fois allClubTeamsRes déjà résolu par le lot ci-dessus
+    // (jamais une requête séparée avant le lot, qui bloquait tout le reste
+    // en série derrière elle). getSiblingTeamIds tourne en mémoire, aucun
+    // coût réseau.
+    // Audit du 30/09 : exclusion sur coachCalendarTeamIds (coachées + jouées
+    // par ce coach), pas seulement coachedTeamIds -- sinon un coach qui
+    // JOUE aussi dans l'équipe sœur (cas Basile) la verrait réintroduite en
+    // double, une fois via ownTeamIds/coachCalendarTeamIds (gestion
+    // complète) et une fois ici via cette liste (consultation seule).
+    const siblingTeamIds = Array.from(
+      new Set(coachedTeams.flatMap((t) => getSiblingTeamIds(t, allClubTeamsRes.data ?? [])))
+    ).filter((id) => !coachCalendarTeamIds.includes(id));
+    const siblingTeamIdSet = new Set(siblingTeamIds);
+    coachSiblingTeamIds = siblingTeamIds;
+    // Matchs officiels ET amicaux des équipes sœurs (jamais les
+    // entraînements), même fenêtre que le reste -- consultation seule (voir
+    // readOnlyExternal plus bas). Une seule requête de plus, SEULEMENT si ce
+    // coach a réellement une équipe sœur (cas rare) -- jamais pour tout le
+    // monde comme avant ce correctif.
+    // Audit du 30/09 : passe désormais par le Semaphore partagé dbLimit
+    // (via runBatched), comme toute autre requête de ce fichier -- une
+    // requête isolée hors plafond était exactement la classe de bug de
+    // l'incident sync-ffbb du 20/09 (voir CLAUDE.md §6), même si une seule
+    // requête ici ne suffit pas à elle seule à saturer le pool.
+    const [siblingMatchesRes] =
+      siblingTeamIds.length > 0
+        ? await runBatched(
+            [
+              () =>
+                supabase
+                  .from("events")
+                  .select(
+                    "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
+                  )
+                  .in("team_id", siblingTeamIds)
+                  .in("event_type", ["MATCH", "FRIENDLY"])
+                  .gte("start_time", eventsWindowStart)
+                  .order("start_time", { ascending: true }),
+            ],
+            dbLimit
+          )
+        : [{ data: [] as typeof eventsRes.data, error: null }];
+    logQueryErrors("Coach (équipes sœurs)", { siblingMatchesRes });
+
     // Matchs/événements ponctuels (eventsRes) + entraînements du mois
     // affiché (trainingsRes) -- même principe que le bloc Bureau plus haut.
     const coachEventsData = [
       ...(eventsRes.data ?? []),
       ...(trainingsRes.data ?? []),
+      ...(siblingMatchesRes.data ?? []),
     ].sort((a, b) => a.start_time.localeCompare(b.start_time));
 
     // Coached teams first, then the ones they only play in — each keeps
@@ -3046,9 +3131,15 @@ export default async function DashboardPage({
     const allMembershipsPromise =
       playerIds.length > 0
         ? withDbLimit(() =>
-            supabase.from("team_players").select("team_id, player_id").in("player_id", playerIds)
+            supabase
+              .from("team_players")
+              .select("team_id, player_id, is_burned")
+              .in("player_id", playerIds)
           )
-        : Promise.resolve({ data: [] as { team_id: string; player_id: string }[], error: null });
+        : Promise.resolve({
+            data: [] as { team_id: string; player_id: string; is_burned: boolean }[],
+            error: null,
+          });
     const rsvpsByEventPromise = fetchRsvpsByEvent(supabase, coachEventIds, dbLimit);
     const coachRsvpRowsPromise =
       coachEventIds.length > 0
@@ -3211,9 +3302,33 @@ export default async function DashboardPage({
         position: tp.position,
         nextEventStatus: null,
         birthDate: player.birth_date,
+        isBurned: tp.is_burned,
       });
       rosterByTeam.set(tp.team_id, list);
     });
+
+    // Retour de Cindy du 30/09 ("U18M seulement... tout devient géré à
+    // deux") : les 22 joueurs U18M sont TOUS inscrits sur l'équipe MÈRE
+    // "U18M" (vérifié en base), jamais sur U18M-1/U18M-2 -- sans cet alias,
+    // "Qui sera là"/présents-absents resterait vide sur un match U18M-1/
+    // U18M-2 même une fois ce coach réellement coach des trois (voir la
+    // note dans team_coaches -- team-manager.tsx/member-detail-modal.tsx
+    // affectent désormais automatiquement les trois ensemble). Alias en
+    // mémoire seulement, aucune requête de plus (rosterByTeam déjà chargé
+    // ci-dessus).
+    const u18mFamilyTeams = coachAllTeams.filter((t) =>
+      isSharedRsvpTeamGroup(t.name ?? t.category ?? "")
+    );
+    if (u18mFamilyTeams.length > 1) {
+      const u18mUnionRoster = Array.from(
+        new Map<string, RosterPlayer>(
+          u18mFamilyTeams
+            .flatMap((t) => rosterByTeam.get(t.id) ?? [])
+            .map((p) => [p.id, p] as const)
+        ).values()
+      );
+      u18mFamilyTeams.forEach((t) => rosterByTeam.set(t.id, u18mUnionRoster));
+    }
 
     // Same "next event per team" presence badge as the Bureau's roster.
     // (coachNextEventIdByTeamId/coachNextEventIds calculés plus haut, la
@@ -3276,6 +3391,10 @@ export default async function DashboardPage({
     const clubTeamById = new Map(coachClubTeams.map((t) => [t.id, t]));
 
     const coachTeamRefsByPlayerId = new Map<string, AdminMemberTeam[]>();
+    // Retour de Cindy du 30/09 ("brûlé"), même correctif que côté Bureau
+    // (voir son commentaire, burnedByPlayerId) : OU logique sur TOUTES les
+    // lignes du joueur, jamais seulement "la première rencontrée".
+    const coachBurnedByPlayerId = new Map<string, boolean>();
     (allMembershipsData ?? []).forEach((tp) => {
       const team =
         clubTeamById.get(tp.team_id) ?? coachAllTeams.find((t) => t.id === tp.team_id);
@@ -3283,6 +3402,7 @@ export default async function DashboardPage({
       const list = coachTeamRefsByPlayerId.get(tp.player_id) ?? [];
       list.push({ id: team.id, name: team.name, category: team.category });
       coachTeamRefsByPlayerId.set(tp.player_id, list);
+      if (tp.is_burned) coachBurnedByPlayerId.set(tp.player_id, true);
     });
 
     // Coaches have no read access to cotisations (financial/payment data
@@ -3352,6 +3472,7 @@ export default async function DashboardPage({
         parentCharterAccepted: player.parent_charter_accepted,
         licenseNumber: player.license_number,
         isSalarie: player.is_salarie ?? false,
+        isBurned: coachBurnedByPlayerId.get(player.id) ?? false,
         licenseExpiresAt: player.license_expires_at,
         medicalCertificateExpiresAt: player.medical_certificate_expires_at,
         teams: coachTeamRefsByPlayerId.get(player.id) ?? [],
@@ -3440,7 +3561,14 @@ export default async function DashboardPage({
         return {
           id: playerId,
           name: formatPersonName(player.first_name, player.last_name, "Joueur"),
-          teamIds: (coachTeamRefsByPlayerId.get(playerId) ?? []).map((t) => t.id),
+          // Retour de Cindy du 30/09 ("U18M seulement... tous les joueurs
+          // peuvent se mettre présent/absent") : élargi à la sœur U18M --
+          // sans ça, un joueur U18M-2 n'aurait jamais respondingPlayers
+          // (calendar-view.tsx) sur un match U18M-1, et inversement.
+          teamIds: widenTeamIdsForSharedRsvpGroups(
+            (coachTeamRefsByPlayerId.get(playerId) ?? []).map((t) => t.id),
+            coachClubTeams
+          ),
         };
       })
       .filter((p): p is { id: string; name: string; teamIds: string[] } => Boolean(p));
@@ -3583,6 +3711,18 @@ export default async function DashboardPage({
         presentPlayers: buildPresentPlayers(rsvpsByEvent, e.id, ownTeamRoster),
         pendingPlayers: buildPendingPlayers(rsvpsByEvent, e.id, ownTeamRoster),
         absentPlayers: buildAbsentPlayers(rsvpsByEvent, e.id, ownTeamRoster),
+        // Retour de Cindy du 30/09 ("équipes sœurs") : un match de
+        // siblingMatchesRes ci-dessus (team.id dans siblingTeamIdSet) reste
+        // strictement consultable -- même marqueur déjà utilisé par
+        // toggleClubMatches() (calendar-view.tsx) pour masquer bouton
+        // Présent/Absent et bloc Organisation sur un événement "juste pour
+        // regarder".
+        readOnlyExternal: Boolean(team && siblingTeamIdSet.has(team.id)),
+        // Retour de Cindy du 30/09 ("besoins d'organisation ouverts entre
+        // équipes sœurs") : même condition que readOnlyExternal ci-dessus --
+        // toute la lecture seule vient d'ici, jamais du toggle "Matchs
+        // officiels du club" (purement client, calendar-view.tsx).
+        volunteeringOpen: Boolean(team && siblingTeamIdSet.has(team.id)),
       };
     });
 
@@ -3606,6 +3746,10 @@ export default async function DashboardPage({
 
   // Parent/joueur: un seul calendrier lecture-seule + RSVP, tous enfants confondus.
   let familyEvents: AdminUpcomingEvent[] = [];
+  // Retour de Cindy du 30/09 ("équipes sœurs") : catalogue complet du club,
+  // transmis à FamilyView (buildFamilyView, plus bas) pour qu'elle puisse
+  // résoudre nom/catégorie des équipes sœurs sur ses propres pastilles.
+  let familyAllClubTeams: AdminMemberTeam[] = [];
   let familyOrganisationTasks: Record<string, EventTasksState> = {};
   let familyVolunteerNeedsByEventId: Record<string, VolunteerNeed[]> = {};
   let familyMatchOfficialRolesByEventId: Record<string, MatchOfficialAssignment[]> = {};
@@ -3687,6 +3831,7 @@ export default async function DashboardPage({
       teamsQueryResults,
       eventsRes,
       trainingsRes,
+      familyAllClubTeamsRes,
       familyCotisationRes,
       familyPenaliteRes,
       cotisationPlayerFieldsRes,
@@ -3918,6 +4063,14 @@ export default async function DashboardPage({
         .gte("start_time", trainingsWindowStart)
         .lte("start_time", trainingsWindowEnd)
         .order("start_time", { ascending: true }),
+      // Retour de Cindy du 30/09 ("équipes sœurs") -- corrigé le 30/09 après
+      // coup (retour de Cindy, "chargement trop long") : catalogue complet
+      // du club (pas filtré à allTeamIds, contrairement à teamsQueryResults
+      // ci-dessus) pour repérer les déclinaisons sœurs -- parti ICI, en
+      // parallèle avec le reste du lot, jamais en série avant lui comme la
+      // première version de ce correctif. getCachedTeams() : même source
+      // déjà utilisée par teamsQueryResults, cache partagé 45s.
+      () => getCachedTeams(),
       // Filtre explicite par player_id plutôt que de compter sur la seule
       // RLS : Cindy elle-même est Bureau ET parente, et la policy admin sur
       // cotisations laisserait passer TOUTES les lignes du club pour son
@@ -3979,7 +4132,74 @@ export default async function DashboardPage({
       dbLimit
     );
 
-    logQueryErrors("Famille", { eventsRes, trainingsRes, familyCotisationRes, familyPenaliteRes });
+    logQueryErrors("Famille", {
+      eventsRes,
+      trainingsRes,
+      familyAllClubTeamsRes,
+      familyCotisationRes,
+      familyPenaliteRes,
+    });
+
+    familyAllClubTeams = familyAllClubTeamsRes.data ?? [];
+    // Retour de Cindy du 30/09 ("équipes sœurs") : calculé ICI, une fois
+    // familyAllClubTeamsRes déjà résolu par le lot ci-dessus (en mémoire,
+    // aucun coût réseau) -- jamais avant le lot comme la première version
+    // de ce correctif.
+    const familySiblingTeamIds = Array.from(
+      new Set(
+        familyAllClubTeams
+          .filter((t) => allTeamIds.includes(t.id))
+          .flatMap((t) => getSiblingTeamIds(t, familyAllClubTeams))
+      )
+    ).filter((id) => !allTeamIds.includes(id));
+    // Retour de Cindy du 30/09 ("pour les U18M seulement... tous les
+    // joueurs peuvent se mettre présent/absent"), corrigé le même jour
+    // après vérification en base : les 22 joueurs U18M sont TOUS inscrits
+    // sur l'équipe MÈRE "U18M" (rang 0) -- U18M-1/U18M-2 n'ont aucun
+    // effectif propre, seulement des matchs FFBB. getSiblingTeamIds (rang>0
+    // à rang>0 seulement) ne détecte donc JAMAIS cette relation ici,
+    // contrairement à U13M-1↔U13M-2 où les joueurs sont directement sur les
+    // déclinaisons -- d'où widenTeamIdsForSharedRsvpGroups (mère incluse),
+    // calculé séparément de familySiblingTeamIds ci-dessus plutôt qu'un
+    // sous-ensemble de celui-ci.
+    const familySharedRsvpTeamIds = Array.from(
+      new Set(widenTeamIdsForSharedRsvpGroups(allTeamIds, familyAllClubTeams))
+    ).filter((id) => !allTeamIds.includes(id));
+    if (familySharedRsvpTeamIds.length > 0) {
+      familyRsvpPlayers = familyRsvpPlayers.map((p) => ({
+        ...p,
+        teamIds: widenTeamIdsForSharedRsvpGroups(p.teamIds, familyAllClubTeams),
+      }));
+    }
+    // Ids des matchs à charger en plus (lecture seule ET U18M partagé
+    // confondus) -- la distinction readOnlyExternal se fait plus bas, sur
+    // familySiblingTeamIdSet, qui EXCLUT familySharedRsvpTeamIds.
+    const familyExtraMatchTeamIds = Array.from(
+      new Set([...familySiblingTeamIds, ...familySharedRsvpTeamIds])
+    );
+    // Une seule requête de plus, SEULEMENT si cette famille a réellement une
+    // équipe sœur (cas rare) -- jamais pour tout le monde.
+    // Audit du 30/09 : Semaphore partagé dbLimit (via runBatched), même
+    // discipline que Coach ci-dessus (voir son commentaire).
+    const [familySiblingMatchesRes] =
+      familyExtraMatchTeamIds.length > 0
+        ? await runBatched(
+            [
+              () =>
+                supabase
+                  .from("events")
+                  .select(
+                    "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
+                  )
+                  .in("team_id", familyExtraMatchTeamIds)
+                  .in("event_type", ["MATCH", "FRIENDLY"])
+                  .gte("start_time", eventsWindowStart)
+                  .order("start_time", { ascending: true }),
+            ],
+            dbLimit
+          )
+        : [{ data: [] as typeof eventsRes.data, error: null }];
+    logQueryErrors("Famille (équipes sœurs)", { familySiblingMatchesRes });
 
     familyPenalites = (
       (familyPenaliteRes?.data ?? []) as unknown as {
@@ -4066,6 +4286,27 @@ export default async function DashboardPage({
         m.teamIds = teamIdsByPlayerId.get(m.id) ?? [];
       });
 
+      // Retour de Cindy du 30/09 ("U18M seulement") : les 22 joueurs U18M
+      // sont TOUS inscrits sur l'équipe MÈRE "U18M" (vérifié en base) --
+      // sans cet alias, "Qui sera là" resterait vide sur un match U18M-1/
+      // U18M-2 pour une famille dont l'enfant est simplement sur "U18M".
+      // N'alias que les ids réellement présents dans rosterByTeamId (la
+      // mère, déjà chargée ci-dessus) vers ceux qui ne le sont pas encore
+      // (U18M-1/U18M-2) -- aucune requête de plus.
+      const familyU18mFamilyTeamIds = familyAllClubTeams
+        .filter((t) => isSharedRsvpTeamGroup(t.name ?? t.category ?? ""))
+        .map((t) => t.id);
+      if (familyU18mFamilyTeamIds.length > 1) {
+        const familyU18mRoster = familyU18mFamilyTeamIds.flatMap(
+          (id) => rosterByTeamId.get(id) ?? []
+        );
+        if (familyU18mRoster.length > 0) {
+          familyU18mFamilyTeamIds.forEach((id) => {
+            if (!rosterByTeamId.has(id)) rosterByTeamId.set(id, familyU18mRoster);
+          });
+        }
+      }
+
       const coachesByTeamId = new Map<
         string,
         (Person & { phone: string | null; email: string | null })[]
@@ -4131,8 +4372,13 @@ export default async function DashboardPage({
 
     // Matchs/événements ponctuels (eventsRes) + entraînements du mois
     // affiché (trainingsRes) -- même principe que les blocs Bureau/Coach.
-    const eventsData = [...(eventsRes.data ?? []), ...(trainingsRes.data ?? [])].sort((a, b) =>
-      a.start_time.localeCompare(b.start_time)
+    const eventsData = [
+      ...(eventsRes.data ?? []),
+      ...(trainingsRes.data ?? []),
+      ...(familySiblingMatchesRes.data ?? []),
+    ].sort((a, b) => a.start_time.localeCompare(b.start_time));
+    const familySiblingTeamIdSet = new Set(
+      familySiblingTeamIds.filter((id) => !familySharedRsvpTeamIds.includes(id))
     );
     const eventIds = eventsData.map((e) => e.id);
     const familyCotisationRows = familyCotisationRes?.data ?? null;
@@ -4181,6 +4427,15 @@ export default async function DashboardPage({
         commissionGroupIds: e.commission_group_ids ?? [],
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, teamsById),
         rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
+        // Retour de Cindy du 30/09 ("équipes sœurs") : un match de
+        // familySiblingMatchesRes ci-dessus reste strictement consultable --
+        // même marqueur déjà utilisé par toggleClubMatches() (calendar-
+        // view.tsx) pour masquer bouton Présent/Absent et bloc Organisation
+        // sur un événement "juste pour regarder".
+        readOnlyExternal: Boolean(team && familySiblingTeamIdSet.has(team.id)),
+        // Retour de Cindy du 30/09 ("besoins d'organisation ouverts entre
+        // équipes sœurs") : même condition que readOnlyExternal ci-dessus.
+        volunteeringOpen: Boolean(team && familySiblingTeamIdSet.has(team.id)),
       };
     });
 
@@ -4573,19 +4828,45 @@ export default async function DashboardPage({
   // construit pour un onglet qui n'est pas affiché) -- un tableau vide fait
   // rendre getSpaceDashboardSummary son repli à zéro sans la moindre
   // requête (voir son court-circuit dans space-dashboard.ts).
+  // Retour de Cindy du 30/09 ("équipes sœurs") : ids des équipes réelles
+  // ci-dessus ENRICHIS de leurs déclinaisons sœurs (U13M-1↔U13M-2...) --
+  // le filtre anti-équipe-mère du Tableau de bord (listTeamsForOfficialMatches,
+  // space-dashboard.ts) continue de s'appliquer normalement dessus. Calculé
+  // par sous-ensemble précis (own-team vs children), pas sur toute la
+  // fratrie combinée, pour ne jamais montrer à "Mon équipe" la sœur d'une
+  // équipe d'un enfant (et inversement).
+  function siblingTeamIdsFor(baseIds: string[]): string[] {
+    return Array.from(
+      new Set(
+        familyAllClubTeams
+          .filter((t) => baseIds.includes(t.id))
+          .flatMap((t) => getSiblingTeamIds(t, familyAllClubTeams))
+      )
+    ).filter((id) => !baseIds.includes(id));
+  }
+  const familyOwnTeamBaseIds = Array.from(new Set(myTeamRsvpPlayers.flatMap((p) => p.teamIds)));
+  const familyOwnTeamSiblingIds =
+    activeTab === "own-team" ? siblingTeamIdsFor(familyOwnTeamBaseIds) : [];
   const familyOwnTeamDashboardSummary = await getSpaceDashboardSummary(
     supabase,
-    activeTab === "own-team" ? Array.from(new Set(myTeamRsvpPlayers.flatMap((p) => p.teamIds))) : [],
+    activeTab === "own-team" ? [...familyOwnTeamBaseIds, ...familyOwnTeamSiblingIds] : [],
     "family",
     activeTab === "own-team" ? myTeamRsvpPlayers : [],
-    dbLimit
+    dbLimit,
+    false,
+    familyOwnTeamSiblingIds
   );
+  const familyChildrenBaseIds = Array.from(new Set(myChildrenRsvpPlayers.flatMap((p) => p.teamIds)));
+  const familyChildrenSiblingIds =
+    activeTab === "children" ? siblingTeamIdsFor(familyChildrenBaseIds) : [];
   const familyChildrenDashboardSummary = await getSpaceDashboardSummary(
     supabase,
-    activeTab === "children" ? Array.from(new Set(myChildrenRsvpPlayers.flatMap((p) => p.teamIds))) : [],
+    activeTab === "children" ? [...familyChildrenBaseIds, ...familyChildrenSiblingIds] : [],
     "family",
     activeTab === "children" ? myChildrenRsvpPlayers : [],
-    dbLimit
+    dbLimit,
+    false,
+    familyChildrenSiblingIds
   );
 
   function buildFamilyView(
@@ -4611,6 +4892,7 @@ export default async function DashboardPage({
         rsvpStatusByKey={familyRsvpStatusByKey}
         birthdayMembers={familyBirthdayMembers}
         teamCards={familyTeamCards}
+        clubTeams={familyAllClubTeams}
         tasksByEventId={familyOrganisationTasks}
         carpoolByEventId={carpoolOffersByEventId}
         whatsappGroups={familyWhatsappGroups}
@@ -4697,10 +4979,16 @@ export default async function DashboardPage({
     // actif.
     const coachDashboardSummary = await getSpaceDashboardSummary(
       supabase,
-      activeTab === "coach" ? coachedTeams.map((t) => t.id) : [],
+      // Retour de Cindy du 30/09 ("équipes sœurs") : coachSiblingTeamIds
+      // (calculé dans coachPromise, hissé pour survivre au bloc) ajoute les
+      // déclinaisons sœurs -- vide tant que coachPromise n'a pas tourné
+      // (onglet pas actif), sans effet dans ce cas (activeTab !== "coach").
+      activeTab === "coach" ? [...coachedTeams.map((t) => t.id), ...coachSiblingTeamIds] : [],
       "coach",
       [],
-      dbLimit
+      dbLimit,
+      false,
+      activeTab === "coach" ? coachSiblingTeamIds : []
     );
     tabs.push({
       key: "coach",
@@ -4844,6 +5132,10 @@ export default async function DashboardPage({
       needs: coachVolunteerNeedsByEventId[e.id] ?? [],
       matchOfficials: coachMatchOfficialRolesByEventId[e.id] ?? [],
       matchOfficialsEnabled: true,
+      // Retour de Cindy du 30/09 ("équipes sœurs") -- corrigé après coup
+      // (audit du 30/09) : sans ce champ, un match d'équipe sœur montrait
+      // les vrais boutons de gestion dans le bandeau "Cette semaine".
+      readOnlyExternal: e.readOnlyExternal,
     };
   }
   function buildFamilyWeekEvent(e: AdminUpcomingEvent): WeekStripEvent {

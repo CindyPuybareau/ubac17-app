@@ -18,7 +18,7 @@ import DocumentsPanel from "@/components/club-documents";
 import ClubReportsSection from "./club-reports-section";
 import Cd17LigueSection from "./cd17-ligue-section";
 import { BOUTIQUE_URL } from "./boutique";
-import { groupTeamsByPrimarySecondary, listTeamsForOfficialMatches } from "@/lib/teams";
+import { getSiblingTeamIds, groupTeamsByPrimarySecondary, listTeamsForOfficialMatches } from "@/lib/teams";
 import CalendarView from "./calendar-view";
 import CalendarSubscribe from "./calendar-subscribe";
 import SpaceDashboardSummary from "./space-dashboard-summary";
@@ -185,7 +185,7 @@ export default function CoachView({
   // n'a QUE des secondaires d'un même groupe sans la principale (rare,
   // mais possible) garde des onglets séparés, sans fusion -- géré par
   // groupTeamsByPrimarySecondary lui-même.
-  const resultsTeamsForCalendar = groupTeamsByPrimarySecondary(
+  const resultsTeamsForCalendarOwnTeams = groupTeamsByPrimarySecondary(
     teams.filter((t) => teamRoleByTeamId[t.id] !== "PLAYER")
   ).map(({ primary, secondaries }) => ({
     id: primary.id,
@@ -197,11 +197,11 @@ export default function CoachView({
   }));
 
   // Retour de Cindy du 21/09 : les onglets "Matchs officiels"/"Résultats"
-  // ci-dessous utilisent cette liste-ci plutôt que resultsTeamsForCalendar
+  // ci-dessous utilisent cette liste-ci plutôt que resultsTeamsForCalendarOwnTeams
   // -- une mère (U13M, U18M, Séniors M...) ne joue jamais elle-même,
   // seules ses déclinaisons (U13M-1, U13M-2...) ont de vrais matchs/liens
   // FFBB (voir listTeamsForOfficialMatches, lib/teams.ts). Le Calendrier
-  // garde lui la fusion habituelle (resultsTeamsForCalendar) -- un
+  // garde lui la fusion habituelle (resultsTeamsForCalendarOwnTeams) -- un
   // entraînement peut très bien être commun aux deux déclinaisons.
   const resultsTeamsForOfficialMatches = listTeamsForOfficialMatches(
     teams.filter((t) => teamRoleByTeamId[t.id] !== "PLAYER")
@@ -211,6 +211,35 @@ export default function CoachView({
     category: t.category,
     role: teamRoleByTeamId[t.id] ?? "COACH",
   }));
+
+  // Retour de Cindy du 30/09 ("équipes sœurs") : U13M-1↔U13M-2 (etc.) --
+  // consultation seule des matchs officiels/amicaux de la déclinaison
+  // sœur. clubTeams porte déjà le catalogue complet du club (prop
+  // existante, "Changer d'équipe") -- aucune requête de plus. `role`
+  // volontairement absent (ni coach ni joueur de cette équipe précise) :
+  // TeamSelectorPills affiche alors une pastille neutre, sans badge
+  // Coach/Joueur, même traitement déjà réservé au Bureau.
+  // Précisé par Cindy le 30/09 ("si sur calendrier aussi !") : d'abord
+  // limité à Matchs officiels/Résultats, désormais ajouté aussi au
+  // Calendrier général (resultsTeamsForCalendar plus bas) -- les
+  // événements de la déclinaison sœur étaient déjà chargés dans `events`
+  // (page.tsx, readOnlyExternal), seule la pastille de filtre manquait ici.
+  const siblingTeamIds = Array.from(
+    new Set(
+      teams
+        .filter((t) => teamRoleByTeamId[t.id] !== "PLAYER")
+        .flatMap((t) => getSiblingTeamIds(t, clubTeams))
+    )
+  ).filter((id) => !teams.some((t) => t.id === id));
+  const siblingResultsTeams = siblingTeamIds
+    .map((id) => clubTeams.find((t) => t.id === id))
+    .filter((t): t is AdminMemberTeam => Boolean(t))
+    .map((t) => ({ id: t.id, name: t.name, category: t.category }));
+  const resultsTeamsForOfficialMatchesWithSiblings = [
+    ...resultsTeamsForOfficialMatches,
+    ...siblingResultsTeams,
+  ];
+  const resultsTeamsForCalendar = [...resultsTeamsForCalendarOwnTeams, ...siblingResultsTeams];
 
   const iconClass = "h-4 w-4 shrink-0";
   const sections: AdminSection[] = [
@@ -228,8 +257,16 @@ export default function CoachView({
               coachées, en premier -- canManagePhoto toujours vrai ici, ce
               coach est bien celui de l'équipe unique éventuellement
               montrée (dashboardSummary.singleTeamId ne vient que de
-              createTeams, jamais d'une équipe où il n'est que joueur). */}
-          <SpaceDashboardSummary summary={dashboardSummary} canManagePhoto />
+              createTeams, jamais d'une équipe où il n'est que joueur).
+              Retour de Cindy du 30/09 ("équipes sœurs") : dashboardSummary
+              (page.tsx) inclut désormais aussi les déclinaisons sœurs --
+              photoRestrictedTeamIds les exclut du bouton d'envoi de photo,
+              consultation seule pour elles. */}
+          <SpaceDashboardSummary
+            summary={dashboardSummary}
+            canManagePhoto
+            photoRestrictedTeamIds={siblingTeamIds}
+          />
           <CalendarSubscribe />
         </div>
       ),
@@ -382,7 +419,7 @@ export default function CoachView({
               scopeTeams={createTeams}
               scopeTeamRoleById={teamRoleByTeamId}
               forcedView="officialMatches"
-              resultsTeams={resultsTeamsForOfficialMatches}
+              resultsTeams={resultsTeamsForOfficialMatchesWithSiblings}
               selfPlayerId={ownPlayerId}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
               celebrateWins
@@ -404,7 +441,7 @@ export default function CoachView({
               scopeTeams={createTeams}
               scopeTeamRoleById={teamRoleByTeamId}
               forcedView="officialResults"
-              resultsTeams={resultsTeamsForOfficialMatches}
+              resultsTeams={resultsTeamsForOfficialMatchesWithSiblings}
               selfPlayerId={ownPlayerId}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
               celebrateWins

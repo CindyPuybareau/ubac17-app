@@ -22,6 +22,13 @@ export type RosterPlayer = Person & {
   // Drives the "Année/Statut" badge (1ère année, ROOKIE, Sparring
   // Partner...) via computePlayerYearStatus — see src/lib/season.ts.
   birthDate: string | null;
+  // Retour de Cindy du 30/09 ("équipes sœurs") : porté par la ligne
+  // team_players représentant l'équipe ACTUELLE de ce joueur -- verrouillé
+  // définitivement sur cette équipe cette saison, ne pourra jamais être
+  // réaffecté vers son équipe sœur (team-card.tsx/member-detail-modal.tsx).
+  // Optionnel : les objets construits ailleurs (calendrier, Bilan de la
+  // saison...) n'ont pas besoin de le porter, false par défaut.
+  isBurned?: boolean;
 };
 
 export type TeamWithMembers = {

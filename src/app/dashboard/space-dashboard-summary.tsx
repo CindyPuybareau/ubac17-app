@@ -23,11 +23,18 @@ type MatchFilter = "official" | "friendly" | "all";
 export default function SpaceDashboardSummary({
   summary,
   canManagePhoto,
+  photoRestrictedTeamIds = [],
 }: {
   summary: SpaceDashboardSummaryData;
   // Bureau (toute équipe) ou coach de CETTE équipe précise (voir la policy
   // du bucket team-photos) -- calculé par l'appelant, jamais recalculé ici.
   canManagePhoto: boolean;
+  // Retour de Cindy du 30/09 ("équipes sœurs") : summary.byTeam peut
+  // désormais inclure une déclinaison sœur (consultation seule) en plus
+  // des équipes réellement coachées -- ses ids ici pour ne jamais proposer
+  // le bouton d'envoi de photo dessus, même quand canManagePhoto est vrai
+  // pour le reste.
+  photoRestrictedTeamIds?: string[];
 }) {
   const [filter, setFilter] = useState<MatchFilter>("official");
   // Retour de Cindy du 20/09 ("mes deux enfants sont mélangés... un coach
@@ -173,6 +180,7 @@ export default function SpaceDashboardSummary({
     needs: e.needs,
     matchOfficials: e.matchOfficials,
     matchOfficialsEnabled: e.matchOfficialsEnabled,
+    readOnlyExternal: e.readOnlyExternal,
   }));
 
   // "Aujourd'hui" plutôt qu'une date qu'on doit lire et comparer soi-même
@@ -277,7 +285,7 @@ export default function SpaceDashboardSummary({
               className="absolute bottom-2 right-2 h-7 w-7 object-contain opacity-60"
             />
           )}
-          {canManagePhoto && effectiveTeamId && (
+          {canManagePhoto && effectiveTeamId && !photoRestrictedTeamIds.includes(effectiveTeamId) && (
             <>
               <button
                 type="button"
