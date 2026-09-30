@@ -487,7 +487,13 @@ export default function AdminView({
               createTeams={teamRefs}
               allowClubWide
               forcedView="officialResults"
-              resultsTeams={teamRefs}
+              // Retour de Cindy du 30/09 : alignée sur "Matchs officiels"
+              // juste au-dessus et sur l'équivalent côté Coach
+              // (resultsTeamsForOfficialMatches, coach-view.tsx) -- une
+              // équipe mère (Séniors M, U13M, U18M...) ne joue quasiment
+              // jamais elle-même, teamRefs (brut) la proposait encore ici
+              // comme case à cocher alors qu'elle n'a jamais de résultat.
+              resultsTeams={teamRefsForOfficialMatches}
               resultsTeamSelector="dropdown"
               eventRoles={eventRoles}
               volunteerNeedsByEventId={volunteerNeedsByEventId}

@@ -39,10 +39,25 @@ export default function SpaceDashboardSummary({
   // le Bureau (club entier) et pour une seule équipe : dans ces deux cas,
   // hasMultipleTeams est faux et tout se comporte exactement comme avant.
   const hasMultipleTeams = summary.byTeam.length > 1;
+  // Retour de Cindy du 30/09 ("Séniors M avant Séniors 1") : byTeam exclut
+  // désormais une équipe mère sans match (listTeamsForOfficialMatches,
+  // space-dashboard.ts) -- une personne avec initialement DEUX équipes
+  // (mère + 1 déclinaison) peut donc se retrouver avec un seul élément
+  // dans byTeam après filtrage, alors que summary.singleTeamId (calculé
+  // AVANT ce filtrage, sur le nombre d'équipes d'ORIGINE) resterait null,
+  // et summary.playerCount/official/friendly (agrégats bruts sur TOUTES
+  // les équipes d'origine, mère incluse) resteraient donc le seul repli
+  // -- des chiffres qui compteraient à tort l'équipe mère exclue. D'où
+  // `byTeam.length > 0`, pas `hasMultipleTeams`, pour la SOURCE des
+  // données : dès qu'il reste ne serait-ce qu'une équipe après filtrage,
+  // ses propres chiffres priment sur l'agrégat brut. hasMultipleTeams
+  // reste `> 1` : décide seulement si le sélecteur de pastilles a un sens
+  // à afficher, question différente de "quelles données utiliser".
   const [selectedTeamId, setSelectedTeamId] = useState(summary.byTeam[0]?.teamId);
-  const activeTeam = hasMultipleTeams
-    ? (summary.byTeam.find((t) => t.teamId === selectedTeamId) ?? summary.byTeam[0])
-    : null;
+  const activeTeam =
+    summary.byTeam.length > 0
+      ? (summary.byTeam.find((t) => t.teamId === selectedTeamId) ?? summary.byTeam[0])
+      : null;
   const effectiveTeamId = activeTeam ? activeTeam.teamId : summary.singleTeamId;
   const effectivePlayerCount = activeTeam ? activeTeam.playerCount : summary.playerCount;
   const effectiveOfficialStats = activeTeam ? activeTeam.official : summary.official;

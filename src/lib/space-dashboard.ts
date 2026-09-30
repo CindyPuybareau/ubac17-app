@@ -3,6 +3,7 @@ import { getCurrentSeasonLabel, getCurrentSeasonWindow } from "./season";
 import { getVolunteerNeedsByEventId, type VolunteerNeed } from "@/app/dashboard/event-volunteer-needs";
 import { getMatchOfficialRolesByEventId, type MatchOfficialAssignment } from "@/app/dashboard/match-official-roles";
 import { runBatched, Semaphore } from "./batch";
+import { listTeamsForOfficialMatches } from "./teams";
 
 // "Tableau de bord" (retour de Cindy du 13/09, "ce que tu mettrais dans le
 // tableau de bord... photo d'équipe, nombre de joueurs, matchs officiels/
@@ -343,7 +344,7 @@ export async function getSpaceDashboardSummary(
     if ((m.team_score ?? 0) > (m.opponent_score ?? 0)) bucket.won += 1;
     matchStatsByTeam.set(m.team_id, entry);
   });
-  const byTeam: SpaceDashboardTeamStats[] =
+  const byTeamRaw: SpaceDashboardTeamStats[] =
     teamIds === null
       ? []
       : teamIds.map((id) => {
@@ -363,6 +364,26 @@ export async function getSpaceDashboardSummary(
             nextEvents: [] as SpaceDashboardNextEvent[],
           };
         });
+  // Retour de Cindy du 30/09 ("Séniors M avant Séniors 1... U13M avant
+  // U13M-1, ça n'a jamais quasi aucun match") : même règle déjà établie
+  // pour "Matchs officiels"/"Résultats" (listTeamsForOfficialMatches,
+  // lib/teams.ts, retour du 21/09) -- une équipe mère sans suffixe
+  // ("Séniors M", "U13M", "U18M") ne joue quasiment jamais elle-même
+  // directement, ce sont ses déclinaisons ("Séniors 1", "U13M-1"...) qui
+  // jouent. Ce tableau de bord n'affichant justement QUE des statistiques
+  // de matchs (officiels/amicaux joués, points, victoires), la même
+  // exclusion s'applique ici -- pas une nouvelle règle inventée, la même
+  // réutilisée. Une équipe mère SANS déclinaison dans la liste de CETTE
+  // personne (ex. un coach qui ne coache QUE "Séniors M") reste affichée
+  // normalement : listTeamsForOfficialMatches ne l'exclut jamais dans ce
+  // cas (voir sa propre logique, par liste individuelle, jamais par
+  // catalogue club entier).
+  const byTeamKeptIds = new Set(
+    listTeamsForOfficialMatches(
+      byTeamRaw.map((t) => ({ id: t.teamId, name: t.teamName, category: t.category }))
+    ).map((t) => t.id)
+  );
+  const byTeam = byTeamRaw.filter((t) => byTeamKeptIds.has(t.teamId));
 
   type EventRow = {
     id: string;
