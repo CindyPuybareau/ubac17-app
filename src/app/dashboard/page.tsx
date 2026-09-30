@@ -3403,6 +3403,28 @@ export default async function DashboardPage({
       })
       .filter((p): p is { id: string; name: string; teamIds: string[] } => Boolean(p));
 
+    // Retour de Cindy du 30/09 ("Christian Devillers ne peut pas cliquer
+    // présent/absent pour Octobre Rose") : coachRsvpPlayers ne vient que du
+    // roster des équipes COACHÉES (teamPlayersRes ci-dessus) -- un coach
+    // dont la propre fiche joueur n'est elle-même sur AUCUNE équipe (cas de
+    // Christian, catégorie "z.Sénior" sans team_players) n'y apparaît donc
+    // jamais, même sur un événement "tout le club" (isClubWideEvent,
+    // calendar-view.tsx) où rsvpVisiblePlayers ne filtre respondingPlayers
+    // que sur selfPlayerId=ownPlayerId : sans sa propre fiche dans ce
+    // tableau, le filtre ne trouve jamais personne. ownOnlyTeamIds/
+    // ownTeamIds (plus haut) couvre déjà le cas d'un coach qui JOUE aussi
+    // dans une équipe (sa fiche vient alors du roster normalement) -- ce
+    // correctif couvre le cas restant, sa fiche ajoutée directement, teamIds
+    // vide s'il n'est sur aucune équipe (isClubWideEvent reste le seul cas
+    // où elle compte alors, exactement le comportement voulu).
+    if (ownPlayerId && !coachRsvpPlayers.some((p) => p.id === ownPlayerId) && ownPlayerRow) {
+      coachRsvpPlayers.push({
+        id: ownPlayerId,
+        name: formatPersonName(ownPlayerRow.first_name, ownPlayerRow.last_name, "Joueur"),
+        teamIds: ownTeamIds,
+      });
+    }
+
     // Retour de Cindy du 16/09 ("Coachs seuls") : même principe que
     // coachRoster côté Bureau (page.tsx, bloc admin), mais construit ici à
     // partir de coachClubTeamCoachesRes/coachClubCoachPlayersRes (portée
