@@ -361,16 +361,39 @@ const FFBB_FETCH_TIMEOUT_MS = 20_000;
 // Shield, qui renvoyait un 403 (ErrorCode 112, "CDN-Challenge: true") sur
 // le User-Agent "UBAC17App/1.0" -- visiblement identifiable comme un
 // script, jamais un vrai navigateur, sans les en-têtes Accept/Accept-
-// Language qui l'accompagnent toujours. Testé en direct (curl) : un
-// User-Agent Chrome réaliste + ces deux en-têtes suffit à passer (200 OK,
-// contenu complet). Pas un souci d'adresse IP Vercel -- uniquement la
-// signature de la requête elle-même.
+// Language qui l'accompagnent toujours. Testé en direct (curl, hors
+// Vercel) : un User-Agent Chrome réaliste + ces deux en-têtes suffit à
+// passer (200 OK, contenu complet) -- mais le problème persiste en
+// production après ce correctif, ce qui pointe maintenant vers un blocage
+// plus large de la plage d'adresses IP des serveurs Vercel eux-mêmes par
+// BunnyCDN Shield (déjà vu chez d'autres hébergeurs "cloud" identifiables),
+// pas seulement la signature de la requête. Non confirmé faute d'accès aux
+// logs serveur Vercel depuis cet environnement -- voir route.ts, l'erreur
+// renvoyée porte maintenant le statut HTTP réel pour diagnostiquer la
+// prochaine fois sans device à distance.
 const FFBB_BROWSER_HEADERS: Record<string, string> = {
   "User-Agent":
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
   Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
   "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
 };
+
+// Porte le statut HTTP réel (et un repli diagnostique côté BunnyCDN Shield,
+// voir son en-tête "cdn-challenge") -- sans ça, route.ts ne pouvait
+// renvoyer qu'un message générique "Impossible de récupérer la fiche
+// FFBB.", impossible à distinguer d'un timeout ou d'un blocage une fois
+// affiché côté Bureau, et sans accès aux logs serveur Vercel pour trancher
+// après coup.
+export class FfbbFetchError extends Error {
+  status: number | null;
+  shieldChallenge: boolean;
+  constructor(message: string, status: number | null, shieldChallenge = false) {
+    super(message);
+    this.name = "FfbbFetchError";
+    this.status = status;
+    this.shieldChallenge = shieldChallenge;
+  }
+}
 
 async function fetchFfbbHtml(url: string): Promise<string> {
   const validated = assertFfbbUrl(url);
@@ -384,14 +407,21 @@ async function fetchFfbbHtml(url: string): Promise<string> {
     });
   } catch (e) {
     if (e instanceof Error && e.name === "AbortError") {
-      throw new Error("FFBB request timed out");
+      throw new FfbbFetchError("FFBB request timed out", null);
     }
-    throw e;
+    throw new FfbbFetchError(
+      e instanceof Error ? e.message : "FFBB request failed (network error)",
+      null
+    );
   } finally {
     clearTimeout(timeout);
   }
   if (!res.ok) {
-    throw new Error(`FFBB request failed with status ${res.status}`);
+    throw new FfbbFetchError(
+      `FFBB request failed with status ${res.status}`,
+      res.status,
+      res.headers.get("cdn-challenge") === "true"
+    );
   }
   return res.text();
 }

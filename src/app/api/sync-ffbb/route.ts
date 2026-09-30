@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { fetchFfbbTeamCalendar } from "@/lib/ffbb";
+import { fetchFfbbTeamCalendar, FfbbFetchError } from "@/lib/ffbb";
 
 // Retour de Cindy du 15/09 ("ça tourne dans le vide") : le fetch vers la
 // FFBB a désormais sa propre limite de 20s (voir ffbb.ts), mais sans
@@ -59,7 +59,20 @@ export async function POST(request: Request) {
   let matches;
   try {
     matches = await fetchFfbbTeamCalendar(team.ffbb_url);
-  } catch {
+  } catch (e) {
+    // Retour de Cindy du 30/09 ("impossible de récupérer la fiche FFBB")
+    // persistant en production après le correctif des en-têtes (voir
+    // ffbb.ts) : logué avec le statut HTTP réel + le repli "shield"
+    // (BunnyCDN) pour diagnostiquer depuis le dashboard Vercel (Logs),
+    // seul accès disponible -- ni cet outil ni le compte connecté n'a accès
+    // aux logs runtime via l'API.
+    if (e instanceof FfbbFetchError) {
+      console.error(
+        `[sync-ffbb] fetch échoué (team ${teamId}): status=${e.status ?? "réseau/timeout"} shield=${e.shieldChallenge} message=${e.message}`
+      );
+    } else {
+      console.error(`[sync-ffbb] fetch échoué (team ${teamId}):`, e);
+    }
     return NextResponse.json(
       { error: "Impossible de récupérer la fiche FFBB." },
       { status: 502 }

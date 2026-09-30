@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { fetchFfbbTeamRanking } from "@/lib/ffbb";
+import { fetchFfbbTeamRanking, FfbbFetchError } from "@/lib/ffbb";
 
 // Même marge que sync-ffbb/route.ts (voir son commentaire) : le fetch
 // FFBB a sa propre limite de 20s (ffbb.ts), 30s laisse de la place
@@ -56,7 +56,17 @@ export async function GET(request: Request) {
   try {
     const ranking = await getFfbbRankingCached(teamId);
     return NextResponse.json({ ranking });
-  } catch {
+  } catch (e) {
+    // Retour de Cindy du 30/09 : même diagnostic que sync-ffbb/route.ts
+    // (voir son commentaire) -- le classement partage le même fetch et
+    // donc le même symptôme.
+    if (e instanceof FfbbFetchError) {
+      console.error(
+        `[ffbb-ranking] fetch échoué (team ${teamId}): status=${e.status ?? "réseau/timeout"} shield=${e.shieldChallenge} message=${e.message}`
+      );
+    } else {
+      console.error(`[ffbb-ranking] fetch échoué (team ${teamId}):`, e);
+    }
     return NextResponse.json(
       { error: "Impossible de récupérer le classement FFBB." },
       { status: 502 }
