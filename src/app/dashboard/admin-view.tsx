@@ -304,6 +304,7 @@ export default function AdminView({
             penalites={penalites}
             commissionGroups={commissionGroups}
             ownPlayerId={ownPlayerId}
+            rsvpStatusByKey={rsvpStatusByKey}
           />
           <SponsorsDisplay sponsors={sponsorDisplay} />
         </div>

@@ -1114,7 +1114,7 @@ export default async function DashboardPage({
 
   const isAdmin = Boolean(adminResult.data);
   const clubFunction = adminResult.data?.club_function ?? null;
-  const ownPlayerId = ownPlayerRowResult.data?.id ?? null;
+  let ownPlayerId = ownPlayerRowResult.data?.id ?? null;
 
   // Profil d'accès sur-mesure (retour de Cindy du 05/09, étape 3) : si CE
   // compte Bureau a un access_profile_id, son espace Bureau ne doit
@@ -1177,6 +1177,48 @@ export default async function DashboardPage({
     })
     .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999));
   const isCoach = coachedTeams.length > 0;
+
+  // Retour de Cindy du 30/09 ("un coach ou une personne du bureau sans
+  // compte joueur doit pouvoir répondre présent/absent... pas les parents
+  // qui s'inscrivent et ne sont pas membres") : uniquement pour un compte
+  // Bureau (isAdmin) ou Coach (isCoach) qui n'a encore AUCUNE fiche joueur
+  // -- jamais pour un simple compte Famille/Parent, qui ne passe jamais par
+  // cette branche (isAdmin et isCoach y sont alors tous deux faux). Même
+  // policy RLS "insert own or child players" (profile_id = auth.uid()) déjà
+  // en place, jamais modifiée -- juste jusqu'ici jamais déclenchée pour ce
+  // cas précis. Une seule fois : la prochaine visite retrouve directement
+  // cette fiche via ownPlayerRowResult plus haut, jamais de re-création.
+  // Catégorie "z.Sénior" reprise telle quelle de Christian Devillers (coach
+  // U9 Mixte, même cas déjà traité à la main par le Bureau) -- même
+  // convention déjà établie pour un adulte sans équipe joueur, pas une
+  // nouvelle catégorie inventée ici.
+  if (!ownPlayerId && (isAdmin || isCoach)) {
+    const { data: viewerProfile, error: viewerProfileError } = await supabase
+      .from("profiles")
+      .select("first_name, last_name")
+      .eq("id", user.id)
+      .single();
+    if (viewerProfileError) {
+      console.error("[dashboard] lecture du profil (auto-création fiche) a échoué:", viewerProfileError);
+    } else if (viewerProfile) {
+      const { data: createdPlayer, error: createPlayerError } = await supabase
+        .from("players")
+        .insert({
+          profile_id: user.id,
+          first_name: viewerProfile.first_name ?? "",
+          last_name: viewerProfile.last_name ?? "",
+          category: "z.Sénior",
+          registration_email: user.email ?? null,
+        })
+        .select("id")
+        .single();
+      if (createPlayerError) {
+        console.error("[dashboard] création de la fiche joueur (Bureau/Coach) a échoué:", createPlayerError);
+      } else if (createdPlayer) {
+        ownPlayerId = createdPlayer.id;
+      }
+    }
+  }
 
   // Comptes rendus (retour de Cindy du 2026-09-01) : jamais pour un simple
   // parent/joueur, seulement Bureau et/ou Coach. RLS filtre déjà tout

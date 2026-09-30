@@ -218,6 +218,7 @@ export default function BureauDashboard({
   penalites,
   commissionGroups = [],
   ownPlayerId = null,
+  rsvpStatusByKey = {},
 }: {
   cotisations: AdminCotisation[];
   members: AdminMember[];
@@ -247,6 +248,17 @@ export default function BureauDashboard({
   // fourni jusqu'ici pour ce calendrier, qui n'en avait pas besoin avant
   // ce type d'événement).
   ownPlayerId?: string | null;
+  // Retour de Cindy du 30/09 ("Basile Lamouret, secrétaire/coach/joueur, ne
+  // peut pas répondre présent depuis son espace Bureau") : ownPlayerId
+  // ci-dessus était déjà transmis à CalendarView (selfPlayerId), mais le
+  // prop `rsvp` (le pool joueurs + statuts sur lequel ce filtre s'applique)
+  // n'était lui-même JAMAIS transmis -- respondingPlayers restait donc
+  // toujours vide, pour absolument tout le monde, quel que soit son rôle
+  // (le correctif du 16/09 n'était que la moitié du branchement). Même
+  // `statusByKey` déjà calculé pour "Bilan de la saison"
+  // (adminRsvpStatusByKey, page.tsx), réutilisé tel quel ici -- aucune
+  // requête de plus.
+  rsvpStatusByKey?: Record<string, string>;
 }) {
   // Même périmètre que l'onglet Cotisations & Licences (KpiHeader) : les
   // stages/événements/boutique (collecteId non nul) ont leur propre suivi
@@ -259,6 +271,19 @@ export default function BureauDashboard({
   const pendingAmount = pending.reduce((sum, c) => sum + balanceDue(c), 0);
 
   const activeMembers = members.filter((m) => !m.archivedAt).length;
+
+  // Retour de Cindy du 30/09 : voir le commentaire sur `rsvpStatusByKey`
+  // plus haut -- un seul élément (soi-même), jamais toute l'équipe (le
+  // Bureau gère les présences des autres depuis ses propres outils, pas
+  // depuis un bouton individuel sur cette carte). teamIds vide : sans effet
+  // sur un événement ciblant une équipe précise (respondingPlayers ne
+  // matcherait de toute façon jamais sur une équipe où cette fiche ne
+  // joue pas), utile seulement sur un événement "tout le club"
+  // (isClubWideEvent, calendar-view.tsx), exactement le cas visé ici.
+  const ownMember = ownPlayerId ? members.find((m) => m.id === ownPlayerId) : undefined;
+  const selfRsvpPlayers = ownPlayerId
+    ? [{ id: ownPlayerId, name: formatPersonName(ownMember?.firstName ?? null, ownMember?.lastName ?? null, "Moi"), teamIds: [] as string[] }]
+    : [];
 
   // Retour de Cindy du 30/08 : "Pénalités" seul ne disait pas si c'était le
   // total ou juste le restant à encaisser — remplacé par le total de
@@ -443,6 +468,7 @@ export default function BureauDashboard({
         // club, Coach/Famille non).
         isBureau
         selfPlayerId={ownPlayerId}
+        rsvp={{ players: selfRsvpPlayers, statusByKey: rsvpStatusByKey }}
         birthdayMembers={birthdayMembers}
         eventRoles={eventRoles}
         volunteerNeedsByEventId={volunteerNeedsByEventId}

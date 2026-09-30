@@ -2052,6 +2052,64 @@ export default function CalendarView({
             </>
           );
         })()}
+        {/* Retour de Cindy du 16/09 ("Réunion Bureau" puis "Réunion
+            d'équipe") : le bouton Présent/Absent n'existait jusqu'ici que
+            pour répondre pour AUTRUI (son enfant) -- jamais pour soi-même
+            en tant que personne qui gère l'événement (canManageEvent=true
+            ici, branche !canManageEvent plus haut jamais atteinte).
+            selfPlayerId (propre fiche joueur de qui consulte) est fourni
+            aussi bien côté Bureau (bureauRoster) que côté Coach (son
+            propre profil joueur, coach-view.tsx) -- rsvpVisiblePlayers,
+            déjà filtré sur selfPlayerId dès que canManage est vrai (voir
+            plus haut), garantit en plus que cette fiche fait bien partie
+            du roster de CET événement précis : sans ce garde-fou, un
+            membre du Bureau qui a par ailleurs sa propre fiche joueur sur
+            l'équipe A pourrait se voir proposer "Ta présence" sur une
+            Réunion d'équipe B, sans aucun rapport.
+            Retour de Cindy du 30/09 ("Octobre Rose... doit fonctionner pour
+            tous les membres peu importe leur rôle") : élargi de
+            `event.event_type === "REUNION"` à isClubWideEvent -- une
+            Réunion est de toute façon TOUJOURS club entier (team_id ET
+            targetTeamIds vides, voir sa création), donc ce changement ne
+            change rien pour elle ; il capture en plus tout autre événement
+            "tout le club" (ex. type OTHER, "Save the date... OCTOBRE
+            ROSE"), qui n'avait jusqu'ici cette carte QUE pour répondre pour
+            un enfant (branche !canManageEvent), jamais pour soi-même.
+            TRAINING exclu par prudence (règle du 24/08 : un entraînement ne
+            montre jamais cette carte), même si un entraînement club entier
+            n'existe pas en pratique. Placé AVANT "Organisation" ci-dessous
+            (retour de Cindy du 30/09, "faire comme les autres cartes, que
+            tout se ressemble") : même ordre et même style (RsvpButtons nu
+            dans un simple "border-t", sans libellé "Ta présence" ni cadre
+            distinct) que la branche !canManageEvent juste au-dessus. */}
+        {canManageEvent &&
+          isClubWideEvent &&
+          event.event_type !== "TRAINING" &&
+          selfPlayerId &&
+          rsvpVisiblePlayers.length > 0 &&
+          (() => {
+          const selfStatus = event.presentPlayers?.some((p) => p.id === selfPlayerId)
+            ? "PRESENT"
+            : event.absentPlayers?.some((p) => p.id === selfPlayerId)
+              ? "ABSENT"
+              : "PENDING";
+          const selfName =
+            event.presentPlayers?.find((p) => p.id === selfPlayerId)?.firstName ??
+            event.absentPlayers?.find((p) => p.id === selfPlayerId)?.firstName ??
+            "";
+          return (
+            <div className="flex flex-col gap-2 border-t border-zinc-100 pt-2">
+              <RsvpButtons
+                eventId={event.id}
+                playerId={selfPlayerId}
+                currentStatus={selfStatus}
+                onStatusChange={(previousStatus, newStatus) =>
+                  updateLocalRsvpStatus(event.id, selfPlayerId, selfName, previousStatus, newStatus)
+                }
+              />
+            </div>
+          );
+        })()}
         {/* Même boîte "Organisation" rétractable que la branche
             !canManageEvent ci-dessus — elle en était encore dépourvue
             (juste "Besoins d'organisation" nu, sans repli), alors que
@@ -2146,48 +2204,6 @@ export default function CalendarView({
               />
             </OrganisationCard>
           )}
-        {/* Retour de Cindy du 16/09 ("Réunion Bureau" puis "Réunion
-            d'équipe") : le bouton Présent/Absent n'existait jusqu'ici que
-            pour répondre pour AUTRUI (son enfant) -- jamais pour soi-même
-            en tant que personne qui gère l'événement (canManageEvent=true
-            ici, branche !canManageEvent plus haut jamais atteinte).
-            selfPlayerId (propre fiche joueur de qui consulte) est fourni
-            aussi bien côté Bureau (bureauRoster) que côté Coach (son
-            propre profil joueur, coach-view.tsx) -- rsvpVisiblePlayers,
-            déjà filtré sur selfPlayerId dès que canManage est vrai (voir
-            plus haut), garantit en plus que cette fiche fait bien partie
-            du roster de CET événement précis : sans ce garde-fou, un
-            membre du Bureau qui a par ailleurs sa propre fiche joueur sur
-            l'équipe A pourrait se voir proposer "Ta présence" sur une
-            Réunion d'équipe B, sans aucun rapport. */}
-        {canManageEvent &&
-          event.event_type === "REUNION" &&
-          selfPlayerId &&
-          rsvpVisiblePlayers.length > 0 &&
-          (() => {
-          const selfStatus = event.presentPlayers?.some((p) => p.id === selfPlayerId)
-            ? "PRESENT"
-            : event.absentPlayers?.some((p) => p.id === selfPlayerId)
-              ? "ABSENT"
-              : "PENDING";
-          const selfName =
-            event.presentPlayers?.find((p) => p.id === selfPlayerId)?.firstName ??
-            event.absentPlayers?.find((p) => p.id === selfPlayerId)?.firstName ??
-            "";
-          return (
-            <div className="mt-3 flex items-center gap-2">
-              <span className="text-xs font-medium text-zinc-500">Ta présence :</span>
-              <RsvpButtons
-                eventId={event.id}
-                playerId={selfPlayerId}
-                currentStatus={selfStatus}
-                onStatusChange={(previousStatus, newStatus) =>
-                  updateLocalRsvpStatus(event.id, selfPlayerId, selfName, previousStatus, newStatus)
-                }
-              />
-            </div>
-          );
-        })()}
       </div>
     );
   }
