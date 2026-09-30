@@ -685,7 +685,17 @@ export default function TeamCard({
     // affecté à U13M-2 depuis aucune des deux cartes.
     const detail = memberDetailsByPlayerId?.[m.id];
     const playerTeamIds = new Set((detail?.teams ?? []).map((t) => t.id));
-    const hasMoreFamilyTeams = sameFamilyTeams.some((t) => !playerTeamIds.has(t.id));
+    // Retour de Cindy du 30/09 ("toujours les petites flèches... alors que
+    // ce n'est plus possible pour les brûlés") : exclut aussi la sœur
+    // brûlée ici, même filtre que switchableTeams plus haut -- sinon la
+    // flèche restait affichée pour un joueur dont la SEULE destination
+    // restante était justement celle-là, ouvrant sur une modale vide
+    // ("Aucun autre groupe où l'affecter").
+    const hasMoreFamilyTeams = sameFamilyTeams.some(
+      (t) =>
+        !playerTeamIds.has(t.id) &&
+        !(m.player?.isBurned && siblingTeamIdsOfThisTeam.has(t.id))
+    );
     return (
       <>
         {(m.role === "COACH" || m.role === "COACH_PENDING") && canAssignCoach && (
@@ -724,7 +734,7 @@ export default function TeamCard({
                 </button>
               )}
             </>
-          ) : canSwitchTeam ? (
+          ) : canSwitchTeam && hasMoreFamilyTeams ? (
             <button
               onClick={() => openSwitch(m.player!)}
               title="Affecter à une autre équipe"

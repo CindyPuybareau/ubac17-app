@@ -3805,7 +3805,7 @@ export default async function DashboardPage({
     // les cartes "Mon Équipe".
     const rosterByTeamId = new Map<
       string,
-      (Person & { birthDate: string | null })[]
+      (Person & { birthDate: string | null; isBurned: boolean })[]
     >();
     // Hissé hors du bloc teamsQueryResults comme rosterByTeamId ci-dessus :
     // familyEvents (plus bas, hors de ce bloc) en a besoin pour nommer un
@@ -3866,9 +3866,14 @@ export default async function DashboardPage({
               // dans ce fichier. La policy RLS d'origine a été supprimée
               // (voir 20261029000000_family_teammate_roster_view.sql).
               async () => {
+                // is_burned ajouté (retour de Cindy du 30/09, "sa flamme ne
+                // s'affiche pas") : vit sur team_players (déjà lu ici pour
+                // le lien team_id/player_id), jamais besoin de toucher la
+                // vue restreinte family_teammate_roster -- même principe
+                // que team-card.tsx côté Bureau/Coach.
                 const linksRes = await supabase
                   .from("team_players")
-                  .select("team_id, player_id")
+                  .select("team_id, player_id, is_burned")
                   .in("team_id", allTeamIds);
                 const uniquePlayerIds = Array.from(
                   new Set((linksRes.data ?? []).map((r) => r.player_id))
@@ -3895,6 +3900,7 @@ export default async function DashboardPage({
                     .map((r) => ({
                       team_id: r.team_id,
                       players: rosterById.get(r.player_id) ?? null,
+                      isBurned: r.is_burned,
                     }))
                     // Une fiche que family_teammate_roster ne renvoie pas
                     // (cas normalement impossible ici, tous ces joueurs
@@ -4255,6 +4261,7 @@ export default async function DashboardPage({
           first_name: p.first_name,
           last_name: p.last_name,
           birthDate: p.birth_date,
+          isBurned: row.isBurned,
         });
         rosterByTeamId.set(row.team_id, list);
 

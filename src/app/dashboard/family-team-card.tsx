@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, Mail, Phone } from "lucide-react";
+import { ExternalLink, Flame, Mail, Phone } from "lucide-react";
 import { formatFirstName, formatLastName, sortByLastName } from "@/lib/names";
 import { computePlayerYearStatus } from "@/lib/season";
 import PlayerYearBadge from "./player-year-badge";
@@ -9,7 +9,11 @@ import { categoryTheme, roleBadge } from "./team-card";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
 type CoachContact = Person & { phone: string | null; email: string | null };
-type RosterMate = Person & { birthDate: string | null };
+// Retour de Cindy du 30/09 ("sa flamme ne s'affiche pas") : team-card.tsx
+// (Bureau/Coach) affichait déjà l'icône Flame après le nom d'un joueur
+// brûlé -- jamais reporté ici (Famille, "Mes Équipes"), point resté hors
+// du périmètre initial de ce chantier.
+type RosterMate = Person & { birthDate: string | null; isBurned: boolean };
 
 export type FamilyTeamCardData = {
   playerId: string;
@@ -70,7 +74,8 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
     role: "COACH" | "COACH_PENDING" | "JOUEUR",
     birthDate: string | null,
     phone: string | null = null,
-    email: string | null = null
+    email: string | null = null,
+    isBurned = false
   ) {
     const badge = roleBadge(role);
     const yearStatus = role === "JOUEUR" ? computePlayerYearStatus(birthDate, card.category) : null;
@@ -80,7 +85,12 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
           {formatLastName(person.last_name) || "—"}
         </td>
         <td className="whitespace-nowrap px-3 py-2.5 text-zinc-700">
-          {person.first_name ? formatFirstName(person.first_name) : "—"}
+          <span className="inline-flex items-center gap-1">
+            {person.first_name ? formatFirstName(person.first_name) : "—"}
+            {isBurned && (
+              <Flame className="h-3.5 w-3.5 shrink-0 text-orange-500" aria-label="Brûlé" />
+            )}
+          </span>
         </td>
         <td className="whitespace-nowrap px-3 py-2.5">
           <span
@@ -163,7 +173,8 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
     birthDate: string | null,
     isStaff: boolean,
     phone: string | null = null,
-    email: string | null = null
+    email: string | null = null,
+    isBurned = false
   ) {
     const badge = roleBadge(role);
     const yearStatus = role === "JOUEUR" ? computePlayerYearStatus(birthDate, card.category) : null;
@@ -174,9 +185,12 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
           isStaff ? "border-l-navy" : "border-l-emerald-400"
         }`}
       >
-        <p className="font-semibold text-zinc-900">
+        <p className="flex items-center gap-1 font-semibold text-zinc-900">
           {formatLastName(person.last_name) || "—"}{" "}
           {person.first_name ? formatFirstName(person.first_name) : ""}
+          {isBurned && (
+            <Flame className="h-3.5 w-3.5 shrink-0 text-orange-500" aria-label="Brûlé" />
+          )}
         </p>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           <span
@@ -292,7 +306,7 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
                     Joueurs ({playerRows.length})
                   </td>
                 </tr>
-                {playerRows.map((p) => renderRow(p.id, p, "JOUEUR", p.birthDate))}
+                {playerRows.map((p) => renderRow(p.id, p, "JOUEUR", p.birthDate, null, null, p.isBurned))}
               </>
             )}
             {coachRows.length === 0 &&
@@ -333,7 +347,7 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
               Joueurs ({playerRows.length})
             </p>
             <div className="flex flex-col gap-2">
-              {playerRows.map((p) => renderCard(p.id, p, "JOUEUR", p.birthDate, false))}
+              {playerRows.map((p) => renderCard(p.id, p, "JOUEUR", p.birthDate, false, null, null, p.isBurned))}
             </div>
           </div>
         )}
