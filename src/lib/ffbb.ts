@@ -356,6 +356,22 @@ const FFBB_FETCH_TIMEOUT_MS = 20_000;
 // (validation d'URL, délai, message d'erreur) -- comportement de
 // fetchFfbbTeamCalendar inchangé, juste sorti de la fonction pour ne pas
 // dupliquer ces garde-fous une deuxième fois.
+// Retour de Cindy du 30/09 ("impossible de récupérer la fiche FFBB... en
+// local ça marche") : compétitions.ffbb.com est protégé par BunnyCDN
+// Shield, qui renvoyait un 403 (ErrorCode 112, "CDN-Challenge: true") sur
+// le User-Agent "UBAC17App/1.0" -- visiblement identifiable comme un
+// script, jamais un vrai navigateur, sans les en-têtes Accept/Accept-
+// Language qui l'accompagnent toujours. Testé en direct (curl) : un
+// User-Agent Chrome réaliste + ces deux en-têtes suffit à passer (200 OK,
+// contenu complet). Pas un souci d'adresse IP Vercel -- uniquement la
+// signature de la requête elle-même.
+const FFBB_BROWSER_HEADERS: Record<string, string> = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+  "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
+};
+
 async function fetchFfbbHtml(url: string): Promise<string> {
   const validated = assertFfbbUrl(url);
   const controller = new AbortController();
@@ -363,7 +379,7 @@ async function fetchFfbbHtml(url: string): Promise<string> {
   let res: Response;
   try {
     res = await fetch(validated, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; UBAC17App/1.0)" },
+      headers: FFBB_BROWSER_HEADERS,
       signal: controller.signal,
     });
   } catch (e) {
