@@ -141,6 +141,15 @@ export default function CoachView({
       roster: t.players,
     }));
 
+  // Retour de Cindy du 01/10 ("son équipe n'a rien à faire là") : même
+  // principe que createTeams/bilanTeams ci-dessus -- une équipe où ce coach
+  // n'est QUE joueur vit déjà dans "Mon équipe" (fiche équipe complète,
+  // lien FFBB compris -- voir family-team-card.tsx). La montrer aussi ici
+  // ("Équipes" ci-dessous, FFBB plus bas) serait un pur doublon, jamais
+  // corrigé par le passage à createTeams/bilanTeams du 10/09 puisque
+  // celui-ci ne portait que sur la création d'événements/le bilan.
+  const coachOnlyTeams = teams.filter((t) => teamRoleByTeamId[t.id] !== "PLAYER");
+
   // Retour de Cindy du 12/09 : manquait ici alors que le sélecteur
   // "Commissions concernées" (create-event-form.tsx/volunteer-needs-
   // panel.tsx) l'attend depuis le 10/09 -- un coach ne l'a donc jamais vu
@@ -314,7 +323,7 @@ export default function CoachView({
       // via CoachTeams non forcé) plutôt qu'un sous-menu déroulant par
       // équipe+rôle. Reste un seul onglet de menu plat.
       key: "teams",
-      label: teams.length > 1 ? "Équipes" : "Équipe",
+      label: coachOnlyTeams.length > 1 ? "Équipes" : "Équipe",
       icon: <Users className={iconClass} />,
       content: (
         <div className="flex flex-col gap-4">
@@ -329,7 +338,7 @@ export default function CoachView({
               liste — impossible à faire correctement depuis ici, en dehors
               du composant qui connaît l'équipe active. */}
           <CoachTeams
-            teams={teams}
+            teams={coachOnlyTeams}
             allProfiles={[]}
             eventsByTeamId={eventsByTeamId}
             contactPhoneByPlayerId={contactPhoneByPlayerId}
@@ -459,7 +468,7 @@ export default function CoachView({
       // n'a jamais de lien FFBB à gérer, elle ne joue jamais elle-même.
       content: (
         <CoachFfbb
-          teams={listTeamsForOfficialMatches(teams)}
+          teams={listTeamsForOfficialMatches(coachOnlyTeams)}
           teamRoleByTeamId={teamRoleByTeamId}
         />
       ),
