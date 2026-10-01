@@ -2345,22 +2345,6 @@ export default function CalendarView({
             À venir
           </span>
         )}
-        {/* Retour de Cindy du 01/10 : la synchro FFBB ne peut tourner que
-            depuis une IP résidentielle (BunnyCDN Shield bloque Vercel), donc
-            jamais garantie à jour en production -- ce lien, ouvert par le
-            téléphone du membre lui-même, affiche la fiche FFBB réelle sans
-            dépendre de la synchro ni d'aucun serveur à nous. */}
-        {event.teamFfbbUrl && (
-          <a
-            href={event.teamFfbbUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex w-fit items-center gap-1 text-xs font-medium text-ubac-blue hover:underline"
-          >
-            <ExternalLink className="h-3 w-3" />
-            Voir sur FFBB
-          </a>
-        )}
       </div>
     );
   }

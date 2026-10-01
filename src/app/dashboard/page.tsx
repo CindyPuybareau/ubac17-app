@@ -597,15 +597,6 @@ export type AdminUpcomingEvent = {
   // pour ne pas ouvrir le bénévolat à n'importe quel match du club parcouru
   // via ce bouton.
   volunteeringOpen?: boolean;
-  // Retour de Cindy du 01/10 ("si tu lis les infos... tu ne peux pas les
-  // basculer ?") : la synchro FFBB ne peut tourner que depuis une IP
-  // résidentielle (voir ffbb.ts/sync-ffbb route.ts -- BunnyCDN Shield
-  // bloque les IP de datacenter, donc Vercel) -- jamais garanti à jour en
-  // production. Un lien direct vers la fiche FFBB de l'équipe, ouvert par
-  // le téléphone du membre lui-même (pas notre serveur), contourne
-  // totalement ce blocage et reste toujours exact. Null tant que l'équipe
-  // n'a aucun lien FFBB renseigné (calendar-view.tsx masque alors le lien).
-  teamFfbbUrl?: string | null;
 };
 
 // Un mineur ne peut jamais afficher le badge Bureau (voir bureauRole
@@ -2221,7 +2212,7 @@ export default async function DashboardPage({
     const teamsById = new Map(
       (teamsRes.data ?? []).map((t) => [
         t.id,
-        { id: t.id, name: t.name, category: t.category, ffbb_url: t.ffbb_url },
+        { id: t.id, name: t.name, category: t.category },
       ])
     );
     const teamsByPlayerId = new Map<string, AdminMemberTeam[]>();
@@ -2705,7 +2696,6 @@ export default async function DashboardPage({
         restrictedAudience: (e.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
         commissionGroupIds: e.commission_group_ids ?? [],
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, teamsById),
-        teamFfbbUrl: teamsById.get(team?.id ?? "")?.ffbb_url ?? null,
         rsvpCounts: buildRsvpCounts(rsvpsByEvent, e.id, eventRoster),
         // Retour de Cindy du 30/08 : "qui sera présent" visible partout, pas
         // seulement côté Famille (voir buildPresentPlayers) — même sujet que
@@ -3399,14 +3389,6 @@ export default async function DashboardPage({
     logQueryErrors("Coach (effectifs)", { allMembershipsRes });
     const allMembershipsData = allMembershipsRes.data;
     const clubTeamById = new Map(coachClubTeams.map((t) => [t.id, t]));
-    // coachClubTeams (ci-dessus) est typé AdminMemberTeam -- pas de champ
-    // ffbb_url -- alors que allClubTeamsRes.data (sa source) l'a déjà,
-    // via le cache 45s de reference-cache.ts. Lookup dédié plutôt que
-    // d'élargir AdminMemberTeam (type partagé par d'autres usages qui n'ont
-    // pas besoin de ce champ).
-    const clubTeamFfbbUrlById = new Map(
-      (allClubTeamsRes.data ?? []).map((t) => [t.id, t.ffbb_url])
-    );
 
     const coachTeamRefsByPlayerId = new Map<string, AdminMemberTeam[]>();
     // Retour de Cindy du 30/09 ("brûlé"), même correctif que côté Bureau
@@ -3721,7 +3703,6 @@ export default async function DashboardPage({
         restrictedAudience: (e.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
         commissionGroupIds: e.commission_group_ids ?? [],
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, clubTeamById),
-        teamFfbbUrl: clubTeamFfbbUrlById.get(team?.id ?? "") ?? null,
         rsvpCounts: buildRsvpCounts(rsvpsByEvent, e.id, eventRoster),
         // Retour de Cindy du 30/08 : "qui sera présent" visible partout,
         // pas seulement côté Famille — voir buildPresentPlayers/bloc Bureau.
@@ -4452,7 +4433,6 @@ export default async function DashboardPage({
         restrictedAudience: (e.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
         commissionGroupIds: e.commission_group_ids ?? [],
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, teamsById),
-        teamFfbbUrl: teamsById.get(team?.id ?? "")?.ffbb_url ?? null,
         rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
         // Retour de Cindy du 30/09 ("équipes sœurs") : un match de
         // familySiblingMatchesRes ci-dessus reste strictement consultable --
