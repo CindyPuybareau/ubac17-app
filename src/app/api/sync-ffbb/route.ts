@@ -10,13 +10,15 @@ import { fetchFfbbTeamCalendar, FfbbFetchError } from "@/lib/ffbb";
 // continuait alors d'attendre. 30s laisse une marge confortable au-delà
 // du timeout interne de fetchFfbbTeamCalendar.
 export const maxDuration = 30;
-// EXPÉRIMENTAL (30/09, "Impossible de récupérer la fiche FFBB" persistant
-// en production malgré les en-têtes) : Edge Runtime plutôt que Node --
-// réseau de sortie différent (edge, pas Lambda/AWS), potentiellement pas
-// bloqué par le même filtre IP côté FFBB/BunnyCDN. Test en local avant
-// déploiement -- à retirer si cheerio (lib/ffbb.ts) ne fonctionne pas
-// correctement sous ce runtime.
-export const runtime = "edge";
+// Essai du 30/09 (Edge Runtime, dans l'espoir d'un réseau de sortie non
+// filtré par BunnyCDN) retiré le 01/10 : confirmé sans effet en
+// production (toujours 403), et des relais tiers indépendants de Vercel
+// (allorigins.win, corsproxy.io, r.jina.ai -- hébergés sur Cloudflare
+// Workers/Google Cloud) sont TOUS bloqués de la même façon -- la
+// protection FFBB (BunnyCDN Shield) filtre une plage bien plus large que
+// la seule infrastructure Vercel, probablement tout le "cloud/datacenter"
+// en bloc. Edge Runtime n'apportait donc rien, juste de la complexité en
+// plus (comportement différent de maxDuration, API Node indisponibles).
 
 export async function POST(request: Request) {
   const { teamId } = await request.json();
