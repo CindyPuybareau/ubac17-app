@@ -193,7 +193,16 @@ async function writeMatchesForTeam(
           opponent_score: c.opponentScore,
         }))
       );
-      if (!error) inserted += toInsert.length;
+      // Retour de Cindy du 01/10 ("regarde les logs") : une erreur ici
+      // (ex. "new row violates row-level security policy for table
+      // notifications", vue en direct ce jour-là -- déclencheur
+      // notify_event_change sur events) passait jusqu'ici totalement
+      // inaperçue : ni logué, ni distingué d'un vrai succès à 0 ligne.
+      if (error) {
+        console.error(`[ffbb-sync] insert events échoué (team ${teamId}):`, error);
+      } else {
+        inserted += toInsert.length;
+      }
     }
 
     for (const { id, candidate: c } of toUpdate) {
@@ -218,7 +227,11 @@ async function writeMatchesForTeam(
             : {}),
         })
         .eq("id", id);
-      if (!error) updated += 1;
+      if (error) {
+        console.error(`[ffbb-sync] update events échoué (team ${teamId}, event ${id}):`, error);
+      } else {
+        updated += 1;
+      }
     }
   }
 
