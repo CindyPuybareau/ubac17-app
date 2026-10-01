@@ -439,3 +439,24 @@ export async function fetchFfbbTeamRanking(url: string): Promise<FfbbRankingEntr
   const html = await fetchFfbbHtml(url);
   return parseFfbbRankings(html);
 }
+
+// Retour de Cindy du 01/10 ("les requêtes sont impeccables ?") : matchs et
+// classement vivent dans le même HTML (voir fetchFfbbTeamCalendar/
+// fetchFfbbTeamRanking ci-dessus, qui chacune refaisaient leur propre fetch
+// de la même fiche équipe) -- scripts/sync-ffbb-all.ts synchronise
+// désormais les deux à partir d'UN SEUL fetch par équipe via cette
+// fonction, au lieu de deux appels réseau distincts vers la FFBB pour la
+// même page.
+export async function fetchFfbbTeamPageData(
+  url: string
+): Promise<{ matches: FfbbMatch[]; ranking: FfbbRankingEntry[] }> {
+  const html = await fetchFfbbHtml(url);
+  const ownTeamFfbbId = extractOwnTeamFfbbId(assertFfbbUrl(url));
+  const scoresByMatchNumber = ownTeamFfbbId
+    ? parseScoresByMatchNumber(html, ownTeamFfbbId)
+    : new Map<string, { ownScore: number; opponentScore: number }>();
+  return {
+    matches: parseFfbbTeamPage(html, scoresByMatchNumber),
+    ranking: parseFfbbRankings(html),
+  };
+}

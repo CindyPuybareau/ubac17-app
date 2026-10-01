@@ -1,5 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { fetchFfbbTeamCalendar, fetchFfbbTeamRanking, FfbbFetchError } from "./ffbb";
+import {
+  fetchFfbbTeamCalendar,
+  fetchFfbbTeamPageData,
+  fetchFfbbTeamRanking,
+  FfbbFetchError,
+  type FfbbMatch,
+  type FfbbRankingEntry,
+} from "./ffbb";
 
 export type FfbbSyncResult =
   | { ok: true; imported: number; updated: number; skipped: number; message?: string }
@@ -9,6 +16,9 @@ export type FfbbRankingSyncResult =
   | { ok: true; count: number }
   | { ok: false; error: string };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnySupabaseClient = SupabaseClient<any, any, any>;
+
 // Extrait de l'ancienne route sync-ffbb (retour de Cindy du 01/10,
 // "comment je synchroniserais ?") : la FFBB (BunnyCDN Shield) bloque les
 // IP de datacenter, donc Vercel, mais pas une IP résidentielle (voir
@@ -16,9 +26,13 @@ export type FfbbRankingSyncResult =
 // Logique de lecture/écriture identique dans les deux cas -- extraite ici
 // pour n'exister qu'UNE fois, peu importe le client Supabase utilisé
 // (session utilisateur côté route API, service_role côté script local).
+//
+// Écriture séparée du fetch (writeMatchesForTeam ci-dessous) : réutilisée
+// telle quelle par syncFfbbTeamForTeam, qui ne fait qu'UN SEUL fetch de la
+// fiche FFBB pour matchs + classement au lieu de deux (retour de Cindy du
+// 01/10, "les requêtes sont impeccables ?").
 export async function syncFfbbMatchesForTeam(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: SupabaseClient<any, any, any>,
+  supabase: AnySupabaseClient,
   teamId: string,
   ffbbUrl: string
 ): Promise<FfbbSyncResult> {
@@ -26,21 +40,16 @@ export async function syncFfbbMatchesForTeam(
   try {
     matches = await fetchFfbbTeamCalendar(ffbbUrl);
   } catch (e) {
-    // Retour de Cindy du 30/09 ("impossible de récupérer la fiche FFBB")
-    // persistant en production après le correctif des en-têtes (voir
-    // ffbb.ts) : logué avec le statut HTTP réel + le repli "shield"
-    // (BunnyCDN) pour diagnostiquer depuis le dashboard Vercel (Logs) ou la
-    // sortie console du script local.
-    if (e instanceof FfbbFetchError) {
-      console.error(
-        `[ffbb-sync] fetch échoué (team ${teamId}): status=${e.status ?? "réseau/timeout"} shield=${e.shieldChallenge} message=${e.message}`
-      );
-    } else {
-      console.error(`[ffbb-sync] fetch échoué (team ${teamId}):`, e);
-    }
-    return { ok: false, status: 502, error: "Impossible de récupérer la fiche FFBB." };
+    return handleFetchError(e, teamId);
   }
+  return writeMatchesForTeam(supabase, teamId, matches);
+}
 
+async function writeMatchesForTeam(
+  supabase: AnySupabaseClient,
+  teamId: string,
+  matches: FfbbMatch[]
+): Promise<FfbbSyncResult> {
   // Posé dès qu'on a réussi à parler à la FFBB pour cette équipe — pas
   // seulement quand des matchs ont réellement changé — pour que la vue
   // d'ensemble (ffbb-manager.tsx) distingue "synchronisé, rien de neuf"
@@ -207,8 +216,7 @@ export async function syncFfbbMatchesForTeam(
 // scripts/sync-ffbb-all.ts (IP résidentielle), lu ensuite sans aucun appel
 // FFBB par /api/ffbb-ranking.
 export async function syncFfbbRankingForTeam(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: SupabaseClient<any, any, any>,
+  supabase: AnySupabaseClient,
   teamId: string,
   ffbbUrl: string
 ): Promise<FfbbRankingSyncResult> {
@@ -216,16 +224,16 @@ export async function syncFfbbRankingForTeam(
   try {
     entries = await fetchFfbbTeamRanking(ffbbUrl);
   } catch (e) {
-    if (e instanceof FfbbFetchError) {
-      console.error(
-        `[ffbb-sync] classement : fetch échoué (team ${teamId}): status=${e.status ?? "réseau/timeout"} shield=${e.shieldChallenge} message=${e.message}`
-      );
-    } else {
-      console.error(`[ffbb-sync] classement : fetch échoué (team ${teamId}):`, e);
-    }
-    return { ok: false, error: "Impossible de récupérer le classement FFBB." };
+    return handleRankingFetchError(e, teamId);
   }
+  return writeRankingForTeam(supabase, teamId, entries);
+}
 
+async function writeRankingForTeam(
+  supabase: AnySupabaseClient,
+  teamId: string,
+  entries: FfbbRankingEntry[]
+): Promise<FfbbRankingSyncResult> {
   // Remplacé en entier (voir migration team_rankings_from_local_sync) :
   // un classement n'a aucune donnée club rattachée ligne à ligne, DELETE +
   // INSERT reflète fidèlement l'état actuel sans ligne fantôme d'une
@@ -258,4 +266,58 @@ export async function syncFfbbRankingForTeam(
   }
 
   return { ok: true, count: entries.length };
+}
+
+// Retour de Cindy du 01/10 ("les requêtes sont impeccables ?") : utilisé
+// par scripts/sync-ffbb-all.ts, qui a besoin des DEUX (matchs + classement)
+// pour chaque équipe -- UN SEUL fetch de la fiche FFBB (fetchFfbbTeamPageData)
+// au lieu des deux fetches indépendants que faisaient jusqu'ici
+// syncFfbbMatchesForTeam + syncFfbbRankingForTeam pour la même page.
+export async function syncFfbbTeamForTeam(
+  supabase: AnySupabaseClient,
+  teamId: string,
+  ffbbUrl: string
+): Promise<{ matches: FfbbSyncResult; ranking: FfbbRankingSyncResult }> {
+  let data;
+  try {
+    data = await fetchFfbbTeamPageData(ffbbUrl);
+  } catch (e) {
+    const matchesError = handleFetchError(e, teamId);
+    const rankingError = handleRankingFetchError(e, teamId, /* alreadyLogged */ true);
+    return { matches: matchesError, ranking: rankingError };
+  }
+  const [matches, ranking] = await Promise.all([
+    writeMatchesForTeam(supabase, teamId, data.matches),
+    writeRankingForTeam(supabase, teamId, data.ranking),
+  ]);
+  return { matches, ranking };
+}
+
+// Retour de Cindy du 30/09 ("impossible de récupérer la fiche FFBB")
+// persistant en production après le correctif des en-têtes (voir ffbb.ts) :
+// logué avec le statut HTTP réel + le repli "shield" (BunnyCDN) pour
+// diagnostiquer depuis le dashboard Vercel (Logs) ou la sortie console du
+// script local.
+function handleFetchError(e: unknown, teamId: string): FfbbSyncResult {
+  if (e instanceof FfbbFetchError) {
+    console.error(
+      `[ffbb-sync] fetch échoué (team ${teamId}): status=${e.status ?? "réseau/timeout"} shield=${e.shieldChallenge} message=${e.message}`
+    );
+  } else {
+    console.error(`[ffbb-sync] fetch échoué (team ${teamId}):`, e);
+  }
+  return { ok: false, status: 502, error: "Impossible de récupérer la fiche FFBB." };
+}
+
+function handleRankingFetchError(e: unknown, teamId: string, alreadyLogged = false): FfbbRankingSyncResult {
+  if (!alreadyLogged) {
+    if (e instanceof FfbbFetchError) {
+      console.error(
+        `[ffbb-sync] classement : fetch échoué (team ${teamId}): status=${e.status ?? "réseau/timeout"} shield=${e.shieldChallenge} message=${e.message}`
+      );
+    } else {
+      console.error(`[ffbb-sync] classement : fetch échoué (team ${teamId}):`, e);
+    }
+  }
+  return { ok: false, error: "Impossible de récupérer le classement FFBB." };
 }

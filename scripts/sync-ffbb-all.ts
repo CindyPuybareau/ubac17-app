@@ -18,7 +18,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServiceClient } from "../src/lib/supabase/service";
-import { syncFfbbMatchesForTeam, syncFfbbRankingForTeam } from "../src/lib/ffbb-sync";
+import { syncFfbbTeamForTeam } from "../src/lib/ffbb-sync";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -80,7 +80,16 @@ async function main() {
   // rouvrirait le même risque de saturation du pool de connexions.
   for (const team of teams) {
     if (!team.ffbb_url) continue;
-    const result = await syncFfbbMatchesForTeam(supabase, team.id, team.ffbb_url);
+    // Retour de Cindy du 01/10 ("les requêtes sont impeccables ?") :
+    // syncFfbbTeamForTeam fait UN SEUL fetch de la fiche FFBB pour matchs +
+    // classement (ils vivent dans le même HTML), au lieu des deux appels
+    // réseau distincts vers la même page que faisait la version précédente.
+    const { matches: result, ranking: rankingResult } = await syncFfbbTeamForTeam(
+      supabase,
+      team.id,
+      team.ffbb_url
+    );
+
     if (!result.ok) {
       console.error(`[sync-ffbb-all] ${team.name} : échec -- ${result.error}`);
       hadError = true;
@@ -92,12 +101,6 @@ async function main() {
       );
     }
 
-    // Retour de Cindy du 01/10 ("ajouter le classement à la synchro
-    // automatique") : même équipe, même page FFBB déjà récupérée pour les
-    // matchs -- un second fetch distinct reste nécessaire (classement et
-    // calendrier vivent dans des blocs HTML différents de la même fiche,
-    // voir ffbb.ts), mais toujours depuis cette IP résidentielle.
-    const rankingResult = await syncFfbbRankingForTeam(supabase, team.id, team.ffbb_url);
     if (!rankingResult.ok) {
       console.error(`[sync-ffbb-all] ${team.name} (classement) : échec -- ${rankingResult.error}`);
       hadError = true;
