@@ -2,9 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { RefreshCw } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
+// Retour de Cindy du 01/10 ("les boutons de synchronisation ne servent
+// plus à rien ?") : le bouton "Synchroniser avec la FFBB" déclenchait
+// toujours le fetch depuis le SERVEUR (route.ts), jamais depuis
+// l'ordinateur de qui cliquait -- déjà systématiquement bloqué en
+// production par la FFBB (BunnyCDN Shield, IP de datacenter), quel que
+// soit le visiteur. Retiré : la synchro réelle tourne désormais depuis une
+// tâche planifiée locale (scripts/sync-ffbb-all.ts, chaque lundi), ce
+// champ ne sert plus qu'à enregistrer le lien de la fiche équipe (lu par
+// cette tâche ET par le lien "Voir sur FFBB" du calendrier).
 export default function FfbbSync({
   teamId,
   initialUrl,
@@ -15,7 +23,6 @@ export default function FfbbSync({
   const router = useRouter();
   const [url, setUrl] = useState(initialUrl ?? "");
   const [saving, setSaving] = useState(false);
-  const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,52 +47,6 @@ export default function FfbbSync({
     router.refresh();
   }
 
-  async function syncNow() {
-    setSyncing(true);
-    setError(null);
-    setMessage(null);
-
-    // Retour de Cindy du 15/09 ("ça tourne dans le vide") : filet de
-    // sécurité en plus du timeout côté serveur (route.ts/ffbb.ts) -- si la
-    // requête reste malgré tout bloquée quelque part entre le navigateur
-    // et le serveur, ce bouton s'arrête quand même de tourner au bout de
-    // 35s plutôt que d'attendre indéfiniment une réponse qui ne vient
-    // jamais.
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 35_000);
-
-    try {
-      const res = await fetch("/api/sync-ffbb", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamId }),
-        signal: controller.signal,
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error ?? "Échec de la synchronisation FFBB.");
-        return;
-      }
-
-      setMessage(
-        `${data.imported} nouveau(x), ${data.updated} mis à jour${
-          data.skipped ? `, ${data.skipped} ignoré(s)` : ""
-        }.`
-      );
-      router.refresh();
-    } catch (e) {
-      setError(
-        e instanceof Error && e.name === "AbortError"
-          ? "La FFBB n'a pas répondu à temps, réessaie plus tard."
-          : "Échec de la synchronisation FFBB."
-      );
-    } finally {
-      clearTimeout(timeout);
-      setSyncing(false);
-    }
-  }
-
   return (
     <div className="flex flex-col gap-2 rounded-xl bg-ubac-yellow/10 p-3">
       <label className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow-dark">
@@ -104,14 +65,6 @@ export default function FfbbSync({
           className="rounded-full border border-zinc-200 px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-white disabled:opacity-60"
         >
           {saving ? "..." : "Enregistrer"}
-        </button>
-        <button
-          onClick={syncNow}
-          disabled={syncing || !initialUrl}
-          className="flex items-center gap-1.5 rounded-full bg-ubac-yellow px-3 py-2 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
-        >
-          <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-          {syncing ? "Synchronisation..." : "Synchroniser avec la FFBB"}
         </button>
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}

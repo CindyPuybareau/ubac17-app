@@ -1,8 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { CheckCircle2, Clock, RefreshCw, TriangleAlert } from "lucide-react";
+import { CalendarClock, CheckCircle2, Clock, TriangleAlert } from "lucide-react";
 import FfbbSync from "./ffbb-sync";
 
 type TeamRef = {
@@ -30,72 +28,22 @@ function relativeSync(iso: string | null | undefined): { label: string; stale: b
 }
 
 export default function FfbbManager({ teams }: { teams: TeamRef[] }) {
-  const router = useRouter();
-  const [syncingAll, setSyncingAll] = useState(false);
-  const [summary, setSummary] = useState<string | null>(null);
-
   const syncableTeams = teams.filter((t) => t.ffbb_url);
-
-  async function syncAll() {
-    setSyncingAll(true);
-    setSummary(null);
-    let okCount = 0;
-    let failCount = 0;
-    // Séquentiel plutôt qu'en parallèle : évite de bombarder la FFBB de
-    // 14 requêtes simultanées (risque de blocage/rate-limit côté serveur
-    // FFBB), un délai de quelques secondes total est largement acceptable
-    // pour une action volontaire du Bureau.
-    for (const team of syncableTeams) {
-      // Retour de Cindy du 15/09 ("ça tourne dans le vide") : cette boucle
-      // est SÉQUENTIELLE -- une seule équipe bloquée bloquait donc
-      // "Tout synchroniser" indéfiniment, y compris pour toutes les
-      // équipes suivantes jamais atteintes. Même filet de sécurité que
-      // ffbb-sync.tsx (le vrai correctif est le timeout côté serveur,
-      // voir route.ts/ffbb.ts, mais celui-ci garantit que ce bouton
-      // précis ne reste jamais bloqué, quelle que soit la cause).
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 35_000);
-      try {
-        const res = await fetch("/api/sync-ffbb", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ teamId: team.id }),
-          signal: controller.signal,
-        });
-        if (res.ok) okCount += 1;
-        else failCount += 1;
-      } catch {
-        failCount += 1;
-      } finally {
-        clearTimeout(timeout);
-      }
-    }
-    setSyncingAll(false);
-    setSummary(
-      failCount === 0
-        ? `${okCount} équipe${okCount > 1 ? "s" : ""} synchronisée${okCount > 1 ? "s" : ""}.`
-        : `${okCount} synchronisée${okCount > 1 ? "s" : ""}, ${failCount} en échec.`
-    );
-    router.refresh();
-  }
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Retour de Cindy du 01/10 ("les boutons de synchronisation ne
+          servent plus à rien ?") : "Tout synchroniser" déclenchait le
+          fetch depuis le serveur Vercel, toujours bloqué par la FFBB
+          (BunnyCDN Shield, IP de datacenter) -- retiré au profit de la
+          tâche planifiée locale (scripts/sync-ffbb-all.ts, chaque lundi
+          10h, IP résidentielle jamais bloquée), dont le résultat se lit
+          directement sur chaque fiche équipe ci-dessous ("Il y a X h"). */}
       {syncableTeams.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
-          <button
-            onClick={syncAll}
-            disabled={syncingAll}
-            className="flex items-center gap-1.5 rounded-full bg-ubac-yellow px-3.5 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
-          >
-            <RefreshCw className={`h-4 w-4 ${syncingAll ? "animate-spin" : ""}`} />
-            {syncingAll ? "Synchronisation en cours..." : "Tout synchroniser"}
-          </button>
-          <span className="text-xs text-zinc-400">
-            {syncableTeams.length} équipe{syncableTeams.length > 1 ? "s" : ""} avec un lien FFBB
-            configuré
-          </span>
-          {summary && <span className="text-xs font-semibold text-navy">{summary}</span>}
+        <div className="flex items-center gap-2 rounded-2xl border border-zinc-100 bg-white p-4 text-sm text-zinc-600 shadow-sm">
+          <CalendarClock className="h-4 w-4 shrink-0 text-ubac-yellow-dark" />
+          Synchronisation automatique chaque lundi à 10h, depuis un ordinateur du
+          club — voir la date ci-dessous sur chaque équipe.
         </div>
       )}
 
