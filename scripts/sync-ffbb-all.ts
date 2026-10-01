@@ -18,7 +18,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServiceClient } from "../src/lib/supabase/service";
-import { syncFfbbTeamForTeam } from "../src/lib/ffbb-sync";
+import { syncFfbbTeamForTeam, touchSyncedAt } from "../src/lib/ffbb-sync";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -73,6 +73,7 @@ async function main() {
   let totalImported = 0;
   let totalUpdated = 0;
   let hadError = false;
+  const successfulTeamIds: string[] = [];
 
   // Séquentiel, jamais en parallèle (incident du 20/09, voir CLAUDE.md) --
   // chaque équipe fait déjà le minimum de requêtes groupées en interne
@@ -96,6 +97,7 @@ async function main() {
     } else {
       totalImported += result.imported;
       totalUpdated += result.updated;
+      successfulTeamIds.push(team.id);
       console.log(
         `[sync-ffbb-all] ${team.name} : ${result.imported} nouveau(x), ${result.updated} mis à jour${result.message ? ` (${result.message})` : ""}`
       );
@@ -108,6 +110,17 @@ async function main() {
       console.log(`[sync-ffbb-all] ${team.name} (classement) : ${rankingResult.count} équipe(s) au classement`);
     }
   }
+
+  // Retour de Cindy du 01/10 ("fais le nécessaire pour le code") : une
+  // SEULE écriture groupée sur "teams", ici, après avoir traité toutes les
+  // équipes -- plutôt qu'une par équipe au fil de la boucle ci-dessus.
+  // RealtimeSync (dashboard) écoute cette table : huit écritures espacées
+  // dans le temps (une par équipe, au rythme des fetches FFBB successifs)
+  // déclenchaient jusqu'à huit rechargements complets du tableau de bord
+  // pour tout le monde connecté au même moment -- une seule écriture à la
+  // fin ne déclenche plus qu'UN seul rechargement, quel que soit le nombre
+  // d'équipes synchronisées.
+  await touchSyncedAt(supabase, successfulTeamIds);
 
   console.log(`[sync-ffbb-all] terminé : ${totalImported} nouveau(x) match(s), ${totalUpdated} mis à jour au total.`);
   if (hadError) process.exitCode = 1;

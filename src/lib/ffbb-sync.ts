@@ -42,7 +42,40 @@ export async function syncFfbbMatchesForTeam(
   } catch (e) {
     return handleFetchError(e, teamId);
   }
-  return writeMatchesForTeam(supabase, teamId, matches);
+  const result = await writeMatchesForTeam(supabase, teamId, matches);
+  // Posé dès qu'on a réussi à parler à la FFBB pour cette équipe — pas
+  // seulement quand des matchs ont réellement changé — pour que la vue
+  // d'ensemble (ffbb-manager.tsx) distingue "synchronisé, rien de neuf"
+  // d'"jamais synchronisé". Un seul appelant ici (une équipe à la fois) :
+  // pas de risque de rafale temps réel (voir syncFfbbTeamForTeam plus bas
+  // pour le cas du script, qui bat toutes les équipes d'un coup).
+  await touchSyncedAt(supabase, [teamId]);
+  return result;
+}
+
+// Retour de Cindy du 01/10 ("fais le nécessaire pour le code") : exportée
+// pour que scripts/sync-ffbb-all.ts l'appelle UNE SEULE FOIS, pour toutes
+// les équipes synchronisées avec succès, à la toute fin de son passage --
+// plutôt qu'une fois par équipe (voir syncFfbbMatchesForTeam ci-dessus,
+// qui continue de le faire pour SON unique équipe). RealtimeSync
+// (dashboard) écoute la table "teams" : huit écritures espacées dans le
+// temps (une par équipe, au fil des fetches FFBB successifs) déclenchaient
+// jusqu'à huit rechargements complets du tableau de bord pour TOUT le
+// monde connecté -- une seule écriture groupée à la fin ne déclenche plus
+// qu'un seul rechargement, quel que soit le nombre d'équipes.
+export async function touchSyncedAt(supabase: AnySupabaseClient, teamIds: string[]): Promise<void> {
+  if (teamIds.length === 0) return;
+  const { error } = await supabase
+    .from("teams")
+    .update({ ffbb_last_synced_at: new Date().toISOString() })
+    .in("id", teamIds);
+  // Non bloquant (les matchs sont le vrai résultat de la synchro) mais
+  // logué (audit du 31/08) : sans ça, un échec silencieux ici laisserait
+  // ffbb-manager.tsx afficher "Jamais synchronisé"/une date obsolète
+  // malgré une synchro par ailleurs réussie.
+  if (error) {
+    console.error("[ffbb-sync] maj de ffbb_last_synced_at échouée:", error);
+  }
 }
 
 async function writeMatchesForTeam(
@@ -50,22 +83,6 @@ async function writeMatchesForTeam(
   teamId: string,
   matches: FfbbMatch[]
 ): Promise<FfbbSyncResult> {
-  // Posé dès qu'on a réussi à parler à la FFBB pour cette équipe — pas
-  // seulement quand des matchs ont réellement changé — pour que la vue
-  // d'ensemble (ffbb-manager.tsx) distingue "synchronisé, rien de neuf"
-  // d'"jamais synchronisé".
-  const { error: syncedAtError } = await supabase
-    .from("teams")
-    .update({ ffbb_last_synced_at: new Date().toISOString() })
-    .eq("id", teamId);
-  // Non bloquant (les matchs ci-dessous sont le vrai résultat de la
-  // synchro) mais logué (audit du 31/08) : sans ça, un échec silencieux ici
-  // laisserait ffbb-manager.tsx afficher "Jamais synchronisé"/une date
-  // obsolète malgré une synchro par ailleurs réussie.
-  if (syncedAtError) {
-    console.error("[ffbb-sync] maj de ffbb_last_synced_at échouée:", syncedAtError);
-  }
-
   if (matches.length === 0) {
     return { ok: true, imported: 0, updated: 0, skipped: 0, message: "Aucun match trouvé sur cette fiche FFBB." };
   }
