@@ -994,9 +994,18 @@ export default function CalendarView({
     const teamIds = activeMemberTeamIdsKey.split(",");
     let cancelled = false;
     setFfbbRanking({ status: "loading", forKey: activeMemberTeamIdsKey, results: [] });
+    // Retour de Cindy du 01/10 ("le chargement du classement est
+    // extrêmement long à apparaître") : sans limite de temps, une panne
+    // Supabase (vue en direct ce jour-là : jusqu'à 80s avant qu'une requête
+    // échoue) laissait cette carte bloquée sur "chargement…" indéfiniment --
+    // même filet de sécurité que l'ancien bouton "Synchroniser" (ffbb-
+    // sync.tsx, 35s), ici 15s puisqu'il s'agit d'un simple affichage
+    // automatique, pas d'une action volontaire à laisser plus de marge.
+    const controllers = teamIds.map(() => new AbortController());
+    const timeouts = controllers.map((c) => setTimeout(() => c.abort(), 15_000));
     Promise.all(
-      teamIds.map((teamId) =>
-        fetch(`/api/ffbb-ranking?teamId=${teamId}`)
+      teamIds.map((teamId, i) =>
+        fetch(`/api/ffbb-ranking?teamId=${teamId}`, { signal: controllers[i].signal })
           .then((res) => res.json())
           .then((data: { ranking?: FfbbRankingEntry[] }) => ({
             teamId,
@@ -1014,6 +1023,8 @@ export default function CalendarView({
     });
     return () => {
       cancelled = true;
+      timeouts.forEach(clearTimeout);
+      controllers.forEach((c) => c.abort());
     };
   }, [activeMemberTeamIdsKey, showRankingCard]);
 
