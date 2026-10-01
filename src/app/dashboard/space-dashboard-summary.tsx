@@ -8,6 +8,7 @@ import { resizeImageForTeamPhoto } from "@/lib/image-resize";
 import AnimatedNumber from "./animated-number";
 import { DayEventCard, type WeekStripEvent } from "./week-strip-banner";
 import TeamSelectorPills from "./team-selector-pills";
+import FfbbRankingTable from "./ffbb-ranking-table";
 import type { SpaceDashboardSummary as SpaceDashboardSummaryData } from "@/lib/space-dashboard";
 
 type MatchFilter = "official" | "friendly" | "all";
@@ -69,6 +70,11 @@ export default function SpaceDashboardSummary({
   const effectivePlayerCount = activeTeam ? activeTeam.playerCount : summary.playerCount;
   const effectiveOfficialStats = activeTeam ? activeTeam.official : summary.official;
   const effectiveFriendlyStats = activeTeam ? activeTeam.friendly : summary.friendly;
+  // Retour de Cindy du 01/10 ("le classement apparaisse dans le tableau de
+  // bord aussi") : jamais pour le Bureau (activeTeam toujours null, club
+  // entier) -- une équipe mère sans lien FFBB (U13M, U18M...) a aussi un
+  // tableau vide, FfbbRankingTable ne rend alors rien (voir son garde-fou).
+  const effectiveRanking = activeTeam ? activeTeam.ranking : [];
   const effectiveBasePhotoUrl = activeTeam ? activeTeam.photoUrl : summary.photoUrl;
   // Photo envoyée pendant cette visite, par équipe -- remplace l'ancien
   // état unique (photoUrl) devenu insuffisant dès qu'on peut changer
@@ -326,6 +332,14 @@ export default function SpaceDashboardSummary({
         </div>
       </div>
       {uploadError && <p className="text-xs text-red-600">{uploadError}</p>}
+
+      {/* Retour de Cindy du 01/10 ("le classement apparaisse dans le
+          tableau de bord aussi") : même composant que Matchs & Résultats
+          (ffbb-ranking-table.tsx), lu depuis summary.byTeam -- déjà
+          synchronisé chaque lundi, aucun appel FFBB ici. Ne rend rien pour
+          le Bureau (effectiveRanking toujours []) ni pour une équipe mère
+          sans lien FFBB. */}
+      <FfbbRankingTable entries={effectiveRanking} />
 
       {nextEventsForCards.length > 0 && (
         <div className="flex flex-col gap-1.5">

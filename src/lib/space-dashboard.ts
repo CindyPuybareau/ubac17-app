@@ -4,6 +4,7 @@ import { getVolunteerNeedsByEventId, type VolunteerNeed } from "@/app/dashboard/
 import { getMatchOfficialRolesByEventId, type MatchOfficialAssignment } from "@/app/dashboard/match-official-roles";
 import { runBatched, Semaphore } from "./batch";
 import { listTeamsForOfficialMatches } from "./teams";
+import type { FfbbRankingEntry } from "./ffbb";
 
 // "Tableau de bord" (retour de Cindy du 13/09, "ce que tu mettrais dans le
 // tableau de bord... photo d'équipe, nombre de joueurs, matchs officiels/
@@ -105,6 +106,12 @@ export type SpaceDashboardTeamStats = {
   // l'équipe globalement la plus proche -- voir son calcul dans
   // space-dashboard.ts).
   nextEvents: SpaceDashboardNextEvent[];
+  // Retour de Cindy du 01/10 ("le classement apparaisse dans le tableau de
+  // bord aussi") : instantané déjà présent en base (team_rankings, écrit
+  // chaque lundi par scripts/sync-ffbb-all.ts) -- lu ici en même temps que
+  // le reste, jamais un nouvel appel FFBB. Vide pour une équipe mère sans
+  // lien FFBB (U13M, U18M, Séniors M...), comme official/friendly plus haut.
+  ranking: FfbbRankingEntry[];
 };
 
 export type SpaceDashboardSummary = {
@@ -233,7 +240,7 @@ export async function getSpaceDashboardSummary(
   const semaphore = dbLimit instanceof Semaphore ? dbLimit : new Semaphore(dbLimit);
 
   const nowIso = new Date().toISOString();
-  const [rosterRes, teamCountRes, teamsMetaRes, matchesRes, upcomingRes] = await runBatched(
+  const [rosterRes, teamCountRes, teamsMetaRes, rankingsRes, matchesRes, upcomingRes] = await runBatched(
     [
       () =>
         teamIds === null
@@ -252,6 +259,18 @@ export async function getSpaceDashboardSummary(
       () =>
         teamIds && teamIds.length > 0
           ? supabase.from("teams").select("id, name, category, photo_url").in("id", teamIds)
+          : Promise.resolve({ data: null, error: null }),
+      // Retour de Cindy du 01/10 ("le classement apparaisse dans le tableau
+      // de bord aussi") : même lot déjà groupé, une requête de plus plutôt
+      // qu'un aller-retour séparé côté navigateur -- jamais pour le Bureau
+      // (club entier, aucune équipe précise à classer).
+      () =>
+        teamIds && teamIds.length > 0
+          ? supabase
+              .from("team_rankings")
+              .select("team_id, sort_order, position, label, points, previous_ranking, is_own_team, logo")
+              .in("team_id", teamIds)
+              .order("sort_order", { ascending: true })
           : Promise.resolve({ data: null, error: null }),
       // Matchs (officiels = MATCH, amicaux = FRIENDLY) de la saison en
       // cours, avec un score déjà enregistré -- un match programmé mais
@@ -359,6 +378,34 @@ export async function getSpaceDashboardSummary(
     if ((m.team_score ?? 0) > (m.opponent_score ?? 0)) bucket.won += 1;
     matchStatsByTeam.set(m.team_id, entry);
   });
+  // Retour de Cindy du 01/10 ("le classement apparaisse dans le tableau de
+  // bord aussi") : même lecture en mémoire des lignes déjà reçues (voir
+  // rankingsRes plus haut) que matchStatsByTeam ci-dessus -- déjà triées
+  // par sort_order (la requête l'ordonne), donc l'ordre de poule est
+  // préservé sans tri supplémentaire ici.
+  const rankingByTeam = new Map<string, FfbbRankingEntry[]>();
+  (
+    (rankingsRes.data ?? []) as {
+      team_id: string;
+      position: string;
+      label: string;
+      points: string;
+      previous_ranking: number | null;
+      is_own_team: boolean;
+      logo: string | null;
+    }[]
+  ).forEach((r) => {
+    const list = rankingByTeam.get(r.team_id) ?? [];
+    list.push({
+      position: r.position,
+      label: r.label,
+      points: r.points,
+      previousRanking: r.previous_ranking,
+      isOwnTeam: r.is_own_team,
+      logo: r.logo,
+    });
+    rankingByTeam.set(r.team_id, list);
+  });
   const byTeamRaw: SpaceDashboardTeamStats[] =
     teamIds === null
       ? []
@@ -373,6 +420,7 @@ export async function getSpaceDashboardSummary(
             playerCount: rosterPlayerIdsByTeam.get(id)?.size ?? 0,
             official: stats?.official ?? { ...EMPTY_MATCH_STATS },
             friendly: stats?.friendly ?? { ...EMPTY_MATCH_STATS },
+            ranking: rankingByTeam.get(id) ?? [],
             // Rempli plus bas (nextEventsByTeamId), une fois le jour propre
             // à CETTE équipe calculé -- voir le retour de Cindy du 20/09
             // au-dessus de SpaceDashboardTeamStats.

@@ -42,8 +42,7 @@ export default function FfbbManager({ teams }: { teams: TeamRef[] }) {
       {syncableTeams.length > 0 && (
         <div className="flex items-center gap-2 rounded-2xl border border-zinc-100 bg-white p-4 text-sm text-zinc-600 shadow-sm">
           <CalendarClock className="h-4 w-4 shrink-0 text-ubac-yellow-dark" />
-          Synchronisation automatique chaque lundi à 10h, depuis un ordinateur du
-          club — voir la date ci-dessous sur chaque équipe.
+          Synchronisation automatique chaque lundi à 10h
         </div>
       )}
 
