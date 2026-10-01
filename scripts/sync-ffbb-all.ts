@@ -18,7 +18,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServiceClient } from "../src/lib/supabase/service";
-import { syncFfbbMatchesForTeam } from "../src/lib/ffbb-sync";
+import { syncFfbbMatchesForTeam, syncFfbbRankingForTeam } from "../src/lib/ffbb-sync";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -84,13 +84,26 @@ async function main() {
     if (!result.ok) {
       console.error(`[sync-ffbb-all] ${team.name} : échec -- ${result.error}`);
       hadError = true;
-      continue;
+    } else {
+      totalImported += result.imported;
+      totalUpdated += result.updated;
+      console.log(
+        `[sync-ffbb-all] ${team.name} : ${result.imported} nouveau(x), ${result.updated} mis à jour${result.message ? ` (${result.message})` : ""}`
+      );
     }
-    totalImported += result.imported;
-    totalUpdated += result.updated;
-    console.log(
-      `[sync-ffbb-all] ${team.name} : ${result.imported} nouveau(x), ${result.updated} mis à jour${result.message ? ` (${result.message})` : ""}`
-    );
+
+    // Retour de Cindy du 01/10 ("ajouter le classement à la synchro
+    // automatique") : même équipe, même page FFBB déjà récupérée pour les
+    // matchs -- un second fetch distinct reste nécessaire (classement et
+    // calendrier vivent dans des blocs HTML différents de la même fiche,
+    // voir ffbb.ts), mais toujours depuis cette IP résidentielle.
+    const rankingResult = await syncFfbbRankingForTeam(supabase, team.id, team.ffbb_url);
+    if (!rankingResult.ok) {
+      console.error(`[sync-ffbb-all] ${team.name} (classement) : échec -- ${rankingResult.error}`);
+      hadError = true;
+    } else {
+      console.log(`[sync-ffbb-all] ${team.name} (classement) : ${rankingResult.count} équipe(s) au classement`);
+    }
   }
 
   console.log(`[sync-ffbb-all] terminé : ${totalImported} nouveau(x) match(s), ${totalUpdated} mis à jour au total.`);

@@ -1,44 +1,15 @@
 import { NextResponse } from "next/server";
-import { unstable_cache } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { createServiceClient } from "@/lib/supabase/service";
-import { fetchFfbbTeamRanking, FfbbFetchError } from "@/lib/ffbb";
 
-// Même marge que sync-ffbb/route.ts (voir son commentaire) : le fetch
-// FFBB a sa propre limite de 20s (ffbb.ts), 30s laisse de la place
-// au-delà pour éviter une coupure brutale côté Vercel.
-export const maxDuration = 30;
-
-// Retour de Cindy du 21/09 ("le classement se recharge à chaque fois,
-// être sûr que ça ne bouffe pas de requêtes") : chaque changement d'onglet
-// Résultats/Matchs officiels relançait un aller-retour vers la FFBB (+ une
-// lecture teams.ffbb_url) même en revenant sur une équipe déjà vue à
-// l'instant. Le classement d'une équipe est identique pour tout le monde
-// (donnée publique côté FFBB elle-même) et ne change pas d'une minute à
-// l'autre -- même raisonnement que getEventRoleTypesCached (event-tasks.ts),
-// même mise en cache 60s. Client service_role (pas celui de la requête en
-// cours) nécessaire ici pour la même raison que là-bas : la valeur mise en
-// cache doit être obtenue une fois, indépendamment de qui a déclenché le
-// cache-miss -- jamais lié aux cookies de session d'un utilisateur précis.
-const getFfbbRankingCached = unstable_cache(
-  async (teamId: string) => {
-    const supabase = createServiceClient();
-    const { data: team } = await supabase
-      .from("teams")
-      .select("ffbb_url")
-      .eq("id", teamId)
-      .maybeSingle();
-    if (!team?.ffbb_url) return [];
-    return fetchFfbbTeamRanking(team.ffbb_url);
-  },
-  ["ffbb-ranking"],
-  { revalidate: 60 }
-);
-
-// Lecture seule, publique sur le site FFBB lui-même -- pas de contrôle
-// coach/admin comme sync-ffbb (qui écrit en base) : n'importe quel compte
-// connecté voyant l'onglet Résultats d'une équipe peut demander son
-// classement.
+// Retour de Cindy du 01/10 ("ajouter le classement à la synchro
+// automatique du lundi") : cette route lisait jusqu'ici le classement EN
+// DIRECT depuis le serveur Vercel (fetchFfbbTeamRanking) -- systématiquement
+// bloqué par la FFBB (BunnyCDN Shield, IP de datacenter), l'échec était
+// avalé côté client (calendar-view.tsx) et affichait à tort "pas encore
+// publié par la FFBB" au lieu du vrai problème. Lit désormais team_rankings,
+// un instantané écrit UNIQUEMENT par scripts/sync-ffbb-all.ts (tâche
+// planifiée locale, IP résidentielle) -- aucun appel FFBB ici, juste une
+// lecture base déjà protégée par RLS ("select team_rankings club wide").
 export async function GET(request: Request) {
   const teamId = new URL(request.url).searchParams.get("teamId");
   if (!teamId) {
@@ -53,23 +24,25 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
   }
 
-  try {
-    const ranking = await getFfbbRankingCached(teamId);
-    return NextResponse.json({ ranking });
-  } catch (e) {
-    // Retour de Cindy du 30/09 : même diagnostic que sync-ffbb/route.ts
-    // (voir son commentaire) -- le classement partage le même fetch et
-    // donc le même symptôme.
-    if (e instanceof FfbbFetchError) {
-      console.error(
-        `[ffbb-ranking] fetch échoué (team ${teamId}): status=${e.status ?? "réseau/timeout"} shield=${e.shieldChallenge} message=${e.message}`
-      );
-    } else {
-      console.error(`[ffbb-ranking] fetch échoué (team ${teamId}):`, e);
-    }
-    return NextResponse.json(
-      { error: "Impossible de récupérer le classement FFBB." },
-      { status: 502 }
-    );
+  const { data, error } = await supabase
+    .from("team_rankings")
+    .select("position, label, points, previous_ranking, is_own_team, logo")
+    .eq("team_id", teamId)
+    .order("sort_order", { ascending: true });
+
+  if (error) {
+    console.error(`[ffbb-ranking] lecture échouée (team ${teamId}):`, error);
+    return NextResponse.json({ error: "Impossible de récupérer le classement." }, { status: 500 });
   }
+
+  return NextResponse.json({
+    ranking: (data ?? []).map((r) => ({
+      position: r.position,
+      label: r.label,
+      points: r.points,
+      previousRanking: r.previous_ranking,
+      isOwnTeam: r.is_own_team,
+      logo: r.logo,
+    })),
+  });
 }

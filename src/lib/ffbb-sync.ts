@@ -1,9 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { fetchFfbbTeamCalendar, FfbbFetchError } from "./ffbb";
+import { fetchFfbbTeamCalendar, fetchFfbbTeamRanking, FfbbFetchError } from "./ffbb";
 
 export type FfbbSyncResult =
   | { ok: true; imported: number; updated: number; skipped: number; message?: string }
   | { ok: false; status: number; error: string };
+
+export type FfbbRankingSyncResult =
+  | { ok: true; count: number }
+  | { ok: false; error: string };
 
 // Extrait de l'ancienne route sync-ffbb (retour de Cindy du 01/10,
 // "comment je synchroniserais ?") : la FFBB (BunnyCDN Shield) bloque les
@@ -193,4 +197,65 @@ export async function syncFfbbMatchesForTeam(
   }
 
   return { ok: true, imported: inserted, updated, skipped };
+}
+
+// Retour de Cindy du 01/10 ("ajouter le classement à la synchro
+// automatique du lundi") : /api/ffbb-ranking lisait jusqu'ici le classement
+// EN DIRECT depuis le serveur Vercel -- bloqué par la FFBB exactement comme
+// la synchro des matchs (voir syncFfbbMatchesForTeam ci-dessus). Même
+// principe : un instantané stocké dans team_rankings, écrit UNIQUEMENT par
+// scripts/sync-ffbb-all.ts (IP résidentielle), lu ensuite sans aucun appel
+// FFBB par /api/ffbb-ranking.
+export async function syncFfbbRankingForTeam(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: SupabaseClient<any, any, any>,
+  teamId: string,
+  ffbbUrl: string
+): Promise<FfbbRankingSyncResult> {
+  let entries;
+  try {
+    entries = await fetchFfbbTeamRanking(ffbbUrl);
+  } catch (e) {
+    if (e instanceof FfbbFetchError) {
+      console.error(
+        `[ffbb-sync] classement : fetch échoué (team ${teamId}): status=${e.status ?? "réseau/timeout"} shield=${e.shieldChallenge} message=${e.message}`
+      );
+    } else {
+      console.error(`[ffbb-sync] classement : fetch échoué (team ${teamId}):`, e);
+    }
+    return { ok: false, error: "Impossible de récupérer le classement FFBB." };
+  }
+
+  // Remplacé en entier (voir migration team_rankings_from_local_sync) :
+  // un classement n'a aucune donnée club rattachée ligne à ligne, DELETE +
+  // INSERT reflète fidèlement l'état actuel sans ligne fantôme d'une
+  // équipe reléguée/promue entre deux synchros.
+  const { error: deleteError } = await supabase.from("team_rankings").delete().eq("team_id", teamId);
+  if (deleteError) {
+    console.error("[ffbb-sync] classement : purge précédente échouée:", deleteError);
+    return { ok: false, error: "La synchronisation du classement a échoué." };
+  }
+
+  if (entries.length === 0) {
+    return { ok: true, count: 0 };
+  }
+
+  const { error: insertError } = await supabase.from("team_rankings").insert(
+    entries.map((e, i) => ({
+      team_id: teamId,
+      sort_order: i,
+      position: e.position,
+      label: e.label,
+      points: e.points,
+      previous_ranking: e.previousRanking,
+      is_own_team: e.isOwnTeam,
+      logo: e.logo,
+    }))
+  );
+  if (insertError) {
+    console.error("[ffbb-sync] classement : insertion échouée:", insertError);
+    return { ok: false, error: "La synchronisation du classement a échoué." };
+  }
+
+  return { ok: true, count: entries.length };
 }
