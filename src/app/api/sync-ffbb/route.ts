@@ -10,6 +10,13 @@ import { fetchFfbbTeamCalendar, FfbbFetchError } from "@/lib/ffbb";
 // continuait alors d'attendre. 30s laisse une marge confortable au-delà
 // du timeout interne de fetchFfbbTeamCalendar.
 export const maxDuration = 30;
+// EXPÉRIMENTAL (30/09, "Impossible de récupérer la fiche FFBB" persistant
+// en production malgré les en-têtes) : Edge Runtime plutôt que Node --
+// réseau de sortie différent (edge, pas Lambda/AWS), potentiellement pas
+// bloqué par le même filtre IP côté FFBB/BunnyCDN. Test en local avant
+// déploiement -- à retirer si cheerio (lib/ffbb.ts) ne fonctionne pas
+// correctement sous ce runtime.
+export const runtime = "edge";
 
 export async function POST(request: Request) {
   const { teamId } = await request.json();
