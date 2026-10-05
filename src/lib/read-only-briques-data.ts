@@ -146,9 +146,9 @@ export async function getReadOnlyBriquesData(
       teamIds.length > 0
         ? supabase
             .from("team_players")
-            .select("team_id, players(id, first_name, last_name)")
+            .select("team_id, is_burned, players(id, first_name, last_name)")
             .in("team_id", teamIds)
-        : Promise.resolve({ data: [] as { team_id: string; players: unknown }[] }),
+        : Promise.resolve({ data: [] as { team_id: string; is_burned: boolean; players: unknown }[] }),
       teamIds.length > 0
         ? supabase
             .from("team_coaches")
@@ -158,13 +158,14 @@ export async function getReadOnlyBriquesData(
     ]);
 
     type PersonRow = { id: string; first_name: string | null; last_name: string | null };
-    const playersByTeamId = new Map<string, PersonRow[]>();
+    const playersByTeamId = new Map<string, (PersonRow & { is_burned: boolean })[]>();
     (teamPlayersRes.data ?? []).forEach((row) => {
       const player = row.players as unknown as PersonRow | null;
       if (!player) return;
-      (playersByTeamId.get(row.team_id) ?? playersByTeamId.set(row.team_id, []).get(row.team_id)!).push(
-        player
-      );
+      (playersByTeamId.get(row.team_id) ?? playersByTeamId.set(row.team_id, []).get(row.team_id)!).push({
+        ...player,
+        is_burned: row.is_burned,
+      });
     });
     const coachesByTeamId = new Map<string, PersonRow[]>();
     (teamCoachesRes.data ?? []).forEach((row) => {
@@ -192,6 +193,7 @@ export async function getReadOnlyBriquesData(
         birthDate: null,
         position: null,
         isSelf: false,
+        isBurned: p.is_burned,
         teamCategory: t.category,
         yearStatus: null,
       })),

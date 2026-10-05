@@ -1,4 +1,4 @@
-import { Users } from "lucide-react";
+import { Flame, Users } from "lucide-react";
 import { avatarColor } from "@/lib/avatar-color";
 import { formatFirstName, formatLastName, formatPersonName, sortByLastName } from "@/lib/names";
 import { PlayerYearStatusBadge } from "@/app/dashboard/player-year-badge";
@@ -108,6 +108,7 @@ export default function ChildTeamTab({
                         Toi
                       </span>
                     )}
+                    {t.isBurned && <Flame className="h-3.5 w-3.5 shrink-0 text-orange-500" aria-label="Brûlé" />}
                   </span>
                 </td>
                 <td className="px-3 py-2.5 text-zinc-700">{t.firstName ? formatFirstName(t.firstName) : "—"}</td>
@@ -186,6 +187,7 @@ export default function ChildTeamTab({
                     Toi
                   </span>
                 )}
+                {t.isBurned && <Flame className="h-3.5 w-3.5 shrink-0 text-orange-500" aria-label="Brûlé" />}
               </p>
             </div>
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">

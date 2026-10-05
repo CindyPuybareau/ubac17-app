@@ -116,7 +116,7 @@ export default async function ChildViewPage() {
     teamIds.length > 0
       ? supabase
           .from("team_players")
-          .select("team_id, position, players(id, first_name, last_name, birth_date)")
+          .select("team_id, position, is_burned, players(id, first_name, last_name, birth_date)")
           .in("team_id", teamIds)
       : Promise.resolve({ data: [] as never[], error: null }),
     teamIds.length > 0
@@ -259,6 +259,7 @@ export default async function ChildViewPage() {
   const teammateRows = (teammatesRes.data ?? []) as unknown as {
     team_id: string;
     position: string | null;
+    is_burned: boolean;
     players: { id: string; first_name: string | null; last_name: string | null; birth_date: string | null } | null;
   }[];
   const teammateBestRankByPlayerId = new Map<string, number>();
@@ -282,6 +283,10 @@ export default async function ChildViewPage() {
       birthDate: row.players.birth_date ? `2000-${row.players.birth_date.slice(5)}` : null,
       position: row.position,
       isSelf: row.players.id === playerId,
+      // Retour de Cindy du 05/10 ("sur tous les espaces les brûlés
+      // doivent être visibles") : même icône que côté Famille (family-
+      // team-card.tsx), absente jusqu'ici d'Espace Enfant.
+      isBurned: row.is_burned,
       teamCategory: teamCategoryById.get(row.team_id) ?? null,
       // Statut année/rookie/sparring calculé ICI, avec la vraie date de
       // naissance (jamais envoyée telle quelle au client, voir

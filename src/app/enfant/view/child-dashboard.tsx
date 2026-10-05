@@ -73,6 +73,9 @@ export type ChildTeammate = {
   birthDate: string | null;
   position: string | null;
   isSelf: boolean;
+  // Brûlé sur son équipe actuelle (ne pourra jamais rejoindre l'équipe
+  // sœur cette saison) — même icône Flame que family-team-card.tsx.
+  isBurned: boolean;
   // Catégorie de L'ÉQUIPE de cette ligne (pas la fiche joueur, parfois
   // obsolète — même règle que team-card.tsx côté Bureau/Coach).
   teamCategory: string | null;
