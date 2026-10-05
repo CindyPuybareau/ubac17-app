@@ -185,18 +185,27 @@ export default async function ChildViewPage() {
     // déjà hors RLS par construction, voir space-dashboard.ts.
     getSpaceDashboardSummary(supabase, teamIds, "coach", [], undefined, true),
   ]);
+  // Retour de Cindy du 05/10 ("je souhaiterais de la lecture seule... cela
+  // laisse croire qu'ils peuvent le faire") : neutralisation déjà en place
+  // ci-dessous pour nextEvents (liste du haut) ne couvrait PAS
+  // byTeam[].nextEvents -- or SpaceDashboardSummary (space-dashboard-
+  // summary.tsx) lit CES événements-là dès qu'il y a plusieurs équipes
+  // (TeamSelectorPills, activeTeam.nextEvents), le cas de tout enfant
+  // réparti sur une équipe mère + sa déclinaison (ex. U13M + U13M-1). Sans
+  // ça, le panneau "Organisation" (goûter/buvette/maillots) restait
+  // affiché avec ses vrais boutons de gestion (+/-, supprimer, choisir un
+  // membre, relancer) -- jamais fonctionnels pour un enfant (RLS les
+  // bloque déjà), mais laissant croire qu'ils le sont. Même neutralisation
+  // reprise ici telle quelle, sur les deux listes désormais.
+  function neutralizeForChild(e: (typeof rawDashboardSummary.nextEvents)[number]) {
+    return { ...e, needs: [], paymentLink: null, matchOfficials: [], matchOfficialsEnabled: false };
+  }
   const dashboardSummary = {
     ...rawDashboardSummary,
-    nextEvents: rawDashboardSummary.nextEvents.map((e) => ({
-      ...e,
-      needs: [],
-      paymentLink: null,
-      // Même frontière de sécurité que needs/paymentLink ci-dessus : sans
-      // ce false, un match à domicile de l'enfant afficherait un vrai
-      // panneau "Organisation match à domicile" gérable (voir
-      // week-strip-banner.tsx, matchOfficialsEnabled).
-      matchOfficials: [],
-      matchOfficialsEnabled: false,
+    nextEvents: rawDashboardSummary.nextEvents.map(neutralizeForChild),
+    byTeam: rawDashboardSummary.byTeam.map((t) => ({
+      ...t,
+      nextEvents: t.nextEvents.map(neutralizeForChild),
     })),
   };
   logQueryErrors("Enfant", { teamsRes, teammatesRes, coachesRes, eventsRes, allClubTeamsForSiblingsRes, notifRes });
