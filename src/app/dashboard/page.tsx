@@ -1998,6 +1998,24 @@ export default async function DashboardPage({
       ])
     );
 
+    // Retour de Cindy du 05/10 ("dans équipe je ne vois toujours pas la
+    // flamme") : is_burned vit sur LA ligne team_players de l'équipe "1"
+    // précisément (voir burnedByPlayerId plus bas, même règle du 30/09) --
+    // un joueur comme Raphaël LAMOURET, inscrit à la fois sur l'équipe mère
+    // "U13M" ET sa déclinaison "U13M-1", n'a is_burned=true QUE sur la
+    // ligne U13M-1. La carte d'équipe affichée depuis la section "U13M"
+    // lisait jusqu'ici tp.is_burned de CETTE ligne précise (toujours faux)
+    // au lieu du statut du JOUEUR -- la flamme doit être visible partout où
+    // son nom apparaît, pas seulement sur la section de sa vraie équipe.
+    // Même agrégat "OU logique sur toutes ses lignes" que burnedByPlayerId
+    // plus bas, calculé ici en premier (ne dépend que de teamPlayersRes,
+    // déjà en mémoire, aucune requête de plus) pour que rosterByTeam puisse
+    // déjà s'en servir.
+    const burnedByPlayerId = new Map<string, boolean>();
+    (teamPlayersRes.data ?? []).forEach((tp) => {
+      if (tp.is_burned) burnedByPlayerId.set(tp.player_id, true);
+    });
+
     const rosterByTeam = new Map<string, RosterPlayer[]>();
     (teamPlayersRes.data ?? []).forEach((tp) => {
       const player = playersById.get(tp.player_id);
@@ -2010,7 +2028,7 @@ export default async function DashboardPage({
         position: tp.position,
         nextEventStatus: null,
         birthDate: player.birth_date,
-        isBurned: tp.is_burned,
+        isBurned: burnedByPlayerId.get(tp.player_id) ?? false,
       });
       rosterByTeam.set(tp.team_id, list);
     });
@@ -2216,22 +2234,14 @@ export default async function DashboardPage({
       ])
     );
     const teamsByPlayerId = new Map<string, AdminMemberTeam[]>();
-    // Retour de Cindy du 30/09 ("brûlé"), corrigé le même jour (cas réel
-    // Raphaël LAMOURET) : NE JAMAIS se fier à "la première ligne
-    // rencontrée" (teams[0]/équipe principale) -- is_burned vit sur la
-    // ligne team_players de l'équipe "1" précisément (jamais l'équipe mère
-    // sans suffixe, jamais l'équipe "2", voir la règle du 30/09 "en équipe
-    // 2 il n'y a jamais de brûlé"), qui n'est pas forcément la première
-    // équipe du joueur dans cette liste. Un simple OU logique sur TOUTES
-    // ses lignes évite d'avoir à deviner laquelle est "la bonne" ici.
-    const burnedByPlayerId = new Map<string, boolean>();
+    // burnedByPlayerId (agrégat OU sur toutes les lignes du joueur) est
+    // déjà calculé plus haut, avant rosterByTeam -- voir son commentaire.
     (teamPlayersRes.data ?? []).forEach((tp) => {
       const team = teamsById.get(tp.team_id);
       if (!team) return;
       const list = teamsByPlayerId.get(tp.player_id) ?? [];
       list.push(team);
       teamsByPlayerId.set(tp.player_id, list);
-      if (tp.is_burned) burnedByPlayerId.set(tp.player_id, true);
     });
     const parentIdsByPlayerId = new Map<string, string[]>();
     (parentPlayerRes.data ?? []).forEach((pp) => {
@@ -3290,6 +3300,24 @@ export default async function DashboardPage({
       if (p.phone) coachContactPhoneByPlayerId[p.id] = p.phone;
       if (p.email) coachContactEmailByPlayerId[p.id] = p.email;
     });
+    // Retour de Cindy du 05/10 ("dans équipe je ne vois toujours pas la
+    // flamme") : même bug/correctif que côté Bureau (voir son commentaire
+    // équivalent, cas réel Raphaël LAMOURET inscrit à la fois sur l'équipe
+    // mère "U13M" et sa déclinaison "U13M-1") -- is_burned agrégé sur
+    // TOUTES les lignes team_players du joueur (allMembershipsPromise,
+    // déjà lancée en parallèle plus haut, portée club entière plutôt que
+    // seulement coachCalendarTeamIds), pas seulement celle de l'équipe
+    // affichée ici. Awaited ici (plus tôt que son usage plus bas pour
+    // coachTeamRefsByPlayerId) pour que rosterByTeam puisse déjà s'en
+    // servir -- aucune requête de plus, juste réordonné.
+    const allMembershipsRes = await allMembershipsPromise;
+    logQueryErrors("Coach (effectifs)", { allMembershipsRes });
+    const allMembershipsData = allMembershipsRes.data;
+    const coachBurnedByPlayerId = new Map<string, boolean>();
+    (allMembershipsData ?? []).forEach((tp) => {
+      if (tp.is_burned) coachBurnedByPlayerId.set(tp.player_id, true);
+    });
+
     const rosterByTeam = new Map<string, RosterPlayer[]>();
     (teamPlayersRes.data ?? []).forEach((tp) => {
       const player = playersById.get(tp.player_id);
@@ -3302,7 +3330,7 @@ export default async function DashboardPage({
         position: tp.position,
         nextEventStatus: null,
         birthDate: player.birth_date,
-        isBurned: tp.is_burned,
+        isBurned: coachBurnedByPlayerId.get(tp.player_id) ?? false,
       });
       rosterByTeam.set(tp.team_id, list);
     });
@@ -3384,17 +3412,10 @@ export default async function DashboardPage({
     // EVERY team each of these players belongs to, not just the coach's own
     // — that's what tells a player of the team apart from one lent by
     // another group, et pilote le "Retirer" vs "Affecter" du tableau
-    // (requête déjà lancée en parallèle — voir allMembershipsPromise).
-    const allMembershipsRes = await allMembershipsPromise;
-    logQueryErrors("Coach (effectifs)", { allMembershipsRes });
-    const allMembershipsData = allMembershipsRes.data;
+    // (allMembershipsData/coachBurnedByPlayerId déjà calculés plus haut).
     const clubTeamById = new Map(coachClubTeams.map((t) => [t.id, t]));
 
     const coachTeamRefsByPlayerId = new Map<string, AdminMemberTeam[]>();
-    // Retour de Cindy du 30/09 ("brûlé"), même correctif que côté Bureau
-    // (voir son commentaire, burnedByPlayerId) : OU logique sur TOUTES les
-    // lignes du joueur, jamais seulement "la première rencontrée".
-    const coachBurnedByPlayerId = new Map<string, boolean>();
     (allMembershipsData ?? []).forEach((tp) => {
       const team =
         clubTeamById.get(tp.team_id) ?? coachAllTeams.find((t) => t.id === tp.team_id);
@@ -3402,7 +3423,6 @@ export default async function DashboardPage({
       const list = coachTeamRefsByPlayerId.get(tp.player_id) ?? [];
       list.push({ id: team.id, name: team.name, category: team.category });
       coachTeamRefsByPlayerId.set(tp.player_id, list);
-      if (tp.is_burned) coachBurnedByPlayerId.set(tp.player_id, true);
     });
 
     // Coaches have no read access to cotisations (financial/payment data
@@ -3895,12 +3915,22 @@ export default async function DashboardPage({
                 const rosterById = new Map(
                   (rosterRes.data ?? []).map((p) => [p.id, p])
                 );
+                // Retour de Cindy du 05/10 ("dans équipe je ne vois toujours
+                // pas la flamme") : même correctif que team-card.tsx côté
+                // Bureau/Coach (voir son commentaire, cas Raphaël LAMOURET
+                // inscrit à la fois sur l'équipe mère et sa déclinaison) --
+                // is_burned agrégé sur TOUTES les lignes du joueur plutôt
+                // que la seule ligne de l'équipe affichée ici.
+                const burnedByPlayerId = new Map<string, boolean>();
+                (linksRes.data ?? []).forEach((r) => {
+                  if (r.is_burned) burnedByPlayerId.set(r.player_id, true);
+                });
                 return {
                   data: (linksRes.data ?? [])
                     .map((r) => ({
                       team_id: r.team_id,
                       players: rosterById.get(r.player_id) ?? null,
-                      isBurned: r.is_burned,
+                      isBurned: burnedByPlayerId.get(r.player_id) ?? false,
                     }))
                     // Une fiche que family_teammate_roster ne renvoie pas
                     // (cas normalement impossible ici, tous ces joueurs
