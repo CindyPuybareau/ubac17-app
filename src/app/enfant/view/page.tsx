@@ -8,7 +8,7 @@ import { getClubOfficialMatches } from "@/lib/club-official-matches";
 import { getSpaceDashboardSummary } from "@/lib/space-dashboard";
 import { computeSeasonParticipation } from "@/app/dashboard/season-bilan";
 import { getCachedTeams } from "@/lib/reference-cache";
-import { getSiblingTeamIds } from "@/lib/teams";
+import { getSiblingTeamIds, splitTeamName } from "@/lib/teams";
 import ChildDashboard, {
   type ChildCoach,
   type ChildEvent,
@@ -236,38 +236,51 @@ export default async function ChildViewPage() {
   // avec la catégorie de l'équipe où il joue, pas avec sa propre fiche,
   // parfois obsolète").
   const teamCategoryById = new Map(teams.map((t) => [t.id, t.category]));
+  // Retour de Cindy du 05/10 ("tout le monde n'est pas visible en U13M-2
+  // ou U13M-1... ils ne sont qu'en U13M ???") : un joueur réparti dans une
+  // déclinaison (U13M-1/U13M-2) garde TOUJOURS sa ligne sur l'équipe mère
+  // en plus ("addition, jamais un déplacement", voir team-card.tsx) --
+  // sans ce classement par rang, "premier arrivé" gardait quasi toujours
+  // la ligne de l'équipe mère (créée en premier historiquement), masquant
+  // la vraie déclinaison pour presque tout le monde. Même repli mère/
+  // déclinaison que listTeamsForOfficialMatches (lib/teams.ts) ailleurs
+  // dans l'appli : une déclinaison (rang > 0) prime toujours sur sa mère.
+  const teamRankById = new Map(teams.map((t) => [t.id, splitTeamName(t.name ?? "").rank]));
 
   const teammateRows = (teammatesRes.data ?? []) as unknown as {
     team_id: string;
     position: string | null;
     players: { id: string; first_name: string | null; last_name: string | null; birth_date: string | null } | null;
   }[];
+  const teammateBestRankByPlayerId = new Map<string, number>();
   const teammatesByPlayerId = new Map<string, ChildTeammate>();
   for (const row of teammateRows) {
     if (!row.players) continue;
-    if (!teammatesByPlayerId.has(row.players.id)) {
-      teammatesByPlayerId.set(row.players.id, {
-        id: row.players.id,
-        firstName: row.players.first_name,
-        lastName: row.players.last_name,
-        // Année neutralisée : l'UI (calendrier, pastille "Anniversaires")
-        // n'affiche jamais que le jour/mois, mais la vraie date de
-        // naissance complète — donc l'âge exact — partait quand même dans
-        // les props envoyées au client, lisible par n'importe quel enfant
-        // via les DevTools. Une année fixe garde le format "YYYY-MM-DD"
-        // que localDateFromParts() attend, sans exposer l'année réelle.
-        birthDate: row.players.birth_date ? `2000-${row.players.birth_date.slice(5)}` : null,
-        position: row.position,
-        isSelf: row.players.id === playerId,
-        teamCategory: teamCategoryById.get(row.team_id) ?? null,
-        // Statut année/rookie/sparring calculé ICI, avec la vraie date de
-        // naissance (jamais envoyée telle quelle au client, voir
-        // birthDate ci-dessus) — bug du 2026-08-25 : recalculer ce statut
-        // côté client à partir de la date neutralisée donnait "Sparring
-        // Partner" à tout le monde (année fixée à 2000 pour tous).
-        yearStatus: computePlayerYearStatus(row.players.birth_date, teamCategoryById.get(row.team_id) ?? null),
-      });
-    }
+    const rank = teamRankById.get(row.team_id) ?? 0;
+    const bestRank = teammateBestRankByPlayerId.get(row.players.id);
+    if (bestRank !== undefined && rank <= bestRank) continue;
+    teammateBestRankByPlayerId.set(row.players.id, rank);
+    teammatesByPlayerId.set(row.players.id, {
+      id: row.players.id,
+      firstName: row.players.first_name,
+      lastName: row.players.last_name,
+      // Année neutralisée : l'UI (calendrier, pastille "Anniversaires")
+      // n'affiche jamais que le jour/mois, mais la vraie date de
+      // naissance complète — donc l'âge exact — partait quand même dans
+      // les props envoyées au client, lisible par n'importe quel enfant
+      // via les DevTools. Une année fixe garde le format "YYYY-MM-DD"
+      // que localDateFromParts() attend, sans exposer l'année réelle.
+      birthDate: row.players.birth_date ? `2000-${row.players.birth_date.slice(5)}` : null,
+      position: row.position,
+      isSelf: row.players.id === playerId,
+      teamCategory: teamCategoryById.get(row.team_id) ?? null,
+      // Statut année/rookie/sparring calculé ICI, avec la vraie date de
+      // naissance (jamais envoyée telle quelle au client, voir
+      // birthDate ci-dessus) — bug du 2026-08-25 : recalculer ce statut
+      // côté client à partir de la date neutralisée donnait "Sparring
+      // Partner" à tout le monde (année fixée à 2000 pour tous).
+      yearStatus: computePlayerYearStatus(row.players.birth_date, teamCategoryById.get(row.team_id) ?? null),
+    });
   }
   const teammates = Array.from(teammatesByPlayerId.values());
 
@@ -275,17 +288,20 @@ export default async function ChildViewPage() {
     team_id: string;
     profiles: { id: string; first_name: string | null; last_name: string | null } | null;
   }[];
+  const coachBestRankByProfileId = new Map<string, number>();
   const coachesByProfileId = new Map<string, ChildCoach>();
   for (const row of coachRows) {
     if (!row.profiles) continue;
-    if (!coachesByProfileId.has(row.profiles.id)) {
-      coachesByProfileId.set(row.profiles.id, {
-        id: row.profiles.id,
-        firstName: row.profiles.first_name,
-        lastName: row.profiles.last_name,
-        teamCategory: teamCategoryById.get(row.team_id) ?? null,
-      });
-    }
+    const rank = teamRankById.get(row.team_id) ?? 0;
+    const bestRank = coachBestRankByProfileId.get(row.profiles.id);
+    if (bestRank !== undefined && rank <= bestRank) continue;
+    coachBestRankByProfileId.set(row.profiles.id, rank);
+    coachesByProfileId.set(row.profiles.id, {
+      id: row.profiles.id,
+      firstName: row.profiles.first_name,
+      lastName: row.profiles.last_name,
+      teamCategory: teamCategoryById.get(row.team_id) ?? null,
+    });
   }
   const coaches = Array.from(coachesByProfileId.values());
 
