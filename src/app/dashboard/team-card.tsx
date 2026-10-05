@@ -251,6 +251,17 @@ export default function TeamCard({
       setTrombinoscopeError("Choisis un fichier PDF.");
       return;
     }
+    // Retour de Cindy du 05/10 ("Envoi impossible, réessaie" sur U18M,
+    // 9,16 Mo déjà pour Séniors M) : vérifié avant l'envoi plutôt que de
+    // laisser échouer côté Storage -- message précis ("fichier trop
+    // lourd") au lieu du générique qui ne disait pas pourquoi. Même
+    // limite que le bucket (26214400, voir sa migration).
+    if (file.size > 26214400) {
+      setTrombinoscopeError(
+        `Fichier trop lourd (${(file.size / 1024 / 1024).toFixed(1)} Mo, 25 Mo maximum).`
+      );
+      return;
+    }
     setUploadingTrombinoscope(true);
     setTrombinoscopeError(null);
     try {
@@ -260,7 +271,11 @@ export default function TeamCard({
         .from("team-trombinoscopes")
         .upload(path, file, { upsert: true, contentType: "application/pdf" });
       if (uploadErr) {
-        setTrombinoscopeError("Envoi impossible, réessaie.");
+        // Message précis (ex. "The resource already exists", quota,
+        // policy RLS...) plutôt qu'un générique qui ne dit pas pourquoi --
+        // retour de Cindy du 05/10, cas réel U18M où la cause (fichier
+        // trop lourd) était invisible sans aller chercher en base.
+        setTrombinoscopeError(`Envoi impossible : ${uploadErr.message}`);
         return;
       }
       const { error: updateErr } = await supabase
@@ -268,7 +283,7 @@ export default function TeamCard({
         .update({ trombinoscope_path: path })
         .eq("id", trombinoscopeOwnerId);
       if (updateErr) {
-        setTrombinoscopeError("Enregistrement impossible, réessaie.");
+        setTrombinoscopeError(`Enregistrement impossible : ${updateErr.message}`);
         return;
       }
       setTrombinoscopePath(path);
