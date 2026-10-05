@@ -1092,21 +1092,16 @@ export default function TeamCard({
     <div
       className={`rounded-2xl border border-l-4 ${theme.border} border-l-ubac-yellow bg-white p-5 shadow-sm transition-all hover:shadow-md`}
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-start gap-2">
-          {/* Retour de Cindy du 13/09 ("où j'importe mes photos d'équipe
-              dans le bureau ?") : miniature paysage + bouton d'envoi, ici
-              plutôt que dans Tableau de bord (résumé club entier côté
-              Bureau, jamais scopé à une seule équipe) -- cet onglet
-              Équipes liste bien chaque équipe une par une, c'est le bon
-              endroit. Jamais affiché en lecture seule (coach qui ne fait
-              QUE jouer dans cette équipe, sans droit d'écriture dessus).
-              Retour de Cindy du 05/10 ("le bouton serait mieux sous
-              l'icône photo d'équipe") : trombinoscope regroupé SOUS la
-              photo dans cette même colonne, plutôt qu'aligné à côté du
-              nom -- les deux envois d'équipe (photo/trombinoscope)
-              forment un seul bloc visuel, distinct du nom/catégorie. */}
-          <div className="flex flex-col items-start gap-1.5">
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Retour de Cindy du 13/09 ("où j'importe mes photos d'équipe
+                dans le bureau ?") : miniature paysage + bouton d'envoi, ici
+                plutôt que dans Tableau de bord (résumé club entier côté
+                Bureau, jamais scopé à une seule équipe) -- cet onglet
+                Équipes liste bien chaque équipe une par une, c'est le bon
+                endroit. Jamais affiché en lecture seule (coach qui ne fait
+                QUE jouer dans cette équipe, sans droit d'écriture dessus). */}
             {!readOnly && (
               <div className="relative h-10 w-16 shrink-0 overflow-hidden rounded-lg border border-zinc-100 bg-navy">
                 {photoUrl ? (
@@ -1129,6 +1124,27 @@ export default function TeamCard({
                 </label>
               </div>
             )}
+            <h3 className="font-semibold text-zinc-900">{team.name}</h3>
+            {team.category && team.category !== team.name && (
+              <span
+                className={`inline-flex w-fit items-center justify-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold leading-none ${theme.badge}`}
+              >
+                {team.category}
+              </span>
+            )}
+          </div>
+        </div>
+        {/* Retour de Cindy du 05/10 ("le bouton serait mieux sous l'icône
+            photo d'équipe", puis "le nom des équipes n'est plus à côté de
+            l'image... problème de responsive") : sur sa PROPRE ligne, sous
+            tout l'en-tête (photo + nom), plutôt qu'empilé dans la colonne
+            de la photo -- ce dernier montage cassait l'alignement
+            photo/nom dès que la carte devenait étroite (mobile), le nom
+            retombant sous la photo au lieu de rester à côté. Même rendu
+            "sous la photo" en pratique, sans dépendre de la largeur
+            disponible. */}
+        {!isBabysTeam && (!readOnly || trombinoscopePath) ? (
+          <div className="flex flex-wrap items-center gap-2">
             {/* Retour de Cindy du 05/10 ("sénior 1 et sénior 2 toujours
                 pas de bouton", "pareil pour les u13 et les U18") : le
                 bouton d'envoi est visible sur TOUTE équipe, déclinaison
@@ -1158,17 +1174,7 @@ export default function TeamCard({
             )}
             {!isBabysTeam && <TrombinoscopeButton path={trombinoscopePath} />}
           </div>
-          <div className="flex flex-wrap items-center gap-2 pt-2">
-            <h3 className="font-semibold text-zinc-900">{team.name}</h3>
-            {team.category && team.category !== team.name && (
-              <span
-                className={`inline-flex w-fit items-center justify-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold leading-none ${theme.badge}`}
-              >
-                {team.category}
-              </span>
-            )}
-          </div>
-        </div>
+        ) : null}
       </div>
       {photoError && <p className="mt-1 text-xs text-red-600">{photoError}</p>}
       {trombinoscopeError && <p className="mt-1 text-xs text-red-600">{trombinoscopeError}</p>}
