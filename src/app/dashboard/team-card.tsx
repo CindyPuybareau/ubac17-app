@@ -1136,7 +1136,7 @@ export default function TeamCard({
               qu'aucun fichier n'existe encore). */}
           {!isBabysTeam && !readOnly && isTrombinoscopeOwner && (
             <label
-              className={`flex items-center gap-1.5 rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50 ${
+              className={`flex items-center gap-1.5 rounded-full bg-navy px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-navy-dark ${
                 uploadingTrombinoscope ? "cursor-wait opacity-60" : "cursor-pointer"
               }`}
             >

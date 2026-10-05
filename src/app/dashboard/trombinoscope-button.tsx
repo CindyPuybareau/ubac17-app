@@ -48,7 +48,7 @@ export default function TrombinoscopeButton({
       disabled={loading}
       className={
         className ??
-        "flex items-center gap-1.5 rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-60"
+        "flex items-center gap-1.5 rounded-full bg-navy/10 px-3 py-1.5 text-xs font-semibold text-navy transition-colors hover:bg-navy/20 disabled:opacity-60"
       }
     >
       <FileText className="h-3.5 w-3.5 shrink-0" />
