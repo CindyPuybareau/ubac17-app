@@ -223,17 +223,20 @@ export default function TeamCard({
     }
   }
 
-  // Retour de Cindy du 05/10 ("trombinoscope, un par équipe mère") : même
-  // principe que la photo d'équipe ci-dessus -- affichage optimiste,
-  // écriture directe -- mais bucket PRIVÉ (team-trombinoscopes) et
-  // toujours écrit sous le dossier de l'équipe MÈRE (team.trombinoscopeOwnerTeamId),
-  // jamais celui d'une déclinaison : seule la carte de l'équipe mère
-  // affiche ce bouton d'envoi (voir isTrombinoscopeOwner plus bas), les
-  // déclinaisons n'ont qu'un lien de consultation vers le même fichier.
+  // Retour de Cindy du 05/10 ("sénior 1 et sénior 2 toujours pas de
+  // bouton") : le bouton d'envoi est finalement visible sur TOUTE équipe
+  // (sauf Babys), y compris une déclinaison -- plus réservé à la seule
+  // carte de l'équipe mère comme la toute première version. Il écrit
+  // toujours sous le dossier de l'équipe MÈRE (trombinoscopeOwnerId
+  // ci-dessous), jamais celui de la déclinaison elle-même : un envoi
+  // depuis Séniors 1, Séniors 2 ou Séniors M met à jour le MÊME fichier
+  // partagé par toute la famille. Même principe que la photo d'équipe
+  // ci-dessus pour le reste (affichage optimiste, écriture directe), mais
+  // bucket PRIVÉ (team-trombinoscopes).
   const [trombinoscopePath, setTrombinoscopePath] = useState(team.trombinoscopePath ?? null);
   const [uploadingTrombinoscope, setUploadingTrombinoscope] = useState(false);
   const [trombinoscopeError, setTrombinoscopeError] = useState<string | null>(null);
-  const isTrombinoscopeOwner = team.id === (team.trombinoscopeOwnerTeamId ?? team.id);
+  const trombinoscopeOwnerId = team.trombinoscopeOwnerTeamId ?? team.id;
   // Retour de Cindy du 05/10 ("pour tous le monde sauf les babys") :
   // s'applique à toute équipe mère OU sans déclinaison (U9, U11, U13F,
   // U15M, Loisirs...) -- seule la catégorie Babys n'a jamais de match
@@ -252,7 +255,7 @@ export default function TeamCard({
     setTrombinoscopeError(null);
     try {
       const supabase = createClient();
-      const path = `${team.id}/trombinoscope.pdf`;
+      const path = `${trombinoscopeOwnerId}/trombinoscope.pdf`;
       const { error: uploadErr } = await supabase.storage
         .from("team-trombinoscopes")
         .upload(path, file, { upsert: true, contentType: "application/pdf" });
@@ -263,7 +266,7 @@ export default function TeamCard({
       const { error: updateErr } = await supabase
         .from("teams")
         .update({ trombinoscope_path: path })
-        .eq("id", team.id);
+        .eq("id", trombinoscopeOwnerId);
       if (updateErr) {
         setTrombinoscopeError("Enregistrement impossible, réessaie.");
         return;
@@ -1126,13 +1129,13 @@ export default function TeamCard({
                 </label>
               </div>
             )}
-            {/* Retour de Cindy du 05/10 ("trombinoscope, un par équipe
-                mère") : seule la carte de l'équipe mère
-                (isTrombinoscopeOwner) a le bouton d'envoi ; une
-                déclinaison qui hérite du fichier n'a qu'un lien de
-                consultation (TrombinoscopeButton renvoie null tant
-                qu'aucun fichier n'existe encore). */}
-            {!isBabysTeam && !readOnly && isTrombinoscopeOwner && (
+            {/* Retour de Cindy du 05/10 ("sénior 1 et sénior 2 toujours
+                pas de bouton", "pareil pour les u13 et les U18") : le
+                bouton d'envoi est visible sur TOUTE équipe, déclinaison
+                comprise -- il écrit vers trombinoscopeOwnerId (toujours
+                l'équipe mère) quelle que soit la carte d'où on l'envoie,
+                voir le commentaire plus haut. */}
+            {!isBabysTeam && !readOnly && (
               <label
                 className={`flex items-center gap-1.5 rounded-full bg-navy px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-navy-dark ${
                   uploadingTrombinoscope ? "cursor-wait opacity-60" : "cursor-pointer"
@@ -1153,11 +1156,7 @@ export default function TeamCard({
                 />
               </label>
             )}
-            {!isBabysTeam && (
-              <TrombinoscopeButton
-                path={isTrombinoscopeOwner ? trombinoscopePath : team.trombinoscopePath ?? null}
-              />
-            )}
+            {!isBabysTeam && <TrombinoscopeButton path={trombinoscopePath} />}
           </div>
           <div className="flex flex-wrap items-center gap-2 pt-2">
             <h3 className="font-semibold text-zinc-900">{team.name}</h3>
