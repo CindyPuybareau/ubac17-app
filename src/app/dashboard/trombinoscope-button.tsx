@@ -48,7 +48,13 @@ export default function TrombinoscopeButton({
       disabled={loading}
       className={
         className ??
-        "flex items-center gap-1.5 rounded-full bg-navy/10 px-3 py-1.5 text-xs font-semibold text-navy transition-colors hover:bg-navy/20 disabled:opacity-60"
+        // Retour de Cindy du 05/10 ("le bouton jaune pour plus de
+        // visibilité") : une fois un fichier envoyé, c'est la vraie
+        // action du quotidien (consulter avant un match) -- même jaune
+        // plein que les CTA principaux de l'appli (ex. "Je me propose"
+        // côté bénévoles, "Se connecter"), plus discret bg-navy/10
+        // d'origine.
+        "flex items-center gap-1.5 rounded-full bg-ubac-yellow px-3 py-1.5 text-xs font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
       }
     >
       <FileText className="h-3.5 w-3.5 shrink-0" />

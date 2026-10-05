@@ -1166,11 +1166,21 @@ export default function TeamCard({
                 comprise -- il écrit vers trombinoscopeOwnerId (toujours
                 l'équipe mère) quelle que soit la carte d'où on l'envoie,
                 voir le commentaire plus haut. */}
+            {/* Retour de Cindy du 05/10 ("le bouton jaune pour plus de
+                visibilité [la consultation], et Remplacer en bleu ciel,
+                moins visible") : une fois un fichier déjà envoyé, la
+                vraie action du quotidien devient "consulter" (ci-dessous,
+                en jaune -- voir TrombinoscopeButton), "Remplacer" passe
+                au second plan. Avant tout envoi, "Envoyer" reste la seule
+                action possible : elle garde le plein navy, rien à
+                éclipser. */}
             {!isBabysTeam && !readOnly && (
               <label
-                className={`flex items-center gap-1.5 rounded-full bg-navy px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-navy-dark ${
-                  uploadingTrombinoscope ? "cursor-wait opacity-60" : "cursor-pointer"
-                }`}
+                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  trombinoscopePath
+                    ? "bg-sky-100 text-sky-700 hover:bg-sky-200"
+                    : "bg-navy text-white hover:bg-navy-dark"
+                } ${uploadingTrombinoscope ? "cursor-wait opacity-60" : "cursor-pointer"}`}
               >
                 <Upload className="h-3.5 w-3.5 shrink-0" />
                 {uploadingTrombinoscope
