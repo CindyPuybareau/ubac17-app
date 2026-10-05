@@ -234,6 +234,12 @@ export default function TeamCard({
   const [uploadingTrombinoscope, setUploadingTrombinoscope] = useState(false);
   const [trombinoscopeError, setTrombinoscopeError] = useState<string | null>(null);
   const isTrombinoscopeOwner = team.id === (team.trombinoscopeOwnerTeamId ?? team.id);
+  // Retour de Cindy du 05/10 ("pour tous le monde sauf les babys") :
+  // s'applique à toute équipe mère OU sans déclinaison (U9, U11, U13F,
+  // U15M, Loisirs...) -- seule la catégorie Babys n'a jamais de match
+  // officiel avec contrôle d'identité, donc jamais de trombinoscope. Même
+  // repli que categoryTheme ci-dessus (c.startsWith("baby")).
+  const isBabysTeam = (team.category ?? team.name ?? "").toLowerCase().startsWith("baby");
   async function onTrombinoscopeChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -1128,7 +1134,7 @@ export default function TeamCard({
               d'envoi ; une déclinaison qui hérite du fichier n'a qu'un
               lien de consultation (TrombinoscopeButton renvoie null tant
               qu'aucun fichier n'existe encore). */}
-          {!readOnly && isTrombinoscopeOwner && (
+          {!isBabysTeam && !readOnly && isTrombinoscopeOwner && (
             <label
               className={`flex items-center gap-1.5 rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50 ${
                 uploadingTrombinoscope ? "cursor-wait opacity-60" : "cursor-pointer"
@@ -1149,7 +1155,11 @@ export default function TeamCard({
               />
             </label>
           )}
-          <TrombinoscopeButton path={isTrombinoscopeOwner ? trombinoscopePath : team.trombinoscopePath ?? null} />
+          {!isBabysTeam && (
+            <TrombinoscopeButton
+              path={isTrombinoscopeOwner ? trombinoscopePath : team.trombinoscopePath ?? null}
+            />
+          )}
         </div>
       </div>
       {photoError && <p className="mt-1 text-xs text-red-600">{photoError}</p>}
