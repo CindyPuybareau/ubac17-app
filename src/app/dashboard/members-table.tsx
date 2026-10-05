@@ -11,6 +11,7 @@ import {
   ChevronDown,
   ChevronUp,
   FileText,
+  Flame,
   Mail,
   MessageCircle,
   MoreVertical,
@@ -1022,6 +1023,14 @@ export default function MembersTable({
                         aria-label="Salarié du club"
                       />
                     )}
+                    {/* Retour de Cindy du 05/10 ("sur tous les espaces les
+                        brûlés doivent être visibles par une petite
+                        flamme") : même icône qu'ailleurs dans l'appli
+                        (team-card.tsx, family-team-card.tsx), absente
+                        jusqu'ici du tableau Membres du Bureau. */}
+                    {m.isBurned && (
+                      <Flame className="h-3.5 w-3.5 shrink-0 text-orange-500" aria-label="Brûlé" />
+                    )}
                   </span>
                   {m.archivedAt && (
                     <span className="ml-1.5 inline-flex items-center justify-center whitespace-nowrap rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none text-zinc-500">
@@ -1184,6 +1193,9 @@ export default function MembersTable({
                         className="h-3.5 w-3.5 shrink-0 text-blue-600"
                         aria-label="Salarié du club"
                       />
+                    )}
+                    {m.isBurned && (
+                      <Flame className="h-3.5 w-3.5 shrink-0 text-orange-500" aria-label="Brûlé" />
                     )}
                     {m.archivedAt && (
                       <span className="inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none text-zinc-500">

@@ -928,8 +928,14 @@ export default function MemberDetailModal({
       <div className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-zinc-100 px-5 py-4">
           <div>
-            <h3 className="font-semibold text-zinc-900">
+            <h3 className="flex items-center gap-1.5 font-semibold text-zinc-900">
               {formatPersonName(member.firstName, member.lastName, "Membre")}
+              {/* Retour de Cindy du 05/10 ("pas de petite flamme présente")
+                  : même icône, même convention (après le nom) que team-
+                  card.tsx/family-team-card.tsx -- state local isBurned
+                  (pas member.isBurned) pour refléter la case à cocher plus
+                  bas sans attendre "Enregistrer". */}
+              {isBurned && <Flame className="h-4 w-4 shrink-0 text-orange-500" aria-label="Brûlé" />}
             </h3>
             {/* Retour de Cindy du 07/09 : même correctif que le champ
                 "Catégorie" plus bas (voir son commentaire) -- le nom de
@@ -1160,7 +1166,14 @@ export default function MemberDetailModal({
                     className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
                   />
                   <Flame className="h-4 w-4 shrink-0 text-orange-500" />
-                  Brûlé pour{" "}
+                  {/* Retour de Cindy du 05/10 ("il n'est pas brûlé pour
+                      U13M-2, il est brûlé pour U13M-1") : le texte nommait
+                      l'équipe SŒUR bloquée (siblingTeamIdsOfCurrentTeam),
+                      lu à tort comme "l'équipe où il est brûlé" -- inversé,
+                      nomme désormais sa VRAIE équipe (burnedTeam), avec le
+                      blocage en précision. Même règle partout (U13M,
+                      Séniors, U18M...), seul le texte changeait de sens. */}
+                  Brûlé sur {teamLabel(burnedTeam)} — ne pourra jamais rejoindre{" "}
                   {teams
                     .filter((t) => siblingTeamIdsOfCurrentTeam.has(t.id))
                     .map((t) => teamLabel(t))
