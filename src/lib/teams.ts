@@ -247,6 +247,30 @@ export function getSiblingTeamIds<
     .map((t) => t.id);
 }
 
+// Retour de Cindy du 05/10 ("trombinoscope, un par équipe mère") : résout
+// l'équipe qui PORTE effectivement le trombinoscope PDF d'une équipe
+// donnée -- elle-même si c'est déjà une équipe mère (rank 0, ex. "U13M")
+// ou une catégorie sans déclinaison (ex. "U13F", pas de "-1"/"-2"), sinon
+// la mère de sa famille (ex. "U13M" pour "U13M-1"). Même repli
+// looseFamilyKey que getSiblingTeamIds ci-dessus (le "M" de genre des
+// Séniors, "Séniors M" reconnue comme mère de "Séniors 1"/"Séniors 2").
+// Ne renvoie jamais null : une déclinaison sans mère trouvée (cas
+// normalement impossible, voir getSiblingTeamIds) reste simplement
+// propriétaire de son propre trombinoscope plutôt que de ne rien afficher.
+export function getTrombinoscopeTeamId<
+  T extends { id: string; name?: string | null; category?: string | null },
+>(team: T, allTeams: T[]): string {
+  const label = team.name ?? team.category ?? "";
+  const { rank } = splitTeamName(label);
+  if (rank === 0) return team.id;
+  const base = looseFamilyKey(label);
+  const mother = allTeams.find((t) => {
+    const tLabel = t.name ?? t.category ?? "";
+    return splitTeamName(tLabel).rank === 0 && looseFamilyKey(tLabel) === base;
+  });
+  return mother?.id ?? team.id;
+}
+
 // Retour de Cindy du 30/09, précisé le même jour ("en équipe 2, il n'y a
 // jamais de brûlé") : le statut ne peut vivre QUE sur la déclinaison la
 // plus petite d'une paire sœur (ex. U13M-1, jamais U13M-2) -- un joueur de

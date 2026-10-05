@@ -10,6 +10,7 @@ import { getSpaceDashboardSummary, type SpaceDashboardSummary } from "@/lib/spac
 import { getCachedTeams, getCachedCategoryTariffs, getCachedAccessProfiles } from "@/lib/reference-cache";
 import {
   getSiblingTeamIds,
+  getTrombinoscopeTeamId,
   isSharedRsvpTeamGroup,
   widenTeamIdsForSharedRsvpGroups,
 } from "@/lib/teams";
@@ -1657,6 +1658,12 @@ export default async function DashboardPage({
   })();
 
   let adminTeams: TeamWithMembers[] = [];
+  // Retour de Cindy du 05/10 ("trombinoscope... accès facile pour chaque
+  // match officiel") : chemin résolu par équipe (mère ou héritée d'une
+  // mère), pour que calendar-view.tsx affiche le lien sur la carte de
+  // match sans avoir à recalculer la famille d'équipes lui-même -- clé
+  // = team.id de N'IMPORTE QUELLE équipe du club (mère ou déclinaison).
+  const adminTrombinoscopeByTeamId: Record<string, string | null> = {};
   let allProfilesForAdmin: Person[] = [];
   let adminCotisations: AdminCotisation[] = [];
   let adminCollectes: AdminCollecte[] = [];
@@ -1734,6 +1741,7 @@ export default async function DashboardPage({
     ffbb_url: string | null;
     sort_order: number | null;
     pending_coach_names: string | null;
+    trombinoscope_path?: string | null;
   }[] = [];
   let adminTeamPlayersRaw: { team_id: string; player_id: string; position: string | null; is_burned: boolean }[] = [];
   let adminTeamCoachesRaw: { team_id: string; coach_id: string }[] = [];
@@ -2203,6 +2211,18 @@ export default async function DashboardPage({
       pendingCoachesByTeam.set(tpc.team_id, list);
     });
 
+    // Retour de Cindy du 05/10 ("trombinoscope, un par équipe mère") :
+    // résolu une fois ici pour tout le club (teamsRes.data, déjà chargé,
+    // aucune requête de plus) -- une déclinaison (ex. "U13M-1") hérite du
+    // chemin de sa mère ("U13M") via getTrombinoscopeTeamId.
+    const trombinoscopePathByOwnerId = new Map(
+      (teamsRes.data ?? []).map((t) => [t.id, t.trombinoscope_path ?? null])
+    );
+    (teamsRes.data ?? []).forEach((t) => {
+      const ownerId = getTrombinoscopeTeamId(t, teamsRes.data ?? []);
+      adminTrombinoscopeByTeamId[t.id] = trombinoscopePathByOwnerId.get(ownerId) ?? null;
+    });
+
     adminTeams = (teamsRes.data ?? []).map((t) => ({
       id: t.id,
       name: t.name,
@@ -2214,6 +2234,8 @@ export default async function DashboardPage({
       pendingCoaches: pendingCoachesByTeam.get(t.id) ?? [],
       pendingCoachNames: t.pending_coach_names,
       photoUrl: t.photo_url,
+      trombinoscopePath: adminTrombinoscopeByTeamId[t.id] ?? null,
+      trombinoscopeOwnerTeamId: getTrombinoscopeTeamId(t, teamsRes.data ?? []),
     }));
     allProfilesForAdmin = profilesRes.data ?? [];
     canonicalTeamRefs = (teamsRes.data ?? [])
@@ -2738,6 +2760,10 @@ export default async function DashboardPage({
   })();
 
   let coachTeamsWithRoster: TeamWithMembers[] = [];
+  // Même principe que adminTrombinoscopeByTeamId côté Bureau -- clé =
+  // team.id de n'importe quelle équipe du club, valeur = chemin déjà
+  // résolu (propre ou hérité de la mère).
+  const coachTrombinoscopeByTeamId: Record<string, string | null> = {};
   let coachEvents: AdminUpcomingEvent[] = [];
   // Retour de Cindy du 30/09 ("équipes sœurs") : ids des déclinaisons
   // sœurs des équipes coachées (U13M-1↔U13M-2...) -- réutilisé à la fois
@@ -3398,6 +3424,22 @@ export default async function DashboardPage({
       pendingCoachesByTeam.set(tpc.team_id, list);
     });
 
+    // Retour de Cindy du 05/10 ("trombinoscope, un par équipe mère") :
+    // résolu sur le catalogue CLUB ENTIER (allClubTeamsRes.data), pas
+    // seulement coachAllTeams -- un coach de U13M-1 doit pouvoir lire le
+    // trombinoscope de "U13M" même s'il ne la coache pas lui-même, voir
+    // la policy de lecture large (is_coach_anywhere) côté Storage.
+    const coachTrombinoscopePathByOwnerId = new Map(
+      (allClubTeamsRes.data ?? []).map((t) => [
+        t.id,
+        (t as { trombinoscope_path?: string | null }).trombinoscope_path ?? null,
+      ])
+    );
+    (allClubTeamsRes.data ?? []).forEach((t) => {
+      const ownerId = getTrombinoscopeTeamId(t, allClubTeamsRes.data ?? []);
+      coachTrombinoscopeByTeamId[t.id] = coachTrombinoscopePathByOwnerId.get(ownerId) ?? null;
+    });
+
     coachTeamsWithRoster = coachAllTeams.map((t) => ({
       id: t.id,
       name: t.name,
@@ -3407,6 +3449,8 @@ export default async function DashboardPage({
       coaches: coachesByTeam.get(t.id) ?? [],
       pendingCoaches: pendingCoachesByTeam.get(t.id) ?? [],
       pendingCoachNames: t.pending_coach_names,
+      trombinoscopePath: coachTrombinoscopeByTeamId[t.id] ?? null,
+      trombinoscopeOwnerTeamId: getTrombinoscopeTeamId(t, allClubTeamsRes.data ?? []),
     }));
 
     // EVERY team each of these players belongs to, not just the coach's own
@@ -5002,6 +5046,7 @@ export default async function DashboardPage({
             seasonVolunteerGuestEntries={adminSeasonVolunteerGuestEntries}
             clubReports={clubReports}
             ownPlayerId={ownPlayerId}
+            trombinoscopeByTeamId={adminTrombinoscopeByTeamId}
           />
         ) : null,
     });
@@ -5063,6 +5108,7 @@ export default async function DashboardPage({
             clubReports={clubReports}
             currentUserId={user.id}
             dashboardSummary={coachDashboardSummary}
+            trombinoscopeByTeamId={coachTrombinoscopeByTeamId}
           />
         ) : null,
     });

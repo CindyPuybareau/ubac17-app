@@ -92,6 +92,7 @@ export default function AdminView({
   clubReports,
   dashboardSummary,
   ownPlayerId = null,
+  trombinoscopeByTeamId,
 }: {
   // Profils d'accès sur-mesure (retour de Cindy du 05/09, étape 3) : null
   // pour un Bureau complet (comportement historique, inchangé) ; sinon, la
@@ -140,6 +141,13 @@ export default function AdminView({
   // BureauDashboard/CalendarView pour le présent/absent en propre nom sur
   // une Réunion.
   ownPlayerId?: string | null;
+  // Retour de Cindy du 05/10 ("trombinoscope... accès facile pour chaque
+  // match officiel") : chemin déjà résolu par équipe (mère ou héritée
+  // d'une mère, voir page.tsx/adminTrombinoscopeByTeamId) -- transmis tel
+  // quel à CalendarView pour le lien sur la carte de match, seulement sur
+  // les onglets dédiés aux matchs officiels (pas le Calendrier général,
+  // mélangé entraînements/amicaux).
+  trombinoscopeByTeamId?: Record<string, string | null>;
 }) {
   const teamRefs = teams.map((t) => ({
     id: t.id,
@@ -474,6 +482,7 @@ export default function AdminView({
               eventRoles={eventRoles}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
               commissionGroups={commissionGroups}
+              trombinoscopeByTeamId={trombinoscopeByTeamId}
             />
           ),
         },
@@ -498,6 +507,7 @@ export default function AdminView({
               eventRoles={eventRoles}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
               commissionGroups={commissionGroups}
+              trombinoscopeByTeamId={trombinoscopeByTeamId}
             />
           ),
         },

@@ -57,6 +57,15 @@ export type TeamWithMembers = {
   // Optionnel : les objets construits ailleurs (ex. le calendrier Coach)
   // n'ont pas besoin de le porter.
   photoUrl?: string | null;
+  // Retour de Cindy du 05/10 ("trombinoscope, un par équipe mère") :
+  // chemin Storage déjà résolu -- celui de CETTE équipe si elle est mère
+  // (ou sans déclinaison), sinon celui de sa mère (héritage transparent,
+  // voir getTrombinoscopeTeamId dans src/lib/teams.ts). trombinoscopeOwnerTeamId
+  // dit quelle équipe porte RÉELLEMENT le fichier -- seule sa propre carte
+  // affiche le bouton d'envoi, les déclinaisons n'ont qu'un lien de
+  // consultation vers le même fichier. Optionnels comme photoUrl ci-dessus.
+  trombinoscopePath?: string | null;
+  trombinoscopeOwnerTeamId?: string;
 };
 
 export default function TeamManager({

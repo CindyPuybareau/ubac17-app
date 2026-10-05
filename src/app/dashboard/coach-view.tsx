@@ -66,6 +66,7 @@ export default function CoachView({
   clubReports,
   currentUserId,
   dashboardSummary,
+  trombinoscopeByTeamId,
 }: {
   teams: TeamWithMembers[];
   events: AdminUpcomingEvent[];
@@ -116,6 +117,10 @@ export default function CoachView({
   // dashboard.ts, teamIds = createTeams ci-dessous) -- jamais des équipes
   // où ce coach n'est que joueur, celles-là vivent déjà dans "Mon équipe".
   dashboardSummary: SpaceDashboardSummaryData;
+  // Retour de Cindy du 05/10 ("trombinoscope... accès facile pour chaque
+  // match officiel") : même chemin déjà résolu que côté Bureau (voir
+  // page.tsx/coachTrombinoscopeByTeamId), transmis tel quel à CalendarView.
+  trombinoscopeByTeamId?: Record<string, string | null>;
 }) {
   // Créer / modifier / supprimer un événement n'est permis que pour les
   // équipes réellement entraînées : proposer celle où l'utilisateur n'est
@@ -432,6 +437,7 @@ export default function CoachView({
               selfPlayerId={ownPlayerId}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
               celebrateWins
+              trombinoscopeByTeamId={trombinoscopeByTeamId}
             />
           ),
         },
@@ -454,6 +460,7 @@ export default function CoachView({
               selfPlayerId={ownPlayerId}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
               celebrateWins
+              trombinoscopeByTeamId={trombinoscopeByTeamId}
             />
           ),
         },

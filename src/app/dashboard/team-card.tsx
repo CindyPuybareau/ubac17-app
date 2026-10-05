@@ -14,6 +14,7 @@ import {
   Phone,
   Search,
   Trash2,
+  Upload,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { resizeImageForTeamPhoto } from "@/lib/image-resize";
@@ -26,6 +27,7 @@ import OpponentDisplay from "./opponent-display";
 import MemberDetailModal from "./member-detail-modal";
 import PlayerYearBadge from "./player-year-badge";
 import SalleBadge from "./salle-badge";
+import TrombinoscopeButton from "./trombinoscope-button";
 import { useToast } from "./toast-context";
 import WhatsAppDirectButton from "./whatsapp-direct-button";
 import WhatsAppGroupButton from "./whatsapp-group-button";
@@ -218,6 +220,52 @@ export default function TeamCard({
       setPhotoError("Image illisible, réessaie avec une autre photo.");
     } finally {
       setUploadingPhoto(false);
+    }
+  }
+
+  // Retour de Cindy du 05/10 ("trombinoscope, un par équipe mère") : même
+  // principe que la photo d'équipe ci-dessus -- affichage optimiste,
+  // écriture directe -- mais bucket PRIVÉ (team-trombinoscopes) et
+  // toujours écrit sous le dossier de l'équipe MÈRE (team.trombinoscopeOwnerTeamId),
+  // jamais celui d'une déclinaison : seule la carte de l'équipe mère
+  // affiche ce bouton d'envoi (voir isTrombinoscopeOwner plus bas), les
+  // déclinaisons n'ont qu'un lien de consultation vers le même fichier.
+  const [trombinoscopePath, setTrombinoscopePath] = useState(team.trombinoscopePath ?? null);
+  const [uploadingTrombinoscope, setUploadingTrombinoscope] = useState(false);
+  const [trombinoscopeError, setTrombinoscopeError] = useState<string | null>(null);
+  const isTrombinoscopeOwner = team.id === (team.trombinoscopeOwnerTeamId ?? team.id);
+  async function onTrombinoscopeChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.type !== "application/pdf") {
+      setTrombinoscopeError("Choisis un fichier PDF.");
+      return;
+    }
+    setUploadingTrombinoscope(true);
+    setTrombinoscopeError(null);
+    try {
+      const supabase = createClient();
+      const path = `${team.id}/trombinoscope.pdf`;
+      const { error: uploadErr } = await supabase.storage
+        .from("team-trombinoscopes")
+        .upload(path, file, { upsert: true, contentType: "application/pdf" });
+      if (uploadErr) {
+        setTrombinoscopeError("Envoi impossible, réessaie.");
+        return;
+      }
+      const { error: updateErr } = await supabase
+        .from("teams")
+        .update({ trombinoscope_path: path })
+        .eq("id", team.id);
+      if (updateErr) {
+        setTrombinoscopeError("Enregistrement impossible, réessaie.");
+        return;
+      }
+      setTrombinoscopePath(path);
+      router.refresh();
+    } finally {
+      setUploadingTrombinoscope(false);
     }
   }
 
@@ -1074,9 +1122,38 @@ export default function TeamCard({
               {team.category}
             </span>
           )}
+          {/* Retour de Cindy du 05/10 ("trombinoscope, un par équipe
+              mère") : même emplacement que la photo ci-dessus. Seule la
+              carte de l'équipe mère (isTrombinoscopeOwner) a le bouton
+              d'envoi ; une déclinaison qui hérite du fichier n'a qu'un
+              lien de consultation (TrombinoscopeButton renvoie null tant
+              qu'aucun fichier n'existe encore). */}
+          {!readOnly && isTrombinoscopeOwner && (
+            <label
+              className={`flex items-center gap-1.5 rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50 ${
+                uploadingTrombinoscope ? "cursor-wait opacity-60" : "cursor-pointer"
+              }`}
+            >
+              <Upload className="h-3.5 w-3.5 shrink-0" />
+              {uploadingTrombinoscope
+                ? "Envoi…"
+                : trombinoscopePath
+                  ? "Remplacer le trombinoscope"
+                  : "Envoyer le trombinoscope"}
+              <input
+                type="file"
+                accept="application/pdf"
+                onChange={onTrombinoscopeChange}
+                disabled={uploadingTrombinoscope}
+                className="hidden"
+              />
+            </label>
+          )}
+          <TrombinoscopeButton path={isTrombinoscopeOwner ? trombinoscopePath : team.trombinoscopePath ?? null} />
         </div>
       </div>
       {photoError && <p className="mt-1 text-xs text-red-600">{photoError}</p>}
+      {trombinoscopeError && <p className="mt-1 text-xs text-red-600">{trombinoscopeError}</p>}
 
       <div className="mt-3">
         <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
