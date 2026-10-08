@@ -3,6 +3,7 @@ import type { ChildEvent } from "@/app/enfant/view/child-dashboard";
 import type { ClubReport, SponsorDisplay } from "@/app/dashboard/page";
 import type { ProfileMember, ProfileTeam } from "@/app/benevole/view/profile-sections";
 import { upcomingBirthdays, type BirthdaySource } from "@/app/dashboard/birthdays";
+import { getCachedTeams } from "@/lib/reference-cache";
 
 // Retour de Cindy du 25/09 ("les bénévoles doivent pouvoir cliquer sur
 // présent ou absent... et payer via HelloAsso") : ChildEvent + de quoi
@@ -131,11 +132,16 @@ export async function getReadOnlyBriquesData(
   // cette requête deux fois.
   let teamsData: { id: string; name: string | null; category: string | null; sort_order: number | null }[] = [];
   if (has("calendrier") || has("evenements") || has("matchs_resultats") || has("equipes")) {
-    const { data } = await supabase
-      .from("teams")
-      .select("id, name, category, sort_order")
-      .order("sort_order", { ascending: true });
-    teamsData = data ?? [];
+    // Retour de l'audit du 05/10 ("il faut revoir les requêtes") : même
+    // donnée que getCachedTeams() (déjà utilisée par dashboard/page.tsx),
+    // redemandée ici directement à chaque chargement au lieu de
+    // réutiliser ce même cache partagé 45s -- teams est lisible
+    // identiquement par tout le monde (policy `using (true)`), exactement
+    // la précondition que reference-cache.ts documente pour ce repli.
+    const { data } = await getCachedTeams();
+    teamsData = (data ?? [])
+      .map((t) => ({ id: t.id, name: t.name, category: t.category, sort_order: t.sort_order }))
+      .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999));
     profileTeamRefs = teamsData.map((t) => ({ id: t.id, name: t.name, category: t.category }));
   }
 
@@ -382,10 +388,13 @@ export async function getReadOnlyBriquesData(
   }
 
   if (has("compte_rendu_mairies") || has("compte_rendu_bureau") || has("compte_rendu_coachs") || has("compte_rendu_cd17_ligue")) {
+    // Retour de l'audit du 05/10 ("il faut revoir les requêtes") : même
+    // correctif que page.tsx -- voir son commentaire.
     const { data: clubReportsData } = await supabase
       .from("club_reports")
       .select("id, category, title, report_date, body, created_by, file_path, updated_at")
-      .order("report_date", { ascending: false });
+      .order("report_date", { ascending: false })
+      .limit(300);
     const filePaths = (clubReportsData ?? [])
       .map((r) => r.file_path)
       .filter((p): p is string => Boolean(p));

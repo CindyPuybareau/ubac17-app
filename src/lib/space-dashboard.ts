@@ -4,6 +4,7 @@ import { getVolunteerNeedsByEventId, type VolunteerNeed } from "@/app/dashboard/
 import { getMatchOfficialRolesByEventId, type MatchOfficialAssignment } from "@/app/dashboard/match-official-roles";
 import { runBatched, Semaphore } from "./batch";
 import { listTeamsForOfficialMatches } from "./teams";
+import { getCachedTeams } from "./reference-cache";
 import type { FfbbRankingEntry } from "./ffbb";
 
 // "Tableau de bord" (retour de Cindy du 13/09, "ce que tu mettrais dans le
@@ -256,9 +257,20 @@ export async function getSpaceDashboardSummary(
       // la fois au repli plat existant (singleTeamId) et au détail par
       // équipe (byTeam) juste en dessous. Toujours vide pour le club
       // entier (teamIds null), comme avant.
+      // Retour de l'audit du 05/10 ("il faut revoir les requêtes") :
+      // redemandait "teams" directement à chaque chargement du Tableau de
+      // bord (Bureau/Coach/Famille/Enfant, le plus fréquent de toute
+      // l'appli) au lieu de réutiliser le cache partagé 45s déjà en place
+      // (getCachedTeams, reference-cache.ts) -- filtré sur teamIds en
+      // mémoire plutôt qu'en base, même résultat.
       () =>
         teamIds && teamIds.length > 0
-          ? supabase.from("teams").select("id, name, category, photo_url").in("id", teamIds)
+          ? getCachedTeams().then((res) => ({
+              data: (res.data ?? [])
+                .filter((t) => teamIds.includes(t.id))
+                .map((t) => ({ id: t.id, name: t.name, category: t.category, photo_url: t.photo_url })),
+              error: res.error,
+            }))
           : Promise.resolve({ data: null, error: null }),
       // Retour de Cindy du 01/10 ("le classement apparaisse dans le tableau
       // de bord aussi") : même lot déjà groupé, une requête de plus plutôt

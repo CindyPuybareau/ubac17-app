@@ -1282,7 +1282,16 @@ export default async function DashboardPage({
       clubReportsResult = await supabase
         .from("club_reports")
         .select("id, category, title, report_date, body, created_by, file_path, updated_at")
-        .order("report_date", { ascending: false });
+        .order("report_date", { ascending: false })
+        // Retour de l'audit du 05/10 ("il faut revoir les requêtes") :
+        // jamais purgé (règle CLAUDE.md), donc grossit chaque saison --
+        // sans limite, chaque chargement du Tableau de bord Bureau/Coach
+        // redemandait TOUT l'historique et régénérait une URL signée pour
+        // CHAQUE fichier jamais déposé, même les plus anciens. 300 lignes
+        // couvre très largement plusieurs saisons (quelques comptes rendus
+        // par mois, 4 catégories) sans jamais rien supprimer en base --
+        // seulement moins chargé par défaut.
+        .limit(300);
     } finally {
       releaseClubReports();
     }
