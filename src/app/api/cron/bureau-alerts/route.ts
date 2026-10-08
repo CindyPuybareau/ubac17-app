@@ -8,6 +8,7 @@ import {
 } from "@/lib/cotisation-relance";
 import { volunteerRoleLabel } from "@/app/dashboard/event-volunteer-needs";
 import { resolveTeamPushSubscriptions, sendWebPush } from "@/lib/push-targets";
+import { runBatched } from "@/lib/batch";
 
 // Une pénalité encore due n'est jamais relancée plus souvent que ça — pas
 // de date d'échéance propre à surveiller (contrairement à une licence),
@@ -93,59 +94,67 @@ async function runExpiryAlerts(supabase: ReturnType<typeof createServiceClient>)
   let sent = 0;
   let skippedNoEmail = 0;
 
-  for (const p of (playersData ?? []) as PlayerRow[]) {
-    const dueLicense = Boolean(
-      p.license_expires_at &&
-        !p.license_expiry_alert_sent_at &&
-        p.license_expires_at <= windowEndIso
-    );
-    const dueMedical = Boolean(
-      p.medical_certificate_expires_at &&
-        !p.medical_expiry_alert_sent_at &&
-        p.medical_certificate_expires_at <= windowEndIso
-    );
-    if (!dueLicense && !dueMedical) continue;
-
-    const email = await resolveContactEmail(supabase, p);
-    const fullName = [p.first_name, p.last_name].filter(Boolean).join(" ") || "ce membre";
-
-    // Pas d'email trouvé : ni envoyé ni marqué "alerté" — si un email est
-    // ajouté plus tard sur la fiche, le prochain passage du cron enverra
-    // normalement le rappel au lieu de rester bloqué indéfiniment.
-    if (!email) {
-      skippedNoEmail += 1;
-      continue;
-    }
-
-    const lines: string[] = [];
-    if (dueLicense)
-      lines.push(`- Licence FFBB : expire le ${formatDateFr(p.license_expires_at as string)}`);
-    if (dueMedical)
-      lines.push(
-        `- Certificat médical : expire le ${formatDateFr(p.medical_certificate_expires_at as string)}`
+  // Retour de l'audit du 05/10 ("il faut revoir les requêtes") : même
+  // correctif que sendCotisationRelances (lib/cotisation-relance.ts) --
+  // runBatched (limite 4) au lieu d'un membre après l'autre.
+  await runBatched(
+    ((playersData ?? []) as PlayerRow[]).map((p) => async () => {
+      const dueLicense = Boolean(
+        p.license_expires_at &&
+          !p.license_expiry_alert_sent_at &&
+          p.license_expires_at <= windowEndIso
       );
+      const dueMedical = Boolean(
+        p.medical_certificate_expires_at &&
+          !p.medical_expiry_alert_sent_at &&
+          p.medical_certificate_expires_at <= windowEndIso
+      );
+      if (!dueLicense && !dueMedical) return;
 
-    const subject = `UBAC — Renouvellement à prévoir pour ${fullName}`;
-    const body = `Bonjour,\n\nUn document arrive à échéance pour ${fullName} :\n${lines.join("\n")}\n\nMerci de vous rapprocher du Bureau pour le renouvellement.\n\nSportivement,\nL'UBAC`;
+      const email = await resolveContactEmail(supabase, p);
+      const fullName = [p.first_name, p.last_name].filter(Boolean).join(" ") || "ce membre";
 
-    const result = await sendEmail({ to: email, subject, body });
-    // "simulated" (pas de fournisseur configuré, cas local) ne compte
-    // jamais comme envoyé : sinon un prochain vrai passage en production
-    // croirait l'alerte déjà partie alors qu'elle n'a jamais existé.
-    if (result.ok && !result.simulated) {
-      sent += 1;
-      const update: Record<string, string> = {};
-      if (dueLicense) update.license_expiry_alert_sent_at = new Date().toISOString();
-      if (dueMedical) update.medical_expiry_alert_sent_at = new Date().toISOString();
-      const { error: markSentError } = await supabase.from("players").update(update).eq("id", p.id);
-      // Audit du 31/08 : ce marqueur est ce qui empêche un renvoi — un
-      // échec silencieux ici ferait relancer la même alerte les jours
-      // suivants (toujours dans la fenêtre d'avril).
-      if (markSentError) {
-        console.error("[bureau-alerts] marquage alerte échéance échoué:", markSentError);
+      // Pas d'email trouvé : ni envoyé ni marqué "alerté" — si un email
+      // est ajouté plus tard sur la fiche, le prochain passage du cron
+      // enverra normalement le rappel au lieu de rester bloqué
+      // indéfiniment.
+      if (!email) {
+        skippedNoEmail += 1;
+        return;
       }
-    }
-  }
+
+      const lines: string[] = [];
+      if (dueLicense)
+        lines.push(`- Licence FFBB : expire le ${formatDateFr(p.license_expires_at as string)}`);
+      if (dueMedical)
+        lines.push(
+          `- Certificat médical : expire le ${formatDateFr(p.medical_certificate_expires_at as string)}`
+        );
+
+      const subject = `UBAC — Renouvellement à prévoir pour ${fullName}`;
+      const body = `Bonjour,\n\nUn document arrive à échéance pour ${fullName} :\n${lines.join("\n")}\n\nMerci de vous rapprocher du Bureau pour le renouvellement.\n\nSportivement,\nL'UBAC`;
+
+      const result = await sendEmail({ to: email, subject, body });
+      // "simulated" (pas de fournisseur configuré, cas local) ne compte
+      // jamais comme envoyé : sinon un prochain vrai passage en
+      // production croirait l'alerte déjà partie alors qu'elle n'a
+      // jamais existé.
+      if (result.ok && !result.simulated) {
+        sent += 1;
+        const update: Record<string, string> = {};
+        if (dueLicense) update.license_expiry_alert_sent_at = new Date().toISOString();
+        if (dueMedical) update.medical_expiry_alert_sent_at = new Date().toISOString();
+        const { error: markSentError } = await supabase.from("players").update(update).eq("id", p.id);
+        // Audit du 31/08 : ce marqueur est ce qui empêche un renvoi — un
+        // échec silencieux ici ferait relancer la même alerte les jours
+        // suivants (toujours dans la fenêtre d'avril).
+        if (markSentError) {
+          console.error("[bureau-alerts] marquage alerte échéance échoué:", markSentError);
+        }
+      }
+    }),
+    4
+  );
 
   return { sent, skippedNoEmail, checked: (playersData ?? []).length };
 }
@@ -202,40 +211,45 @@ async function runPenaliteRelances(supabase: ReturnType<typeof createServiceClie
   let skippedNoEmail = 0;
   let checked = 0;
 
-  for (const row of (penalitesData ?? []) as unknown as PenaliteRow[]) {
-    const player = row.players;
-    if (!player) continue;
-    checked += 1;
+  // Retour de l'audit du 05/10 ("il faut revoir les requêtes") : même
+  // correctif que sendCotisationRelances/runExpiryAlerts ci-dessus.
+  await runBatched(
+    ((penalitesData ?? []) as unknown as PenaliteRow[]).map((row) => async () => {
+      const player = row.players;
+      if (!player) return;
+      checked += 1;
 
-    const fullName = [player.first_name, player.last_name].filter(Boolean).join(" ") || "ce membre";
-    const email = await resolveContactEmail(supabase, {
-      id: row.player_id,
-      registration_email: player.registration_email,
-      profile_id: player.profile_id,
-    });
-    if (!email) {
-      skippedNoEmail += 1;
-      continue;
-    }
-
-    const amountFr = row.amount.toLocaleString("fr-FR", { minimumFractionDigits: 2 });
-    const dateLine = row.penalite_date ? ` (${formatDateFr(row.penalite_date)})` : "";
-    const notesLine = row.notes ? `\nMotif : ${row.notes}` : "";
-    const subject = `UBAC — Pénalité à régler pour ${fullName}`;
-    const body = `Bonjour,\n\nUne pénalité de ${amountFr} €${dateLine} reste à régler pour ${fullName}.${notesLine}\n\nMerci de vous rapprocher du Bureau pour le règlement.\n\nSportivement,\nL'UBAC`;
-
-    const result = await sendEmail({ to: email, subject, body });
-    if (result.ok && !result.simulated) {
-      sent += 1;
-      const { error: markSentError } = await supabase
-        .from("penalites")
-        .update({ last_auto_relance_sent_at: new Date().toISOString() })
-        .eq("id", row.id);
-      if (markSentError) {
-        console.error("[bureau-alerts] marquage relance pénalité échoué:", markSentError);
+      const fullName = [player.first_name, player.last_name].filter(Boolean).join(" ") || "ce membre";
+      const email = await resolveContactEmail(supabase, {
+        id: row.player_id,
+        registration_email: player.registration_email,
+        profile_id: player.profile_id,
+      });
+      if (!email) {
+        skippedNoEmail += 1;
+        return;
       }
-    }
-  }
+
+      const amountFr = row.amount.toLocaleString("fr-FR", { minimumFractionDigits: 2 });
+      const dateLine = row.penalite_date ? ` (${formatDateFr(row.penalite_date)})` : "";
+      const notesLine = row.notes ? `\nMotif : ${row.notes}` : "";
+      const subject = `UBAC — Pénalité à régler pour ${fullName}`;
+      const body = `Bonjour,\n\nUne pénalité de ${amountFr} €${dateLine} reste à régler pour ${fullName}.${notesLine}\n\nMerci de vous rapprocher du Bureau pour le règlement.\n\nSportivement,\nL'UBAC`;
+
+      const result = await sendEmail({ to: email, subject, body });
+      if (result.ok && !result.simulated) {
+        sent += 1;
+        const { error: markSentError } = await supabase
+          .from("penalites")
+          .update({ last_auto_relance_sent_at: new Date().toISOString() })
+          .eq("id", row.id);
+        if (markSentError) {
+          console.error("[bureau-alerts] marquage relance pénalité échoué:", markSentError);
+        }
+      }
+    }),
+    4
+  );
 
   return { sent, skippedNoEmail, checked };
 }
@@ -331,80 +345,86 @@ async function runVolunteerNeedRemindersForStage(
   const eventById = new Map(events.map((e) => [e.id, e]));
 
   let sent = 0;
-  for (const need of needs) {
+  // Retour de l'audit du 05/10 ("il faut revoir les requêtes") : même
+  // correctif que les deux fonctions précédentes.
+  await runBatched(
+    needs.map((need) => async () => {
     const filled = signupCountByNeedId.get(need.id) ?? 0;
-    if (filled >= need.required_count) continue; // déjà complet, rien à relancer
+      if (filled >= need.required_count) return; // déjà complet, rien à relancer
 
-    const event = eventById.get(need.event_id);
-    if (!event) continue;
+      const event = eventById.get(need.event_id);
+      if (!event) return;
 
-    const roleLabel = volunteerRoleLabel(need.role_code, need.custom_label);
-    const remaining = need.required_count - filled;
-    const dateLabel = new Date(event.start_time).toLocaleDateString("fr-FR", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      timeZone: "Europe/Paris",
-    });
-    const title = "Besoin bénévole non pourvu";
-    const body = `${roleLabel} — encore ${remaining} place${remaining > 1 ? "s" : ""} pour ${
-      event.title ?? "un événement"
-    } du ${dateLabel}.`;
-
-    const { error: teamNotifError } = await supabase.from("notifications").insert({
-      team_id: event.team_id,
-      target_team_ids: event.target_team_ids,
-      event_id: event.id,
-      title,
-      body,
-      url: "/dashboard",
-    });
-    if (teamNotifError) {
-      console.error("[bureau-alerts] notification relance besoin (équipe) échouée:", teamNotifError);
-    }
-
-    if (event.commission_group_ids.length > 0) {
-      const { error: commissionNotifError } = await supabase.from("notifications").insert(
-        event.commission_group_ids.map((groupId) => ({
-          commission_group_id: groupId,
-          event_id: event.id,
-          title,
-          body,
-        }))
-      );
-      if (commissionNotifError) {
-        console.error(
-          "[bureau-alerts] notification relance besoin (commission) échouée:",
-          commissionNotifError
-        );
-      }
-    }
-
-    // Retour de Cindy du 17/09 ("je veux des push réels pour...").
-    try {
-      const targets = await resolveTeamPushSubscriptions(supabase, {
-        teamId: event.team_id,
-        targetTeamIds: event.target_team_ids,
+      const roleLabel = volunteerRoleLabel(need.role_code, need.custom_label);
+      const remaining = need.required_count - filled;
+      const dateLabel = new Date(event.start_time).toLocaleDateString("fr-FR", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        timeZone: "Europe/Paris",
       });
-      await sendWebPush(targets, { title, body, url: "/dashboard" });
-    } catch (pushError) {
-      console.error("[bureau-alerts] push relance besoin échoué:", pushError);
-    }
+      const title = "Besoin bénévole non pourvu";
+      const body = `${roleLabel} — encore ${remaining} place${remaining > 1 ? "s" : ""} pour ${
+        event.title ?? "un événement"
+      } du ${dateLabel}.`;
 
-    // Marqué "relancé" même si l'un des deux inserts ci-dessus a échoué :
-    // même logique que match-reminders (reminder_sent_at) — ce n'est pas
-    // une erreur à réessayer demain, sans quoi ce même besoin serait
-    // relancé indéfiniment tant qu'il resterait non pourvu.
-    const { error: markSentError } = await supabase
-      .from("event_volunteer_needs")
-      .update({ [stage.column]: new Date().toISOString() })
-      .eq("id", need.id);
-    if (markSentError) {
-      console.error(`[bureau-alerts] marquage ${stage.column} (besoin) échoué:`, markSentError);
-    } else {
-      sent += 1;
-    }
-  }
+      const { error: teamNotifError } = await supabase.from("notifications").insert({
+        team_id: event.team_id,
+        target_team_ids: event.target_team_ids,
+        event_id: event.id,
+        title,
+        body,
+        url: "/dashboard",
+      });
+      if (teamNotifError) {
+        console.error("[bureau-alerts] notification relance besoin (équipe) échouée:", teamNotifError);
+      }
+
+      if (event.commission_group_ids.length > 0) {
+        const { error: commissionNotifError } = await supabase.from("notifications").insert(
+          event.commission_group_ids.map((groupId) => ({
+            commission_group_id: groupId,
+            event_id: event.id,
+            title,
+            body,
+          }))
+        );
+        if (commissionNotifError) {
+          console.error(
+            "[bureau-alerts] notification relance besoin (commission) échouée:",
+            commissionNotifError
+          );
+        }
+      }
+
+      // Retour de Cindy du 17/09 ("je veux des push réels pour...").
+      try {
+        const targets = await resolveTeamPushSubscriptions(supabase, {
+          teamId: event.team_id,
+          targetTeamIds: event.target_team_ids,
+        });
+        await sendWebPush(targets, { title, body, url: "/dashboard" });
+      } catch (pushError) {
+        console.error("[bureau-alerts] push relance besoin échoué:", pushError);
+      }
+
+      // Marqué "relancé" même si l'un des deux inserts ci-dessus a
+      // échoué : même logique que match-reminders (reminder_sent_at) —
+      // ce n'est pas une erreur à réessayer demain, sans quoi ce même
+      // besoin serait relancé indéfiniment tant qu'il resterait non
+      // pourvu.
+      const { error: markSentError } = await supabase
+        .from("event_volunteer_needs")
+        .update({ [stage.column]: new Date().toISOString() })
+        .eq("id", need.id);
+      if (markSentError) {
+        console.error(`[bureau-alerts] marquage ${stage.column} (besoin) échoué:`, markSentError);
+      } else {
+        sent += 1;
+      }
+    }),
+    4
+  );
 
   return { sent, checked: needs.length };
 }

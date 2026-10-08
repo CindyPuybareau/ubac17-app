@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { chunkedQuery, type Semaphore } from "@/lib/batch";
+import { chunkedQuery, runBatched, type Semaphore } from "@/lib/batch";
 import { formatPersonName } from "@/lib/names";
 import { sendTeamPush } from "@/lib/push-notify-client";
 import type { RoleIconName } from "./role-icon";
@@ -204,43 +204,51 @@ export async function notifyVolunteerNeedReminder(
   });
   const title = "Besoin bénévole non pourvu";
 
-  for (const need of unresolvedNeeds) {
-    const roleLabel = volunteerRoleLabel(need.roleCode, need.customLabel);
-    const remaining = need.requiredCount - need.signups.length;
-    const body = `${roleLabel} — encore ${remaining} place${remaining > 1 ? "s" : ""} pour ${
-      event.title ?? "un événement"
-    } du ${dateLabel}.`;
+  // Retour de l'audit du 05/10 ("il faut revoir les requêtes") : un
+  // besoin après l'autre (jusqu'à 3 requêtes + un envoi push chacun) --
+  // volume limité ici (bouton manuel "Relancer", un seul événement à la
+  // fois), mais même défaut que les boucles cron ci-dessus. runBatched
+  // (lib/batch.ts, limite 4) parallélise sans rien changer au résultat.
+  await runBatched(
+    unresolvedNeeds.map((need) => async () => {
+      const roleLabel = volunteerRoleLabel(need.roleCode, need.customLabel);
+      const remaining = need.requiredCount - need.signups.length;
+      const body = `${roleLabel} — encore ${remaining} place${remaining > 1 ? "s" : ""} pour ${
+        event.title ?? "un événement"
+      } du ${dateLabel}.`;
 
-    await supabase.from("notifications").insert({
-      team_id: event.team_id,
-      target_team_ids: event.target_team_ids,
-      event_id: eventId,
-      title,
-      body,
-      url: "/dashboard",
-      category: "ORGANISATION_NEED",
-    });
+      await supabase.from("notifications").insert({
+        team_id: event.team_id,
+        target_team_ids: event.target_team_ids,
+        event_id: eventId,
+        title,
+        body,
+        url: "/dashboard",
+        category: "ORGANISATION_NEED",
+      });
 
-    if ((event.commission_group_ids ?? []).length > 0) {
-      await supabase.from("notifications").insert(
-        (event.commission_group_ids as string[]).map((groupId) => ({
-          commission_group_id: groupId,
-          event_id: eventId,
-          title,
-          body,
-        }))
-      );
-    }
+      if ((event.commission_group_ids ?? []).length > 0) {
+        await supabase.from("notifications").insert(
+          (event.commission_group_ids as string[]).map((groupId) => ({
+            commission_group_id: groupId,
+            event_id: eventId,
+            title,
+            body,
+          }))
+        );
+      }
 
-    // Retour de Cindy du 17/09 ("je veux des push réels pour...").
-    await sendTeamPush({
-      teamId: event.team_id,
-      targetTeamIds: event.target_team_ids,
-      title,
-      body,
-      url: "/dashboard",
-    });
-  }
+      // Retour de Cindy du 17/09 ("je veux des push réels pour...").
+      await sendTeamPush({
+        teamId: event.team_id,
+        targetTeamIds: event.target_team_ids,
+        title,
+        body,
+        url: "/dashboard",
+      });
+    }),
+    4
+  );
 
   return { error: null };
 }

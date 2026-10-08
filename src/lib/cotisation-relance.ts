@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/service";
+import { runBatched } from "@/lib/batch";
 import { sendEmail } from "@/lib/send-email";
 import {
   computeStatus,
@@ -100,69 +101,81 @@ export async function sendCotisationRelances(
   let skippedNoEmail = 0;
   let checked = 0;
 
-  for (const row of (cotisationsData ?? []) as unknown as CotisationRow[]) {
-    const player = row.players;
-    if (!player) continue;
+  // Retour de l'audit du 05/10 ("il faut revoir les requêtes") : une
+  // relance (lecture email + envoi réel + marquage) l'une après l'autre
+  // pour chaque cotisation en retard -- sur un nombre de dossiers qui
+  // peut compter plusieurs dizaines en période de relance. runBatched
+  // (lib/batch.ts, limite 4) parallélise sans rien changer au résultat ;
+  // sent/skippedNoEmail/checked restent sûrs à incrémenter depuis
+  // plusieurs tâches, JavaScript n'exécute jamais deux `+= 1` en même
+  // temps (un seul thread, jamais d'entrelacement à l'intérieur d'une
+  // instruction synchrone).
+  await runBatched(
+    ((cotisationsData ?? []) as unknown as CotisationRow[]).map((row) => async () => {
+      const player = row.players;
+      if (!player) return;
 
-    // AdminCotisation minimal : seuls les champs que computeStatus /
-    // balanceDue / renderRelanceTemplate lisent réellement sont
-    // significatifs ici, le reste est renseigné à vide.
-    const cotisation: AdminCotisation = {
-      id: row.id,
-      saison: "",
-      prix: row.prix,
-      remise: row.remise,
-      paiement: row.paiement,
-      statut: row.statut,
-      mode_paiement: null,
-      playerName: [player.first_name, player.last_name].filter(Boolean).join(" ") || "ce membre",
-      firstName: player.first_name,
-      lastName: player.last_name,
-      category: null,
-      playerId: row.player_id,
-      isGuest: false,
-      membershipType: null,
-      fbiStatus: null,
-      collecteId: null,
-      collecteType: null,
-      collecteName: null,
-      payments: [],
-      createdAt: null,
-    };
+      // AdminCotisation minimal : seuls les champs que computeStatus /
+      // balanceDue / renderRelanceTemplate lisent réellement sont
+      // significatifs ici, le reste est renseigné à vide.
+      const cotisation: AdminCotisation = {
+        id: row.id,
+        saison: "",
+        prix: row.prix,
+        remise: row.remise,
+        paiement: row.paiement,
+        statut: row.statut,
+        mode_paiement: null,
+        playerName: [player.first_name, player.last_name].filter(Boolean).join(" ") || "ce membre",
+        firstName: player.first_name,
+        lastName: player.last_name,
+        category: null,
+        playerId: row.player_id,
+        isGuest: false,
+        membershipType: null,
+        fbiStatus: null,
+        collecteId: null,
+        collecteType: null,
+        collecteName: null,
+        payments: [],
+        createdAt: null,
+      };
 
-    const status = computeStatus(cotisation);
-    if (status !== "EN_ATTENTE" && status !== "PARTIEL") continue;
-    checked += 1;
+      const status = computeStatus(cotisation);
+      if (status !== "EN_ATTENTE" && status !== "PARTIEL") return;
+      checked += 1;
 
-    const email = await resolveContactEmail(supabase, {
-      id: row.player_id,
-      registration_email: player.registration_email,
-      profile_id: player.profile_id,
-    });
-    if (!email) {
-      skippedNoEmail += 1;
-      continue;
-    }
-
-    const tpl = RELANCE_TEMPLATES[relanceTemplateKeyFor(cotisation)];
-    const subject = renderRelanceTemplate(tpl.subject, cotisation);
-    const body = renderRelanceTemplate(tpl.body, cotisation);
-
-    const result = await sendEmail({ to: email, subject, body });
-    // Un envoi simulé (pas de fournisseur configuré, cas local) ne doit
-    // jamais poser last_auto_relance_sent_at, ni compter comme envoyé --
-    // sinon un prochain vrai passage croirait la relance déjà partie.
-    if (result.ok && !result.simulated) {
-      sent += 1;
-      const { error: markSentError } = await supabase
-        .from("cotisations")
-        .update({ last_auto_relance_sent_at: new Date().toISOString() })
-        .eq("id", row.id);
-      if (markSentError) {
-        console.error("[cotisation-relance] marquage relance cotisation échoué:", markSentError);
+      const email = await resolveContactEmail(supabase, {
+        id: row.player_id,
+        registration_email: player.registration_email,
+        profile_id: player.profile_id,
+      });
+      if (!email) {
+        skippedNoEmail += 1;
+        return;
       }
-    }
-  }
+
+      const tpl = RELANCE_TEMPLATES[relanceTemplateKeyFor(cotisation)];
+      const subject = renderRelanceTemplate(tpl.subject, cotisation);
+      const body = renderRelanceTemplate(tpl.body, cotisation);
+
+      const result = await sendEmail({ to: email, subject, body });
+      // Un envoi simulé (pas de fournisseur configuré, cas local) ne doit
+      // jamais poser last_auto_relance_sent_at, ni compter comme envoyé --
+      // sinon un prochain vrai passage croirait la relance déjà partie.
+      if (result.ok && !result.simulated) {
+        sent += 1;
+        const { error: markSentError } = await supabase
+          .from("cotisations")
+          .update({ last_auto_relance_sent_at: new Date().toISOString() })
+          .eq("id", row.id);
+        if (markSentError) {
+          console.error("[cotisation-relance] marquage relance cotisation échoué:", markSentError);
+        }
+      }
+    }),
+    4
+  );
 
   return { sent, skippedNoEmail, checked };
 }

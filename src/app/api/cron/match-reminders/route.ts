@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { isMatchType, homeAwayLabel } from "@/app/dashboard/event-style";
 import { parseMatchTitle } from "@/lib/match-display";
 import { resolveTeamPushSubscriptions, sendWebPush } from "@/lib/push-targets";
+import { runBatched } from "@/lib/batch";
 
 // Rappel automatique la veille d'un match : plus besoin que le coach y
 // pense. Déclenché une fois par jour par Vercel Cron (voir vercel.json).
@@ -83,74 +84,85 @@ export async function GET(request: Request) {
     return NextResponse.json({ sent: 0, matches: 0 });
   }
 
-  let totalSent = 0;
-  for (const event of matches) {
-    const team = event.teams as unknown as { name: string | null } | null;
-    const parsed = parseMatchTitle(event.title);
-    const home = event.is_home ?? parsed.isHome;
-    const homeAway = homeAwayLabel(home);
-    const lieu = event.salle || event.location;
-    const fmtHeure = (iso: string) =>
-      new Date(iso).toLocaleTimeString("fr-FR", {
-        hour: "2-digit",
-        minute: "2-digit",
-        timeZone: "Europe/Paris",
+  // Retour de l'audit du 05/10 ("il faut revoir les requêtes") : traitait
+  // chaque match l'un après l'autre (plusieurs requêtes + un envoi push
+  // par match, jamais en parallèle) -- le week-end, 15-20 équipes peuvent
+  // jouer le lendemain. runBatched (lib/batch.ts, limite 4) parallélise
+  // sans rien changer au résultat, chaque match reste indépendant des
+  // autres (aucun état partagé entre deux itérations).
+  const sentCounts = await runBatched(
+    matches.map((event) => async () => {
+      const team = event.teams as unknown as { name: string | null } | null;
+      const parsed = parseMatchTitle(event.title);
+      const home = event.is_home ?? parsed.isHome;
+      const homeAway = homeAwayLabel(home);
+      const lieu = event.salle || event.location;
+      const fmtHeure = (iso: string) =>
+        new Date(iso).toLocaleTimeString("fr-FR", {
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZone: "Europe/Paris",
+        });
+      // Retour de Cindy du 12/09 ("heure d'impact") : le rappel J-1 met en
+      // avant l'heure à laquelle la famille doit réellement être là
+      // (arrivée) plutôt que l'heure du coup d'envoi -- c'est elle qui
+      // compte pour ne pas être en retard. L'heure du match reste
+      // mentionnée juste après, pour ne pas non plus la faire disparaître.
+      const heure = event.impact_time
+        ? `Arrivée ${fmtHeure(event.impact_time)} (match ${fmtHeure(event.start_time)})`
+        : fmtHeure(event.start_time);
+
+      const title = `UBAC — ${team?.name ?? "Match"} demain`;
+      const body = [
+        heure,
+        homeAway ? homeAway.toLowerCase() : null,
+        parsed.opponent ? `contre ${parsed.opponent}` : null,
+        lieu,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+
+      // Historique en base pour la cloche in-app, comme dans
+      // /api/send-push — indépendant de subs.length : un rappel reste
+      // consultable dans l'historique même sans personne d'abonné au
+      // push ce jour-là.
+      await supabase.from("notifications").insert({
+        team_id: event.team_id,
+        event_id: event.id,
+        title,
+        body,
+        url: "/dashboard",
       });
-    // Retour de Cindy du 12/09 ("heure d'impact") : le rappel J-1 met en
-    // avant l'heure à laquelle la famille doit réellement être là (arrivée)
-    // plutôt que l'heure du coup d'envoi -- c'est elle qui compte pour ne
-    // pas être en retard. L'heure du match reste mentionnée juste après,
-    // pour ne pas non plus la faire disparaître.
-    const heure = event.impact_time
-      ? `Arrivée ${fmtHeure(event.impact_time)} (match ${fmtHeure(event.start_time)})`
-      : fmtHeure(event.start_time);
 
-    const title = `UBAC — ${team?.name ?? "Match"} demain`;
-    const body = [
-      heure,
-      homeAway ? homeAway.toLowerCase() : null,
-      parsed.opponent ? `contre ${parsed.opponent}` : null,
-      lieu,
-    ]
-      .filter(Boolean)
-      .join(" · ");
+      const subs = await resolveTeamPushSubscriptions(supabase, {
+        teamId: event.team_id,
+        targetTeamIds: null,
+      });
+      const { sent } = await sendWebPush(subs, {
+        title,
+        body,
+        url: "/dashboard",
+        tag: `reminder-${event.id}`,
+      });
 
-    // Historique en base pour la cloche in-app, comme dans /api/send-push
-    // — indépendant de subs.length : un rappel reste consultable dans
-    // l'historique même sans personne d'abonné au push ce jour-là.
-    await supabase.from("notifications").insert({
-      team_id: event.team_id,
-      event_id: event.id,
-      title,
-      body,
-      url: "/dashboard",
-    });
-
-    const subs = await resolveTeamPushSubscriptions(supabase, {
-      teamId: event.team_id,
-      targetTeamIds: null,
-    });
-    const { sent } = await sendWebPush(subs, {
-      title,
-      body,
-      url: "/dashboard",
-      tag: `reminder-${event.id}`,
-    });
-    totalSent += sent;
-
-    // Marqué "envoyé" même si personne n'était abonné aux notifications
-    // ce jour-là : ce n'est pas une erreur à réessayer demain, juste un
-    // fait — sans quoi le job retenterait indéfiniment ce même match.
-    const { error: markSentError } = await supabase
-      .from("events")
-      .update({ reminder_sent_at: new Date().toISOString() })
-      .eq("id", event.id);
-    // Audit du 31/08 : ce marqueur est ce qui empêche un double envoi — un
-    // échec silencieux ici ferait renvoyer le même rappel le lendemain.
-    if (markSentError) {
-      console.error("[match-reminders] marquage reminder_sent_at échoué:", markSentError);
-    }
-  }
+      // Marqué "envoyé" même si personne n'était abonné aux notifications
+      // ce jour-là : ce n'est pas une erreur à réessayer demain, juste un
+      // fait — sans quoi le job retenterait indéfiniment ce même match.
+      const { error: markSentError } = await supabase
+        .from("events")
+        .update({ reminder_sent_at: new Date().toISOString() })
+        .eq("id", event.id);
+      // Audit du 31/08 : ce marqueur est ce qui empêche un double envoi —
+      // un échec silencieux ici ferait renvoyer le même rappel le
+      // lendemain.
+      if (markSentError) {
+        console.error("[match-reminders] marquage reminder_sent_at échoué:", markSentError);
+      }
+      return sent;
+    }),
+    4
+  );
+  const totalSent = sentCounts.reduce((a, b) => a + b, 0);
 
   return NextResponse.json({ sent: totalSent, matches: matches.length });
 }
