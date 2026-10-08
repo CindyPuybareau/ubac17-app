@@ -1830,7 +1830,15 @@ export default async function DashboardPage({
               // plus bas, jamais réévalués via un embed imbriqué.
               "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, guest_name, collecte_id, created_at, collectes(id, name, type)"
             )
-            .order("saison", { ascending: false }),
+            .order("saison", { ascending: false })
+            // Retour de l'audit du 08/10 : aucune limite sur cette requête,
+            // qui grossira saison après saison. Plafond défensif (même
+            // principe que club_reports .limit(300) plus haut) -- l'ordre
+            // desc garantit que ce sont les saisons les PLUS ANCIENNES qui
+            // seraient tronquées en premier si ce plafond était un jour
+            // atteint, jamais la saison en cours (clubStatusByPlayerId a
+            // justement besoin de la ligne la plus récente par joueur).
+            .limit(1000),
         () =>
           supabase
             .from("collectes")

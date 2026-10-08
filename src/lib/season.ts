@@ -125,11 +125,16 @@ export function computePlayerYearStatus(
 // fichier Excel, un formulaire...). Ajouté le 31/08 pour la suggestion
 // automatique d'équipe à l'inscription (voir team-assignment.ts) : demain,
 // plus aucune source externe ne fournira de catégorie toute faite, donc ce
-// calcul doit tenir tout seul. Étend AGE_CATEGORIES avec U07 (5-6 ans, la
+// calcul doit tenir tout seul. Étend AGE_CATEGORIES avec U07 (4-6 ans, la
 // tranche la plus jeune réellement suivie par le club) et un repli
 // "SENIOR" au-delà de la dernière tranche.
+// Retour de Cindy du 08/10 (6 enfants nés en 2022, 4 ans, sans suggestion
+// d'équipe à l'import) : baseAge abaissé de 5 à 4, years élargi à 3 pour
+// garder la même borne haute (toujours 5-6 ans ET DÉSORMAIS 4 ans, la
+// tranche U9 juste après reste inchangée à partir de 7 ans) — ces enfants
+// rejoignent les Babys comme demandé.
 const TEAM_AGE_BANDS: { band: string; baseAge: number; years: number }[] = [
-  { band: "U07", baseAge: 5, years: 2 },
+  { band: "U07", baseAge: 4, years: 3 },
   ...AGE_CATEGORIES.map(({ prefix, baseAge, years }) => ({
     band: prefix.toUpperCase(),
     baseAge,
@@ -145,7 +150,7 @@ export function computeAgeBand(
   const parts = parseDateParts(birthDate);
   if (!parts) return null;
   const age = getCurrentSeasonStartYear(referenceDate) - parts.year;
-  // En dessous de la plus jeune tranche suivie (U07, 5 ans) : donnée
+  // En dessous de la plus jeune tranche suivie (U07, 4 ans) : donnée
   // probablement erronée (faute de frappe sur l'année), on ne devine rien.
   if (age < TEAM_AGE_BANDS[0].baseAge) return null;
   for (const b of TEAM_AGE_BANDS) {

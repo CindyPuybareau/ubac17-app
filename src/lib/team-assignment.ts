@@ -57,7 +57,13 @@ export function suggestTeamCategory({
   switch (ageBand) {
     case "U07":
       return "Babys";
-    case "U09":
+    // Bug trouvé le 08/10 (retour de Cindy, "des membres n'ont pas
+    // d'équipe attitrée alors que tu as le sexe et la date de naissance") :
+    // computeAgeBand (season.ts) renvoie "U9" (prefix.toUpperCase() de
+    // "u9", jamais de zéro) -- ce "U09" ne correspondait donc JAMAIS,
+    // aucun des 7-8 ans n'obtenait de suggestion depuis la création de
+    // cette fonction le 31/08.
+    case "U9":
       return "U9 Mixte";
     case "U11":
       return "U11 Mixte";

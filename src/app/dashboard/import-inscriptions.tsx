@@ -261,13 +261,15 @@ export default function ImportInscriptions() {
       ]),
     };
 
-    // Garde-fou (audit du 31/08) : sans ça, une colonne renommée dans le
-    // fichier (ex. "Catégorie" -> "Catégorie d'âge") faisait ignorer TOUTES
-    // les lignes en silence (idx.categorie = -1, chaque ligne rejetée par
-    // le "continue" plus bas) — l'écran affichait juste "0 inscriptions
-    // détectées" sans jamais dire pourquoi.
+    // Garde-fou (audit du 31/08) : sans ça, une colonne Nom/Prénom renommée
+    // dans le fichier faisait ignorer TOUTES les lignes en silence — l'écran
+    // affichait juste "0 inscriptions détectées" sans jamais dire pourquoi.
+    // "Catégorie" n'y figure plus (retour de Cindy du 08/10, colonne retirée
+    // du formulaire source par le Bureau sans la prévenir) : elle n'est
+    // de toute façon jamais que de l'affichage ici (voir plus bas) --
+    // computeSuggestion plus bas, lui, ne l'a jamais lue, il appelle déjà
+    // suggestTeamCategory indépendamment.
     const missingColumns = [
-      idx.categorie < 0 ? "Catégorie" : null,
       idx.nom < 0 ? "Nom" : null,
       idx.prenom < 0 ? "Prénom" : null,
     ].filter((c): c is string => c !== null);
@@ -283,9 +285,14 @@ export default function ImportInscriptions() {
     const parsed: ParsedRow[] = [];
     for (let i = 1; i < raw.length; i++) {
       const r = raw[i];
-      const category =
-        idx.categorie >= 0 ? (r[idx.categorie] as string | null) : null;
-      if (!category || !String(category).trim()) continue;
+      // Repère "ligne réellement remplie" (plus "Catégorie", toujours
+      // garanti vide depuis qu'elle a disparu du fichier -- voir plus haut) :
+      // Nom ET Prénom, les deux seules colonnes dont la présence est déjà
+      // vérifiée ci-dessus, valent mieux comme repère de toute façon (une
+      // ligne sans nom n'est jamais une vraie inscription).
+      const lastName = String(r[idx.nom] ?? "").trim();
+      const firstName = String(r[idx.prenom] ?? "").trim();
+      if (!lastName || !firstName) continue;
 
       const birthRaw = idx.naissance >= 0 ? r[idx.naissance] : null;
       let birthDate: string | null = null;
@@ -294,6 +301,21 @@ export default function ImportInscriptions() {
       } else if (typeof birthRaw === "number") {
         birthDate = excelSerialToISODate(birthRaw);
       }
+
+      const sex = strOrNull(get(r, idx.sexe));
+      const licenseType = strOrNull(get(r, idx.typeLicence));
+      // Repli (retour de Cindy du 08/10) : si le fichier a encore une
+      // colonne "Catégorie" un jour, elle reste prioritaire ; sinon, même
+      // calcul indépendant (date de naissance + sexe + type de licence) que
+      // la suggestion d'équipe plus bas (suggestTeamCategory,
+      // team-assignment.ts) -- affichage/statistiques seulement, ne pilote
+      // aucun rattachement d'équipe réel (voir le commentaire plus bas).
+      const fileCategory =
+        idx.categorie >= 0 ? strOrNull(get(r, idx.categorie)) : null;
+      const category =
+        fileCategory ??
+        suggestTeamCategory({ birthDate, sex, licenseType }) ??
+        "—";
 
       const horodatageRaw = get(r, idx.horodatage);
       const horodatage =
@@ -320,10 +342,10 @@ export default function ImportInscriptions() {
       };
 
       parsed.push({
-        firstName: String(r[idx.prenom] ?? "").trim(),
-        lastName: String(r[idx.nom] ?? "").trim(),
+        firstName,
+        lastName,
         birthDate,
-        category: String(category).trim(),
+        category,
         parentEmail:
           idx.email >= 0 ? (r[idx.email] as string | null) : null,
         prix: idx.prix >= 0 ? numOrNull(r[idx.prix]) : null,
@@ -335,7 +357,7 @@ export default function ImportInscriptions() {
           idx.modePaiement >= 0
             ? (r[idx.modePaiement] as string | null)
             : null,
-        sex: strOrNull(get(r, idx.sexe)),
+        sex,
         registrationEmail: strOrNull(get(r, idx.email)),
         registrationPhone: formatPhoneValue(get(r, idx.licencie)),
         address: strOrNull(get(r, idx.adressePrincipale)),
@@ -346,7 +368,7 @@ export default function ImportInscriptions() {
         fatherPhone: formatPhoneValue(get(r, idx.pere)),
         otherPhones: strOrNull(get(r, idx.autresTelephones)),
         secondaryAddress: strOrNull(get(r, idx.adresseSecondaire)),
-        licenseType: strOrNull(get(r, idx.typeLicence)),
+        licenseType,
         membershipType: strOrNull(get(r, idx.typeAdhesion)),
         fbiStatus: strOrNull(get(r, idx.statutFbi)),
         medicalNotes: strOrNull(get(r, idx.particularitesMedicales)),
