@@ -437,6 +437,7 @@ export default function CalendarView({
   commissionGroups = [],
   isBureau = false,
   trombinoscopeByTeamId,
+  officialsTrombinoscopePath,
 }: {
   events: AdminUpcomingEvent[];
   createTeams?: CalendarTeamRef[];
@@ -462,6 +463,13 @@ export default function CalendarView({
   // absent côté Famille/Enfant (jamais passé par family-view.tsx), le
   // bouton ne s'affiche alors simplement jamais.
   trombinoscopeByTeamId?: Record<string, string | null>;
+  // Retour de Cindy du 08/10 ("trombinoscope officiels... concerne les
+  // parents, les coachs et le bureau") : chemin unique, club entier --
+  // bouton rendu à côté de MatchOfficialsPanel, matchs à domicile
+  // uniquement (bare côté undefined : jamais passé par family-view.tsx
+  // sur le Calendrier général, pas la peine ailleurs qu'aux onglets
+  // Matchs officiels/Résultats).
+  officialsTrombinoscopePath?: string | null;
   birthdayMembers?: BirthdaySource[];
   // Équipes dont ce calendrier montre les événements. Affiché tel quel :
   // sans cette ligne, un calendrier vide ne dit pas s'il ne couvre rien ou
@@ -2087,6 +2095,12 @@ export default function CalendarView({
               )}
               {isHomeMatchEvent && (
                 <OrganisationCard defaultOpen={organisationDefaultOpen} variant="terracotta">
+                  {/* Retour de Cindy du 08/10 ("trombinoscope officiels...
+                      accessible lors des matchs officiels") : juste
+                      au-dessus du bandeau des 8 rôles, visible à qui voit
+                      déjà ce bandeau (Bureau/Coach/Famille, matchs à
+                      domicile uniquement). */}
+                  <TrombinoscopeButton path={officialsTrombinoscopePath ?? null} bucket="club-documents" />
                   <MatchOfficialsPanel
                     eventId={event.id}
                     eventTitle={event.title}
@@ -2242,6 +2256,7 @@ export default function CalendarView({
           !organisationLoading &&
           isHomeMatch(event) && (
             <OrganisationCard defaultOpen={organisationDefaultOpen} variant="terracotta">
+              <TrombinoscopeButton path={officialsTrombinoscopePath ?? null} bucket="club-documents" />
               <MatchOfficialsPanel
                 eventId={event.id}
                 eventTitle={event.title}

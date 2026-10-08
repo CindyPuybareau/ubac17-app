@@ -59,3 +59,23 @@ export const getCachedAccessProfiles = unstable_cache(
   ["reference-access-profiles"],
   { revalidate: REVALIDATE_SECONDS, tags: ["reference-access-profiles"] }
 );
+
+// Retour de Cindy du 08/10 ("trombinoscope officiels... concerne les
+// parents, les coachs et le bureau") : club_settings n'est normalement
+// lisible que par le Bureau (RLS "admin read club_settings") -- ce chemin
+// de fichier précis doit pourtant être connu de Coach ET Famille aussi,
+// donc lu ici via le service role (même repli que getCachedTeams
+// ci-dessus) plutôt que d'élargir la policy RLS de toute la table (qui
+// porte aussi des réglages d'automatisation strictement Bureau).
+export const getCachedOfficialsTrombinoscopePath = unstable_cache(
+  async () => {
+    const supabase = createServiceClient();
+    return supabase
+      .from("club_settings")
+      .select("officials_trombinoscope_path")
+      .eq("id", true)
+      .maybeSingle();
+  },
+  ["reference-officials-trombinoscope"],
+  { revalidate: REVALIDATE_SECONDS, tags: ["reference-officials-trombinoscope"] }
+);

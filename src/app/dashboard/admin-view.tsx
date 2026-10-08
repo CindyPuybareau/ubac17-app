@@ -93,6 +93,7 @@ export default function AdminView({
   dashboardSummary,
   ownPlayerId = null,
   trombinoscopeByTeamId,
+  officialsTrombinoscopePath,
 }: {
   // Profils d'accès sur-mesure (retour de Cindy du 05/09, étape 3) : null
   // pour un Bureau complet (comportement historique, inchangé) ; sinon, la
@@ -148,6 +149,12 @@ export default function AdminView({
   // les onglets dédiés aux matchs officiels (pas le Calendrier général,
   // mélangé entraînements/amicaux).
   trombinoscopeByTeamId?: Record<string, string | null>;
+  // Retour de Cindy du 08/10 ("trombinoscope officiels... concerne les
+  // parents, les coachs et le bureau") : un seul chemin, club entier --
+  // transmis à DocumentsPanel ("Documents", où le Bureau l'envoie) et à
+  // CalendarView (bouton sur la carte de match, bandeau "Organisation
+  // match à domicile").
+  officialsTrombinoscopePath?: string | null;
 }) {
   const teamRefs = teams.map((t) => ({
     id: t.id,
@@ -483,6 +490,7 @@ export default function AdminView({
               volunteerNeedsByEventId={volunteerNeedsByEventId}
               commissionGroups={commissionGroups}
               trombinoscopeByTeamId={trombinoscopeByTeamId}
+              officialsTrombinoscopePath={officialsTrombinoscopePath}
             />
           ),
         },
@@ -508,6 +516,7 @@ export default function AdminView({
               volunteerNeedsByEventId={volunteerNeedsByEventId}
               commissionGroups={commissionGroups}
               trombinoscopeByTeamId={trombinoscopeByTeamId}
+              officialsTrombinoscopePath={officialsTrombinoscopePath}
             />
           ),
         },
@@ -606,6 +615,8 @@ export default function AdminView({
               {!isRestricted && (
                 <DocumentsPanel
                   documentIds={["charte-joueur", "charte-parent", "reglement-interieur"]}
+                  officialsTrombinoscopePath={officialsTrombinoscopePath ?? null}
+                  canManageOfficialsTrombinoscope
                 />
               )}
               {/* Comptes rendus (retour de Cindy du 2026-09-01) : texte

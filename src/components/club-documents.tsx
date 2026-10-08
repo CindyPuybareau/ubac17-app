@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   BookOpen,
@@ -8,6 +10,7 @@ import {
   Flame,
   Handshake,
   HeartPulse,
+  IdCard,
   Info,
   MessageCircle,
   ScrollText,
@@ -15,10 +18,13 @@ import {
   ShieldCheck,
   Shirt,
   Target,
+  Upload,
   UserCheck,
   Users,
   type LucideIcon,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import TrombinoscopeButton from "@/app/dashboard/trombinoscope-button";
 import CollapsibleCard from "./collapsible-card";
 
 // Contenu des 3 documents officiels du club (retour de Cindy du 25/08,
@@ -350,6 +356,107 @@ export function DocumentCard({ id }: { id: ClubDocumentId }) {
   );
 }
 
+// Retour de Cindy du 08/10 ("trombinoscope officiels... concerne les
+// parents, les coachs et le bureau") : même emplacement que les chartes
+// (onglet "Documents", seul endroit commun à Bureau/Coach/Famille), mais
+// contenu différent -- un vrai PDF déposé par le Bureau, pas du texte
+// retranscrit. Bucket dédié "club-documents" (voir sa migration) : un
+// seul fichier pour tout le club, jamais par équipe (un e-marque ou un
+// chronométreur n'appartient à aucune équipe en particulier).
+// canManage=true seulement côté Bureau (admin-view.tsx) -- Coach/Famille
+// n'ont que le bouton de consultation, jamais l'envoi.
+function OfficialsTrombinoscopeCard({
+  path,
+  canManage,
+}: {
+  path: string | null;
+  canManage: boolean;
+}) {
+  const router = useRouter();
+  const [trombinoscopePath, setTrombinoscopePath] = useState(path);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Rien à afficher pour Coach/Famille tant que le Bureau n'a encore rien
+  // envoyé -- pas de carte vide à montrer sans aucune action possible.
+  if (!canManage && !trombinoscopePath) return null;
+
+  async function onChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.type !== "application/pdf") {
+      setError("Choisis un fichier PDF.");
+      return;
+    }
+    if (file.size > 26214400) {
+      setError(`Fichier trop lourd (${(file.size / 1024 / 1024).toFixed(1)} Mo, 25 Mo maximum).`);
+      return;
+    }
+    setUploading(true);
+    setError(null);
+    try {
+      const supabase = createClient();
+      const path = "officiels/trombinoscope.pdf";
+      const { error: uploadErr } = await supabase.storage
+        .from("club-documents")
+        .upload(path, file, { upsert: true, contentType: "application/pdf" });
+      if (uploadErr) {
+        setError(`Envoi impossible : ${uploadErr.message}`);
+        return;
+      }
+      const { error: updateErr } = await supabase
+        .from("club_settings")
+        .update({ officials_trombinoscope_path: path })
+        .eq("id", true);
+      if (updateErr) {
+        setError(`Enregistrement impossible : ${updateErr.message}`);
+        return;
+      }
+      setTrombinoscopePath(path);
+      router.refresh();
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <CollapsibleCard icon={IdCard} title="Trombinoscope officiels" badge="Saison 2026-2027">
+      <p className="text-sm text-zinc-600">
+        Photos et noms des officiels de table de marque (e-marque, chronométreur, marqueur...) et
+        délégués du club, à consulter avant un match officiel à domicile.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        {canManage && (
+          <label
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+              trombinoscopePath
+                ? "bg-sky-100 text-sky-700 hover:bg-sky-200"
+                : "bg-navy text-white hover:bg-navy-dark"
+            } ${uploading ? "cursor-wait opacity-60" : "cursor-pointer"}`}
+          >
+            <Upload className="h-3.5 w-3.5 shrink-0" />
+            {uploading
+              ? "Envoi…"
+              : trombinoscopePath
+                ? "Remplacer le trombinoscope"
+                : "Envoyer le trombinoscope"}
+            <input
+              type="file"
+              accept="application/pdf"
+              onChange={onChange}
+              disabled={uploading}
+              className="hidden"
+            />
+          </label>
+        )}
+        <TrombinoscopeButton path={trombinoscopePath} bucket="club-documents" />
+      </div>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+    </CollapsibleCard>
+  );
+}
+
 // Répartition par espace (retour de Cindy du 25/08) :
 // - Bureau et Coach : Règlement Intérieur uniquement.
 // - Famille (parents) : Charte du Joueur + Charte du Parent + Règlement
@@ -357,7 +464,18 @@ export function DocumentCard({ id }: { id: ClubDocumentId }) {
 //   enfant mineur.
 // - Enfant : Charte du Joueur + Règlement Intérieur — pas la Charte du
 //   Parent, qui ne le concerne pas directement.
-export default function DocumentsPanel({ documentIds }: { documentIds: ClubDocumentId[] }) {
+export default function DocumentsPanel({
+  documentIds,
+  officialsTrombinoscopePath,
+  canManageOfficialsTrombinoscope = false,
+}: {
+  documentIds: ClubDocumentId[];
+  // Retour de Cindy du 08/10 : absent (undefined) pour les espaces qui ne
+  // concernent pas le trombinoscope officiels (Enfant, bénévole) -- la
+  // carte ne s'affiche alors jamais, aucun changement pour ces espaces.
+  officialsTrombinoscopePath?: string | null;
+  canManageOfficialsTrombinoscope?: boolean;
+}) {
   return (
     <div className="flex flex-col gap-3">
       <p className="text-xs text-zinc-500">
@@ -367,6 +485,12 @@ export default function DocumentsPanel({ documentIds }: { documentIds: ClubDocum
       {documentIds.map((id) => (
         <DocumentCard key={id} id={id} />
       ))}
+      {officialsTrombinoscopePath !== undefined && (
+        <OfficialsTrombinoscopeCard
+          path={officialsTrombinoscopePath}
+          canManage={canManageOfficialsTrombinoscope}
+        />
+      )}
     </div>
   );
 }

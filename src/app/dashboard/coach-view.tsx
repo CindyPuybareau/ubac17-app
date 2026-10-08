@@ -67,6 +67,7 @@ export default function CoachView({
   currentUserId,
   dashboardSummary,
   trombinoscopeByTeamId,
+  officialsTrombinoscopePath,
 }: {
   teams: TeamWithMembers[];
   events: AdminUpcomingEvent[];
@@ -121,6 +122,11 @@ export default function CoachView({
   // match officiel") : même chemin déjà résolu que côté Bureau (voir
   // page.tsx/coachTrombinoscopeByTeamId), transmis tel quel à CalendarView.
   trombinoscopeByTeamId?: Record<string, string | null>;
+  // Retour de Cindy du 08/10 ("trombinoscope officiels... concerne les
+  // parents, les coachs et le bureau") : chemin unique, club entier --
+  // transmis à DocumentsPanel et CalendarView, jamais d'envoi possible ici
+  // (canManageOfficialsTrombinoscope réservé à admin-view.tsx).
+  officialsTrombinoscopePath?: string | null;
 }) {
   // Créer / modifier / supprimer un événement n'est permis que pour les
   // équipes réellement entraînées : proposer celle où l'utilisateur n'est
@@ -438,6 +444,7 @@ export default function CoachView({
               volunteerNeedsByEventId={volunteerNeedsByEventId}
               celebrateWins
               trombinoscopeByTeamId={trombinoscopeByTeamId}
+              officialsTrombinoscopePath={officialsTrombinoscopePath}
             />
           ),
         },
@@ -461,6 +468,7 @@ export default function CoachView({
               volunteerNeedsByEventId={volunteerNeedsByEventId}
               celebrateWins
               trombinoscopeByTeamId={trombinoscopeByTeamId}
+              officialsTrombinoscopePath={officialsTrombinoscopePath}
             />
           ),
         },
@@ -520,6 +528,7 @@ export default function CoachView({
             <div className="flex flex-col gap-4">
               <DocumentsPanel
                 documentIds={["charte-joueur", "charte-parent", "reglement-interieur"]}
+                officialsTrombinoscopePath={officialsTrombinoscopePath ?? null}
               />
               {/* Comptes rendus (retour de Cindy du 2026-09-01) : un coach
                   consulte Mairies/Bureau (lecture seule) et voit AUSSI les

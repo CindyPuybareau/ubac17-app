@@ -10,12 +10,16 @@ import { createClient } from "@/lib/supabase/client";
 // les joueurs, pas une simple photo de groupe. Pas d'URL publique stockée
 // en base : une URL signée (1h, largement assez pour un clic -> ouverture)
 // est générée à la demande, au clic. Composant partagé entre team-card.tsx
-// (fiche équipe) et calendar-view.tsx (carte de match officiel).
+// (fiche équipe), calendar-view.tsx (carte de match officiel) et, depuis
+// le 08/10, club-documents.tsx (trombinoscope officiels, bucket distinct
+// -- voir `bucket` ci-dessous).
 export default function TrombinoscopeButton({
   path,
+  bucket = "team-trombinoscopes",
   className,
 }: {
   path: string | null;
+  bucket?: "team-trombinoscopes" | "club-documents";
   className?: string;
 }) {
   const [loading, setLoading] = useState(false);
@@ -29,7 +33,7 @@ export default function TrombinoscopeButton({
     try {
       const supabase = createClient();
       const { data, error: signError } = await supabase.storage
-        .from("team-trombinoscopes")
+        .from(bucket)
         .createSignedUrl(path as string, 3600);
       if (signError || !data?.signedUrl) {
         setError(true);

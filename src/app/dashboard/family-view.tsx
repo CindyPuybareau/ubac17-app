@@ -116,6 +116,7 @@ export default function FamilyView({
   penalites,
   sponsorDisplay = [],
   dashboardSummary,
+  officialsTrombinoscopePath,
 }: {
   events: AdminUpcomingEvent[];
   rsvpPlayers: CalendarRsvpPlayer[];
@@ -145,6 +146,11 @@ export default function FamilyView({
   // chacun un différent (voir buildFamilyView, page.tsx), calculé sur la
   // bonne liste à chaque fois.
   dashboardSummary: SpaceDashboardSummaryData;
+  // Retour de Cindy du 08/10 ("trombinoscope officiels... concerne les
+  // parents, les coachs et le bureau") : chemin unique, club entier --
+  // transmis à DocumentsPanel (lecture seule, jamais d'envoi côté Famille)
+  // et à CalendarView (bouton sur la carte de match à domicile).
+  officialsTrombinoscopePath?: string | null;
 }) {
   const iconClass = "h-4 w-4 shrink-0";
 
@@ -491,6 +497,7 @@ export default function FamilyView({
               resultsTeams={matchesResultsTeams}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
               celebrateWins
+              officialsTrombinoscopePath={officialsTrombinoscopePath}
             />
           ),
         },
@@ -506,6 +513,7 @@ export default function FamilyView({
               resultsTeams={matchesResultsTeams}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
               celebrateWins
+              officialsTrombinoscopePath={officialsTrombinoscopePath}
             />
           ),
         },
@@ -538,7 +546,10 @@ export default function FamilyView({
       label: "Documents",
       icon: <ScrollText className={iconClass} />,
       content: (
-        <DocumentsPanel documentIds={["charte-joueur", "charte-parent", "reglement-interieur"]} />
+        <DocumentsPanel
+          documentIds={["charte-joueur", "charte-parent", "reglement-interieur"]}
+          officialsTrombinoscopePath={officialsTrombinoscopePath ?? null}
+        />
       ),
     },
     {

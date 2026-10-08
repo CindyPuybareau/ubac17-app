@@ -7,7 +7,12 @@ import { formatFirstName, formatPersonName } from "@/lib/names";
 import { EMAIL_REPLY_TO } from "@/lib/email";
 import { localDateFromParts } from "@/lib/local-date";
 import { getSpaceDashboardSummary, type SpaceDashboardSummary } from "@/lib/space-dashboard";
-import { getCachedTeams, getCachedCategoryTariffs, getCachedAccessProfiles } from "@/lib/reference-cache";
+import {
+  getCachedTeams,
+  getCachedCategoryTariffs,
+  getCachedAccessProfiles,
+  getCachedOfficialsTrombinoscopePath,
+} from "@/lib/reference-cache";
 import {
   getSiblingTeamIds,
   getTrombinoscopeTeamId,
@@ -1137,6 +1142,14 @@ export default async function DashboardPage({
   const isAdmin = Boolean(adminResult.data);
   const clubFunction = adminResult.data?.club_function ?? null;
   let ownPlayerId = ownPlayerRowResult.data?.id ?? null;
+
+  // Retour de Cindy du 08/10 ("trombinoscope officiels... concerne les
+  // parents, les coachs et le bureau") : un seul chemin, club entier --
+  // lu une fois ici (caché 45s, service role) plutôt que dans chacun des
+  // trois blocs Bureau/Coach/Famille, puisque les trois en ont besoin.
+  const officialsTrombinoscopeRes = await getCachedOfficialsTrombinoscopePath();
+  const officialsTrombinoscopePath =
+    officialsTrombinoscopeRes.data?.officials_trombinoscope_path ?? null;
 
   // Profil d'accès sur-mesure (retour de Cindy du 05/09, étape 3) : si CE
   // compte Bureau a un access_profile_id, son espace Bureau ne doit
@@ -4983,6 +4996,7 @@ export default async function DashboardPage({
         penalites={familyPenalites}
         sponsorDisplay={sponsorDisplay}
         dashboardSummary={dashboardSummary}
+        officialsTrombinoscopePath={officialsTrombinoscopePath}
       />
     );
   }
@@ -5047,6 +5061,7 @@ export default async function DashboardPage({
             clubReports={clubReports}
             ownPlayerId={ownPlayerId}
             trombinoscopeByTeamId={adminTrombinoscopeByTeamId}
+            officialsTrombinoscopePath={officialsTrombinoscopePath}
           />
         ) : null,
     });
@@ -5109,6 +5124,7 @@ export default async function DashboardPage({
             currentUserId={user.id}
             dashboardSummary={coachDashboardSummary}
             trombinoscopeByTeamId={coachTrombinoscopeByTeamId}
+            officialsTrombinoscopePath={officialsTrombinoscopePath}
           />
         ) : null,
     });
