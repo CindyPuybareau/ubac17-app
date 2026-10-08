@@ -25,12 +25,27 @@ export async function resolveTeamPushSubscriptions(
   const teamIds = params.teamId ? [params.teamId] : params.targetTeamIds;
   const profileIds = new Set<string>();
 
+  // Retour de l'audit du 08/10 ("il faut revoir les requêtes") : l'effectif
+  // (team_players) et les coachs (team_coaches) ne dépendent pas l'un de
+  // l'autre, mais partaient l'un après l'autre -- un aller-retour perdu à
+  // chaque appel, qui plus est répété pour chaque besoin non pourvu dans la
+  // boucle de relance (voir bureau-alerts/route.ts). Partis ensemble, le
+  // reste de la fonction (parent/compte joueur) reste séquentiel puisqu'il
+  // a, lui, réellement besoin de playerIds.
+  const coachQuery = supabase.from("team_coaches").select("coach_id");
+  const rosterQuery = supabase.from("team_players").select("player_id");
+  const [coachRowsResult, rosterRowsResult] = await Promise.all([
+    teamIds ? coachQuery.in("team_id", teamIds) : coachQuery,
+    params.coachesOnly
+      ? Promise.resolve({ data: null as { player_id: string }[] | null })
+      : teamIds
+        ? rosterQuery.in("team_id", teamIds)
+        : rosterQuery,
+  ]);
+  (coachRowsResult.data ?? []).forEach((r) => profileIds.add(r.coach_id));
+
   if (!params.coachesOnly) {
-    const rosterQuery = supabase.from("team_players").select("player_id");
-    const { data: rosterRows } = teamIds
-      ? await rosterQuery.in("team_id", teamIds)
-      : await rosterQuery;
-    const playerIds = Array.from(new Set((rosterRows ?? []).map((r) => r.player_id)));
+    const playerIds = Array.from(new Set((rosterRowsResult.data ?? []).map((r) => r.player_id)));
 
     if (playerIds.length > 0) {
       const [parentRows, playerAccountRows] = await Promise.all([
@@ -47,10 +62,6 @@ export async function resolveTeamPushSubscriptions(
       });
     }
   }
-
-  const coachQuery = supabase.from("team_coaches").select("coach_id");
-  const { data: coachRows } = teamIds ? await coachQuery.in("team_id", teamIds) : await coachQuery;
-  (coachRows ?? []).forEach((r) => profileIds.add(r.coach_id));
 
   if (profileIds.size === 0) return [];
 

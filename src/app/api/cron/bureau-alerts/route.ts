@@ -344,6 +344,26 @@ async function runVolunteerNeedRemindersForStage(
 
   const eventById = new Map(events.map((e) => [e.id, e]));
 
+  // Retour de l'audit du 08/10 ("il faut revoir les requêtes", suite) :
+  // plusieurs besoins non pourvus (goûter, buvette, table de marque...)
+  // partagent souvent le même événement, donc la même équipe/portée --
+  // resolveTeamPushSubscriptions (jusqu'à 5 requêtes, lib/push-targets.ts)
+  // était relancée à l'identique pour chacun. Mémorisée ici par clé
+  // équipe/portée, le temps d'un seul passage de cette fonction : la
+  // PROMESSE est mise en cache (pas seulement le résultat), pour que deux
+  // besoins traités en parallèle par runBatched partagent le même appel
+  // en vol au lieu d'en déclencher chacun un.
+  const pushTargetsCache = new Map<string, ReturnType<typeof resolveTeamPushSubscriptions>>();
+  function getPushTargetsCached(teamId: string | null, targetTeamIds: string[] | null) {
+    const key = teamId ?? (targetTeamIds ?? []).join(",");
+    let cached = pushTargetsCache.get(key);
+    if (!cached) {
+      cached = resolveTeamPushSubscriptions(supabase, { teamId, targetTeamIds });
+      pushTargetsCache.set(key, cached);
+    }
+    return cached;
+  }
+
   let sent = 0;
   // Retour de l'audit du 05/10 ("il faut revoir les requêtes") : même
   // correctif que les deux fonctions précédentes.
@@ -399,10 +419,7 @@ async function runVolunteerNeedRemindersForStage(
 
       // Retour de Cindy du 17/09 ("je veux des push réels pour...").
       try {
-        const targets = await resolveTeamPushSubscriptions(supabase, {
-          teamId: event.team_id,
-          targetTeamIds: event.target_team_ids,
-        });
+        const targets = await getPushTargetsCached(event.team_id, event.target_team_ids);
         await sendWebPush(targets, { title, body, url: "/dashboard" });
       } catch (pushError) {
         console.error("[bureau-alerts] push relance besoin échoué:", pushError);

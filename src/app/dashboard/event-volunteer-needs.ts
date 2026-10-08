@@ -346,10 +346,24 @@ export async function getVolunteerNeedsByEventId(
   // à relire).
   const signupsByNeedId = new Map<string, VolunteerSignup[]>();
   if (needIds.length > 0) {
-    const { data: signupRows } = await supabase
-      .from("event_volunteer_signups")
-      .select("id, need_id, player_id, benevole_id, commission_group_id, guest_name, source")
-      .in("need_id", needIds);
+    // Retour de l'audit du 08/10 : même .in() non découpé que celui qui a
+    // déjà cassé en production pour event_id (URL trop longue, puis
+    // statement timeout -- voir plus haut dans ce fichier, déjà corrigé
+    // via chunkedQuery) -- needIds peut porter plusieurs centaines d'ids
+    // avec le calendrier chargé 6 mois en arrière + tout l'avenir.
+    const { data: signupRows, errors: signupErrors } = await chunkedQuery(
+      needIds,
+      150,
+      (chunk) =>
+        supabase
+          .from("event_volunteer_signups")
+          .select("id, need_id, player_id, benevole_id, commission_group_id, guest_name, source")
+          .in("need_id", chunk),
+      dbLimit ?? 4
+    );
+    signupErrors.forEach((error) =>
+      console.error("[getVolunteerNeedsByEventId] select event_volunteer_signups failed (tranche):", error)
+    );
 
     // Noms résolus via club_member_names plutôt qu'une jointure
     // players(...) directe : la fiche complète d'un autre membre n'est

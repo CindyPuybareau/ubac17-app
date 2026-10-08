@@ -240,13 +240,24 @@ export async function getCarpoolOffersByEventId(
   // (offres -> réservations -> fiches) : plus simple à relire, et cohérent
   // avec le reste du fichier (team_players -> players fait déjà pareil).
   const reservationsByOfferId = new Map<string, CarpoolReservation[]>();
-  const reservationRowsResult = offerIds.length > 0
-    ? await supabase
+  // Retour de l'audit du 08/10 : même .in() non découpé que celui déjà
+  // corrigé juste au-dessus (offerIds peut porter plusieurs centaines
+  // d'ids avec le calendrier chargé 6 mois en arrière + tout l'avenir) --
+  // même chunkedQuery, même raison (URL trop longue / statement timeout,
+  // déjà vécu deux fois pour event_id avant ce fichier n'y passe).
+  const { data: reservationRows, errors: reservationErrors } = await chunkedQuery(
+    offerIds,
+    150,
+    (chunk) =>
+      supabase
         .from("event_carpool_reservations")
         .select("offer_id, player_id, seats")
-        .in("offer_id", offerIds)
-    : { data: null };
-  const reservationRows = reservationRowsResult.data;
+        .in("offer_id", chunk),
+    dbLimit ?? 4
+  );
+  reservationErrors.forEach((error) =>
+    console.error("[getCarpoolOffersByEventId] select event_carpool_reservations failed (tranche):", error)
+  );
 
   // Noms résolus via club_member_names plutôt qu'une jointure players(...)
   // directe : la fiche complète d'un autre membre n'est pas accessible
