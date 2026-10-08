@@ -21,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { runBatched } from "@/lib/batch";
 import { getLogoBase64, PDF_COLORS } from "@/lib/pdf-brand";
 import EmptyState from "./empty-state";
 import { buildGmailComposeLink, signatureIndex, withSignature } from "@/lib/email";
@@ -759,8 +760,15 @@ export default function CotisationParticipantsTable({
       // Bulk "Marquer comme payé" still settles each dossier in full with a
       // single mode, but now also logs that settlement as a payment record
       // so it shows up in each member's history like any other règlement.
-      const results = await Promise.all(
-        paymentIds.map(async (id) => {
+      // Retour de l'audit du 05/10 ("il faut revoir les requêtes") : un
+      // Promise.all brut envoyait jusqu'à 2×N requêtes strictement
+      // simultanées (un paiement + une mise à jour par dossier) -- avec
+      // "Tout sélectionner", N peut être toute une équipe ou tout le club.
+      // Même défaut, même risque que l'incident du 20/09 (CLAUDE.md) sur
+      // sync-ffbb, ici côté paiements. runBatched (lib/batch.ts) plafonne
+      // sans rien changer au résultat (même tableau, même ordre).
+      const results = await runBatched(
+        paymentIds.map((id) => async () => {
           const c = byId.get(id);
           // skipped: exclu du contrôle "0 ligne modifiée" plus bas — ce
           // n'est pas un blocage RLS, juste un id qui n'a jamais correspondu
@@ -780,7 +788,8 @@ export default function CotisationParticipantsTable({
             .update({ paiement: due(c), mode_paiement: effectivePaymentMode, statut: "PAYE" })
             .eq("id", id)
             .select("id");
-        })
+        }),
+        4
       );
       const err = results.find((r) => r.error)?.error;
       if (err) {

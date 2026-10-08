@@ -4,6 +4,7 @@ import { useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import { createClient } from "@/lib/supabase/client";
+import { runBatched } from "@/lib/batch";
 import { getCurrentSeasonLabel } from "@/lib/season";
 import { suggestTeamCategory } from "@/lib/team-assignment";
 import { notifyCoachesOfNewTeamMember } from "@/lib/member-notifications";
@@ -605,14 +606,21 @@ export default function ImportInscriptions() {
     // du nombre de lignes (audit du 31/08) : RLS peut bloquer une écriture
     // sans erreur — sans ce contrôle, l'écran affichait "mis à jour" même
     // quand rien n'avait changé en base.
-    const updateResults = await Promise.all(
-      toUpdate.map((r) =>
+    // Retour de l'audit du 05/10 ("il faut revoir les requêtes") : un
+    // Promise.all brut envoyait une mise à jour par joueur strictement en
+    // même temps -- un réimport de rentrée (~90-150 membres) faisait donc
+    // partir 90 à 150+ requêtes d'un coup, même défaut que l'incident du
+    // 20/09 (CLAUDE.md) sur sync-ffbb. runBatched (lib/batch.ts) plafonne
+    // sans rien changer au résultat (même tableau, même ordre).
+    const updateResults = await runBatched(
+      toUpdate.map((r) => () =>
         supabase
           .from("players")
           .update({ ...mergedPlayerFields(r), archived_at: null })
           .eq("id", r.id)
           .select("id")
-      )
+      ),
+      4
     );
     const updateError = updateResults.find((res) => res.error)?.error;
     if (updateError) {
@@ -689,14 +697,16 @@ export default function ImportInscriptions() {
       }
     }
 
-    const cotisationsUpdateResults = await Promise.all(
-      cotisationsToUpdate.map((r) =>
+    // Même correctif que updateResults plus haut (audit du 05/10).
+    const cotisationsUpdateResults = await runBatched(
+      cotisationsToUpdate.map((r) => () =>
         supabase
           .from("cotisations")
           .update(cotisationFields(r))
           .eq("id", cotisationIdByPlayerId.get(r.id))
           .select("id")
-      )
+      ),
+      4
     );
     const cotisationsUpdateError = cotisationsUpdateResults.find(
       (res) => res.error
