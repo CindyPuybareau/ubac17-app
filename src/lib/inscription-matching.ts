@@ -136,8 +136,18 @@ export async function matchAndUpsertPlayer(
   // 3. Repli nom seul (homonyme unique) — même garde-fou que l'import
   // Excel : jamais de fusion automatique si l'année de naissance connue ne
   // correspond pas du tout.
+  // Retour de l'audit du 05/10 ("il faut revoir les requêtes") : ce repli
+  // tournait en select("*") SANS AUCUN filtre -- tout le club, toutes les
+  // colonnes (dont notes médicales, adresse, téléphones), à chaque
+  // inscription via le formulaire dès que licence + date de naissance ne
+  // suffisaient pas. La comparaison reste en mémoire (accents non gérés
+  // par ilike, voir l'étape 2 ci-dessus), mais seules les 4 colonnes
+  // nécessaires à CETTE comparaison sont ramenées ici ; la fiche complète
+  // n'est redemandée, ciblée par id, que pour l'unique candidat retenu.
   if (!existing) {
-    const { data, error } = await supabase.from("players").select("*");
+    const { data, error } = await supabase
+      .from("players")
+      .select("id, first_name, last_name, birth_date");
     if (error) return { kind: "error", message: error.message };
     const candidates = (data ?? []).filter(
       (p) =>
@@ -158,7 +168,13 @@ export async function matchAndUpsertPlayer(
           candidateName: `${candidate.first_name} ${candidate.last_name}`,
         };
       }
-      existing = candidate;
+      const { data: fullCandidate, error: fullError } = await supabase
+        .from("players")
+        .select("*")
+        .eq("id", candidate.id)
+        .maybeSingle();
+      if (fullError) return { kind: "error", message: fullError.message };
+      existing = fullCandidate;
     } else if (candidates.length > 1) {
       // Plusieurs homonymes : jamais deviner lequel.
       return {
