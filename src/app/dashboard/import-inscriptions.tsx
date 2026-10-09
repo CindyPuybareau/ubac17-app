@@ -167,6 +167,18 @@ type ExistingPlayerRow = {
   license_number: string | null;
 };
 
+// Même usage que ExistingPlayerRow ci-dessus, pour mergedCotisationFields
+// (bug du 09/10) -- voir handleImport.
+type ExistingCotisationRow = {
+  id: string;
+  player_id: string;
+  prix: number | null;
+  remise: number | null;
+  paiement: number | null;
+  statut: string | null;
+  mode_paiement: string | null;
+};
+
 export default function ImportInscriptions() {
   const router = useRouter();
   const [rows, setRows] = useState<ParsedRow[] | null>(null);
@@ -206,8 +218,19 @@ export default function ImportInscriptions() {
       defval: null,
     }) as unknown[][];
 
+    // Bug trouvé le 09/10 ("les cotisations sont toutes à 0") : l'export
+    // Google Sheets -> Excel encode les retours à la ligne des en-têtes en
+    // CRLF ("Prix à payer\r\n22895 €"), jamais LF seul -- findPrefix
+    // ci-dessous cherchait "Prix à payer\n" (LF), qui ne correspondait donc
+    // JAMAIS. idx.prix/remise/paiement valaient -1 en permanence, chaque
+    // import écrivait silencieusement prix=null/remise=null/paiement=null
+    // sur TOUTES les cotisations déjà en base pour les membres réimportés
+    // (voir mergedCotisationFields plus bas, deuxième moitié du correctif).
+    // Normalisé une fois ici pour que toute colonne à en-tête multi-ligne
+    // (présente ou future) marche quel que soit le style de retour à la
+    // ligne du fichier.
     const headerRow = (raw[0] ?? []).map((h) =>
-      typeof h === "string" ? h : ""
+      typeof h === "string" ? h.replace(/\r\n/g, "\n") : ""
     );
     const findExact = (name: string) =>
       headerRow.findIndex((h) => h.trim() === name);
@@ -668,14 +691,20 @@ export default function ImportInscriptions() {
     // Cotisations: one row per player per season. Update this season's row
     // if it already exists (re-import correcting the same season) instead
     // of adding a duplicate; insert a new one otherwise.
+    // Colonnes élargies (bug du 09/10, voir le commentaire sur headerRow
+    // plus haut) : prix/remise/paiement/statut/mode_paiement récupérés en
+    // plus de id/player_id, pour pouvoir garder la valeur déjà en base
+    // quand le fichier n'en apporte pas (mergedCotisationFields ci-dessous)
+    // -- même principe que mergedPlayerFields, qui n'existait jusqu'ici que
+    // côté fiche joueur, jamais côté cotisation.
     const { data: existingCotisations, error: cotisationsFetchError } =
       allIds.length > 0
         ? await supabase
             .from("cotisations")
-            .select("id, player_id")
+            .select("id, player_id, prix, remise, paiement, statut, mode_paiement")
             .eq("saison", season)
             .in("player_id", allIds)
-        : { data: [] as { id: string; player_id: string }[], error: null };
+        : { data: [] as ExistingCotisationRow[], error: null };
 
     if (cotisationsFetchError) {
       setLoading(false);
@@ -683,6 +712,9 @@ export default function ImportInscriptions() {
       return;
     }
 
+    const existingCotisationByPlayerId = new Map(
+      (existingCotisations ?? []).map((c) => [c.player_id, c])
+    );
     const cotisationIdByPlayerId = new Map(
       (existingCotisations ?? []).map((c) => [c.player_id, c.id])
     );
@@ -694,6 +726,23 @@ export default function ImportInscriptions() {
       statut: normalizeStatut(r.statutClub),
       mode_paiement: r.modePaiement,
     });
+
+    // Même garde-fou que mergedPlayerFields plus haut (bug du 09/10) : une
+    // cellule vide ou introuvable dans le fichier (ex. Prix/Remise/Paiement
+    // avant ce correctif) ne doit jamais effacer un montant déjà enregistré
+    // en base -- seule une vraie valeur du fichier remplace l'existant.
+    function mergedCotisationFields(r: ParsedRow & { id: string }) {
+      const fresh = cotisationFields(r);
+      const existing = existingCotisationByPlayerId.get(r.id);
+      if (!existing) return fresh;
+      const merged = { ...fresh } as Record<string, unknown>;
+      (Object.keys(merged) as (keyof typeof fresh)[]).forEach((key) => {
+        if (merged[key] === null && existing[key] != null) {
+          merged[key] = existing[key];
+        }
+      });
+      return merged as ReturnType<typeof cotisationFields>;
+    }
 
     const cotisationsToInsert = allRows.filter(
       (r) => !cotisationIdByPlayerId.has(r.id)
@@ -724,7 +773,7 @@ export default function ImportInscriptions() {
       cotisationsToUpdate.map((r) => () =>
         supabase
           .from("cotisations")
-          .update(cotisationFields(r))
+          .update(mergedCotisationFields(r))
           .eq("id", cotisationIdByPlayerId.get(r.id))
           .select("id")
       ),
