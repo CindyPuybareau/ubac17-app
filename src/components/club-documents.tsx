@@ -11,6 +11,7 @@ import {
   Handshake,
   HeartPulse,
   IdCard,
+  Images,
   Info,
   MessageCircle,
   ScrollText,
@@ -24,6 +25,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { teamLabel } from "@/lib/teams";
 import TrombinoscopeButton from "@/app/dashboard/trombinoscope-button";
 import CollapsibleCard from "./collapsible-card";
 
@@ -450,9 +452,46 @@ function OfficialsTrombinoscopeCard({
             />
           </label>
         )}
-        <TrombinoscopeButton path={trombinoscopePath} bucket="club-documents" />
+        <TrombinoscopeButton path={trombinoscopePath} bucket="club-documents" label="officiels" />
       </div>
       {error && <p className="text-xs text-red-600">{error}</p>}
+    </CollapsibleCard>
+  );
+}
+
+// Retour de Cindy du 16/10 ("chaque équipe a son propre trombinoscope...
+// directement dans Documents, comme pour les officiels") : une carte par
+// équipe mère ayant un trombinoscope envoyé (team-card.tsx, onglet
+// Équipes) -- lecture seule ici, aucun envoi possible depuis Documents.
+// `entries` arrive déjà dédupliqué par équipe mère (listTeamTrombinoscopes,
+// lib/teams.ts), calculé côté appelant (admin-view.tsx/coach-view.tsx) à
+// partir des équipes visibles pour CE viewer -- ce composant ne fait que
+// l'affichage. Jamais transmis côté Famille/Bénévole/Enfant pour
+// l'instant (le bucket team-trombinoscopes n'autorise en lecture que
+// Bureau/coachs, voir la migration 20261115000000_team_trombinoscopes.sql).
+function TeamTrombinoscopesCard({
+  entries,
+}: {
+  entries: {
+    team: { id: string; name: string | null; category: string | null };
+    path: string;
+  }[];
+}) {
+  // Rien à montrer : aucune équipe visible n'a encore de trombinoscope
+  // envoyé -- pas de carte vide (même principe que OfficialsTrombinoscopeCard
+  // côté Coach/Famille).
+  if (entries.length === 0) return null;
+
+  return (
+    <CollapsibleCard icon={Images} title="Trombinoscopes d'équipe" badge="Saison 2026-2027">
+      <p className="text-sm text-zinc-600">
+        Photos et noms des joueurs de chaque équipe, à consulter avant un match.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        {entries.map(({ team, path }) => (
+          <TrombinoscopeButton key={team.id} path={path} text={teamLabel(team)} />
+        ))}
+      </div>
     </CollapsibleCard>
   );
 }
@@ -468,6 +507,7 @@ export default function DocumentsPanel({
   documentIds,
   officialsTrombinoscopePath,
   canManageOfficialsTrombinoscope = false,
+  teamTrombinoscopes = [],
 }: {
   documentIds: ClubDocumentId[];
   // Retour de Cindy du 08/10 : absent (undefined) pour les espaces qui ne
@@ -475,6 +515,19 @@ export default function DocumentsPanel({
   // carte ne s'affiche alors jamais, aucun changement pour ces espaces.
   officialsTrombinoscopePath?: string | null;
   canManageOfficialsTrombinoscope?: boolean;
+  // Retour de Cindy du 16/10 : une entrée par équipe mère avec
+  // trombinoscope envoyé, déjà dédupliquée/résolue côté appelant
+  // (listTeamTrombinoscopes, lib/teams.ts). Par défaut [] (jamais le motif
+  // `undefined` de officialsTrombinoscopePath ci-dessus -- ici pas de cas
+  // "afficher vide pour permettre l'envoi", juste rien à montrer) pour
+  // Famille/Enfant/Bénévole, hors scope pour cette itération (RLS Storage
+  // team-trombinoscopes n'autorise pas encore leur lecture, voir migration
+  // 20261115000000_team_trombinoscopes.sql) -- TeamTrombinoscopesCard se
+  // masque alors entièrement, zéro changement visuel pour ces espaces.
+  teamTrombinoscopes?: {
+    team: { id: string; name: string | null; category: string | null };
+    path: string;
+  }[];
 }) {
   return (
     <div className="flex flex-col gap-3">
@@ -491,6 +544,7 @@ export default function DocumentsPanel({
           canManage={canManageOfficialsTrombinoscope}
         />
       )}
+      <TeamTrombinoscopesCard entries={teamTrombinoscopes} />
     </div>
   );
 }

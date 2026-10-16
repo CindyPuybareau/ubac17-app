@@ -271,6 +271,38 @@ export function getTrombinoscopeTeamId<
   return mother?.id ?? team.id;
 }
 
+// Retour de Cindy du 16/10 ("chaque équipe... directement dans
+// Documents, comme pour les officiels") : construit la liste dédupliquée
+// des trombinoscopes d'équipe à afficher dans l'onglet Documents, à
+// partir des équipes à montrer pour CE viewer (`teamsToShow` --
+// catalogue complet pour le Bureau, équipes coachées seulement pour un
+// Coach) et du catalogue complet du club (`allTeams`, nécessaire pour
+// retrouver le nom de la mère même quand elle n'est pas elle-même dans
+// `teamsToShow`, ex. un coach de seulement "U13M-1"). `trombinoscopeByTeamId`
+// est déjà résolu par héritage (voir getTrombinoscopeTeamId, appelé côté
+// serveur dans page.tsx) -- aucune nouvelle résolution de chemin ici,
+// seulement la dédup/label (un coach de U13M-1 ET U13M-2 ne doit voir
+// "Trombinoscope U13M" qu'une fois, jamais les deux déclinaisons).
+export function listTeamTrombinoscopes<
+  T extends { id: string; name?: string | null; category?: string | null },
+>(
+  teamsToShow: T[],
+  allTeams: T[],
+  trombinoscopeByTeamId: Record<string, string | null | undefined>
+): { team: T; path: string }[] {
+  const seenOwnerIds = new Set<string>();
+  const entries: { team: T; path: string }[] = [];
+  teamsToShow.forEach((team) => {
+    const path = trombinoscopeByTeamId[team.id];
+    if (!path) return;
+    const ownerId = getTrombinoscopeTeamId(team, allTeams);
+    if (seenOwnerIds.has(ownerId)) return;
+    seenOwnerIds.add(ownerId);
+    entries.push({ team: allTeams.find((t) => t.id === ownerId) ?? team, path });
+  });
+  return entries;
+}
+
 // Retour de Cindy du 30/09, précisé le même jour ("en équipe 2, il n'y a
 // jamais de brûlé") : le statut ne peut vivre QUE sur la déclinaison la
 // plus petite d'une paire sœur (ex. U13M-1, jamais U13M-2) -- un joueur de

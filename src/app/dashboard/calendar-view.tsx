@@ -1902,7 +1902,14 @@ export default function CalendarView({
             null) ou côté Famille/Enfant (trombinoscopeByTeamId jamais
             transmis là-bas). */}
         {event.event_type === "MATCH" && event.teamId && (
-          <TrombinoscopeButton path={trombinoscopeByTeamId?.[event.teamId] ?? null} />
+          <TrombinoscopeButton
+            path={trombinoscopeByTeamId?.[event.teamId] ?? null}
+            label={
+              createTeams?.find((t) => t.id === event.teamId)
+                ? teamLabel(createTeams.find((t) => t.id === event.teamId)!)
+                : undefined
+            }
+          />
         )}
 
         {hasRoster && (
@@ -2100,7 +2107,7 @@ export default function CalendarView({
                       au-dessus du bandeau des 8 rôles, visible à qui voit
                       déjà ce bandeau (Bureau/Coach/Famille, matchs à
                       domicile uniquement). */}
-                  <TrombinoscopeButton path={officialsTrombinoscopePath ?? null} bucket="club-documents" />
+                  <TrombinoscopeButton path={officialsTrombinoscopePath ?? null} bucket="club-documents" label="officiels" />
                   <MatchOfficialsPanel
                     eventId={event.id}
                     eventTitle={event.title}
@@ -2256,7 +2263,7 @@ export default function CalendarView({
           !organisationLoading &&
           isHomeMatch(event) && (
             <OrganisationCard defaultOpen={organisationDefaultOpen} variant="terracotta">
-              <TrombinoscopeButton path={officialsTrombinoscopePath ?? null} bucket="club-documents" />
+              <TrombinoscopeButton path={officialsTrombinoscopePath ?? null} bucket="club-documents" label="officiels" />
               <MatchOfficialsPanel
                 eventId={event.id}
                 eventTitle={event.title}
@@ -2379,7 +2386,14 @@ export default function CalendarView({
             ci-dessus, voir son commentaire -- matchs officiels uniquement
             (cette vue n'affiche jamais que ça), déjà joué ou à venir. */}
         {event.teamId && (
-          <TrombinoscopeButton path={trombinoscopeByTeamId?.[event.teamId] ?? null} />
+          <TrombinoscopeButton
+            path={trombinoscopeByTeamId?.[event.teamId] ?? null}
+            label={
+              createTeams?.find((t) => t.id === event.teamId)
+                ? teamLabel(createTeams.find((t) => t.id === event.teamId)!)
+                : undefined
+            }
+          />
         )}
 
         {alreadyPlayed ? (

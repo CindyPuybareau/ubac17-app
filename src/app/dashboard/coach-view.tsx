@@ -18,7 +18,12 @@ import DocumentsPanel from "@/components/club-documents";
 import ClubReportsSection from "./club-reports-section";
 import Cd17LigueSection from "./cd17-ligue-section";
 import { BOUTIQUE_URL } from "./boutique";
-import { getSiblingTeamIds, groupTeamsByPrimarySecondary, listTeamsForOfficialMatches } from "@/lib/teams";
+import {
+  getSiblingTeamIds,
+  groupTeamsByPrimarySecondary,
+  listTeamsForOfficialMatches,
+  listTeamTrombinoscopes,
+} from "@/lib/teams";
 import CalendarView from "./calendar-view";
 import CalendarSubscribe from "./calendar-subscribe";
 import SpaceDashboardSummary from "./space-dashboard-summary";
@@ -138,6 +143,17 @@ export default function CoachView({
       name: t.name,
       category: t.category,
     }));
+
+  // Retour de Cindy du 16/10 ("chaque équipe... directement dans
+  // Documents") : équipes réellement coachées seulement, jamais une équipe
+  // où ce coach n'est que joueur. clubTeams (catalogue complet du club)
+  // sert à retrouver le nom de la mère même si ce coach ne coache QUE une
+  // déclinaison (ex. "U13M-1") et jamais "U13M" elle-même.
+  const teamTrombinoscopes = listTeamTrombinoscopes(
+    createTeams,
+    clubTeams,
+    trombinoscopeByTeamId ?? {}
+  );
 
   // "Bilan de la saison" (retour de Cindy du 24/09) : équipes réellement
   // coachées uniquement, même filtre que createTeams ci-dessus -- jamais
@@ -529,6 +545,7 @@ export default function CoachView({
               <DocumentsPanel
                 documentIds={["charte-joueur", "charte-parent", "reglement-interieur"]}
                 officialsTrombinoscopePath={officialsTrombinoscopePath ?? null}
+                teamTrombinoscopes={teamTrombinoscopes}
               />
               {/* Comptes rendus (retour de Cindy du 2026-09-01) : un coach
                   consulte Mairies/Bureau (lecture seule) et voit AUSSI les

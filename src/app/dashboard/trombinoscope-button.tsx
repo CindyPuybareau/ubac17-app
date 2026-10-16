@@ -16,10 +16,26 @@ import { createClient } from "@/lib/supabase/client";
 export default function TrombinoscopeButton({
   path,
   bucket = "team-trombinoscopes",
+  label,
+  text,
   className,
 }: {
   path: string | null;
   bucket?: "team-trombinoscopes" | "club-documents";
+  // Retour de Cindy du 16/10 ("je ne sais pas quel trombi je vais ouvrir")
+  // : plusieurs boutons peuvent apparaître proches l'un de l'autre sur une
+  // même carte de match (équipe + officiels) -- précise le texte
+  // ("Trombinoscope U13M", "Trombinoscope officiels"). Optionnel : un appel
+  // sans ambiguïté possible (team-card.tsx, déjà dans la fiche d'UNE seule
+  // équipe) garde le texte simple "Trombinoscope".
+  label?: string;
+  // Retour de Cindy du 16/10 (bis, carte "Trombinoscopes d'équipe") : le
+  // mot "Trombinoscope" est déjà dans le TITRE de la carte qui regroupe
+  // plusieurs de ces boutons -- le répéter sur chacun n'apporte rien.
+  // `text`, s'il est fourni, REMPLACE tout le texte du bouton (ex. juste
+  // "U13F") au lieu de le préfixer comme `label` ("Trombinoscope U13F") --
+  // les deux ne sont jamais passés ensemble.
+  text?: string;
   className?: string;
 }) {
   const [loading, setLoading] = useState(false);
@@ -58,11 +74,22 @@ export default function TrombinoscopeButton({
         // plein que les CTA principaux de l'appli (ex. "Je me propose"
         // côté bénévoles, "Se connecter"), plus discret bg-navy/10
         // d'origine.
-        "flex items-center gap-1.5 rounded-full bg-ubac-yellow px-3 py-1.5 text-xs font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+        // self-start (retour de Cindy du 16/10, "prend toute la largeur de
+        // mon écran") : les cartes qui l'accueillent (calendar-view.tsx,
+        // team-card.tsx...) sont toutes en `flex flex-col` sans
+        // `items-start` -- un enfant flex SANS largeur propre s'étire par
+        // défaut (align-items: stretch), ce qui agrandissait tout le
+        // bouton (fond jaune compris) à la largeur de la carte, PC comme
+        // mobile. Fixé une fois ici plutôt que sur chacun des 7 appels.
+        "flex w-fit items-center gap-1.5 self-start rounded-full bg-ubac-yellow px-3 py-1.5 text-xs font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
       }
     >
       <FileText className="h-3.5 w-3.5 shrink-0" />
-      {loading ? "Ouverture…" : error ? "Indisponible, réessaie" : "Trombinoscope"}
+      {loading
+        ? "Ouverture…"
+        : error
+          ? "Indisponible, réessaie"
+          : (text ?? (label ? `Trombinoscope ${label}` : "Trombinoscope"))}
     </button>
   );
 }

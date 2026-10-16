@@ -31,7 +31,7 @@ import ImportPlanning from "./import-planning";
 import ImportCoaches from "./import-coaches";
 import CotisationsManager from "./cotisations-manager";
 import CalendarView from "./calendar-view";
-import { listTeamsForOfficialMatches, splitTeamName } from "@/lib/teams";
+import { listTeamsForOfficialMatches, listTeamTrombinoscopes, splitTeamName } from "@/lib/teams";
 import MembersTable from "./members-table";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import FfbbManager from "./ffbb-manager";
@@ -161,6 +161,18 @@ export default function AdminView({
     name: t.name,
     category: t.category,
   }));
+
+  // Retour de Cindy du 16/10 ("chaque équipe... directement dans
+  // Documents") : catalogue complet club entier -- le Bureau voit tous les
+  // trombinoscopes équipe envoyés, pas seulement ceux d'une équipe
+  // particulière. canonicalTeamRefs sert à la fois de "équipes à montrer"
+  // ET de "catalogue complet" (nécessaire à listTeamTrombinoscopes pour
+  // retrouver le nom d'une équipe mère).
+  const teamTrombinoscopes = listTeamTrombinoscopes(
+    canonicalTeamRefs,
+    canonicalTeamRefs,
+    trombinoscopeByTeamId ?? {}
+  );
 
   // "Bilan de la saison" (retour de Cindy du 24/09, refonte "Organisation &
   // Bilan") : club entier -- contrairement à côté Coach (season-bilan-
@@ -617,6 +629,7 @@ export default function AdminView({
                   documentIds={["charte-joueur", "charte-parent", "reglement-interieur"]}
                   officialsTrombinoscopePath={officialsTrombinoscopePath ?? null}
                   canManageOfficialsTrombinoscope
+                  teamTrombinoscopes={teamTrombinoscopes}
                 />
               )}
               {/* Comptes rendus (retour de Cindy du 2026-09-01) : texte
