@@ -78,7 +78,6 @@ import { MATCH_OFFICIAL_ROLES, type MatchOfficialAssignment } from "./match-offi
 import MatchOfficialsPanel from "./match-officials-panel";
 import ConfirmDialog from "./confirm-dialog";
 import OrganisationCard from "./organisation-card";
-import TrombinoscopeButton from "./trombinoscope-button";
 import MatchResultCelebration from "@/components/match-result-celebration";
 import type { FfbbRankingEntry } from "@/lib/ffbb";
 
@@ -436,8 +435,6 @@ export default function CalendarView({
   celebrateWins = false,
   commissionGroups = [],
   isBureau = false,
-  trombinoscopeByTeamId,
-  officialsTrombinoscopePath,
 }: {
   events: AdminUpcomingEvent[];
   createTeams?: CalendarTeamRef[];
@@ -457,19 +454,6 @@ export default function CalendarView({
   // club" (voir plus bas), jamais faux ailleurs (Coach/Famille : false par
   // défaut).
   isBureau?: boolean;
-  // Retour de Cindy du 05/10 ("trombinoscope... accès facile pour chaque
-  // match officiel") : chemin Storage déjà résolu par équipe (mère ou
-  // hérité d'une mère, voir page.tsx), clé = event.teamId. Optionnel :
-  // absent côté Famille/Enfant (jamais passé par family-view.tsx), le
-  // bouton ne s'affiche alors simplement jamais.
-  trombinoscopeByTeamId?: Record<string, string | null>;
-  // Retour de Cindy du 08/10 ("trombinoscope officiels... concerne les
-  // parents, les coachs et le bureau") : chemin unique, club entier --
-  // bouton rendu à côté de MatchOfficialsPanel, matchs à domicile
-  // uniquement (bare côté undefined : jamais passé par family-view.tsx
-  // sur le Calendrier général, pas la peine ailleurs qu'aux onglets
-  // Matchs officiels/Résultats).
-  officialsTrombinoscopePath?: string | null;
   birthdayMembers?: BirthdaySource[];
   // Équipes dont ce calendrier montre les événements. Affiché tel quel :
   // sans cette ligne, un calendrier vide ne dit pas s'il ne couvre rien ou
@@ -1892,26 +1876,6 @@ export default function CalendarView({
 
         <ItineraryButton query={venueQuery(event)} />
 
-        {/* Retour de Cindy du 05/10 ("trombinoscope... les coachs en ont
-            besoin pour chaque match officiel") : match officiel uniquement
-            (jamais amical/tournoi/entraînement), indépendant de
-            canManageEvent -- consultable par tout coach du club, pas
-            seulement celui de cette équipe précise (voir la policy Storage
-            "any coach or admin read trombinoscope"). N'affiche rien si
-            aucun fichier n'a encore été envoyé (TrombinoscopeButton renvoie
-            null) ou côté Famille/Enfant (trombinoscopeByTeamId jamais
-            transmis là-bas). */}
-        {event.event_type === "MATCH" && event.teamId && (
-          <TrombinoscopeButton
-            path={trombinoscopeByTeamId?.[event.teamId] ?? null}
-            label={
-              createTeams?.find((t) => t.id === event.teamId)
-                ? teamLabel(createTeams.find((t) => t.id === event.teamId)!)
-                : undefined
-            }
-          />
-        )}
-
         {hasRoster && (
           <div className="flex flex-wrap gap-1.5">
             <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-status-success/10 px-2 py-0.5 text-xs font-semibold leading-none text-status-success">
@@ -2102,12 +2066,6 @@ export default function CalendarView({
               )}
               {isHomeMatchEvent && (
                 <OrganisationCard defaultOpen={organisationDefaultOpen} variant="terracotta">
-                  {/* Retour de Cindy du 08/10 ("trombinoscope officiels...
-                      accessible lors des matchs officiels") : juste
-                      au-dessus du bandeau des 8 rôles, visible à qui voit
-                      déjà ce bandeau (Bureau/Coach/Famille, matchs à
-                      domicile uniquement). */}
-                  <TrombinoscopeButton path={officialsTrombinoscopePath ?? null} bucket="club-documents" label="officiels" />
                   <MatchOfficialsPanel
                     eventId={event.id}
                     eventTitle={event.title}
@@ -2263,7 +2221,6 @@ export default function CalendarView({
           !organisationLoading &&
           isHomeMatch(event) && (
             <OrganisationCard defaultOpen={organisationDefaultOpen} variant="terracotta">
-              <TrombinoscopeButton path={officialsTrombinoscopePath ?? null} bucket="club-documents" label="officiels" />
               <MatchOfficialsPanel
                 eventId={event.id}
                 eventTitle={event.title}
@@ -2381,20 +2338,6 @@ export default function CalendarView({
             </span>
           )}
         </div>
-
-        {/* Retour de Cindy du 05/10 : même bouton que renderEventCard
-            ci-dessus, voir son commentaire -- matchs officiels uniquement
-            (cette vue n'affiche jamais que ça), déjà joué ou à venir. */}
-        {event.teamId && (
-          <TrombinoscopeButton
-            path={trombinoscopeByTeamId?.[event.teamId] ?? null}
-            label={
-              createTeams?.find((t) => t.id === event.teamId)
-                ? teamLabel(createTeams.find((t) => t.id === event.teamId)!)
-                : undefined
-            }
-          />
-        )}
 
         {alreadyPlayed ? (
           <MatchScore

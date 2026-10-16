@@ -27,7 +27,6 @@ import OpponentDisplay from "./opponent-display";
 import MemberDetailModal from "./member-detail-modal";
 import PlayerYearBadge from "./player-year-badge";
 import SalleBadge from "./salle-badge";
-import TrombinoscopeButton from "./trombinoscope-button";
 import { useToast } from "./toast-context";
 import WhatsAppDirectButton from "./whatsapp-direct-button";
 import WhatsAppGroupButton from "./whatsapp-group-button";
@@ -1158,46 +1157,40 @@ export default function TeamCard({
             retombant sous la photo au lieu de rester à côté. Même rendu
             "sous la photo" en pratique, sans dépendre de la largeur
             disponible. */}
-        {!isBabysTeam && (!readOnly || trombinoscopePath) ? (
+        {!isBabysTeam && !readOnly ? (
           <div className="flex flex-wrap items-center gap-2">
             {/* Retour de Cindy du 05/10 ("sénior 1 et sénior 2 toujours
                 pas de bouton", "pareil pour les u13 et les U18") : le
                 bouton d'envoi est visible sur TOUTE équipe, déclinaison
                 comprise -- il écrit vers trombinoscopeOwnerId (toujours
                 l'équipe mère) quelle que soit la carte d'où on l'envoie,
-                voir le commentaire plus haut. */}
-            {/* Retour de Cindy du 05/10 ("le bouton jaune pour plus de
-                visibilité [la consultation], et Remplacer en bleu ciel,
-                moins visible") : une fois un fichier déjà envoyé, la
-                vraie action du quotidien devient "consulter" (ci-dessous,
-                en jaune -- voir TrombinoscopeButton), "Remplacer" passe
-                au second plan. Avant tout envoi, "Envoyer" reste la seule
-                action possible : elle garde le plein navy, rien à
-                éclipser. */}
-            {!isBabysTeam && !readOnly && (
-              <label
-                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-                  trombinoscopePath
-                    ? "bg-sky-100 text-sky-700 hover:bg-sky-200"
-                    : "bg-navy text-white hover:bg-navy-dark"
-                } ${uploadingTrombinoscope ? "cursor-wait opacity-60" : "cursor-pointer"}`}
-              >
-                <Upload className="h-3.5 w-3.5 shrink-0" />
-                {uploadingTrombinoscope
-                  ? "Envoi…"
-                  : trombinoscopePath
-                    ? "Remplacer le trombinoscope"
-                    : "Envoyer le trombinoscope"}
-                <input
-                  type="file"
-                  accept="application/pdf"
-                  onChange={onTrombinoscopeChange}
-                  disabled={uploadingTrombinoscope}
-                  className="hidden"
-                />
-              </label>
-            )}
-            {!isBabysTeam && <TrombinoscopeButton path={trombinoscopePath} />}
+                voir le commentaire plus haut. Bouton de CONSULTATION
+                retiré d'ici le 16/10 (retour de Cindy, "je veux les
+                trombi seulement dans document") -- l'envoi reste ici,
+                mais ouvrir le fichier déjà envoyé se fait désormais
+                uniquement depuis Vie du club > Documents
+                (TeamTrombinoscopesCard, club-documents.tsx). */}
+            <label
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                trombinoscopePath
+                  ? "bg-sky-100 text-sky-700 hover:bg-sky-200"
+                  : "bg-navy text-white hover:bg-navy-dark"
+              } ${uploadingTrombinoscope ? "cursor-wait opacity-60" : "cursor-pointer"}`}
+            >
+              <Upload className="h-3.5 w-3.5 shrink-0" />
+              {uploadingTrombinoscope
+                ? "Envoi…"
+                : trombinoscopePath
+                  ? "Remplacer le trombinoscope"
+                  : "Envoyer le trombinoscope"}
+              <input
+                type="file"
+                accept="application/pdf"
+                onChange={onTrombinoscopeChange}
+                disabled={uploadingTrombinoscope}
+                className="hidden"
+              />
+            </label>
           </div>
         ) : null}
       </div>

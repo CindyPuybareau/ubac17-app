@@ -497,7 +497,6 @@ export default function FamilyView({
               resultsTeams={matchesResultsTeams}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
               celebrateWins
-              officialsTrombinoscopePath={officialsTrombinoscopePath}
             />
           ),
         },
@@ -513,7 +512,6 @@ export default function FamilyView({
               resultsTeams={matchesResultsTeams}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
               celebrateWins
-              officialsTrombinoscopePath={officialsTrombinoscopePath}
             />
           ),
         },

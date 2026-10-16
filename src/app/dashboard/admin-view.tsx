@@ -501,8 +501,6 @@ export default function AdminView({
               eventRoles={eventRoles}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
               commissionGroups={commissionGroups}
-              trombinoscopeByTeamId={trombinoscopeByTeamId}
-              officialsTrombinoscopePath={officialsTrombinoscopePath}
             />
           ),
         },
@@ -527,8 +525,6 @@ export default function AdminView({
               eventRoles={eventRoles}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
               commissionGroups={commissionGroups}
-              trombinoscopeByTeamId={trombinoscopeByTeamId}
-              officialsTrombinoscopePath={officialsTrombinoscopePath}
             />
           ),
         },

@@ -459,8 +459,6 @@ export default function CoachView({
               selfPlayerId={ownPlayerId}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
               celebrateWins
-              trombinoscopeByTeamId={trombinoscopeByTeamId}
-              officialsTrombinoscopePath={officialsTrombinoscopePath}
             />
           ),
         },
@@ -483,8 +481,6 @@ export default function CoachView({
               selfPlayerId={ownPlayerId}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
               celebrateWins
-              trombinoscopeByTeamId={trombinoscopeByTeamId}
-              officialsTrombinoscopePath={officialsTrombinoscopePath}
             />
           ),
         },
