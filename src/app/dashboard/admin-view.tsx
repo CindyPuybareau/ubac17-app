@@ -9,6 +9,7 @@ import {
   ListOrdered,
   LogOut,
   MessageCircle,
+  Package,
   ScrollText,
   Shield,
   ShoppingBag,
@@ -37,6 +38,7 @@ import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import FfbbManager from "./ffbb-manager";
 import WhatsAppGroupsManager from "./whatsapp-groups-manager";
 import SponsorsManager from "./sponsors-manager";
+import InventoryManager from "./inventory-manager";
 import SponsorsDisplay from "./sponsors-display";
 import CommissionsManager from "./commissions-manager";
 import BureauDashboard from "./bureau-dashboard";
@@ -49,6 +51,7 @@ import type {
   AdminCategoryTariff,
   AdminCollecte,
   AdminCotisation,
+  AdminInventoryItem,
   AdminMember,
   AdminPenalite,
   AdminSponsor,
@@ -79,6 +82,7 @@ export default function AdminView({
   canonicalTeamRefs,
   whatsappGroups,
   sponsors,
+  inventoryItems,
   sponsorDisplay,
   benevoles,
   accessProfiles,
@@ -115,6 +119,9 @@ export default function AdminView({
   canonicalTeamRefs: { id: string; name: string | null; category: string | null }[];
   whatsappGroups: WhatsAppGroup[];
   sponsors: AdminSponsor[];
+  // Retour de Cindy du 16/10 ("Inventaire") : matériel club, club entier,
+  // modifiable par le Bureau ET les coachs -- voir inventory-manager.tsx.
+  inventoryItems: AdminInventoryItem[];
   sponsorDisplay: SponsorDisplay[];
   benevoles: AdminBenevole[];
   accessProfiles: AdminAccessProfile[];
@@ -679,6 +686,18 @@ export default function AdminView({
               {!isRestricted && <Cd17LigueSection canUpload reports={clubReports} />}
             </div>
           ),
+        },
+        {
+          // Retour de Cindy du 16/10 ("Inventaire") : matériel club libre
+          // (nom + quantité), visible et modifiable par le Bureau ET les
+          // coachs (voir coach-view.tsx, même enfant) -- jamais rattaché à
+          // une équipe précise, donc hors de la liste blanche des briques
+          // (étape 3, 05/09), comme Paiements/Documents ci-dessus : Bureau
+          // complet uniquement côté profils d'accès restreints.
+          key: "inventaire",
+          label: "Inventaire",
+          icon: <Package className={iconClass} />,
+          content: <InventoryManager items={inventoryItems} />,
         },
         {
           // Retour de Cindy du 09/09 : devient un sous-menu (comme

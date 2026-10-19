@@ -6,6 +6,7 @@ import {
   ListOrdered,
   LogOut,
   MessageCircle,
+  Package,
   RefreshCw,
   ScrollText,
   Shield,
@@ -36,6 +37,7 @@ import SponsorsDisplay from "./sponsors-display";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import type { TeamWithMembers } from "./team-manager";
 import type {
+  AdminInventoryItem,
   AdminMemberTeam,
   AdminPenalite,
   AdminUpcomingEvent,
@@ -44,6 +46,7 @@ import type {
   SponsorDisplay,
   WhatsAppGroup,
 } from "./page";
+import InventoryManager from "./inventory-manager";
 import type { EventRoleType } from "./event-tasks";
 import type { VolunteerNeed } from "./event-volunteer-needs";
 import type { SeasonGuestVolunteer, SeasonVolunteerTally } from "./season-bilan";
@@ -59,6 +62,7 @@ export default function CoachView({
   rsvpStatusByKey,
   teamRoleByTeamId,
   clubTeams,
+  inventoryItems,
   birthdayMembers,
   seasonVolunteerTallyByPlayerId,
   seasonVolunteerGuestEntries,
@@ -86,6 +90,9 @@ export default function CoachView({
   teamRoleByTeamId: Record<string, "COACH" | "PLAYER">;
   // Every club team, for the roster's "Changer d'équipe" picker.
   clubTeams: AdminMemberTeam[];
+  // Retour de Cindy du 16/10 ("Inventaire") : matériel club, club entier,
+  // modifiable par le Bureau ET les coachs -- voir inventory-manager.tsx.
+  inventoryItems: AdminInventoryItem[];
   birthdayMembers: BirthdaySource[];
   // "Bilan de la saison" -> onglet Bénévoles (retour de Cindy du 24/09) :
   // Buvette/Goûter/Lavage maillots, rôles officiels, covoiturage proposé,
@@ -585,6 +592,16 @@ export default function CoachView({
               <Cd17LigueSection canUpload={false} reports={clubReports} />
             </div>
           ),
+        },
+        {
+          // Retour de Cindy du 16/10 ("Inventaire") : matériel club libre
+          // (nom + quantité), visible et modifiable par le Bureau ET les
+          // coachs (voir admin-view.tsx, même enfant) -- jamais rattaché à
+          // une équipe précise.
+          key: "inventaire",
+          label: "Inventaire",
+          icon: <Package className={iconClass} />,
+          content: <InventoryManager items={inventoryItems} />,
         },
         {
           // Un lien externe, pas un onglet de contenu (voir href sur AdminSection).

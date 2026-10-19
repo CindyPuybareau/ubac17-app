@@ -120,6 +120,15 @@ export type AdminSponsor = {
   sortOrder: number;
 };
 
+// Retour de Cindy du 16/10 ("Inventaire") : liste libre de matériel club,
+// visible et modifiable par le Bureau ET les coachs (jamais rattaché à une
+// équipe précise -- voir inventory_items).
+export type AdminInventoryItem = {
+  id: string;
+  name: string;
+  quantity: number;
+};
+
 // Vue publique (sponsor_display) : nom + logo + lien uniquement, jamais le
 // contrat ni les coordonnées de contact — lisible par tous les espaces
 // (Bureau/Coach/Famille) et par la page d'accueil publique non connectée.
@@ -1702,6 +1711,7 @@ export default async function DashboardPage({
   let adminSeasonVolunteerGuestEntries: SeasonGuestVolunteer[] = [];
   let adminMembers: AdminMember[] = [];
   let adminSponsors: AdminSponsor[] = [];
+  let adminInventoryItems: AdminInventoryItem[] = [];
   let adminBenevoles: AdminBenevole[] = [];
   let adminPenalites: AdminPenalite[] = [];
   let adminAccessProfiles: AdminAccessProfile[] = [];
@@ -1788,6 +1798,7 @@ export default async function DashboardPage({
       categoryTariffsRes,
       clubSettingsRes,
       sponsorsRes,
+      inventoryRes,
       penalitesRes,
       benevolesRes,
       accessProfilesRes,
@@ -1910,6 +1921,10 @@ export default async function DashboardPage({
             // exactement l'ordre montré partout ailleurs pour que les
             // flèches aient un sens.
             .order("sort_order", { ascending: true }),
+        // Retour de Cindy du 16/10 ("Inventaire") : liste libre de matériel
+        // club, club entier (jamais filtrée par équipe) — même table pour
+        // le Bureau et les coachs (voir le bloc Coach plus bas).
+        () => supabase.from("inventory_items").select("id, name, quantity").order("name"),
         // Toutes les pénalités du club — le Bureau les gère toutes (onglet
         // Pénalités, à côté de Stages & Événements Payants).
         () =>
@@ -1966,6 +1981,7 @@ export default async function DashboardPage({
       categoryTariffsRes,
       clubSettingsRes,
       sponsorsRes,
+      inventoryRes,
       penalitesRes,
       benevolesRes,
       accessProfilesRes,
@@ -2626,6 +2642,12 @@ export default async function DashboardPage({
       sortOrder: s.sort_order,
     }));
 
+    adminInventoryItems = (inventoryRes.data ?? []).map((i) => ({
+      id: i.id,
+      name: i.name,
+      quantity: i.quantity,
+    }));
+
     adminBenevoles = (
       (benevolesRes.data ?? []) as unknown as {
         id: string;
@@ -2805,6 +2827,7 @@ export default async function DashboardPage({
   let coachSeasonVolunteerGuestEntries: SeasonGuestVolunteer[] = [];
   let coachTeamRoleByTeamId: Record<string, "COACH" | "PLAYER"> = {};
   let coachClubTeams: AdminMemberTeam[] = [];
+  let coachInventoryItems: AdminInventoryItem[] = [];
   let coachOrganisationTasks: Record<string, EventTasksState> = {};
   let coachVolunteerNeedsByEventId: Record<string, VolunteerNeed[]> = {};
   let coachMatchOfficialRolesByEventId: Record<string, MatchOfficialAssignment[]> = {};
@@ -2869,6 +2892,7 @@ export default async function DashboardPage({
       trainingsRes,
       ownTeamsRes,
       allClubTeamsRes,
+      coachInventoryRes,
       coachClubTeamCoachesRes,
       coachClubCoachPlayersRes,
     ] = await runBatched(
@@ -2974,6 +2998,15 @@ export default async function DashboardPage({
                   .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999)),
                 error: res.error,
               })),
+        // Retour de Cindy du 16/10 ("Inventaire") : même table que le bloc
+        // Bureau juste au-dessus (club entier, jamais filtrée) -- réutilise
+        // adminInventoryItems (déjà dans la bonne forme, aucune conversion
+        // snake_case/camelCase ici) quand le Bureau l'a déjà chargée, même
+        // principe que allClubTeamsRes juste au-dessus.
+        () =>
+          bureauDataLoaded
+            ? Promise.resolve({ data: adminInventoryItems, error: null })
+            : supabase.from("inventory_items").select("id, name, quantity").order("name"),
         // Retour de Cindy du 16/09 ("les coachs ne peuvent pas donner leur
         // présence ?" -- en fait ils pouvaient déjà, seul le DÉCOMPTE
         // affiché depuis l'espace Coach pouvait être sous-évalué pour une
@@ -3015,6 +3048,7 @@ export default async function DashboardPage({
       trainingsRes,
       ownTeamsRes,
       allClubTeamsRes,
+      coachInventoryRes,
       coachClubTeamCoachesRes,
       coachClubCoachPlayersRes,
     });
@@ -3092,6 +3126,7 @@ export default async function DashboardPage({
       name: t.name,
       category: t.category,
     }));
+    coachInventoryItems = (coachInventoryRes.data ?? []) as AdminInventoryItem[];
 
     const pendingCoachPlayerIds = Array.from(
       new Set((teamPendingCoachesRes.data ?? []).map((r) => r.player_id))
@@ -5065,6 +5100,7 @@ export default async function DashboardPage({
             canonicalTeamRefs={canonicalTeamRefs}
             whatsappGroups={whatsappGroups}
             sponsors={adminSponsors}
+            inventoryItems={adminInventoryItems}
             sponsorDisplay={sponsorDisplay}
             benevoles={adminBenevoles}
             accessProfiles={adminAccessProfiles}
@@ -5128,6 +5164,7 @@ export default async function DashboardPage({
             rsvpStatusByKey={coachRsvpStatusByKey}
             teamRoleByTeamId={coachTeamRoleByTeamId}
             clubTeams={coachClubTeams}
+            inventoryItems={coachInventoryItems}
             birthdayMembers={coachBirthdayMembers}
             seasonVolunteerTallyByPlayerId={coachSeasonVolunteerTallyByPlayerId}
             seasonVolunteerGuestEntries={coachSeasonVolunteerGuestEntries}

@@ -38,6 +38,10 @@ const WATCHED_TABLES = [
   "event_volunteer_signups",
   "club_reports", // comptes rendus mairies/Bureau/coachs (audit du 01/09)
   "match_official_roles", // Organisation match à domicile (retour du 17/09)
+  // Retour de Cindy du 16/10 ("Inventaire") : Bureau ET coachs modifient la
+  // même liste -- cas typique de la règle 360° (contrairement à sponsors,
+  // Bureau seul, jamais ajouté ici).
+  "inventory_items",
 ] as const;
 
 // Mounted once at the dashboard root (src/app/dashboard/page.tsx) so it
