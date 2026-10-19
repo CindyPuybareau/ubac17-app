@@ -18,7 +18,14 @@ export default function OpponentDisplay({
       >
         {opponentInitials(opponent)}
       </span>
-      <span className={`truncate font-semibold text-zinc-900 ${textSize}`}>
+      {/* Retour de Cindy du 19/10 : un nom d'adversaire long se coupait en
+          plein milieu d'un mot ("RO...") sur mobile -- `truncate` impose une
+          seule ligne. `line-clamp-2` autorise le retour à la ligne (jamais en
+          plein mot grâce à `break-words`) et n'ellipse qu'au-delà de 2
+          lignes, pour les noms vraiment très longs. */}
+      <span
+        className={`break-words leading-snug font-semibold text-zinc-900 ${textSize} line-clamp-2`}
+      >
         {opponent}
       </span>
       {isHome !== null && (
