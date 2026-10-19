@@ -102,7 +102,14 @@ const emptyMatchOfficialRoles: Record<string, MatchOfficialAssignment[]> = {};
 
 // Ré-exportés : beaucoup d'écrans les importent historiquement d'ici, et
 // ce fichier reste le point d'entrée naturel du calendrier.
-export { EVENT_TYPE_OPTIONS, formatEventTime, homeAwayLabel, isMatchType, styleFor };
+export {
+  EVENT_TYPE_OPTIONS,
+  formatEventTime,
+  hasAlreadyStarted,
+  homeAwayLabel,
+  isMatchType,
+  styleFor,
+};
 
 function pillLabel(event: AdminUpcomingEvent) {
   if (isMatchType(event.event_type)) {
@@ -163,6 +170,23 @@ function isRecentWin(event: { teamScore: number | null; opponentScore: number | 
     event.teamScore > event.opponentScore &&
     Date.now() - new Date(event.start_time).getTime() < 5 * 24 * 60 * 60 * 1000
   );
+}
+
+// Fonctions ordinaires, hors du corps du composant (même raison que
+// startOfTodayMs/isRecentWin ci-dessus -- nettoyage du 19/10, lint
+// react-hooks/purity) : un appel à Date.now() depuis un simple helper de
+// module n'est jamais signalé, contrairement au même appel écrit en plein
+// milieu de renderEventCard/renderResultCard. Toujours réévalué à chaque
+// appel (jamais figé au chargement du module) -- le bug du 31/08
+// (team-card.tsx : un onglet resté ouvert traitait un vieux match comme "à
+// venir") ne peut pas revenir ici.
+function isWithinReminderWindow(startTime: string) {
+  const msUntilStart = new Date(startTime).getTime() - Date.now();
+  return msUntilStart >= 0 && msUntilStart <= 7 * 24 * 60 * 60 * 1000;
+}
+
+function hasAlreadyStarted(startTime: string) {
+  return new Date(startTime).getTime() < Date.now();
 }
 
 // Matches groupBirthdaysByMonthDay's "MM-DD" key format so a Date on the
@@ -554,10 +578,22 @@ export default function CalendarView({
   // recharge tout le tableau de bord) — retour de Cindy du 2026-08-21 :
   // "7-8 secondes... c'est long" à la création comme à la suppression.
   // Même principe que volunteer-needs-panel.tsx/match-tasks-panel.tsx.
+  //
+  // Nettoyage du 19/10 (lint react-hooks/set-state-in-effect) : recopier
+  // `events` dans `localEvents` via un effet déclenchait un rendu en
+  // cascade (un rendu avec l'ancienne copie, puis un second juste après
+  // avec la nouvelle). Schéma recommandé par React pour "ajuster un state
+  // quand une prop change" : comparer pendant le rendu lui-même plutôt
+  // qu'après coup dans un effet -- `prevEventsProp` ne sert qu'à détecter
+  // ce changement, jamais lu ailleurs. Toutes les mises à jour optimistes
+  // de `localEvents` ailleurs dans ce fichier (setLocalEvents(prev => ...))
+  // restent inchangées.
   const [localEvents, setLocalEvents] = useState(events);
-  useEffect(() => {
+  const [prevEventsProp, setPrevEventsProp] = useState(events);
+  if (events !== prevEventsProp) {
+    setPrevEventsProp(events);
     setLocalEvents(events);
-  }, [events]);
+  }
 
   // Retour de Cindy du 16/09 (chantier Suspense, "afficher le contenu
   // principal tout de suite, tasks/carpool/besoins d'organisation après
@@ -580,7 +616,17 @@ export default function CalendarView({
     () => [...organisationEventIds].sort().join(","),
     [organisationEventIds]
   );
+  // Nettoyage du 19/10 (lint react-hooks/set-state-in-effect) : `forKey`
+  // remplace l'ancien "vider puis remplir" (setOrganisationData(null) au
+  // début de l'effet, juste pour forcer l'affichage "chargement…" le temps
+  // de la requête). Même principe que ffbbRanking un peu plus bas :
+  // organisationLoading se déduit en comparant `forKey` à la clé actuelle,
+  // plus besoin d'un aller-retour par état "vide" intermédiaire -- dès que
+  // organisationEventIdsKey change, la comparaison devient fausse DANS LE
+  // MÊME rendu (pas besoin d'attendre l'effet), donc aucune donnée de
+  // l'ancienne clé ne s'affiche jamais, pas même une fraction de seconde.
   const [organisationData, setOrganisationData] = useState<{
+    forKey: string;
     tasksByEventId: Record<string, EventTasksState>;
     carpoolByEventId: Record<string, CarpoolOffer[]>;
     volunteerNeedsByEventId: Record<string, VolunteerNeed[]>;
@@ -592,7 +638,6 @@ export default function CalendarView({
     // court-circuitent déjà ce cas sans attendre organisationData).
     if (organisationEventIds.length === 0) return;
     let cancelled = false;
-    setOrganisationData(null);
     fetch("/api/event-organisation", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -600,7 +645,9 @@ export default function CalendarView({
     })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (!cancelled && data) setOrganisationData(data);
+        if (!cancelled && data) {
+          setOrganisationData({ forKey: organisationEventIdsKey, ...data });
+        }
       })
       .catch(() => {
         // Best-effort (retour hors-ligne, etc.) : reste en chargement plutôt
@@ -614,13 +661,20 @@ export default function CalendarView({
     // au-dessus de ce tableau.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organisationEventIdsKey]);
-  const tasksByEventId = organisationData?.tasksByEventId ?? emptyOrganisationTasks;
-  const carpoolByEventId = organisationData?.carpoolByEventId ?? emptyOrganisationCarpool;
-  const volunteerNeedsByEventId =
-    organisationData?.volunteerNeedsByEventId ?? emptyOrganisationNeeds;
-  const matchOfficialRolesByEventId =
-    organisationData?.matchOfficialRolesByEventId ?? emptyMatchOfficialRoles;
-  const organisationLoading = organisationEventIds.length > 0 && organisationData === null;
+  const isOrganisationDataCurrent = organisationData?.forKey === organisationEventIdsKey;
+  const tasksByEventId = isOrganisationDataCurrent
+    ? organisationData.tasksByEventId
+    : emptyOrganisationTasks;
+  const carpoolByEventId = isOrganisationDataCurrent
+    ? organisationData.carpoolByEventId
+    : emptyOrganisationCarpool;
+  const volunteerNeedsByEventId = isOrganisationDataCurrent
+    ? organisationData.volunteerNeedsByEventId
+    : emptyOrganisationNeeds;
+  const matchOfficialRolesByEventId = isOrganisationDataCurrent
+    ? organisationData.matchOfficialRolesByEventId
+    : emptyMatchOfficialRoles;
+  const organisationLoading = organisationEventIds.length > 0 && !isOrganisationDataCurrent;
 
   // "Besoins d'organisation en visuel sur le calendrier" (retour de Cindy
   // du 24/09) : un match à domicile dont il manque au moins un bénévole ou
@@ -994,7 +1048,12 @@ export default function CalendarView({
     if (!showRankingCard || activeMemberTeamIdsKey === "") return;
     const teamIds = activeMemberTeamIdsKey.split(",");
     let cancelled = false;
-    setFfbbRanking({ status: "loading", forKey: activeMemberTeamIdsKey, results: [] });
+    // Nettoyage du 19/10 (lint react-hooks/set-state-in-effect) : poser
+    // explicitement status="loading" ici était redondant -- le rendu plus
+    // bas (`isCurrent = ffbbRanking.forKey === activeMemberTeamIdsKey`)
+    // détecte déjà "ancienne clé, à ignorer" tout seul dès que
+    // activeMemberTeamIdsKey change, sans attendre ce setState. Supprimé
+    // sans remplacement : comportement visuel strictement identique.
     // Retour de Cindy du 01/10 ("le chargement du classement est
     // extrêmement long à apparaître") : sans limite de temps, une panne
     // Supabase (vue en direct ce jour-là : jusqu'à 80s avant qu'une requête
@@ -1581,9 +1640,8 @@ export default function CalendarView({
     // par construction) -- l'onglet Organisation d'un match d'il y a un
     // mois restait donc ouvert par défaut indéfiniment. Bornée aussi en
     // bas (l'événement doit être à venir, pas déjà passé).
-    const msUntilStart = new Date(event.start_time).getTime() - Date.now();
-    const withinReminderWindow = msUntilStart >= 0 && msUntilStart <= 7 * 24 * 60 * 60 * 1000;
-    const organisationDefaultOpen = withinReminderWindow || event.id === nextEventId;
+    const organisationDefaultOpen =
+      isWithinReminderWindow(event.start_time) || event.id === nextEventId;
     const rsvpCounts = event.rsvpCounts;
     const hasRoster =
       rsvpCounts.present + rsvpCounts.absent + rsvpCounts.late + rsvpCounts.pending > 0;
@@ -2263,7 +2321,7 @@ export default function CalendarView({
     // saison, match à venir compris (voir seasonListEvents) : le bouton
     // "Ajouter le score" ne doit s'afficher qu'une fois le match
     // réellement joué, jamais avant.
-    const alreadyPlayed = new Date(event.start_time).getTime() < Date.now();
+    const alreadyPlayed = hasAlreadyStarted(event.start_time);
     // Même logique d'accent que renderEventCard ci-dessus (direction
     // artistique du 2026-08-23), gardée cohérente entre "à venir" et
     // "résultats" pour ne pas avoir deux traitements différents du même

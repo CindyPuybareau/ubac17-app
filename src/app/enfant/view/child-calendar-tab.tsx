@@ -27,6 +27,7 @@ import {
   formatEventTime,
   formatImpactTime,
 } from "@/app/dashboard/event-style";
+import { hasAlreadyStarted } from "@/app/dashboard/calendar-view";
 import { groupBirthdaysByMonthDay, type BirthdaySource } from "@/app/dashboard/birthdays";
 import EmptyState from "@/app/dashboard/empty-state";
 import MatchVenue from "@/app/dashboard/match-venue";
@@ -289,12 +290,14 @@ export default function ChildCalendarTab({
     return attendanceByEventId?.[eventId] ?? (eventId === nextEventId ? nextEventAttendance : undefined);
   }
 
-  const now = Date.now();
+  // hasAlreadyStarted (calendar-view.tsx) : nettoyage du 19/10, lint
+  // react-hooks/purity -- Date.now() appelé depuis un simple helper de
+  // module plutôt qu'en plein rendu, jamais figé.
   const upcoming = displayedEvents
-    .filter((e) => new Date(e.startTime).getTime() >= now)
+    .filter((e) => !hasAlreadyStarted(e.startTime))
     .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
   const past = displayedEvents
-    .filter((e) => new Date(e.startTime).getTime() < now)
+    .filter((e) => hasAlreadyStarted(e.startTime))
     .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
 
   return (

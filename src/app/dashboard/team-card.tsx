@@ -21,7 +21,7 @@ import { formatFirstName, formatLastName, formatPersonName, sortByLastName } fro
 import { computePlayerYearStatus, getCurrentSeasonLabel } from "@/lib/season";
 import { getSiblingTeamIds, sameCategoryFamily, teamCategoryLabel, teamLabel } from "@/lib/teams";
 import { notifyBureauNewMemberFromClient, notifyCoachesOfNewTeamMember } from "@/lib/member-notifications";
-import { formatEventTime, isMatchType, styleFor } from "./calendar-view";
+import { formatEventTime, hasAlreadyStarted, isMatchType, styleFor } from "./calendar-view";
 import { resolveIsHome } from "@/lib/match-display";
 import OpponentDisplay from "./opponent-display";
 import MatchVenue from "./match-venue";
@@ -143,10 +143,6 @@ export default function TeamCard({
   canEditFullProfile?: boolean;
 }) {
   const router = useRouter();
-  // Recalculé à chaque rendu plutôt qu'au chargement du module (audit du
-  // 31/08) : figé au niveau module, un onglet resté ouvert plusieurs
-  // heures continuait de traiter un match déjà passé comme "à venir".
-  const now = Date.now();
   const [detailPlayerId, setDetailPlayerId] = useState<string | null>(null);
   const [removeTarget, setRemoveTarget] = useState<RosterPlayer | null>(null);
   const [removing, setRemoving] = useState(false);
@@ -676,8 +672,13 @@ export default function TeamCard({
         null,
     };
   }
+  // hasAlreadyStarted (calendar-view.tsx) : nettoyage du 19/10, lint
+  // react-hooks/purity -- Date.now() appelé depuis un simple helper de
+  // module plutôt qu'en plein rendu, jamais figé (audit du 31/08 : un
+  // onglet resté ouvert plusieurs heures traitait sinon un match déjà
+  // passé comme "à venir").
   const teamEvents = (eventsByTeamId[team.id] ?? [])
-    .filter((e) => new Date(e.start_time).getTime() >= now)
+    .filter((e) => !hasAlreadyStarted(e.start_time))
     .slice(0, 3);
 
   const theme = categoryTheme(team.category);
