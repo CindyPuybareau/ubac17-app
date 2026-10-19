@@ -862,14 +862,13 @@ export function EventRow({
             {formatImpactTime(event.impactTime)}
           </span>
         )}
-        {!isMatchType(event.eventType) &&
-          lieu && (
-            <span className="flex items-center gap-1">
-              <MapPin className="h-3 w-3" />
-              {lieu}
-            </span>
-          )}
       </div>
+      {!isMatchType(event.eventType) && lieu && (
+        <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-zinc-500">
+          <MapPin className="h-3 w-3" />
+          {lieu}
+        </div>
+      )}
       {isMatchType(event.eventType) && (
         <div className="mt-1 flex flex-wrap text-xs text-zinc-500">
           <MatchVenue

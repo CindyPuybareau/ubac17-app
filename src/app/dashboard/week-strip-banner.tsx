@@ -280,18 +280,19 @@ export function DayEventCard({ event }: { event: WeekStripEvent }) {
             {formatImpactTime(event.impactTime)}
           </span>
         )}
-        {!isMatchType(event.eventType) && (
-          <>
-            {event.location && (
-              <span className="flex items-center gap-1">
-                <MapPin className="h-3 w-3 shrink-0" />
-                {event.location}
-              </span>
-            )}
-            {event.salle && <SalleBadge salle={event.salle} />}
-          </>
-        )}
       </div>
+
+      {!isMatchType(event.eventType) && (event.location || event.salle) && (
+        <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-zinc-500">
+          {event.location && (
+            <span className="flex items-center gap-1">
+              <MapPin className="h-3 w-3 shrink-0" />
+              {event.location}
+            </span>
+          )}
+          {event.salle && <SalleBadge salle={event.salle} />}
+        </div>
+      )}
 
       {isMatchType(event.eventType) && (
         <div className="mt-1 flex flex-wrap text-xs text-zinc-500">

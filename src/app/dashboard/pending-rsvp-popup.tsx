@@ -199,14 +199,13 @@ export default function PendingRsvpPopup({
                     <CalendarDays className="h-3.5 w-3.5 shrink-0 text-navy" />
                     {formatEventDate(item.event.start_time)}
                   </span>
-                  {!isMatchType(item.event.event_type) &&
-                    lieu && (
-                      <span className="flex items-center gap-1 truncate">
-                        <MapPin className="h-3.5 w-3.5 shrink-0" />
-                        {item.event.salle ? <SalleBadge salle={item.event.salle} /> : item.event.location}
-                      </span>
-                    )}
                 </div>
+                {!isMatchType(item.event.event_type) && lieu && (
+                  <div className="flex flex-wrap items-center gap-1 text-xs text-zinc-500">
+                    <MapPin className="h-3.5 w-3.5 shrink-0" />
+                    {item.event.salle ? <SalleBadge salle={item.event.salle} /> : item.event.location}
+                  </div>
+                )}
                 {isMatchType(item.event.event_type) && (
                   <div className="flex flex-wrap text-xs text-zinc-500">
                     <MatchVenue

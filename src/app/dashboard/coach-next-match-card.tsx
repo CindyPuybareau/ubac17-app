@@ -126,18 +126,19 @@ export default function CoachNextMatchCard({
                 minute: "2-digit",
               })}
             </span>
-            {!isMatchType(event.event_type) && (
-              <>
-                {event.location && (
-                  <span className="flex items-center gap-1.5">
-                    <MapPin className="h-4 w-4 shrink-0 text-zinc-400" />
-                    {event.location}
-                  </span>
-                )}
-                {event.salle && <SalleBadge salle={event.salle} />}
-              </>
-            )}
           </div>
+
+          {!isMatchType(event.event_type) && (event.location || event.salle) && (
+            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-sm font-medium text-zinc-700">
+              {event.location && (
+                <span className="flex items-center gap-1.5">
+                  <MapPin className="h-4 w-4 shrink-0 text-zinc-400" />
+                  {event.location}
+                </span>
+              )}
+              {event.salle && <SalleBadge salle={event.salle} />}
+            </div>
+          )}
 
           {isMatchType(event.event_type) && (
             <div className="mt-1 flex flex-wrap text-sm font-medium text-zinc-700">

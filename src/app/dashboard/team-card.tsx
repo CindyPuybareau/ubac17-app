@@ -1452,14 +1452,13 @@ export default function TeamCard({
                         <Clock className="h-3 w-3 shrink-0" />
                         {formatEventTime(e.start_time, e.end_time)}
                       </span>
-                      {!isMatchType(e.event_type) &&
-                        (e.salle || e.location) && (
-                          <span className="flex items-center gap-1 truncate">
-                            <MapPin className="h-3 w-3 shrink-0" />
-                            {e.salle ? <SalleBadge salle={e.salle} /> : e.location}
-                          </span>
-                        )}
                     </div>
+                    {!isMatchType(e.event_type) && (e.salle || e.location) && (
+                      <div className="flex flex-wrap items-center gap-1 pl-0.5 text-xs text-zinc-500">
+                        <MapPin className="h-3 w-3 shrink-0" />
+                        {e.salle ? <SalleBadge salle={e.salle} /> : e.location}
+                      </div>
+                    )}
                     {isMatchType(e.event_type) && (
                       <div className="flex flex-wrap pl-0.5 text-xs text-zinc-500">
                         <MatchVenue

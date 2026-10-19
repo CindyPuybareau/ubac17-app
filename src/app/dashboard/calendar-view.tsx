@@ -1851,25 +1851,26 @@ export default function CalendarView({
               {formatImpactTime(event.impactTime)}
             </span>
           )}
-          {!isMatchType(event.event_type) && (
-            <>
-              {event.location && (
-                <span className="flex items-center gap-1">
-                  <MapPin className="h-4 w-4" />
-                  {event.location}
-                </span>
-              )}
-              {event.salle && <SalleBadge salle={event.salle} />}
-            </>
-          )}
         </div>
 
         {/* Retour de Cindy du 19/10 ("le DOM/EXT se cherche dans la carte,
             et l'info est en double" puis "sous la date et l'heure, partout")
-            : Domicile/Extérieur fusionné avec le gymnase, sur sa propre
-            ligne juste sous la date/heure -- uniquement pour un match
-            (le cas générique "entraînement"/réunion reste dans la ligne
-            date/heure ci-dessus, inchangé). */}
+            : lieu/salle toujours sur sa propre ligne sous la date/heure,
+            jamais à la suite sur mobile (dépendait sinon du hasard du
+            retour à la ligne du flex-wrap, selon la longueur du texte) --
+            vrai pour un match (Domicile/Extérieur fusionné via MatchVenue)
+            comme pour un entraînement/réunion (lieu/salle seuls). */}
+        {!isMatchType(event.event_type) && (event.location || event.salle) && (
+          <div className="flex flex-wrap items-center gap-1 text-sm text-zinc-500">
+            {event.location && (
+              <span className="flex items-center gap-1">
+                <MapPin className="h-4 w-4" />
+                {event.location}
+              </span>
+            )}
+            {event.salle && <SalleBadge salle={event.salle} />}
+          </div>
+        )}
         {isMatchType(event.event_type) && (
           <div className="flex flex-wrap text-sm text-zinc-500">
             <MatchVenue
