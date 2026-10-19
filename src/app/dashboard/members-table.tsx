@@ -300,10 +300,13 @@ export default function MembersTable({
     // partout ailleurs dans l'appli (listes d'équipe, trombinoscope...).
     const sortGroup = (group: typeof list) => {
       const sorted = sortByLastName(group, (m) => m.lastName);
-      const ordered = sortDir === "asc" ? sorted : sorted.reverse();
-      // Retour de Cindy du 18/09 : les salariés remontent en tête de liste
-      // (dans chaque groupe) pour ne pas avoir à les chercher.
-      return [...ordered].sort((a, b) => Number(b.isSalarie) - Number(a.isSalarie));
+      // Retour de Cindy du 19/10 ("Jean et Jules doivent être dans l'ordre
+      // alphabétique normal") : la règle du 18/09 ("les salariés remontent
+      // en tête de liste") les faisait sauter en haut, hors de leur place
+      // alphabétique -- retirée, ordre alphabétique pur pour tout le monde
+      // désormais. Le badge "Salarié du club" (is_salarie) reste affiché
+      // sur la carte, inchangé -- seul son effet sur le TRI disparaît.
+      return sortDir === "asc" ? sorted : sorted.reverse();
     };
     return [
       ...sortGroup(list.filter((m) => m.archivedAt)),
