@@ -24,13 +24,13 @@ import {
 import {
   styleFor,
   isMatchType,
-  homeAwayLabel,
   formatEventTime,
   formatImpactTime,
 } from "@/app/dashboard/event-style";
 import { groupBirthdaysByMonthDay, type BirthdaySource } from "@/app/dashboard/birthdays";
 import EmptyState from "@/app/dashboard/empty-state";
-import { parseMatchTitle } from "@/lib/match-display";
+import MatchVenue from "@/app/dashboard/match-venue";
+import { parseMatchTitle, resolveIsHome } from "@/lib/match-display";
 import { formatFirstName } from "@/lib/names";
 import { groupTeamsByPrimarySecondary, teamLabel } from "@/lib/teams";
 import { schoolHolidayFor } from "@/lib/school-holidays";
@@ -91,13 +91,13 @@ function pillLabel(event: ChildEvent) {
 
 // Retour de Cindy du 25/09 ("pastilles rondes dorées pour les matchs à
 // domicile, pouvoir filtrer comme le Bureau") : même définition que
-// isHomeMatch (calendar-view.tsx, Bureau) -- event.isHome reste souvent
-// null (matchs synchronisés FFBB), même repli sur le titre parsé que
-// week-strip-banner.tsx/OpponentDisplay. Exportée : CalendarSection
-// (profile-sections.tsx) filtre "Domicile seulement" avec la même fonction,
-// jamais une deuxième définition qui pourrait diverger.
-export function isHomeMatch(event: Pick<ChildEvent, "eventType" | "title" | "isHome">) {
-  return isMatchType(event.eventType) && (event.isHome ?? parseMatchTitle(event.title).isHome) === true;
+// isHomeMatch (calendar-view.tsx, Bureau) -- resolveIsHome (lib/match-display.ts)
+// retombe sur le titre puis, en dernier recours, sur la salle choisie.
+// Exportée : CalendarSection (profile-sections.tsx) filtre "Domicile
+// seulement" avec la même fonction, jamais une deuxième définition qui
+// pourrait diverger.
+export function isHomeMatch(event: Pick<ChildEvent, "eventType" | "title" | "isHome" | "salle">) {
+  return isMatchType(event.eventType) && resolveIsHome(event) === true;
 }
 
 // Retour de Cindy du 26/09 ("confettis à l'ouverture des espaces") : même
@@ -786,7 +786,7 @@ export function EventRow({
 }) {
   const style = styleFor(event.eventType);
   const parsed = parseMatchTitle(event.title);
-  const home = event.isHome ?? parsed.isHome;
+  const home = resolveIsHome(event);
   const lieu = event.salle || event.location;
   // Même différenciation que calendar-view.tsx (retour de Cindy du
   // 2026-08-24, item 6 du topo, puis "vérifier sur tous les espaces que
@@ -835,9 +835,12 @@ export function EventRow({
         )}
       </div>
       <p className="mt-1 font-semibold text-zinc-900">
+        {/* Retour de Cindy du 19/10 : Domicile/Extérieur ne se répète plus
+            ici -- il vit désormais, coloré, sur la ligne du lieu juste en
+            dessous (MatchVenue), à côté du gymnase. */}
         {isMatchType(event.eventType)
-          ? [homeAwayLabel(home), parsed.opponent ? `vs ${parsed.opponent}` : null].filter(Boolean).join(" · ")
-          : event.title ?? style.label}
+          ? (parsed.opponent ?? event.title ?? style.label)
+          : (event.title ?? style.label)}
       </p>
       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
         <span>
@@ -856,13 +859,24 @@ export function EventRow({
             {formatImpactTime(event.impactTime)}
           </span>
         )}
-        {lieu && (
-          <span className="flex items-center gap-1">
-            <MapPin className="h-3 w-3" />
-            {lieu}
-          </span>
-        )}
+        {!isMatchType(event.eventType) &&
+          lieu && (
+            <span className="flex items-center gap-1">
+              <MapPin className="h-3 w-3" />
+              {lieu}
+            </span>
+          )}
       </div>
+      {isMatchType(event.eventType) && (
+        <div className="mt-1 flex flex-wrap text-xs text-zinc-500">
+          <MatchVenue
+            isHome={home}
+            salle={event.salle}
+            location={event.location}
+            size="sm"
+          />
+        </div>
+      )}
       {attendance && attendance.length > 0 && <AttendanceSummary attendance={attendance} />}
       {extra}
     </div>

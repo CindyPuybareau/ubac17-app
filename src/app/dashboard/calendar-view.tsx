@@ -37,9 +37,10 @@ import { buildGmailComposeLink } from "@/lib/email";
 import EmptyState from "./empty-state";
 import FfbbRankingTable from "./ffbb-ranking-table";
 import { formatFirstName, formatLastName, sortByLastName } from "@/lib/names";
-import { parseMatchTitle } from "@/lib/match-display";
+import { parseMatchTitle, resolveIsHome } from "@/lib/match-display";
 import { sortTeamsByGroup, teamLabel } from "@/lib/teams";
 import OpponentDisplay from "./opponent-display";
+import MatchVenue from "./match-venue";
 import CreateEventForm from "./create-event-form";
 import RsvpButtons from "./rsvp-buttons";
 import ItineraryButton from "./itinerary-button";
@@ -113,11 +114,11 @@ function pillLabel(event: AdminUpcomingEvent) {
 // Match officiel/amical à domicile (jamais tournoi, isMatchType les exclut
 // déjà) -- extrait le 24/09 (retour de Cindy, filtre "Domicile seulement")
 // des deux endroits qui le calculaient chacun de son côté (Organisation
-// match à domicile, plus bas). event.isHome ?? parseMatchTitle(...).isHome :
-// la colonne events.is_home reste souvent null (matchs synchronisés FFBB),
-// même repli que week-strip-banner.tsx/OpponentDisplay.
-function isHomeMatch(event: Pick<AdminUpcomingEvent, "event_type" | "title" | "isHome">) {
-  return isMatchType(event.event_type) && (event.isHome ?? parseMatchTitle(event.title).isHome) === true;
+// match à domicile, plus bas). resolveIsHome (lib/match-display.ts) retombe
+// sur le titre puis, en dernier recours, sur la salle choisie -- la colonne
+// events.is_home reste souvent null (matchs synchronisés FFBB).
+function isHomeMatch(event: Pick<AdminUpcomingEvent, "event_type" | "title" | "isHome" | "salle">) {
+  return isMatchType(event.event_type) && resolveIsHome(event) === true;
 }
 
 // "Besoin non pourvu" (retour de Cindy du 24/09, "avoir les besoins en
@@ -1616,7 +1617,6 @@ export default function CalendarView({
         )
       : [];
     const mailto = relanceMailto(event);
-    const homeAway = isMatchType(event.event_type) ? homeAwayLabel(event.isHome) : null;
     const canManageEvent = canManageThisEvent(event);
     // Une famille voit tous ses enfants concernés (respondingPlayers peut
     // en contenir plusieurs). Un coach, lui, ne doit jamais voir le bouton
@@ -1694,11 +1694,6 @@ export default function CalendarView({
                 {effectiveStyle.solid && <Lock className="h-2.5 w-2.5 shrink-0" />}
                 {reunionLabel}
               </span>
-              {homeAway && (
-                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-bold uppercase text-zinc-600">
-                  {homeAway}
-                </span>
-              )}
               {/* "Besoins d'organisation en visuel" (retour de Cindy du
                   24/09) : même prédicat que le calendrier Mois
                   (needsOrganizing) -- réutilise organisationData déjà
@@ -1798,14 +1793,34 @@ export default function CalendarView({
               {formatImpactTime(event.impactTime)}
             </span>
           )}
-          {event.location && (
-            <span className="flex items-center gap-1">
-              <MapPin className="h-4 w-4" />
-              {event.location}
-            </span>
+          {!isMatchType(event.event_type) && (
+            <>
+              {event.location && (
+                <span className="flex items-center gap-1">
+                  <MapPin className="h-4 w-4" />
+                  {event.location}
+                </span>
+              )}
+              {event.salle && <SalleBadge salle={event.salle} />}
+            </>
           )}
-          {event.salle && <SalleBadge salle={event.salle} />}
         </div>
+
+        {/* Retour de Cindy du 19/10 ("le DOM/EXT se cherche dans la carte,
+            et l'info est en double" puis "sous la date et l'heure, partout")
+            : Domicile/Extérieur fusionné avec le gymnase, sur sa propre
+            ligne juste sous la date/heure -- uniquement pour un match
+            (le cas générique "entraînement"/réunion reste dans la ligne
+            date/heure ci-dessus, inchangé). */}
+        {isMatchType(event.event_type) && (
+          <div className="flex flex-wrap text-sm text-zinc-500">
+            <MatchVenue
+              isHome={resolveIsHome(event)}
+              salle={event.salle}
+              location={event.location}
+            />
+          </div>
+        )}
 
         {/* Écrite par le coach/Bureau à la création ou la modification,
             mais jusqu'ici jamais réaffichée nulle part — une note comme
@@ -2243,7 +2258,6 @@ export default function CalendarView({
   // erreur de saisie après coup.
   function renderResultCard(event: AdminUpcomingEvent) {
     const style = styleFor(event.event_type);
-    const homeAway = homeAwayLabel(event.isHome);
     const canManageEvent = canManageThisEvent(event);
     // Les vues Résultats/Matchs officiels montrent désormais toute la
     // saison, match à venir compris (voir seasonListEvents) : le bouton
@@ -2309,11 +2323,6 @@ export default function CalendarView({
           >
             {style.label}
           </span>
-          {homeAway && (
-            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-bold uppercase text-zinc-600">
-              {homeAway}
-            </span>
-          )}
         </span>
 
         <OpponentDisplay title={event.title} size="sm" />
@@ -2331,12 +2340,18 @@ export default function CalendarView({
               {formatImpactTime(event.impactTime)}
             </span>
           )}
-          {(event.salle || event.location) && (
-            <span className="flex items-center gap-1 truncate">
-              <MapPin className="h-3 w-3 shrink-0" />
-              {event.salle ? <SalleBadge salle={event.salle} /> : event.location}
-            </span>
-          )}
+        </div>
+
+        {/* Retour de Cindy du 19/10 ("sous la date et l'heure, partout") :
+            Domicile/Extérieur fusionné avec le lieu, sur sa propre ligne --
+            cette vue est toujours un match (MATCH/FRIENDLY). */}
+        <div className="flex flex-wrap text-xs text-zinc-500">
+          <MatchVenue
+            isHome={resolveIsHome(event)}
+            salle={event.salle}
+            location={event.location}
+            size="sm"
+          />
         </div>
 
         {alreadyPlayed ? (

@@ -22,7 +22,9 @@ import { computePlayerYearStatus, getCurrentSeasonLabel } from "@/lib/season";
 import { getSiblingTeamIds, sameCategoryFamily, teamCategoryLabel, teamLabel } from "@/lib/teams";
 import { notifyBureauNewMemberFromClient, notifyCoachesOfNewTeamMember } from "@/lib/member-notifications";
 import { formatEventTime, isMatchType, styleFor } from "./calendar-view";
+import { resolveIsHome } from "@/lib/match-display";
 import OpponentDisplay from "./opponent-display";
+import MatchVenue from "./match-venue";
 import MemberDetailModal from "./member-detail-modal";
 import PlayerYearBadge from "./player-year-badge";
 import SalleBadge from "./salle-badge";
@@ -1449,13 +1451,24 @@ export default function TeamCard({
                         <Clock className="h-3 w-3 shrink-0" />
                         {formatEventTime(e.start_time, e.end_time)}
                       </span>
-                      {(e.salle || e.location) && (
-                        <span className="flex items-center gap-1 truncate">
-                          <MapPin className="h-3 w-3 shrink-0" />
-                          {e.salle ? <SalleBadge salle={e.salle} /> : e.location}
-                        </span>
-                      )}
+                      {!isMatchType(e.event_type) &&
+                        (e.salle || e.location) && (
+                          <span className="flex items-center gap-1 truncate">
+                            <MapPin className="h-3 w-3 shrink-0" />
+                            {e.salle ? <SalleBadge salle={e.salle} /> : e.location}
+                          </span>
+                        )}
                     </div>
+                    {isMatchType(e.event_type) && (
+                      <div className="flex flex-wrap pl-0.5 text-xs text-zinc-500">
+                        <MatchVenue
+                          isHome={resolveIsHome(e)}
+                          salle={e.salle}
+                          location={e.location}
+                          size="sm"
+                        />
+                      </div>
+                    )}
                   </li>
                 );
               })}

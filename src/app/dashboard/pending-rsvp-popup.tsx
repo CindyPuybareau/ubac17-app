@@ -2,7 +2,9 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { CalendarDays, MapPin, X } from "lucide-react";
+import { resolveIsHome } from "@/lib/match-display";
 import OpponentDisplay from "./opponent-display";
+import MatchVenue from "./match-venue";
 import SalleBadge from "./salle-badge";
 import { isMatchType, styleFor } from "./event-style";
 import {
@@ -197,13 +199,24 @@ export default function PendingRsvpPopup({
                     <CalendarDays className="h-3.5 w-3.5 shrink-0 text-navy" />
                     {formatEventDate(item.event.start_time)}
                   </span>
-                  {lieu && (
-                    <span className="flex items-center gap-1 truncate">
-                      <MapPin className="h-3.5 w-3.5 shrink-0" />
-                      {item.event.salle ? <SalleBadge salle={item.event.salle} /> : item.event.location}
-                    </span>
-                  )}
+                  {!isMatchType(item.event.event_type) &&
+                    lieu && (
+                      <span className="flex items-center gap-1 truncate">
+                        <MapPin className="h-3.5 w-3.5 shrink-0" />
+                        {item.event.salle ? <SalleBadge salle={item.event.salle} /> : item.event.location}
+                      </span>
+                    )}
                 </div>
+                {isMatchType(item.event.event_type) && (
+                  <div className="flex flex-wrap text-xs text-zinc-500">
+                    <MatchVenue
+                      isHome={resolveIsHome(item.event)}
+                      salle={item.event.salle}
+                      location={item.event.location}
+                      size="sm"
+                    />
+                  </div>
+                )}
                 <div className="mt-2.5">
                   {renderActions(item, () => handleAnswered(item))}
                 </div>

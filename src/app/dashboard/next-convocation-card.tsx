@@ -1,6 +1,9 @@
 import { CalendarDays, MapPin, Sparkles, StickyNote } from "lucide-react";
+import { resolveIsHome } from "@/lib/match-display";
 import RsvpButtons from "./rsvp-buttons";
 import OpponentDisplay from "./opponent-display";
+import MatchVenue from "./match-venue";
+import SalleBadge from "./salle-badge";
 import NextMatchActions from "./next-match-actions";
 import MatchTasksPanel from "./match-tasks-panel";
 import VolunteerNeedsPanel from "./volunteer-needs-panel";
@@ -83,13 +86,27 @@ export default function NextConvocationCard({
           <CalendarDays className="h-4 w-4 text-navy" />
           {formatEventDate(event.start_time)}
         </span>
-        {event.location && (
-          <span className="flex items-center gap-1">
-            <MapPin className="h-4 w-4" />
-            {event.location}
-          </span>
+        {!isMatchType(event.event_type) && (
+          <>
+            {event.location && (
+              <span className="flex items-center gap-1">
+                <MapPin className="h-4 w-4" />
+                {event.location}
+              </span>
+            )}
+            {event.salle && <SalleBadge salle={event.salle} />}
+          </>
         )}
       </div>
+      {isMatchType(event.event_type) && (
+        <div className="mt-1 flex flex-wrap text-sm text-zinc-500">
+          <MatchVenue
+            isHome={resolveIsHome(event)}
+            salle={event.salle}
+            location={event.location}
+          />
+        </div>
+      )}
       {event.notes && (
         <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2.5 py-2 text-xs text-amber-900">
           <StickyNote className="h-3.5 w-3.5 shrink-0 translate-y-0.5" />

@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
-import { Clock, ListOrdered, MapPin, Shield } from "lucide-react";
-import { formatEventTime, homeAwayLabel, styleFor } from "@/app/dashboard/event-style";
+import { Clock, ListOrdered, Shield } from "lucide-react";
+import { formatEventTime, styleFor } from "@/app/dashboard/event-style";
+import { resolveIsHome } from "@/lib/match-display";
 import { sortTeamsByGroup, teamLabel } from "@/lib/teams";
 import EmptyState from "@/app/dashboard/empty-state";
 import MatchResultCelebration from "@/components/match-result-celebration";
 import MatchScore from "@/app/dashboard/match-score";
+import MatchVenue from "@/app/dashboard/match-venue";
 import OpponentDisplay from "@/app/dashboard/opponent-display";
-import SalleBadge from "@/app/dashboard/salle-badge";
 import { EventRow } from "./child-calendar-tab";
 import type { ChildEvent } from "./child-dashboard";
 
@@ -36,7 +37,6 @@ function isRecentWin(event: { teamScore: number | null; opponentScore: number | 
 // (canEdit toujours à false).
 function ResultRow({ event }: { event: ChildEvent }) {
   const style = styleFor(event.eventType);
-  const homeAway = homeAwayLabel(event.isHome);
   const hasScore = event.teamScore !== null && event.opponentScore !== null;
   const alreadyPlayed = new Date(event.startTime).getTime() < new Date().getTime();
   // Même différenciation que renderResultCard/EventRow (direction
@@ -73,11 +73,6 @@ function ResultRow({ event }: { event: ChildEvent }) {
         <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${style.badge}`}>
           {style.label}
         </span>
-        {homeAway && (
-          <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-bold uppercase text-zinc-600">
-            {homeAway}
-          </span>
-        )}
       </span>
 
       <OpponentDisplay title={event.title} size="sm" />
@@ -87,12 +82,18 @@ function ResultRow({ event }: { event: ChildEvent }) {
           <Clock className="h-3 w-3 shrink-0" />
           {formatEventTime(event.startTime, null)}
         </span>
-        {(event.salle || event.location) && (
-          <span className="flex items-center gap-1 truncate">
-            <MapPin className="h-3 w-3 shrink-0" />
-            {event.salle ? <SalleBadge salle={event.salle} /> : event.location}
-          </span>
-        )}
+      </div>
+
+      {/* Retour de Cindy du 19/10 : Domicile/Extérieur fusionné avec le
+          lieu, sur sa propre ligne sous la date/heure -- cette vue est
+          toujours un match. */}
+      <div className="flex flex-wrap text-xs text-zinc-500">
+        <MatchVenue
+          isHome={resolveIsHome(event)}
+          salle={event.salle}
+          location={event.location}
+          size="sm"
+        />
       </div>
 
       {alreadyPlayed ? (

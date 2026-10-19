@@ -7,7 +7,7 @@ export default function OpponentDisplay({
   title: string | null;
   size?: "sm" | "md";
 }) {
-  const { opponent, isHome } = parseMatchTitle(title);
+  const { opponent } = parseMatchTitle(title);
   const avatarSize = size === "sm" ? "h-7 w-7 text-[10px]" : "h-9 w-9 text-xs";
   const textSize = size === "sm" ? "text-sm" : "text-base";
 
@@ -28,17 +28,6 @@ export default function OpponentDisplay({
       >
         {opponent}
       </span>
-      {isHome !== null && (
-        <span
-          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
-            isHome
-              ? "bg-green-100 text-green-700"
-              : "bg-ubac-blue/10 text-ubac-blue"
-          }`}
-        >
-          {isHome ? "DOM" : "EXT"}
-        </span>
-      )}
     </div>
   );
 }

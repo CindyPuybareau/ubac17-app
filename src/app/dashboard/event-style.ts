@@ -109,6 +109,14 @@ export function homeAwayLabel(isHome: boolean | null) {
   return isHome ? "Domicile" : "Extérieur";
 }
 
+// Retour de Cindy du 19/10 ("domicile en vert et exterieur en bleu, pour
+// qu'il ressorte mieux des cartes") : couleur unique, centralisée ici pour
+// rester identique partout où Domicile/Extérieur s'affiche (match-venue.tsx,
+// week-strip-banner.tsx, child-calendar-tab.tsx...).
+export function homeAwayColorClass(isHome: boolean) {
+  return isHome ? "text-green-700" : "text-ubac-blue";
+}
+
 // "18h30" seul, ou "18h30 – 20h00" une fois l'heure de fin renseignée.
 export function formatEventTime(startIso: string, endIso: string | null) {
   const fmt = (iso: string) => {

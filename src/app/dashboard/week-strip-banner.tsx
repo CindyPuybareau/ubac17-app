@@ -5,17 +5,17 @@ import { AlarmClock, Check, Clock, Euro, ExternalLink, MapPin, Sparkles, StickyN
 import {
   styleFor,
   isMatchType,
-  homeAwayLabel,
   formatEventTime,
   formatImpactTime,
 } from "@/app/dashboard/event-style";
 import { PresentPlayersList, AbsentPlayersList, PendingPlayersList } from "@/app/dashboard/calendar-view";
-import { parseMatchTitle } from "@/lib/match-display";
+import { parseMatchTitle, resolveIsHome } from "@/lib/match-display";
 import RsvpControl from "./rsvp-control";
 import MatchTasksPanel from "./match-tasks-panel";
 import VolunteerNeedsPanel from "./volunteer-needs-panel";
 import OrganisationCard from "./organisation-card";
 import MatchOfficialsPanel from "./match-officials-panel";
+import MatchVenue from "./match-venue";
 import SalleBadge from "./salle-badge";
 import ItineraryButton from "./itinerary-button";
 import { venueQuery } from "./salles";
@@ -210,7 +210,7 @@ function weekSummary(events: WeekStripEvent[], weekStart: Date, weekEnd: Date): 
 export function DayEventCard({ event }: { event: WeekStripEvent }) {
   const style = styleFor(event.eventType);
   const parsed = parseMatchTitle(event.title);
-  const home = event.isHome ?? parsed.isHome;
+  const home = resolveIsHome(event);
   const venue = venueQuery(event);
   const isTournament = event.eventType === "TOURNAMENT";
   const isOfficialMatch = event.eventType === "MATCH";
@@ -227,9 +227,9 @@ export function DayEventCard({ event }: { event: WeekStripEvent }) {
   const hasNeeds = !isTraining && event.needs.length > 0;
   // "Organisation match à domicile" (retour de Cindy du 17/09) : match
   // officiel/amical à domicile seulement, même règle que calendar-view.tsx
-  // (isHomeMatch). `home` ci-dessus retombe sur parseMatchTitle si isHome
-  // n'est pas encore renseigné en base -- ce repli reste voulu ici comme
-  // pour le badge Domicile/Extérieur juste au-dessus.
+  // (isHomeMatch). `home` (resolveIsHome) retombe sur parseMatchTitle si
+  // isHome n'est pas encore renseigné en base -- ce repli reste voulu ici
+  // comme pour MatchVenue plus bas (ligne du lieu).
   const isHomeMatch = event.matchOfficialsEnabled && isMatchType(event.eventType) && home === true;
   // Même règle que renderEventCard (calendar-view.tsx) : indépendant de
   // `source` (Bureau/Coach/Famille voient tous ce bloc dès qu'un effectif
@@ -262,9 +262,12 @@ export function DayEventCard({ event }: { event: WeekStripEvent }) {
         )}
       </div>
       <p className="mt-1 font-semibold text-zinc-900">
+        {/* Retour de Cindy du 19/10 : Domicile/Extérieur ne se répète plus
+            ici -- il vit désormais, coloré, sur la ligne du lieu juste en
+            dessous (MatchVenue), à côté du gymnase. */}
         {isMatchType(event.eventType)
-          ? [homeAwayLabel(home), parsed.opponent ? `vs ${parsed.opponent}` : null].filter(Boolean).join(" · ")
-          : event.title ?? style.label}
+          ? (parsed.opponent ?? event.title ?? style.label)
+          : (event.title ?? style.label)}
       </p>
       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
         <span>{formatEventTime(event.startTime, event.endTime)}</span>
@@ -277,14 +280,29 @@ export function DayEventCard({ event }: { event: WeekStripEvent }) {
             {formatImpactTime(event.impactTime)}
           </span>
         )}
-        {event.location && (
-          <span className="flex items-center gap-1">
-            <MapPin className="h-3 w-3 shrink-0" />
-            {event.location}
-          </span>
+        {!isMatchType(event.eventType) && (
+          <>
+            {event.location && (
+              <span className="flex items-center gap-1">
+                <MapPin className="h-3 w-3 shrink-0" />
+                {event.location}
+              </span>
+            )}
+            {event.salle && <SalleBadge salle={event.salle} />}
+          </>
         )}
-        {event.salle && <SalleBadge salle={event.salle} />}
       </div>
+
+      {isMatchType(event.eventType) && (
+        <div className="mt-1 flex flex-wrap text-xs text-zinc-500">
+          <MatchVenue
+            isHome={home}
+            salle={event.salle}
+            location={event.location}
+            size="sm"
+          />
+        </div>
+      )}
 
       {event.notes && (
         <p className="mt-1 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2.5 py-2 text-xs text-amber-900">

@@ -1,5 +1,7 @@
 import { CalendarDays, Check, Clock, MapPin, Sparkles, StickyNote, X } from "lucide-react";
+import { resolveIsHome } from "@/lib/match-display";
 import OpponentDisplay from "./opponent-display";
+import MatchVenue from "./match-venue";
 import NextMatchActions from "./next-match-actions";
 import MatchTasksPanel from "./match-tasks-panel";
 import VolunteerNeedsPanel from "./volunteer-needs-panel";
@@ -124,14 +126,28 @@ export default function CoachNextMatchCard({
                 minute: "2-digit",
               })}
             </span>
-            {event.location && (
-              <span className="flex items-center gap-1.5">
-                <MapPin className="h-4 w-4 shrink-0 text-zinc-400" />
-                {event.location}
-              </span>
+            {!isMatchType(event.event_type) && (
+              <>
+                {event.location && (
+                  <span className="flex items-center gap-1.5">
+                    <MapPin className="h-4 w-4 shrink-0 text-zinc-400" />
+                    {event.location}
+                  </span>
+                )}
+                {event.salle && <SalleBadge salle={event.salle} />}
+              </>
             )}
-            {event.salle && <SalleBadge salle={event.salle} />}
           </div>
+
+          {isMatchType(event.event_type) && (
+            <div className="mt-1 flex flex-wrap text-sm font-medium text-zinc-700">
+              <MatchVenue
+                isHome={resolveIsHome(event)}
+                salle={event.salle}
+                location={event.location}
+              />
+            </div>
+          )}
 
           {event.notes && (
             <p className="mt-2.5 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2.5 py-2 text-xs text-amber-900">
