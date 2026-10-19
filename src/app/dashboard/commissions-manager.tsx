@@ -257,9 +257,8 @@ function CommissionCard({
 
                 {/* Retour de Cindy du 10/09 ("conserver la possibilité de
                     régénérer/révoquer le lien... en cas de besoin de
-                    sécurité") : même principe que le lien d'invitation
-                    WhatsApp existant (whatsapp-groups-manager.tsx) --
-                    l'ancien lien cesse aussitôt de fonctionner. */}
+                    sécurité") : l'ancien lien cesse aussitôt de
+                    fonctionner. */}
                 <div className="flex flex-col gap-2 border-t border-zinc-100 pt-3">
                   <label className="block text-xs font-medium text-zinc-600">Lien public</label>
                   {confirmRegenerate ? (
@@ -326,9 +325,9 @@ function CommissionCard({
 
 // Remplace benevoles-manager.tsx comme mode de fonctionnement PRINCIPAL
 // (retour de Cindy du 10/09, "Accès Commissions & Administration") : les
-// accès en lecture seule se gèrent désormais par commission entière (même
-// liste que whatsapp-groups-manager.tsx, category='COMMISSION') plutôt
-// que personne par personne. L'accès individuel (BenevolesManager) reste
+// accès en lecture seule se gèrent désormais par commission entière
+// (whatsapp_groups, category='COMMISSION') plutôt que personne par
+// personne. L'accès individuel (BenevolesManager) reste
 // disponible mais replié par défaut, en option secondaire — voir son
 // propre commentaire plus bas.
 export default function CommissionsManager({
@@ -343,10 +342,10 @@ export default function CommissionsManager({
   const [individualOpen, setIndividualOpen] = useState(false);
 
   // hideFromCommissionAccess (retour de Cindy du 24/09) : Bureau/Coachs/
-  // Salariés restent des groupes WhatsApp normaux (whatsapp-groups-
-  // manager.tsx, jamais touché ici) -- seul LEUR lien public "accès en
-  // lecture seule" n'a pas de sens, chacun ayant déjà son propre accès
-  // (compte Bureau/Coach, ou accès individuel pour un salarié).
+  // Salariés restent des commissions normales (whatsapp_groups) -- seul
+  // LEUR lien public "accès en lecture seule" n'a pas de sens, chacun
+  // ayant déjà son propre accès (compte Bureau/Coach, ou accès individuel
+  // pour un salarié).
   const commissions = whatsappGroups
     .filter((g) => g.category === "COMMISSION")
     .map((g) => ({ group: g, ...commissionMeta(g.name) }))
@@ -404,11 +403,7 @@ export default function CommissionsManager({
         </p>
         {individualOpen && (
           <div className="mt-4">
-            <BenevolesManager
-              benevoles={benevoles}
-              accessProfiles={accessProfiles}
-              whatsappGroups={whatsappGroups}
-            />
+            <BenevolesManager benevoles={benevoles} accessProfiles={accessProfiles} />
           </div>
         )}
       </div>

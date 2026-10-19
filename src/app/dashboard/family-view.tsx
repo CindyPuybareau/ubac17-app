@@ -6,7 +6,6 @@ import {
   LayoutDashboard,
   ListOrdered,
   LogOut,
-  MessageCircle,
   ScrollText,
   Shield,
   ShoppingBag,
@@ -31,8 +30,6 @@ import ChildAccessManager from "./child-access-manager";
 import SpaceDashboardSummary from "./space-dashboard-summary";
 import type { SpaceDashboardSummary as SpaceDashboardSummaryData } from "@/lib/space-dashboard";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
-import WhatsAppGroupsFamily from "./whatsapp-groups-family";
-import WhatsAppGroupsManager from "./whatsapp-groups-manager";
 import SponsorsDisplay from "./sponsors-display";
 import type {
   AdminCotisation,
@@ -40,7 +37,6 @@ import type {
   AdminPenalite,
   AdminUpcomingEvent,
   SponsorDisplay,
-  WhatsAppGroup,
 } from "./page";
 import type { BirthdaySource } from "./birthdays";
 import type { CarpoolOffer, EventRoleType, EventTasksState } from "./event-tasks";
@@ -109,7 +105,6 @@ export default function FamilyView({
   clubTeams,
   tasksByEventId,
   carpoolByEventId,
-  whatsappGroups,
   eventRoles,
   volunteerNeedsByEventId,
   cotisations,
@@ -129,7 +124,6 @@ export default function FamilyView({
   clubTeams: AdminMemberTeam[];
   tasksByEventId: Record<string, EventTasksState>;
   carpoolByEventId: Record<string, CarpoolOffer[]>;
-  whatsappGroups: WhatsAppGroup[];
   eventRoles: EventRoleType[];
   // Besoins en bénévoles (buvette, table de marque...) des événements club
   // ciblés/ouverts à tous — affichés en lecture "Je m'en occupe" seulement,
@@ -307,32 +301,12 @@ export default function FamilyView({
     () => penalites.filter((p) => visiblePlayerIds.includes(p.playerId)),
     [penalites, visiblePlayerIds]
   );
-  // Un groupe "Équipe" ne concerne qu'une seule équipe : il ne s'affiche
-  // que si cette équipe fait partie de l'enfant/des enfants actuellement
-  // sélectionnés. Retour de Cindy du 29/08 ("je ne veux que le groupe
-  // whatsapp de l'équipe concerné") : les groupes "Commission"
-  // (Buvette...) ne s'affichent plus mêlés ici, quel que soit l'enfant
-  // choisi — ils vivent maintenant dans leur propre onglet "Groupes
-  // WhatsApp" plus bas, pour ne jamais perdre l'accès à un groupe où l'on
-  // est membre pour une tout autre raison que l'équipe affichée ici.
-  const visibleWhatsappGroups = useMemo(
-    () => whatsappGroups.filter((g) => g.teamId !== null && visibleTeamIds.has(g.teamId)),
-    [whatsappGroups, visibleTeamIds]
-  );
-
-  // Retour de Cindy du 2026-09-01 : l'onglet "Groupes WhatsApp" ci-dessous
-  // ne montre jamais que les commissions (showTeamGroups=false) — s'il n'y
-  // en a aucune de configurée, il n'affichait qu'un "Aucun groupe." sans
-  // aucun autre contenu, un onglet mort pour rien. Visible seulement dès
-  // qu'au moins une commission existe.
-  const hasCommissionGroups = whatsappGroups.some((g) => g.category === "COMMISSION");
-
-  // Même logique que les groupes WhatsApp ci-dessus : un anniversaire ne
-  // reste affiché (puce du calendrier ET bloc "Anniversaires de la
-  // semaine", tous deux dérivés de ce même tableau à l'intérieur de
-  // CalendarView) que s'il appartient à une équipe de l'enfant/des enfants
-  // actuellement sélectionnés — sinon, sélectionner Raphaël montrerait
-  // quand même l'anniversaire d'une coéquipière de Léonie.
+  // Un anniversaire ne reste affiché (puce du calendrier ET bloc
+  // "Anniversaires de la semaine", tous deux dérivés de ce même tableau à
+  // l'intérieur de CalendarView) que s'il appartient à une équipe de
+  // l'enfant/des enfants actuellement sélectionnés — sinon, sélectionner
+  // Raphaël montrerait quand même l'anniversaire d'une coéquipière de
+  // Léonie.
   const visibleBirthdayMembers = useMemo(
     () => birthdayMembers.filter((m) => m.teamIds?.some((id) => visibleTeamIds.has(id))),
     [birthdayMembers, visibleTeamIds]
@@ -457,17 +431,6 @@ export default function FamilyView({
           {visibleTeamCards.length === 0 && (
             <p className="text-sm text-zinc-500">Aucune équipe rattachée pour le moment.</p>
           )}
-
-          {/* Les groupes WhatsApp appartiennent à l'équipe : les chercher
-              dans un onglet séparé revenait à quitter la page où on vient
-              justement de lire qui sont les coachs. */}
-          <div className="flex flex-col gap-2 border-t border-zinc-100 pt-4">
-            <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-              <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
-              Discussions WhatsApp
-            </p>
-            <WhatsAppGroupsFamily groups={visibleWhatsappGroups} />
-          </div>
         </div>
       ),
     },
@@ -517,25 +480,6 @@ export default function FamilyView({
         },
       ],
     },
-    // Retour de Cindy du 29/08 : les groupes "Commission" (Buvette,
-    // Coachs UBAC...) ne sont plus mêlés à "Mon équipe"/"Mon enfant" (voir
-    // visibleWhatsappGroups plus haut) — un parent/joueur membre d'une
-    // commission sans être aussi au Bureau (seul espace avec l'équivalent
-    // "Vie du club") a donc besoin de son propre accès. showTeamGroups=false :
-    // la grille "Équipes du Club" resterait vide de sens ici, chaque équipe
-    // a déjà son groupe sur sa propre carte plus haut. Onglet entier retiré
-    // (retour du 2026-09-01) tant qu'aucune commission n'est configurée —
-    // voir hasCommissionGroups.
-    ...(hasCommissionGroups
-      ? [
-          {
-            key: "whatsapp",
-            label: "Groupes WhatsApp",
-            icon: <MessageCircle className={iconClass} />,
-            content: <WhatsAppGroupsManager groups={whatsappGroups} showTeamGroups={false} />,
-          },
-        ]
-      : []),
     {
       // Retour de Cindy du 25/08 : Charte du Joueur + Charte du Parent +
       // Règlement Intérieur — ce sont les parents qui portent la

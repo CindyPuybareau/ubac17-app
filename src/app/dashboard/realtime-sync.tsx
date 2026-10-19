@@ -19,15 +19,20 @@ const WATCHED_TABLES = [
   "players",
   "team_pending_coaches",
   "club_administrators",
+  // Retour de Cindy du 19/10 ("supprime les groupes WhatsApp de partout") :
+  // whatsapp_groups reste ici -- partagée avec "Accès Commissions &
+  // Administration" (category='COMMISSION'), toujours modifiée en direct
+  // par le Bureau. whatsapp_group_members et whatsapp_messages, eux,
+  // retirés en même temps que le reste de "Groupes WhatsApp" : plus aucun
+  // lecteur/écrivain dans l'appli, les tables restent en base (jamais
+  // purgées) mais n'ont plus besoin d'être écoutées.
   "whatsapp_groups",
-  "whatsapp_group_members",
   // Ajoutées après l'audit du 360° : ces tables étaient écrites par l'app
   // sans être écoutées, donc leurs changements n'atteignaient les autres
   // rôles qu'après un F5.
-  "teams", // création/renommage d'une équipe, lien du groupe WhatsApp
+  "teams", // création/renommage d'une équipe
   "parent_player", // rattachement d'un parent à son enfant (espace Famille)
   "profiles", // nom, téléphone, email d'un compte — colonnes de contact
-  "whatsapp_messages", // historique des messages par membre
   "collectes", // stages & événements payants
   "category_tariffs", // tarifs par catégorie
   // Besoins d'organisation (buvette, table de marque...) : déjà publiées

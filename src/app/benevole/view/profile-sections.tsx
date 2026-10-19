@@ -7,12 +7,10 @@ import {
   Contact,
   Eye,
   EyeOff,
-  ExternalLink,
   Handshake,
   Home,
   LayoutDashboard,
   ListOrdered,
-  MessageCircle,
   PartyPopper,
   ScrollText,
   Shield,
@@ -371,8 +369,6 @@ export function buildProfileSections({
   events,
   sponsors,
   clubReports,
-  whatsappGroups,
-  whatsappDirectory = [],
   dashboardCounts = null,
   attendanceByEventId,
   commissionContext,
@@ -399,15 +395,6 @@ export function buildProfileSections({
   events: ProfileCalendarEvent[];
   sponsors: SponsorDisplay[];
   clubReports: ClubReport[];
-  // Retour de Cindy du 06/09 ("je ne vois pas dans Vie du club son groupe
-  // WhatsApp") : jamais conditionné par une brique, voir benevole-view.tsx.
-  // Le(s) groupe(s) que CETTE personne rejoint déjà elle-même -- distinct
-  // de whatsappDirectory ci-dessous.
-  whatsappGroups: { id: string; name: string; inviteLink: string | null }[];
-  // Retour de Cindy du 12/09 ("Groupes WhatsApp") : annuaire de TOUS les
-  // groupes du club (équipes + commissions), gouverné par la brique
-  // "whatsapp_groups" -- voir read-only-briques-data.ts.
-  whatsappDirectory?: { id: string; name: string; inviteLink: string | null }[];
   // Retour de Cindy du 12/09 ("Tableau de bord (lecture seule)") : voir
   // DashboardSection ci-dessus et read-only-briques-data.ts -- null tant
   // que "tableau_de_bord" n'est pas coché.
@@ -518,13 +505,11 @@ export function buildProfileSections({
   }
 
   // Retour de Cindy du 06/09 ("comme pour le bureau... le même menu mais
-  // sélectionnable et sur mesure : groupe whatsapp, documents, sponsors,
-  // boutique") : vrai sous-menu "Vie du club" (children), comme côté
-  // Bureau (admin-view.tsx), pas un seul écran qui empile tout. Chaque
-  // sous-entrée apparaît indépendamment des autres -- Documents et
-  // Boutique toujours là (comme le Règlement intérieur qu'il contient),
-  // Sponsors et le(s) groupe(s) WhatsApp seulement s'il y a quelque chose
-  // à y montrer.
+  // sélectionnable et sur mesure") : vrai sous-menu "Vie du club"
+  // (children), comme côté Bureau (admin-view.tsx), pas un seul écran qui
+  // empile tout. Chaque sous-entrée apparaît indépendamment des autres --
+  // Documents et Boutique toujours là (comme le Règlement intérieur qu'il
+  // contient), Sponsors seulement s'il y a quelque chose à y montrer.
   // Retour de Cindy du 12/09 ("pouvoir sélectionner les documents visibles
   // ou non -- cases à cocher pour tous les docs en sous-menu de
   // document") : chacune des 3 chartes/règlement a désormais SA PROPRE
@@ -596,92 +581,6 @@ export function buildProfileSections({
       };
 
   const vieDuClubChildren: AdminSection[] = [
-    ...(whatsappGroups.length > 0
-      ? [
-          {
-            key: "whatsapp-groups",
-            label: whatsappGroups.length > 1 ? "Groupes WhatsApp" : "Groupe WhatsApp",
-            icon: <MessageCircle className={iconClass} />,
-            content: (
-              <div className="flex flex-col gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
-                <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                  <MessageCircle className="h-3.5 w-3.5 text-navy" />
-                  {whatsappGroups.length > 1 ? "Tes groupes WhatsApp" : "Ton groupe WhatsApp"}
-                </p>
-                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                  {whatsappGroups.map((g) =>
-                    g.inviteLink ? (
-                      <a
-                        key={g.id}
-                        href={g.inviteLink}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center justify-center gap-1.5 rounded-full bg-emerald-500 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                        {g.name}
-                      </a>
-                    ) : (
-                      <span
-                        key={g.id}
-                        className="flex items-center justify-center gap-1.5 rounded-full bg-zinc-50 px-3.5 py-2 text-sm font-medium text-zinc-400"
-                      >
-                        {g.name} — lien non renseigné
-                      </span>
-                    )
-                  )}
-                </div>
-              </div>
-            ),
-          },
-        ]
-      : []),
-    // Retour de Cindy du 12/09 ("Groupes WhatsApp") : annuaire de TOUS les
-    // groupes du club (équipes + commissions), distinct du bloc "Ton/tes
-    // groupe(s)" ci-dessus (celui d'une personne précise, jamais
-    // conditionné). Celui-ci est gouverné par la brique "whatsapp_groups"
-    // -- vide tant qu'elle n'est pas cochée (whatsappDirectory=[] par
-    // défaut).
-    ...(has("whatsapp_groups") && whatsappDirectory.length > 0
-      ? [
-          {
-            key: "whatsapp-directory",
-            label: "Groupes WhatsApp",
-            icon: <MessageCircle className={iconClass} />,
-            content: (
-              <div className="flex flex-col gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
-                <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                  <MessageCircle className="h-3.5 w-3.5 text-navy" />
-                  Groupes WhatsApp du club
-                </p>
-                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                  {whatsappDirectory.map((g) =>
-                    g.inviteLink ? (
-                      <a
-                        key={g.id}
-                        href={g.inviteLink}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center justify-center gap-1.5 rounded-full bg-emerald-500 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                        {g.name}
-                      </a>
-                    ) : (
-                      <span
-                        key={g.id}
-                        className="flex items-center justify-center gap-1.5 rounded-full bg-zinc-50 px-3.5 py-2 text-sm font-medium text-zinc-400"
-                      >
-                        {g.name} — lien non renseigné
-                      </span>
-                    )
-                  )}
-                </div>
-              </div>
-            ),
-          },
-        ]
-      : []),
     ...(documentsChild ? [documentsChild] : []),
     ...(has("sponsors")
       ? [

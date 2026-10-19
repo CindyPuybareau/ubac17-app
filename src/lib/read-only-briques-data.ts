@@ -63,10 +63,6 @@ export type ReadOnlyBriquesData = {
     upcomingEventCount: number;
     birthdaysThisWeekCount: number;
   } | null;
-  // Retour de Cindy du 12/09 ("Groupes WhatsApp") : annuaire en lecture
-  // seule de tous les groupes du club (équipes + commissions) ayant un
-  // lien d'invitation renseigné -- gouverné par la brique "whatsapp_groups".
-  profileWhatsappGroups: { id: string; name: string; inviteLink: string | null }[];
 };
 
 // Retour de Cindy du 25/09 : équivalent local de resolvePaidInfo (page.tsx),
@@ -122,7 +118,6 @@ export async function getReadOnlyBriquesData(
   let profileSponsors: SponsorDisplay[] = [];
   let profileClubReports: ClubReport[] = [];
   let profileDashboardCounts: ReadOnlyBriquesData["profileDashboardCounts"] = null;
-  let profileWhatsappGroups: ReadOnlyBriquesData["profileWhatsappGroups"] = [];
   const attendanceByEventId: Record<string, { name: string | null; status: string }[]> = {};
 
   // Team refs légers (id/name/category, jamais roster/coachs) pour le
@@ -375,18 +370,6 @@ export async function getReadOnlyBriquesData(
     };
   }
 
-  if (has("whatsapp_groups")) {
-    const { data: groupsData } = await supabase
-      .from("whatsapp_groups")
-      .select("id, name, invite_link")
-      .order("sort_order", { ascending: true });
-    profileWhatsappGroups = (groupsData ?? []).map((g) => ({
-      id: g.id,
-      name: g.name,
-      inviteLink: g.invite_link,
-    }));
-  }
-
   if (has("compte_rendu_mairies") || has("compte_rendu_bureau") || has("compte_rendu_coachs") || has("compte_rendu_cd17_ligue")) {
     // Retour de l'audit du 05/10 ("il faut revoir les requêtes") : même
     // correctif que page.tsx -- voir son commentaire.
@@ -441,6 +424,5 @@ export async function getReadOnlyBriquesData(
     profileClubReports,
     attendanceByEventId,
     profileDashboardCounts,
-    profileWhatsappGroups,
   };
 }

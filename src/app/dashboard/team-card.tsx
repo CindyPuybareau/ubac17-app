@@ -7,7 +7,6 @@ import {
   Camera,
   CalendarDays,
   Clock,
-  ExternalLink,
   Flame,
   Mail,
   MapPin,
@@ -28,9 +27,7 @@ import MemberDetailModal from "./member-detail-modal";
 import PlayerYearBadge from "./player-year-badge";
 import SalleBadge from "./salle-badge";
 import { useToast } from "./toast-context";
-import WhatsAppDirectButton from "./whatsapp-direct-button";
-import WhatsAppGroupButton from "./whatsapp-group-button";
-import type { AdminMemberTeam, AdminUpcomingEvent, MemberDetail, WhatsAppGroup } from "./page";
+import type { AdminMemberTeam, AdminUpcomingEvent, MemberDetail } from "./page";
 import type { RosterPlayer, TeamWithMembers } from "./team-manager";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
@@ -114,12 +111,6 @@ export default function TeamCard({
   // droit dédié plutôt que readOnly, qui couvre bien plus large (Bureau
   // ET coach sur sa propre équipe valent tous les deux readOnly=false).
   canRemoveMembers = true,
-  // Groupe WhatsApp de CETTE équipe (whatsapp_groups) : sert uniquement au
-  // lien "Ouvrir sur WhatsApp" ci-dessous désormais (retour de Cindy du
-  // 29/08 : le bouton "Configurer WhatsApp" de l'en-tête a été retiré,
-  // l'édition du lien se fait maintenant depuis l'onglet dédié "Groupes
-  // WhatsApp").
-  whatsappGroup,
   // Vrai droit dédié (même logique que canRemoveMembers ci-dessus) : le
   // rattachement parent-enfant n'a aucune UI équivalente ailleurs, donc il
   // reste ouvert au Bureau même depuis cet onglet Équipes — seul un Coach
@@ -145,7 +136,6 @@ export default function TeamCard({
   showRosterSearch?: boolean;
   contactEmailByPlayerId?: Record<string, string>;
   clubTeams?: AdminMemberTeam[];
-  whatsappGroup?: WhatsAppGroup | null;
   canRemoveMembers?: boolean;
   canManageParentLinks?: boolean;
   canEditFullProfile?: boolean;
@@ -930,25 +920,14 @@ export default function TeamCard({
               </td>
               <td className="whitespace-nowrap px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
                 {phone ? (
-                  <span className="flex items-center gap-1">
-                    <a
-                      href={`tel:${phone}`}
-                      title="Appeler"
-                      className="inline-flex items-center gap-1.5 text-zinc-600 hover:text-navy hover:underline"
-                    >
-                      <Phone className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-                      {phone}
-                    </a>
-                    {/* Bascule directe vers WhatsApp (retour de Cindy du
-                        2026-08-21, voulue à la fois Bureau et Coach) — seule
-                        icône WhatsApp de la ligne depuis le retrait du
-                        doublon "avec composition" du 2026-08-23. */}
-                    <WhatsAppDirectButton
-                      phone={phone}
-                      message={`Bonjour, ici le coach de ${team.name ?? "l'équipe"}.`}
-                      playerId={m.id}
-                    />
-                  </span>
+                  <a
+                    href={`tel:${phone}`}
+                    title="Appeler"
+                    className="inline-flex items-center gap-1.5 text-zinc-600 hover:text-navy hover:underline"
+                  >
+                    <Phone className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                    {phone}
+                  </a>
                 ) : (
                   <span className="text-zinc-400">—</span>
                 )}
@@ -968,13 +947,6 @@ export default function TeamCard({
                 )}
               </td>
               <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
-                {/* Icône WhatsApp retirée d'ici (retour de Cindy du
-                    2026-08-23, "doublon du symbole whattsapp dans les
-                    cartes des équipes") : WhatsAppDirectButton, juste à
-                    côté du numéro de téléphone un peu plus haut sur la
-                    même ligne, ouvrait déjà WhatsApp pour cette même
-                    personne — celle-ci (avec sa modale de composition)
-                    faisait doublon. */}
                 <div className="flex items-center gap-1">{renderActions(m, isSecondaryTeam)}</div>
               </td>
             </tr>
@@ -1071,20 +1043,13 @@ export default function TeamCard({
             onClick={(e) => e.stopPropagation()}
           >
             {phone && (
-              <span className="flex items-center gap-1">
-                <a
-                  href={`tel:${phone}`}
-                  className="inline-flex items-center gap-1.5 hover:text-navy hover:underline"
-                >
-                  <Phone className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-                  {phone}
-                </a>
-                <WhatsAppDirectButton
-                  phone={phone}
-                  message={`Bonjour, ici le coach de ${team.name ?? "l'équipe"}.`}
-                  playerId={m.id}
-                />
-              </span>
+              <a
+                href={`tel:${phone}`}
+                className="inline-flex items-center gap-1.5 hover:text-navy hover:underline"
+              >
+                <Phone className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                {phone}
+              </a>
             )}
             {email && (
               <a
@@ -1500,41 +1465,6 @@ export default function TeamCard({
           )}
         </div>
       </div>
-
-      {/* Un lien direct dès qu'il existe — coach ou joueur, même bouton.
-          Retour de Cindy du 29/08 : le bouton "Configurer WhatsApp" de
-          l'en-tête (édition du lien + gestion des membres, voir
-          team-whatsapp-settings.tsx) a été retiré, redondant avec le
-          nouvel onglet dédié "Groupes WhatsApp" (Coach) qui édite déjà le
-          lien de chaque groupe — seule la gestion des membres n'a pas
-          d'équivalent là-bas, mais elle n'était lue nulle part ailleurs
-          dans l'appli (bookkeeping sans effet fonctionnel). Le bouton
-          "compose un message" (générique, sans vrai lien) ne reste qu'en
-          dernier recours pour un joueur, tant qu'aucun lien n'a encore été
-          renseigné. Retour du 29/08 (suite) : "Ouvrir sur WhatsApp" ne
-          disait pas QUEL groupe — remplacé par teamLabel(team) (ex.
-          "U13F"), pas whatsappGroup.name : ce dernier est le nom brut
-          saisi au seed ("U13F UBAC 2026/27"...), pas pensé pour tenir sur
-          un bouton — même correctif que "trop long" signalé juste après. */}
-      {whatsappGroup?.inviteLink ? (
-        <a
-          href={whatsappGroup.inviteLink}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-3 flex w-fit items-center gap-1.5 rounded-full bg-emerald-500 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
-        >
-          <ExternalLink className="h-4 w-4" />
-          Groupe WhatsApp {teamLabel(team)}
-        </a>
-      ) : (
-        readOnly && (
-          <WhatsAppGroupButton
-            groupName={teamLabel(team)}
-            defaultMessage={`Bonjour à tous, je suis un joueur de l'équipe ${team.name ?? ""}.`}
-            className="mt-3 flex w-fit items-center gap-1.5 rounded-full bg-emerald-500 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
-          />
-        )
-      )}
 
       {detailPlayerId &&
         memberDetailsByPlayerId?.[detailPlayerId] &&

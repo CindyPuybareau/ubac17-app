@@ -8,7 +8,6 @@ import {
   LayoutDashboard,
   ListOrdered,
   LogOut,
-  MessageCircle,
   Package,
   ScrollText,
   Shield,
@@ -36,7 +35,6 @@ import { listTeamsForOfficialMatches, listTeamTrombinoscopes, splitTeamName } fr
 import MembersTable from "./members-table";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import FfbbManager from "./ffbb-manager";
-import WhatsAppGroupsManager from "./whatsapp-groups-manager";
 import SponsorsManager from "./sponsors-manager";
 import InventoryManager from "./inventory-manager";
 import SponsorsDisplay from "./sponsors-display";
@@ -235,7 +233,7 @@ export default function AdminView({
   // liste des commissions pour rattacher un besoin en bénévoles ou cibler
   // "Commissions concernées" à la création d'un événement (voir
   // VolunteerNeedsPanel/CommissionMultiSelect/commissionGroups) -- mêmes
-  // groupes que whatsapp-groups-manager.tsx, jamais une nouvelle liste.
+  // groupes que commissions-manager.tsx, jamais une nouvelle liste.
   // Retour de Cindy du 25/09 ("ces deux points doivent être reliés") :
   // même filtre hideFromCommissionAccess que commissions-manager.tsx
   // (Bureau/Coachs/Salariés ont déjà leur propre espace connecté, jamais
@@ -365,7 +363,6 @@ export default function AdminView({
           contactEmailByPlayerId={contactEmailByPlayerId}
           memberDetailsByPlayerId={memberDetailsByPlayerId}
           clubTeams={canonicalTeamRefs}
-          whatsappGroups={whatsappGroups}
         />
       ),
     },
@@ -560,14 +557,9 @@ export default function AdminView({
     },
     {
       // Regroupement (retour de Cindy du 29/08, menu Bureau à simplifier) :
-      // ces 6 onglets sont des ressources/outils annexes consultés
+      // ces onglets sont des ressources/outils annexes consultés
       // ponctuellement, pas des outils du quotidien comme Membres/Équipes/
-      // Paiements — les sortir du premier niveau fait passer le Bureau de
-      // 12 à 7 entrées. keys inchangées (sponsors/benevoles/ffbb/whatsapp/
-      // documents/boutique) : sectionExists/findSection cherchent
-      // récursivement dans les enfants, donc un lien profond
-      // "?openGroup=…" (implique la section "whatsapp") continue de
-      // fonctionner tel quel une fois nichée ici.
+      // Paiements — les sortir du premier niveau simplifie le menu Bureau.
       key: "club-life",
       label: "Vie du club",
       icon: <Building2 className={iconClass} />,
@@ -583,9 +575,8 @@ export default function AdminView({
           // Retour de Cindy du 10/09 ("Accès Commissions & Administration") :
           // remplace la gestion d'accès personne par personne
           // (benevoles-manager.tsx, jusqu'ici "Bénévoles & Accès") par une
-          // gestion au niveau de chaque commission — mêmes commissions que
-          // whatsapp-groups-manager.tsx, mêmes briques de lecture seule
-          // qu'avant (access-briques.ts), mais portées par la commission
+          // gestion au niveau de chaque commission — mêmes briques de
+          // lecture seule qu'avant (access-briques.ts), mais portées par la commission
           // elle-même : un seul lien public par commission plutôt qu'un
           // lien par personne. L'ancien fonctionnement individuel reste
           // disponible en option secondaire à l'intérieur de ce composant
@@ -602,15 +593,6 @@ export default function AdminView({
               benevoles={benevoles}
             />
           ),
-        },
-        {
-          // Retour de Cindy du 2026-08-22 : renommé et déplacé après FFBB
-          // (était juste après "Événements et Résultats"). FFBB lui-même a
-          // depuis rejoint "Matchs & Résultats" (retour de Cindy du 10/09).
-          key: "whatsapp",
-          label: "Groupes WhatsApp",
-          icon: <MessageCircle className={iconClass} />,
-          content: <WhatsAppGroupsManager groups={whatsappGroups} teams={canonicalTeamRefs} />,
         },
         {
           // Retour de Cindy du 25/08 : le Bureau voit les 3 documents

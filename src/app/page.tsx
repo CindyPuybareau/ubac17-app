@@ -42,13 +42,13 @@ const roles = [
     icon: Building2,
     title: "Pour le Bureau",
     // Retour de Cindy du 15/09 ("on ne comprend pas le HUB franchement") :
-    // d'abord juste "hub" -> "tous les groupes WhatsApp... réunis au même
-    // endroit", puis retour "plus concis" -- résumé complet proposé en
-    // amont (membres/équipes/cotisations/licences/événements/WhatsApp/
-    // commissions/sponsors/documents/relances/FFBB, voir la conversation)
-    // condensé en une phrase, sans perdre l'essentiel.
+    // résumé complet proposé en amont (membres/équipes/cotisations/
+    // licences/événements/commissions/sponsors/documents/relances/FFBB,
+    // voir la conversation) condensé en une phrase, sans perdre
+    // l'essentiel. "Groupes WhatsApp" retiré de la liste le 19/10 avec le
+    // reste de cette fonctionnalité.
     description:
-      "Une vision globale du club, en un coup d'œil. Membres, équipes, cotisations, licences et événements du club, tous gérés au même endroit — avec les groupes WhatsApp, les commissions et les relances automatiques.",
+      "Une vision globale du club, en un coup d'œil. Membres, équipes, cotisations, licences et événements du club, tous gérés au même endroit — avec les commissions et les relances automatiques.",
   },
   {
     icon: ClipboardList,

@@ -160,13 +160,6 @@ export type AdminBenevole = {
   // lui, toujours) -- null = aucune brique supplémentaire, comportement
   // historique (juste ses événements/besoins de bénévolat habituels).
   accessProfileId: string | null;
-  // Retour de Cindy du 06/09 ("quel groupe whatsapp lui sera attribué",
-  // puis "un bénévole peut faire partie de plusieurs groupes") : simple
-  // attribution informative parmi les groupes "Commissions &
-  // Administration" -- ne rattache jamais un bénévole à
-  // whatsapp_group_members (réservé aux joueurs, voir whatsapp-groups-
-  // manager.tsx). Voir benevole_whatsapp_groups (20261031210000).
-  whatsappGroupIds: string[];
 };
 
 // Profils d'accès sur-mesure (retour de Cindy du 05/09, reprise du sujet
@@ -188,10 +181,9 @@ export type WhatsAppGroup = {
   inviteLink: string | null;
   sortOrder: number;
   // Whether the CURRENT user (Bureau, or the coach of this group's team)
-  // may edit the invite link and membership — computed server-side since
-  // RLS already narrows which groups appear at all.
+  // may edit the invite link — computed server-side since RLS already
+  // narrows which groups appear at all.
   canManage: boolean;
-  members: { id: string; firstName: string | null; lastName: string | null }[];
   // Retour de Cindy du 10/09 ("Accès Commissions & Administration") : lien
   // public permanent + profil d'accès en lecture seule portés par la
   // commission elle-même — seulement renseignés pour category='COMMISSION'
@@ -1558,18 +1550,17 @@ export default async function DashboardPage({
     sponsorDisplayRes,
   ] = await runBatched(
     [
-    // A single query, unconditional on role: RLS already narrows the
-    // result to exactly what this user may see (everything for Bureau,
-    // their own team's + own memberships for a Coach, only their own
-    // family's memberships for everyone else) — see
-    // is_whatsapp_group_member() / is_whatsapp_group_team_coach() in the
+    // Table partagée avec "Accès Commissions & Administration" (category=
+    // 'COMMISSION', access_token/access_profile_id) -- cette requête reste
+    // nécessaire pour Commissions même après le retrait de "Groupes
+    // WhatsApp" (category='EQUIPE', retiré le 19/10). A single query,
+    // unconditional on role: RLS already narrows the result to exactly
+    // what this user may see — see is_whatsapp_group_team_coach() in the
     // whatsapp_groups migration.
     () =>
       supabase
         .from("whatsapp_groups")
-        .select(
-          "id, name, category, team_id, invite_link, sort_order, access_token, access_profile_id, whatsapp_group_members(player_id, players(id, first_name, last_name))"
-        )
+        .select("id, name, category, team_id, invite_link, sort_order, access_token, access_profile_id")
         .order("sort_order", { ascending: true }),
     // Priority zone: next convocation per linked player.
     () =>
@@ -1633,10 +1624,6 @@ export default async function DashboardPage({
     sort_order: number;
     access_token: string | null;
     access_profile_id: string | null;
-    whatsapp_group_members: {
-      player_id: string;
-      players: { id: string; first_name: string | null; last_name: string | null } | null;
-    }[];
   };
 
   const whatsappGroups: WhatsAppGroup[] = (
@@ -1651,12 +1638,6 @@ export default async function DashboardPage({
     accessToken: g.access_token,
     accessProfileId: g.access_profile_id,
     canManage: isAdmin || (g.team_id !== null && coachedTeamIds.has(g.team_id)),
-    members: g.whatsapp_group_members
-      .map((m) => m.players)
-      .filter((p): p is { id: string; first_name: string | null; last_name: string | null } =>
-        Boolean(p)
-      )
-      .map((p) => ({ id: p.id, firstName: p.first_name, lastName: p.last_name })),
   }));
 
   // Match-day parent tasks (jerseys/snacks/carpool) for every event shown
@@ -1939,7 +1920,7 @@ export default async function DashboardPage({
           supabase
             .from("benevoles")
             .select(
-              "id, first_name, last_name, phone, email, notes, access_token, archived_at, access_profile_id, benevole_whatsapp_groups(whatsapp_group_id)"
+              "id, first_name, last_name, phone, email, notes, access_token, archived_at, access_profile_id"
             )
             .order("last_name"),
         // Profils d'accès sur-mesure (retour de Cindy du 05/09) : liste des
@@ -2659,7 +2640,6 @@ export default async function DashboardPage({
         access_token: string;
         archived_at: string | null;
         access_profile_id: string | null;
-        benevole_whatsapp_groups: { whatsapp_group_id: string }[] | null;
       }[]
     ).map((b) => ({
       id: b.id,
@@ -2671,7 +2651,6 @@ export default async function DashboardPage({
       accessToken: b.access_token,
       archivedAt: b.archived_at,
       accessProfileId: b.access_profile_id,
-      whatsappGroupIds: (b.benevole_whatsapp_groups ?? []).map((g) => g.whatsapp_group_id),
     }));
 
     adminAccessProfiles = (
@@ -5019,18 +4998,6 @@ export default async function DashboardPage({
     rsvpPlayers: typeof familyRsvpPlayers,
     dashboardSummary: SpaceDashboardSummary
   ) {
-    // Audit du 31/08 : whatsappGroups porte la liste NOMINATIVE des
-    // membres de CHAQUE groupe (y compris ceux des équipes d'autres
-    // familles) — le passer tel quel envoie ces noms au navigateur de
-    // cette famille même si l'écran ne les affiche jamais (showTeamGroups
-    // masque juste visuellement la grille "Équipes du Club", il n'empêche
-    // pas les données d'avoir déjà traversé le réseau). Filtré ici, côté
-    // serveur, aux commissions (ouvertes à tous) + aux seules équipes de
-    // CES joueurs — jamais après coup côté client.
-    const familyTeamIds = new Set(rsvpPlayers.flatMap((p) => p.teamIds));
-    const familyWhatsappGroups = whatsappGroups.filter(
-      (g) => g.category === "COMMISSION" || (g.teamId !== null && familyTeamIds.has(g.teamId))
-    );
     return (
       <FamilyView
         events={familyEvents}
@@ -5041,7 +5008,6 @@ export default async function DashboardPage({
         clubTeams={familyAllClubTeams}
         tasksByEventId={familyOrganisationTasks}
         carpoolByEventId={carpoolOffersByEventId}
-        whatsappGroups={familyWhatsappGroups}
         eventRoles={eventRoleTypes}
         volunteerNeedsByEventId={familyVolunteerNeedsByEventId}
         cotisations={familyCotisations}

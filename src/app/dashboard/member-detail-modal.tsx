@@ -17,7 +17,7 @@ import { formatPersonName } from "@/lib/names";
 import { formatLocalDateFr } from "@/lib/local-date";
 import { teamLabel } from "@/lib/teams";
 import { notifyCoachesOfNewTeamMember } from "@/lib/member-notifications";
-import { buildAppDeepLink } from "@/lib/whatsapp";
+import { buildAppDeepLink } from "@/lib/app-links";
 import {
   getSiblingTeamIds,
   isLowestRankSiblingTeam,

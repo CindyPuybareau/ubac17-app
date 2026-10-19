@@ -70,24 +70,6 @@ export default async function BenevoleViewPage() {
     allowedBriques = (briquesData ?? []).map((b) => b.brique);
   }
 
-  // Retour de Cindy du 06/09 ("je ne vois pas dans Vie du club son groupe
-  // WhatsApp") : pas une brique -- c'est une information sur LUI (à quel
-  // groupe il a été rattaché, voir benevoles-manager.tsx), pas un droit
-  // d'accès, donc toujours chargée, jamais conditionnée par
-  // allowedBriques.
-  const { data: myGroupsData } = await supabase
-    .from("benevole_whatsapp_groups")
-    .select("whatsapp_groups(id, name, invite_link)")
-    .eq("benevole_id", benevoleId);
-  const myWhatsappGroups = (
-    (myGroupsData ?? []) as unknown as {
-      whatsapp_groups: { id: string; name: string; invite_link: string | null } | null;
-    }[]
-  )
-    .map((row) => row.whatsapp_groups)
-    .filter((g): g is { id: string; name: string; invite_link: string | null } => Boolean(g))
-    .map((g) => ({ id: g.id, name: g.name, inviteLink: g.invite_link }));
-
   const {
     profileTeams,
     profileTeamRefs,
@@ -97,7 +79,6 @@ export default async function BenevoleViewPage() {
     profileClubReports,
     attendanceByEventId,
     profileDashboardCounts,
-    profileWhatsappGroups,
   } = await getReadOnlyBriquesData(supabase, allowedBriques);
 
   // Cloche de notifications (retour de Cindy du 06/09, "comme pour tous
@@ -143,9 +124,7 @@ export default async function BenevoleViewPage() {
       profileSponsors={profileSponsors}
       profileClubReports={profileClubReports}
       attendanceByEventId={attendanceByEventId}
-      myWhatsappGroups={myWhatsappGroups}
       profileDashboardCounts={profileDashboardCounts}
-      profileWhatsappGroups={profileWhatsappGroups}
       notifications={notifications}
       notificationsEnabled={notificationsEnabled}
     />

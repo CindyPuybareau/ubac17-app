@@ -5,7 +5,6 @@ import {
   LayoutDashboard,
   ListOrdered,
   LogOut,
-  MessageCircle,
   Package,
   RefreshCw,
   ScrollText,
@@ -32,7 +31,6 @@ import type { SpaceDashboardSummary as SpaceDashboardSummaryData } from "@/lib/s
 import CoachTeams from "./coach-teams";
 import CoachFfbb from "./coach-ffbb";
 import SeasonBilanPanel, { type BilanTeamRoster } from "./season-bilan-panel";
-import WhatsAppGroupsManager from "./whatsapp-groups-manager";
 import SponsorsDisplay from "./sponsors-display";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import type { TeamWithMembers } from "./team-manager";
@@ -380,7 +378,6 @@ export default function CoachView({
             memberDetailsByPlayerId={memberDetailsByPlayerId}
             teamRoleByTeamId={teamRoleByTeamId}
             clubTeams={clubTeams}
-            whatsappGroups={whatsappGroups}
             penalites={penalites}
           />
         </div>
@@ -519,23 +516,6 @@ export default function CoachView({
       icon: <Building2 className={iconClass} />,
       content: null,
       children: [
-        {
-          // Retour de Cindy du 29/08 : "Commissions & Admin" (Bureau,
-          // Coachs UBAC, Buvette...) vivait uniquement comme un bloc
-          // attaché à l'onglet Équipe, redondant pour qui cumule aussi le
-          // Bureau (même liste que "Vie du club" -> "Groupes WhatsApp"
-          // là-bas) — mais c'était le SEUL accès pour un coach sans accès
-          // Bureau (ex. à son propre groupe "Coachs UBAC"). Un vrai onglet
-          // dédié ici plutôt qu'une suppression pure et simple.
-          // WhatsAppGroupsManager gère déjà canManage par groupe (RLS),
-          // donc un coach ne voit le crayon d'édition que sur les groupes
-          // qu'il gère réellement (sa propre équipe) — rien de plus exposé
-          // qu'avant.
-          key: "whatsapp",
-          label: "Groupes WhatsApp",
-          icon: <MessageCircle className={iconClass} />,
-          content: <WhatsAppGroupsManager groups={whatsappGroups} teams={clubTeams} />,
-        },
         {
           // Retour de Cindy du 26/08 : les 3 documents sur tous les
           // espaces sauf Bénévoles (Règlement Intérieur seul là-bas) —

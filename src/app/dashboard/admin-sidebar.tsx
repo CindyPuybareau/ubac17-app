@@ -124,11 +124,11 @@ export default function AdminSidebar({
   // (repli sur firstLeafKey, comportement historique).
   defaultActiveKey?: string;
 }) {
-  // Deep-link support (see buildAppDeepLink in lib/whatsapp.ts): a shared
-  // "?section=…" URL — or an "?openMember=…" / "?openGroup=…" link, which
-  // implies its natural section — jumps straight to the right tab on
-  // first render. Read once via lazy initial state, not an effect, so
-  // there's no flash of the default section first.
+  // Deep-link support (see buildAppDeepLink in lib/app-links.ts): a shared
+  // "?section=…" URL — or an "?openMember=…" link, which implies its
+  // natural section — jumps straight to the right tab on first render.
+  // Read once via lazy initial state, not an effect, so there's no flash
+  // of the default section first.
   const searchParams = useSearchParams();
   const [active, setActive] = useState(() => {
     const sectionParam = searchParams.get("section");
@@ -137,9 +137,6 @@ export default function AdminSidebar({
     }
     if (searchParams.get("openMember") && sectionExists(sections, "members")) {
       return "members";
-    }
-    if (searchParams.get("openGroup") && sectionExists(sections, "whatsapp")) {
-      return "whatsapp";
     }
     if (defaultActiveKey && sectionExists(sections, defaultActiveKey)) {
       return defaultActiveKey;

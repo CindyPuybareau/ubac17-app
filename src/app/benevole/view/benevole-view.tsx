@@ -35,9 +35,7 @@ export default function BenevoleView({
   profileSponsors,
   profileClubReports,
   attendanceByEventId,
-  myWhatsappGroups,
   profileDashboardCounts,
-  profileWhatsappGroups,
   notifications,
   notificationsEnabled,
 }: {
@@ -57,11 +55,6 @@ export default function BenevoleView({
   // Retour de Cindy du 11/09 ("qui est présent/absent ?") : voir
   // read-only-briques-data.ts, gouverné par la brique "membres".
   attendanceByEventId: Record<string, { name: string | null; status: string }[]>;
-  // Retour de Cindy du 06/09 ("je ne vois pas dans Vie du club son groupe
-  // WhatsApp") : à quel(s) groupe(s) ce bénévole a été rattaché (voir
-  // benevoles-manager.tsx) -- jamais conditionné par une brique, c'est une
-  // information sur lui, pas un droit d'accès.
-  myWhatsappGroups: { id: string; name: string; inviteLink: string | null }[];
   // Retour de Cindy du 12/09 : voir read-only-briques-data.ts.
   profileDashboardCounts: {
     memberCount: number;
@@ -69,7 +62,6 @@ export default function BenevoleView({
     upcomingEventCount: number;
     birthdaysThisWeekCount: number;
   } | null;
-  profileWhatsappGroups: { id: string; name: string; inviteLink: string | null }[];
   // Retour de Cindy du 06/09 ("ajouter aux bénévoles les notifications
   // comme pour tous les autres espaces") : voir benevole-notification-
   // bell.tsx.
@@ -93,8 +85,6 @@ export default function BenevoleView({
     events: profileEvents,
     sponsors: profileSponsors,
     clubReports: profileClubReports,
-    whatsappGroups: myWhatsappGroups,
-    whatsappDirectory: profileWhatsappGroups,
     dashboardCounts: profileDashboardCounts,
     attendanceByEventId,
   });
@@ -113,8 +103,8 @@ export default function BenevoleView({
             content: (
               <p className="rounded-2xl border border-zinc-100 bg-white p-4 text-sm text-zinc-500">
                 Aucun accès n&apos;est encore configuré pour toi. Demande au Bureau
-                de t&apos;ajouter à une commission (message WhatsApp épinglé dans
-                ton groupe) ou de configurer ton accès individuel.
+                de t&apos;ajouter à une commission ou de configurer ton accès
+                individuel.
               </p>
             ),
           },

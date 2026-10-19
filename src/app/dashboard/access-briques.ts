@@ -12,8 +12,10 @@
 // Retour de Cindy du 12/09 ("le menu que l'on doit pouvoir cocher aux
 // commissions et administrations") : "Documents" éclaté en une brique par
 // document/compte rendu plutôt qu'un seul bloc à 3 briques (pour choisir
-// précisément lesquels une commission voit), et un nouveau "Groupes
-// WhatsApp" (annuaire en lecture seule des groupes du club). Cotisations/
+// précisément lesquels une commission voit). "Groupes WhatsApp" (annuaire
+// en lecture seule) a existé ici un temps, retiré le 19/10 avec le reste de
+// la fonctionnalité "Groupes WhatsApp" -- voir git history si jamais il
+// fallait un jour le retrouver. Cotisations/
 // Pénalités restent dans la liste malgré sa demande initiale de les
 // retirer : ces 2 clés servent AUSSI, via REQUIRED_BRIQUE (admin-view.tsx),
 // à autoriser un "Comité directeur" restreint à voir les VRAIS écrans
@@ -81,10 +83,7 @@ export const BRIQUE_GROUPS: { label: string; briques: { key: string; label: stri
   },
   {
     label: "Vie du club",
-    briques: [
-      { key: "sponsors", label: "Sponsors" },
-      { key: "whatsapp_groups", label: "Groupes WhatsApp" },
-    ],
+    briques: [{ key: "sponsors", label: "Sponsors" }],
   },
   {
     label: "Documents",

@@ -12,7 +12,6 @@ import type {
   AdminPenalite,
   AdminUpcomingEvent,
   MemberDetail,
-  WhatsAppGroup,
 } from "./page";
 
 export default function CoachTeams({
@@ -24,7 +23,6 @@ export default function CoachTeams({
   memberDetailsByPlayerId,
   teamRoleByTeamId,
   clubTeams,
-  whatsappGroups,
   penalites = [],
 }: {
   teams: TeamWithMembers[];
@@ -35,7 +33,6 @@ export default function CoachTeams({
   memberDetailsByPlayerId: Record<string, MemberDetail>;
   teamRoleByTeamId: Record<string, "COACH" | "PLAYER">;
   clubTeams: AdminMemberTeam[];
-  whatsappGroups: WhatsAppGroup[];
   // Retour de Cindy du 29/08 : "Pénalités de l'équipe" mélangeait les
   // pénalités de TOUTES les équipes coachées (ex. U13F + U13M pour Basile)
   // dans une seule liste, quelle que soit l'équipe sélectionnée ci-dessus —
@@ -62,7 +59,6 @@ export default function CoachTeams({
   // Bureau (the RLS wouldn't accept the write either).
   const activeRole = teamRoleByTeamId[active.id] ?? "COACH";
   const isPlayerTeam = activeRole === "PLAYER";
-  const activeWhatsappGroup = whatsappGroups.find((g) => g.teamId === active.id) ?? null;
   const activeRosterIds = new Set(active.players.map((p) => p.id));
   const activeTeamPenalites = penalites.filter((p) => activeRosterIds.has(p.playerId));
 
@@ -117,7 +113,6 @@ export default function CoachTeams({
         // le déclencheur protect_sensitive_player_fields côté base, qui
         // applique la même règle même hors de cette interface.
         canEditFullProfile={false}
-        whatsappGroup={activeWhatsappGroup}
       />
       <PenalitesCard
         title="Pénalités de l'équipe"

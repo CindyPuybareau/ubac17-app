@@ -4,7 +4,6 @@ import { ExternalLink, Flame, Mail, Phone } from "lucide-react";
 import { formatFirstName, formatLastName, sortByLastName } from "@/lib/names";
 import { computePlayerYearStatus } from "@/lib/season";
 import PlayerYearBadge from "./player-year-badge";
-import WhatsAppDirectButton from "./whatsapp-direct-button";
 import { categoryTheme, roleBadge } from "./team-card";
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
@@ -40,12 +39,9 @@ export type FamilyTeamCardData = {
 // bureau au niveau du visuel". Plus léger que la version Coach/Bureau :
 // pas d'actions de gestion (Retirer/Affecter, réservées au Bureau) —
 // seulement l'habillage visuel.
-// Retour de Cindy du 29/08 ("comme déjà vu côté coach, un icône whatsapp
-// près des coachs, ajouter aussi téléphone et mail") : un coach a
-// maintenant les mêmes colonnes Téléphone/E-mail (avec icône WhatsApp
-// directe) que côté Coach/Bureau (team-card.tsx) — "—" pour un
-// coéquipier/une famille de l'équipe, dont le contact reste non exposé
-// ici.
+// Retour de Cindy du 29/08 : un coach a les mêmes colonnes Téléphone/E-mail
+// que côté Coach/Bureau (team-card.tsx) — "—" pour un coéquipier/une
+// famille de l'équipe, dont le contact reste non exposé ici.
 export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
   const theme = categoryTheme(card.category ?? card.teamName);
   const categoryLabel = card.category ?? card.teamName;
@@ -126,20 +122,14 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
             "—" pour un coéquipier, dont le contact reste non exposé ici. */}
         <td className="whitespace-nowrap px-3 py-2.5">
           {phone ? (
-            <span className="flex items-center gap-1">
-              <a
-                href={`tel:${phone}`}
-                title="Appeler"
-                className="inline-flex items-center gap-1.5 text-zinc-600 hover:text-navy hover:underline"
-              >
-                <Phone className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-                {phone}
-              </a>
-              <WhatsAppDirectButton
-                phone={phone}
-                message={`Bonjour, ici ${card.playerName}, de l'équipe ${categoryLabel ?? ""}.`}
-              />
-            </span>
+            <a
+              href={`tel:${phone}`}
+              title="Appeler"
+              className="inline-flex items-center gap-1.5 text-zinc-600 hover:text-navy hover:underline"
+            >
+              <Phone className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+              {phone}
+            </a>
           ) : (
             <span className="text-zinc-400">—</span>
           )}
@@ -211,19 +201,13 @@ export default function FamilyTeamCard({ card }: { card: FamilyTeamCardData }) {
         {(phone || email) && (
           <div className="mt-2 flex flex-col gap-1 border-t border-zinc-50 pt-2 text-xs text-zinc-600">
             {phone && (
-              <span className="flex items-center gap-1">
-                <a
-                  href={`tel:${phone}`}
-                  className="inline-flex items-center gap-1.5 hover:text-navy hover:underline"
-                >
-                  <Phone className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-                  {phone}
-                </a>
-                <WhatsAppDirectButton
-                  phone={phone}
-                  message={`Bonjour, ici ${card.playerName}, de l'équipe ${categoryLabel ?? ""}.`}
-                />
-              </span>
+              <a
+                href={`tel:${phone}`}
+                className="inline-flex items-center gap-1.5 hover:text-navy hover:underline"
+              >
+                <Phone className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                {phone}
+              </a>
             )}
             {email && (
               <a

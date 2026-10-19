@@ -115,7 +115,6 @@ export default function CommissionView({
   profileSponsors,
   profileClubReports,
   attendanceByEventId,
-  profileWhatsappGroups,
 }: {
   token: string;
   // Retour de Cindy du 13/09 ("via leur espace dédié") : id du groupe
@@ -139,7 +138,6 @@ export default function CommissionView({
   // Retour de Cindy du 11/09 ("qui est présent/absent ?") : voir
   // read-only-briques-data.ts, gouverné par la brique "membres".
   attendanceByEventId: Record<string, { name: string | null; status: string }[]>;
-  profileWhatsappGroups: { id: string; name: string; inviteLink: string | null }[];
 }) {
   // Retour de Cindy du 25/09 ("ordre : tableau de bord, calendrier, besoin
   // bénévole dans le tableau de bord... on supprime les KPI du tableau de
@@ -181,9 +179,6 @@ export default function CommissionView({
       </div>
     ),
   };
-  // whatsappGroups=[] : le groupe WhatsApp de CETTE commission n'a pas sa
-  // place ici, la personne y est déjà, contrairement à un bénévole qui
-  // découvre son rattachement.
   const sections: AdminSection[] = [
     tableauDeBordSection,
     ...buildProfileSections({
@@ -194,8 +189,6 @@ export default function CommissionView({
       events: profileEvents,
       sponsors: profileSponsors,
       clubReports: profileClubReports,
-      whatsappGroups: [],
-      whatsappDirectory: profileWhatsappGroups,
       attendanceByEventId,
       commissionContext: { token, groupId },
       // Retour de Cindy du 25/09 : même besoins d'organisation qu'au-dessus

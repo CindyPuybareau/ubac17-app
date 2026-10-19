@@ -8,7 +8,7 @@ import { sortTeamsByGroup } from "@/lib/teams";
 import EmptyState from "./empty-state";
 import TeamCard from "./team-card";
 import TeamFilterDropdown from "./team-filter-dropdown";
-import type { AdminMemberTeam, AdminUpcomingEvent, MemberDetail, WhatsAppGroup } from "./page";
+import type { AdminMemberTeam, AdminUpcomingEvent, MemberDetail } from "./page";
 
 // Exporté (audit du 31/08) : coach-teams.tsx et admin-view.tsx redéfinissaient
 // chacun le même littéral au lieu d'importer celui-ci.
@@ -76,7 +76,6 @@ export default function TeamManager({
   contactEmailByPlayerId,
   memberDetailsByPlayerId,
   clubTeams,
-  whatsappGroups,
 }: {
   teams: TeamWithMembers[];
   allProfiles: Person[];
@@ -85,10 +84,6 @@ export default function TeamManager({
   contactEmailByPlayerId: Record<string, string>;
   memberDetailsByPlayerId: Record<string, MemberDetail>;
   clubTeams: AdminMemberTeam[];
-  // Retour de Cindy du 29/08 : le Bureau n'avait aucun accès au groupe
-  // WhatsApp de chaque équipe depuis cet onglet, contrairement à Coach
-  // (coach-teams.tsx) qui l'a déjà — un vrai oubli, pas un choix.
-  whatsappGroups: WhatsAppGroup[];
 }) {
   const router = useRouter();
   const categoryListId = useId();
@@ -192,7 +187,6 @@ export default function TeamManager({
             // groupes), et un retrait complet du club passe par
             // Archiver/Réactiver dans l'onglet Membres.
             canRemoveMembers={false}
-            whatsappGroup={whatsappGroups.find((g) => g.teamId === team.id) ?? null}
           />
         ))}
         {teams.length === 0 && (

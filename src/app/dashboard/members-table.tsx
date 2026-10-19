@@ -13,7 +13,6 @@ import {
   FileText,
   Flame,
   Mail,
-  MessageCircle,
   MoreVertical,
   Phone,
   RefreshCw,
@@ -34,8 +33,6 @@ import EmptyState from "./empty-state";
 import MemberDetailModal from "./member-detail-modal";
 import PlayerYearBadge from "./player-year-badge";
 import SelectDropdown from "./select-dropdown";
-import WhatsAppButton from "./whatsapp-button";
-import WhatsAppDirectButton from "./whatsapp-direct-button";
 import { useToast } from "./toast-context";
 import { formatFirstName, formatLastName, formatPersonName, sortByLastName } from "@/lib/names";
 import { formatLocalDateFr } from "@/lib/local-date";
@@ -633,7 +630,7 @@ export default function MembersTable({
   const menuItemClass =
     "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-zinc-700 hover:bg-zinc-50";
 
-  // Menu ⋮ (Voir/Modifier, WhatsApp, e-mail, Archiver/Réactiver, Supprimer)
+  // Menu ⋮ (Voir/Modifier, e-mail, Archiver/Réactiver, Supprimer)
   // partagé entre la ligne de tableau (≥640px) et la carte mobile
   // (<640px, voir plus bas) — un seul endroit à faire évoluer plutôt que
   // deux copies qui divergent avec le temps. Le conteneur appelant doit
@@ -687,24 +684,6 @@ export default function MembersTable({
                   <User className="h-3.5 w-3.5 text-zinc-500" />
                   Voir / Modifier le profil
                 </button>
-                {m.phone ? (
-                  <WhatsAppButton
-                    phone={m.phone}
-                    message={`Bonjour ${m.firstName ? formatFirstName(m.firstName) : ""}, ici l'UBAC.`}
-                    label="Contacter sur WhatsApp"
-                    playerId={m.id}
-                    onTriggerClick={() => setOpenMenuId(null)}
-                    className={menuItemClass}
-                  />
-                ) : (
-                  <span
-                    title="Aucun numéro de téléphone connu"
-                    className={`${menuItemClass} cursor-not-allowed text-zinc-300 hover:bg-transparent`}
-                  >
-                    <MessageCircle className="h-3.5 w-3.5" />
-                    Contacter sur WhatsApp
-                  </span>
-                )}
                 {m.pendingParentEmail || m.email ? (
                   <button
                     onClick={() => {
@@ -1104,11 +1083,6 @@ export default function MembersTable({
                     <span className="flex items-center gap-1 whitespace-nowrap">
                       <Phone className="h-3 w-3 shrink-0 text-zinc-400" />
                       {m.phone}
-                      <WhatsAppDirectButton
-                        phone={m.phone}
-                        message={`Bonjour ${m.firstName ? formatFirstName(m.firstName) : ""}, ici l'UBAC.`}
-                        playerId={m.id}
-                      />
                     </span>
                   ) : (
                     <span className="text-zinc-300">—</span>
@@ -1238,11 +1212,6 @@ export default function MembersTable({
                   <p className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                     <Phone className="h-3 w-3 shrink-0 text-zinc-400" />
                     {m.phone}
-                    <WhatsAppDirectButton
-                      phone={m.phone}
-                      message={`Bonjour ${m.firstName ? formatFirstName(m.firstName) : ""}, ici l'UBAC.`}
-                      playerId={m.id}
-                    />
                   </p>
                 )}
               </div>
