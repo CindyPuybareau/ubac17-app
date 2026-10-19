@@ -28,7 +28,6 @@ import { BOUTIQUE_SALES_URL, BOUTIQUE_URL } from "./boutique";
 import TeamManager, { type Person, type TeamWithMembers } from "./team-manager";
 import ImportInscriptions from "./import-inscriptions";
 import ImportPlanning from "./import-planning";
-import ImportCoaches from "./import-coaches";
 import CotisationsManager from "./cotisations-manager";
 import CalendarView from "./calendar-view";
 import { listTeamsForOfficialMatches, listTeamTrombinoscopes, splitTeamName } from "@/lib/teams";
@@ -549,7 +548,6 @@ export default function AdminView({
               <FfbbManager teams={listTeamsForOfficialMatches(teams)} />
               <ImportInscriptions />
               <ImportPlanning existingTeams={teamRefs} />
-              <ImportCoaches existingTeams={teamRefs} />
             </div>
           ),
         },
