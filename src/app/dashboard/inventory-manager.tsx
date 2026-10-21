@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Package, Pencil, Plus, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -33,10 +33,16 @@ function toForm(item: AdminInventoryItem): InventoryForm {
 // dépend que de qui agit, jamais du contenu de la ligne).
 export default function InventoryManager({ items }: { items: AdminInventoryItem[] }) {
   const router = useRouter();
+  // Nettoyage du 21/10 (lint react-hooks/set-state-in-effect) : ajuste
+  // pendant le rendu plutôt que dans un effet après coup (même schéma que
+  // calendar-view.tsx/localEvents) -- `prevItemsProp` ne sert qu'à
+  // détecter le changement, jamais lu ailleurs.
   const [localItems, setLocalItems] = useState(items);
-  useEffect(() => {
+  const [prevItemsProp, setPrevItemsProp] = useState(items);
+  if (items !== prevItemsProp) {
+    setPrevItemsProp(items);
     setLocalItems(items);
-  }, [items]);
+  }
   const [editing, setEditing] = useState<AdminInventoryItem | "new" | null>(null);
   const [form, setForm] = useState<InventoryForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);

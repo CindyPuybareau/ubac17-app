@@ -41,10 +41,16 @@ export default function MatchOfficialsPanel({
   assignments: MatchOfficialAssignment[];
   canManage: boolean;
 }) {
+  // Nettoyage du 21/10 (lint react-hooks/set-state-in-effect) : ajuste
+  // pendant le rendu plutôt que dans un effet après coup (même schéma que
+  // calendar-view.tsx/localEvents) -- `prevAssignmentsProp` ne sert qu'à
+  // détecter le changement, jamais lu ailleurs.
   const [localAssignments, setLocalAssignments] = useState(assignments);
-  useEffect(() => {
+  const [prevAssignmentsProp, setPrevAssignmentsProp] = useState(assignments);
+  if (assignments !== prevAssignmentsProp) {
+    setPrevAssignmentsProp(assignments);
     setLocalAssignments(assignments);
-  }, [assignments]);
+  }
 
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);

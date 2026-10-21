@@ -55,7 +55,7 @@ export default async function ChildLoginPage({
             un parent de vérifier dans son espace UBAC.
           </p>
         ) : (
-          <ChildLoginForm code={code} children={children} />
+          <ChildLoginForm code={code} kids={children} />
         )}
       </div>
     </div>

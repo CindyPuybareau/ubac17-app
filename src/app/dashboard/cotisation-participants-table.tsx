@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -563,10 +563,16 @@ export default function CotisationParticipantsTable({
   // serveur, mais chaque mutation le corrige en plus, IMMÉDIATEMENT après
   // l'écriture réussie, sans attendre router.refresh() pour que la ligne
   // change à l'écran.
+  // Nettoyage du 21/10 (lint react-hooks/set-state-in-effect) : ajuste
+  // pendant le rendu plutôt que dans un effet après coup (même schéma que
+  // calendar-view.tsx/localEvents) -- `prevCotisationsProp` ne sert qu'à
+  // détecter le changement, jamais lu ailleurs.
   const [localRows, setLocalRows] = useState(cotisations);
-  useEffect(() => {
+  const [prevCotisationsProp, setPrevCotisationsProp] = useState(cotisations);
+  if (cotisations !== prevCotisationsProp) {
+    setPrevCotisationsProp(cotisations);
     setLocalRows(cotisations);
-  }, [cotisations]);
+  }
 
   function patchLocalCotisation(
     id: string,

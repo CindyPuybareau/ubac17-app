@@ -1073,7 +1073,6 @@ export default async function DashboardPage({
   // lire l'heure courante ici est le comportement voulu, pas un effet de
   // bord à masquer.
   const eventsWindowStart = new Date(
-    // eslint-disable-next-line react-hooks/purity -- voir commentaire au-dessus
     Date.now() - 183 * 24 * 60 * 60 * 1000
   ).toISOString();
   const {
@@ -1335,10 +1334,6 @@ export default async function DashboardPage({
     (authorProfilesResult.data ?? []).forEach((p) => {
       authorNameById.set(p.id, formatPersonName(p.first_name, p.last_name, "Membre"));
     });
-    // Même faux positif que adminAutomationSettings plus bas (voir son
-    // commentaire) : composant serveur, exécuté une seule fois, jamais relu
-    // avant le "await Promise.all(...)" qui suit tous ces blocs.
-    // eslint-disable-next-line react-hooks/immutability
     clubReports = (clubReportsData ?? []).map((r) => ({
       id: r.id,
       category: r.category as ClubReport["category"],

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Check, Undo2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -40,10 +40,17 @@ export default function RsvpButtons({
   // composant s'en aperçoive, gardant affiché le statut du précédent
   // (ex. "Absent" du match de samedi affiché à tort sur l'entraînement de
   // mercredi).
-  useEffect(() => {
+  // Nettoyage du 21/10 (lint react-hooks/set-state-in-effect) : ajuste
+  // pendant le rendu plutôt que dans un effet après coup (même schéma que
+  // calendar-view.tsx/localEvents) -- clé composite (les deux dépendances
+  // d'origine) comparée à sa valeur précédente, jamais lue ailleurs.
+  const resetKey = `${eventId}:${currentStatus}`;
+  const [prevResetKey, setPrevResetKey] = useState(resetKey);
+  if (resetKey !== prevResetKey) {
+    setPrevResetKey(resetKey);
     setStatus(currentStatus);
     setError(null);
-  }, [eventId, currentStatus]);
+  }
 
   async function respond(newStatus: "PRESENT" | "ABSENT") {
     // Affichage optimiste (retour de Cindy du 28/08, "l'affichage au clic

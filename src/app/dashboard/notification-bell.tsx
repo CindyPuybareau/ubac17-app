@@ -54,8 +54,29 @@ export default function NotificationBell() {
   // ensuite — le rafraîchissement périodique (60s, voir plus bas) ou
   // l'arrivée d'une nouvelle notification en cours de visite ne doit
   // jamais rejouer l'animation.
+  //
+  // Nettoyage du 21/10 (lint react-hooks/set-state-in-effect) : le
+  // déclenchement (une seule fois, à la détection du premier chargement)
+  // est ajusté pendant le rendu -- même schéma que calendar-view.tsx/
+  // localEvents -- plutôt qu'au sommet d'un effet. Remplace l'ancien
+  // `shakeTriggeredRef` (ref mutée hors effet) par un state dédié, plus
+  // conforme. Seul le minuteur qui éteint l'animation après 600ms reste
+  // dans un effet -- c'est sa vraie raison d'être (gérer un `setTimeout`),
+  // et `setShake(false)` s'y exécute dans le callback du minuteur, jamais
+  // au sommet de l'effet.
   const [shake, setShake] = useState(false);
-  const shakeTriggeredRef = useRef(false);
+  const [shakeChecked, setShakeChecked] = useState(false);
+  const [notificationsForShake, setNotificationsForShake] =
+    useState<NotificationRow[] | null>(null);
+  if (notifications !== notificationsForShake) {
+    setNotificationsForShake(notifications);
+    if (!shakeChecked && notifications !== null) {
+      setShakeChecked(true);
+      if (notifications.some((n) => !n.read_at)) {
+        setShake(true);
+      }
+    }
+  }
 
   // useCallback + boucle plutôt qu'un rappel récursif de load() elle-même
   // (retour d'audit du 28/08, ajusté pour le React Compiler qui refuse de
@@ -92,6 +113,16 @@ export default function NotificationBell() {
   }, []);
 
   useEffect(() => {
+    // Nettoyage du 21/10 (lint react-hooks/set-state-in-effect) : `load`
+    // ne peut pas être déplacée à l'intérieur de cet effet (contrairement
+    // à child-access-manager.tsx) -- elle est partagée avec l'intervalle/
+    // visibilitychange juste en dessous ET avec toggleOpen() plus bas dans
+    // ce fichier, trois contextes où l'appeler est légitime (jamais pendant
+    // un rendu). Toutes ses écritures d'état sont déjà après un `await`
+    // (voir sa définition ci-dessus), donc déjà asynchrones -- le repli
+    // vers une duplication de la logique de chargement à 4 endroits
+    // rendrait le code moins sûr, pas plus.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
     // Rafraîchi périodiquement plutôt qu'en temps réel (pas d'abonnement
     // Realtime dédié pour ce premier jet) : un décalage d'une minute sur
@@ -121,14 +152,10 @@ export default function NotificationBell() {
   }, [load]);
 
   useEffect(() => {
-    if (shakeTriggeredRef.current || notifications === null) return;
-    shakeTriggeredRef.current = true;
-    if (notifications.some((n) => !n.read_at)) {
-      setShake(true);
-      const t = setTimeout(() => setShake(false), 600);
-      return () => clearTimeout(t);
-    }
-  }, [notifications]);
+    if (!shake) return;
+    const t = setTimeout(() => setShake(false), 600);
+    return () => clearTimeout(t);
+  }, [shake]);
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {

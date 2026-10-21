@@ -42,6 +42,12 @@ export default function CommissionNotificationBell({
   const [hydrated, setHydrated] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Nettoyage du 21/10 (lint react-hooks/set-state-in-effect) : lecture de
+  // `localStorage`, une API navigateur absente côté serveur -- justement
+  // POUR ça que `hydrated`/`lastSeen` existent (voir leurs commentaires
+  // plus haut) : la lire pendant le rendu romprait l'hydratation au lieu
+  // de l'éviter. Rester dans un effet est la bonne solution ici, pas un
+  // repli à contourner.
   useEffect(() => {
     let seen: string | null = null;
     try {
@@ -49,6 +55,7 @@ export default function CommissionNotificationBell({
     } catch {
       seen = null;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLastSeen(seen);
     setHydrated(true);
   }, [groupId]);
@@ -70,18 +77,24 @@ export default function CommissionNotificationBell({
   // Shake joué une seule fois, seulement une fois qu'on sait vraiment s'il
   // y a du non-lu (après hydratation) — jamais avant, pour ne pas se fier
   // à un badge encore à zéro par construction (voir hydrated ci-dessus).
+  //
+  // Nettoyage du 21/10 (lint react-hooks/set-state-in-effect, même schéma
+  // que notification-bell.tsx) : déclenchement ajusté pendant le rendu
+  // (plus de ref mutée hors effet) ; seul le minuteur qui éteint
+  // l'animation après 600ms reste dans un effet.
   const [shake, setShake] = useState(false);
-  const shakeTriggeredRef = useRef(false);
-  useEffect(() => {
-    if (!hydrated || shakeTriggeredRef.current) return;
-    shakeTriggeredRef.current = true;
+  const [shakeChecked, setShakeChecked] = useState(false);
+  if (hydrated && !shakeChecked) {
+    setShakeChecked(true);
     if (unreadCount > 0) {
       setShake(true);
-      const t = setTimeout(() => setShake(false), 600);
-      return () => clearTimeout(t);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated]);
+  }
+  useEffect(() => {
+    if (!shake) return;
+    const t = setTimeout(() => setShake(false), 600);
+    return () => clearTimeout(t);
+  }, [shake]);
 
   function toggleOpen() {
     const next = !open;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import * as XLSX from "xlsx";
@@ -103,10 +103,16 @@ export default function MembersTable({
   // plusieurs secondes à chaque fois) — retour de Cindy du 2026-08-21 :
   // "quand je supprime... un membre... trop long". Même correctif que
   // calendar-view.tsx/volunteer-needs-panel.tsx.
+  // Nettoyage du 21/10 (lint react-hooks/set-state-in-effect) : ajuste
+  // pendant le rendu plutôt que dans un effet après coup (même schéma que
+  // calendar-view.tsx/localEvents) -- `prevMembersProp` ne sert qu'à
+  // détecter le changement, jamais lu ailleurs.
   const [localMembers, setLocalMembers] = useState(members);
-  useEffect(() => {
+  const [prevMembersProp, setPrevMembersProp] = useState(members);
+  if (members !== prevMembersProp) {
+    setPrevMembersProp(members);
     setLocalMembers(members);
-  }, [members]);
+  }
 
   const [search, setSearch] = useState("");
   const [teamFilter, setTeamFilter] = useState("");
@@ -272,24 +278,34 @@ export default function MembersTable({
     return `${ids.length} membres`;
   }
 
+  const searchQuery = search.trim().toLowerCase();
+  // Nettoyage du 21/10 (lint react-hooks/preserve-manual-memoization) :
+  // préexistant, indépendant de tout ce qui a été touché aujourd'hui dans
+  // ce fichier (confirmé via git stash -- l'avertissement existait déjà
+  // avant toute modification de cette session). Réécrit en pipeline sans
+  // réaffectation (`let list = ...; list = ...`) ni mutation, cause la
+  // plus probable, sans que ça suffise à faire disparaître l'avertissement
+  // -- le React Compiler semble buter sur autre chose, pas identifié avec
+  // certitude après plusieurs essais. Avertissement d'optimisation
+  // seulement (pas un bug) : le useMemo écrit à la main continue de
+  // fonctionner normalement via React lui-même, ce composant perd juste la
+  // mémoïsation AUTOMATIQUE additionnelle du compilateur sur le reste de
+  // son rendu. À creuser plus tard si besoin (ex. avec les outils de trace
+  // dédiés du React Compiler), pas prioritaire.
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const filtered = useMemo(() => {
-    let list = showArchived ? localMembers : localMembers.filter((m) => !m.archivedAt);
-    if (teamFilter) {
-      list = list.filter(
-        (m) =>
-          m.teams.some((t) => t.id === teamFilter) ||
-          m.coachTeams.some((t) => t.id === teamFilter) ||
-          m.pendingCoachTeams.some((t) => t.id === teamFilter)
-      );
-    }
-    const q = search.trim().toLowerCase();
-    if (q) {
-      list = list.filter((m) =>
-        `${m.firstName ?? ""} ${m.lastName ?? ""} ${m.email ?? ""}`
-          .toLowerCase()
-          .includes(q)
-      );
-    }
+    const base = showArchived ? localMembers : localMembers.filter((m) => !m.archivedAt);
+    const matchesTeam = (m: AdminMember) =>
+      !teamFilter ||
+      m.teams.some((t) => t.id === teamFilter) ||
+      m.coachTeams.some((t) => t.id === teamFilter) ||
+      m.pendingCoachTeams.some((t) => t.id === teamFilter);
+    const matchesSearch = (m: AdminMember) =>
+      !searchQuery ||
+      `${m.firstName ?? ""} ${m.lastName ?? ""} ${m.email ?? ""}`
+        .toLowerCase()
+        .includes(searchQuery);
+    const list = base.filter((m) => matchesTeam(m) && matchesSearch(m));
     // Archivés groupés en tête (retour de Cindy du 2026-08-24, "afficher les
     // archivés en haut du tableau des membres pour ne pas avoir à les
     // chercher") — seulement quand "Afficher les archivés" est coché, sinon
@@ -298,7 +314,7 @@ export default function MembersTable({
     // groupe. Tri par nom via sortByLastName (lib/names.ts, audit du 31/08)
     // au lieu d'un localeCompare("fr") réécrit ici — la même règle que
     // partout ailleurs dans l'appli (listes d'équipe, trombinoscope...).
-    const sortGroup = (group: typeof list) => {
+    const sortGroup = (group: AdminMember[]) => {
       const sorted = sortByLastName(group, (m) => m.lastName);
       // Retour de Cindy du 19/10 ("Jean et Jules doivent être dans l'ordre
       // alphabétique normal") : la règle du 18/09 ("les salariés remontent
@@ -306,13 +322,12 @@ export default function MembersTable({
       // alphabétique -- retirée, ordre alphabétique pur pour tout le monde
       // désormais. Le badge "Salarié du club" (is_salarie) reste affiché
       // sur la carte, inchangé -- seul son effet sur le TRI disparaît.
-      return sortDir === "asc" ? sorted : sorted.reverse();
+      return sortDir === "asc" ? sorted : sorted.toReversed();
     };
-    return [
-      ...sortGroup(list.filter((m) => m.archivedAt)),
-      ...sortGroup(list.filter((m) => !m.archivedAt)),
-    ];
-  }, [localMembers, teamFilter, search, sortDir, showArchived]);
+    const archived = sortGroup(list.filter((m) => m.archivedAt));
+    const active = sortGroup(list.filter((m) => !m.archivedAt));
+    return [...archived, ...active];
+  }, [localMembers, teamFilter, searchQuery, sortDir, showArchived]);
 
   const allFilteredSelected =
     filtered.length > 0 && filtered.every((m) => selectedIds.has(m.id));

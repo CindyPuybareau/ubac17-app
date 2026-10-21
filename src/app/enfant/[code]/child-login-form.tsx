@@ -11,7 +11,11 @@ const KEYPAD = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "back"] as
 // plus simple à manipuler au pouce pour un enfant, et le clavier natif ne
 // vient jamais recouvrir l'écran (même esprit que le sélecteur bottom-sheet
 // du DateTimePicker).
-export default function ChildLoginForm({ code, children }: { code: string; children: Child[] }) {
+// Nettoyage du 21/10 (lint react/no-children-prop) : `kids` plutôt que
+// `children` -- ce prop porte la liste des enfants du club à choisir
+// (Child[]), rien à voir avec le `children` réservé de React (contenu
+// JSX imbriqué), la confusion de nom pouvait prêter à erreur.
+export default function ChildLoginForm({ code, kids }: { code: string; kids: Child[] }) {
   const [selected, setSelected] = useState<Child | null>(null);
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +72,14 @@ export default function ChildLoginForm({ code, children }: { code: string; child
     // cookie tout juste posé lors d'une transition "douce" côté client —
     // un vrai rechargement de page repart toujours du cookie réellement
     // stocké par le navigateur.
+    //
+    // Nettoyage du 21/10 (lint react-hooks/immutability) : cette ligne ne
+    // s'exécute jamais pendant un rendu -- uniquement au bout de la chaîne
+    // pressKey() -> submitPin(), déclenchée par un appui sur le clavier
+    // tactile. La suggestion de la règle ("utiliser un effet") n'a pas de
+    // sens ici : une navigation ponctuelle suite à une action de
+    // l'utilisateur n'est jamais le rôle d'un effet.
+    // eslint-disable-next-line react-hooks/immutability
     window.location.href = "/enfant/view";
   }
 
@@ -75,7 +87,7 @@ export default function ChildLoginForm({ code, children }: { code: string; child
   if (!selected) {
     return (
       <div className="flex flex-wrap justify-center gap-2.5">
-        {children.map((c) => (
+        {kids.map((c) => (
           <button
             key={c.id}
             onClick={() => setSelected(c)}

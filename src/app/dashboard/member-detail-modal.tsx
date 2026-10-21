@@ -363,11 +363,21 @@ export default function MemberDetailModal({
   // has nothing to transition from otherwise.
   const [coachTeamsVisible, setCoachTeamsVisible] = useState(isCoach);
 
+  // Nettoyage du 21/10 (lint react-hooks/set-state-in-effect) : masquer
+  // immédiatement (décocher "Coach") est ajusté pendant le rendu -- même
+  // schéma que calendar-view.tsx/localEvents -- plutôt qu'au sommet d'un
+  // effet. Le réapparition (cocher "Coach") reste forcément dans un effet :
+  // c'est tout l'intérêt du délai de 10ms (laisser le navigateur peindre
+  // l'état invisible avant de déclencher la transition CSS), et
+  // `setCoachTeamsVisible(true)` ne s'exécute que dans le callback du
+  // minuteur, jamais au sommet de l'effet.
+  const [prevIsCoachForFade, setPrevIsCoachForFade] = useState(isCoach);
+  if (isCoach !== prevIsCoachForFade) {
+    setPrevIsCoachForFade(isCoach);
+    if (!isCoach) setCoachTeamsVisible(false);
+  }
   useEffect(() => {
-    if (!isCoach) {
-      setCoachTeamsVisible(false);
-      return;
-    }
+    if (!isCoach) return;
     const id = setTimeout(() => setCoachTeamsVisible(true), 10);
     return () => clearTimeout(id);
   }, [isCoach]);

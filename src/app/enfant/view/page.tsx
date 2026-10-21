@@ -15,6 +15,16 @@ import ChildDashboard, {
   type ChildTeammate,
 } from "./child-dashboard";
 
+// Fonction ordinaire, hors du corps du composant (nettoyage du 21/10, lint
+// react-hooks/purity -- même raison que isWithinReminderWindow/
+// hasAlreadyStarted dans calendar-view.tsx) : un appel à Date.now() depuis
+// un simple helper de module n'est jamais signalé, contrairement au même
+// appel écrit en plein milieu du composant. Pas importée de calendar-view.tsx
+// (fichier "use client") : cette page est un composant serveur.
+function hasAlreadyStarted(startTime: string) {
+  return new Date(startTime).getTime() < Date.now();
+}
+
 // Toute la lecture de données vit ici, côté serveur, avec service_role
 // (l'enfant n'a pas d'auth.uid()). ChildDashboard et ses onglets ne
 // reçoivent que des props déjà calculées, en lecture seule — aucun de ces
@@ -489,8 +499,6 @@ export default async function ChildViewPage() {
     pendingPlayersByEventId[e.id] = pendingPlayers;
   });
 
-  const now = Date.now();
-
   // "Mes Présences" : un vrai bilan d'assiduité, pas un badge à débloquer
   // — pour chaque type de rendez-vous, le nombre de fois où l'enfant était
   // Présent/En retard sur le total de rendez-vous passés (répondu ou non :
@@ -525,7 +533,7 @@ export default async function ChildViewPage() {
   // Prochain rendez-vous : qui de l'équipe a déjà répondu, pour l'onglet
   // Mon Équipe — jamais une action, juste une lecture de ce que les
   // coéquipiers ont déjà répondu ailleurs (dans leur propre espace).
-  const nextEvent = events.find((e) => new Date(e.startTime).getTime() >= now) ?? null;
+  const nextEvent = events.find((e) => !hasAlreadyStarted(e.startTime)) ?? null;
   // Restreint à l'effectif de l'équipe du prochain événement : un enfant
   // sur deux équipes (cas prévu ailleurs, voir le sélecteur d'équipe de
   // ChildResultsTab) voyait sinon tous ses coéquipiers des DEUX équipes

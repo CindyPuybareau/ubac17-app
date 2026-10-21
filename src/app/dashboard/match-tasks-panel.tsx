@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Car, Check, Clock, MapPin, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { sendTeamPush } from "@/lib/push-notify-client";
@@ -83,14 +83,23 @@ export default function MatchTasksPanel({
   // confirmer en arrière-plan et resynchroniser les autres onglets/
   // appareils, ces copies étant écrasées par les props fraîches à son
   // arrivée. Même correctif que volunteer-needs-panel.tsx.
+  // Nettoyage du 21/10 (lint react-hooks/set-state-in-effect) : ajuste
+  // pendant le rendu plutôt que dans un effet après coup (même schéma que
+  // calendar-view.tsx/localEvents) -- `prevInitialTasksProp`/
+  // `prevInitialCarpoolProp` ne servent qu'à détecter le changement,
+  // jamais lus ailleurs.
   const [localTasks, setLocalTasks] = useState(initialTasks);
-  useEffect(() => {
+  const [prevInitialTasksProp, setPrevInitialTasksProp] = useState(initialTasks);
+  if (initialTasks !== prevInitialTasksProp) {
+    setPrevInitialTasksProp(initialTasks);
     setLocalTasks(initialTasks);
-  }, [initialTasks]);
+  }
   const [localCarpool, setLocalCarpool] = useState(initialCarpool);
-  useEffect(() => {
+  const [prevInitialCarpoolProp, setPrevInitialCarpoolProp] = useState(initialCarpool);
+  if (initialCarpool !== prevInitialCarpoolProp) {
+    setPrevInitialCarpoolProp(initialCarpool);
     setLocalCarpool(initialCarpool);
-  }, [initialCarpool]);
+  }
 
   function rosterName(playerId: string) {
     return roster.find((p) => p.id === playerId)?.name ?? "";

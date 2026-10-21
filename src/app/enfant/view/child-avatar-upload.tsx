@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Camera } from "lucide-react";
 import { resizeImageForAvatar } from "@/lib/image-resize";
@@ -25,10 +25,16 @@ export default function ChildAvatarUpload({
   // tout l'arbre Server Component avec les nouvelles props une fois
   // SEULEMENT ce rechargement complet terminé — même mécanisme que
   // dashboard/avatar-upload.tsx, voir son commentaire pour le détail.
+  // Nettoyage du 21/10 (lint react-hooks/set-state-in-effect) : ajuste
+  // pendant le rendu plutôt que dans un effet après coup (même schéma que
+  // calendar-view.tsx/localEvents) -- `prevAvatarUrlProp` ne sert qu'à
+  // détecter le changement, jamais lu ailleurs.
   const [localAvatarUrl, setLocalAvatarUrl] = useState(avatarUrl);
-  useEffect(() => {
+  const [prevAvatarUrlProp, setPrevAvatarUrlProp] = useState(avatarUrl);
+  if (avatarUrl !== prevAvatarUrlProp) {
+    setPrevAvatarUrlProp(avatarUrl);
     setLocalAvatarUrl(avatarUrl);
-  }, [avatarUrl]);
+  }
 
   async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];

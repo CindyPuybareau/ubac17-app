@@ -89,14 +89,23 @@ export default function DateTimePicker({
   // Si la valeur change depuis l'extérieur pendant que le picker est fermé
   // (reset de formulaire, ouverture d'un autre événement à éditer...), la
   // vue doit suivre — sinon la réouverture affiche encore l'ancien mois.
-  useEffect(() => {
-    if (open) return;
-    const p = parseLocal(value);
-    if (p) {
-      setViewYear(p.y);
-      setViewMonth(p.m);
+  //
+  // Nettoyage du 21/10 (lint react-hooks/set-state-in-effect) : ajuste
+  // pendant le rendu plutôt que dans un effet après coup (même schéma que
+  // calendar-view.tsx/localEvents) -- clé composite (les deux dépendances
+  // d'origine) comparée à sa valeur précédente, jamais lue ailleurs.
+  const resyncKey = `${value}:${open}`;
+  const [prevResyncKey, setPrevResyncKey] = useState(resyncKey);
+  if (resyncKey !== prevResyncKey) {
+    setPrevResyncKey(resyncKey);
+    if (!open) {
+      const p = parseLocal(value);
+      if (p) {
+        setViewYear(p.y);
+        setViewMonth(p.m);
+      }
     }
-  }, [value, open]);
+  }
 
   useEffect(() => {
     if (!open) return;

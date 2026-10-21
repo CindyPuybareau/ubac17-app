@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Camera } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -37,10 +37,16 @@ export default function AvatarUpload({
   // change à l'instant ; router.refresh() continue en arrière-plan pour
   // que le reste de la page (et un futur rechargement) reflète la même
   // valeur, sans plus jamais bloquer l'affichage.
+  // Nettoyage du 21/10 (lint react-hooks/set-state-in-effect, même schéma
+  // que calendar-view.tsx/localEvents) : ajuste pendant le rendu plutôt
+  // que dans un effet après coup -- `prevAvatarUrlProp` ne sert qu'à
+  // détecter le changement, jamais lu ailleurs.
   const [localAvatarUrl, setLocalAvatarUrl] = useState(avatarUrl);
-  useEffect(() => {
+  const [prevAvatarUrlProp, setPrevAvatarUrlProp] = useState(avatarUrl);
+  if (avatarUrl !== prevAvatarUrlProp) {
+    setPrevAvatarUrlProp(avatarUrl);
     setLocalAvatarUrl(avatarUrl);
-  }, [avatarUrl]);
+  }
 
   async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
