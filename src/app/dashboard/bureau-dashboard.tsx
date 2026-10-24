@@ -216,7 +216,6 @@ export default function BureauDashboard({
   volunteerNeedsByEventId,
   sponsors,
   penalites,
-  commissionGroups = [],
   ownPlayerId = null,
   rsvpStatusByKey = {},
 }: {
@@ -239,9 +238,6 @@ export default function BureauDashboard({
   // après "Montant en attente" — même famille de chiffre (un montant en
   // euros restant à encaisser), voir penalites-manager.tsx pour la saisie.
   penalites: AdminPenalite[];
-  // Retour de Cindy du 10/09 ("Accès Commissions & Administration") :
-  // transmis tel quel à DeferredCalendar/VolunteerNeedsPanel plus bas.
-  commissionGroups?: { id: string; name: string }[];
   // Retour de Cindy du 16/09 ("Réunion Bureau") : propre fiche joueur de
   // qui consulte -- transmis à CalendarView pour qu'un membre du Bureau
   // puisse répondre présent/absent pour lui-même sur une Réunion (jamais
@@ -472,7 +468,6 @@ export default function BureauDashboard({
         birthdayMembers={birthdayMembers}
         eventRoles={eventRoles}
         volunteerNeedsByEventId={volunteerNeedsByEventId}
-        commissionGroups={commissionGroups}
         // Retour de Cindy du 09/09 ("le calendrier devient illisible dès
         // qu'il y a plusieurs événements le même jour... sans filtre par
         // équipe/catégorie visible") : même liste que createTeams (même

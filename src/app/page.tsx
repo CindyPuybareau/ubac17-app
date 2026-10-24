@@ -43,12 +43,12 @@ const roles = [
     title: "Pour le Bureau",
     // Retour de Cindy du 15/09 ("on ne comprend pas le HUB franchement") :
     // résumé complet proposé en amont (membres/équipes/cotisations/
-    // licences/événements/commissions/sponsors/documents/relances/FFBB,
-    // voir la conversation) condensé en une phrase, sans perdre
-    // l'essentiel. "Groupes WhatsApp" retiré de la liste le 19/10 avec le
-    // reste de cette fonctionnalité.
+    // licences/événements/sponsors/documents/relances/FFBB, voir la
+    // conversation) condensé en une phrase, sans perdre l'essentiel.
+    // "Groupes WhatsApp" retiré de la liste le 19/10, "commissions" le
+    // 21/10, avec le reste de ces fonctionnalités.
     description:
-      "Une vision globale du club, en un coup d'œil. Membres, équipes, cotisations, licences et événements du club, tous gérés au même endroit — avec les commissions et les relances automatiques.",
+      "Une vision globale du club, en un coup d'œil. Membres, équipes, cotisations, licences et événements du club, tous gérés au même endroit — avec les relances automatiques.",
   },
   {
     icon: ClipboardList,
@@ -76,13 +76,8 @@ const roles = [
     icon: HandHeart,
     title: "Pour les Bénévoles",
     badge: "Nouveau",
-    // Retour de Cindy du 15/09 ("on peut ajouter aussi un espace bénévoles
-    // (commissions et administration)") : commissions/administration
-    // ajoutées à cette même carte plutôt qu'une carte à part (Cindy a
-    // tranché : la carte Bénévoles existe déjà, pas besoin d'en dupliquer
-    // une).
     description:
-      "Un club qui vit grâce à vous. Créneaux (buvette, table de marque, tournois), commissions et administration : proposez-vous et suivez votre engagement sur la saison.",
+      "Un club qui vit grâce à vous. Créneaux (buvette, table de marque, tournois) : proposez-vous et suivez votre engagement sur la saison.",
   },
 ];
 

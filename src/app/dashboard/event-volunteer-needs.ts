@@ -74,10 +74,7 @@ export function volunteerRoleLabel(roleCode: string, customLabel: string | null)
 // Ciblage identique à notify_event_change (voir son commentaire) : le côté
 // équipe (team_id/target_team_ids) reste écrit tel quel, toujours -- y
 // compris team_id et target_team_ids tous deux null (= tout le club, même
-// codage que partout ailleurs). Le côté "commission concernée" ne vise pas
-// des personnes individuelles (voir access-briques.ts / commissions-
-// manager.tsx) mais l'espace partagé /commission/[token] lui-même : une
-// ligne par commission taguée sur l'événement, jamais par personne.
+// codage que partout ailleurs).
 export async function notifyNewVolunteerNeed(
   supabase: SupabaseClient,
   params: {
@@ -86,7 +83,6 @@ export async function notifyNewVolunteerNeed(
     startTime: string;
     teamId: string | null;
     targetTeamIds: string[] | null;
-    commissionGroupIds: string[];
     roleCode: string;
     customLabel: string | null;
     requiredCount: number;
@@ -128,20 +124,6 @@ export async function notifyNewVolunteerNeed(
     console.error("[notifyNewVolunteerNeed] notification équipe échouée:", teamError);
   }
 
-  if (params.commissionGroupIds.length > 0) {
-    const { error: commissionError } = await supabase.from("notifications").insert(
-      params.commissionGroupIds.map((groupId) => ({
-        commission_group_id: groupId,
-        event_id: params.eventId,
-        title,
-        body,
-      }))
-    );
-    if (commissionError) {
-      console.error("[notifyNewVolunteerNeed] notification commission échouée:", commissionError);
-    }
-  }
-
   // Retour de Cindy du 17/09 ("je veux des push réels pour...") : même
   // titre/corps que la cloche ci-dessus, en plus -- jamais à la place.
   await sendTeamPush({
@@ -164,7 +146,7 @@ export async function notifyNewVolunteerNeed(
 // (contrairement à notifyNewVolunteerNeed, appelé juste après un insert où
 // l'appelant a déjà tout sous la main) : cette fonction est déclenchée bien
 // plus tard, depuis le panneau qui ne connaît que l'event_id -- va donc
-// chercher elle-même team_id/target_team_ids/commission_group_ids/titre/date.
+// chercher elle-même team_id/target_team_ids/titre/date.
 export async function notifyVolunteerNeedReminder(
   supabase: SupabaseClient,
   eventId: string,
@@ -189,7 +171,7 @@ export async function notifyVolunteerNeedReminder(
 
   const { data: event, error: eventError } = await supabase
     .from("events")
-    .select("title, start_time, team_id, target_team_ids, commission_group_ids")
+    .select("title, start_time, team_id, target_team_ids")
     .eq("id", eventId)
     .maybeSingle();
   if (eventError || !event) {
@@ -227,17 +209,6 @@ export async function notifyVolunteerNeedReminder(
         category: "ORGANISATION_NEED",
       });
 
-      if ((event.commission_group_ids ?? []).length > 0) {
-        await supabase.from("notifications").insert(
-          (event.commission_group_ids as string[]).map((groupId) => ({
-            commission_group_id: groupId,
-            event_id: eventId,
-            title,
-            body,
-          }))
-        );
-      }
-
       // Retour de Cindy du 17/09 ("je veux des push réels pour...").
       await sendTeamPush({
         teamId: event.team_id,
@@ -259,19 +230,15 @@ export function volunteerRoleIcon(roleCode: string): RoleIconName {
 
 export type VolunteerSignupSource = "VOLUNTEER" | "ADMIN";
 
-// playerId/benevoleId/commissionGroupId : exactement UN des trois est
-// renseigné, jamais deux à la fois (retour de Cindy du 2026-08-25, "besoin
-// en bénévoles hors club", puis du 10/09, lien commun d'une commission) —
-// voir la contrainte event_volunteer_signups_signer_check en base.
+// playerId/benevoleId : exactement UN des deux est renseigné, jamais les
+// deux à la fois (retour de Cindy du 2026-08-25, "besoin en bénévoles hors
+// club") -- voir la contrainte event_volunteer_signups_signer_check en
+// base (qui tolère un troisième signataire, plus utilisé côté appli depuis
+// le retrait de "Accès Commissions & Administration" le 21/10).
 export type VolunteerSignup = {
   id: string;
   playerId: string | null;
   benevoleId: string | null;
-  // Retour de Cindy du 10/09 ("Accès Commissions & Administration") :
-  // inscription depuis le lien commun d'une commission, sans identité
-  // permanente -- guestName porte le prénom saisi au moment de se
-  // proposer (voir /api/commission-signup).
-  commissionGroupId: string | null;
   guestName: string | null;
   // Nom affiché, résolu selon lequel des trois champs ci-dessus est
   // renseigné — gardé "playerName" (pas renommé) pour ne pas casser tous
@@ -357,7 +324,7 @@ export async function getVolunteerNeedsByEventId(
       (chunk) =>
         supabase
           .from("event_volunteer_signups")
-          .select("id, need_id, player_id, benevole_id, commission_group_id, guest_name, source")
+          .select("id, need_id, player_id, benevole_id, guest_name, source")
           .in("need_id", chunk),
       dbLimit ?? 4
     );
@@ -427,13 +394,11 @@ export async function getVolunteerNeedsByEventId(
       const list = signupsByNeedId.get(needId) ?? [];
       const playerId = row.player_id as string | null;
       const benevoleId = row.benevole_id as string | null;
-      const commissionGroupId = row.commission_group_id as string | null;
       const guestName = row.guest_name as string | null;
       list.push({
         id: row.id as string,
         playerId,
         benevoleId,
-        commissionGroupId,
         guestName,
         playerName:
           (playerId ? nameByPlayerId.get(playerId) : null) ??

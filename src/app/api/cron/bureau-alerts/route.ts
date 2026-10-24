@@ -260,7 +260,6 @@ type VolunteerEventRow = {
   start_time: string;
   team_id: string | null;
   target_team_ids: string[] | null;
-  commission_group_ids: string[];
 };
 
 type VolunteerNeedRow = {
@@ -281,10 +280,7 @@ type VolunteerNeedRow = {
 // juste au-dessus : le plan Vercel Hobby plafonne à 2 crons.
 //
 // Ciblage identique aux deux autres notifications de ce chantier : équipe
-// (team_id/target_team_ids, y compris tous deux null = tout le club) +
-// une ligne par commission taguée sur l'événement (espace partagé
-// /commission/[token], jamais une personne individuelle — voir le
-// commentaire de notifyNewVolunteerNeed pour le pourquoi).
+// (team_id/target_team_ids, y compris tous deux null = tout le club).
 //
 // Deux colonnes de marquage distinctes (reminder_sent_at pour J-7,
 // reminder_sent_at_j3 pour J-3, migration 20260917000000) : une seule aurait
@@ -307,7 +303,7 @@ async function runVolunteerNeedRemindersForStage(
 
   const { data: eventsData, error: eventsError } = await supabase
     .from("events")
-    .select("id, title, start_time, team_id, target_team_ids, commission_group_ids")
+    .select("id, title, start_time, team_id, target_team_ids")
     .gte("start_time", targetDay.toISOString())
     .lt("start_time", dayAfter.toISOString());
 
@@ -398,23 +394,6 @@ async function runVolunteerNeedRemindersForStage(
       });
       if (teamNotifError) {
         console.error("[bureau-alerts] notification relance besoin (équipe) échouée:", teamNotifError);
-      }
-
-      if (event.commission_group_ids.length > 0) {
-        const { error: commissionNotifError } = await supabase.from("notifications").insert(
-          event.commission_group_ids.map((groupId) => ({
-            commission_group_id: groupId,
-            event_id: event.id,
-            title,
-            body,
-          }))
-        );
-        if (commissionNotifError) {
-          console.error(
-            "[bureau-alerts] notification relance besoin (commission) échouée:",
-            commissionNotifError
-          );
-        }
       }
 
       // Retour de Cindy du 17/09 ("je veux des push réels pour...").

@@ -13,7 +13,6 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
-import { commissionMeta } from "@/lib/commission-labels";
 import DocumentsPanel from "@/components/club-documents";
 import ClubReportsSection from "./club-reports-section";
 import Cd17LigueSection from "./cd17-ligue-section";
@@ -42,7 +41,6 @@ import type {
   ClubReport,
   MemberDetail,
   SponsorDisplay,
-  WhatsAppGroup,
 } from "./page";
 import InventoryManager from "./inventory-manager";
 import type { EventRoleType } from "./event-tasks";
@@ -64,7 +62,6 @@ export default function CoachView({
   birthdayMembers,
   seasonVolunteerTallyByPlayerId,
   seasonVolunteerGuestEntries,
-  whatsappGroups,
   eventRoles,
   volunteerNeedsByEventId = {},
   ownPlayerId,
@@ -100,7 +97,6 @@ export default function CoachView({
   // sans compte club) -- retour de Cindy du 24/09, doivent apparaître dans
   // le même tableau.
   seasonVolunteerGuestEntries: SeasonGuestVolunteer[];
-  whatsappGroups: WhatsAppGroup[];
   // Catalogue des roles d organisation (event_role_types).
   eventRoles: EventRoleType[];
   // Besoins en bénévoles d'un événement club (buvette...) — un coach qui
@@ -181,19 +177,6 @@ export default function CoachView({
   // corrigé par le passage à createTeams/bilanTeams du 10/09 puisque
   // celui-ci ne portait que sur la création d'événements/le bilan.
   const coachOnlyTeams = teams.filter((t) => teamRoleByTeamId[t.id] !== "PLAYER");
-
-  // Retour de Cindy du 12/09 : manquait ici alors que le sélecteur
-  // "Commissions concernées" (create-event-form.tsx/volunteer-needs-
-  // panel.tsx) l'attend depuis le 10/09 -- un coach ne l'a donc jamais vu
-  // s'afficher (CommissionMultiSelect se cache tout seul si la liste est
-  // vide). Même calcul et même filtre hideFromCommissionAccess que
-  // admin-view.tsx (commissionGroups, retour du 25/09).
-  const commissionGroups = whatsappGroups
-    .filter((g) => g.category === "COMMISSION")
-    .map((g) => ({ id: g.id, ...commissionMeta(g.name) }))
-    .filter((c) => !c.hideFromCommissionAccess)
-    .sort((a, b) => a.rank - b.rank)
-    .map((c) => ({ id: c.id, name: c.label }));
 
   // Retour d'audit du 28/08 : un événement ciblant plusieurs équipes
   // précises (targetTeamIds) n'a pas de teamId — il n'apparaissait dans
@@ -322,7 +305,6 @@ export default function CoachView({
             events={events}
             createTeams={createTeams}
             rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
-            commissionGroups={commissionGroups}
             contactEmailByPlayerId={contactEmailByPlayerId}
             birthdayMembers={birthdayMembers}
             // Retour de Cindy du 10/09 (bug Basile) : createTeams plutôt que
@@ -453,7 +435,6 @@ export default function CoachView({
               events={events}
               createTeams={createTeams}
               rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
-            commissionGroups={commissionGroups}
               // Retour de Cindy du 10/09 (bug Basile) : createTeams, même
               // correctif que sur "Calendrier" ci-dessus.
               scopeTeams={createTeams}
@@ -475,7 +456,6 @@ export default function CoachView({
               events={events}
               createTeams={createTeams}
               rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
-            commissionGroups={commissionGroups}
               // Retour de Cindy du 10/09 (bug Basile) : createTeams, même
               // correctif que sur "Calendrier" ci-dessus.
               scopeTeams={createTeams}

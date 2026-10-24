@@ -20,7 +20,6 @@ import {
   Wallet,
   RefreshCw,
 } from "lucide-react";
-import { commissionMeta } from "@/lib/commission-labels";
 import DocumentsPanel from "@/components/club-documents";
 import ClubReportsSection from "./club-reports-section";
 import Cd17LigueSection from "./cd17-ligue-section";
@@ -37,14 +36,12 @@ import FfbbManager from "./ffbb-manager";
 import SponsorsManager from "./sponsors-manager";
 import InventoryManager from "./inventory-manager";
 import SponsorsDisplay from "./sponsors-display";
-import CommissionsManager from "./commissions-manager";
 import BureauDashboard from "./bureau-dashboard";
 import AutomationSettings, { type AutomationKey } from "./automation-settings";
 import SpaceDashboardSummary from "./space-dashboard-summary";
 import type { SpaceDashboardSummary as SpaceDashboardSummaryData } from "@/lib/space-dashboard";
 import type {
   AdminAccessProfile,
-  AdminBenevole,
   AdminCategoryTariff,
   AdminCollecte,
   AdminCotisation,
@@ -56,7 +53,6 @@ import type {
   ClubReport,
   MemberDetail,
   SponsorDisplay,
-  WhatsAppGroup,
 } from "./page";
 import type { BirthdaySource } from "./birthdays";
 import type { EventRoleType } from "./event-tasks";
@@ -77,11 +73,9 @@ export default function AdminView({
   members,
   birthdayMembers,
   canonicalTeamRefs,
-  whatsappGroups,
   sponsors,
   inventoryItems,
   sponsorDisplay,
-  benevoles,
   accessProfiles,
   penalites,
   automationSettings,
@@ -114,13 +108,11 @@ export default function AdminView({
   members: AdminMember[];
   birthdayMembers: BirthdaySource[];
   canonicalTeamRefs: { id: string; name: string | null; category: string | null }[];
-  whatsappGroups: WhatsAppGroup[];
   sponsors: AdminSponsor[];
   // Retour de Cindy du 16/10 ("Inventaire") : matériel club, club entier,
   // modifiable par le Bureau ET les coachs -- voir inventory-manager.tsx.
   inventoryItems: AdminInventoryItem[];
   sponsorDisplay: SponsorDisplay[];
-  benevoles: AdminBenevole[];
   accessProfiles: AdminAccessProfile[];
   penalites: AdminPenalite[];
   automationSettings: Record<AutomationKey, boolean>;
@@ -228,24 +220,6 @@ export default function AdminView({
     return splitTeamName(labelA).rank - splitTeamName(labelB).rank;
   });
 
-  // Retour de Cindy du 10/09 ("Accès Commissions & Administration") :
-  // liste des commissions pour rattacher un besoin en bénévoles ou cibler
-  // "Commissions concernées" à la création d'un événement (voir
-  // VolunteerNeedsPanel/CommissionMultiSelect/commissionGroups) -- mêmes
-  // groupes que commissions-manager.tsx, jamais une nouvelle liste.
-  // Retour de Cindy du 25/09 ("ces deux points doivent être reliés") :
-  // même filtre hideFromCommissionAccess que commissions-manager.tsx
-  // (Bureau/Coachs/Salariés ont déjà leur propre espace connecté, jamais
-  // via un lien de commission -- les cibler ici n'aurait aucun effet, le
-  // futur bouton présent/absent n'y répondrait jamais). Même tableau
-  // whatsappGroups déjà chargé, filtré en mémoire -- aucune requête de plus.
-  const commissionGroups = whatsappGroups
-    .filter((g) => g.category === "COMMISSION")
-    .map((g) => ({ id: g.id, ...commissionMeta(g.name) }))
-    .filter((c) => !c.hideFromCommissionAccess)
-    .sort((a, b) => a.rank - b.rank)
-    .map((c) => ({ id: c.id, name: c.label }));
-
   // Retour d'audit du 28/08 : un événement ciblant plusieurs équipes
   // précises (targetTeamIds) n'a pas de teamId — il n'apparaissait dans
   // "Prochains rendez-vous" d'AUCUNE des équipes qu'il vise pourtant
@@ -333,7 +307,6 @@ export default function AdminView({
             volunteerNeedsByEventId={volunteerNeedsByEventId}
             sponsors={sponsors}
             penalites={penalites}
-            commissionGroups={commissionGroups}
             ownPlayerId={ownPlayerId}
             rsvpStatusByKey={rsvpStatusByKey}
           />
@@ -503,7 +476,6 @@ export default function AdminView({
               resultsTeams={teamRefsForOfficialMatches}
               eventRoles={eventRoles}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
-              commissionGroups={commissionGroups}
             />
           ),
         },
@@ -527,7 +499,6 @@ export default function AdminView({
               resultsTeamSelector="dropdown"
               eventRoles={eventRoles}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
-              commissionGroups={commissionGroups}
             />
           ),
         },
@@ -535,7 +506,7 @@ export default function AdminView({
           // Retour de Cindy du 10/09 : déplacé depuis "Vie du club" (en
           // dernier ici) — les imports FFBB concernent les matchs/résultats
           // officiels, plus proche de ce sous-menu que des outils annexes
-          // (Sponsors/Commissions/WhatsApp/Documents).
+          // (Sponsors/Documents...).
           key: "ffbb",
           label: "FFBB",
           icon: <RefreshCw className={iconClass} />,
@@ -568,29 +539,6 @@ export default function AdminView({
           label: "Sponsors",
           icon: <Handshake className={iconClass} />,
           content: <SponsorsManager sponsors={sponsors} />,
-        },
-        {
-          // Retour de Cindy du 10/09 ("Accès Commissions & Administration") :
-          // remplace la gestion d'accès personne par personne
-          // (benevoles-manager.tsx, jusqu'ici "Bénévoles & Accès") par une
-          // gestion au niveau de chaque commission — mêmes briques de
-          // lecture seule qu'avant (access-briques.ts), mais portées par la commission
-          // elle-même : un seul lien public par commission plutôt qu'un
-          // lien par personne. L'ancien fonctionnement individuel reste
-          // disponible en option secondaire à l'intérieur de ce composant
-          // (voir commissions-manager.tsx) — pour inviter quelqu'un à un
-          // événement précis, ce qu'un lien de commission partagé ne sait
-          // pas faire.
-          key: "commissions",
-          label: "Accès Commissions & Administration",
-          icon: <HandHeart className={iconClass} />,
-          content: (
-            <CommissionsManager
-              whatsappGroups={whatsappGroups}
-              accessProfiles={accessProfiles}
-              benevoles={benevoles}
-            />
-          ),
         },
         {
           // Retour de Cindy du 25/08 : le Bureau voit les 3 documents
@@ -758,12 +706,6 @@ export default function AdminView({
     "matches-official": "matchs_resultats",
     "matches-results": "matchs_resultats",
     sponsors: "sponsors",
-    // Retour de Cindy du 13/09 ("à quoi sert la case Bénévoles ?") : cette
-    // brique s'appelait "benevoles" (nom trompeur, sans rapport avec son
-    // vrai rôle) -- renommée "commissions_admin" dans COMMITTEE_BRIQUE_
-    // GROUPS (access-briques.ts, seul endroit où elle est cochable), le nom
-    // ici doit suivre à l'identique.
-    commissions: "commissions_admin",
   };
   const documentsVisible =
     !isRestricted ||

@@ -140,28 +140,6 @@ export type SponsorDisplay = {
   websiteUrl: string | null;
 };
 
-// Bénévoles hors club (retour de Cindy du 2026-08-25) : ni joueur, ni
-// Bureau, parfois parent d'un joueur, parfois pas du tout — voir la
-// migration 20261027000000_benevoles.sql. Jamais de lien avec les
-// cotisations ni l'effectif d'une équipe -- sauf ce que le Bureau choisit
-// explicitement de lui ouvrir via accessProfileId (retour de Cindy du
-// 05/09, "profil et bénévoles doivent être fusionnés" -- voir
-// 20261031150000_benevoles_access_profile.sql et /benevole/view).
-export type AdminBenevole = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  phone: string | null;
-  email: string | null;
-  notes: string | null;
-  accessToken: string;
-  archivedAt: string | null;
-  // Profil d'accès sur-mesure assigné à ce bénévole (lecture seule pour
-  // lui, toujours) -- null = aucune brique supplémentaire, comportement
-  // historique (juste ses événements/besoins de bénévolat habituels).
-  accessProfileId: string | null;
-};
-
 // Profils d'accès sur-mesure (retour de Cindy du 05/09, reprise du sujet
 // mis en pause le 02/09) : un profil nommé + la liste des briques qu'il
 // ouvre (voir la liste blanche de la migration 20261031130000). Assigné à
@@ -171,27 +149,6 @@ export type AdminAccessProfile = {
   id: string;
   name: string;
   briques: string[];
-};
-
-export type WhatsAppGroup = {
-  id: string;
-  name: string;
-  category: "EQUIPE" | "COMMISSION";
-  teamId: string | null;
-  inviteLink: string | null;
-  sortOrder: number;
-  // Whether the CURRENT user (Bureau, or the coach of this group's team)
-  // may edit the invite link — computed server-side since RLS already
-  // narrows which groups appear at all.
-  canManage: boolean;
-  // Retour de Cindy du 10/09 ("Accès Commissions & Administration") : lien
-  // public permanent + profil d'accès en lecture seule portés par la
-  // commission elle-même — seulement renseignés pour category='COMMISSION'
-  // (toujours présents en base pour category='EQUIPE' aussi, mais jamais
-  // utilisés ni affichés de ce côté-là). Voir commissions-manager.tsx et
-  // /commission/[token].
-  accessToken: string | null;
-  accessProfileId: string | null;
 };
 
 // Full registration record, mirroring the club's official enrollment form
@@ -543,11 +500,6 @@ export type AdminUpcomingEvent = {
   // qui partagent sinon exactement la même forme. Null pour tout le
   // reste (réunion d'équipe, ou tout autre type d'événement).
   restrictedAudience: "BUREAU" | "COACHS" | null;
-  // Retour de Cindy du 10/09 ("un seul choix pour l'événement entier") :
-  // quelle(s) commission(s) voient TOUS les besoins d'organisation de cet
-  // événement sur leur page publique (/commission/[token]) -- porté par
-  // events.commission_group_ids, plus par besoin.
-  commissionGroupIds: string[];
   teamName: string;
   rsvpCounts: {
     present: number;
@@ -1539,24 +1491,11 @@ export default async function DashboardPage({
   // comme les autres gros lots de cette page -- même résultat, mêmes
   // données, juste borné.
   const [
-    whatsappGroupsRes,
     convocationCardsRaw,
     eventRoleTypes,
     sponsorDisplayRes,
   ] = await runBatched(
     [
-    // Table partagée avec "Accès Commissions & Administration" (category=
-    // 'COMMISSION', access_token/access_profile_id) -- cette requête reste
-    // nécessaire pour Commissions même après le retrait de "Groupes
-    // WhatsApp" (category='EQUIPE', retiré le 19/10). A single query,
-    // unconditional on role: RLS already narrows the result to exactly
-    // what this user may see — see is_whatsapp_group_team_coach() in the
-    // whatsapp_groups migration.
-    () =>
-      supabase
-        .from("whatsapp_groups")
-        .select("id, name, category, team_id, invite_link, sort_order, access_token, access_profile_id")
-        .order("sort_order", { ascending: true }),
     // Priority zone: next convocation per linked player.
     () =>
       runBatched(
@@ -1588,7 +1527,7 @@ export default async function DashboardPage({
     dbLimit
   );
 
-  logQueryErrors("commun (whatsapp/sponsors)", { whatsappGroupsRes, sponsorDisplayRes });
+  logQueryErrors("commun (sponsors)", { sponsorDisplayRes });
 
   const sponsorDisplay: SponsorDisplay[] = (sponsorDisplayRes.data ?? []).map((s) => ({
     id: s.id,
@@ -1609,31 +1548,6 @@ export default async function DashboardPage({
   // que soit le filtre d'équipe coachée sélectionné, comme si elle
   // "suivait" le mauvais onglet. Cette convocation reste bien visible à sa
   // vraie place : l'onglet "Mon équipe" du coach (voir CoachView).
-
-  type WhatsAppGroupRow = {
-    id: string;
-    name: string;
-    category: string;
-    team_id: string | null;
-    invite_link: string | null;
-    sort_order: number;
-    access_token: string | null;
-    access_profile_id: string | null;
-  };
-
-  const whatsappGroups: WhatsAppGroup[] = (
-    (whatsappGroupsRes.data ?? []) as unknown as WhatsAppGroupRow[]
-  ).map((g) => ({
-    id: g.id,
-    name: g.name,
-    category: g.category === "COMMISSION" ? "COMMISSION" : "EQUIPE",
-    teamId: g.team_id,
-    inviteLink: g.invite_link,
-    sortOrder: g.sort_order,
-    accessToken: g.access_token,
-    accessProfileId: g.access_profile_id,
-    canManage: isAdmin || (g.team_id !== null && coachedTeamIds.has(g.team_id)),
-  }));
 
   // Match-day parent tasks (jerseys/snacks/carpool) for every event shown
   // in the priority zone above.
@@ -1656,7 +1570,6 @@ export default async function DashboardPage({
 
   return {
     convocationCards,
-    whatsappGroups,
     eventRoleTypes,
     sponsorDisplay,
     eventTasksByEventId,
@@ -1688,7 +1601,6 @@ export default async function DashboardPage({
   let adminMembers: AdminMember[] = [];
   let adminSponsors: AdminSponsor[] = [];
   let adminInventoryItems: AdminInventoryItem[] = [];
-  let adminBenevoles: AdminBenevole[] = [];
   let adminPenalites: AdminPenalite[] = [];
   let adminAccessProfiles: AdminAccessProfile[] = [];
   // The Membres table's team pickers (filter + "Modifier le profil") only
@@ -1776,7 +1688,6 @@ export default async function DashboardPage({
       sponsorsRes,
       inventoryRes,
       penalitesRes,
-      benevolesRes,
       accessProfilesRes,
     ] = await runBatched(
       [
@@ -1841,7 +1752,7 @@ export default async function DashboardPage({
           supabase
             .from("events")
             .select(
-              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
+              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, teams(id, name, category), collectes(id, prix, payment_link)"
             )
             .neq("event_type", "TRAINING")
             .gte("start_time", eventsWindowStart)
@@ -1854,7 +1765,7 @@ export default async function DashboardPage({
           supabase
             .from("events")
             .select(
-              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
+              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, teams(id, name, category), collectes(id, prix, payment_link)"
             )
             .eq("event_type", "TRAINING")
             .gte("start_time", trainingsWindowStart)
@@ -1908,16 +1819,6 @@ export default async function DashboardPage({
             .from("penalites")
             .select("id, player_id, amount, notes, penalite_date, statut, paid_at, payment_link, players(first_name, last_name)")
             .order("penalite_date", { ascending: false }),
-        // Bénévoles hors club (retour de Cindy du 2026-08-25) : réservé au
-        // Bureau (voir policy "admin manage benevoles"), même périmètre
-        // que sponsors ci-dessus.
-        () =>
-          supabase
-            .from("benevoles")
-            .select(
-              "id, first_name, last_name, phone, email, notes, access_token, archived_at, access_profile_id"
-            )
-            .order("last_name"),
         // Profils d'accès sur-mesure (retour de Cindy du 05/09) : liste des
         // profils et de leurs briques, pour l'écran de gestion et pour
         // remplir le sélecteur "Étendue de l'accès" dans la fiche membre.
@@ -1959,7 +1860,6 @@ export default async function DashboardPage({
       sponsorsRes,
       inventoryRes,
       penalitesRes,
-      benevolesRes,
       accessProfilesRes,
     });
 
@@ -2624,30 +2524,6 @@ export default async function DashboardPage({
       quantity: i.quantity,
     }));
 
-    adminBenevoles = (
-      (benevolesRes.data ?? []) as unknown as {
-        id: string;
-        first_name: string;
-        last_name: string;
-        phone: string | null;
-        email: string | null;
-        notes: string | null;
-        access_token: string;
-        archived_at: string | null;
-        access_profile_id: string | null;
-      }[]
-    ).map((b) => ({
-      id: b.id,
-      firstName: b.first_name,
-      lastName: b.last_name,
-      phone: b.phone,
-      email: b.email,
-      notes: b.notes,
-      accessToken: b.access_token,
-      archivedAt: b.archived_at,
-      accessProfileId: b.access_profile_id,
-    }));
-
     adminAccessProfiles = (
       (accessProfilesRes.data ?? []) as unknown as {
         id: string;
@@ -2752,7 +2628,6 @@ export default async function DashboardPage({
         targetProfileIds: e.target_profile_ids ?? null,
         targetProfileNotes: e.target_profile_notes ?? null,
         restrictedAudience: (e.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
-        commissionGroupIds: e.commission_group_ids ?? [],
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, teamsById),
         rsvpCounts: buildRsvpCounts(rsvpsByEvent, e.id, eventRoster),
         // Retour de Cindy du 30/08 : "qui sera présent" visible partout, pas
@@ -2924,7 +2799,7 @@ export default async function DashboardPage({
           supabase
             .from("events")
             .select(
-              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
+              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, teams(id, name, category), collectes(id, prix, payment_link)"
             )
             .or(teamOrClubWideOrProfileFilter(coachedTeamIds, user.id))
             .neq("event_type", "TRAINING")
@@ -2935,7 +2810,7 @@ export default async function DashboardPage({
           supabase
             .from("events")
             .select(
-              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
+              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, teams(id, name, category), collectes(id, prix, payment_link)"
             )
             .or(teamOrClubWideOrProfileFilter(coachedTeamIds, user.id))
             .eq("event_type", "TRAINING")
@@ -3061,7 +2936,7 @@ export default async function DashboardPage({
                 supabase
                   .from("events")
                   .select(
-                    "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
+                    "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, teams(id, name, category), collectes(id, prix, payment_link)"
                   )
                   .in("team_id", siblingTeamIds)
                   .in("event_type", ["MATCH", "FRIENDLY"])
@@ -3804,7 +3679,6 @@ export default async function DashboardPage({
         targetProfileIds: e.target_profile_ids ?? null,
         targetProfileNotes: e.target_profile_notes ?? null,
         restrictedAudience: (e.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
-        commissionGroupIds: e.commission_group_ids ?? [],
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, clubTeamById),
         rsvpCounts: buildRsvpCounts(rsvpsByEvent, e.id, eventRoster),
         // Retour de Cindy du 30/08 : "qui sera présent" visible partout,
@@ -4164,7 +4038,7 @@ export default async function DashboardPage({
       supabase
         .from("events")
         .select(
-          "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
+          "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, teams(id, name, category), collectes(id, prix, payment_link)"
         )
         .or(teamOrClubWideOrProfileFilter(allTeamIds, user.id))
         .neq("event_type", "TRAINING")
@@ -4175,7 +4049,7 @@ export default async function DashboardPage({
       supabase
         .from("events")
         .select(
-          "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
+          "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, teams(id, name, category), collectes(id, prix, payment_link)"
         )
         .or(teamOrClubWideOrProfileFilter(allTeamIds, user.id))
         .eq("event_type", "TRAINING")
@@ -4308,7 +4182,7 @@ export default async function DashboardPage({
                 supabase
                   .from("events")
                   .select(
-                    "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, commission_group_ids, teams(id, name, category), collectes(id, prix, payment_link)"
+                    "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, teams(id, name, category), collectes(id, prix, payment_link)"
                   )
                   .in("team_id", familyExtraMatchTeamIds)
                   .in("event_type", ["MATCH", "FRIENDLY"])
@@ -4544,7 +4418,6 @@ export default async function DashboardPage({
         targetProfileIds: e.target_profile_ids ?? null,
         targetProfileNotes: e.target_profile_notes ?? null,
         restrictedAudience: (e.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
-        commissionGroupIds: e.commission_group_ids ?? [],
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, teamsById),
         rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
         // Retour de Cindy du 30/09 ("équipes sœurs") : un match de
@@ -4846,7 +4719,6 @@ export default async function DashboardPage({
     priorityZonePromise,
   ]);
   const {
-    whatsappGroups,
     eventRoleTypes,
     sponsorDisplay,
     eventTasksByEventId,
@@ -5059,11 +4931,9 @@ export default async function DashboardPage({
             members={adminMembers}
             birthdayMembers={adminBirthdayMembers}
             canonicalTeamRefs={canonicalTeamRefs}
-            whatsappGroups={whatsappGroups}
             sponsors={adminSponsors}
             inventoryItems={adminInventoryItems}
             sponsorDisplay={sponsorDisplay}
-            benevoles={adminBenevoles}
             accessProfiles={adminAccessProfiles}
             penalites={adminPenalites}
             automationSettings={adminAutomationSettings}
@@ -5129,7 +4999,6 @@ export default async function DashboardPage({
             birthdayMembers={coachBirthdayMembers}
             seasonVolunteerTallyByPlayerId={coachSeasonVolunteerTallyByPlayerId}
             seasonVolunteerGuestEntries={coachSeasonVolunteerGuestEntries}
-            whatsappGroups={whatsappGroups}
             eventRoles={eventRoleTypes}
             volunteerNeedsByEventId={coachVolunteerNeedsByEventId}
             ownPlayerId={ownPlayerId}

@@ -8,7 +8,6 @@ import { SALLES } from "./salles";
 import { sendEventPush } from "./event-push";
 import DateTimePicker from "./date-time-picker";
 import RoleIcon from "./role-icon";
-import CommissionMultiSelect from "./commission-multi-select";
 import { Briefcase, Calendar, CalendarSync, ChevronDown, ChevronUp, Clock, Euro, Plus, X } from "lucide-react";
 import { EVENT_TYPE_OPTIONS, styleFor } from "./event-style";
 import {
@@ -143,7 +142,6 @@ const typeChoices: { value: EventType; label: string; active: string }[] =
 
 export default function CreateEventForm({
   teams,
-  commissionGroups = [],
   existingNeeds = [],
   allowClubWide = false,
   open,
@@ -153,14 +151,6 @@ export default function CreateEventForm({
   onUpdated,
 }: {
   teams: Team[];
-  // Retour de Cindy du 10/09 ("Accès Commissions & Administration", puis
-  // "un seul choix pour l'événement entier") : transmis à
-  // CommissionMultiSelect, un seul sélecteur pour tout l'événement (voir
-  // commissionGroupIds plus bas) — même liste que VolunteerNeedsPanel.
-  // Retour de Cindy du 12/09 ("un bénévole fait partie d'une commission
-  // quoi qu'il arrive") : occupe désormais la place de l'ancienne section
-  // "Bénévoles invités" (retirée), en bas du formulaire.
-  commissionGroups?: { id: string; name: string }[];
   // Retour de Cindy du 10/09 ("recharge et affiche correctement les
   // besoins d'organisation existants") : les besoins déjà en base pour
   // editingEvent (vide en création) — l'appelant (calendar-view.tsx) les a
@@ -357,17 +347,6 @@ export default function CreateEventForm({
       customLabel: n.customLabel ?? "",
       count: String(n.requiredCount),
     }))
-  );
-  // Retour de Cindy du 10/09 ("l'onglet commission apparaît à chaque
-  // besoin créé, pas la peine, les groupes commissions concernés seront
-  // informés de tous les besoins créés") : un seul choix pour l'événement
-  // ENTIER (pas par besoin) -- tous les besoins d'organisation de cet
-  // événement, quel que soit le moment où ils sont ajoutés (ici ou depuis
-  // VolunteerNeedsPanel sur la carte), remontent sur la page publique de
-  // CES commissions. Porté par events.commission_group_ids, plus du tout
-  // par event_volunteer_needs.
-  const [commissionGroupIds, setCommissionGroupIds] = useState<string[]>(
-    () => editingEvent?.commissionGroupIds ?? []
   );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -679,7 +658,6 @@ export default function CreateEventForm({
           end_time: endTime ? new Date(`${dt.slice(0, 10)}T${endTime}`).toISOString() : null,
           impact_time: impactTime ? new Date(`${dt.slice(0, 10)}T${impactTime}`).toISOString() : null,
           notes: notes || null,
-          commission_group_ids: commissionGroupIds,
           team_id: effectiveTeamId || null,
           target_team_ids: effectiveTargetTeamIds,
           target_profile_ids: effectiveTargetProfileIds,
@@ -737,7 +715,6 @@ export default function CreateEventForm({
           targetProfileNotes: row.target_profile_notes,
           restrictedAudience: (row.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
           teamName,
-          commissionGroupIds,
           rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
         }))
       );
@@ -767,7 +744,6 @@ export default function CreateEventForm({
       target_profile_ids: string[] | null;
       target_profile_notes: { id: string; name: string; note: string }[] | null;
       restricted_audience?: "BUREAU" | "COACHS" | null;
-      commission_group_ids: string[];
     } = {
       title: eventName,
       event_type: effectiveEventType,
@@ -782,18 +758,12 @@ export default function CreateEventForm({
       // raccourci de saisie côté UI).
       impact_time: impactTime ? new Date(`${startTime.slice(0, 10)}T${impactTime}`).toISOString() : null,
       notes: notes || null,
-      // Retour de Cindy du 10/09 : un seul choix pour l'événement entier
-      // (voir commissionGroupIds plus haut) -- toujours envoyé, en création
-      // comme en édition, aucune restriction par rôle contrairement à
-      // team_id/target_team_ids plus bas (ça ne change jamais la portée de
-      // l'événement, juste qui est informé des besoins d'organisation).
-      commission_group_ids: commissionGroupIds,
       // "Personnes spécifiques" / "+ Inclure aussi..." (retour de Cindy du
-      // 18/09) : toujours envoyé, comme commission_group_ids ci-dessus --
-      // additif, jamais restreint par scopeMode (contrairement à
-      // team_id/target_team_ids/restricted_audience juste en dessous).
-      // Toujours null pour un coach (le champ n'est même pas affiché sans
-      // allowClubWide, targetProfileIds reste alors [] côté état).
+      // 18/09) : toujours envoyé -- additif, jamais restreint par scopeMode
+      // (contrairement à team_id/target_team_ids/restricted_audience juste
+      // en dessous). Toujours null pour un coach (le champ n'est même pas
+      // affiché sans allowClubWide, targetProfileIds reste alors [] côté
+      // état).
       target_profile_ids: effectiveTargetProfileIds,
       target_profile_notes: effectiveTargetProfileNotes,
     };
@@ -1004,7 +974,6 @@ export default function CreateEventForm({
         targetProfileNotes: inserted.target_profile_notes,
         restrictedAudience: (inserted.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
         teamName,
-        commissionGroupIds,
       });
     } else {
       onCreated?.([
@@ -1034,7 +1003,6 @@ export default function CreateEventForm({
         targetProfileNotes: inserted.target_profile_notes,
         restrictedAudience: (inserted.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
           teamName,
-          commissionGroupIds,
           rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
         },
       ]);
@@ -1135,7 +1103,6 @@ export default function CreateEventForm({
           startTime: inserted.start_time,
           teamId: inserted.team_id,
           targetTeamIds: inserted.target_team_ids,
-          commissionGroupIds,
           roleCode: n.roleCode,
           customLabel: n.customLabel,
           requiredCount: n.count,
@@ -1795,27 +1762,6 @@ export default function CreateEventForm({
           </button>
       </div>
 
-      {/* Retour de Cindy du 12/09 ("un bénévole fait partie d'une commission
-          quoi qu'il arrive... on pourrait mettre l'onglet commissions à la
-          place de bénévoles invités optionnel") : occupe désormais cette
-          place -- l'ancienne section "Bénévoles invités" est retirée (les
-          invitations individuelles à un événement précis n'ont plus lieu
-          d'être, chaque bénévole étant de toute façon rattaché à une
-          commission qui voit déjà tous les besoins via commissionGroupIds
-          plus haut). Gardé conditionnel (commissionGroups.length > 0) comme
-          l'était "Bénévoles invités" avant elle : jamais une étiquette
-          orpheline sans le moindre contrôle à côté (CommissionMultiSelect se
-          cache tout seul, mais pas le libellé qui l'entoure ici). */}
-      {commissionGroups.length > 0 && (
-        <div className="flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3">
-          <p className="text-xs font-medium text-zinc-600">Commissions concernées</p>
-          <CommissionMultiSelect
-            commissions={commissionGroups}
-            selectedIds={commissionGroupIds}
-            onChange={setCommissionGroupIds}
-          />
-        </div>
-      )}
         </>
       )}
 

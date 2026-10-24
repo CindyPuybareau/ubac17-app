@@ -458,7 +458,6 @@ export default function CalendarView({
   resultsTeamSelector = "pills",
   resultsTeams,
   celebrateWins = false,
-  commissionGroups = [],
   isBureau = false,
 }: {
   events: AdminUpcomingEvent[];
@@ -562,10 +561,6 @@ export default function CalendarView({
   // (coach-view.tsx, family-view.tsx : true ; admin-view.tsx : jamais
   // passé, donc false) de trancher.
   celebrateWins?: boolean;
-  // Retour de Cindy du 10/09 ("Accès Commissions & Administration") :
-  // transmis tel quel à VolunteerNeedsPanel (voir son propre commentaire)
-  // pour rattacher un besoin à une commission à la création.
-  commissionGroups?: { id: string; name: string }[];
 }) {
   // Recalculés à chaque rendu (pas au chargement du module) : un onglet
   // Bureau laissé ouvert toute la nuit gardait sinon la pastille "jour
@@ -746,16 +741,6 @@ export default function CalendarView({
     );
   }
 
-  // Retour de Cindy du 12/09 ("ajoute-le aussi directement sur la carte") :
-  // même geste optimiste que ci-dessus, pour le sélecteur "Commissions
-  // concernées" modifié directement depuis VolunteerNeedsPanel (plus
-  // seulement via "Modifier l'événement") -- l'écriture réelle vit dans
-  // volunteer-needs-panel.tsx, ce callback ne fait que refléter le
-  // résultat dans localEvents.
-  function updateLocalEventCommissionGroupIds(eventId: string, commissionGroupIds: string[]) {
-    setLocalEvents((prev) => prev.map((e) => (e.id === eventId ? { ...e, commissionGroupIds } : e)));
-  }
-
   const today = new Date();
   const todayKey = toKey(today);
   const router = useRouter();
@@ -921,7 +906,6 @@ export default function CalendarView({
           // Toujours un MATCH ici (voir le .eq plus haut) -- jamais une
           // Réunion, restrictedAudience ne s'applique donc jamais.
           restrictedAudience: null,
-          commissionGroupIds: [],
           teamName: team?.name ?? "Équipe",
           rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
           presentPlayers: [],
@@ -1300,7 +1284,6 @@ export default function CalendarView({
         notes: updated.notes,
         team_id: updated.teamId,
         target_team_ids: updated.targetTeamIds,
-        commission_group_ids: updated.commissionGroupIds,
       })
       .eq("series_id", updated.seriesId!)
       .gt("start_time", updated.start_time);
@@ -1322,7 +1305,6 @@ export default function CalendarView({
               notes: updated.notes,
               teamId: updated.teamId,
               targetTeamIds: updated.targetTeamIds,
-              commissionGroupIds: updated.commissionGroupIds,
               teamName,
             }
           : e
@@ -2268,11 +2250,6 @@ export default function CalendarView({
                 myPlayerIds={[]}
                 canManage
                 bare
-                commissionGroups={commissionGroups}
-                commissionGroupIds={event.commissionGroupIds}
-                onCommissionGroupIdsChange={(next) =>
-                  updateLocalEventCommissionGroupIds(event.id, next)
-                }
                 onNeedAdded={(n) =>
                   notifyNewVolunteerNeed(createClient(), {
                     eventId: event.id,
@@ -2280,7 +2257,6 @@ export default function CalendarView({
                     startTime: event.start_time,
                     teamId: event.teamId,
                     targetTeamIds: event.targetTeamIds,
-                    commissionGroupIds: event.commissionGroupIds,
                     ...n,
                   })
                 }
@@ -2696,7 +2672,6 @@ export default function CalendarView({
           // ferait setState après coup (voir create-event-form.tsx).
           key={editingEvent?.id ?? "create"}
           teams={createTeams}
-          commissionGroups={commissionGroups}
           existingNeeds={editingEvent ? (volunteerNeedsByEventId[editingEvent.id] ?? emptyVolunteerNeeds) : emptyVolunteerNeeds}
           allowClubWide={allowClubWide}
           open={createOpen || Boolean(editingEvent)}
