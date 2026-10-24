@@ -2156,8 +2156,6 @@ export default async function DashboardPage({
       pendingCoaches: pendingCoachesByTeam.get(t.id) ?? [],
       pendingCoachNames: t.pending_coach_names,
       photoUrl: t.photo_url,
-      trombinoscopePath: adminTrombinoscopeByTeamId[t.id] ?? null,
-      trombinoscopeOwnerTeamId: getTrombinoscopeTeamId(t, teamsRes.data ?? []),
     }));
     allProfilesForAdmin = profilesRes.data ?? [];
     canonicalTeamRefs = (teamsRes.data ?? [])
@@ -3363,8 +3361,6 @@ export default async function DashboardPage({
       coaches: coachesByTeam.get(t.id) ?? [],
       pendingCoaches: pendingCoachesByTeam.get(t.id) ?? [],
       pendingCoachNames: t.pending_coach_names,
-      trombinoscopePath: coachTrombinoscopeByTeamId[t.id] ?? null,
-      trombinoscopeOwnerTeamId: getTrombinoscopeTeamId(t, allClubTeamsRes.data ?? []),
     }));
 
     // EVERY team each of these players belongs to, not just the coach's own

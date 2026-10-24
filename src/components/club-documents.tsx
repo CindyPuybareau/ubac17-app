@@ -459,37 +459,132 @@ function OfficialsTrombinoscopeCard({
   );
 }
 
+// Retour de Cindy du 24/10 ("tout doit être centralisé au même endroit...
+// et non pas dans l'onglet équipe") : une ligne par équipe mère, envoi ET
+// consultation réunis ici -- le bouton d'envoi (auparavant sur la fiche
+// équipe, team-card.tsx) a été retiré de là-bas, Documents est désormais
+// le SEUL endroit qui touche aux trombinoscopes d'équipe. Juste deux
+// boutons par ligne (retour de Cindy du 24/10, suite : un bouton
+// "Télécharger" distinct existait un temps à côté de "Visualiser", retiré
+// aussitôt -- "Remplacer" suffit déjà à renvoyer un nouveau fichier). `path`
+// initial arrive déjà résolu côté appelant (listTeamTrombinoscopes,
+// lib/teams.ts) ; chaque ligne garde son propre état local (même principe
+// que OfficialsTrombinoscopeCard juste au-dessus) pour refléter
+// l'envoi/remplacement sans attendre un rafraîchissement de toute la page.
+function TeamTrombinoscopeRow({
+  team,
+  initialPath,
+}: {
+  team: { id: string; name: string | null; category: string | null };
+  initialPath: string | null;
+}) {
+  const router = useRouter();
+  const [path, setPath] = useState(initialPath);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.type !== "application/pdf") {
+      setError("Choisis un fichier PDF.");
+      return;
+    }
+    if (file.size > 26214400) {
+      setError(`Fichier trop lourd (${(file.size / 1024 / 1024).toFixed(1)} Mo, 25 Mo maximum).`);
+      return;
+    }
+    setUploading(true);
+    setError(null);
+    try {
+      const supabase = createClient();
+      // Toujours le dossier de l'équipe MÈRE (`team` est déjà résolue vers
+      // la mère par listTeamTrombinoscopes) -- un envoi depuis n'importe
+      // quelle déclinaison met à jour le même fichier partagé par toute la
+      // famille, même principe que l'ancien bouton de team-card.tsx.
+      const newPath = `${team.id}/trombinoscope.pdf`;
+      const { error: uploadErr } = await supabase.storage
+        .from("team-trombinoscopes")
+        .upload(newPath, file, { upsert: true, contentType: "application/pdf" });
+      if (uploadErr) {
+        setError(`Envoi impossible : ${uploadErr.message}`);
+        return;
+      }
+      const { error: updateErr } = await supabase
+        .from("teams")
+        .update({ trombinoscope_path: newPath })
+        .eq("id", team.id);
+      if (updateErr) {
+        setError(`Enregistrement impossible : ${updateErr.message}`);
+        return;
+      }
+      setPath(newPath);
+      router.refresh();
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5 rounded-xl border border-zinc-100 bg-white px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm font-medium text-zinc-700">{teamLabel(team)}</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <TrombinoscopeButton
+          path={path}
+          text="Visualiser"
+          className="flex w-fit items-center gap-1.5 self-start rounded-full bg-ubac-yellow px-3 py-1.5 text-xs font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+        />
+        <label
+          className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+            path ? "bg-sky-100 text-sky-700 hover:bg-sky-200" : "bg-navy text-white hover:bg-navy-dark"
+          } ${uploading ? "cursor-wait opacity-60" : "cursor-pointer"}`}
+        >
+          <Upload className="h-3.5 w-3.5 shrink-0" />
+          {uploading ? "Envoi…" : path ? "Remplacer" : "Envoyer"}
+          <input
+            type="file"
+            accept="application/pdf"
+            onChange={onChange}
+            disabled={uploading}
+            className="hidden"
+          />
+        </label>
+      </div>
+      {error && <p className="w-full text-xs text-red-600">{error}</p>}
+    </div>
+  );
+}
+
 // Retour de Cindy du 16/10 ("chaque équipe a son propre trombinoscope...
-// directement dans Documents, comme pour les officiels") : une carte par
-// équipe mère ayant un trombinoscope envoyé (team-card.tsx, onglet
-// Équipes) -- lecture seule ici, aucun envoi possible depuis Documents.
-// `entries` arrive déjà dédupliqué par équipe mère (listTeamTrombinoscopes,
-// lib/teams.ts), calculé côté appelant (admin-view.tsx/coach-view.tsx) à
-// partir des équipes visibles pour CE viewer -- ce composant ne fait que
-// l'affichage. Jamais transmis côté Famille/Bénévole/Enfant pour
-// l'instant (le bucket team-trombinoscopes n'autorise en lecture que
-// Bureau/coachs, voir la migration 20261115000000_team_trombinoscopes.sql).
+// directement dans Documents, comme pour les officiels"), étendu le 24/10
+// (envoi inclus ici aussi, voir TeamTrombinoscopeRow) : une ligne par
+// équipe mère que CE viewer a le droit de gérer. `entries` arrive déjà
+// dédupliqué (listTeamTrombinoscopes, lib/teams.ts), calculé côté
+// appelant (admin-view.tsx/coach-view.tsx) à partir des équipes visibles
+// pour CE viewer -- `teamsToShow` y représente déjà exactement les
+// équipes gérables (Bureau = tout le club, Coach = ses équipes coachées),
+// donc pas de vérification de droits supplémentaire ici. Jamais transmis
+// côté Famille/Bénévole/Enfant pour l'instant (le bucket
+// team-trombinoscopes n'autorise en lecture/écriture que Bureau/coachs,
+// voir la migration 20261115000000_team_trombinoscopes.sql).
 function TeamTrombinoscopesCard({
   entries,
 }: {
   entries: {
     team: { id: string; name: string | null; category: string | null };
-    path: string;
+    path: string | null;
   }[];
 }) {
-  // Rien à montrer : aucune équipe visible n'a encore de trombinoscope
-  // envoyé -- pas de carte vide (même principe que OfficialsTrombinoscopeCard
-  // côté Coach/Famille).
+  // Rien à montrer : aucune équipe gérable pour ce viewer -- pas de carte
+  // vide (même principe que OfficialsTrombinoscopeCard côté Coach/Famille).
   if (entries.length === 0) return null;
 
   return (
     <CollapsibleCard icon={Images} title="Trombinoscopes d'équipe" badge="Saison 2026-2027">
-      <p className="text-sm text-zinc-600">
-        Photos et noms des joueurs de chaque équipe, à consulter avant un match.
-      </p>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col gap-2">
         {entries.map(({ team, path }) => (
-          <TrombinoscopeButton key={team.id} path={path} text={teamLabel(team)} />
+          <TeamTrombinoscopeRow key={team.id} team={team} initialPath={path} />
         ))}
       </div>
     </CollapsibleCard>
@@ -515,26 +610,24 @@ export default function DocumentsPanel({
   // carte ne s'affiche alors jamais, aucun changement pour ces espaces.
   officialsTrombinoscopePath?: string | null;
   canManageOfficialsTrombinoscope?: boolean;
-  // Retour de Cindy du 16/10 : une entrée par équipe mère avec
-  // trombinoscope envoyé, déjà dédupliquée/résolue côté appelant
-  // (listTeamTrombinoscopes, lib/teams.ts). Par défaut [] (jamais le motif
-  // `undefined` de officialsTrombinoscopePath ci-dessus -- ici pas de cas
-  // "afficher vide pour permettre l'envoi", juste rien à montrer) pour
-  // Famille/Enfant/Bénévole, hors scope pour cette itération (RLS Storage
-  // team-trombinoscopes n'autorise pas encore leur lecture, voir migration
-  // 20261115000000_team_trombinoscopes.sql) -- TeamTrombinoscopesCard se
-  // masque alors entièrement, zéro changement visuel pour ces espaces.
+  // Retour de Cindy du 16/10, étendu le 24/10 (envoi inclus) : une entrée
+  // par équipe mère gérable pour ce viewer, déjà dédupliquée/résolue côté
+  // appelant (listTeamTrombinoscopes, lib/teams.ts) -- `path` null pour
+  // une équipe sans trombinoscope envoyé (bouton "Envoyer" seul). Par
+  // défaut [] (jamais le motif `undefined` de officialsTrombinoscopePath
+  // ci-dessus -- ici pas de cas "afficher vide pour permettre l'envoi
+  // côté Bureau uniquement", juste rien à montrer) pour Famille/Enfant/
+  // Bénévole, hors scope pour cette itération (RLS Storage
+  // team-trombinoscopes n'autorise pas encore leur lecture/écriture, voir
+  // migration 20261115000000_team_trombinoscopes.sql) -- TeamTrombinoscopesCard
+  // se masque alors entièrement, zéro changement visuel pour ces espaces.
   teamTrombinoscopes?: {
     team: { id: string; name: string | null; category: string | null };
-    path: string;
+    path: string | null;
   }[];
 }) {
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-xs text-zinc-500">
-        Documents officiels du club, saison 2026-2027 — mêmes engagements que sur le dossier
-        d&apos;inscription papier.
-      </p>
       {documentIds.map((id) => (
         <DocumentCard key={id} id={id} />
       ))}

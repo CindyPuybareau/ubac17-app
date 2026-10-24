@@ -13,7 +13,6 @@ import {
   Phone,
   Search,
   Trash2,
-  Upload,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { resizeImageForTeamPhoto } from "@/lib/image-resize";
@@ -207,76 +206,6 @@ export default function TeamCard({
       setPhotoError("Image illisible, réessaie avec une autre photo.");
     } finally {
       setUploadingPhoto(false);
-    }
-  }
-
-  // Retour de Cindy du 05/10 ("sénior 1 et sénior 2 toujours pas de
-  // bouton") : le bouton d'envoi est finalement visible sur TOUTE équipe
-  // (sauf Babys), y compris une déclinaison -- plus réservé à la seule
-  // carte de l'équipe mère comme la toute première version. Il écrit
-  // toujours sous le dossier de l'équipe MÈRE (trombinoscopeOwnerId
-  // ci-dessous), jamais celui de la déclinaison elle-même : un envoi
-  // depuis Séniors 1, Séniors 2 ou Séniors M met à jour le MÊME fichier
-  // partagé par toute la famille. Même principe que la photo d'équipe
-  // ci-dessus pour le reste (affichage optimiste, écriture directe), mais
-  // bucket PRIVÉ (team-trombinoscopes).
-  const [trombinoscopePath, setTrombinoscopePath] = useState(team.trombinoscopePath ?? null);
-  const [uploadingTrombinoscope, setUploadingTrombinoscope] = useState(false);
-  const [trombinoscopeError, setTrombinoscopeError] = useState<string | null>(null);
-  const trombinoscopeOwnerId = team.trombinoscopeOwnerTeamId ?? team.id;
-  // Retour de Cindy du 05/10 ("pour tous le monde sauf les babys") :
-  // s'applique à toute équipe mère OU sans déclinaison (U9, U11, U13F,
-  // U15M, Loisirs...) -- seule la catégorie Babys n'a jamais de match
-  // officiel avec contrôle d'identité, donc jamais de trombinoscope. Même
-  // repli que categoryTheme ci-dessus (c.startsWith("baby")).
-  const isBabysTeam = (team.category ?? team.name ?? "").toLowerCase().startsWith("baby");
-  async function onTrombinoscopeChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    if (file.type !== "application/pdf") {
-      setTrombinoscopeError("Choisis un fichier PDF.");
-      return;
-    }
-    // Retour de Cindy du 05/10 ("Envoi impossible, réessaie" sur U18M,
-    // 9,16 Mo déjà pour Séniors M) : vérifié avant l'envoi plutôt que de
-    // laisser échouer côté Storage -- message précis ("fichier trop
-    // lourd") au lieu du générique qui ne disait pas pourquoi. Même
-    // limite que le bucket (26214400, voir sa migration).
-    if (file.size > 26214400) {
-      setTrombinoscopeError(
-        `Fichier trop lourd (${(file.size / 1024 / 1024).toFixed(1)} Mo, 25 Mo maximum).`
-      );
-      return;
-    }
-    setUploadingTrombinoscope(true);
-    setTrombinoscopeError(null);
-    try {
-      const supabase = createClient();
-      const path = `${trombinoscopeOwnerId}/trombinoscope.pdf`;
-      const { error: uploadErr } = await supabase.storage
-        .from("team-trombinoscopes")
-        .upload(path, file, { upsert: true, contentType: "application/pdf" });
-      if (uploadErr) {
-        // Message précis (ex. "The resource already exists", quota,
-        // policy RLS...) plutôt qu'un générique qui ne dit pas pourquoi --
-        // retour de Cindy du 05/10, cas réel U18M où la cause (fichier
-        // trop lourd) était invisible sans aller chercher en base.
-        setTrombinoscopeError(`Envoi impossible : ${uploadErr.message}`);
-        return;
-      }
-      const { error: updateErr } = await supabase
-        .from("teams")
-        .update({ trombinoscope_path: path })
-        .eq("id", trombinoscopeOwnerId);
-      if (updateErr) {
-        setTrombinoscopeError(`Enregistrement impossible : ${updateErr.message}`);
-        return;
-      }
-      setTrombinoscopePath(path);
-      router.refresh();
-    } finally {
-      setUploadingTrombinoscope(false);
     }
   }
 
@@ -1116,54 +1045,8 @@ export default function TeamCard({
             )}
           </div>
         </div>
-        {/* Retour de Cindy du 05/10 ("le bouton serait mieux sous l'icône
-            photo d'équipe", puis "le nom des équipes n'est plus à côté de
-            l'image... problème de responsive") : sur sa PROPRE ligne, sous
-            tout l'en-tête (photo + nom), plutôt qu'empilé dans la colonne
-            de la photo -- ce dernier montage cassait l'alignement
-            photo/nom dès que la carte devenait étroite (mobile), le nom
-            retombant sous la photo au lieu de rester à côté. Même rendu
-            "sous la photo" en pratique, sans dépendre de la largeur
-            disponible. */}
-        {!isBabysTeam && !readOnly ? (
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Retour de Cindy du 05/10 ("sénior 1 et sénior 2 toujours
-                pas de bouton", "pareil pour les u13 et les U18") : le
-                bouton d'envoi est visible sur TOUTE équipe, déclinaison
-                comprise -- il écrit vers trombinoscopeOwnerId (toujours
-                l'équipe mère) quelle que soit la carte d'où on l'envoie,
-                voir le commentaire plus haut. Bouton de CONSULTATION
-                retiré d'ici le 16/10 (retour de Cindy, "je veux les
-                trombi seulement dans document") -- l'envoi reste ici,
-                mais ouvrir le fichier déjà envoyé se fait désormais
-                uniquement depuis Vie du club > Documents
-                (TeamTrombinoscopesCard, club-documents.tsx). */}
-            <label
-              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-                trombinoscopePath
-                  ? "bg-sky-100 text-sky-700 hover:bg-sky-200"
-                  : "bg-navy text-white hover:bg-navy-dark"
-              } ${uploadingTrombinoscope ? "cursor-wait opacity-60" : "cursor-pointer"}`}
-            >
-              <Upload className="h-3.5 w-3.5 shrink-0" />
-              {uploadingTrombinoscope
-                ? "Envoi…"
-                : trombinoscopePath
-                  ? "Remplacer le trombinoscope"
-                  : "Envoyer le trombinoscope"}
-              <input
-                type="file"
-                accept="application/pdf"
-                onChange={onTrombinoscopeChange}
-                disabled={uploadingTrombinoscope}
-                className="hidden"
-              />
-            </label>
-          </div>
-        ) : null}
       </div>
       {photoError && <p className="mt-1 text-xs text-red-600">{photoError}</p>}
-      {trombinoscopeError && <p className="mt-1 text-xs text-red-600">{trombinoscopeError}</p>}
 
       <div className="mt-3">
         <div className="mb-1 flex flex-wrap items-center justify-between gap-2">

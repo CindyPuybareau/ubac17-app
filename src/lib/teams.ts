@@ -272,33 +272,40 @@ export function getTrombinoscopeTeamId<
 }
 
 // Retour de Cindy du 16/10 ("chaque équipe... directement dans
-// Documents, comme pour les officiels") : construit la liste dédupliquée
-// des trombinoscopes d'équipe à afficher dans l'onglet Documents, à
-// partir des équipes à montrer pour CE viewer (`teamsToShow` --
-// catalogue complet pour le Bureau, équipes coachées seulement pour un
-// Coach) et du catalogue complet du club (`allTeams`, nécessaire pour
-// retrouver le nom de la mère même quand elle n'est pas elle-même dans
-// `teamsToShow`, ex. un coach de seulement "U13M-1"). `trombinoscopeByTeamId`
-// est déjà résolu par héritage (voir getTrombinoscopeTeamId, appelé côté
-// serveur dans page.tsx) -- aucune nouvelle résolution de chemin ici,
-// seulement la dédup/label (un coach de U13M-1 ET U13M-2 ne doit voir
-// "Trombinoscope U13M" qu'une fois, jamais les deux déclinaisons).
+// Documents, comme pour les officiels"), étendu le 24/10 ("tout doit être
+// centralisé au même endroit... envoi, visualisation et téléchargement
+// depuis Documents, plus rien dans l'onglet Équipes") : construit la liste
+// dédupliquée des équipes à afficher dans l'onglet Documents, à partir des
+// équipes à montrer pour CE viewer (`teamsToShow` -- catalogue complet
+// pour le Bureau, équipes coachées seulement pour un Coach) et du
+// catalogue complet du club (`allTeams`, nécessaire pour retrouver le nom
+// de la mère même quand elle n'est pas elle-même dans `teamsToShow`, ex.
+// un coach de seulement "U13M-1"). `trombinoscopeByTeamId` est déjà résolu
+// par héritage (voir getTrombinoscopeTeamId, appelé côté serveur dans
+// page.tsx) -- aucune nouvelle résolution de chemin ici, seulement la
+// dédup/label (un coach de U13M-1 ET U13M-2 ne doit voir "U13M" qu'une
+// fois, jamais les deux déclinaisons). `path` peut désormais être null
+// (équipe sans trombinoscope envoyé) : `teamsToShow` représente déjà
+// exactement les équipes que CE viewer a le droit de gérer (Bureau = tout
+// le club, Coach = ses équipes coachées), donc chaque ligne renvoyée peut
+// toujours proposer le bouton d'envoi, pas seulement la consultation.
 export function listTeamTrombinoscopes<
   T extends { id: string; name?: string | null; category?: string | null },
 >(
   teamsToShow: T[],
   allTeams: T[],
   trombinoscopeByTeamId: Record<string, string | null | undefined>
-): { team: T; path: string }[] {
+): { team: T; path: string | null }[] {
   const seenOwnerIds = new Set<string>();
-  const entries: { team: T; path: string }[] = [];
+  const entries: { team: T; path: string | null }[] = [];
   teamsToShow.forEach((team) => {
-    const path = trombinoscopeByTeamId[team.id];
-    if (!path) return;
     const ownerId = getTrombinoscopeTeamId(team, allTeams);
     if (seenOwnerIds.has(ownerId)) return;
     seenOwnerIds.add(ownerId);
-    entries.push({ team: allTeams.find((t) => t.id === ownerId) ?? team, path });
+    entries.push({
+      team: allTeams.find((t) => t.id === ownerId) ?? team,
+      path: trombinoscopeByTeamId[team.id] ?? null,
+    });
   });
   return entries;
 }
