@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Lock, Plus, Trash2, TriangleAlert, X } from "lucide-react";
+import { FileText, Lock, Trash2, TriangleAlert, Upload, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { ClubReport } from "./page";
 import ConfirmDialog from "./confirm-dialog";
@@ -146,9 +146,9 @@ export default function Cd17LigueSection({
           <button
             type="button"
             onClick={openUpload}
-            className="flex items-center gap-1 rounded-full bg-ubac-yellow px-2.5 py-1 text-xs font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark"
+            className="flex items-center gap-1 rounded-full border border-navy/20 px-2.5 py-1 text-xs font-semibold text-navy transition-colors hover:bg-navy/5"
           >
-            <Plus className="h-3.5 w-3.5 shrink-0" />
+            <Upload className="h-3.5 w-3.5 shrink-0" />
             Déposer
           </button>
         )}

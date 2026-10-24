@@ -577,6 +577,7 @@ export default function AdminView({
                   title="Comptes rendus mairies"
                   emptyLabel="Aucun compte rendu de réunion avec une mairie pour le moment."
                   canCreate
+                  canUpload
                   isAdmin
                   reports={clubReports}
                 />
@@ -587,6 +588,7 @@ export default function AdminView({
                   title="Comptes rendus bureau"
                   emptyLabel="Aucun compte rendu de réunion du Bureau pour le moment."
                   canCreate
+                  canUpload
                   isAdmin
                   reports={clubReports}
                 />

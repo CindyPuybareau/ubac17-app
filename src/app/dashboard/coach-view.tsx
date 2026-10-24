@@ -542,6 +542,7 @@ export default function CoachView({
                 title="Comptes rendus des coachs"
                 emptyLabel="Aucun compte rendu de coach pour le moment."
                 canCreate
+                canUpload
                 isAdmin={false}
                 currentUserId={currentUserId}
                 showAuthor

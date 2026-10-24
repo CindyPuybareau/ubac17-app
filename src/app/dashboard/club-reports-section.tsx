@@ -9,7 +9,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { Bold, Eraser, FileText, Highlighter, Italic, Plus, Printer, Trash2, X } from "lucide-react";
+import { Bold, Eraser, FileText, Highlighter, Italic, Plus, Printer, Trash2, Upload, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getLogoBase64, PDF_COLORS } from "@/lib/pdf-brand";
 import {
@@ -542,6 +542,7 @@ export default function ClubReportsSection({
   title,
   emptyLabel,
   canCreate,
+  canUpload = false,
   isAdmin,
   currentUserId = null,
   showAuthor = false,
@@ -557,6 +558,14 @@ export default function ClubReportsSection({
   // (cas du Bureau, qui consulte/corrige les comptes rendus coachs mais
   // n'en rédige jamais en tant que "coach" depuis son propre onglet).
   canCreate: boolean;
+  // Retour de Cindy du 24/10 ("le bureau rédige souvent ses comptes rendus
+  // sur un document Word... tout centralisé ici") : même principe que
+  // canCreate mais pour le bouton "Déposer" (fichier) -- même personne qui
+  // écrit un texte peut aussi déposer un fichier, les deux boutons sont
+  // donc câblés côté appelant avec les mêmes droits (admin-view.tsx/
+  // coach-view.tsx), mais restent deux props distinctes pour pouvoir un
+  // jour les faire diverger sans casser la signature de ce composant.
+  canUpload?: boolean;
   // isAdmin/currentUserId plutôt qu'une fonction canEditRow (audit du
   // 2026-09-01) : admin-view.tsx/coach-view.tsx sont des Server Components,
   // qui ne peuvent pas passer une fonction à un composant client ("use
@@ -589,6 +598,12 @@ export default function ClubReportsSection({
   const [error, setError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ClubReport | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // Dépôt d'un fichier (retour de Cindy du 24/10) : formTitle/formDate/
+  // saving/error partagés avec Création/Modification ci-dessus (jamais
+  // deux modales ouvertes en même temps) -- seul le fichier a besoin de
+  // son propre state, absent des deux autres flux.
+  const [depositing, setDepositing] = useState(false);
+  const [depositFile, setDepositFile] = useState<File | null>(null);
 
   function openCreate() {
     setFormTitle("");
@@ -628,6 +643,70 @@ export default function ClubReportsSection({
       return;
     }
     setCreating(false);
+    router.refresh();
+  }
+
+  // Retour de Cindy du 24/10 ("ajouter un bouton télécharger sur chaque
+  // carte compte rendu", "faire le distingo entre télécharger et écrire
+  // directement depuis l'appli") : même mécanique à deux écritures que
+  // cd17-ligue-section.tsx (dépôt Storage, puis fiche club_reports) --
+  // jamais de boucle, toujours ces deux seuls appels réseau par dépôt,
+  // quelle que soit la taille du fichier.
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 Mo, même limite que le bucket
+
+  function openDeposit() {
+    setFormTitle("");
+    setFormDate(new Date().toISOString().slice(0, 10));
+    setDepositFile(null);
+    setError(null);
+    setDepositing(true);
+  }
+
+  async function confirmDeposit() {
+    if (!formTitle.trim()) {
+      setError("Le titre est obligatoire.");
+      return;
+    }
+    if (!depositFile) {
+      setError("Choisis un fichier à déposer.");
+      return;
+    }
+    if (depositFile.size > MAX_FILE_SIZE) {
+      setError(`Fichier trop lourd (${(depositFile.size / 1024 / 1024).toFixed(1)} Mo, 10 Mo maximum).`);
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    const supabase = createClient();
+    const { data: userData } = await supabase.auth.getUser();
+    const safeName = depositFile.name.replace(/[^a-zA-Z0-9.-]+/g, "_");
+    const path = `${crypto.randomUUID()}-${safeName}`;
+    const { error: uploadError } = await supabase.storage
+      .from("club-report-files")
+      .upload(path, depositFile);
+    if (uploadError) {
+      setSaving(false);
+      setError(`Dépôt impossible : ${uploadError.message}`);
+      return;
+    }
+    const { error: insertError } = await supabase.from("club_reports").insert({
+      category,
+      title: formTitle.trim(),
+      report_date: formDate,
+      file_path: path,
+      created_by: userData.user?.id ?? null,
+    });
+    setSaving(false);
+    if (insertError) {
+      // Même repli que cd17-ligue-section.tsx : le fichier est déposé mais
+      // la fiche n'a pas pu être créée -- jamais rencontré en pratique
+      // (même policy RLS déjà vérifiée au moment de l'upload), mais la
+      // personne doit le savoir plutôt que croire que c'est fait.
+      console.error("[club-reports-section] création de la fiche échouée après dépôt:", insertError);
+      setError(`Le fichier est déposé, mais la fiche n'a pas pu être créée : ${insertError.message}`);
+      return;
+    }
+    setDepositing(false);
     router.refresh();
   }
 
@@ -689,37 +768,99 @@ export default function ClubReportsSection({
           <FileText className="h-4 w-4 shrink-0 text-navy" />
           {title}
         </p>
-        {canCreate && (
-          <button
-            type="button"
-            onClick={openCreate}
-            className="flex items-center gap-1 rounded-full bg-ubac-yellow px-2.5 py-1 text-xs font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark"
-          >
-            <Plus className="h-3.5 w-3.5 shrink-0" />
-            Nouveau
-          </button>
-        )}
+        <div className="flex shrink-0 items-center gap-1.5">
+          {canCreate && (
+            <button
+              type="button"
+              onClick={openCreate}
+              className="flex items-center gap-1 rounded-full bg-ubac-yellow px-2.5 py-1 text-xs font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark"
+            >
+              <Plus className="h-3.5 w-3.5 shrink-0" />
+              Nouveau
+            </button>
+          )}
+          {canUpload && (
+            <button
+              type="button"
+              onClick={openDeposit}
+              className="flex items-center gap-1 rounded-full border border-navy/20 px-2.5 py-1 text-xs font-semibold text-navy transition-colors hover:bg-navy/5"
+            >
+              <Upload className="h-3.5 w-3.5 shrink-0" />
+              Déposer
+            </button>
+          )}
+        </div>
       </div>
       <div className="flex flex-col">
         {list.length === 0 && <p className="px-4 py-6 text-center text-sm text-zinc-400">{emptyLabel}</p>}
-        {list.map((r) => (
-          <button
-            key={r.id}
-            type="button"
-            onClick={() => setDetail(r)}
-            className="flex items-center justify-between gap-2 border-b border-zinc-50 px-4 py-2.5 text-left last:border-b-0 hover:bg-zinc-50"
-          >
-            <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-800">
-              {r.title}
-              {showAuthor && r.authorName && (
-                <span className="ml-1.5 font-normal text-zinc-400">— {r.authorName}</span>
-              )}
-            </span>
-            <span className="shrink-0 text-xs text-zinc-400">
-              {new Date(r.reportDate).toLocaleDateString("fr-FR")}
-            </span>
-          </button>
-        ))}
+        {list.map((r) =>
+          // Retour de Cindy du 24/10 : une ligne-fichier (déposée) affiche
+          // directement Télécharger au lieu d'ouvrir la fenêtre de texte --
+          // body et filePath ne sont jamais renseignés en même temps
+          // (voir confirmCreate/confirmDeposit ci-dessus), le distingo se
+          // fait donc juste sur filePath.
+          r.filePath ? (
+            <div
+              key={r.id}
+              className="flex items-center justify-between gap-2 border-b border-zinc-50 px-4 py-2.5 last:border-b-0"
+            >
+              <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-800">
+                {r.title}
+                {showAuthor && r.authorName && (
+                  <span className="ml-1.5 font-normal text-zinc-400">— {r.authorName}</span>
+                )}
+              </span>
+              <div className="flex shrink-0 items-center gap-3">
+                <span className="text-xs text-zinc-400">
+                  {new Date(r.reportDate).toLocaleDateString("fr-FR")}
+                </span>
+                {/* Lien direct déjà prêt (URL signée générée côté serveur,
+                    voir page.tsx) -- jamais une navigation déclenchée après
+                    un clic, qui se ferait bloquer par le bloqueur de popup
+                    sur iPhone (même raison que cd17-ligue-section.tsx). */}
+                {r.fileUrl ? (
+                  <a
+                    href={r.fileUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-full bg-navy/5 px-2.5 py-1 text-xs font-semibold text-navy hover:bg-navy/10"
+                  >
+                    Télécharger
+                  </a>
+                ) : (
+                  <span className="text-xs text-zinc-300">Lien indisponible</span>
+                )}
+                {canEditRow(r) && (
+                  <button
+                    type="button"
+                    onClick={() => setDeleteTarget(r)}
+                    aria-label="Supprimer"
+                    className="rounded-full p-1.5 text-zinc-300 hover:bg-red-50 hover:text-red-600"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => setDetail(r)}
+              className="flex items-center justify-between gap-2 border-b border-zinc-50 px-4 py-2.5 text-left last:border-b-0 hover:bg-zinc-50"
+            >
+              <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-800">
+                {r.title}
+                {showAuthor && r.authorName && (
+                  <span className="ml-1.5 font-normal text-zinc-400">— {r.authorName}</span>
+                )}
+              </span>
+              <span className="shrink-0 text-xs text-zinc-400">
+                {new Date(r.reportDate).toLocaleDateString("fr-FR")}
+              </span>
+            </button>
+          )
+        )}
       </div>
 
       {/* Consultation / impression / export PDF — même mécanisme que le
@@ -852,6 +993,66 @@ export default function ClubReportsSection({
               <button
                 type="button"
                 onClick={() => setCreating(false)}
+                className="rounded-full px-3.5 py-1.5 text-sm font-semibold text-zinc-500 hover:bg-zinc-100"
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Dépôt d'un fichier (retour de Cindy du 24/10) : même formulaire
+          que cd17-ligue-section.tsx, sans l'avertissement de verrouillage
+          définitif -- une ligne déposée ici reste supprimable (voir
+          canEditRow plus haut), juste jamais remplaçable en place (pas de
+          "Modifier" sur une ligne-fichier, on supprime et on redépose). */}
+      {depositing && (
+        <Modal title={`Déposer — ${title}`} onClose={() => setDepositing(false)} wide>
+          <div className="flex flex-col gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-600">Titre</label>
+              <input
+                type="text"
+                value={formTitle}
+                onChange={(e) => setFormTitle(e.target.value)}
+                placeholder="Réunion du 12 septembre"
+                className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-600">Date</label>
+              <input
+                type="date"
+                value={formDate}
+                onChange={(e) => setFormDate(e.target.value)}
+                className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-600">
+                Fichier (Word, PDF, JPEG ou PNG, 10 Mo maximum)
+              </label>
+              <input
+                type="file"
+                accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf,image/jpeg,image/png"
+                onChange={(e) => setDepositFile(e.target.files?.[0] ?? null)}
+                className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+              />
+            </div>
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            <div className="mt-1 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={confirmDeposit}
+                disabled={saving}
+                className="rounded-full bg-ubac-yellow px-3.5 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+              >
+                {saving ? "Dépôt en cours..." : "Déposer"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDepositing(false)}
                 className="rounded-full px-3.5 py-1.5 text-sm font-semibold text-zinc-500 hover:bg-zinc-100"
               >
                 Annuler
