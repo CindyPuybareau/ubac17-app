@@ -96,11 +96,34 @@ export function relanceTemplateKeyFor(c: AdminCotisation): RelanceTemplateKey {
   return status === "PARTIEL" || status === "EN_ATTENTE" ? status : "PAYE";
 }
 
+// Retour de Cindy du 25/10 ("carte 'Collecte en attente' sur Événements
+// payants, avec un bouton Relancer") : RELANCE_TEMPLATES ci-dessus parle de
+// "la cotisation de cette saison" -- faux pour un stage/événement/boutique
+// (collecte_id non nul). Même mécanique de relance (preview, envoi,
+// cooldown côté cron) réutilisée telle quelle, juste un gabarit qui nomme
+// l'événement concerné via {evenement}. Jamais de PAYE ici : l'entrée de ce
+// chantier (pendingEventCotisations, cotisations-manager.tsx) ne contient
+// que des lignes En attente/Partiel.
+export const COLLECTE_RELANCE_TEMPLATES: Record<
+  Exclude<RelanceTemplateKey, "PAYE">,
+  { subject: string; body: string }
+> = {
+  EN_ATTENTE: {
+    subject: "UBAC Basket - Rappel de paiement : {evenement}",
+    body: `Bonjour {prenom}, sauf erreur de notre part, nous n'avons pas encore reçu votre règlement concernant {evenement} (Montant : {tarif} €). Merci de bien vouloir faire le nécessaire ou de contacter le bureau en cas de besoin.\n\n${EMAIL_SIGNATURE}`,
+  },
+  PARTIEL: {
+    subject: "UBAC Basket - Solde à régler : {evenement}",
+    body: `Bonjour {prenom}, nous vous remercions pour vos premiers versements. Il reste un solde de {solde} € à régler pour {evenement} (Montant total : {tarif} €, déjà réglé : {paye} €). Merci de régulariser ce solde prochainement.\n\n${EMAIL_SIGNATURE}`,
+  },
+};
+
 export function renderRelanceTemplate(text: string, c: AdminCotisation) {
   return text
     .replace(/\{prenom\}/g, cotisationFirstName(c))
     .replace(/\{nom\}/g, cotisationLastName(c))
     .replace(/\{tarif\}/g, formatPlaceholderAmount(c.prix))
     .replace(/\{paye\}/g, formatPlaceholderAmount(c.paiement))
-    .replace(/\{solde\}/g, formatPlaceholderAmount(balanceDue(c)));
+    .replace(/\{solde\}/g, formatPlaceholderAmount(balanceDue(c)))
+    .replace(/\{evenement\}/g, c.collecteName ?? "votre cotisation");
 }

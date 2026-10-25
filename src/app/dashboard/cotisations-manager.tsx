@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
@@ -148,6 +148,8 @@ function KpiCard({
   onClick,
   active = false,
   activeClassName = "",
+  badge,
+  reserveBadgeSpace = false,
 }: {
   icon: typeof Wallet;
   iconClass: string;
@@ -171,6 +173,20 @@ function KpiCard({
   onClick?: () => void;
   active?: boolean;
   activeClassName?: string;
+  // Retour de Cindy du 25/10 ("bouton Relancer... même fonctionnement que
+  // la page calendrier") : même esprit que cornerBadge (bureau-dashboard.tsx)
+  // -- superposé en position absolue, JAMAIS imbriqué dans le <button> de
+  // la carte (un <button> dans un <button> serait invalide et empêcherait
+  // ce badge d'avoir sa propre action, différente du clic sur la carte).
+  badge?: ReactNode;
+  // Retour de Cindy du 25/10 ("les icônes et les montants doivent être
+  // alignés... petit décalage en hauteur à cause du bouton Relancer") :
+  // une carte SANS badge, posée à côté d'une carte AVEC badge (ex. "Total
+  // collecté" à côté de "Collecte en attente"), réservait moins de place
+  // en haut (p-4) que sa voisine (pt-9) -- son contenu, centré dans un
+  // espace plus grand, se retrouvait plus bas. Ce prop fait réserver la
+  // même place même sans badge réel, pour que tout s'aligne.
+  reserveBadgeSpace?: boolean;
 }) {
   const cardBody = (
     <>
@@ -201,26 +217,47 @@ function KpiCard({
   // (signalé par Cindy le 07/09, sur tablette). overflow-hidden en
   // filet de sécurité si jamais un montant futur reste malgré tout trop
   // long pour sa carte.
-  const baseClass = `flex h-full min-w-0 flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border p-4 text-center shadow-sm transition-colors ${
-    wide ? "col-span-2" : ""
-  }`;
+  // Retour de Cindy du 25/10 ("comme la carte du calendrier") : même
+  // repli que cornerBadge sur bureau-dashboard.tsx -- pt-9 au lieu de p-4
+  // quand un badge est présent, pour que le contenu centré (icône/
+  // chiffre/libellé) ne remonte jamais sous le badge ancré en haut à
+  // droite (même correctif déjà fait une fois là-bas, "le bouton mange
+  // l'icône").
+  const baseClass = `flex h-full w-full min-w-0 flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border text-center shadow-sm transition-colors ${
+    badge || reserveBadgeSpace ? "px-4 pb-4 pt-9" : "p-4"
+  } ${wide ? "col-span-2" : ""}`;
 
-  if (onClick) {
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        aria-pressed={active}
-        className={`${baseClass} cursor-pointer ${
-          active ? activeClassName : "border-slate-200 bg-white hover:bg-slate-50"
-        }`}
-      >
-        {cardBody}
-      </button>
-    );
-  }
+  const card = onClick ? (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`${baseClass} cursor-pointer ${
+        active ? activeClassName : "border-slate-200 bg-white hover:bg-slate-50"
+      }`}
+    >
+      {cardBody}
+    </button>
+  ) : (
+    <div className={`${baseClass} border-slate-200 bg-white`}>{cardBody}</div>
+  );
 
-  return <div className={`${baseClass} border-slate-200 bg-white`}>{cardBody}</div>;
+  if (!badge) return card;
+
+  // Retour de Cindy du 25/10 ("le bouton Relancer doit se trouver DANS la
+  // carte, comme la page calendrier") : un <button> dans un <button> est
+  // invalide (voir le commentaire sur `badge` plus haut), donc ce
+  // wrapper reste nécessaire -- mais sans w-full/h-full explicites sur
+  // CE wrapper, le <button> de la carte retombe à sa largeur de contenu
+  // (il n'est plus l'élément de grille lui-même) et le badge, positionné
+  // par rapport au wrapper redevenu plus large que la carte visible,
+  // flottait hors du cadre rose au lieu d'y rester collé.
+  return (
+    <div className={`relative h-full w-full ${wide ? "col-span-2" : ""}`}>
+      {card}
+      <div className="absolute right-2 top-2">{badge}</div>
+    </div>
+  );
 }
 
 function KpiHeader({
@@ -429,6 +466,16 @@ export default function CotisationsManager({
   const [editingGroupLinkLabel, setEditingGroupLinkLabel] = useState<string | null>(null);
   const [groupLinkDraft, setGroupLinkDraft] = useState("");
   const [groupLinkSaving, setGroupLinkSaving] = useState(false);
+  // Retour de Cindy du 25/10 ("carte 'Collecte en attente'... cliquable
+  // pour voir qui est concerné, avec un bouton Relancer") : clic sur la
+  // carte -> ouvre la liste (showPendingOverview) ; clic sur le badge
+  // "Relancer" -> ouvre la MÊME liste mais tout présélectionné
+  // (pendingAutoSelect), prêt pour "Relancer la sélection" sans retrouver
+  // les cases une par une -- même esprit que RelanceRedirectButton
+  // (bureau-dashboard.tsx), ici sans navigation puisqu'on reste dans le
+  // même composant.
+  const [showPendingOverview, setShowPendingOverview] = useState(false);
+  const [pendingAutoSelect, setPendingAutoSelect] = useState(false);
 
   const contactEmailByPlayerId = useMemo(() => {
     const map: Record<string, string> = {};
@@ -567,6 +614,25 @@ export default function CotisationsManager({
     () =>
       Array.from(kpisByCollecteId.values()).reduce((sum, k) => sum + k.totalCollected, 0),
     [kpisByCollecteId]
+  );
+
+  // Retour de Cindy du 25/10 ("carte 'Collecte en attente' à côté de Total
+  // collecté, avec un bouton Relancer -- même fonctionnement que la page
+  // calendrier") : même regroupement En attente + Partiel que "Cotisations
+  // en attente" sur le tableau de bord (bureau-dashboard.tsx), mais sur
+  // TOUTES les collectes (stage/événement/boutique) plutôt que la seule
+  // cotisation saison -- visibleCollecteCotisations pour rester cohérent
+  // avec ce que montre déjà chaque carte/dossier (jamais un participant
+  // absent du RSVP, sauf paiement réel/Offert/ajout manuel).
+  const pendingEventCotisations = useMemo(
+    () =>
+      collectes
+        .flatMap((c) => visibleCollecteCotisations(c, cotisations))
+        .filter((c) => {
+          const status = computeStatus(c);
+          return status === "EN_ATTENTE" || status === "PARTIEL";
+        }),
+    [collectes, cotisations]
   );
 
   const availableMembers = useMemo(() => {
@@ -1268,6 +1334,34 @@ export default function CotisationsManager({
     );
   }
 
+  // Retour de Cindy du 25/10 ("au clic sur un évènement, le total collecté
+  // / la collecte en attente de CET évènement -- à l'arrivée sur la page,
+  // le total de TOUS les évènements") : "focus" désigne ce que les deux
+  // cartes KPI (et le bouton Relancer) doivent montrer -- un dossier ouvert
+  // (effectiveOpenGroupLabel), sinon une collecte individuelle sélectionnée
+  // ET toujours visible comme carte (même garde-fou que
+  // renderSelectedCollecteDetailPanel -- jamais le nom d'une collecte
+  // avalée par un dossier entre-temps), sinon null (vue globale). Les deux
+  // cartes ET le clic "Relancer" partagent la MÊME cible : jamais un
+  // chiffre qui annonce "3 en attente" pendant qu'un clic sur Relancer en
+  // contacterait 23.
+  const focus = effectiveOpenGroupLabel
+    ? { label: effectiveOpenGroupLabel, cotisations: groupParticipants }
+    : selectedCollecte && ungroupedCollectes.some((c) => c.id === selectedCollecte.id)
+      ? { label: selectedCollecte.name, cotisations: collecteCotisations }
+      : null;
+
+  const focusedTotalCollected = focus
+    ? computeKpis(focus.cotisations).totalCollected
+    : totalCollectedAllCollectes;
+
+  const focusedPendingCotisations = focus
+    ? focus.cotisations.filter((c) => {
+        const status = computeStatus(c);
+        return status === "EN_ATTENTE" || status === "PARTIEL";
+      })
+    : pendingEventCotisations;
+
   // Panneau détail (liste des participants + "Ajouter des participants")
   // de la collecte actuellement sélectionnée (selectedCollecte) -- partagé
   // entre la grille principale (cartes non groupées) et la vue "Événements"
@@ -1430,21 +1524,83 @@ export default function CotisationsManager({
 
       {shownTab === "collectes" && (
         <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-1 gap-3 sm:max-w-xs">
+          <div className="grid grid-cols-2 gap-3 sm:max-w-md">
             <KpiCard
               icon={Wallet}
               iconClass="text-amber-700"
-              value={
-                effectiveOpenGroupLabel
-                  ? groupKpis(effectiveOpenGroupLabel).totalCollected
-                  : totalCollectedAllCollectes
-              }
+              value={focusedTotalCollected}
               kind="amount"
-              label={effectiveOpenGroupLabel ? `Total collecté — ${effectiveOpenGroupLabel}` : "Total collecté"}
+              // Retour de Cindy du 25/10 ("pas la peine d'écrire le nom de
+              // l'évènement dans les cartes, on le sait puisqu'on a
+              // cliqué") : le libellé reste générique, seule la VALEUR se
+              // scope sur `focus`.
+              label="Total collecté"
+              // Même réserve que le badge "Relancer" voisin (visible
+              // seulement si focusedPendingCotisations.length > 0) -- sinon
+              // les deux cartes retombent chacune sur un padding différent
+              // et leurs icônes/montants se décalent (retour de Cindy du
+              // 25/10, déjà corrigé une fois pour ce même couple de cartes).
+              reserveBadgeSpace={focusedPendingCotisations.length > 0}
+            />
+            {/* Retour de Cindy du 25/10 ("Collecte en attente à côté de
+                Total collecté, avec un bouton Relancer -- même
+                fonctionnement que la page calendrier") puis ("au clic sur
+                un évènement, le total/la collecte en attente de CET
+                évènement") : scopée sur `focus` au lieu de masquée --
+                dossier ouvert ou collecte individuelle sélectionnée donnent
+                toutes les deux un sous-total, sinon le compteur global.
+                Le bouton Relancer suit la même cible (focusedPendingCotisations),
+                jamais désynchronisé du chiffre affiché. */}
+            <KpiCard
+              icon={AlertTriangle}
+              iconClass="text-rose-600"
+              value={focusedPendingCotisations.length}
+              kind="integer"
+              label="Collecte en attente"
+              onClick={() => {
+                setShowPendingOverview(true);
+                setPendingAutoSelect(false);
+              }}
+              active={showPendingOverview}
+              activeClassName="border-rose-400 bg-rose-50"
+              badge={
+                focusedPendingCotisations.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowPendingOverview(true);
+                      setPendingAutoSelect(true);
+                    }}
+                    className="rounded-full bg-navy/10 px-2 py-0.5 text-[11px] font-semibold text-navy transition-colors hover:bg-navy/15"
+                  >
+                    Relancer
+                  </button>
+                )
+              }
             />
           </div>
 
-          {effectiveOpenGroupLabel ? (
+          {showPendingOverview ? (
+            <div className="flex flex-col gap-4">
+              <button
+                onClick={() => {
+                  setShowPendingOverview(false);
+                  setPendingAutoSelect(false);
+                }}
+                className="flex w-fit items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-navy hover:bg-zinc-50"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Retour
+              </button>
+              <CotisationParticipantsTable
+                cotisations={focusedPendingCotisations}
+                contactEmailByPlayerId={contactEmailByPlayerId}
+                emptyLabel="Aucune collecte en attente."
+                autoSelectAll={pendingAutoSelect}
+              />
+            </div>
+          ) : effectiveOpenGroupLabel ? (
             <div className="flex flex-col gap-4">
               <div className="flex flex-wrap items-center gap-2">
                 <button

@@ -1,6 +1,7 @@
 import {
   Building2,
   CalendarDays,
+  Coffee,
   Contact,
   Gavel,
   HandHeart,
@@ -35,6 +36,7 @@ import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import FfbbManager from "./ffbb-manager";
 import SponsorsManager from "./sponsors-manager";
 import InventoryManager from "./inventory-manager";
+import BuvetteManager from "./buvette-manager";
 import SponsorsDisplay from "./sponsors-display";
 import BureauDashboard from "./bureau-dashboard";
 import AutomationSettings, { type AutomationKey } from "./automation-settings";
@@ -42,6 +44,7 @@ import SpaceDashboardSummary from "./space-dashboard-summary";
 import type { SpaceDashboardSummary as SpaceDashboardSummaryData } from "@/lib/space-dashboard";
 import type {
   AdminAccessProfile,
+  AdminBuvette,
   AdminCategoryTariff,
   AdminCollecte,
   AdminCotisation,
@@ -78,6 +81,7 @@ export default function AdminView({
   sponsorDisplay,
   accessProfiles,
   penalites,
+  buvette,
   automationSettings,
   eventRoles,
   volunteerNeedsByEventId,
@@ -115,6 +119,9 @@ export default function AdminView({
   sponsorDisplay: SponsorDisplay[];
   accessProfiles: AdminAccessProfile[];
   penalites: AdminPenalite[];
+  // Retour de Cindy du 25/10 ("onglet Buvette dans Paiements") : recette
+  // jour par jour (CB/Sumup + espèces) -- voir buvette-manager.tsx.
+  buvette: AdminBuvette[];
   automationSettings: Record<AutomationKey, boolean>;
   // Catalogue des rôles d'organisation (buvette, table de marque...) et
   // besoins déjà définis par événement — pour créer/gérer les besoins en
@@ -445,6 +452,18 @@ export default function AdminView({
             />
           ),
         },
+        {
+          // Retour de Cindy du 25/10 ("ajouter un onglet Buvette dans
+          // Paiements, pour que le comptable puisse saisir tel jour : X €
+          // en CB/Sumup, X € en espèces") : suivi indépendant des
+          // cotisations/collectes/pénalités ci-dessus, jamais besoin de
+          // passer par CotisationsManager -- même patron que "Sponsors",
+          // enfant autonome du groupe voisin "Vie du club".
+          key: "cotisations-buvette",
+          label: "Buvette",
+          icon: <Coffee className={iconClass} />,
+          content: <BuvetteManager buvette={buvette} />,
+        },
       ],
     },
     // Retour de Cindy du 10/09 ("fusionner Événements dans Calendrier >
@@ -705,6 +724,10 @@ export default function AdminView({
     "cotisations-licences": "cotisations",
     "cotisations-evenements": "cotisations",
     "cotisations-penalites": "penalites",
+    // Retour de Cindy du 25/10 : réutilise la brique "cotisations" déjà
+    // partagée par cotisations-licences/cotisations-evenements plutôt
+    // qu'une brique dédiée -- pas demandé, à séparer plus tard si besoin.
+    "cotisations-buvette": "cotisations",
     "matches-official": "matchs_resultats",
     "matches-results": "matchs_resultats",
     sponsors: "sponsors",

@@ -7,6 +7,7 @@ import {
   Gavel,
   Handshake,
   Minus,
+  Ticket,
   Users,
   Wallet,
 } from "lucide-react";
@@ -266,6 +267,17 @@ export default function BureauDashboard({
   });
   const pendingAmount = pending.reduce((sum, c) => sum + balanceDue(c), 0);
 
+  // Retour de Cindy du 25/10 ("ajouter Total évènements payants juste
+  // avant Total pénalités... cette information est importante sur la page
+  // d'atterrissage") : complémentaire de seasonCotisations ci-dessus
+  // (collecteId non nul cette fois) -- même somme que "Total collecté" en
+  // haut de l'onglet Événements payants (cotisations-manager.tsx), juste
+  // réaffichée ici sans requête de plus (cotisations contient déjà les
+  // deux populations).
+  const collecteCotisationsTotal = cotisations
+    .filter((c) => c.collecteId)
+    .reduce((sum, c) => sum + (c.paiement ?? 0), 0);
+
   const activeMembers = members.filter((m) => !m.archivedAt).length;
 
   // Retour de Cindy du 30/09 : voir le commentaire sur `rsvpStatusByKey`
@@ -332,7 +344,7 @@ export default function BureauDashboard({
             signification -- "argent dû") réintroduirait exactement cette
             confusion. Cette grille de cartes fonctionne comme une petite
             palette catégorielle propre à chaque indicateur (comme
-            "Renouvellement Sponsors" en orange, "Membres actifs" en
+            "Total évènements payants" en or, "Membres actifs" en
             navy), pas comme une liste de statuts où la cohérence
             prime -- à la différence des badges détaillés (une ligne de
             cotisation, une pénalité individuelle...) déjà migrés. */}
@@ -356,6 +368,23 @@ export default function BureauDashboard({
           label="Montant en attente"
           href="/dashboard?tab=admin&section=cotisations-licences"
           sectionKey="cotisations-licences"
+        />
+        {/* Retour de Cindy du 25/10 ("ajouter Total évènements payants
+            juste avant Total pénalités, information importante sur la
+            page d'atterrissage") : même teinte or de marque que les
+            tickets/billets d'événement ailleurs dans l'appli
+            (collecte-type-style, cotisations-manager.tsx), jamais réutilisée
+            par les 3 cartes "argent dû" (rose/ambre/rouge) à côté -- celle-ci
+            annonce un montant déjà encaissé, pas une dette. */}
+        <KpiCard
+          icon={Ticket}
+          iconClass="text-ubac-yellow-dark"
+          iconBgClass="bg-ubac-yellow/15"
+          value={collecteCotisationsTotal}
+          kind="amount"
+          label="Total évènements payants"
+          href="/dashboard?tab=admin&section=cotisations-evenements"
+          sectionKey="cotisations-evenements"
         />
         <KpiCard
           icon={Gavel}
@@ -381,19 +410,6 @@ export default function BureauDashboard({
             iconBgClass: "bg-status-success/10",
             cardClass: "border-status-success/30 bg-status-success/10",
           }}
-        />
-        <KpiCard
-          icon={Handshake}
-          // Retour de Cindy du 09/09 (couleurs sémantiques) : status-pending
-          // (même token que le bandeau "Sponsors à renouveler" ci-dessous,
-          // même statut réel).
-          iconClass="text-status-pending-dark"
-          iconBgClass="bg-status-pending/10"
-          value={sponsorsNeedingRenewal.length}
-          kind="integer"
-          label="Renouvellement Sponsors"
-          href="/dashboard?tab=admin&section=sponsors"
-          sectionKey="sponsors"
         />
       </div>
 

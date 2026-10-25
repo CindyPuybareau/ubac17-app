@@ -101,6 +101,17 @@ export type AdminPenalite = {
   paymentLink: string | null;
 };
 
+// Retour de Cindy du 25/10 ("onglet Buvette dans Paiements... X € en CB,
+// X € en espèces") : suivi financier indépendant, Bureau seul, jamais lié à
+// un joueur (contrairement à AdminPenalite ci-dessus).
+export type AdminBuvette = {
+  id: string;
+  buvetteDate: string | null;
+  cardAmount: number;
+  cashAmount: number;
+  notes: string | null;
+};
+
 export type AdminSponsor = {
   id: string;
   name: string;
@@ -1622,6 +1633,7 @@ export default async function DashboardPage({
   let adminSponsors: AdminSponsor[] = [];
   let adminInventoryItems: AdminInventoryItem[] = [];
   let adminPenalites: AdminPenalite[] = [];
+  let adminBuvette: AdminBuvette[] = [];
   let adminAccessProfiles: AdminAccessProfile[] = [];
   // The Membres table's team pickers (filter + "Modifier le profil") only
   // offer teams with a sort_order set — any future leftover/legacy import
@@ -1708,6 +1720,7 @@ export default async function DashboardPage({
       sponsorsRes,
       inventoryRes,
       penalitesRes,
+      buvetteRes,
       accessProfilesRes,
     ] = await runBatched(
       [
@@ -1846,6 +1859,13 @@ export default async function DashboardPage({
             .from("penalites")
             .select("id, player_id, amount, notes, penalite_date, statut, paid_at, payment_link, players(first_name, last_name)")
             .order("penalite_date", { ascending: false }),
+        // Recette buvette, jour par jour (retour de Cindy du 25/10) --
+        // Bureau seul, jamais lié à un joueur.
+        () =>
+          supabase
+            .from("buvette_entries")
+            .select("id, buvette_date, card_amount, cash_amount, notes")
+            .order("buvette_date", { ascending: false }),
         // Profils d'accès sur-mesure (retour de Cindy du 05/09) : liste des
         // profils et de leurs briques, pour l'écran de gestion et pour
         // remplir le sélecteur "Étendue de l'accès" dans la fiche membre.
@@ -2583,6 +2603,14 @@ export default async function DashboardPage({
         paymentLink: p.payment_link,
       };
     });
+
+    adminBuvette = (buvetteRes.data ?? []).map((b) => ({
+      id: b.id,
+      buvetteDate: b.buvette_date,
+      cardAmount: b.card_amount,
+      cashAmount: b.cash_amount,
+      notes: b.notes,
+    }));
 
     const adminPaidParticipantsByCollecteId = await adminPaidParticipantsPromise;
     adminUpcomingEvents = adminEventsData.map((e) => {
@@ -4964,6 +4992,7 @@ export default async function DashboardPage({
             sponsorDisplay={sponsorDisplay}
             accessProfiles={adminAccessProfiles}
             penalites={adminPenalites}
+            buvette={adminBuvette}
             automationSettings={adminAutomationSettings}
             eventRoles={eventRoleTypes}
             volunteerNeedsByEventId={adminVolunteerNeedsByEventId}

@@ -38,6 +38,7 @@ import {
   relanceTemplateKeyFor,
   renderRelanceTemplate,
   roundCents,
+  COLLECTE_RELANCE_TEMPLATES,
   RELANCE_TEMPLATES,
   type RelanceTemplateKey,
   type StatusKey,
@@ -436,6 +437,7 @@ export default function CotisationParticipantsTable({
   onStatusFilterChange,
   toolbarExtra,
   belowToolbar,
+  autoSelectAll = false,
 }: {
   cotisations: AdminCotisation[];
   contactEmailByPlayerId: Record<string, string>;
@@ -460,6 +462,13 @@ export default function CotisationParticipantsTable({
   // -- séparé de toolbarExtra pour ne jamais être écrasé par la ligne de
   // recherche, qui elle doit rester compacte.
   belowToolbar?: ReactNode;
+  // Retour de Cindy du 25/10 ("bouton Relancer sur la carte 'Collecte en
+  // attente' d'Événements payants") : pré-coche tout à l'ouverture, même
+  // effet que "?preselect=en_attente" ci-dessous mais piloté par le parent
+  // plutôt que par l'URL -- cotisations-manager.tsx fournit déjà exactement
+  // le sous-ensemble voulu (pendingEventCotisations), pas besoin de refiltrer
+  // par statut ici ni de faire naviguer la page.
+  autoSelectAll?: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -488,6 +497,7 @@ export default function CotisationParticipantsTable({
   // statut (En attente/Partiel sont deux valeurs séparées de ce filtre,
   // "Cotisations en attente" au tableau de bord regroupe les deux).
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => {
+    if (autoSelectAll) return new Set(cotisations.map((c) => c.id));
     if (searchParams.get("preselect") !== "en_attente") return new Set();
     return new Set(
       cotisations
@@ -499,6 +509,11 @@ export default function CotisationParticipantsTable({
     );
   });
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  // Coordonnées écran du bouton ⋮ cliqué (renderRowMenu plus bas) --
+  // calculées une fois à l'ouverture, pour positionner le menu en
+  // position:fixed via un portail plutôt qu'en absolute ancré sur la ligne
+  // (rogné par le conteneur scrollable du tableau, voir son commentaire).
+  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [clearRemiseTarget, setClearRemiseTarget] = useState<string | null>(null);
   const [deletePaymentTarget, setDeletePaymentTarget] = useState<
@@ -1218,6 +1233,21 @@ export default function CotisationParticipantsTable({
   // placeholders stay literal in the textarea and are only resolved per
   // recipient at send time, since a single rendered preview can't
   // represent several different people's amounts at once.
+  // Retour de Cindy du 25/10 ("Relancer" sur "Collecte en attente",
+  // Événements payants) : RELANCE_TEMPLATES parle de "la cotisation de
+  // cette saison", faux pour un stage/événement/boutique -- bascule sur
+  // COLLECTE_RELANCE_TEMPLATES (qui nomme l'événement via {evenement})
+  // quand TOUTE la sélection est liée à une collecte (collecteId non nul).
+  // Chaque appelant ne nourrit ce tableau qu'avec un seul type de
+  // cotisations à la fois (jamais un mélange saison/événement dans la même
+  // liste), donc regarder le premier suffit. PAYE n'existe pas côté
+  // collecte (rien à confirmer par email ici) -- repli sur le gabarit
+  // saison dans ce seul cas, plutôt qu'en inventer un 4e gabarit.
+  function templateFor(key: RelanceTemplateKey, collecteBased: boolean) {
+    if (collecteBased && key !== "PAYE") return COLLECTE_RELANCE_TEMPLATES[key];
+    return RELANCE_TEMPLATES[key];
+  }
+
   function openRelancePreview(ids: string[]) {
     const targets = ids
       .map((id) => byId.get(id))
@@ -1231,10 +1261,11 @@ export default function CotisationParticipantsTable({
       .then((d: { configured?: boolean }) => setMailServiceConfigured(Boolean(d?.configured)))
       .catch(() => setMailServiceConfigured(false));
 
+    const collecteBased = Boolean(targets[0]?.collecteId);
     const allIds = targets.map((c) => c.id);
     if (targets.length === 1) {
       const c = targets[0];
-      const tpl = RELANCE_TEMPLATES[relanceTemplateKeyFor(c)];
+      const tpl = templateFor(relanceTemplateKeyFor(c), collecteBased);
       setRelancePreview({
         ids,
         allIds,
@@ -1245,7 +1276,7 @@ export default function CotisationParticipantsTable({
     } else {
       const keys = new Set(targets.map(relanceTemplateKeyFor));
       const key: RelanceTemplateKey = keys.size === 1 ? [...keys][0] : "EN_ATTENTE";
-      const tpl = RELANCE_TEMPLATES[key];
+      const tpl = templateFor(key, collecteBased);
       // Un destinataire sans email connu démarre décoché (retour de Cindy
       // du 07/09, voir la liste plus bas) : il n'a de toute façon aucune
       // chance d'être joint, pas la peine de lui laisser prendre la place
@@ -1366,21 +1397,42 @@ export default function CotisationParticipantsTable({
   // entre la ligne de tableau (≥640px) et la carte mobile (<640px, voir
   // plus bas) — même correctif que members-table.tsx/renderMemberMenu :
   // un seul endroit à faire évoluer plutôt que deux copies qui divergent.
-  // Le conteneur appelant doit être positionné (`relative`) pour que le
-  // menu déroulant s'ancre au bon endroit.
+  // Retour de Cindy du 25/10 ("pour les dernières lignes de la liste, on ne
+  // voit pas toutes les entrées du menu") : `absolute` ancré sur la ligne
+  // était rogné par le conteneur du tableau (overflow-x-auto sur
+  // "rounded-2xl ... sm:block" plus bas -- poser overflow-x sans overflow-y
+  // rend ce dernier implicitement "auto" aussi, d'après la spec CSS, donc
+  // tout ce qui dépasse en bas du conteneur est coupé). createPortal vers
+  // document.body + position:fixed calculée au clic (getBoundingClientRect
+  // du bouton) échappe à ce rognage, même patron que la Modal "reçu" plus
+  // haut dans ce fichier.
   function renderRowMenu(c: AdminCotisation, contactEmail: string | null) {
     return (
       <>
         <button
-          onClick={() => setOpenMenuId((cur) => (cur === c.id ? null : c.id))}
+          onClick={(e) => {
+            if (openMenuId === c.id) {
+              setOpenMenuId(null);
+              return;
+            }
+            const rect = e.currentTarget.getBoundingClientRect();
+            setMenuPosition({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+            setOpenMenuId(c.id);
+          }}
           className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
         >
           <MoreVertical className="h-4 w-4" />
         </button>
-        {openMenuId === c.id && (
-          <>
-            <div className="fixed inset-0 z-30" onClick={() => setOpenMenuId(null)} />
-            <div className="absolute right-0 z-40 mt-1 w-64 rounded-xl border border-zinc-100 bg-white p-1.5 text-left shadow-lg">
+        {openMenuId === c.id &&
+          menuPosition &&
+          typeof document !== "undefined" &&
+          createPortal(
+            <>
+              <div className="fixed inset-0 z-30" onClick={() => setOpenMenuId(null)} />
+              <div
+                style={{ top: menuPosition.top, right: menuPosition.right }}
+                className="fixed z-40 w-64 rounded-xl border border-zinc-100 bg-white p-1.5 text-left shadow-lg"
+              >
               <button
                 onClick={() => {
                   setOpenMenuId(null);
@@ -1448,9 +1500,10 @@ export default function CotisationParticipantsTable({
                   Retirer ce participant
                 </button>
               )}
-            </div>
-          </>
-        )}
+              </div>
+            </>,
+            document.body
+          )}
       </>
     );
   }
@@ -1562,7 +1615,15 @@ export default function CotisationParticipantsTable({
           empilées (même traitement que members-table.tsx, retour de
           Cindy du 2026-08-24 : "réaliser sur mobile le même visuel que
           membres"), voir plus bas. */}
-      <div className="hidden w-full overflow-x-auto rounded-2xl border border-l-4 border-zinc-100 border-l-ubac-yellow bg-white sm:block">
+      {/* Retour de Cindy du 25/10 ("en mode tablette je suis obligée de
+          scroller à droite") : 10 colonnes (case, Nom, Prénom, Tarif,
+          Remise, Payé, Solde restant, Mode Paiement, Statut, menu) ne
+          tiennent pas sous ~1024px sans défilement horizontal -- la bascule
+          vers la carte mobile (plus bas) passait à "sm" (640px), bien trop
+          tôt pour une tablette (ex. iPad portrait, ~768-820px), qui
+          héritait donc du tableau complet. "lg" (1024px) laisse la carte
+          jusqu'à l'écran de bureau. */}
+      <div className="hidden w-full overflow-x-auto rounded-2xl border border-l-4 border-zinc-100 border-l-ubac-yellow bg-white lg:block">
         <table className="w-full table-auto border-collapse text-sm">
           <thead>
             <tr className="border-b border-slate-100 bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-400">
@@ -1677,7 +1738,7 @@ export default function CotisationParticipantsTable({
           paiement), même actions (tap = ouvre le suivi de paiement, ⋮ =
           menu partagé via renderRowMenu) — même traitement que
           members-table.tsx (retour de Cindy du 2026-08-24). */}
-      <div className="flex flex-col gap-3 sm:hidden">
+      <div className="flex flex-col gap-3 lg:hidden">
         {filtered.length > 0 && (
           <label className="flex items-center gap-2 self-start text-xs font-medium text-zinc-500">
             <input
