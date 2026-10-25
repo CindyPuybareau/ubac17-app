@@ -420,6 +420,15 @@ export default function CotisationsManager({
   // que sur une sélection de cartes.
   const [renamingGroup, setRenamingGroup] = useState(false);
   const [groupRenameDraft, setGroupRenameDraft] = useState("");
+  // Retour de Cindy du 25/10 ("la carte dossier est pauvre... le lien de
+  // paiement qui s'incrémentera aux autres cartes du dossier si besoin") :
+  // un seul lien saisi sur la tuile dossier, propagé en un seul UPDATE
+  // groupé à tous les membres qui n'en ont pas encore (jamais à ceux qui
+  // ont déjà leur propre lien -- "si besoin" uniquement, jamais d'écrasement
+  // silencieux d'un lien différent déjà renseigné).
+  const [editingGroupLinkLabel, setEditingGroupLinkLabel] = useState<string | null>(null);
+  const [groupLinkDraft, setGroupLinkDraft] = useState("");
+  const [groupLinkSaving, setGroupLinkSaving] = useState(false);
 
   const contactEmailByPlayerId = useMemo(() => {
     const map: Record<string, string> = {};
@@ -800,6 +809,29 @@ export default function CotisationsManager({
     router.refresh();
   }
 
+  async function saveGroupLink(memberIds: string[]) {
+    const link = groupLinkDraft.trim();
+    setGroupLinkSaving(true);
+    setError(null);
+    const supabase = createClient();
+    // Un seul UPDATE groupé, jamais une requête par carte. `.is("payment_link",
+    // null)` est la clause "si besoin" : ne touche jamais une collecte qui a
+    // déjà son propre lien (volontairement différent ou déjà vérifié).
+    const { error: updateError } = await supabase
+      .from("collectes")
+      .update({ payment_link: link || null })
+      .in("id", memberIds)
+      .is("payment_link", null);
+    setGroupLinkSaving(false);
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+    setEditingGroupLinkLabel(null);
+    setGroupLinkDraft("");
+    router.refresh();
+  }
+
   const tabButtonClass = (active: boolean) =>
     `flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${
       // Inactive keeps the club navy (icon + label) instead of grey: on a
@@ -952,118 +984,127 @@ export default function CotisationsManager({
             la création de la collecte, jamais effacé même une fois
             l'événement supprimé -- contrairement à eventStartTime (jointure
             en direct, redevient null dans ce cas). */}
-        {(c.eventStartTime || c.eventDate) && (
-          <span className="flex items-center gap-1 text-xs leading-none text-zinc-500">
-            <CalendarDays className="h-3.5 w-3.5 shrink-0 text-navy" />
-            {new Date(c.eventStartTime ?? c.eventDate ?? "").toLocaleDateString(
-              "fr-FR",
-              { day: "numeric", month: "short", year: "numeric" }
-            )}
-          </span>
-        )}
-        {isOrphaned && (
-          <span className="flex items-center gap-1 text-xs font-medium leading-none text-amber-700">
-            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-            Événement supprimé
-          </span>
-        )}
-        {/* Retour de Cindy du 25/10 ("mettre en vert pour montrer la
-            présence") : vert (même teinte que le montant collecté) plutôt
-            que gris -- ce compteur reflète déjà uniquement les présents
-            (visibleCollecteCotisations), le gris neutre ne le montrait pas. */}
-        {c.eventId && (
-          <span className="flex items-center gap-1 text-xs leading-none text-court-green">
-            <Users className="h-3.5 w-3.5 shrink-0" />
-            {visibleCountByCollecteId.get(c.id) ?? 0} participant
-            {(visibleCountByCollecteId.get(c.id) ?? 0) > 1 ? "s" : ""}
-          </span>
-        )}
-        {selectedCollecteId === c.id && editingLink ? (
-          <div
-            className="flex flex-col gap-1.5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <input
-              type="url"
-              autoFocus
-              placeholder="https://www.helloasso.com/..."
-              value={linkDraft}
-              onChange={(e) => setLinkDraft(e.target.value)}
-              className="min-w-0 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs"
-            />
-            <div className="flex shrink-0 gap-3">
-              <button
-                onClick={saveLink}
-                disabled={savingLink}
-                className="rounded-full bg-ubac-yellow px-3 py-1 text-xs font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+        {/* Retour de Cindy du 25/10 ("grosse marge en bas... le calendrier et
+            les participants aussi") : date, participants, lien de paiement
+            ET barre de progression voyagent ensemble, tout en bas de la
+            carte (mt-auto sur CE bloc, pas sur la barre seule) -- sinon,
+            quand la grille CSS étire la carte pour l'aligner sur sa voisine
+            (titre plus long), seule la barre descendait et la date/les
+            participants restaient collés en haut, juste sous le titre. */}
+        <div className="mt-auto flex flex-col gap-2.5">
+          {(c.eventStartTime || c.eventDate) && (
+            <span className="flex items-center gap-1 text-xs leading-none text-zinc-500">
+              <CalendarDays className="h-3.5 w-3.5 shrink-0 text-navy" />
+              {new Date(c.eventStartTime ?? c.eventDate ?? "").toLocaleDateString(
+                "fr-FR",
+                { day: "numeric", month: "short", year: "numeric" }
+              )}
+            </span>
+          )}
+          {isOrphaned && (
+            <span className="flex items-center gap-1 text-xs font-medium leading-none text-amber-700">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+              Événement supprimé
+            </span>
+          )}
+          {/* Retour de Cindy du 25/10 ("mettre en vert pour montrer la
+              présence") : vert (même teinte que le montant collecté) plutôt
+              que gris -- ce compteur reflète déjà uniquement les présents
+              (visibleCollecteCotisations), le gris neutre ne le montrait pas. */}
+          {c.eventId && (
+            <span className="flex items-center gap-1 text-xs leading-none text-court-green">
+              <Users className="h-3.5 w-3.5 shrink-0" />
+              {visibleCountByCollecteId.get(c.id) ?? 0} participant
+              {(visibleCountByCollecteId.get(c.id) ?? 0) > 1 ? "s" : ""}
+            </span>
+          )}
+          {selectedCollecteId === c.id && editingLink ? (
+            <div
+              className="flex flex-col gap-1.5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <input
+                type="url"
+                autoFocus
+                placeholder="https://www.helloasso.com/..."
+                value={linkDraft}
+                onChange={(e) => setLinkDraft(e.target.value)}
+                className="min-w-0 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs"
+              />
+              <div className="flex shrink-0 gap-3">
+                <button
+                  onClick={saveLink}
+                  disabled={savingLink}
+                  className="rounded-full bg-ubac-yellow px-3 py-1 text-xs font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+                >
+                  {savingLink ? "Enregistrement..." : "Enregistrer"}
+                </button>
+                <button
+                  onClick={() => setEditingLink(false)}
+                  className="text-xs text-zinc-500 hover:underline"
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+          ) : c.paymentLink ? (
+            <div className="flex w-fit items-center gap-1">
+              <a
+                href={c.paymentLink}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="flex w-fit items-center gap-1.5 truncate rounded-full border border-navy/20 bg-navy/5 px-2.5 py-1 text-xs font-medium text-navy hover:bg-navy/10"
               >
-                {savingLink ? "Enregistrement..." : "Enregistrer"}
-              </button>
+                <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                Lien de paiement
+              </a>
               <button
-                onClick={() => setEditingLink(false)}
-                className="text-xs text-zinc-500 hover:underline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedCollecteId(c.id);
+                  setLinkDraft(c.paymentLink ?? "");
+                  setEditingLink(true);
+                }}
+                title="Modifier le lien"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
               >
-                Annuler
+                <Pencil className="h-3.5 w-3.5" />
               </button>
             </div>
-          </div>
-        ) : c.paymentLink ? (
-          <div className="flex w-fit items-center gap-1">
-            <a
-              href={c.paymentLink}
-              target="_blank"
-              rel="noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="flex w-fit items-center gap-1.5 truncate rounded-full border border-navy/20 bg-navy/5 px-2.5 py-1 text-xs font-medium text-navy hover:bg-navy/10"
-            >
-              <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-              Lien de paiement
-            </a>
+          ) : (
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 setSelectedCollecteId(c.id);
-                setLinkDraft(c.paymentLink ?? "");
+                setLinkDraft("");
                 setEditingLink(true);
               }}
-              title="Modifier le lien"
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+              className="flex w-fit items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
             >
-              <Pencil className="h-3.5 w-3.5" />
+              <Plus className="h-3.5 w-3.5" />
+              Ajouter un lien de paiement
             </button>
-          </div>
-        ) : (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setSelectedCollecteId(c.id);
-              setLinkDraft("");
-              setEditingLink(true);
-            }}
-            className="flex w-fit items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Ajouter un lien de paiement
-          </button>
-        )}
-        {kpis && kpis.total > 0 && (
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-baseline justify-between text-sm">
-              <span className="font-bold text-court-green">
-                {formatAmount(kpis.totalCollected)}
-              </span>
-              <span className="text-xs text-zinc-500">
-                sur {formatAmount(kpis.totalDue)} attendu
-              </span>
+          )}
+          {kpis && kpis.total > 0 && (
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-baseline justify-between text-sm">
+                <span className="font-bold text-court-green">
+                  {formatAmount(kpis.totalCollected)}
+                </span>
+                <span className="text-xs text-zinc-500">
+                  sur {formatAmount(kpis.totalDue)} attendu
+                </span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
+                <div
+                  className={`h-full rounded-full ${typeStyle.barClass} transition-all`}
+                  style={{ width: `${Math.min(100, kpis.percentage)}%` }}
+                />
+              </div>
             </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
-              <div
-                className={`h-full rounded-full ${typeStyle.barClass} transition-all`}
-                style={{ width: `${Math.min(100, kpis.percentage)}%` }}
-              />
-            </div>
-          </div>
-        )}
+          )}
+        </div>
         {/* Retour de Cindy du 25/10 ("les participants dans la carte
             cliquable même, pour chaque événement") : le tableau participants
             + "Ajouter des participants" s'affiche désormais à même la carte
@@ -1088,6 +1129,25 @@ export default function CotisationsManager({
   function renderFolderTile(label: string) {
     const members = groupedCollectes.get(label) ?? [];
     const kpis = groupKpis(label);
+    // Retour de Cindy du 25/10 ("la carte dossier est pauvre") : dates de
+    // tous les événements du groupe, triées puis dédupliquées (deux
+    // collectes le même jour, ex. U13M/U13F le 21 oct., n'affichent qu'une
+    // seule fois cette date).
+    const memberDateLabels = Array.from(
+      new Set(
+        Array.from(
+          new Set(
+            members
+              .map((m) => m.eventStartTime ?? m.eventDate)
+              .filter((d): d is string => Boolean(d))
+          )
+        )
+          .sort()
+          .map((d) => new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }))
+      )
+    );
+    const folderPaymentLink = members.find((m) => m.paymentLink)?.paymentLink ?? null;
+    const editingThisLink = editingGroupLinkLabel === label;
     return (
       <div
         key={label}
@@ -1105,28 +1165,105 @@ export default function CotisationsManager({
             </span>
           </div>
         </div>
-        <span className="flex items-center gap-1 text-xs leading-none text-court-green">
-          <Users className="h-3.5 w-3.5 shrink-0" />
-          {kpis.participantCount} participant{kpis.participantCount > 1 ? "s" : ""}
-        </span>
-        {kpis.totalDue > 0 && (
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-baseline justify-between text-sm">
-              <span className="font-bold text-court-green">
-                {formatAmount(kpis.totalCollected)}
-              </span>
-              <span className="text-xs text-zinc-500">
-                sur {formatAmount(kpis.totalDue)} attendu
-              </span>
-            </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
-              <div
-                className="h-full rounded-full bg-navy transition-all"
-                style={{ width: `${Math.min(100, kpis.percentage)}%` }}
+        {/* Retour de Cindy du 25/10 ("le calendrier et les participants
+            aussi") : même principe que renderCollecteCard -- date, lien de
+            paiement et barre voyagent ensemble, ancrés en bas de la tuile
+            (mt-auto sur ce bloc) plutôt que la barre seule. */}
+        <div className="mt-auto flex flex-col gap-2.5">
+          {memberDateLabels.length > 0 && (
+            <span className="flex items-center gap-1 text-xs leading-none text-zinc-500">
+              <CalendarDays className="h-3.5 w-3.5 shrink-0 text-navy" />
+              {memberDateLabels.join(", ")}
+            </span>
+          )}
+          <span className="flex items-center gap-1 text-xs leading-none text-court-green">
+            <Users className="h-3.5 w-3.5 shrink-0" />
+            {kpis.participantCount} participant{kpis.participantCount > 1 ? "s" : ""}
+          </span>
+          {/* Retour de Cindy du 25/10 ("le lien hello asso qui s'incrémentera
+              aux autres cartes du dossier si besoin") : un seul lien saisi
+              ici, propagé par saveGroupLink à tous les membres qui n'en ont
+              pas encore -- jamais à ceux qui ont déjà le leur. */}
+          {editingThisLink ? (
+            <div className="flex flex-col gap-1.5" onClick={(e) => e.stopPropagation()}>
+              <input
+                type="url"
+                autoFocus
+                placeholder="https://www.helloasso.com/..."
+                value={groupLinkDraft}
+                onChange={(e) => setGroupLinkDraft(e.target.value)}
+                className="min-w-0 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs"
               />
+              <div className="flex shrink-0 gap-3">
+                <button
+                  onClick={() => saveGroupLink(members.map((m) => m.id))}
+                  disabled={groupLinkSaving}
+                  className="rounded-full bg-ubac-yellow px-3 py-1 text-xs font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+                >
+                  {groupLinkSaving ? "Enregistrement..." : "Enregistrer"}
+                </button>
+                <button
+                  onClick={() => setEditingGroupLinkLabel(null)}
+                  className="text-xs text-zinc-500 hover:underline"
+                >
+                  Annuler
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          ) : folderPaymentLink ? (
+            <div className="flex w-fit items-center gap-1" onClick={(e) => e.stopPropagation()}>
+              <a
+                href={folderPaymentLink}
+                target="_blank"
+                rel="noreferrer"
+                className="flex w-fit items-center gap-1.5 truncate rounded-full border border-navy/20 bg-navy/5 px-2.5 py-1 text-xs font-medium text-navy hover:bg-navy/10"
+              >
+                <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                Lien de paiement
+              </a>
+              <button
+                onClick={() => {
+                  setGroupLinkDraft(folderPaymentLink ?? "");
+                  setEditingGroupLinkLabel(label);
+                }}
+                title="Modifier le lien"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setGroupLinkDraft("");
+                setEditingGroupLinkLabel(label);
+              }}
+              className="flex w-fit items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Ajouter un lien de paiement
+            </button>
+          )}
+          {kpis.totalDue > 0 && (
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-baseline justify-between text-sm">
+                <span className="font-bold text-court-green">
+                  {formatAmount(kpis.totalCollected)}
+                </span>
+                <span className="text-xs text-zinc-500">
+                  sur {formatAmount(kpis.totalDue)} attendu
+                </span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
+                <div
+                  className="h-full rounded-full bg-navy transition-all"
+                  style={{ width: `${Math.min(100, kpis.percentage)}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
