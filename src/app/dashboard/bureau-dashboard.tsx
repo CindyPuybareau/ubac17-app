@@ -3,6 +3,7 @@ import {
   ArrowDown,
   ArrowUp,
   CheckCircle2,
+  Coffee,
   FileWarning,
   Gavel,
   Handshake,
@@ -20,6 +21,7 @@ import SectionLinkCard from "./section-link-card";
 import RelanceRedirectButton from "./relance-redirect-button";
 import type {
   AdminMemberTeam,
+  AdminBuvette,
   AdminCotisation,
   AdminMember,
   AdminPenalite,
@@ -217,6 +219,7 @@ export default function BureauDashboard({
   volunteerNeedsByEventId,
   sponsors,
   penalites,
+  buvette,
   ownPlayerId = null,
   rsvpStatusByKey = {},
 }: {
@@ -239,6 +242,9 @@ export default function BureauDashboard({
   // après "Montant en attente" — même famille de chiffre (un montant en
   // euros restant à encaisser), voir penalites-manager.tsx pour la saisie.
   penalites: AdminPenalite[];
+  // Retour de Cindy du 25/10 ("une carte Total Buvette, juste avant
+  // Total pénalités") -- voir buvette-manager.tsx pour la saisie.
+  buvette: AdminBuvette[];
   // Retour de Cindy du 16/09 ("Réunion Bureau") : propre fiche joueur de
   // qui consulte -- transmis à CalendarView pour qu'un membre du Bureau
   // puisse répondre présent/absent pour lui-même sur une Réunion (jamais
@@ -278,6 +284,11 @@ export default function BureauDashboard({
     .filter((c) => c.collecteId)
     .reduce((sum, c) => sum + (c.paiement ?? 0), 0);
 
+  // Retour de Cindy du 25/10 ("une carte Total Buvette, juste avant Total
+  // pénalités") -- même somme que le résumé en haut de buvette-manager.tsx,
+  // réaffichée ici sans requête de plus.
+  const buvetteTotal = buvette.reduce((sum, b) => sum + b.cardAmount + b.cashAmount, 0);
+
   const activeMembers = members.filter((m) => !m.archivedAt).length;
 
   // Retour de Cindy du 30/09 : voir le commentaire sur `rsvpStatusByKey`
@@ -316,14 +327,12 @@ export default function BureauDashboard({
     <div className="flex flex-col gap-4">
       {/* Retour de Cindy du 12/09 : "Envois automatiques" déménage dans
           "Tableau de bord" (admin-view.tsx) -- vivait ici avant. */}
-      {/* Retour de Cindy du 2026-08-22 : "Équipes sans coach" retirée
-          (pas d'intérêt) ; "Documents à renouveler" devenue
-          "Renouvellement Sponsors" ; carte "Pénalités" ajoutée juste après
-          "Montant en attente" (nouvelles fonctionnalités, voir
-          sponsors-manager.tsx / penalites-manager.tsx) — grille passée de
-          5 à 5 cartes (4 puis +1, jamais 6 : "Équipes sans coach" partie
-          en a laissé la place). */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      {/* Historique : "Équipes sans coach" retirée (2026-08-22) ;
+          "Renouvellement Sponsors" retirée à son tour le 25/10 (remplacée
+          par "Total évènements payants" puis "Total Buvette", ajoutées le
+          même jour juste avant "Total pénalités") -- 6 cartes aujourd'hui,
+          lg:grid-cols-6 pour tenir sur une seule rangée en bureau. */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <KpiCard
           icon={Users}
           iconClass="text-navy"
@@ -385,6 +394,20 @@ export default function BureauDashboard({
           label="Total évènements payants"
           href="/dashboard?tab=admin&section=cotisations-evenements"
           sectionKey="cotisations-evenements"
+        />
+        {/* Retour de Cindy du 25/10 ("une carte Total Buvette, juste avant
+            Total pénalités") : même esprit que "Total évènements payants"
+            juste au-dessus (un montant déjà encaissé, pas une dette) --
+            vert plutôt qu'or pour les distinguer d'un coup d'œil. */}
+        <KpiCard
+          icon={Coffee}
+          iconClass="text-court-green"
+          iconBgClass="bg-court-green/10"
+          value={buvetteTotal}
+          kind="amount"
+          label="Total Buvette"
+          href="/dashboard?tab=admin&section=cotisations-buvette"
+          sectionKey="cotisations-buvette"
         />
         <KpiCard
           icon={Gavel}

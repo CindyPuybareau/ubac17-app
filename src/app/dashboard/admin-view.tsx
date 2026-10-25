@@ -314,6 +314,7 @@ export default function AdminView({
             volunteerNeedsByEventId={volunteerNeedsByEventId}
             sponsors={sponsors}
             penalites={penalites}
+            buvette={buvette}
             ownPlayerId={ownPlayerId}
             rsvpStatusByKey={rsvpStatusByKey}
           />
