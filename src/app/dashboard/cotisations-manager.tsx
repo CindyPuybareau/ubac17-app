@@ -4,11 +4,15 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
+  ArrowLeft,
   CalendarDays,
   CheckCircle2,
   Clock,
   ExternalLink,
+  Folder,
+  FolderInput,
   Gavel,
+  ListChecks,
   Pencil,
   Plus,
   Search,
@@ -350,9 +354,13 @@ export default function CotisationsManager({
   // use-scroll-top-on-change.ts) — sans ce garde-fou, le montage du
   // composant relancerait quand même le saut de scroll à chaque clic.
   useScrollTopOnChange(tab, undefined, !forcedTab);
-  const [selectedCollecteId, setSelectedCollecteId] = useState<string | null>(
-    collectes[0]?.id ?? null
-  );
+  // Retour de Cindy du 25/10 : depuis que les participants s'affichent DANS
+  // la carte cliquée (plus de panneau séparé "par défaut" en bas de page à
+  // remplir), partir sans rien sélectionné -- sinon la toute première carte
+  // de la grille apparaît déjà "ouverte" (tableau de participants déployé)
+  // avant le moindre clic, ce qui a été source de confusion avec le
+  // formulaire d'édition du lien HelloAsso.
+  const [selectedCollecteId, setSelectedCollecteId] = useState<string | null>(null);
   // Retour de Cindy du 14/09 ("les cartes KPI cliquables réutilisent le
   // filtre existant") : remonté ici depuis CotisationParticipantsTable
   // (qui le gardait en interne) pour que KpiHeader (son frère, pas son
@@ -385,6 +393,33 @@ export default function CotisationsManager({
   const [deleteTarget, setDeleteTarget] = useState<AdminCollecte | null>(null);
   const [deletingCollecte, setDeletingCollecte] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Retour du comptable du 25/10 ("stage de la Toussaint géré comme 6
+  // événements distincts... pas de vision consolidée") : "cocher +
+  // regrouper" (décision de Cindy, préférée à un vrai glisser-déposer
+  // tactile ou à un objet "événement parent") -- groupSelectIds ne porte
+  // que des collectes SANS groupe déjà (voir ungroupedCollectes plus
+  // bas) ; rejoindre un groupe déjà nommé se fait depuis le dossier
+  // ouvert (addToGroupPicker ci-dessous), jamais en mélangeant une tuile
+  // dossier et des cartes libres dans la même sélection.
+  const [groupSelectMode, setGroupSelectMode] = useState(false);
+  const [groupSelectIds, setGroupSelectIds] = useState<Set<string>>(new Set());
+  const [groupNamePrompt, setGroupNamePrompt] = useState(false);
+  const [groupNameDraft, setGroupNameDraft] = useState("");
+  const [groupSaving, setGroupSaving] = useState(false);
+  // Dossier actuellement ouvert (null = grille principale). showGroupParticipants
+  // bascule entre "les cartes individuelles du dossier" (gérer présence/
+  // paiement équipe par équipe, comme avant) et "tous les participants
+  // réunis" (vue de lecture/suivi paiement consolidée).
+  const [openGroupLabel, setOpenGroupLabel] = useState<string | null>(null);
+  const [showGroupParticipants, setShowGroupParticipants] = useState(false);
+  const [addToGroupPicker, setAddToGroupPicker] = useState(false);
+  // Retour de Cindy du 25/10 ("je me suis trompée quand j'ai nommé le
+  // groupe") : crayon à côté du titre du dossier ouvert, même renommage en
+  // masse que confirmGrouping mais sur le group_label déjà existant plutôt
+  // que sur une sélection de cartes.
+  const [renamingGroup, setRenamingGroup] = useState(false);
+  const [groupRenameDraft, setGroupRenameDraft] = useState("");
 
   const contactEmailByPlayerId = useMemo(() => {
     const map: Record<string, string> = {};
@@ -464,6 +499,55 @@ export default function CotisationsManager({
     });
     return map;
   }, [collectes, cotisations]);
+
+  // Retour du comptable du 25/10 : regroupe les collectes par group_label,
+  // en ignorant un groupe retombé à une seule collecte (toutes les autres
+  // retirées) -- traitée comme une carte normale plutôt que comme un
+  // "dossier" d'un seul élément, jamais besoin d'une étape de nettoyage à
+  // part pour ce cas.
+  const groupedCollectes = useMemo(() => {
+    const map = new Map<string, AdminCollecte[]>();
+    collectes.forEach((c) => {
+      if (!c.groupLabel) return;
+      const list = map.get(c.groupLabel) ?? [];
+      list.push(c);
+      map.set(c.groupLabel, list);
+    });
+    for (const [label, list] of map) {
+      if (list.length < 2) map.delete(label);
+    }
+    return map;
+  }, [collectes]);
+
+  const ungroupedCollectes = useMemo(
+    () =>
+      collectes.filter((c) => !c.groupLabel || !groupedCollectes.has(c.groupLabel)),
+    [collectes, groupedCollectes]
+  );
+
+  function groupKpis(label: string) {
+    const members = groupedCollectes.get(label) ?? [];
+    let totalDue = 0;
+    let totalCollected = 0;
+    let participantCount = 0;
+    members.forEach((c) => {
+      const k = kpisByCollecteId.get(c.id);
+      if (k) {
+        totalDue = roundCents(totalDue + k.totalDue);
+        totalCollected = roundCents(totalCollected + k.totalCollected);
+      }
+      participantCount += visibleCountByCollecteId.get(c.id) ?? 0;
+    });
+    const percentage =
+      totalDue > 0 ? Math.round((totalCollected / totalDue) * 100) : members.length > 0 ? 100 : 0;
+    return { totalDue, totalCollected, participantCount, percentage };
+  }
+
+  const openGroupMembers = openGroupLabel ? (groupedCollectes.get(openGroupLabel) ?? []) : [];
+  // Participants des 6 collectes réunis (vue "Tous les participants" du
+  // dossier) -- même filtre de visibilité (visibleCollecteCotisations) que
+  // chaque carte individuelle, juste concaténé plutôt qu'une seule collecte.
+  const groupParticipants = openGroupMembers.flatMap((c) => visibleCollecteCotisations(c, cotisations));
 
   // Retour de Cindy du 20/09 ("total collecté doit etre en haut de page...
   // ce sera le total collecter de tous les evenement payant") : somme du
@@ -608,6 +692,114 @@ export default function CotisationsManager({
     router.refresh();
   }
 
+  // Retour du comptable du 25/10 ("vision consolidée pour un stage
+  // multi-équipes") : "cocher + regrouper". toggleGroupSelect ne
+  // s'applique qu'aux collectes SANS groupe (ungroupedCollectes) --
+  // rejoindre un groupe déjà nommé se fait via addCollecteToGroup, depuis
+  // le dossier ouvert, jamais en mélangeant les deux mécanismes.
+  function toggleGroupSelect(id: string) {
+    setGroupSelectIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function openGroupingPrompt() {
+    if (groupSelectIds.size < 2) return;
+    // Suggestion : si toutes les collectes sélectionnées portent le même
+    // nom (cas courant, "Stage" x6), le proposer tout fait plutôt qu'un
+    // champ vide à chaque fois.
+    const names = new Set(
+      Array.from(groupSelectIds)
+        .map((id) => collectes.find((c) => c.id === id)?.name)
+        .filter((n): n is string => Boolean(n))
+    );
+    setGroupNameDraft(names.size === 1 ? (Array.from(names)[0] ?? "") : "");
+    setGroupNamePrompt(true);
+  }
+
+  async function confirmGrouping() {
+    const name = groupNameDraft.trim();
+    if (!name || groupSelectIds.size < 2) return;
+    setGroupSaving(true);
+    setError(null);
+    const supabase = createClient();
+    const { error: updateError } = await supabase
+      .from("collectes")
+      .update({ group_label: name })
+      .in("id", Array.from(groupSelectIds));
+    setGroupSaving(false);
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+    setGroupNamePrompt(false);
+    setGroupNameDraft("");
+    setGroupSelectIds(new Set());
+    setGroupSelectMode(false);
+    router.refresh();
+  }
+
+  async function removeFromGroup(id: string) {
+    setGroupSaving(true);
+    setError(null);
+    const supabase = createClient();
+    const { error: updateError } = await supabase
+      .from("collectes")
+      .update({ group_label: null })
+      .eq("id", id);
+    setGroupSaving(false);
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+    router.refresh();
+  }
+
+  async function addCollecteToGroup(id: string) {
+    if (!openGroupLabel) return;
+    setGroupSaving(true);
+    setError(null);
+    const supabase = createClient();
+    const { error: updateError } = await supabase
+      .from("collectes")
+      .update({ group_label: openGroupLabel })
+      .eq("id", id);
+    setGroupSaving(false);
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+    setAddToGroupPicker(false);
+    router.refresh();
+  }
+
+  async function renameGroup() {
+    if (!openGroupLabel) return;
+    const name = groupRenameDraft.trim();
+    if (!name || name === openGroupLabel) {
+      setRenamingGroup(false);
+      return;
+    }
+    setGroupSaving(true);
+    setError(null);
+    const supabase = createClient();
+    const { error: updateError } = await supabase
+      .from("collectes")
+      .update({ group_label: name })
+      .eq("group_label", openGroupLabel);
+    setGroupSaving(false);
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+    setOpenGroupLabel(name);
+    setRenamingGroup(false);
+    router.refresh();
+  }
+
   const tabButtonClass = (active: boolean) =>
     `flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${
       // Inactive keeps the club navy (icon + label) instead of grey: on a
@@ -615,6 +807,417 @@ export default function CotisationsManager({
       // a second tab one can switch to.
       active ? "bg-navy text-white" : "text-navy hover:bg-blue-50"
     }`;
+
+  // Même esprit que tabButtonClass, mais avec un fond blanc + bordure à
+  // l'état inactif (retour de Cindy du 25/10 : "Retour"/"Tous les
+  // participants" se fondaient trop dans le fond crème du dossier ouvert) --
+  // local à la vue "dossier ouvert" plutôt que de changer tabButtonClass,
+  // qui reste utilisé tel quel par les onglets principaux (Cotisations/
+  // Événements payants/Pénalités).
+  const groupTabButtonClass = (active: boolean) =>
+    `flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors ${
+      active
+        ? "border-navy bg-navy text-white"
+        : "border-zinc-200 bg-white text-navy hover:bg-blue-50"
+    }`;
+
+  // Un groupe tombe sous 2 membres (dernier "Retirer du groupe") -- la vue
+  // "dossier ouvert" n'a alors plus de sens. Dérivé plutôt que remis à zéro
+  // dans un effet (pas de setState en cascade) : ça referme la vue dès le
+  // rendu suivant, sans action explicite nécessaire.
+  const effectiveOpenGroupLabel =
+    openGroupLabel && groupedCollectes.has(openGroupLabel) ? openGroupLabel : null;
+
+  // Carte d'une collecte individuelle (stage/événement/boutique) -- partagée
+  // entre la grille principale et la vue "dossier ouvert" d'un groupe, pour
+  // ne jamais dupliquer ce rendu assez long. `selectable` affiche une case à
+  // cocher (mode "Sélectionner" avant un "Regrouper") ; `showRemoveFromGroup`
+  // affiche le bouton "Retirer du groupe" à la place de la corbeille
+  // (retirer une collecte d'un groupe n'efface jamais ses données, voir
+  // removeFromGroup plus haut).
+  function renderCollecteCard(
+    c: AdminCollecte,
+    options?: { selectable?: boolean; showRemoveFromGroup?: boolean }
+  ) {
+    const kpis = kpisByCollecteId.get(c.id);
+    const isOrphaned = c.type === "EVENEMENT" && !c.eventId;
+    const typeStyle = collecteTypeStyle[c.type];
+    const TypeIcon = typeStyle.icon;
+    const selectable = options?.selectable ?? false;
+    const checked = groupSelectIds.has(c.id);
+    return (
+      <div
+        key={c.id}
+        onClick={() => {
+          if (selectable) {
+            toggleGroupSelect(c.id);
+            return;
+          }
+          // Retour de Cindy du 25/10 ("au clic sur la carte ça ouvre le
+          // lien Hello Asso") : editingLink est un seul état partagé par
+          // toutes les cartes (jamais remis à zéro ailleurs qu'"Annuler"/
+          // l'enregistrement du lien) -- cliquer la carte pour
+          // ouvrir/fermer ses participants ne doit jamais hériter d'une
+          // édition de lien restée ouverte sur une AUTRE carte.
+          setEditingLink(false);
+          setSelectedCollecteId((prev) => (prev === c.id ? null : c.id));
+        }}
+        className={`flex cursor-pointer flex-col gap-2.5 rounded-2xl border border-l-4 p-4 text-left shadow-sm transition-colors ${
+          // Retour de Cindy du 25/10 ("les participants dans la carte
+          // cliquable même") : une carte sélectionnée s'étire sur toute la
+          // largeur de la grille pour laisser la place au tableau de
+          // participants intégré (voir le bloc embarqué plus bas) --
+          // jamais en mode sélection/regroupement, où l'étirement n'aurait
+          // aucun sens.
+          selectedCollecteId === c.id && !selectable ? "sm:col-span-2 lg:col-span-3 " : ""
+        }${
+          checked
+            ? "border-ubac-yellow-dark border-l-ubac-yellow-dark bg-amber-50/40"
+            : selectedCollecteId === c.id
+              ? "border-navy border-l-navy bg-blue-50/40"
+              : `border-zinc-200 bg-white hover:bg-zinc-50 ${
+                  c.type === "STAGE"
+                    ? "border-l-navy"
+                    : c.type === "BOUTIQUE"
+                      ? "border-l-court-green"
+                      : "border-l-ubac-yellow"
+                }`
+        }`}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2.5">
+            {selectable && (
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={() => toggleGroupSelect(c.id)}
+                onClick={(e) => e.stopPropagation()}
+                className="h-4 w-4 shrink-0 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
+              />
+            )}
+            <span
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${typeStyle.iconBgClass}`}
+            >
+              <TypeIcon className={`h-4 w-4 ${typeStyle.iconClass}`} />
+            </span>
+            <div className="flex min-w-0 flex-col">
+              <span className="font-semibold text-zinc-900">{c.name}</span>
+              <span className={`text-xs font-medium ${typeStyle.iconClass}`}>
+                {collecteTypeLabels[c.type]}
+              </span>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {/* Retour de Cindy du 25/10 ("on ne fait pas le distingo si on
+                regarde tous les stages créés") : même badge coloré par
+                catégorie que le reste de l'appli (categoryTheme,
+                team-card.tsx). */}
+            {c.eventTeamCategory && (
+              <span
+                className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold leading-none ${categoryTheme(c.eventTeamCategory).badge}`}
+              >
+                {c.eventTeamCategory}
+              </span>
+            )}
+            {options?.showRemoveFromGroup && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeFromGroup(c.id);
+                }}
+                title="Retirer du groupe"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-amber-50 hover:text-amber-600"
+              >
+                <FolderInput className="h-4 w-4" />
+              </button>
+            )}
+            {!selectable && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeleteTarget(c);
+                }}
+                title="Supprimer cette collecte"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        </div>
+        {/* Retour de Cindy du 29/08 ("j'aimerai voir la date de l'evenement
+            payant, quand a til lieu ?") : eventDate est un instantané pris à
+            la création de la collecte, jamais effacé même une fois
+            l'événement supprimé -- contrairement à eventStartTime (jointure
+            en direct, redevient null dans ce cas). */}
+        {(c.eventStartTime || c.eventDate) && (
+          <span className="flex items-center gap-1 text-xs leading-none text-zinc-500">
+            <CalendarDays className="h-3.5 w-3.5 shrink-0 text-navy" />
+            {new Date(c.eventStartTime ?? c.eventDate ?? "").toLocaleDateString(
+              "fr-FR",
+              { day: "numeric", month: "short", year: "numeric" }
+            )}
+          </span>
+        )}
+        {isOrphaned && (
+          <span className="flex items-center gap-1 text-xs font-medium leading-none text-amber-700">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+            Événement supprimé
+          </span>
+        )}
+        {/* Retour de Cindy du 25/10 ("mettre en vert pour montrer la
+            présence") : vert (même teinte que le montant collecté) plutôt
+            que gris -- ce compteur reflète déjà uniquement les présents
+            (visibleCollecteCotisations), le gris neutre ne le montrait pas. */}
+        {c.eventId && (
+          <span className="flex items-center gap-1 text-xs leading-none text-court-green">
+            <Users className="h-3.5 w-3.5 shrink-0" />
+            {visibleCountByCollecteId.get(c.id) ?? 0} participant
+            {(visibleCountByCollecteId.get(c.id) ?? 0) > 1 ? "s" : ""}
+          </span>
+        )}
+        {selectedCollecteId === c.id && editingLink ? (
+          <div
+            className="flex flex-col gap-1.5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <input
+              type="url"
+              autoFocus
+              placeholder="https://www.helloasso.com/..."
+              value={linkDraft}
+              onChange={(e) => setLinkDraft(e.target.value)}
+              className="min-w-0 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs"
+            />
+            <div className="flex shrink-0 gap-3">
+              <button
+                onClick={saveLink}
+                disabled={savingLink}
+                className="rounded-full bg-ubac-yellow px-3 py-1 text-xs font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+              >
+                {savingLink ? "Enregistrement..." : "Enregistrer"}
+              </button>
+              <button
+                onClick={() => setEditingLink(false)}
+                className="text-xs text-zinc-500 hover:underline"
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        ) : c.paymentLink ? (
+          <div className="flex w-fit items-center gap-1">
+            <a
+              href={c.paymentLink}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="flex w-fit items-center gap-1.5 truncate rounded-full border border-navy/20 bg-navy/5 px-2.5 py-1 text-xs font-medium text-navy hover:bg-navy/10"
+            >
+              <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+              Lien de paiement
+            </a>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedCollecteId(c.id);
+                setLinkDraft(c.paymentLink ?? "");
+                setEditingLink(true);
+              }}
+              title="Modifier le lien"
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedCollecteId(c.id);
+              setLinkDraft("");
+              setEditingLink(true);
+            }}
+            className="flex w-fit items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Ajouter un lien de paiement
+          </button>
+        )}
+        {kpis && kpis.total > 0 && (
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-baseline justify-between text-sm">
+              <span className="font-bold text-court-green">
+                {formatAmount(kpis.totalCollected)}
+              </span>
+              <span className="text-xs text-zinc-500">
+                sur {formatAmount(kpis.totalDue)} attendu
+              </span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
+              <div
+                className={`h-full rounded-full ${typeStyle.barClass} transition-all`}
+                style={{ width: `${Math.min(100, kpis.percentage)}%` }}
+              />
+            </div>
+          </div>
+        )}
+        {/* Retour de Cindy du 25/10 ("les participants dans la carte
+            cliquable même, pour chaque événement") : le tableau participants
+            + "Ajouter des participants" s'affiche désormais à même la carte
+            cliquée (stopPropagation pour que les clics à l'intérieur --
+            recherche, cases à cocher, menu ⋮ -- n'inversent pas la sélection
+            de la carte), plus de panneau séparé ailleurs sur la page. */}
+        {!selectable && selectedCollecteId === c.id && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="mt-1 border-t border-zinc-100 pt-3"
+          >
+            {renderSelectedCollecteDetailPanel()}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Tuile "dossier" remplaçant les cartes individuelles d'un groupe dans la
+  // grille principale -- totaux consolidés via groupKpis, clic -> ouvre la
+  // vue détaillée du groupe (openGroupLabel).
+  function renderFolderTile(label: string) {
+    const members = groupedCollectes.get(label) ?? [];
+    const kpis = groupKpis(label);
+    return (
+      <div
+        key={label}
+        onClick={() => setOpenGroupLabel(label)}
+        className="flex cursor-pointer flex-col gap-2.5 rounded-2xl border border-l-4 border-zinc-200 border-l-navy bg-white p-4 text-left shadow-sm transition-colors hover:bg-zinc-50"
+      >
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-navy/10">
+            <Folder className="h-4 w-4 text-navy" />
+          </span>
+          <div className="flex min-w-0 flex-col">
+            <span className="truncate font-semibold text-zinc-900">{label}</span>
+            <span className="text-xs font-medium text-navy">
+              {members.length} événements regroupés
+            </span>
+          </div>
+        </div>
+        <span className="flex items-center gap-1 text-xs leading-none text-court-green">
+          <Users className="h-3.5 w-3.5 shrink-0" />
+          {kpis.participantCount} participant{kpis.participantCount > 1 ? "s" : ""}
+        </span>
+        {kpis.totalDue > 0 && (
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-baseline justify-between text-sm">
+              <span className="font-bold text-court-green">
+                {formatAmount(kpis.totalCollected)}
+              </span>
+              <span className="text-xs text-zinc-500">
+                sur {formatAmount(kpis.totalDue)} attendu
+              </span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
+              <div
+                className="h-full rounded-full bg-navy transition-all"
+                style={{ width: `${Math.min(100, kpis.percentage)}%` }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Panneau détail (liste des participants + "Ajouter des participants")
+  // de la collecte actuellement sélectionnée (selectedCollecte) -- partagé
+  // entre la grille principale (cartes non groupées) et la vue "Événements"
+  // d'un dossier ouvert, pour ne jamais dupliquer ce bloc assez long.
+  // Retour de Cindy du 25/10 ("je clique sur une carte [dans le dossier],
+  // les participants ne s'affichent plus en bas de page") : avant cette
+  // extraction, ce panneau n'existait que dans la grille principale --
+  // cliquer une carte à l'intérieur d'un dossier ouvert mettait bien à jour
+  // selectedCollecteId mais rien ne le montrait.
+  function renderSelectedCollecteDetailPanel() {
+    if (!selectedCollecte) return null;
+    return (
+      <div className="flex flex-col gap-4">
+        <CotisationParticipantsTable
+          cotisations={collecteCotisations}
+          contactEmailByPlayerId={contactEmailByPlayerId}
+          emptyLabel="Aucun participant pour cette collecte."
+          // Retour de Cindy du 25/10 ("pour faciliter la vie du
+          // comptable, le bouton à côté de rechercher un membre") :
+          // longtemps une carte séparée au-dessus du tableau
+          // (masquée pour une collecte "Événement" avec RSVP actif
+          // jusqu'au 25/10, voir l'historique de ce fichier) --
+          // maintenant intégré à la barre recherche/statut du
+          // tableau lui-même via toolbarExtra/belowToolbar, toujours
+          // utile pour quelqu'un qui a payé sans jamais répondre
+          // Présent dans l'appli. addParticipants marque en plus ce
+          // participant Présent sur le calendrier quand l'événement
+          // existe (voir son commentaire), donc plus de risque
+          // d'incohérence entre "a payé" et "absent au RSVP".
+          toolbarExtra={
+            <button
+              onClick={() => setAddingParticipants((v) => !v)}
+              className="flex w-fit shrink-0 items-center gap-1.5 rounded-full bg-ubac-yellow px-3 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Ajouter des participants
+            </button>
+          }
+          belowToolbar={
+            addingParticipants && (
+              <div className="flex flex-col gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                  <input
+                    value={participantSearch}
+                    onChange={(e) => setParticipantSearch(e.target.value)}
+                    placeholder="Rechercher un membre"
+                    className="w-full rounded-full border border-zinc-200 bg-white py-1.5 pl-9 pr-3 text-sm focus:border-ubac-yellow focus:outline-none"
+                  />
+                </div>
+                <ul className="flex max-h-56 flex-col gap-0.5 overflow-y-auto rounded-lg bg-zinc-50 p-2">
+                  {availableMembers.map((m) => (
+                    <li key={m.id}>
+                      <label className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-white">
+                        <input
+                          type="checkbox"
+                          checked={selectedNewIds.has(m.id)}
+                          onChange={() => toggleNewParticipant(m.id)}
+                          className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
+                        />
+                        {formatPersonName(m.firstName, m.lastName)}
+                        {m.category ? (
+                          <span className="text-xs text-zinc-400">· {m.category}</span>
+                        ) : null}
+                      </label>
+                    </li>
+                  ))}
+                  {availableMembers.length === 0 && (
+                    <li className="px-2 py-1.5 text-sm text-zinc-400">
+                      Tous les membres sont déjà dans cette collecte.
+                    </li>
+                  )}
+                </ul>
+                <button
+                  onClick={addParticipants}
+                  disabled={addingSaving || selectedNewIds.size === 0}
+                  className="w-fit rounded-full bg-ubac-yellow px-3.5 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+                >
+                  {addingSaving ? "Ajout..." : `Ajouter (${selectedNewIds.size})`}
+                </button>
+              </div>
+            )
+          }
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -694,307 +1297,179 @@ export default function CotisationsManager({
             <KpiCard
               icon={Wallet}
               iconClass="text-amber-700"
-              value={totalCollectedAllCollectes}
+              value={
+                effectiveOpenGroupLabel
+                  ? groupKpis(effectiveOpenGroupLabel).totalCollected
+                  : totalCollectedAllCollectes
+              }
               kind="amount"
-              label="Total collecté"
+              label={effectiveOpenGroupLabel ? `Total collecté — ${effectiveOpenGroupLabel}` : "Total collecté"}
             />
           </div>
-          {/* Retour de Cindy du 29/08 ("un truc ne va pas niveau visibilité
-              et clarté") : de simples pastilles de nom ne montraient ni le
-              lien vers l'événement du calendrier, ni un moyen de supprimer
-              la collecte — remplacées par de vraies cartes : montant
-              collecté/attendu en un coup d'œil, date de l'événement rattaché
-              ou repère "Événement supprimé" pour une collecte orpheline
-              (event_id passé à null par la suppression de l'événement,
-              volontairement conservée pour ne jamais perdre un historique de
-              paiements réels — voir deleteCollecte plus haut), et une
-              corbeille directe. */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {collectes.map((c) => {
-              const kpis = kpisByCollecteId.get(c.id);
-              const isOrphaned = c.type === "EVENEMENT" && !c.eventId;
-              const typeStyle = collecteTypeStyle[c.type];
-              const TypeIcon = typeStyle.icon;
-              return (
-                <div
-                  key={c.id}
-                  onClick={() => setSelectedCollecteId(c.id)}
-                  className={`flex cursor-pointer flex-col gap-2.5 rounded-2xl border border-l-4 p-4 text-left shadow-sm transition-colors ${
-                    selectedCollecteId === c.id
-                      ? "border-navy border-l-navy bg-blue-50/40"
-                      : `border-zinc-200 bg-white hover:bg-zinc-50 ${
-                          c.type === "STAGE"
-                            ? "border-l-navy"
-                            : c.type === "BOUTIQUE"
-                              ? "border-l-court-green"
-                              : "border-l-ubac-yellow"
-                        }`
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-2.5">
-                      <span
-                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${typeStyle.iconBgClass}`}
-                      >
-                        <TypeIcon className={`h-4 w-4 ${typeStyle.iconClass}`} />
-                      </span>
-                      <div className="flex min-w-0 flex-col">
-                        <span className="truncate font-semibold text-zinc-900">{c.name}</span>
-                        <span className={`text-xs font-medium ${typeStyle.iconClass}`}>
-                          {collecteTypeLabels[c.type]}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1.5">
-                      {/* Retour de Cindy du 25/10 ("on ne fait pas le
-                          distingo si on regarde tous les stages créés") :
-                          même badge coloré par catégorie que le reste de
-                          l'appli (categoryTheme, team-card.tsx) -- absent
-                          pour une collecte sans événement (Stage/Boutique
-                          "libres") ou dont l'événement ne cible aucune
-                          équipe précise (ex. une Réunion Bureau). */}
-                      {c.eventTeamCategory && (
-                        <span
-                          className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold leading-none ${categoryTheme(c.eventTeamCategory).badge}`}
-                        >
-                          {c.eventTeamCategory}
-                        </span>
-                      )}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteTarget(c);
-                        }}
-                        title="Supprimer cette collecte"
-                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                  {/* Retour de Cindy du 29/08 ("j'aimerai voir la date de
-                      l'evenement payant, quand a til lieu ?") : eventDate
-                      est un instantané pris à la création de la collecte,
-                      jamais effacé même une fois l'événement supprimé —
-                      contrairement à eventStartTime (jointure en direct,
-                      redevient null dans ce cas). Les deux peuvent donc
-                      s'afficher ensemble : la date d'origine ET le repère
-                      "Événement supprimé". */}
-                  {(c.eventStartTime || c.eventDate) && (
-                    <span className="flex items-center gap-1 text-xs text-zinc-500">
-                      <CalendarDays className="h-3.5 w-3.5 shrink-0 text-navy" />
-                      {new Date(c.eventStartTime ?? c.eventDate ?? "").toLocaleDateString(
-                        "fr-FR",
-                        { day: "numeric", month: "short", year: "numeric" }
-                      )}
-                    </span>
-                  )}
-                  {isOrphaned && (
-                    <span className="flex items-center gap-1 text-xs font-medium text-amber-700">
-                      <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                      Événement supprimé
-                    </span>
-                  )}
-                  {/* Retour de Cindy du 20/09 ("aucun participants doit etre
-                      relié dans la carte") : même compteur que la liste du
-                      détail (visibleCollecteCotisations), présent uniquement
-                      si un événement est lié -- une collecte Stage/Boutique
-                      sans RSVP possible n'a pas ce filtre, donc pas ce
-                      compteur (son nombre de lignes est déjà fiable tel quel). */}
-                  {c.eventId && (
-                    <span className="flex items-center gap-1 text-xs text-zinc-500">
-                      <Users className="h-3.5 w-3.5 shrink-0" />
-                      {visibleCountByCollecteId.get(c.id) ?? 0} participant
-                      {(visibleCountByCollecteId.get(c.id) ?? 0) > 1 ? "s" : ""}
-                    </span>
-                  )}
-                  {/* Retour de Cindy du 20/09 ("le lien de paiement hello
-                      asso... doit etre visible dans la carte et pas au
-                      milieu de la page" puis "supprimer le lien hello asso
-                      qui est tout seul dans une carte") : lecture ET
-                      édition directement ici, plus de bloc séparé au milieu
-                      de la page -- stopPropagation partout pour ne pas
-                      interférer avec la sélection de la collecte au clic
-                      sur la carte. Auto-rempli à la création de l'événement
-                      payant (create-event-form.tsx, champ "Lien HelloAsso")
-                      -- l'édition ici ne sert qu'à corriger ou compléter. */}
-                  {selectedCollecteId === c.id && editingLink ? (
-                    <div
-                      className="flex flex-col gap-1.5"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <input
-                        type="url"
-                        autoFocus
-                        placeholder="https://www.helloasso.com/..."
-                        value={linkDraft}
-                        onChange={(e) => setLinkDraft(e.target.value)}
-                        className="min-w-0 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs"
-                      />
-                      <div className="flex shrink-0 gap-3">
-                        <button
-                          onClick={saveLink}
-                          disabled={savingLink}
-                          className="rounded-full bg-ubac-yellow px-3 py-1 text-xs font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
-                        >
-                          {savingLink ? "Enregistrement..." : "Enregistrer"}
-                        </button>
-                        <button
-                          onClick={() => setEditingLink(false)}
-                          className="text-xs text-zinc-500 hover:underline"
-                        >
-                          Annuler
-                        </button>
-                      </div>
-                    </div>
-                  ) : c.paymentLink ? (
-                    <div className="flex w-fit items-center gap-1">
-                      <a
-                        href={c.paymentLink}
-                        target="_blank"
-                        rel="noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="flex w-fit items-center gap-1.5 truncate rounded-full border border-navy/20 bg-navy/5 px-2.5 py-1 text-xs font-medium text-navy hover:bg-navy/10"
-                      >
-                        <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                        Lien de paiement
-                      </a>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedCollecteId(c.id);
-                          setLinkDraft(c.paymentLink ?? "");
-                          setEditingLink(true);
-                        }}
-                        title="Modifier le lien"
-                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedCollecteId(c.id);
-                        setLinkDraft("");
-                        setEditingLink(true);
-                      }}
-                      className="flex w-fit items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      Ajouter un lien de paiement
-                    </button>
-                  )}
-                  {kpis && kpis.total > 0 && (
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex items-baseline justify-between text-sm">
-                        <span className="font-bold text-court-green">
-                          {formatAmount(kpis.totalCollected)}
-                        </span>
-                        <span className="text-xs text-zinc-500">
-                          sur {formatAmount(kpis.totalDue)} attendu
-                        </span>
-                      </div>
-                      {/* Barre de progression (retour de Cindy du 20/09) :
-                          même pourcentage déjà calculé pour le grand
-                          KpiHeader (kpis.percentage, computeKpis plus haut)
-                          -- juste réutilisé ici en version compacte. */}
-                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
-                        <div
-                          className={`h-full rounded-full ${typeStyle.barClass} transition-all`}
-                          style={{ width: `${Math.min(100, kpis.percentage)}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
 
-          {selectedCollecte ? (
+          {effectiveOpenGroupLabel ? (
             <div className="flex flex-col gap-4">
-              <CotisationParticipantsTable
-                cotisations={collecteCotisations}
-                contactEmailByPlayerId={contactEmailByPlayerId}
-                emptyLabel="Aucun participant pour cette collecte."
-                // Retour de Cindy du 25/10 ("pour faciliter la vie du
-                // comptable, le bouton à côté de rechercher un membre") :
-                // longtemps une carte séparée au-dessus du tableau
-                // (masquée pour une collecte "Événement" avec RSVP actif
-                // jusqu'au 25/10, voir l'historique de ce fichier) --
-                // maintenant intégré à la barre recherche/statut du
-                // tableau lui-même via toolbarExtra/belowToolbar, toujours
-                // utile pour quelqu'un qui a payé sans jamais répondre
-                // Présent dans l'appli. addParticipants marque en plus ce
-                // participant Présent sur le calendrier quand l'événement
-                // existe (voir son commentaire), donc plus de risque
-                // d'incohérence entre "a payé" et "absent au RSVP".
-                toolbarExtra={
-                  <button
-                    onClick={() => setAddingParticipants((v) => !v)}
-                    className="flex w-fit shrink-0 items-center gap-1.5 rounded-full bg-ubac-yellow px-3 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Ajouter des participants
-                  </button>
-                }
-                belowToolbar={
-                  addingParticipants && (
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => {
+                    setOpenGroupLabel(null);
+                    setShowGroupParticipants(false);
+                    setAddToGroupPicker(false);
+                  }}
+                  className="flex shrink-0 items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-navy hover:bg-zinc-50"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Retour
+                </button>
+                {!renamingGroup && <span className="text-sm text-zinc-400">/</span>}
+                {renamingGroup ? (
+                  <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                    <input
+                      autoFocus
+                      value={groupRenameDraft}
+                      onChange={(e) => setGroupRenameDraft(e.target.value)}
+                      className="min-w-0 flex-1 rounded-full border border-zinc-200 px-2.5 py-1 text-sm font-semibold text-zinc-900 focus:border-ubac-yellow focus:outline-none"
+                    />
+                    <button
+                      onClick={renameGroup}
+                      disabled={groupSaving || !groupRenameDraft.trim()}
+                      className="shrink-0 rounded-full bg-ubac-yellow px-3 py-1 text-xs font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+                    >
+                      {groupSaving ? "..." : "Enregistrer"}
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <span className="font-semibold text-zinc-900">{effectiveOpenGroupLabel}</span>
+                    <button
+                      onClick={() => {
+                        setGroupRenameDraft(effectiveOpenGroupLabel);
+                        setRenamingGroup(true);
+                      }}
+                      title="Renommer le groupe"
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  </>
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setShowGroupParticipants(false)}
+                  className={groupTabButtonClass(!showGroupParticipants)}
+                >
+                  <Ticket className="h-3.5 w-3.5" />
+                  Événements
+                </button>
+                <button
+                  onClick={() => setShowGroupParticipants(true)}
+                  className={groupTabButtonClass(showGroupParticipants)}
+                >
+                  <Users className="h-3.5 w-3.5" />
+                  Tous les participants
+                </button>
+              </div>
+
+              {showGroupParticipants ? (
+                <CotisationParticipantsTable
+                  cotisations={groupParticipants}
+                  contactEmailByPlayerId={contactEmailByPlayerId}
+                  emptyLabel="Aucun participant dans ce groupe."
+                />
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {openGroupMembers.map((c) => renderCollecteCard(c, { showRemoveFromGroup: true }))}
+                  </div>
+                  {addToGroupPicker ? (
                     <div className="flex flex-col gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
-                      <div className="relative">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-                        <input
-                          value={participantSearch}
-                          onChange={(e) => setParticipantSearch(e.target.value)}
-                          placeholder="Rechercher un membre"
-                          className="w-full rounded-full border border-zinc-200 bg-white py-1.5 pl-9 pr-3 text-sm focus:border-ubac-yellow focus:outline-none"
-                        />
-                      </div>
-                      <ul className="flex max-h-56 flex-col gap-0.5 overflow-y-auto rounded-lg bg-zinc-50 p-2">
-                        {availableMembers.map((m) => (
-                          <li key={m.id}>
-                            <label className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-white">
-                              <input
-                                type="checkbox"
-                                checked={selectedNewIds.has(m.id)}
-                                onChange={() => toggleNewParticipant(m.id)}
-                                className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
-                              />
-                              {formatPersonName(m.firstName, m.lastName)}
-                              {m.category ? (
-                                <span className="text-xs text-zinc-400">· {m.category}</span>
-                              ) : null}
-                            </label>
+                      <span className="text-sm font-medium text-zinc-700">
+                        Ajouter une collecte à ce groupe
+                      </span>
+                      <ul className="flex flex-col gap-0.5 rounded-lg bg-zinc-50 p-2">
+                        {ungroupedCollectes.map((c) => (
+                          <li key={c.id}>
+                            <button
+                              onClick={() => addCollecteToGroup(c.id)}
+                              disabled={groupSaving}
+                              className="w-full rounded-lg px-2 py-1.5 text-left text-sm hover:bg-white disabled:opacity-60"
+                            >
+                              {c.name}
+                            </button>
                           </li>
                         ))}
-                        {availableMembers.length === 0 && (
+                        {ungroupedCollectes.length === 0 && (
                           <li className="px-2 py-1.5 text-sm text-zinc-400">
-                            Tous les membres sont déjà dans cette collecte.
+                            Aucune autre collecte disponible.
                           </li>
                         )}
                       </ul>
                       <button
-                        onClick={addParticipants}
-                        disabled={addingSaving || selectedNewIds.size === 0}
-                        className="w-fit rounded-full bg-ubac-yellow px-3.5 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+                        onClick={() => setAddToGroupPicker(false)}
+                        className="w-fit text-xs text-zinc-500 hover:underline"
                       >
-                        {addingSaving
-                          ? "Ajout..."
-                          : `Ajouter (${selectedNewIds.size})`}
+                        Annuler
                       </button>
                     </div>
-                  )
-                }
-              />
+                  ) : (
+                    <button
+                      onClick={() => setAddToGroupPicker(true)}
+                      className="flex w-fit items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+                    >
+                      <FolderInput className="h-4 w-4" />
+                      Ajouter une collecte
+                    </button>
+                  )}
+                </>
+              )}
             </div>
           ) : (
-            <p className="text-sm text-zinc-500">
-              Crée une collecte (stage, événement ou boutique) pour commencer à
-              suivre ses participants et ses paiements.
-            </p>
+            <>
+              {/* Retour du comptable du 25/10 ("stage de la Toussaint géré
+                  comme 6 événements distincts, pas de vision consolidée") :
+                  "Sélectionner" + "Regrouper" (décision de Cindy, "cocher +
+                  regrouper" plutôt qu'un glisser-déposer façon dossiers
+                  iOS, jugé peu fiable au doigt) fait apparaître un dossier
+                  cliquable à la place des cartes cochées, avec un total
+                  consolidé -- voir groupKpis/groupedCollectes plus haut. */}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => {
+                    setGroupSelectMode((v) => !v);
+                    setGroupSelectIds(new Set());
+                  }}
+                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${
+                    groupSelectMode
+                      ? "bg-zinc-200 text-zinc-700 hover:bg-zinc-300"
+                      : "bg-navy text-white hover:bg-navy-dark"
+                  }`}
+                >
+                  <ListChecks className="h-3.5 w-3.5" />
+                  {groupSelectMode ? "Annuler la sélection" : "Sélectionner"}
+                </button>
+                {groupSelectMode && groupSelectIds.size >= 2 && (
+                  <button
+                    onClick={openGroupingPrompt}
+                    className="flex items-center gap-1.5 rounded-full bg-ubac-yellow px-3 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark"
+                  >
+                    <Folder className="h-3.5 w-3.5" />
+                    Regrouper ({groupSelectIds.size})
+                  </button>
+                )}
+              </div>
+
+              {/* Retour de Cindy du 29/08 ("un truc ne va pas niveau
+                  visibilité et clarté") : de simples pastilles de nom ne
+                  montraient ni le lien vers l'événement du calendrier, ni un
+                  moyen de supprimer la collecte — remplacées par de vraies
+                  cartes (voir renderCollecteCard plus haut). */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {ungroupedCollectes.map((c) => renderCollecteCard(c, { selectable: groupSelectMode }))}
+                {Array.from(groupedCollectes.keys()).map((label) => renderFolderTile(label))}
+              </div>
+            </>
           )}
         </div>
       )}
@@ -1027,6 +1502,45 @@ export default function CotisationsManager({
           setDeleteError(null);
         }}
       />
+
+      {groupNamePrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
+            <h3 className="mb-2 font-semibold text-zinc-900">Regrouper ces collectes</h3>
+            <p className="mb-3 text-sm text-zinc-600">
+              Donne un nom à ce groupe (ex. &laquo;&nbsp;Stage de la Toussaint&nbsp;&raquo;).
+            </p>
+            <input
+              autoFocus
+              value={groupNameDraft}
+              onChange={(e) => setGroupNameDraft(e.target.value)}
+              placeholder="Nom du groupe"
+              className="mb-3 w-full rounded-full border border-zinc-200 px-3.5 py-1.5 text-sm focus:border-ubac-yellow focus:outline-none"
+            />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setGroupNamePrompt(false);
+                  setGroupNameDraft("");
+                }}
+                disabled={groupSaving}
+                className="flex-1 rounded-full border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-60"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={confirmGrouping}
+                disabled={groupSaving || !groupNameDraft.trim()}
+                className="flex-1 rounded-full bg-navy px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-navy-dark disabled:opacity-60"
+              >
+                {groupSaving ? "Regroupement..." : "Regrouper"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

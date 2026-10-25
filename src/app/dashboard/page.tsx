@@ -276,6 +276,11 @@ export type AdminCollecte = {
   // dans l'appli -- null pour une collecte sans événement (Stage,
   // Boutique) ou dont l'événement ne cible aucune équipe précise.
   eventTeamCategory: string | null;
+  // Retour du comptable du 25/10 ("stage de la Toussaint... pas de vision
+  // consolidée") : étiquette de regroupement -- les collectes qui
+  // partagent la même valeur non nulle apparaissent réunies dans un
+  // "dossier" sur l'écran Événements payants (cotisations-manager.tsx).
+  groupLabel: string | null;
 };
 
 // Default season price per team category (Bureau-editable, see
@@ -1763,7 +1768,7 @@ export default async function DashboardPage({
               // niveau de plus ici (collectes -> events -> teams) --
               // aucune requête supplémentaire, l'équipe de l'événement
               // lié arrive dans ce même select groupé.
-              "id, name, type, prix, event_id, event_date, payment_link, events(start_time, teams(category, name))"
+              "id, name, type, prix, event_id, event_date, payment_link, group_label, events(start_time, teams(category, name))"
             )
             .order("created_at", { ascending: false }),
         // Matchs, tournois, stages... — chargés en entier (comme avant),
@@ -2520,6 +2525,7 @@ export default async function DashboardPage({
         paymentLink: c.payment_link ?? null,
         presentPlayerIds,
         eventTeamCategory: event?.teams?.category ?? event?.teams?.name ?? null,
+        groupLabel: c.group_label ?? null,
       };
     });
 

@@ -468,6 +468,13 @@ export default function CotisationParticipantsTable({
   const [internalStatusFilter, setInternalStatusFilter] = useState<StatusKey | "ALL">("ALL");
   const statusFilter = controlledStatusFilter ?? internalStatusFilter;
   const setStatusFilter = onStatusFilterChange ?? setInternalStatusFilter;
+  // Retour du comptable du 25/10 ("filtrer par mode de paiement") : les
+  // options viennent des modes RÉELLEMENT présents dans les lignes
+  // chargées (pas la liste fixe `paymentModes` du formulaire de saisie
+  // plus haut) -- un règlement importé porte souvent un mode hors liste
+  // ("Chèque CA @Emilie", "HelloAsso + CS", voir son commentaire), un
+  // filtre figé sur la liste fixe ne le retrouverait jamais.
+  const [modeFilter, setModeFilter] = useState<string>("ALL");
   const [sortKey, setSortKey] = useState<"lastName" | "firstName">("lastName");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   // Retour de Cindy du 07/09 ("bouton Relancer qui redirige... avec toutes
@@ -633,10 +640,24 @@ export default function CotisationParticipantsTable({
     [localRows]
   );
 
+  // Retour du comptable du 25/10 : options du filtre mode -- un seul passage
+  // sur localRows, recalculé seulement quand la liste change (pas à chaque
+  // frappe de recherche).
+  const availableModes = useMemo(
+    () =>
+      Array.from(new Set(localRows.map((c) => c.mode_paiement).filter((m): m is string => Boolean(m)))).sort(
+        (a, b) => a.localeCompare(b, "fr")
+      ),
+    [localRows]
+  );
+
   const filtered = useMemo(() => {
     let list = localRows;
     if (statusFilter !== "ALL") {
       list = list.filter((c) => computeStatus(c) === statusFilter);
+    }
+    if (modeFilter !== "ALL") {
+      list = list.filter((c) => c.mode_paiement === modeFilter);
     }
     const q = search.trim().toLowerCase();
     if (q) {
@@ -647,7 +668,16 @@ export default function CotisationParticipantsTable({
       const cmp = key(a).localeCompare(key(b), "fr");
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [localRows, statusFilter, search, sortKey, sortDir]);
+  }, [localRows, statusFilter, modeFilter, search, sortKey, sortDir]);
+
+  // Retour du comptable du 25/10 ("un total du montant et du nombre de
+  // lignes, qui tient compte du filtre appliqué") : recalculé à partir de
+  // `filtered`, donc déjà à jour avec statut + mode + recherche réunis --
+  // jamais une requête de plus, tout est déjà en mémoire.
+  const filteredTotalPaiement = useMemo(
+    () => roundCents(filtered.reduce((sum, c) => sum + (c.paiement ?? 0), 0)),
+    [filtered]
+  );
 
   function toggleSort(key: "lastName" | "firstName") {
     if (sortKey === key) {
@@ -1468,8 +1498,23 @@ export default function CotisationParticipantsTable({
             value={statusFilter}
             onChange={(v) => setStatusFilter(v as StatusKey | "ALL")}
           />
+          {/* Retour du comptable du 25/10 ("filtrer par mode de paiement") :
+              masqué si aucun règlement n'a encore été saisi (rien à
+              filtrer) -- jamais une liste vide avec juste "Tous les
+              modes" dedans. */}
+          {availableModes.length > 0 && (
+            <SelectDropdown
+              options={[
+                { value: "ALL", label: "Tous les modes" },
+                ...availableModes.map((m) => ({ value: m, label: m })),
+              ]}
+              value={modeFilter}
+              onChange={setModeFilter}
+            />
+          )}
           <span className="text-xs font-medium text-zinc-400">
             {filtered.length} ligne{filtered.length > 1 ? "s" : ""}
+            {filteredTotalPaiement > 0 && ` · ${formatAmount(filteredTotalPaiement)} payé`}
           </span>
         </div>
         {belowToolbar}
