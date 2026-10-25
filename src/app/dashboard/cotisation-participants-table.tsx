@@ -21,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { categoryTheme } from "./team-card";
 import { runBatched } from "@/lib/batch";
 import { getLogoBase64, PDF_COLORS } from "@/lib/pdf-brand";
 import EmptyState from "./empty-state";
@@ -433,6 +434,8 @@ export default function CotisationParticipantsTable({
   emptyLabel = "Aucune cotisation.",
   statusFilter: controlledStatusFilter,
   onStatusFilterChange,
+  toolbarExtra,
+  belowToolbar,
 }: {
   cotisations: AdminCotisation[];
   contactEmailByPlayerId: Record<string, string>;
@@ -445,6 +448,18 @@ export default function CotisationParticipantsTable({
   // cliquables.
   statusFilter?: StatusKey | "ALL";
   onStatusFilterChange?: (value: StatusKey | "ALL") => void;
+  // Retour de Cindy du 25/10 ("le bouton ajouter des participants... à
+  // côté de rechercher un membre") : contenu libre affiché SUR LA MÊME
+  // LIGNE que la recherche (ex. le bouton "Ajouter des participants" de
+  // cotisations-manager.tsx, détail d'une collecte) -- absent (undefined)
+  // pour le 1er usage (onglet Cotisations général), qui n'a rien à ajouter
+  // ici.
+  toolbarExtra?: ReactNode;
+  // Panneau affiché juste SOUS la barre recherche/filtre (ex. le
+  // sélecteur de membres à cocher, déplié au clic sur le bouton ci-dessus)
+  // -- séparé de toolbarExtra pour ne jamais être écrasé par la ligne de
+  // recherche, qui elle doit rester compacte.
+  belowToolbar?: ReactNode;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -482,6 +497,17 @@ export default function CotisationParticipantsTable({
   const [deletePaymentTarget, setDeletePaymentTarget] = useState<
     { paymentId: string; cotisationId: string } | null
   >(null);
+  // Retour de Cindy du 25/10 ("supprimer un participant... il se blesse
+  // juste avant le stage et oublie de se mettre absent") : retire la
+  // ligne cotisations elle-même (jamais pour une cotisation de saison,
+  // voir renderRowMenu -- seulement un participant d'une collecte).
+  // cotisation_payments est en ON DELETE CASCADE côté base : un éventuel
+  // règlement déjà enregistré part avec, d'où l'avertissement explicite
+  // dans la confirmation (pas un retrait silencieux d'argent déjà reçu).
+  const [deleteParticipantTarget, setDeleteParticipantTarget] = useState<AdminCotisation | null>(
+    null
+  );
+  const [deletingParticipant, setDeletingParticipant] = useState(false);
   // Retour de Cindy du 09/09 ("confirmations visuelles immédiates après
   // chaque action clé") : toast partagé (toast-context.tsx) plutôt qu'une
   // implémentation locale -- cet écran en avait la version la plus
@@ -1089,6 +1115,34 @@ export default function CotisationParticipantsTable({
     showToast("Règlement supprimé.");
   }
 
+  async function deleteParticipant() {
+    if (!deleteParticipantTarget) return;
+    const id = deleteParticipantTarget.id;
+    setDeletingParticipant(true);
+    setActionError(null);
+    const supabase = createClient();
+    const { error, data } = await supabase
+      .from("cotisations")
+      .delete()
+      .eq("id", id)
+      .select("id");
+    setDeletingParticipant(false);
+    if (error) {
+      setActionError(`Suppression impossible : ${error.message}`);
+      return;
+    }
+    if ((data?.length ?? 0) === 0) {
+      setActionError(
+        "Le participant n'a pas pu être retiré (droits d'accès). Recharge la page et réessaie."
+      );
+      return;
+    }
+    setLocalRows((prev) => prev.filter((c) => c.id !== id));
+    setDeleteParticipantTarget(null);
+    showToast("Participant retiré.");
+    router.refresh();
+  }
+
   async function exportSelection(ids: string[]) {
     // xlsx importé ici seulement (même correctif que jsPDF plus haut) : ne
     // sert qu'à ce bouton "Exporter", pas de raison qu'il pèse sur le
@@ -1347,6 +1401,23 @@ export default function CotisationParticipantsTable({
                 <Receipt className="h-3.5 w-3.5" />
                 Générer reçu / facture
               </button>
+              {/* Retour de Cindy du 25/10 ("il se blesse juste avant le
+                  stage et oublie de se mettre absent") : jamais proposé
+                  sur une cotisation de saison (licence) -- seulement un
+                  participant d'un événement payant, qu'il soit arrivé là
+                  automatiquement (RSVP) ou via "Ajouter des participants". */}
+              {c.collecteId && (
+                <button
+                  onClick={() => {
+                    setOpenMenuId(null);
+                    setDeleteParticipantTarget(c);
+                  }}
+                  className={`${menuItemClass} text-red-600 hover:bg-red-50`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Retirer ce participant
+                </button>
+              )}
             </div>
           </>
         )}
@@ -1368,30 +1439,40 @@ export default function CotisationParticipantsTable({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative min-w-[200px] flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Rechercher un membre..."
-            className="w-full rounded-full border border-zinc-200 bg-white py-1.5 pl-9 pr-3 text-sm focus:border-ubac-yellow focus:outline-none"
-          />
+      <div className="flex flex-col gap-3">
+        {/* Retour de Cindy du 25/10 : recherche + bouton "Ajouter des
+            participants" (toolbarExtra) sur la même ligne, statut sur la
+            sienne juste en dessous -- plus lisible qu'une seule ligne qui
+            s'étirait avec recherche/statut/compteur/bouton tous ensemble. */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative min-w-[200px] flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Rechercher un membre"
+              className="w-full rounded-full border border-zinc-200 bg-white py-1.5 pl-9 pr-3 text-sm focus:border-ubac-yellow focus:outline-none"
+            />
+          </div>
+          {toolbarExtra}
         </div>
-        <SelectDropdown
-          options={[
-            { value: "ALL", label: "Tous les statuts" },
-            ...(Object.keys(statusBadge) as StatusKey[]).map((k) => ({
-              value: k,
-              label: statusBadge[k].label,
-            })),
-          ]}
-          value={statusFilter}
-          onChange={(v) => setStatusFilter(v as StatusKey | "ALL")}
-        />
-        <span className="text-xs font-medium text-zinc-400">
-          {filtered.length} ligne{filtered.length > 1 ? "s" : ""}
-        </span>
+        <div className="flex flex-wrap items-center gap-3">
+          <SelectDropdown
+            options={[
+              { value: "ALL", label: "Tous les statuts" },
+              ...(Object.keys(statusBadge) as StatusKey[]).map((k) => ({
+                value: k,
+                label: statusBadge[k].label,
+              })),
+            ]}
+            value={statusFilter}
+            onChange={(v) => setStatusFilter(v as StatusKey | "ALL")}
+          />
+          <span className="text-xs font-medium text-zinc-400">
+            {filtered.length} ligne{filtered.length > 1 ? "s" : ""}
+          </span>
+        </div>
+        {belowToolbar}
       </div>
 
       {selectedIds.size > 0 && (
@@ -1585,11 +1666,26 @@ export default function CotisationParticipantsTable({
                     <p className="truncate font-semibold text-zinc-900">
                       {cotisationLastName(c)} {cotisationFirstName(c)}
                     </p>
-                    <span
-                      className={`mt-0.5 inline-flex items-center justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold leading-none ${status.className}`}
-                    >
-                      {status.label}
-                    </span>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                      <span
+                        className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold leading-none ${status.className}`}
+                      >
+                        {status.label}
+                      </span>
+                      {/* Retour de Cindy du 25/10 ("son équipe, même
+                          visuel que les autres cartes existantes") :
+                          même badge coloré par catégorie que team-card.tsx
+                          (categoryTheme) -- absent pour un bénévole invité
+                          (jamais d'équipe) ou un joueur sans équipe
+                          affectée. */}
+                      {c.category && (
+                        <span
+                          className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold leading-none ${categoryTheme(c.category).badge}`}
+                        >
+                          {c.category}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -2463,6 +2559,31 @@ export default function CotisationParticipantsTable({
           deletePayment(deletePaymentTarget.paymentId, deletePaymentTarget.cotisationId)
         }
         onCancel={() => setDeletePaymentTarget(null)}
+      />
+      <ConfirmDialog
+        open={Boolean(deleteParticipantTarget)}
+        title="Retirer ce participant ?"
+        message={
+          deleteParticipantTarget && (deleteParticipantTarget.paiement ?? 0) > 0 ? (
+            <>
+              {deleteParticipantTarget.playerName} sera retiré(e) de cet événement payant —{" "}
+              <strong>
+                {formatAmount(deleteParticipantTarget.paiement ?? 0)} déjà enregistré(s) seront
+                aussi supprimés
+              </strong>
+              , y compris l&apos;historique des règlements.
+            </>
+          ) : deleteParticipantTarget ? (
+            `${deleteParticipantTarget.playerName} sera retiré(e) de cet événement payant.`
+          ) : (
+            ""
+          )
+        }
+        confirmLabel="Retirer"
+        pending={deletingParticipant}
+        pendingLabel="Retrait..."
+        onConfirm={deleteParticipant}
+        onCancel={() => setDeleteParticipantTarget(null)}
       />
     </div>
   );

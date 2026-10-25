@@ -646,6 +646,7 @@ export default async function ChildViewPage() {
       isGuest: false,
       payments: paymentsByCotisationId.get(c.id) ?? [],
       createdAt: c.created_at,
+      addedManually: false,
     };
   });
 

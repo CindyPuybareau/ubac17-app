@@ -139,6 +139,7 @@ export async function sendCotisationRelances(
         collecteName: null,
         payments: [],
         createdAt: null,
+        addedManually: false,
       };
 
       const status = computeStatus(cotisation);

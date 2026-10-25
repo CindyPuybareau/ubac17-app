@@ -23,6 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { categoryTheme } from "./team-card";
 import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
 import { formatPersonName } from "@/lib/names";
 import AnimatedNumber from "./animated-number";
@@ -122,7 +123,12 @@ function visibleCollecteCotisations(collecte: AdminCollecte | undefined, all: Ad
       c.isGuest ||
       (c.playerId !== null && presentIds.has(c.playerId)) ||
       (c.paiement ?? 0) > 0 ||
-      c.statut === "OFFERT"
+      c.statut === "OFFERT" ||
+      // Retour de Cindy du 25/10 ("ajouter un participant qui ne s'est pas
+      // noté présent") : une ligne ajoutée à la main par le Bureau reste
+      // toujours visible, même à 0 € et même sans RSVP "Présent" --
+      // sinon elle disparaîtrait du tableau juste après sa création.
+      c.addedManually
   );
 }
 
@@ -355,11 +361,6 @@ export default function CotisationsManager({
   // licences" ; le détail d'une collecte (plus bas) garde son propre
   // filtre interne, non concerné par cette demande.
   const [mainStatusFilter, setMainStatusFilter] = useState<StatusKey | "ALL">("ALL");
-  const [creatingCollecte, setCreatingCollecte] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newType, setNewType] = useState<CollecteType>("STAGE");
-  const [newPrix, setNewPrix] = useState("");
-  const [creatingSaving, setCreatingSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [addingParticipants, setAddingParticipants] = useState(false);
@@ -485,33 +486,6 @@ export default function CotisationsManager({
     });
   }, [members, collecteCotisations, participantSearch]);
 
-  async function createCollecte() {
-    if (!newName.trim()) return;
-    setCreatingSaving(true);
-    setError(null);
-    const supabase = createClient();
-    const { data, error: insertError } = await supabase
-      .from("collectes")
-      .insert({
-        name: newName.trim(),
-        type: newType,
-        prix: newPrix ? Number(newPrix) : null,
-      })
-      .select("id")
-      .single();
-
-    setCreatingSaving(false);
-    if (insertError) {
-      setError(insertError.message);
-      return;
-    }
-    setCreatingCollecte(false);
-    setNewName("");
-    setNewPrix("");
-    setSelectedCollecteId(data?.id ?? null);
-    router.refresh();
-  }
-
   function toggleNewParticipant(id: string) {
     setSelectedNewIds((prev) => {
       const next = new Set(prev);
@@ -526,7 +500,13 @@ export default function CotisationsManager({
     setAddingSaving(true);
     setError(null);
     const supabase = createClient();
-    const rows = Array.from(selectedNewIds).map((playerId) => ({
+    const ids = Array.from(selectedNewIds);
+    // Retour de Cindy du 25/10 ("le comptable n'a pas trouvé comment
+    // ajouter un participant qui ne s'est pas noté présent") : added_manually
+    // garde cette ligne visible/protégée (voir visibleCollecteCotisations
+    // plus haut et le trigger sync_paid_event_cotisation_on_rsvp, base de
+    // données) même sans RSVP "Présent" et même à 0 €.
+    const rows = ids.map((playerId) => ({
       player_id: playerId,
       collecte_id: selectedCollecte.id,
       saison: selectedCollecte.name,
@@ -534,13 +514,42 @@ export default function CotisationsManager({
       remise: 0,
       paiement: 0,
       statut: null,
+      added_manually: true,
     }));
     const { error: insertError } = await supabase.from("cotisations").insert(rows);
-    setAddingSaving(false);
     if (insertError) {
+      setAddingSaving(false);
       setError(insertError.message);
       return;
     }
+    // Retour de Cindy du 25/10 ("en 360°, sur le calendrier du coach, de la
+    // famille et de l'enfant aussi") : posé APRÈS la ligne cotisations
+    // ci-dessus, jamais avant -- sync_paid_event_cotisation_on_rsvp (le
+    // déclencheur qui réagit à ce même RSVP) trouve alors la ligne déjà
+    // créée et ne tente pas d'en insérer une seconde en double. Seulement
+    // pour une collecte liée à un vrai événement du calendrier (Stage/
+    // Boutique "libres" n'en ont pas) ; Bureau/Coach/Famille le voient
+    // aussitôt (rsvps déjà écouté en temps réel, realtime-sync.tsx),
+    // l'Espace Enfant au prochain chargement (pas d'écoute temps réel là-bas,
+    // déjà le cas pour tout autre changement de présence).
+    if (selectedCollecte.eventId) {
+      const { error: rsvpError } = await supabase.from("rsvps").upsert(
+        ids.map((playerId) => ({
+          event_id: selectedCollecte.eventId,
+          player_id: playerId,
+          status: "PRESENT",
+        })),
+        { onConflict: "event_id,player_id" }
+      );
+      if (rsvpError) {
+        setAddingSaving(false);
+        setError(
+          `Participant(s) ajouté(s), mais le calendrier n'a pas pu être mis à jour : ${rsvpError.message}`
+        );
+        return;
+      }
+    }
+    setAddingSaving(false);
     setAddingParticipants(false);
     setSelectedNewIds(new Set());
     router.refresh();
@@ -736,17 +745,33 @@ export default function CotisationsManager({
                         </span>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeleteTarget(c);
-                      }}
-                      title="Supprimer cette collecte"
-                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      {/* Retour de Cindy du 25/10 ("on ne fait pas le
+                          distingo si on regarde tous les stages créés") :
+                          même badge coloré par catégorie que le reste de
+                          l'appli (categoryTheme, team-card.tsx) -- absent
+                          pour une collecte sans événement (Stage/Boutique
+                          "libres") ou dont l'événement ne cible aucune
+                          équipe précise (ex. une Réunion Bureau). */}
+                      {c.eventTeamCategory && (
+                        <span
+                          className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold leading-none ${categoryTheme(c.eventTeamCategory).badge}`}
+                        >
+                          {c.eventTeamCategory}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteTarget(c);
+                        }}
+                        title="Supprimer cette collecte"
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                   {/* Retour de Cindy du 29/08 ("j'aimerai voir la date de
                       l'evenement payant, quand a til lieu ?") : eventDate
@@ -887,107 +912,44 @@ export default function CotisationsManager({
                 </div>
               );
             })}
-            <button
-              onClick={() => setCreatingCollecte((v) => !v)}
-              className="flex items-center justify-center gap-1.5 rounded-2xl border border-dashed border-zinc-300 p-4 text-sm font-semibold text-navy transition-colors hover:bg-blue-50/40"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Nouvelle collecte
-            </button>
           </div>
-
-          {creatingCollecte && (
-            <div className="flex flex-col gap-3 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
-              {/* Retour de Cindy du 29/08 : un "Événement" créé ici (nom +
-                  type + tarif seulement) n'avait ni date ni lien vers le
-                  calendrier, ni participants pré-remplis — indiscernable
-                  d'une collecte orpheline dès sa création. "Événement"
-                  retiré des choix ci-dessous : un seul chemin désormais,
-                  "Créer un événement" + case "Événement payant", qui bascule
-                  automatiquement la collecte ici avec toutes ces
-                  informations. Stage/Boutique n'ont pas cet équivalent
-                  calendrier, ils gardent ce formulaire. */}
-              <p className="flex items-start gap-1.5 text-xs text-zinc-500">
-                <Ticket className="h-3.5 w-3.5 shrink-0 text-navy" />
-                Pour un événement payant (stage, tournoi...), crée-le depuis
-                Calendrier ou Événements avec la case &laquo;&nbsp;Événement
-                payant&nbsp;&raquo; — sa collecte apparaîtra ici automatiquement,
-                déjà reliée et avec ses participants. Ce formulaire sert
-                seulement pour un stage externe ou une boutique, sans
-                événement au calendrier.
-              </p>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
-                <div className="flex-1">
-                  <label className="mb-1 block text-xs font-medium text-zinc-600">Nom</label>
-                  <input
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    placeholder="Stage Toussaint 2026"
-                    className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-zinc-600">Type</label>
-                  <select
-                    value={newType}
-                    onChange={(e) => setNewType(e.target.value as CollecteType)}
-                    className="rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
-                  >
-                    <option value="STAGE">Stage</option>
-                    <option value="BOUTIQUE">Boutique</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-zinc-600">Tarif (€)</label>
-                  <input
-                    type="number"
-                    value={newPrix}
-                    onChange={(e) => setNewPrix(e.target.value)}
-                    className="w-24 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
-                  />
-                </div>
-                <button
-                  onClick={createCollecte}
-                  disabled={creatingSaving || !newName.trim()}
-                  className="rounded-full bg-ubac-yellow px-3.5 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
-                >
-                  {creatingSaving ? "Création..." : "Créer"}
-                </button>
-              </div>
-            </div>
-          )}
 
           {selectedCollecte ? (
             <div className="flex flex-col gap-4">
-              {/* Retour de Cindy du 20/09 ("total collecté est deux fois
-                  présent, je ne veux que celui du haut") : le "Total
-                  collecté" agrégé en tête de page (totalCollectedAllCollectes
-                  plus haut) suffit -- plus de doublon ici au niveau du
-                  détail d'une collecte. */}
-              {/* Retour de Cindy du 20/09 ("les participants seront ajoutés
-                  automatiquement... quand ils tapent présent") : pour une
-                  collecte "Événement" avec RSVP actif (presentPlayerIds non
-                  null), l'ajout manuel n'a plus lieu d'être -- il reste
-                  disponible pour Stage/Boutique (pas de RSVP possible) et
-                  pour un événement orphelin ou hors fenêtre RSVP, seuls cas
-                  où l'inscription automatique ne peut pas s'appliquer. */}
-              {selectedCollecte.presentPlayerIds === null && (
-                <div className="flex flex-col gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
+              <CotisationParticipantsTable
+                cotisations={collecteCotisations}
+                contactEmailByPlayerId={contactEmailByPlayerId}
+                emptyLabel="Aucun participant pour cette collecte."
+                // Retour de Cindy du 25/10 ("pour faciliter la vie du
+                // comptable, le bouton à côté de rechercher un membre") :
+                // longtemps une carte séparée au-dessus du tableau
+                // (masquée pour une collecte "Événement" avec RSVP actif
+                // jusqu'au 25/10, voir l'historique de ce fichier) --
+                // maintenant intégré à la barre recherche/statut du
+                // tableau lui-même via toolbarExtra/belowToolbar, toujours
+                // utile pour quelqu'un qui a payé sans jamais répondre
+                // Présent dans l'appli. addParticipants marque en plus ce
+                // participant Présent sur le calendrier quand l'événement
+                // existe (voir son commentaire), donc plus de risque
+                // d'incohérence entre "a payé" et "absent au RSVP".
+                toolbarExtra={
                   <button
                     onClick={() => setAddingParticipants((v) => !v)}
-                    className="flex w-fit items-center gap-1.5 rounded-full bg-ubac-yellow px-3 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark"
+                    className="flex w-fit shrink-0 items-center gap-1.5 rounded-full bg-ubac-yellow px-3 py-1.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark"
                   >
                     <Plus className="h-3.5 w-3.5" />
                     Ajouter des participants
                   </button>
-                  {addingParticipants && (
-                    <div className="flex flex-col gap-2">
+                }
+                belowToolbar={
+                  addingParticipants && (
+                    <div className="flex flex-col gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
                       <div className="relative">
                         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
                         <input
                           value={participantSearch}
                           onChange={(e) => setParticipantSearch(e.target.value)}
-                          placeholder="Rechercher un membre..."
+                          placeholder="Rechercher un membre"
                           className="w-full rounded-full border border-zinc-200 bg-white py-1.5 pl-9 pr-3 text-sm focus:border-ubac-yellow focus:outline-none"
                         />
                       </div>
@@ -1024,14 +986,8 @@ export default function CotisationsManager({
                           : `Ajouter (${selectedNewIds.size})`}
                       </button>
                     </div>
-                  )}
-                </div>
-              )}
-
-              <CotisationParticipantsTable
-                cotisations={collecteCotisations}
-                contactEmailByPlayerId={contactEmailByPlayerId}
-                emptyLabel="Aucun participant pour cette collecte."
+                  )
+                }
               />
             </div>
           ) : (

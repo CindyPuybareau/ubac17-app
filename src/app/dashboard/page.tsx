@@ -270,6 +270,12 @@ export type AdminCollecte = {
   // de requête en plus). null pour une collecte sans événement (Stage,
   // Boutique) : pas de filtrage applicable dans ce cas.
   presentPlayerIds: string[] | null;
+  // Retour de Cindy du 25/10 ("on ne fait pas le distingo si on regarde
+  // tous les stages créés") : équipe de l'événement lié, pour afficher le
+  // même badge coloré (categoryTheme, team-card.tsx) que partout ailleurs
+  // dans l'appli -- null pour une collecte sans événement (Stage,
+  // Boutique) ou dont l'événement ne cible aucune équipe précise.
+  eventTeamCategory: string | null;
 };
 
 // Default season price per team category (Bureau-editable, see
@@ -346,6 +352,13 @@ export type AdminCotisation = {
   // une cotisation) -- voir la carte "Cotisations en attente" dans
   // bureau-dashboard.tsx.
   createdAt: string | null;
+  // Retour de Cindy du 25/10 ("le comptable n'a pas trouvé comment ajouter
+  // un participant... qui ne s'est pas noté présent") : vrai pour une ligne
+  // créée via "Ajouter des participants" (cotisations-manager.tsx), jamais
+  // par sync_paid_event_cotisation_on_rsvp (base de données) -- sert à la
+  // garder visible même à 0 € sans RSVP "Présent" (visibleCollecteCotisations,
+  // cotisations-manager.tsx), le trigger lui-même ne la supprime jamais.
+  addedManually: boolean;
 };
 
 // Transforme une ligne brute de "cotisations" (avec ses jointures players/
@@ -365,6 +378,7 @@ function mapCotisationRow(
     guest_name: string | null;
     collecte_id: string | null;
     created_at: string | null;
+    added_manually: boolean;
     players: unknown;
     collectes: unknown;
   },
@@ -403,6 +417,7 @@ function mapCotisationRow(
     playerId: c.player_id,
     isGuest: c.player_id === null,
     createdAt: c.created_at,
+    addedManually: c.added_manually,
     payments: paymentsByCotisationId.get(c.id) ?? [],
     membershipType: player?.membership_type ?? null,
     fbiStatus: player?.fbi_status ?? null,
@@ -1726,7 +1741,7 @@ export default async function DashboardPage({
               // ailleurs dans ce même lot (playersRes/teamPlayersRes/
               // teamsRes) : réunis en mémoire juste avant adminCotisations
               // plus bas, jamais réévalués via un embed imbriqué.
-              "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, guest_name, collecte_id, created_at, collectes(id, name, type)"
+              "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, guest_name, collecte_id, created_at, added_manually, collectes(id, name, type)"
             )
             .order("saison", { ascending: false })
             // Retour de l'audit du 08/10 : aucune limite sur cette requête,
@@ -1741,7 +1756,14 @@ export default async function DashboardPage({
           supabase
             .from("collectes")
             .select(
-              "id, name, type, prix, event_id, event_date, payment_link, events(start_time)"
+              // teams(category, name) en plus (retour de Cindy du 25/10,
+              // "on ne fait pas le distingo si on regarde tous les
+              // stages créés") : même embed à deux niveaux déjà utilisé
+              // ailleurs dans ce fichier (events -> teams), juste un
+              // niveau de plus ici (collectes -> events -> teams) --
+              // aucune requête supplémentaire, l'équipe de l'événement
+              // lié arrive dans ce même select groupé.
+              "id, name, type, prix, event_id, event_date, payment_link, events(start_time, teams(category, name))"
             )
             .order("created_at", { ascending: false }),
         // Matchs, tournois, stages... — chargés en entier (comme avant),
@@ -2463,7 +2485,10 @@ export default async function DashboardPage({
       // Jointure directe (collectes.event_id -> events.id) : un seul objet,
       // pas un tableau, contrairement à resolvePaidInfo plus haut qui lit
       // la relation dans l'autre sens.
-      const event = c.events as unknown as { start_time: string } | null;
+      const event = c.events as unknown as {
+        start_time: string;
+        teams: { category: string | null; name: string | null } | null;
+      } | null;
       // null = pas de filtrage possible (pas d'événement lié, ou événement
       // hors de la fenêtre déjà chargée pour rsvpsByEvent -- voir
       // upcomingEventIdSet) : mieux vaut tout montrer que de cacher à tort
@@ -2494,6 +2519,7 @@ export default async function DashboardPage({
         eventDate: c.event_date ?? null,
         paymentLink: c.payment_link ?? null,
         presentPlayerIds,
+        eventTeamCategory: event?.teams?.category ?? event?.teams?.name ?? null,
       };
     });
 
@@ -4079,7 +4105,7 @@ export default async function DashboardPage({
               // part ci-dessous (cotisationPlayerFieldsRes/
               // cotisationPlayerTeamsRes), jamais réévalués via un embed
               // imbriqué.
-              "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, guest_name, collecte_id, created_at, collectes(id, name, type)"
+              "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, guest_name, collecte_id, created_at, added_manually, collectes(id, name, type)"
             )
             .in("player_id", familyPlayerIds)
             .order("saison", { ascending: false })
