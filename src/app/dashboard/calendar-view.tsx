@@ -255,16 +255,92 @@ export type CalendarRsvpPlayer = {
 // (week-strip-banner.tsx), jamais reconstruite à part.
 export function PresentPlayersList({
   players,
+  eventId,
+  canManage = false,
+  onStatusChange,
 }: {
   players: {
     id: string;
     firstName: string | null;
     lastName: string | null;
   }[];
+  // Retour de Cindy du 27/10 ("le coach puisse le faire aussi, mais
+  // toujours en plus des familles, jamais à leur place") : coach/Bureau
+  // gagne un clic pour basculer un joueur en absent -- la famille garde
+  // toujours son propre bouton Présent/Absent (RsvpButtons/RsvpControl),
+  // inchangé. eventId/canManage optionnels : absents, la liste reste le
+  // simple affichage lecture seule d'avant (week-strip-banner.tsx côté
+  // famille, par ex.).
+  eventId?: string;
+  canManage?: boolean;
+  // Retour de Cindy du 27/10 ("c'est long, ça ne s'affiche toujours pas") :
+  // laisser le seul rafraîchissement temps réel (realtime-sync.tsx, ~0,8s
+  // de débounce + un aller-retour serveur complet) déplacer le joueur vers
+  // "Absents" se sentait cassé. Permet à l'appelant (renderEventCard,
+  // calendar-view.tsx) de répercuter le geste tout de suite dans sa propre
+  // copie locale (updateLocalRsvpStatus, même mécanisme déjà utilisé par
+  // RsvpButtons) -- optionnel : sans lui (week-strip-banner.tsx, qui n'a
+  // pas cette copie locale), le retrait optimiste de CETTE liste (hiddenIds
+  // ci-dessous) reste le seul filet, comme avant.
+  onStatusChange?: (
+    player: { id: string; firstName: string | null; lastName: string | null },
+    previousStatus: string,
+    newStatus: string
+  ) => void;
 }) {
   const [open, setOpen] = useState(false);
+  // Retrait optimiste de la liste au clic, même esprit que rsvp-buttons.tsx
+  // -- le temps réel (realtime-sync.tsx, table rsvps) rafraîchit ensuite
+  // tout le reste de la page (compteurs, liste "Absents") sans qu'on ait
+  // besoin d'un router.refresh() ici.
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
+  // Bug constaté en direct le 27/10 ("je reclique sur Raphaël, il ne
+  // s'affiche toujours pas absent") : un joueur sorti PUIS revenu dans
+  // CETTE liste (ex. présent -> absent -> présent, deux clics rapprochés)
+  // restait caché -- `hiddenIds` ne s'effaçait jamais une fois posé.
+  // Dès que `players` change de référence (le geste du coach vient de se
+  // répercuter via onStatusChange/updateLocalRsvpStatus, ou un vrai
+  // rafraîchissement temps réel vient d'arriver), ce masquage local n'a
+  // plus de raison d'être : la prop fraîchement reçue fait à nouveau foi.
+  // Même schéma que `prevEventsProp` plus haut dans ce fichier (ajuster
+  // pendant le rendu, pas dans un effet, lint react-hooks/set-state-in-effect).
+  const [prevPlayers, setPrevPlayers] = useState(players);
+  if (players !== prevPlayers) {
+    setPrevPlayers(players);
+    setHiddenIds(new Set());
+  }
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  if (players.length === 0) return null;
+  async function markAbsent(p: { id: string; firstName: string | null; lastName: string | null }) {
+    if (!eventId) return;
+    // Optimiste avant l'écriture (même geste que rsvp-buttons.tsx) :
+    // rollback des deux côtés si l'écriture échoue réellement.
+    setHiddenIds((prev) => new Set(prev).add(p.id));
+    onStatusChange?.(p, "PRESENT", "ABSENT");
+    setSavingId(p.id);
+    setError(null);
+    const supabase = createClient();
+    const { error: writeError } = await supabase
+      .from("rsvps")
+      .upsert(
+        { event_id: eventId, player_id: p.id, status: "ABSENT" },
+        { onConflict: "event_id,player_id" }
+      );
+    setSavingId(null);
+    if (writeError) {
+      setError(writeError.message);
+      setHiddenIds((prev) => {
+        const next = new Set(prev);
+        next.delete(p.id);
+        return next;
+      });
+      onStatusChange?.(p, "ABSENT", "PRESENT");
+    }
+  }
+
+  const visiblePlayers = players.filter((p) => !hiddenIds.has(p.id));
+  if (visiblePlayers.length === 0) return null;
 
   return (
     <div className="flex flex-col gap-1.5 border-t border-zinc-100 pt-2">
@@ -274,7 +350,7 @@ export function PresentPlayersList({
         className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:text-zinc-900"
       >
         <Users className="h-3.5 w-3.5 shrink-0 text-status-success" />
-        {players.length} {players.length > 1 ? "joueurs/joueuses présent(e)s" : "joueur/joueuse présent(e)"}
+        {visiblePlayers.length} {visiblePlayers.length > 1 ? "joueurs/joueuses présent(e)s" : "joueur/joueuse présent(e)"}
         {open ? (
           <ChevronUp className="h-3.5 w-3.5 shrink-0" />
         ) : (
@@ -283,17 +359,32 @@ export function PresentPlayersList({
       </button>
       {open && (
         <div className="flex flex-wrap gap-1.5">
-          {sortByLastName(players, (p) => p.lastName).map((p) => (
-            <span
-              key={p.id}
-              className="inline-flex items-center gap-1 rounded-full bg-status-success/10 px-2.5 py-1 text-xs font-medium text-status-success"
-            >
-              {formatFirstName(p.firstName)}{" "}
-              <span className="font-bold uppercase">{formatLastName(p.lastName)}</span>
-            </span>
-          ))}
+          {sortByLastName(visiblePlayers, (p) => p.lastName).map((p) =>
+            canManage && eventId ? (
+              <button
+                key={p.id}
+                type="button"
+                disabled={savingId === p.id}
+                onClick={() => markAbsent(p)}
+                title="Marquer absent"
+                className="inline-flex items-center gap-1 rounded-full bg-status-success/10 px-2.5 py-1 text-xs font-medium text-status-success transition-opacity hover:bg-status-success/20 disabled:opacity-50"
+              >
+                {formatFirstName(p.firstName)}{" "}
+                <span className="font-bold uppercase">{formatLastName(p.lastName)}</span>
+              </button>
+            ) : (
+              <span
+                key={p.id}
+                className="inline-flex items-center gap-1 rounded-full bg-status-success/10 px-2.5 py-1 text-xs font-medium text-status-success"
+              >
+                {formatFirstName(p.firstName)}{" "}
+                <span className="font-bold uppercase">{formatLastName(p.lastName)}</span>
+              </span>
+            )
+          )}
         </div>
       )}
+      {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   );
 }
@@ -308,12 +399,70 @@ export function PresentPlayersList({
 // Exportée le 14/09, même raison que PresentPlayersList ci-dessus.
 export function AbsentPlayersList({
   players,
+  eventId,
+  canManage = false,
+  onStatusChange,
 }: {
   players: { id: string; firstName: string | null; lastName: string | null }[];
+  // Même ajout que PresentPlayersList ci-dessus, symétrique : un clic
+  // coach/Bureau bascule en présent, toujours en plus (jamais à la place)
+  // du propre bouton de la famille.
+  eventId?: string;
+  canManage?: boolean;
+  // Même raison que PresentPlayersList ci-dessus.
+  onStatusChange?: (
+    player: { id: string; firstName: string | null; lastName: string | null },
+    previousStatus: string,
+    newStatus: string
+  ) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
+  // Bug constaté en direct le 27/10 ("je reclique sur Raphaël, il ne
+  // s'affiche toujours pas absent") : un joueur sorti PUIS revenu dans
+  // CETTE liste (ex. présent -> absent -> présent, deux clics rapprochés)
+  // restait caché -- `hiddenIds` ne s'effaçait jamais une fois posé.
+  // Dès que `players` change de référence (le geste du coach vient de se
+  // répercuter via onStatusChange/updateLocalRsvpStatus, ou un vrai
+  // rafraîchissement temps réel vient d'arriver), ce masquage local n'a
+  // plus de raison d'être : la prop fraîchement reçue fait à nouveau foi.
+  // Même schéma que `prevEventsProp` plus haut dans ce fichier (ajuster
+  // pendant le rendu, pas dans un effet, lint react-hooks/set-state-in-effect).
+  const [prevPlayers, setPrevPlayers] = useState(players);
+  if (players !== prevPlayers) {
+    setPrevPlayers(players);
+    setHiddenIds(new Set());
+  }
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  if (players.length === 0) return null;
+  async function markPresent(p: { id: string; firstName: string | null; lastName: string | null }) {
+    if (!eventId) return;
+    setHiddenIds((prev) => new Set(prev).add(p.id));
+    onStatusChange?.(p, "ABSENT", "PRESENT");
+    setSavingId(p.id);
+    setError(null);
+    const supabase = createClient();
+    const { error: writeError } = await supabase
+      .from("rsvps")
+      .upsert(
+        { event_id: eventId, player_id: p.id, status: "PRESENT" },
+        { onConflict: "event_id,player_id" }
+      );
+    setSavingId(null);
+    if (writeError) {
+      setError(writeError.message);
+      setHiddenIds((prev) => {
+        const next = new Set(prev);
+        next.delete(p.id);
+        return next;
+      });
+      onStatusChange?.(p, "PRESENT", "ABSENT");
+    }
+  }
+
+  const visiblePlayers = players.filter((p) => !hiddenIds.has(p.id));
+  if (visiblePlayers.length === 0) return null;
 
   return (
     <div className="flex flex-col gap-1.5 border-t border-zinc-100 pt-2">
@@ -323,7 +472,7 @@ export function AbsentPlayersList({
         className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:text-zinc-900"
       >
         <Users className="h-3.5 w-3.5 shrink-0 text-status-urgent-dark" />
-        {players.length} {players.length > 1 ? "joueurs/joueuses absent(e)s" : "joueur/joueuse absent(e)"}
+        {visiblePlayers.length} {visiblePlayers.length > 1 ? "joueurs/joueuses absent(e)s" : "joueur/joueuse absent(e)"}
         {open ? (
           <ChevronUp className="h-3.5 w-3.5 shrink-0" />
         ) : (
@@ -332,17 +481,32 @@ export function AbsentPlayersList({
       </button>
       {open && (
         <div className="flex flex-wrap gap-1.5">
-          {sortByLastName(players, (p) => p.lastName).map((p) => (
-            <span
-              key={p.id}
-              className="inline-flex items-center gap-1 rounded-full bg-status-urgent/10 px-2.5 py-1 text-xs font-medium text-status-urgent-dark"
-            >
-              {formatFirstName(p.firstName)}{" "}
-              <span className="font-bold uppercase">{formatLastName(p.lastName)}</span>
-            </span>
-          ))}
+          {sortByLastName(visiblePlayers, (p) => p.lastName).map((p) =>
+            canManage && eventId ? (
+              <button
+                key={p.id}
+                type="button"
+                disabled={savingId === p.id}
+                onClick={() => markPresent(p)}
+                title="Marquer présent"
+                className="inline-flex items-center gap-1 rounded-full bg-status-urgent/10 px-2.5 py-1 text-xs font-medium text-status-urgent-dark transition-opacity hover:bg-status-urgent/20 disabled:opacity-50"
+              >
+                {formatFirstName(p.firstName)}{" "}
+                <span className="font-bold uppercase">{formatLastName(p.lastName)}</span>
+              </button>
+            ) : (
+              <span
+                key={p.id}
+                className="inline-flex items-center gap-1 rounded-full bg-status-urgent/10 px-2.5 py-1 text-xs font-medium text-status-urgent-dark"
+              >
+                {formatFirstName(p.firstName)}{" "}
+                <span className="font-bold uppercase">{formatLastName(p.lastName)}</span>
+              </span>
+            )
+          )}
         </div>
       )}
+      {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   );
 }
@@ -357,12 +521,76 @@ export function AbsentPlayersList({
 // (réutilisée par DayEventCard, week-strip-banner.tsx).
 export function PendingPlayersList({
   players,
+  eventId,
+  canManage = false,
+  onStatusChange,
 }: {
   players: { id: string; firstName: string | null; lastName: string | null }[];
+  // Retour de Cindy du 27/10 ("la plupart des joueurs sont en attente, pas
+  // déjà présents/absents") : contrairement à Present/AbsentPlayersList (un
+  // seul clic suffit, le statut opposé est déjà connu), "en attente" n'a
+  // pas de statut de départ -- deux petits boutons Présent/Absent par
+  // joueur, au lieu d'un seul clic qui togglerait vers une destination
+  // ambiguë.
+  eventId?: string;
+  canManage?: boolean;
+  // Même raison que PresentPlayersList ci-dessus.
+  onStatusChange?: (
+    player: { id: string; firstName: string | null; lastName: string | null },
+    previousStatus: string,
+    newStatus: string
+  ) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
+  // Bug constaté en direct le 27/10 ("je reclique sur Raphaël, il ne
+  // s'affiche toujours pas absent") : un joueur sorti PUIS revenu dans
+  // CETTE liste (ex. présent -> absent -> présent, deux clics rapprochés)
+  // restait caché -- `hiddenIds` ne s'effaçait jamais une fois posé.
+  // Dès que `players` change de référence (le geste du coach vient de se
+  // répercuter via onStatusChange/updateLocalRsvpStatus, ou un vrai
+  // rafraîchissement temps réel vient d'arriver), ce masquage local n'a
+  // plus de raison d'être : la prop fraîchement reçue fait à nouveau foi.
+  // Même schéma que `prevEventsProp` plus haut dans ce fichier (ajuster
+  // pendant le rendu, pas dans un effet, lint react-hooks/set-state-in-effect).
+  const [prevPlayers, setPrevPlayers] = useState(players);
+  if (players !== prevPlayers) {
+    setPrevPlayers(players);
+    setHiddenIds(new Set());
+  }
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  if (players.length === 0) return null;
+  async function setStatus(
+    p: { id: string; firstName: string | null; lastName: string | null },
+    status: "PRESENT" | "ABSENT"
+  ) {
+    if (!eventId) return;
+    setHiddenIds((prev) => new Set(prev).add(p.id));
+    onStatusChange?.(p, "PENDING", status);
+    setSavingId(p.id);
+    setError(null);
+    const supabase = createClient();
+    const { error: writeError } = await supabase
+      .from("rsvps")
+      .upsert(
+        { event_id: eventId, player_id: p.id, status },
+        { onConflict: "event_id,player_id" }
+      );
+    setSavingId(null);
+    if (writeError) {
+      setError(writeError.message);
+      setHiddenIds((prev) => {
+        const next = new Set(prev);
+        next.delete(p.id);
+        return next;
+      });
+      onStatusChange?.(p, status, "PENDING");
+    }
+  }
+
+  const visiblePlayers = players.filter((p) => !hiddenIds.has(p.id));
+  if (visiblePlayers.length === 0) return null;
 
   return (
     <div className="flex flex-col gap-1.5 border-t border-zinc-100 pt-2">
@@ -372,7 +600,7 @@ export function PendingPlayersList({
         className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:text-zinc-900"
       >
         <Users className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
-        {players.length} {players.length > 1 ? "joueurs/joueuses en attente" : "joueur/joueuse en attente"}
+        {visiblePlayers.length} {visiblePlayers.length > 1 ? "joueurs/joueuses en attente" : "joueur/joueuse en attente"}
         {open ? (
           <ChevronUp className="h-3.5 w-3.5 shrink-0" />
         ) : (
@@ -381,17 +609,46 @@ export function PendingPlayersList({
       </button>
       {open && (
         <div className="flex flex-wrap gap-1.5">
-          {sortByLastName(players, (p) => p.lastName).map((p) => (
-            <span
-              key={p.id}
-              className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-600"
-            >
-              {formatFirstName(p.firstName)}{" "}
-              <span className="font-bold uppercase">{formatLastName(p.lastName)}</span>
-            </span>
-          ))}
+          {sortByLastName(visiblePlayers, (p) => p.lastName).map((p) =>
+            canManage && eventId ? (
+              <span
+                key={p.id}
+                className="inline-flex items-center gap-1 rounded-full bg-zinc-100 py-1 pl-2.5 pr-1 text-xs font-medium text-zinc-600"
+              >
+                {formatFirstName(p.firstName)}{" "}
+                <span className="font-bold uppercase">{formatLastName(p.lastName)}</span>
+                <button
+                  type="button"
+                  disabled={savingId === p.id}
+                  onClick={() => setStatus(p, "PRESENT")}
+                  title="Marquer présent"
+                  className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full text-status-success hover:bg-status-success/20 disabled:opacity-50"
+                >
+                  <Check className="h-3 w-3 shrink-0" />
+                </button>
+                <button
+                  type="button"
+                  disabled={savingId === p.id}
+                  onClick={() => setStatus(p, "ABSENT")}
+                  title="Marquer absent"
+                  className="flex h-4 w-4 items-center justify-center rounded-full text-status-urgent-dark hover:bg-status-urgent/20 disabled:opacity-50"
+                >
+                  <X className="h-3 w-3 shrink-0" />
+                </button>
+              </span>
+            ) : (
+              <span
+                key={p.id}
+                className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-600"
+              >
+                {formatFirstName(p.firstName)}{" "}
+                <span className="font-bold uppercase">{formatLastName(p.lastName)}</span>
+              </span>
+            )
+          )}
         </div>
       )}
+      {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   );
 }
@@ -699,34 +956,62 @@ export default function CalendarView({
     playerId: string,
     playerName: string,
     previousStatus: string,
-    newStatus: string
+    newStatus: string,
+    // Retour de Cindy du 27/10 ("c'est long... il ne s'affiche toujours
+    // pas") : le coach qui clique un nom dans Présents/Absents/En attente
+    // connaît déjà le nom complet du joueur cliqué (il vient de la liste
+    // affichée) -- contrairement à l'appel self-RSVP ci-dessous
+    // (selfName, prénom seul), qui n'a jamais eu ce besoin. Optionnel pour
+    // ne rien changer aux appels existants.
+    playerLastName?: string | null
   ) {
     if (previousStatus === newStatus) return;
-    const bucketFor = (status: string) =>
-      status === "PRESENT" || status === "ABSENT" || status === "LATE"
-        ? (status.toLowerCase() as "present" | "absent" | "late")
-        : "pending";
     setLocalEvents((prev) =>
       prev.map((e) => {
         if (e.id !== eventId) return e;
-        const rsvpCounts = { ...e.rsvpCounts };
-        rsvpCounts[bucketFor(previousStatus)] = Math.max(
-          0,
-          rsvpCounts[bucketFor(previousStatus)] - 1
-        );
-        rsvpCounts[bucketFor(newStatus)] += 1;
-        let presentPlayers = e.presentPlayers;
-        if (presentPlayers) {
-          if (newStatus === "PRESENT" && !presentPlayers.some((p) => p.id === playerId)) {
-            presentPlayers = [
-              ...presentPlayers,
-              { id: playerId, firstName: playerName, lastName: null },
-            ];
-          } else if (previousStatus === "PRESENT" && newStatus !== "PRESENT") {
-            presentPlayers = presentPlayers.filter((p) => p.id !== playerId);
-          }
-        }
-        return { ...e, rsvpCounts, presentPlayers };
+        const player = { id: playerId, firstName: playerName, lastName: playerLastName ?? null };
+        // Retour de Cindy du 27/10 : avant, seul presentPlayers était tenu à
+        // jour ici -- un clic "Absent" (depuis Présents ou En attente)
+        // laissait le joueur visible nulle part jusqu'au rafraîchissement
+        // temps réel (~0,8s + un aller-retour serveur complet, ressenti
+        // comme "ça ne s'affiche toujours pas"). Les trois listes sont
+        // maintenant tenues en symétrie : retiré de partout, puis réinséré
+        // dans la seule liste qui correspond au nouveau statut.
+        const removeFrom = (list: typeof e.presentPlayers) =>
+          list ? list.filter((p) => p.id !== playerId) : list;
+        const addTo = (list: typeof e.presentPlayers) =>
+          list && !list.some((p) => p.id === playerId) ? [...list, player] : list;
+        let presentPlayers = removeFrom(e.presentPlayers);
+        let absentPlayers = removeFrom(e.absentPlayers);
+        let pendingPlayers = removeFrom(e.pendingPlayers);
+        if (newStatus === "PRESENT") presentPlayers = addTo(presentPlayers);
+        else if (newStatus === "ABSENT") absentPlayers = addTo(absentPlayers);
+        else if (newStatus === "PENDING") pendingPlayers = addTo(pendingPlayers);
+
+        // Bug constaté en direct le 27/10 : un badge "X absents" qui ne
+        // correspondait plus au contenu réel de la liste dépliée. Cause :
+        // le badge était calculé par delta (+1/-1 à chaque appel), qui
+        // suppose que `previousStatus` reflète encore la vérité AU MOMENT
+        // où cet appel s'exécute -- faux dès que deux actions rapprochées
+        // sur le même joueur se chevauchent (ex. le rollback d'une
+        // écriture échouée qui arrive après un second clic déjà parti dans
+        // l'autre sens). Recalculer le badge depuis la longueur réelle des
+        // listes ci-dessus, plutôt qu'accumuler un delta, garantit que
+        // badge et liste restent TOUJOURS cohérents entre eux, quel que
+        // soit l'ordre d'arrivée des réponses réseau. `late` reste en
+        // delta : aucun tableau nominatif équivalent n'existe pour lui (ce
+        // n'est jamais une destination choisie depuis ces boutons, voir
+        // rsvp-control.tsx), donc rien à désynchroniser dans la pratique.
+        let late = e.rsvpCounts.late;
+        if (previousStatus === "LATE") late = Math.max(0, late - 1);
+        if (newStatus === "LATE") late += 1;
+        const rsvpCounts = {
+          late,
+          present: presentPlayers?.length ?? e.rsvpCounts.present,
+          absent: absentPlayers?.length ?? e.rsvpCounts.absent,
+          pending: pendingPlayers?.length ?? e.rsvpCounts.pending,
+        };
+        return { ...e, rsvpCounts, presentPlayers, absentPlayers, pendingPlayers };
       })
     );
   }
@@ -1960,15 +2245,36 @@ export default function CalendarView({
         {/* "Qui sera là ?" — retour de Cindy du 30/08 : visible sur tous
             les espaces (Bureau/Coach/Famille), plus seulement côté Famille
             comme avant (voir presentPlayers sur AdminUpcomingEvent). */}
-        <PresentPlayersList players={event.presentPlayers ?? []} />
+        <PresentPlayersList
+          players={event.presentPlayers ?? []}
+          eventId={event.id}
+          canManage={canManageEvent}
+          onStatusChange={(p, previousStatus, newStatus) =>
+            updateLocalRsvpStatus(event.id, p.id, p.firstName ?? "", previousStatus, newStatus, p.lastName)
+          }
+        />
 
         {/* Retour de Cindy du 11/09 ("qui est absent ?") : même endroit,
             juste après "Qui sera là ?". */}
-        <AbsentPlayersList players={event.absentPlayers ?? []} />
+        <AbsentPlayersList
+          players={event.absentPlayers ?? []}
+          eventId={event.id}
+          canManage={canManageEvent}
+          onStatusChange={(p, previousStatus, newStatus) =>
+            updateLocalRsvpStatus(event.id, p.id, p.firstName ?? "", previousStatus, newStatus, p.lastName)
+          }
+        />
 
         {/* Retour de Cindy du 18/09 ("voir aussi les joueurs en attente") :
             même endroit, juste après "Qui est absent ?". */}
-        <PendingPlayersList players={event.pendingPlayers ?? []} />
+        <PendingPlayersList
+          players={event.pendingPlayers ?? []}
+          eventId={event.id}
+          canManage={canManageEvent}
+          onStatusChange={(p, previousStatus, newStatus) =>
+            updateLocalRsvpStatus(event.id, p.id, p.firstName ?? "", previousStatus, newStatus, p.lastName)
+          }
+        />
 
         {/* Plus d'appel express ici pour une équipe gérée : le coach ne
             répond pas à la place des familles, il leur demande de le

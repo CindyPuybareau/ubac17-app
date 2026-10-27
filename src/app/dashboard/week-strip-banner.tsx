@@ -360,9 +360,21 @@ export function DayEventCard({ event }: { event: WeekStripEvent }) {
           </span>
         </div>
       )}
-      <PresentPlayersList players={event.presentPlayers} />
-      <AbsentPlayersList players={event.absentPlayers} />
-      <PendingPlayersList players={event.pendingPlayers} />
+      <PresentPlayersList
+        players={event.presentPlayers}
+        eventId={event.id}
+        canManage={(event.source === "coach" || event.source === "bureau") && !event.readOnlyExternal}
+      />
+      <AbsentPlayersList
+        players={event.absentPlayers}
+        eventId={event.id}
+        canManage={(event.source === "coach" || event.source === "bureau") && !event.readOnlyExternal}
+      />
+      <PendingPlayersList
+        players={event.pendingPlayers}
+        eventId={event.id}
+        canManage={(event.source === "coach" || event.source === "bureau") && !event.readOnlyExternal}
+      />
 
       {/* Présent/Absent : uniquement côté Famille, un enfant à la fois
           (même composant que family-attendance-requests.tsx). */}
