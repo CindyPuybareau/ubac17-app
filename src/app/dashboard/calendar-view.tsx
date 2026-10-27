@@ -1629,8 +1629,23 @@ export default function CalendarView({
   // resultsTeamSelector, selectedResultTeamIds, activeResultsTeamIdResolved)
   // sont listées explicitement ci-dessous à sa place.
   const visibleEvents = useMemo(() => {
-    const base = localEvents
-      .filter((e) => !hiddenEventTypes.has(e.event_type ?? "OTHER"))
+    // Retour de Cindy du 27/10 ("je n'ai plus les matchs à venir") : bug
+    // trouvé en direct -- "Filtrer par type" (hiddenEventTypes) est un
+    // réglage GÉNÉRAL du compte (profiles.calendar_hidden_event_types,
+    // pensé pour désencombrer le Calendrier des entraînements) mais
+    // s'appliquait aussi aux onglets dédiés "Matchs officiels"/"Résultats"
+    // -- si "Match officiel" est décoché là-bas un jour (Calendrier), ces
+    // deux onglets, dont MATCH est tout le contenu, se retrouvent vides
+    // sans la moindre explication. matchesSeasonView restreint déjà
+    // strictement ces deux vues à event_type === "MATCH" ; leur appliquer
+    // EN PLUS le réglage général n'a jamais de sens ici, contrairement au
+    // Calendrier/Événements où il sert justement à masquer les
+    // entraînements trop nombreux.
+    const skipHiddenTypesFilter = view === "officialMatches" || view === "officialResults";
+    const afterTypeFilter = skipHiddenTypesFilter
+      ? localEvents
+      : localEvents.filter((e) => !hiddenEventTypes.has(e.event_type ?? "OTHER"));
+    const base = afterTypeFilter
       .filter(matchesTeamFilter)
       // "Domicile seulement" (retour de Cindy du 24/09) : ne garde que les
       // matchs à domicile -- masque donc aussi entraînements, tournois,
@@ -1641,16 +1656,17 @@ export default function CalendarView({
     // matchesTeamFilter, jamais soumis à ce filtre-là -- celui-ci ne parle
     // que "parmi MES équipes, lesquelles afficher", alors que ces matchs-là
     // sont volontairement ceux des AUTRES équipes. hiddenEventTypes
-    // s'applique quand même : masquer "Match officiel" via "Filtrer par
-    // type" les cache aussi ici, pour ne jamais les faire réapparaître par
-    // une voie détournée. Dédoublonnés par id contre localEvents (pas
-    // seulement `base`) : un match qui concerne déjà ce viewer ne doit
-    // jamais s'afficher deux fois, même s'il a été filtré de `base` par
-    // ailleurs (équipe/type masqués).
+    // s'applique quand même (sauf sur "Matchs officiels"/"Résultats", voir
+    // skipHiddenTypesFilter ci-dessus) : masquer "Match officiel" via
+    // "Filtrer par type" les cache aussi ici, pour ne jamais les faire
+    // réapparaître par une voie détournée. Dédoublonnés par id contre
+    // localEvents (pas seulement `base`) : un match qui concerne déjà ce
+    // viewer ne doit jamais s'afficher deux fois, même s'il a été filtré
+    // de `base` par ailleurs (équipe/type masqués).
     if (!showClubMatches || !clubMatches) return base;
     const ownIds = new Set(localEvents.map((e) => e.id));
     const extra = clubMatches.filter(
-      (e) => !ownIds.has(e.id) && !hiddenEventTypes.has(e.event_type ?? "OTHER")
+      (e) => !ownIds.has(e.id) && (skipHiddenTypesFilter || !hiddenEventTypes.has(e.event_type ?? "OTHER"))
     );
     return [...base, ...extra].sort(byStartTime);
     // matchesTeamFilter et byStartTime sont des fonctions déclarées dans le
@@ -1667,6 +1683,7 @@ export default function CalendarView({
     showClubMatches,
     clubMatches,
     homeOnly,
+    view,
   ]);
 
   const eventsByDate = useMemo(() => {
