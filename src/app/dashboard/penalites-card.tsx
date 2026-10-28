@@ -66,16 +66,30 @@ export default function PenalitesCard({
               // jamais une fois "Payée", et jamais côté Enfant (paymentLink
               // y est structurellement absent, voir PenaliteLike ci-dessus).
               const showPayLink = !isPaidStatut(p.statut) && Boolean(p.paymentLink);
+              // Retour de Cindy du 28/10 ("le texte aussi peut être aligné
+              // avec 30,00 restant...") : px-3 ici décalait le contenu de
+              // chaque ligne plus à droite que "X € restant à régler" juste
+              // au-dessus (qui, lui, ne vit que dans le padding p-4 de la
+              // carte) -- même marge gauche partout.
               return (
-                <div key={p.id} className="flex flex-col gap-1 rounded-xl bg-zinc-50 px-3 py-2">
-                  <div className="flex items-center justify-between gap-2">
+                <div key={p.id} className="flex flex-col gap-2 rounded-xl bg-zinc-50 py-2 pl-0 pr-3">
+                  <div className="flex items-start justify-between gap-2">
                     <div className="flex min-w-0 flex-col">
                       {showPlayerName && (
                         <span className="truncate text-sm font-medium text-zinc-800">
                           {p.playerName}
                         </span>
                       )}
-                      <span className="truncate text-xs text-zinc-500">
+                      {/* Retour de Cindy du 28/10 ("le texte est coupé sur
+                          mobile/tablette") : ce motif/ces notes passaient en
+                          `truncate` (une seule ligne, "...") alors que la
+                          carte, étroite sur mobile et encore plus à l'étroit
+                          en grille 2-3 colonnes sur tablette (family-view.tsx),
+                          ne laissait la place qu'à 3-4 mots avant de couper --
+                          ex. "1ère Faute te...". Un retour à la ligne normal
+                          coûte juste un peu de hauteur, jamais d'information
+                          perdue. */}
+                      <span className="text-xs text-zinc-500">
                         {p.penaliteDate ? formatLocalDateFr(p.penaliteDate) : ""}
                         {p.notes ? ` · ${p.notes}` : ""}
                       </span>
@@ -94,12 +108,17 @@ export default function PenalitesCard({
                       {formatAmount(p.amount)}
                     </span>
                   </div>
+                  {/* Retour de Cindy du 28/10 ("le bouton Payer peut être à
+                      gauche, aligné avec le reste") : self-end -> self-start,
+                      pour qu'il parte du même bord gauche que la date/les
+                      notes juste au-dessus, plutôt que collé à droite sous
+                      le badge montant. */}
                   {showPayLink && (
                     <a
                       href={p.paymentLink as string}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex w-fit items-center gap-1 self-end rounded-full bg-navy px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-navy-dark"
+                      className="flex w-fit items-center gap-1 self-start rounded-full bg-navy px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-navy-dark"
                     >
                       Payer sur HelloAsso
                       <ExternalLink className="h-3 w-3 shrink-0" />
