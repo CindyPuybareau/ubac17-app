@@ -28,6 +28,7 @@ import CalendarSubscribe from "./calendar-subscribe";
 import SpaceDashboardSummary from "./space-dashboard-summary";
 import type { SpaceDashboardSummary as SpaceDashboardSummaryData } from "@/lib/space-dashboard";
 import CoachTeams from "./coach-teams";
+import PenalitesCard from "./penalites-card";
 import CoachFfbb from "./coach-ffbb";
 import SeasonBilanPanel, { type BilanTeamRoster } from "./season-bilan-panel";
 import SponsorsDisplay from "./sponsors-display";
@@ -290,6 +291,25 @@ export default function CoachView({
             summary={dashboardSummary}
             canManagePhoto
             photoRestrictedTeamIds={siblingTeamIds}
+          />
+          {/* Retour de Cindy du 28/10 ("un coach doit pouvoir voir les
+              pénalités de ses joueurs, payée ou non, sur le Tableau de
+              bord") : `penalites` ci-dessous est déjà le même tableau
+              transmis à CoachTeams plus bas (onglet "Équipe(s)") -- déjà
+              filtré côté serveur (page.tsx, coachPenaliteScope) sur le
+              roster de TOUTES les équipes que ce coach encadre, aucune
+              nouvelle requête. Volontairement PAS filtré par équipe active
+              ici (contrairement à CoachTeams, qui ne montre que l'équipe du
+              pill sélectionné) : une vraie vue d'ensemble doit montrer tous
+              ses joueurs d'un coup, peu importe l'équipe -- confirmé avec
+              Cindy (liste combinée plutôt que groupée par équipe).
+              Toujours lecture seule : seul le Bureau crée/modifie/marque
+              payé (penalites-manager.tsx), inchangé. */}
+          <PenalitesCard
+            title="Pénalités de mes joueurs"
+            penalites={penalites}
+            showPlayerName
+            emptyLabel="Aucune pénalité pour tes joueurs."
           />
           <CalendarSubscribe />
         </div>

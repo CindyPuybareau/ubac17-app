@@ -39,6 +39,12 @@ const WATCHED_TABLES = [
   // même liste -- cas typique de la règle 360° (contrairement à sponsors,
   // Bureau seul, jamais ajouté ici).
   "inventory_items",
+  // Retour de Cindy du 28/10 ("dès que le Bureau marque payé, le coach et
+  // le joueur/parent doivent le voir") : même famille que cotisations/
+  // cotisation_payments juste au-dessus (Bureau seul écrit, Coach/Famille
+  // doivent voir sans F5) -- oubliée ici jusqu'ici, même catégorie d'oubli
+  // que event_volunteer_needs ci-dessus.
+  "penalites",
 ] as const;
 
 // Mounted once at the dashboard root (src/app/dashboard/page.tsx) so it
