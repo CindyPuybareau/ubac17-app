@@ -104,6 +104,20 @@ export function isMatchType(eventType: string | null) {
   return eventType === "MATCH" || eventType === "FRIENDLY";
 }
 
+// Retour de Cindy du 28/10 ("pour les entraînements, pas besoin d'heure
+// d'arrivée -- un entraînement à 18h avec une arrivée à 18h, c'est
+// redondant") : "Heure d'arrivée" (impactTime) n'a de sens que pour les
+// événements où l'équipe doit être prête AVANT le début officiel (match
+// officiel, match amical, tournoi/plateau) -- jamais pour un entraînement,
+// une réunion ou un événement club, où le début EST déjà l'heure
+// d'arrivée. Un seul helper partagé (plutôt que répéter le même OR dans le
+// formulaire ET les 4 endroits d'affichage) : create-event-form.tsx
+// (champ visible ou non), calendar-view.tsx/week-strip-banner.tsx/
+// child-calendar-tab.tsx (badge "Arrivée" affiché ou non).
+export function showsImpactTime(eventType: string | null) {
+  return eventType === "MATCH" || eventType === "FRIENDLY" || eventType === "TOURNAMENT";
+}
+
 export function homeAwayLabel(isHome: boolean | null) {
   if (isHome === null) return null;
   return isHome ? "Domicile" : "Extérieur";

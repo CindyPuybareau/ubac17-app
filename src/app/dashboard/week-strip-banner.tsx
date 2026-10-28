@@ -7,6 +7,7 @@ import {
   isMatchType,
   formatEventTime,
   formatImpactTime,
+  showsImpactTime,
 } from "@/app/dashboard/event-style";
 import { PresentPlayersList, AbsentPlayersList, PendingPlayersList } from "@/app/dashboard/calendar-view";
 import { parseMatchTitle, resolveIsHome } from "@/lib/match-display";
@@ -273,8 +274,9 @@ export function DayEventCard({ event }: { event: WeekStripEvent }) {
         <span>{formatEventTime(event.startTime, event.endTime)}</span>
         {/* Ambre plutôt que gris neutre : même distinction visuelle que
             renderEventCard (calendar-view.tsx) entre l'heure de début et
-            l'heure d'arrivée demandée. */}
-        {event.impactTime && (
+            l'heure d'arrivée demandée. Retour de Cindy du 28/10 :
+            showsImpactTime en plus, même raison que calendar-view.tsx. */}
+        {event.impactTime && showsImpactTime(event.eventType) && (
           <span className="flex items-center gap-1 font-semibold text-amber-700">
             <AlarmClock className="h-3 w-3" />
             {formatImpactTime(event.impactTime)}

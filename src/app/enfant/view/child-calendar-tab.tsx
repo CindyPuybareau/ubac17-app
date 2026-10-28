@@ -26,6 +26,7 @@ import {
   isMatchType,
   formatEventTime,
   formatImpactTime,
+  showsImpactTime,
 } from "@/app/dashboard/event-style";
 import { hasAlreadyStarted } from "@/app/dashboard/calendar-view";
 import { groupBirthdaysByMonthDay, type BirthdaySource } from "@/app/dashboard/birthdays";
@@ -855,8 +856,9 @@ export function EventRow({
           , {formatEventTime(event.startTime, event.endTime)}
         </span>
         {/* Retour de Cindy du 12/09 ("heure d'impact") : même principe que
-            calendar-view.tsx (Bureau/Coach/Famille). */}
-        {event.impactTime && (
+            calendar-view.tsx (Bureau/Coach/Famille). Retour de Cindy du
+            28/10 : showsImpactTime en plus, même raison. */}
+        {event.impactTime && showsImpactTime(event.eventType) && (
           <span className="flex items-center gap-1 font-semibold text-amber-700">
             <AlarmClock className="h-3 w-3" />
             {formatImpactTime(event.impactTime)}

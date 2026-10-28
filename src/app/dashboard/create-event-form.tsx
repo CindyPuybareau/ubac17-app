@@ -9,7 +9,7 @@ import { sendEventPush } from "./event-push";
 import DateTimePicker from "./date-time-picker";
 import RoleIcon from "./role-icon";
 import { Briefcase, Calendar, CalendarSync, ChevronDown, ChevronUp, Clock, Euro, Plus, X } from "lucide-react";
-import { EVENT_TYPE_OPTIONS, styleFor } from "./event-style";
+import { EVENT_TYPE_OPTIONS, showsImpactTime, styleFor } from "./event-style";
 import {
   CUSTOM_ROLE_CODE,
   STANDARD_VOLUNTEER_ROLES,
@@ -1415,8 +1415,13 @@ export default function CreateEventForm({
           directe dans le champ heure garde donc la main, sans jamais être
           recalculée en silence si startTime change ensuite. Retour de
           Cindy du 18/09 ("À faire") : sans objet pour cette portée, qui
-          n'a que Début/Fin. */}
-      {!isPersonalTask && (
+          n'a que Début/Fin. Retour de Cindy du 28/10 : restreint en plus
+          à showsImpactTime (match officiel/amical, tournoi/plateau) --
+          un entraînement garde le champ masqué, redondant avec son heure
+          de début. Une valeur déjà enregistrée sur un vieil entraînement
+          n'est pas effacée (jamais de purge, voir CLAUDE.md), juste plus
+          proposée ni réaffichée nulle part pour ce type désormais. */}
+      {!isPersonalTask && showsImpactTime(eventType) && (
       <div>
         <label className="mb-1 flex items-center gap-1 text-xs font-medium text-zinc-600">
           <Clock className="h-3.5 w-3.5 shrink-0 text-sky-500" />

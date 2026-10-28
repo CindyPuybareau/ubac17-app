@@ -65,6 +65,7 @@ import {
   formatImpactTime,
   homeAwayLabel,
   isMatchType,
+  showsImpactTime,
   styleFor,
 } from "./event-style";
 import {
@@ -2128,8 +2129,12 @@ export default function CalendarView({
               neutre de la ligne date/heure) -- affichée dès qu'elle
               existe, sur les 4 espaces qui voient cette carte
               (Bureau/Coach/Famille/Enfant, plus Commissions/Bénévoles via
-              child-calendar-tab.tsx). */}
-          {event.impactTime && (
+              child-calendar-tab.tsx). Retour de Cindy du 28/10 :
+              showsImpactTime en plus -- un entraînement peut porter une
+              vieille valeur jamais purgée (voir create-event-form.tsx),
+              mais ne l'affiche plus jamais, redondante avec son heure de
+              début. */}
+          {event.impactTime && showsImpactTime(event.event_type) && (
             <span className="flex items-center gap-1 font-semibold text-amber-700">
               <AlarmClock className="h-4 w-4" />
               {formatImpactTime(event.impactTime)}
@@ -2691,8 +2696,11 @@ export default function CalendarView({
             {formatEventTime(event.start_time, event.end_time)}
           </span>
           {/* Retour de Cindy du 12/09 ("heure d'impact") : même principe
-              que renderEventCard plus haut. */}
-          {event.impactTime && (
+              que renderEventCard plus haut (showsImpactTime ajouté le
+              28/10, sans effet concret ici -- une carte Résultat n'existe
+              déjà que pour un MATCH, jamais un entraînement, mais garde
+              la même garde-fou que partout ailleurs). */}
+          {event.impactTime && showsImpactTime(event.event_type) && (
             <span className="flex items-center gap-1 font-semibold text-amber-700">
               <AlarmClock className="h-3 w-3 shrink-0" />
               {formatImpactTime(event.impactTime)}
