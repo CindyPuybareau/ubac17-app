@@ -230,39 +230,41 @@ async function writeMatchesForTeam(
       }
     }
 
-    for (const { id, candidate: c } of toUpdate) {
-      const { error } = await supabase
-        .from("events")
-        .update({
-          title: c.title,
-          event_type: "MATCH" as const,
-          location: c.location,
-          start_time: c.startTime,
-          // Adopte le nouveau numéro FFBB sur la ligne déjà là (cas du
-          // repli par start_time) -- les prochaines synchros la
-          // retrouveront directement par external_uid, plus par repli.
-          external_uid: c.externalUid,
-          // Retour de Cindy du 28/10 : comble au passage une ligne jamais
-          // étiquetée (ffbb_phase NULL, importée avant ce chantier) --
-          // sans effet sur une ligne de l'autre phase désormais, puisque
-          // phaseRows plus haut garantit que `id` vient forcément de la
-          // phase qu'on resynchronise (correctif du 29/10 -- voir le
-          // commentaire sur phaseRows).
-          ffbb_phase: phase,
-          // Retour de Cindy du 21/09 ("les résultats ne s'affichent pas en
-          // automatique") : uniquement quand la FFBB a réellement publié
-          // un score (jamais null) -- sinon un score déjà saisi à la main
-          // avant que la FFBB publie le sien se ferait écraser par du vide
-          // à chaque re-synchro.
-          ...(c.ownScore != null
-            ? { team_score: c.ownScore, opponent_score: c.opponentScore }
-            : {}),
+    if (toUpdate.length > 0) {
+      // Audit du 29/10 ("regardes le code point par point, requêtes
+      // nickels") : cette boucle faisait encore 1 UPDATE par match changé
+      // en séquence -- le même anti-motif que l'incident du 20/09, juste
+      // réduit aux seuls matchs réellement modifiés plutôt qu'à tous.
+      // Remplacé par un seul UPSERT groupé (ON CONFLICT sur id), à
+      // l'identique du principe déjà appliqué à la lecture et à
+      // l'insertion ci-dessus. existingById permet de reprendre le score
+      // déjà en base quand la FFBB n'en a pas encore publié de nouveau --
+      // l'upsert doit resoumettre une valeur pour team_score/
+      // opponent_score sur CHAQUE ligne (jamais absente du lot), sous
+      // peine que Postgres les efface par défaut sur les lignes où le
+      // score n'a pas changé.
+      const existingById = new Map(phaseRows.map((r) => [r.id, r]));
+      const { error } = await supabase.from("events").upsert(
+        toUpdate.map(({ id, candidate: c }) => {
+          const existing = existingById.get(id);
+          return {
+            id,
+            team_id: teamId,
+            title: c.title,
+            event_type: "MATCH" as const,
+            location: c.location,
+            start_time: c.startTime,
+            external_uid: c.externalUid,
+            ffbb_phase: phase,
+            team_score: c.ownScore ?? existing?.team_score ?? null,
+            opponent_score: c.ownScore != null ? c.opponentScore : existing?.opponent_score ?? null,
+          };
         })
-        .eq("id", id);
+      );
       if (error) {
-        console.error(`[ffbb-sync] update events échoué (team ${teamId}, event ${id}):`, error);
+        console.error(`[ffbb-sync] update events échoué (team ${teamId}):`, error);
       } else {
-        updated += 1;
+        updated += toUpdate.length;
       }
     }
   }

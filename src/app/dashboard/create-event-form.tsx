@@ -1063,19 +1063,24 @@ export default function CreateEventForm({
         return;
       }
     }
-    for (const n of needsToUpdate) {
-      const { error: updateNeedError } = await supabase
-        .from("event_volunteer_needs")
-        .update({
+    if (needsToUpdate.length > 0) {
+      // Audit du 29/10 ("requêtes nickels") : un UPDATE par ligne changée
+      // en séquence, même anti-motif que l'incident du 20/09 -- remplacé
+      // par un seul UPSERT groupé (ON CONFLICT sur id), comme pour la
+      // suppression/l'ajout juste au-dessus et en-dessous.
+      const { error: updateNeedsError } = await supabase.from("event_volunteer_needs").upsert(
+        needsToUpdate.map((n) => ({
+          id: n.id,
+          event_id: inserted.id,
           role_code: n.roleCode,
           custom_label: n.customLabel,
           required_count: n.count,
           sort_order: n.sortOrder,
-        })
-        .eq("id", n.id);
-      if (updateNeedError) {
+        }))
+      );
+      if (updateNeedsError) {
         setError(
-          `Événement enregistré, mais la mise à jour d'un besoin d'organisation a échoué : ${updateNeedError.message}`
+          `Événement enregistré, mais la mise à jour d'un besoin d'organisation a échoué : ${updateNeedsError.message}`
         );
         return;
       }
