@@ -88,10 +88,14 @@ export default function ChildTileMenu({
   const [active, setActive] = useState<string | undefined>(
     () => defaultActiveKey ?? firstLeafKey(sections)
   );
-  // Sous-groupe actuellement ouvert (ici, seul "Matchs & Résultats" en a
-  // un) : ses tuiles remplacent la grille principale le temps d'y
-  // naviguer, avec une tuile "Retour" plutôt qu'un vrai changement
-  // d'écran — pas besoin de plus pour une seule profondeur de sous-menu.
+  // Sous-groupe actuellement ouvert : ses tuiles remplacent la grille
+  // principale le temps d'y naviguer, avec une tuile "Retour" plutôt
+  // qu'un vrai changement d'écran — pas besoin de plus pour une seule
+  // profondeur de sous-menu. Retour de Cindy du 29/10 ("Résultats n'a
+  // plus d'intérêt") : "Matchs & Résultats", seul groupe à avoir eu des
+  // enfants ici, a été aplati en tuile directe -- aucune section de
+  // l'Espace Enfant n'a plus de sous-groupe aujourd'hui, ce mécanisme
+  // reste donc prêt pour un futur groupe sans rien casser en attendant.
   const [openGroupKey, setOpenGroupKey] = useState<string | null>(null);
   const current = active ? findSection(sections, active) : undefined;
   const router = useRouter();

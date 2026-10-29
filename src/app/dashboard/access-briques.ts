@@ -33,8 +33,12 @@ export const BRIQUE_GROUPS: { label: string; briques: { key: string; label: stri
     briques: [{ key: "equipes", label: "Équipes" }],
   },
   {
-    label: "Matchs & Résultats",
-    briques: [{ key: "matchs_resultats", label: "Matchs & Résultats" }],
+    // Retour de Cindy du 29/10 ("Résultats n'a plus d'intérêt") : libellés
+    // mis à jour en même temps que l'onglet retiré -- la clé DB
+    // "matchs_resultats" reste inchangée (contrainte CHECK en base,
+    // access_profile_briques), seul le texte affiché change.
+    label: "Matchs officiels",
+    briques: [{ key: "matchs_resultats", label: "Matchs officiels" }],
   },
   {
     label: "Paiements",

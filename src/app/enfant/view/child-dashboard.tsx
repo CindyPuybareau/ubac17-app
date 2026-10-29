@@ -5,10 +5,8 @@ import {
   Cake,
   CalendarDays,
   LayoutDashboard,
-  ListOrdered,
   ScrollText,
   Shield,
-  Trophy,
   Users,
 } from "lucide-react";
 import type { AdminSection } from "@/app/dashboard/admin-sidebar";
@@ -363,34 +361,22 @@ export default function ChildDashboard({
     // "Événements" les avait jusqu'ici (voir child-calendar-tab.tsx).
     {
       // Retour de Cindy du 2026-08-22 : "Matchs officiels" / "Résultats"
-      // deviennent un vrai sous-menu au lieu d'un bouton interne sur la
-      // page — même traitement que côté Bureau/Coach/Parent.
+      // formaient un sous-menu à deux entrées, aligné sur Bureau/Coach/
+      // Parent. Retour de Cindy du 29/10 ("Résultats n'a plus d'intérêt,
+      // Matchs officiels montre déjà tout le calendrier") : "Résultats"
+      // retiré partout, y compris ici ; sans lui ce groupe n'avait plus
+      // qu'un seul enfant, aplati en item direct.
       key: "matches",
-      label: "Matchs & Résultats",
-      icon: <Trophy className={iconClass} />,
-      content: null,
-      children: [
-        {
-          key: "matches-official",
-          label: "Matchs officiels",
-          icon: <Shield className={iconClass} />,
-          content: (
-            <ChildResultsTab
-              events={events}
-              teams={teams}
-              forcedMode="officialMatches"
-              nextEventId={nextEvent?.id ?? null}
-              nextEventAttendance={nextEventAttendance}
-            />
-          ),
-        },
-        {
-          key: "matches-results",
-          label: "Résultats",
-          icon: <ListOrdered className={iconClass} />,
-          content: <ChildResultsTab events={events} teams={teams} forcedMode="officialResults" />,
-        },
-      ],
+      label: "Matchs officiels",
+      icon: <Shield className={iconClass} />,
+      content: (
+        <ChildResultsTab
+          events={events}
+          teams={teams}
+          nextEventId={nextEvent?.id ?? null}
+          nextEventAttendance={nextEventAttendance}
+        />
+      ),
     },
     {
       // Retour de Cindy du 26/08 : les 3 documents sur tous les espaces

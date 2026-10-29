@@ -438,12 +438,15 @@ export default function CoachView({
     // strictement identiques à celles de "Calendrier".
     {
       // Retour de Cindy du 2026-08-22 : "Matchs officiels" / "Résultats"
-      // deviennent un vrai sous-menu (comme Organisation & Bilan) au lieu
-      // d'un bouton interne sur la page — moins de contrôles empilés
-      // quand il y a aussi le sélecteur d'équipe à afficher.
+      // formaient un sous-menu (comme Organisation & Bilan) au lieu d'un
+      // bouton interne sur la page — moins de contrôles empilés quand il
+      // y a aussi le sélecteur d'équipe à afficher. Retour de Cindy du
+      // 29/10 ("Résultats n'a plus d'intérêt") : "Résultats" retiré --
+      // ce groupe garde ses deux autres enfants ("Matchs officiels",
+      // "FFBB"), label mis à jour en conséquence.
       key: "matches",
-      label: "Matchs & Résultats",
-      icon: <Trophy className={iconClass} />,
+      label: "Matchs",
+      icon: <Shield className={iconClass} />,
       content: null,
       children: [
         {
@@ -460,27 +463,6 @@ export default function CoachView({
               scopeTeams={createTeams}
               scopeTeamRoleById={teamRoleByTeamId}
               forcedView="officialMatches"
-              resultsTeams={resultsTeamsForOfficialMatchesWithSiblings}
-              selfPlayerId={ownPlayerId}
-              volunteerNeedsByEventId={volunteerNeedsByEventId}
-              celebrateWins
-            />
-          ),
-        },
-        {
-          key: "matches-results",
-          label: "Résultats",
-          icon: <ListOrdered className={iconClass} />,
-          content: (
-            <CalendarView
-              events={events}
-              createTeams={createTeams}
-              rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
-              // Retour de Cindy du 10/09 (bug Basile) : createTeams, même
-              // correctif que sur "Calendrier" ci-dessus.
-              scopeTeams={createTeams}
-              scopeTeamRoleById={teamRoleByTeamId}
-              forcedView="officialResults"
               resultsTeams={resultsTeamsForOfficialMatchesWithSiblings}
               selfPlayerId={ownPlayerId}
               volunteerNeedsByEventId={volunteerNeedsByEventId}

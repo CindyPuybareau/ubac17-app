@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Clock, ListOrdered, Shield } from "lucide-react";
+import { Clock, Shield } from "lucide-react";
 import { formatEventTime, styleFor } from "@/app/dashboard/event-style";
 import { resolveIsHome } from "@/lib/match-display";
 import { sortTeamsByGroup, teamLabel } from "@/lib/teams";
@@ -118,18 +118,16 @@ function ResultRow({ event }: { event: ChildEvent }) {
   );
 }
 
-// "Matchs & Résultats" (retour de Cindy du 2026-08-22) : les matchs
-// officiels et leurs résultats. "Matchs officiels" / "Résultats" sont
-// maintenant deux sous-onglets de menu à part entière (voir
-// child-dashboard.tsx, forcedMode) plutôt qu'un bouton interne — même
-// bascule que forcedTab côté Coach/Bureau (coach-organisation.tsx,
-// cotisations-manager.tsx). "Matchs officiels" montre tout le calendrier
-// (à venir compris), "Résultats" ne montre que ceux déjà joués. En
-// lecture seule ici comme tout le reste de l'espace Enfant.
+// "Matchs officiels" (retour de Cindy du 2026-08-22, onglet de menu à
+// part entière, voir child-dashboard.tsx). Retour de Cindy du 29/10
+// ("Résultats n'a plus d'intérêt") : le sous-onglet "Résultats" (qui ne
+// filtrait qu'aux matchs déjà joués) a été retiré partout, y compris ici
+// — ce composant ne montre donc plus qu'un seul mode, tout le calendrier
+// de la saison (à venir compris). En lecture seule ici comme tout le
+// reste de l'espace Enfant.
 export default function ChildResultsTab({
   events,
   teams,
-  forcedMode,
   nextEventId,
   nextEventAttendance,
 }: {
@@ -139,17 +137,12 @@ export default function ChildResultsTab({
   // mélangés dans un seul fil sans distinction — même sélecteur que côté
   // Bureau/Coach/Parent (calendar-view.tsx) pour s'y retrouver.
   teams: { id: string; name: string | null; category: string | null }[];
-  forcedMode?: "officialMatches" | "officialResults";
   // Retour de Cindy du 2026-08-25 : si le prochain rendez-vous est un
   // match officiel, sa carte de présences vit ici plutôt que dans
   // "Événements" — voir child-events-tab.tsx pour le cas symétrique.
   nextEventId?: string | null;
   nextEventAttendance?: { name: string | null; status: string }[];
 }) {
-  const [mode, setMode] = useState<"officialMatches" | "officialResults">(
-    forcedMode ?? "officialMatches"
-  );
-  const shownMode = forcedMode ?? mode;
   const sortedTeams = useMemo(() => sortTeamsByGroup(teams), [teams]);
   const [activeTeamId, setActiveTeamId] = useState<string | undefined>(undefined);
   const activeTeamIdResolved = sortedTeams.some((t) => t.id === activeTeamId)
@@ -162,57 +155,24 @@ export default function ChildResultsTab({
         .filter((e) => e.eventType === "MATCH")
         .filter(
           (e) =>
-            shownMode === "officialMatches" || new Date(e.startTime).getTime() < new Date().getTime()
-        )
-        .filter(
-          (e) =>
             sortedTeams.length <= 1 ||
             e.teamId === activeTeamIdResolved ||
             (activeTeamIdResolved ? (e.targetTeamIds?.includes(activeTeamIdResolved) ?? false) : false)
         )
         .sort((a, b) => a.startTime.localeCompare(b.startTime)),
-    [events, shownMode, sortedTeams, activeTeamIdResolved]
+    [events, sortedTeams, activeTeamIdResolved]
   );
 
   // Carte détaillée du prochain match, avec ses présences (retour de
-  // Cindy du 2026-08-25) : uniquement en mode "Matchs officiels" (un match
-  // déjà joué dans "Résultats" n'a plus de présences à afficher) et
-  // seulement s'il fait partie des matchs visibles ici — sinon c'est
-  // child-events-tab.tsx qui s'en charge (prochain rendez-vous = un
-  // entraînement/tournoi, pas un match officiel). Retiré de la liste
-  // compacte ci-dessous pour ne pas l'y montrer deux fois.
-  const nextMatch =
-    shownMode === "officialMatches" ? visibleMatches.find((e) => e.id === nextEventId) ?? null : null;
+  // Cindy du 2026-08-25) : seulement s'il fait partie des matchs visibles
+  // ici — sinon c'est child-events-tab.tsx qui s'en charge (prochain
+  // rendez-vous = un entraînement/tournoi, pas un match officiel). Retiré
+  // de la liste compacte ci-dessous pour ne pas l'y montrer deux fois.
+  const nextMatch = visibleMatches.find((e) => e.id === nextEventId) ?? null;
   const listedMatches = nextMatch ? visibleMatches.filter((e) => e.id !== nextMatch.id) : visibleMatches;
 
   return (
     <div className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
-      {!forcedMode && (
-        <div className="mb-3 flex flex-wrap gap-2">
-          <button
-            onClick={() => setMode("officialMatches")}
-            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors ${
-              mode === "officialMatches"
-                ? "bg-navy text-white"
-                : "border border-zinc-200 text-zinc-600 hover:bg-zinc-50"
-            }`}
-          >
-            <Shield className="h-3.5 w-3.5" />
-            Matchs officiels
-          </button>
-          <button
-            onClick={() => setMode("officialResults")}
-            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors ${
-              mode === "officialResults"
-                ? "bg-navy text-white"
-                : "border border-zinc-200 text-zinc-600 hover:bg-zinc-50"
-            }`}
-          >
-            <ListOrdered className="h-3.5 w-3.5" />
-            Résultats
-          </button>
-        </div>
-      )}
       {sortedTeams.length > 1 && (
         <div className="mb-3 flex flex-wrap gap-2">
           {sortedTeams.map((t) => {
@@ -243,14 +203,7 @@ export default function ChildResultsTab({
           ce même espacement entre elles. */}
       <div className="flex flex-col gap-4">
         {visibleMatches.length === 0 ? (
-          <EmptyState
-            icon={Shield}
-            message={
-              shownMode === "officialMatches"
-                ? "Aucun match officiel programmé pour le moment."
-                : "Aucun résultat pour le moment."
-            }
-          />
+          <EmptyState icon={Shield} message="Aucun match officiel programmé pour le moment." />
         ) : (
           listedMatches.map((e) => <ResultRow key={e.id} event={e} />)
         )}

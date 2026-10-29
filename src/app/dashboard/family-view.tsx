@@ -4,12 +4,10 @@ import { useMemo, useState } from "react";
 import {
   CalendarDays,
   LayoutDashboard,
-  ListOrdered,
   LogOut,
   ScrollText,
   Shield,
   ShoppingBag,
-  Trophy,
   Users,
 } from "lucide-react";
 import DocumentsPanel from "@/components/club-documents";
@@ -441,44 +439,25 @@ export default function FamilyView({
     // celle de "Calendrier".
     {
       // Retour de Cindy du 2026-08-22 : "Matchs officiels" / "Résultats"
-      // deviennent un vrai sous-menu au lieu d'un bouton interne sur la
-      // page — même traitement que côté Bureau/Coach.
+      // formaient un sous-menu à deux entrées, aligné sur Bureau/Coach.
+      // Retour de Cindy du 29/10 ("Résultats n'a plus d'intérêt, Matchs
+      // officiels montre déjà tout le calendrier + le Classement") :
+      // "Résultats" retiré ; sans lui ce groupe n'avait plus qu'un seul
+      // enfant, aplati ici en item direct plutôt que garder un sous-menu
+      // à une seule entrée.
       key: "matches",
-      label: "Matchs & Résultats",
-      icon: <Trophy className={iconClass} />,
-      content: null,
-      children: [
-        {
-          key: "matches-official",
-          label: "Matchs officiels",
-          icon: <Shield className={iconClass} />,
-          content: (
-            <CalendarView
-              events={matchesVisibleEvents}
-              rsvp={{ players: visiblePlayers, statusByKey: rsvpStatusByKey }}
-              forcedView="officialMatches"
-              resultsTeams={matchesResultsTeams}
-              volunteerNeedsByEventId={volunteerNeedsByEventId}
-              celebrateWins
-            />
-          ),
-        },
-        {
-          key: "matches-results",
-          label: "Résultats",
-          icon: <ListOrdered className={iconClass} />,
-          content: (
-            <CalendarView
-              events={matchesVisibleEvents}
-              rsvp={{ players: visiblePlayers, statusByKey: rsvpStatusByKey }}
-              forcedView="officialResults"
-              resultsTeams={matchesResultsTeams}
-              volunteerNeedsByEventId={volunteerNeedsByEventId}
-              celebrateWins
-            />
-          ),
-        },
-      ],
+      label: "Matchs officiels",
+      icon: <Shield className={iconClass} />,
+      content: (
+        <CalendarView
+          events={matchesVisibleEvents}
+          rsvp={{ players: visiblePlayers, statusByKey: rsvpStatusByKey }}
+          forcedView="officialMatches"
+          resultsTeams={matchesResultsTeams}
+          volunteerNeedsByEventId={volunteerNeedsByEventId}
+          celebrateWins
+        />
+      ),
     },
     {
       // Retour de Cindy du 25/08 : Charte du Joueur + Charte du Parent +

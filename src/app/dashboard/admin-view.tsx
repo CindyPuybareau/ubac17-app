@@ -476,11 +476,14 @@ export default function AdminView({
     // rien à migrer ici, tout y était déjà.
     {
       // Retour de Cindy du 2026-08-22 : "Matchs officiels" / "Résultats"
-      // deviennent un vrai sous-menu (comme Cotisations) au lieu d'un
-      // bouton interne sur la page.
+      // formaient un sous-menu (comme Cotisations) au lieu d'un bouton
+      // interne sur la page. Retour de Cindy du 29/10 ("Résultats n'a
+      // plus d'intérêt") : "Résultats" retiré -- ce groupe garde ses deux
+      // autres enfants ("Matchs officiels", "FFBB"), label mis à jour en
+      // conséquence (plus de "& Résultats").
       key: "matches",
-      label: "Matchs & Résultats",
-      icon: <Trophy className={iconClass} />,
+      label: "Matchs",
+      icon: <Shield className={iconClass} />,
       content: null,
       children: [
         {
@@ -494,29 +497,6 @@ export default function AdminView({
               allowClubWide
               forcedView="officialMatches"
               resultsTeams={teamRefsForOfficialMatches}
-              eventRoles={eventRoles}
-              volunteerNeedsByEventId={volunteerNeedsByEventId}
-            />
-          ),
-        },
-        {
-          key: "matches-results",
-          label: "Résultats",
-          icon: <ListOrdered className={iconClass} />,
-          content: (
-            <CalendarView
-              events={upcomingEvents}
-              createTeams={teamRefs}
-              allowClubWide
-              forcedView="officialResults"
-              // Retour de Cindy du 30/09 : alignée sur "Matchs officiels"
-              // juste au-dessus et sur l'équivalent côté Coach
-              // (resultsTeamsForOfficialMatches, coach-view.tsx) -- une
-              // équipe mère (Séniors M, U13M, U18M...) ne joue quasiment
-              // jamais elle-même, teamRefs (brut) la proposait encore ici
-              // comme case à cocher alors qu'elle n'a jamais de résultat.
-              resultsTeams={teamRefsForOfficialMatches}
-              resultsTeamSelector="dropdown"
               eventRoles={eventRoles}
               volunteerNeedsByEventId={volunteerNeedsByEventId}
             />
@@ -730,7 +710,6 @@ export default function AdminView({
     // qu'une brique dédiée -- pas demandé, à séparer plus tard si besoin.
     "cotisations-buvette": "cotisations",
     "matches-official": "matchs_resultats",
-    "matches-results": "matchs_resultats",
     sponsors: "sponsors",
   };
   const documentsVisible =
