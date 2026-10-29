@@ -17,6 +17,7 @@ import {
   getSiblingTeamIds,
   getTrombinoscopeTeamId,
   isSharedRsvpTeamGroup,
+  sortTeamsByGroup,
   widenTeamIdsForSharedRsvpGroups,
 } from "@/lib/teams";
 import DashboardTabs, { type DashboardTab } from "./dashboard-tabs";
@@ -2251,6 +2252,21 @@ export default async function DashboardPage({
       const list = teamsByPlayerId.get(tp.player_id) ?? [];
       list.push(team);
       teamsByPlayerId.set(tp.player_id, list);
+    });
+    // Retour de Cindy du 29/10 ("je veux qu'il soit en U13M en haut à
+    // droite, comme les autres") : team_players n'a aucune colonne d'ordre
+    // -- sans tri explicite, l'équipe affichée en premier (member.teams[0],
+    // utilisée par le sous-titre de la fiche ET par le détachement
+    // principale/déclinaisons de member-detail-modal.tsx) dépend de l'ordre
+    // d'écriture en base, pas de la vraie hiérarchie équipe mère/
+    // déclinaisons -- repéré sur plusieurs joueurs de U13M-2 (dont Adam
+    // CORCY, dont la ligne U13M-2 existait avant que sa ligne U13M ne soit
+    // rattrapée aujourd'hui), pas seulement un cas isolé. sortTeamsByGroup
+    // (lib/teams.ts, déjà utilisée ailleurs pour ce même regroupement
+    // mère/déclinaisons) rend ça déterministe : la mère (rang 0) passe
+    // toujours avant ses déclinaisons, quel que soit l'ordre d'écriture.
+    teamsByPlayerId.forEach((list, playerId) => {
+      teamsByPlayerId.set(playerId, sortTeamsByGroup(list));
     });
     const parentIdsByPlayerId = new Map<string, string[]>();
     (parentPlayerRes.data ?? []).forEach((pp) => {
