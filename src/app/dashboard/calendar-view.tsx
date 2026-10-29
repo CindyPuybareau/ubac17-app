@@ -3337,21 +3337,20 @@ export default function CalendarView({
               // les Séniors (une seule phase cette saison), rien ne change
               // à l'écran.
               const anyPhase2 = ffbbRanking.results.some((r) => r.hasPhase2);
-              // Correctif du 29/10 (relecture "je veux du propre") : le
-              // DÉFAUT (avant tout clic explicite) doit rester sur Phase 1
-              // tant qu'aucun classement Phase 2 n'existe réellement --
-              // sinon, juste après avoir enregistré un lien Phase 2 (hasPhase2
-              // devient vrai AVANT la prochaine synchro du lundi), tout le
-              // monde verrait par défaut "pas encore publié" à la place du
-              // vrai classement Phase 1, pourtant toujours valide à cet
-              // instant. Même principe que displayResultsPhase plus bas
-              // (qui, lui, se base déjà sur de vraies données de matchs).
-              const anyPhase2HasData = ffbbRanking.results.some((r) => r.entriesPhase2.length > 0);
+              // Retour de Cindy du 29/10 (re-affiné le même jour, "que ça
+              // ouvre la phase deux partout") : le DÉFAUT s'aligne sur
+              // displayResultsPhase plus bas (Phase 2 dès qu'elle est
+              // configurée, pas seulement quand un classement y existe déjà)
+              // -- cohérent avec la carte Matchs juste en dessous plutôt que
+              // de les faire s'ouvrir chacune sur une phase différente. Tant
+              // qu'aucun classement Phase 2 n'est encore publié, le message
+              // "pas encore publié" (showPhase2NotYetPublished plus bas) le
+              // dit explicitement, au lieu de montrer la Phase 1 en silence.
               // Même garde-fou que displayResultsPhase plus bas : jamais
               // juste "rankingPhase ?? ...", sinon un choix "Phase 2" fait
               // sur une équipe qui l'a reste collé en silence après avoir
               // changé d'équipe pour une qui ne l'a pas.
-              const displayPhase = anyPhase2 ? (rankingPhase ?? (anyPhase2HasData ? 2 : 1)) : 1;
+              const displayPhase = anyPhase2 ? (rankingPhase ?? 2) : 1;
               const visibleResults = ffbbRanking.results
                 .map((r) => ({
                   teamId: r.teamId,
