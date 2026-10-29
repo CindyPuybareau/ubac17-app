@@ -54,7 +54,11 @@ export default function CoachFfbb({
             ) : (
               <>
                 <div className="mt-3">
-                  <FfbbSync teamId={team.id} initialUrl={team.ffbb_url} />
+                  <FfbbSync
+                    teamId={team.id}
+                    initialUrl={team.ffbb_url}
+                    initialUrlPhase2={team.ffbb_url_phase2}
+                  />
                 </div>
                 {team.ffbb_url && (
                   <a

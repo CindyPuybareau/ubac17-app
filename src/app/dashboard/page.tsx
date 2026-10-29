@@ -69,6 +69,15 @@ import {
   type SeasonVolunteerTally,
 } from "./season-bilan";
 
+// Retour de Cindy du 29/10 ("je veux du propre") : cette liste de colonnes
+// était recopiée à la main dans 8 requêtes `.select(...)` events quasi
+// identiques (Bureau, Coach, Famille, équipes sœurs...) -- une constante
+// unique ici, pour qu'un futur ajout de colonne ne se fasse plus qu'à UN
+// seul endroit (un oubli sur l'une des 8 copies faisait silencieusement
+// diverger ce qu'un rôle voit par rapport à un autre, voir CLAUDE.md §3).
+const EVENTS_SELECT_COLUMNS =
+  "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, ffbb_phase, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, teams(id, name, category), collectes(id, prix, payment_link)" as const;
+
 type PlayerRow = {
   id: string;
   first_name: string | null;
@@ -480,6 +489,14 @@ export type AdminUpcomingEvent = {
   // matchs (api/cron/match-reminders) à la place de start_time quand
   // elle existe.
   impactTime: string | null;
+  // Retour de Cindy du 28/10 ("onglet Phase 1 / Phase 2") : posée par la
+  // synchro FFBB (scripts/sync-ffbb-all.ts) sur un match importé -- null
+  // pour tout le reste (entraînement, réunion... et tout match déjà
+  // enregistré avant ce chantier, qui veut dire "phase 1" tel quel, jamais
+  // besoin de les retoucher). Sert uniquement à Matchs officiels/Résultats
+  // (calendar-view.tsx) pour proposer le même onglet Phase 1/Phase 2 que
+  // le classement, et seulement si une vraie phase 2 existe.
+  ffbbPhase: number | null;
   // Retour de Cindy du 12/09 ("Répéter") : commun à toutes les occurrences
   // générées par une même création répétée -- null pour un événement
   // isolé (comportement historique). Sert uniquement à proposer "cette
@@ -1089,7 +1106,7 @@ export default async function DashboardPage({
         supabase
           .from("team_coaches")
           .select(
-            "teams(id, name, category, ffbb_url, sort_order, pending_coach_names)"
+            "teams(id, name, category, ffbb_url, ffbb_url_phase2, sort_order, pending_coach_names)"
           )
           .eq("coach_id", user.id),
       () =>
@@ -1158,6 +1175,7 @@ export default async function DashboardPage({
     name: string | null;
     category: string | null;
     ffbb_url: string | null;
+    ffbb_url_phase2?: string | null;
     sort_order: number | null;
     pending_coach_names: string | null;
   };
@@ -1175,7 +1193,7 @@ export default async function DashboardPage({
     ? await supabase
         .from("team_pending_coaches")
         .select(
-          "teams(id, name, category, ffbb_url, sort_order, pending_coach_names)"
+          "teams(id, name, category, ffbb_url, ffbb_url_phase2, sort_order, pending_coach_names)"
         )
         .eq("player_id", ownPlayerId)
     : { data: [] as { teams: unknown }[], error: null };
@@ -1691,6 +1709,7 @@ export default async function DashboardPage({
     name: string | null;
     category: string | null;
     ffbb_url: string | null;
+    ffbb_url_phase2?: string | null;
     sort_order: number | null;
     pending_coach_names: string | null;
     trombinoscope_path?: string | null;
@@ -1792,7 +1811,7 @@ export default async function DashboardPage({
           supabase
             .from("events")
             .select(
-              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, teams(id, name, category), collectes(id, prix, payment_link)"
+              EVENTS_SELECT_COLUMNS
             )
             .neq("event_type", "TRAINING")
             .gte("start_time", eventsWindowStart)
@@ -1805,7 +1824,7 @@ export default async function DashboardPage({
           supabase
             .from("events")
             .select(
-              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, teams(id, name, category), collectes(id, prix, payment_link)"
+              EVENTS_SELECT_COLUMNS
             )
             .eq("event_type", "TRAINING")
             .gte("start_time", trainingsWindowStart)
@@ -2197,6 +2216,7 @@ export default async function DashboardPage({
       name: t.name,
       category: t.category,
       ffbb_url: t.ffbb_url,
+      ffbb_url_phase2: t.ffbb_url_phase2,
       ffbb_last_synced_at: t.ffbb_last_synced_at,
       players: rosterByTeam.get(t.id) ?? [],
       coaches: coachesByTeam.get(t.id) ?? [],
@@ -2674,6 +2694,7 @@ export default async function DashboardPage({
         start_time: e.start_time,
         end_time: e.end_time,
         impactTime: e.impact_time ?? null,
+        ffbbPhase: e.ffbb_phase ?? null,
         seriesId: e.series_id ?? null,
         notes: e.notes,
         isPaid: paidInfo.isPaid,
@@ -2857,7 +2878,7 @@ export default async function DashboardPage({
           supabase
             .from("events")
             .select(
-              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, teams(id, name, category), collectes(id, prix, payment_link)"
+              EVENTS_SELECT_COLUMNS
             )
             .or(teamOrClubWideOrProfileFilter(coachedTeamIds, user.id))
             .neq("event_type", "TRAINING")
@@ -2868,7 +2889,7 @@ export default async function DashboardPage({
           supabase
             .from("events")
             .select(
-              "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, teams(id, name, category), collectes(id, prix, payment_link)"
+              EVENTS_SELECT_COLUMNS
             )
             .or(teamOrClubWideOrProfileFilter(coachedTeamIds, user.id))
             .eq("event_type", "TRAINING")
@@ -2994,7 +3015,7 @@ export default async function DashboardPage({
                 supabase
                   .from("events")
                   .select(
-                    "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, teams(id, name, category), collectes(id, prix, payment_link)"
+                    EVENTS_SELECT_COLUMNS
                   )
                   .in("team_id", siblingTeamIds)
                   .in("event_type", ["MATCH", "FRIENDLY"])
@@ -3417,6 +3438,7 @@ export default async function DashboardPage({
       name: t.name,
       category: t.category,
       ffbb_url: t.ffbb_url,
+      ffbb_url_phase2: t.ffbb_url_phase2 ?? null,
       players: rosterByTeam.get(t.id) ?? [],
       coaches: coachesByTeam.get(t.id) ?? [],
       pendingCoaches: pendingCoachesByTeam.get(t.id) ?? [],
@@ -3723,6 +3745,7 @@ export default async function DashboardPage({
         start_time: e.start_time,
         end_time: e.end_time,
         impactTime: e.impact_time ?? null,
+        ffbbPhase: e.ffbb_phase ?? null,
         seriesId: e.series_id ?? null,
         notes: e.notes,
         isPaid: paidInfo.isPaid,
@@ -4094,7 +4117,7 @@ export default async function DashboardPage({
       supabase
         .from("events")
         .select(
-          "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, teams(id, name, category), collectes(id, prix, payment_link)"
+          EVENTS_SELECT_COLUMNS
         )
         .or(teamOrClubWideOrProfileFilter(allTeamIds, user.id))
         .neq("event_type", "TRAINING")
@@ -4105,7 +4128,7 @@ export default async function DashboardPage({
       supabase
         .from("events")
         .select(
-          "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, teams(id, name, category), collectes(id, prix, payment_link)"
+          EVENTS_SELECT_COLUMNS
         )
         .or(teamOrClubWideOrProfileFilter(allTeamIds, user.id))
         .eq("event_type", "TRAINING")
@@ -4238,7 +4261,7 @@ export default async function DashboardPage({
                 supabase
                   .from("events")
                   .select(
-                    "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, teams(id, name, category), collectes(id, prix, payment_link)"
+                    EVENTS_SELECT_COLUMNS
                   )
                   .in("team_id", familyExtraMatchTeamIds)
                   .in("event_type", ["MATCH", "FRIENDLY"])
@@ -4462,6 +4485,7 @@ export default async function DashboardPage({
         start_time: e.start_time,
         end_time: e.end_time,
         impactTime: e.impact_time ?? null,
+        ffbbPhase: e.ffbb_phase ?? null,
         seriesId: e.series_id ?? null,
         notes: e.notes,
         isPaid: paidInfo.isPaid,

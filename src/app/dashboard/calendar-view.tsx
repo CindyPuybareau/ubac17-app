@@ -36,6 +36,7 @@ import { formatAmount } from "./cotisation-shared";
 import { buildGmailComposeLink } from "@/lib/email";
 import EmptyState from "./empty-state";
 import FfbbRankingTable from "./ffbb-ranking-table";
+import { FFBB_PHASE_1, FFBB_PHASE_2, normalizeFfbbPhase, type FfbbPhase } from "@/lib/ffbb-phase";
 import { formatFirstName, formatLastName, sortByLastName } from "@/lib/names";
 import { parseMatchTitle, resolveIsHome } from "@/lib/match-display";
 import { sortTeamsByGroup, teamLabel } from "@/lib/teams";
@@ -701,6 +702,41 @@ function PaidParticipantsList({
   );
 }
 
+// Retour de Cindy du 29/10 ("je veux du propre") : sélecteur Phase 1/Phase 2,
+// jusqu'ici dupliqué quasi à l'identique entre la carte Classement et la
+// carte Matchs/Résultats (même markup, même logique de bouton actif) --
+// un seul composant réutilisé aux deux endroits. `selfStart` distingue le
+// seul vrai écart visuel entre les deux (la carte Classement l'aligne à
+// gauche dans une colonne flex, l'autre non).
+function PhaseToggle({
+  phase,
+  onChange,
+  selfStart,
+}: {
+  phase: FfbbPhase;
+  onChange: (phase: FfbbPhase) => void;
+  selfStart?: boolean;
+}) {
+  return (
+    <div
+      className={`flex w-fit items-center gap-0.5 rounded-full border border-zinc-200 bg-white p-0.5 ${selfStart ? "self-start" : ""}`}
+    >
+      {([FFBB_PHASE_1, FFBB_PHASE_2] as const).map((p) => (
+        <button
+          key={p}
+          type="button"
+          onClick={() => onChange(p)}
+          className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+            phase === p ? "bg-navy text-white" : "text-zinc-500 hover:bg-zinc-50"
+          }`}
+        >
+          Phase {p}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function CalendarView({
   events,
   createTeams,
@@ -1151,7 +1187,7 @@ export default function CalendarView({
     const { data, error } = await supabase
       .from("events")
       .select(
-        "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, team_score, opponent_score, team_id, teams(name)"
+        "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, ffbb_phase, series_id, notes, team_score, opponent_score, team_id, teams(name)"
       )
       .eq("event_type", "MATCH")
       .gte("start_time", windowStart)
@@ -1178,6 +1214,7 @@ export default function CalendarView({
           start_time: e.start_time,
           end_time: e.end_time,
           impactTime: e.impact_time,
+          ffbbPhase: e.ffbb_phase,
           seriesId: e.series_id,
           notes: e.notes,
           isPaid: false,
@@ -1304,8 +1341,25 @@ export default function CalendarView({
   const [ffbbRanking, setFfbbRanking] = useState<{
     status: "idle" | "loading" | "loaded" | "error";
     forKey: string | null;
-    results: { teamId: string; entries: FfbbRankingEntry[] }[];
+    results: {
+      teamId: string;
+      entries: FfbbRankingEntry[];
+      entriesPhase2: FfbbRankingEntry[];
+      hasPhase2: boolean;
+    }[];
   }>({ status: "idle", forKey: null, results: [] });
+  // Retour de Cindy du 28/10 ("onglet Phase 1 / Phase 2") : null tant que
+  // personne n'a cliqué -- l'onglet affiché par défaut est alors la phase
+  // la plus récente qui a vraiment des données (2 si elle existe, sinon
+  // 1), recalculé à chaque arrivée de nouvelles données. Un clic explicite
+  // fige le choix, même si entre-temps la phase 2 apparaît.
+  const [rankingPhase, setRankingPhase] = useState<1 | 2 | null>(null);
+  // Même principe que rankingPhase ci-dessus, pour les listes de matchs
+  // (Matchs officiels/Résultats) cette fois -- séparé de rankingPhase :
+  // rien n'oblige à regarder la même phase sur les deux cartes en même
+  // temps (ex. vérifier un résultat de phase 1 tout en consultant le
+  // classement de phase 2).
+  const [resultsPhase, setResultsPhase] = useState<1 | 2 | null>(null);
 
   const showRankingCard =
     resultsTeamSelector !== "dropdown" &&
@@ -1337,18 +1391,32 @@ export default function CalendarView({
       teamIds.map((teamId, i) =>
         fetch(`/api/ffbb-ranking?teamId=${teamId}`, { signal: controllers[i].signal })
           .then((res) => res.json())
-          .then((data: { ranking?: FfbbRankingEntry[] }) => ({
+          .then(
+            (data: { ranking?: FfbbRankingEntry[]; ranking2?: FfbbRankingEntry[]; hasPhase2?: boolean }) => ({
+              teamId,
+              entries: data.ranking ?? [],
+              entriesPhase2: data.ranking2 ?? [],
+              hasPhase2: data.hasPhase2 ?? false,
+            })
+          )
+          .catch(() => ({
             teamId,
-            entries: data.ranking ?? [],
+            entries: [] as FfbbRankingEntry[],
+            entriesPhase2: [] as FfbbRankingEntry[],
+            hasPhase2: false,
           }))
-          .catch(() => ({ teamId, entries: [] as FfbbRankingEntry[] }))
       )
     ).then((results) => {
       if (cancelled) return;
       setFfbbRanking({
         status: "loaded",
         forKey: activeMemberTeamIdsKey,
-        results: results.filter((r) => r.entries.length > 0),
+        // hasPhase2 garde une équipe qui vient tout juste de recevoir son
+        // lien Phase 2 (ffbb-sync.tsx) mais n'a encore aucune ligne de
+        // classement dans AUCUNE des deux phases (pas encore synchronisée,
+        // ou FFBB qui n'a publié ni l'une ni l'autre) -- sans ça, l'onglet
+        // Phase 1/Phase 2 resterait invisible jusqu'à la première synchro.
+        results: results.filter((r) => r.entries.length > 0 || r.entriesPhase2.length > 0 || r.hasPhase2),
       });
     });
     return () => {
@@ -1852,6 +1920,25 @@ export default function CalendarView({
     // paramètre variable (`view`) est déjà listé ci-dessous.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleEvents, view]);
+
+  // Retour de Cindy du 28/10 ("onglet Phase 2 dans Résultats, garder la
+  // phase 1 visible") : seuls Matchs officiels/Résultats proposent cet
+  // onglet (results/clubEvents -- Famille/Événements -- n'ont pas cette
+  // notion). Même logique de "phase la plus récente par défaut" que
+  // rankingPhase/ffbbRanking plus haut, mais à partir des matchs déjà en
+  // mémoire (visibleEvents, via seasonListEvents) : aucune requête de
+  // plus, juste une étiquette déjà posée par la synchro FFBB.
+  const isPhasedView = view === "officialMatches" || view === "officialResults";
+  const anyResultsPhase2 = isPhasedView && seasonListEvents.some((e) => normalizeFfbbPhase(e.ffbbPhase) === FFBB_PHASE_2);
+  // anyResultsPhase2 décide en premier (pas juste resultsPhase ?? ...) :
+  // sans ça, choisir "Phase 2" sur une équipe qui l'a puis basculer vers
+  // une équipe qui ne l'a pas garderait le filtre sur 2 en silence --
+  // l'onglet disparaît (anyResultsPhase2 redevient faux) mais le filtre
+  // continuerait de ne garder que du vide, masquant la vraie phase 1.
+  const displayResultsPhase = anyResultsPhase2 ? (resultsPhase ?? FFBB_PHASE_2) : FFBB_PHASE_1;
+  const phasedSeasonListEvents = isPhasedView
+    ? seasonListEvents.filter((e) => normalizeFfbbPhase(e.ffbbPhase) === displayResultsPhase)
+    : seasonListEvents;
 
   // Anniversaires + événements mélangés dans un seul fil chronologique,
   // triés ensemble : un anniversaire vaut minuit ce jour-là (avant tout
@@ -3249,15 +3336,78 @@ export default function CalendarView({
                 );
               }
 
+              // Retour de Cindy du 28/10 ("onglet Phase 1 / Phase 2"), affiné
+              // le 29/10 ("l'onglet doit apparaître même sans classement
+              // encore publié, comme pour les matchs") : l'onglet apparaît
+              // dès qu'au moins une des équipes représentées a un lien
+              // Phase 2 CONFIGURÉ (hasPhase2, posé par ffbb-sync.tsx) --
+              // plus seulement si un classement existe déjà pour elle. Pour
+              // les Séniors (une seule phase cette saison), rien ne change
+              // à l'écran.
+              const anyPhase2 = ffbbRanking.results.some((r) => r.hasPhase2);
+              // Correctif du 29/10 (relecture "je veux du propre") : le
+              // DÉFAUT (avant tout clic explicite) doit rester sur Phase 1
+              // tant qu'aucun classement Phase 2 n'existe réellement --
+              // sinon, juste après avoir enregistré un lien Phase 2 (hasPhase2
+              // devient vrai AVANT la prochaine synchro du lundi), tout le
+              // monde verrait par défaut "pas encore publié" à la place du
+              // vrai classement Phase 1, pourtant toujours valide à cet
+              // instant. Même principe que displayResultsPhase plus bas
+              // (qui, lui, se base déjà sur de vraies données de matchs).
+              const anyPhase2HasData = ffbbRanking.results.some((r) => r.entriesPhase2.length > 0);
+              // Même garde-fou que displayResultsPhase plus bas : jamais
+              // juste "rankingPhase ?? ...", sinon un choix "Phase 2" fait
+              // sur une équipe qui l'a reste collé en silence après avoir
+              // changé d'équipe pour une qui ne l'a pas.
+              const displayPhase = anyPhase2 ? (rankingPhase ?? (anyPhase2HasData ? 2 : 1)) : 1;
+              const visibleResults = ffbbRanking.results
+                .map((r) => ({
+                  teamId: r.teamId,
+                  entries: displayPhase === 2 ? r.entriesPhase2 : r.entries,
+                }))
+                .filter((r) => r.entries.length > 0);
+              // Phase 2 configurée mais pas encore publiée par la FFBB
+              // (cas normal juste après avoir renseigné le lien, voir
+              // sync-ffbb-all.ts : "0 équipe au classement" tant que la
+              // FFBB n'a rien publié) -- même message que la carte
+              // Classement vide plus haut, plutôt que de n'afficher rien
+              // du tout sous l'onglet actif.
+              const showPhase2NotYetPublished = displayPhase === 2 && visibleResults.length === 0;
+
               return (
-                <div className="flex flex-col gap-3">
-                  {ffbbRanking.results.map(({ teamId, entries }) => (
-                    <FfbbRankingTable key={teamId} entries={entries} label={label} />
-                  ))}
+                <div className="flex flex-col gap-2">
+                  {anyPhase2 && (
+                    <PhaseToggle phase={displayPhase} onChange={setRankingPhase} selfStart />
+                  )}
+                  {showPhase2NotYetPublished ? (
+                    <div className="flex items-start gap-2 rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/60 px-4 py-3">
+                      <ListOrdered className="h-4 w-4 shrink-0 text-navy" />
+                      <p className="text-sm text-zinc-500">
+                        <span className="font-semibold text-zinc-600">Classement{label}</span> :
+                        pas encore publié par la FFBB pour cette phase — apparaîtra ici
+                        automatiquement dès les premiers résultats.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      {visibleResults.map(({ teamId, entries }) => (
+                        <FfbbRankingTable key={teamId} entries={entries} label={label} />
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })()}
-          {seasonListEvents.length === 0 ? (
+          {/* Retour de Cindy du 28/10 ("onglet Phase 2 dans Résultats,
+              garder la phase 1 visible") : n'apparaît que si cette
+              équipe/vue a vraiment des matchs de phase 2 -- sinon rien ne
+              change à l'écran (Séniors 1/2, ou une catégorie jeune pas
+              encore passée en phase 2). Même style que le sélecteur
+              Liste/Mois plus haut, pour rester cohérent visuellement. */}
+          {anyResultsPhase2 && (
+            <PhaseToggle phase={displayResultsPhase} onChange={setResultsPhase} />
+          )}
+          {phasedSeasonListEvents.length === 0 ? (
             <EmptyState
               icon={CalendarDays}
               message={
@@ -3273,11 +3423,11 @@ export default function CalendarView({
             // gap-4 (voir plus haut, vue "list") : même filet contre le
             // fanion "Spécial" qui déborde au-dessus de sa carte.
             <div className="flex flex-col gap-4">
-              {seasonListEvents.map((event) => renderResultCard(event))}
+              {phasedSeasonListEvents.map((event) => renderResultCard(event))}
             </div>
           ) : (
             <div className="flex flex-col gap-4">
-              {seasonListEvents.map((event) => renderEventCard(event))}
+              {phasedSeasonListEvents.map((event) => renderEventCard(event))}
             </div>
           )}
         </div>

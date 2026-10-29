@@ -7,6 +7,7 @@ import {
   type FfbbMatch,
   type FfbbRankingEntry,
 } from "./ffbb";
+import { FFBB_PHASE_1_OR_NULL_FILTER, normalizeFfbbPhase, type FfbbPhase } from "./ffbb-phase";
 
 export type FfbbSyncResult =
   | { ok: true; imported: number; updated: number; skipped: number; message?: string }
@@ -34,7 +35,13 @@ type AnySupabaseClient = SupabaseClient<any, any, any>;
 export async function syncFfbbMatchesForTeam(
   supabase: AnySupabaseClient,
   teamId: string,
-  ffbbUrl: string
+  ffbbUrl: string,
+  // Retour de Cindy du 29/10 ("je veux du propre") : obligatoire, jamais
+  // défaulté -- un appelant qui oublierait de le préciser écrirait
+  // silencieusement ffbb_phase=1 au lieu d'échouer. Les deux appelants
+  // (api/sync-ffbb/route.ts, scripts/sync-ffbb-all.ts) le déterminent déjà
+  // explicitement avant d'appeler cette fonction.
+  phase: FfbbPhase
 ): Promise<FfbbSyncResult> {
   let matches;
   try {
@@ -42,7 +49,7 @@ export async function syncFfbbMatchesForTeam(
   } catch (e) {
     return handleFetchError(e, teamId);
   }
-  const result = await writeMatchesForTeam(supabase, teamId, matches);
+  const result = await writeMatchesForTeam(supabase, teamId, matches, phase);
   // Posé dès qu'on a réussi à parler à la FFBB pour cette équipe — pas
   // seulement quand des matchs ont réellement changé — pour que la vue
   // d'ensemble (ffbb-manager.tsx) distingue "synchronisé, rien de neuf"
@@ -81,7 +88,8 @@ export async function touchSyncedAt(supabase: AnySupabaseClient, teamIds: string
 async function writeMatchesForTeam(
   supabase: AnySupabaseClient,
   teamId: string,
-  matches: FfbbMatch[]
+  matches: FfbbMatch[],
+  phase: FfbbPhase
 ): Promise<FfbbSyncResult> {
   if (matches.length === 0) {
     return { ok: true, imported: 0, updated: 0, skipped: 0, message: "Aucun match trouvé sur cette fiche FFBB." };
@@ -135,7 +143,7 @@ async function writeMatchesForTeam(
     // renuméroté", pas un second match.
     const { data: existingRows, error: existingError } = await supabase
       .from("events")
-      .select("id, external_uid, title, location, start_time, team_score, opponent_score")
+      .select("id, external_uid, title, location, start_time, team_score, opponent_score, ffbb_phase")
       .eq("team_id", teamId)
       .eq("event_type", "MATCH");
 
@@ -144,13 +152,26 @@ async function writeMatchesForTeam(
       return { ok: false, status: 500, error: "La synchronisation a échoué." };
     }
 
-    const existingByUid = new Map((existingRows ?? []).map((r) => [r.external_uid, r]));
+    // Retour de Cindy du 29/10 ("je veux du propre") : la correspondance
+    // (par external_uid OU par repli start_time, voir ci-dessus) doit
+    // rester DANS la phase qu'on resynchronise -- sans ce filtre, un match
+    // Phase 2 dont le numéro FFBB (#1, #2...) repart de zéro sur la
+    // nouvelle poule peut retomber sur le même "ffbb-1" qu'un match Phase 1
+    // pourtant gelé pour toujours (voir migration ffbb_phase2), et
+    // l'écraser (titre/horaire/score) au lieu d'être inséré comme un
+    // nouveau match. Même garde-fou que la purge phase-scopée de
+    // writeRankingForTeam plus bas, appliqué ici à la recherche plutôt
+    // qu'à une suppression.
+    const phaseRows = (existingRows ?? []).filter(
+      (r) => normalizeFfbbPhase(r.ffbb_phase) === normalizeFfbbPhase(phase)
+    );
+    const existingByUid = new Map(phaseRows.map((r) => [r.external_uid, r]));
     // Clé numérique (epoch), pas la chaîne brute : Supabase ne renvoie pas
     // forcément start_time dans le même format ISO que celui produit ici
     // (toISOString(), voir ffbb.ts) -- une comparaison de chaînes ratait
     // silencieusement des horaires pourtant identiques.
     const existingByStartTime = new Map(
-      (existingRows ?? []).map((r) => [new Date(r.start_time).getTime(), r])
+      phaseRows.map((r) => [new Date(r.start_time).getTime(), r])
     );
 
     const toInsert: typeof candidates = [];
@@ -191,6 +212,10 @@ async function writeMatchesForTeam(
           external_uid: c.externalUid,
           team_score: c.ownScore,
           opponent_score: c.opponentScore,
+          // Retour de Cindy du 28/10 ("phase 1 -> phase 2") : posée une
+          // fois pour toutes à l'import, jamais retouchée ensuite --
+          // une phase ne change pas de numéro une fois le match créé.
+          ffbb_phase: phase,
         }))
       );
       // Retour de Cindy du 01/10 ("regarde les logs") : une erreur ici
@@ -217,6 +242,13 @@ async function writeMatchesForTeam(
           // repli par start_time) -- les prochaines synchros la
           // retrouveront directement par external_uid, plus par repli.
           external_uid: c.externalUid,
+          // Retour de Cindy du 28/10 : comble au passage une ligne jamais
+          // étiquetée (ffbb_phase NULL, importée avant ce chantier) --
+          // sans effet sur une ligne de l'autre phase désormais, puisque
+          // phaseRows plus haut garantit que `id` vient forcément de la
+          // phase qu'on resynchronise (correctif du 29/10 -- voir le
+          // commentaire sur phaseRows).
+          ffbb_phase: phase,
           // Retour de Cindy du 21/09 ("les résultats ne s'affichent pas en
           // automatique") : uniquement quand la FFBB a réellement publié
           // un score (jamais null) -- sinon un score déjà saisi à la main
@@ -248,7 +280,8 @@ async function writeMatchesForTeam(
 export async function syncFfbbRankingForTeam(
   supabase: AnySupabaseClient,
   teamId: string,
-  ffbbUrl: string
+  ffbbUrl: string,
+  phase: FfbbPhase
 ): Promise<FfbbRankingSyncResult> {
   let entries;
   try {
@@ -256,19 +289,32 @@ export async function syncFfbbRankingForTeam(
   } catch (e) {
     return handleRankingFetchError(e, teamId);
   }
-  return writeRankingForTeam(supabase, teamId, entries);
+  return writeRankingForTeam(supabase, teamId, entries, phase);
 }
 
 async function writeRankingForTeam(
   supabase: AnySupabaseClient,
   teamId: string,
-  entries: FfbbRankingEntry[]
+  entries: FfbbRankingEntry[],
+  phase: FfbbPhase
 ): Promise<FfbbRankingSyncResult> {
   // Remplacé en entier (voir migration team_rankings_from_local_sync) :
   // un classement n'a aucune donnée club rattachée ligne à ligne, DELETE +
   // INSERT reflète fidèlement l'état actuel sans ligne fantôme d'une
   // équipe reléguée/promue entre deux synchros.
-  const { error: deleteError } = await supabase.from("team_rankings").delete().eq("team_id", teamId);
+  // Retour de Cindy du 28/10 ("phase 1 -> phase 2") : purge limitée à
+  // CETTE phase -- sans ça, resynchroniser la phase 2 d'une équipe
+  // effacerait aussi son classement de phase 1, pourtant censé rester gelé
+  // pour toujours. Phase 1 inclut les lignes jamais étiquetées (NULL,
+  // importées avant ce chantier) en plus de celles déjà marquées "1" --
+  // la phase 2, elle, ne correspond jamais à une ligne NULL (aucune ligne
+  // de phase 1 n'a pu être écrite par un appel phase=2).
+  let deleteQuery = supabase.from("team_rankings").delete().eq("team_id", teamId);
+  deleteQuery =
+    phase === 1
+      ? deleteQuery.or(FFBB_PHASE_1_OR_NULL_FILTER)
+      : deleteQuery.eq("ffbb_phase", phase);
+  const { error: deleteError } = await deleteQuery;
   if (deleteError) {
     console.error("[ffbb-sync] classement : purge précédente échouée:", deleteError);
     return { ok: false, error: "La synchronisation du classement a échoué." };
@@ -288,6 +334,7 @@ async function writeRankingForTeam(
       previous_ranking: e.previousRanking,
       is_own_team: e.isOwnTeam,
       logo: e.logo,
+      ffbb_phase: phase,
     }))
   );
   if (insertError) {
@@ -306,7 +353,8 @@ async function writeRankingForTeam(
 export async function syncFfbbTeamForTeam(
   supabase: AnySupabaseClient,
   teamId: string,
-  ffbbUrl: string
+  ffbbUrl: string,
+  phase: FfbbPhase
 ): Promise<{ matches: FfbbSyncResult; ranking: FfbbRankingSyncResult }> {
   let data;
   try {
@@ -317,8 +365,8 @@ export async function syncFfbbTeamForTeam(
     return { matches: matchesError, ranking: rankingError };
   }
   const [matches, ranking] = await Promise.all([
-    writeMatchesForTeam(supabase, teamId, data.matches),
-    writeRankingForTeam(supabase, teamId, data.ranking),
+    writeMatchesForTeam(supabase, teamId, data.matches, phase),
+    writeRankingForTeam(supabase, teamId, data.ranking, phase),
   ]);
   return { matches, ranking };
 }

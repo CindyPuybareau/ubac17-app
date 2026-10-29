@@ -59,16 +59,26 @@ export async function POST(request: Request) {
 
   const { data: team, error: teamError } = await supabase
     .from("teams")
-    .select("id, ffbb_url")
+    .select("id, ffbb_url, ffbb_url_phase2")
     .eq("id", teamId)
     .single();
 
-  if (teamError || !team?.ffbb_url) {
+  if (teamError || (!team?.ffbb_url && !team?.ffbb_url_phase2)) {
     return NextResponse.json(
       { error: "Aucun lien FFBB configuré pour cette équipe." },
       { status: 400 }
     );
   }
+
+  // Retour de Cindy du 29/10 ("je veux du propre") : même règle que
+  // scripts/sync-ffbb-all.ts -- dès qu'un lien Phase 2 est configuré pour
+  // cette équipe, cette route doit resynchroniser LUI, jamais la Phase 1
+  // (gelée pour toujours). Avant ce correctif, cette route ignorait
+  // totalement ffbb_url_phase2 et resynchronisait encore la Phase 1 pour
+  // une équipe déjà passée en Phase 2.
+  const { url: ffbbUrl, phase } = team.ffbb_url_phase2
+    ? { url: team.ffbb_url_phase2, phase: 2 as const }
+    : { url: team.ffbb_url as string, phase: 1 as const };
 
   // Logique de lecture/écriture extraite dans ffbb-sync.ts (retour de
   // Cindy du 01/10, "comment je synchroniserais ?") -- partagée avec
@@ -76,7 +86,7 @@ export async function POST(request: Request) {
   // pour n'avoir qu'UNE seule logique de correspondance/anti-doublon, peu
   // importe le client Supabase utilisé (session utilisateur ici,
   // service_role côté script).
-  const result = await syncFfbbMatchesForTeam(supabase, teamId, team.ffbb_url);
+  const result = await syncFfbbMatchesForTeam(supabase, teamId, ffbbUrl, phase);
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }

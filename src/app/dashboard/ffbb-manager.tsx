@@ -8,6 +8,7 @@ type TeamRef = {
   name: string | null;
   category: string | null;
   ffbb_url: string | null;
+  ffbb_url_phase2?: string | null;
   ffbb_last_synced_at?: string | null;
 };
 
@@ -75,7 +76,11 @@ export default function FfbbManager({ teams }: { teams: TeamRef[] }) {
               )}
             </div>
             <div className="mt-3">
-              <FfbbSync teamId={team.id} initialUrl={team.ffbb_url} />
+              <FfbbSync
+                teamId={team.id}
+                initialUrl={team.ffbb_url}
+                initialUrlPhase2={team.ffbb_url_phase2}
+              />
             </div>
           </div>
         );

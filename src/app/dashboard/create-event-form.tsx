@@ -702,6 +702,10 @@ export default function CreateEventForm({
           start_time: row.start_time,
           end_time: row.end_time,
           impactTime: row.impact_time,
+          // Un événement créé ou modifié ici l'est toujours à la main --
+          // jamais synchronisé FFBB (voir ffbbPhase sur AdminUpcomingEvent,
+          // page.tsx).
+          ffbbPhase: null,
           seriesId: row.series_id,
           notes: row.notes,
           isPaid: false,
@@ -796,7 +800,7 @@ export default function CreateEventForm({
       : supabase.from("events").insert(eventPayload);
     const { data: inserted, error } = await query
       .select(
-        "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, series_id, notes, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience"
+        "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, ffbb_phase, series_id, notes, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience"
       )
       .single();
 
@@ -961,6 +965,7 @@ export default function CreateEventForm({
         start_time: inserted.start_time,
         end_time: inserted.end_time,
         impactTime: inserted.impact_time,
+        ffbbPhase: inserted.ffbb_phase,
         seriesId: inserted.series_id,
         notes: inserted.notes,
         isPaid,
@@ -990,6 +995,7 @@ export default function CreateEventForm({
           start_time: inserted.start_time,
           end_time: inserted.end_time,
           impactTime: inserted.impact_time,
+          ffbbPhase: inserted.ffbb_phase,
           seriesId: inserted.series_id,
           notes: inserted.notes,
           isPaid,

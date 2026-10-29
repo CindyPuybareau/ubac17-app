@@ -13,12 +13,27 @@ import { createClient } from "@/lib/supabase/client";
 // tâche planifiée locale (scripts/sync-ffbb-all.ts, chaque lundi), ce
 // champ ne sert plus qu'à enregistrer le lien de la fiche équipe (lu par
 // cette tâche ET par le lien "Voir sur FFBB" du calendrier).
-export default function FfbbSync({
+// Retour de Cindy du 28/10 ("phase 1 -> phase 2 pour U18 à U9") : les
+// deux champs vivent côte à côte dans la même carte, chacun avec son
+// propre bouton Enregistrer -- jamais couplés (on peut très bien remplir
+// la phase 2 des semaines après la phase 1, ou ne jamais la remplir pour
+// une équipe qui n'a qu'une seule phase, Séniors 1/2 notamment). Dès que
+// le lien Phase 2 est renseigné, la tâche automatique
+// (scripts/sync-ffbb-all.ts) arrête de relire la phase 1 pour cette
+// équipe -- son classement/ses matchs restent gelés tels quels pour
+// toujours, voir la migration ffbb_phase2.
+function FfbbUrlField({
   teamId,
+  column,
   initialUrl,
+  label,
+  helperText,
 }: {
   teamId: string;
+  column: "ffbb_url" | "ffbb_url_phase2";
   initialUrl: string | null;
+  label: string;
+  helperText?: string;
 }) {
   const router = useRouter();
   const [url, setUrl] = useState(initialUrl ?? "");
@@ -34,7 +49,7 @@ export default function FfbbSync({
     const supabase = createClient();
     const { error } = await supabase
       .from("teams")
-      .update({ ffbb_url: url || null })
+      .update({ [column]: url || null })
       .eq("id", teamId);
 
     setSaving(false);
@@ -50,8 +65,9 @@ export default function FfbbSync({
   return (
     <div className="flex flex-col gap-2 rounded-xl bg-ubac-yellow/10 p-3">
       <label className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow-dark">
-        Lien de la fiche équipe FFBB (competitions.ffbb.com)
+        {label}
       </label>
+      {helperText && <p className="text-xs text-zinc-500">{helperText}</p>}
       <div className="flex flex-wrap gap-2">
         <input
           value={url}
@@ -69,6 +85,34 @@ export default function FfbbSync({
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
       {message && <p className="text-sm text-green-600">{message}</p>}
+    </div>
+  );
+}
+
+export default function FfbbSync({
+  teamId,
+  initialUrl,
+  initialUrlPhase2,
+}: {
+  teamId: string;
+  initialUrl: string | null;
+  initialUrlPhase2?: string | null;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <FfbbUrlField
+        teamId={teamId}
+        column="ffbb_url"
+        initialUrl={initialUrl}
+        label="Lien de la fiche équipe FFBB — Phase 1 (competitions.ffbb.com)"
+      />
+      <FfbbUrlField
+        teamId={teamId}
+        column="ffbb_url_phase2"
+        initialUrl={initialUrlPhase2 ?? null}
+        label="Lien de la fiche équipe FFBB — Phase 2"
+        helperText="À remplir seulement une fois la phase 2 publiée par la FFBB pour cette équipe (reclassement U18 à U9) — laisser vide sinon, y compris pour les Séniors."
+      />
     </div>
   );
 }

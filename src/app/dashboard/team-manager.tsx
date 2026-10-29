@@ -36,6 +36,10 @@ export type TeamWithMembers = {
   name: string | null;
   category: string | null;
   ffbb_url: string | null;
+  // Optionnel : seul l'onglet FFBB du Coach (coach-ffbb.tsx) en a besoin —
+  // les objets construits ailleurs (ex. le calendrier Coach) n'ont pas
+  // besoin de le porter.
+  ffbb_url_phase2?: string | null;
   // Posé par /api/sync-ffbb juste après une synchro réussie — alimente la
   // vue d'ensemble de l'onglet FFBB (ffbb-manager.tsx). Optionnel : les
   // objets construits ailleurs (ex. le calendrier Coach) n'ont pas besoin

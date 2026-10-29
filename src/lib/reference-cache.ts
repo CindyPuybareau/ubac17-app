@@ -30,7 +30,7 @@ export const getCachedTeams = unstable_cache(
     return supabase
       .from("teams")
       .select(
-        "id, name, category, ffbb_url, ffbb_last_synced_at, pending_coach_names, sort_order, photo_url, trombinoscope_path"
+        "id, name, category, ffbb_url, ffbb_url_phase2, ffbb_last_synced_at, pending_coach_names, sort_order, photo_url, trombinoscope_path"
       )
       .order("sort_order", { ascending: true, nullsFirst: false })
       .order("category");

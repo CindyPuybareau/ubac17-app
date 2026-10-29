@@ -52,10 +52,15 @@ async function main() {
   loadEnvLocal();
   const supabase = createServiceClient();
 
+  // Retour de Cindy du 29/10 ("je veux du propre") : OR plutôt que le
+  // simple .not("ffbb_url", "is", null) d'avant -- sans ça, une équipe qui
+  // aurait ffbb_url vide mais ffbb_url_phase2 rempli (ex. un lien Phase 1
+  // retiré après coup) disparaîtrait purement et simplement de toute
+  // synchro, Phase 1 ET Phase 2, sans la moindre erreur ni log.
   const { data: teams, error } = await supabase
     .from("teams")
-    .select("id, name, ffbb_url")
-    .not("ffbb_url", "is", null);
+    .select("id, name, ffbb_url, ffbb_url_phase2")
+    .or("ffbb_url.not.is.null,ffbb_url_phase2.not.is.null");
 
   if (error) {
     console.error("[sync-ffbb-all] lecture des équipes échouée:", error);
@@ -80,7 +85,19 @@ async function main() {
   // (voir ffbb-sync.ts), mais paralléliser plusieurs équipes à la fois
   // rouvrirait le même risque de saturation du pool de connexions.
   for (const team of teams) {
-    if (!team.ffbb_url) continue;
+    // Garde mise à jour en même temps que le filtre OR ci-dessus : une
+    // équipe sans ffbb_url mais avec ffbb_url_phase2 doit continuer, pas
+    // être sautée ici.
+    if (!team.ffbb_url && !team.ffbb_url_phase2) continue;
+    // Retour de Cindy du 28/10 ("phase 1 -> phase 2 pour U18 à U9") : dès
+    // qu'un lien de phase 2 est renseigné pour une équipe, on arrête de
+    // relire sa phase 1 (gelée pour toujours, voir writeRankingForTeam/
+    // writeMatchesForTeam) -- seule la phase 2 continue d'être
+    // synchronisée. Une équipe sans phase 2 (Séniors, ou une catégorie
+    // jeune qui n'y est pas encore) continue exactement comme avant.
+    const { url: ffbbUrl, phase } = team.ffbb_url_phase2
+      ? { url: team.ffbb_url_phase2, phase: 2 as const }
+      : { url: team.ffbb_url as string, phase: 1 as const };
     // Retour de Cindy du 01/10 ("les requêtes sont impeccables ?") :
     // syncFfbbTeamForTeam fait UN SEUL fetch de la fiche FFBB pour matchs +
     // classement (ils vivent dans le même HTML), au lieu des deux appels
@@ -88,7 +105,8 @@ async function main() {
     const { matches: result, ranking: rankingResult } = await syncFfbbTeamForTeam(
       supabase,
       team.id,
-      team.ffbb_url
+      ffbbUrl,
+      phase
     );
 
     if (!result.ok) {

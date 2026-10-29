@@ -6,6 +6,7 @@ import { runBatched, Semaphore } from "./batch";
 import { listTeamsForOfficialMatches } from "./teams";
 import { getCachedTeams } from "./reference-cache";
 import type { FfbbRankingEntry } from "./ffbb";
+import { normalizeFfbbPhase } from "./ffbb-phase";
 
 // "Tableau de bord" (retour de Cindy du 13/09, "ce que tu mettrais dans le
 // tableau de bord... photo d'équipe, nombre de joueurs, matchs officiels/
@@ -280,7 +281,7 @@ export async function getSpaceDashboardSummary(
         teamIds && teamIds.length > 0
           ? supabase
               .from("team_rankings")
-              .select("team_id, sort_order, position, label, points, previous_ranking, is_own_team, logo")
+              .select("team_id, sort_order, position, label, points, previous_ranking, is_own_team, logo, ffbb_phase")
               .in("team_id", teamIds)
               .order("sort_order", { ascending: true })
           : Promise.resolve({ data: null, error: null }),
@@ -395,18 +396,30 @@ export async function getSpaceDashboardSummary(
   // rankingsRes plus haut) que matchStatsByTeam ci-dessus -- déjà triées
   // par sort_order (la requête l'ordonne), donc l'ordre de poule est
   // préservé sans tri supplémentaire ici.
+  const rankingRows = (rankingsRes.data ?? []) as {
+    team_id: string;
+    position: string;
+    label: string;
+    points: string;
+    previous_ranking: number | null;
+    is_own_team: boolean;
+    logo: string | null;
+    ffbb_phase: number | null;
+  }[];
+  // Retour de Cindy du 28/10 ("onglet Phase 1 / Phase 2") : cette vignette
+  // compacte du Tableau de bord n'a pas la place pour un onglet -- montre
+  // toujours la phase la plus récente qui existe pour chaque équipe (2 dès
+  // qu'elle est enregistrée, sinon 1), jamais un mélange des deux. Le
+  // détail complet avec le vrai sélecteur de phase reste sur la carte
+  // Classement de Matchs officiels/Résultats (calendar-view.tsx).
+  const latestPhaseByTeam = new Map<string, number>();
+  rankingRows.forEach((r) => {
+    const phase = normalizeFfbbPhase(r.ffbb_phase);
+    latestPhaseByTeam.set(r.team_id, Math.max(latestPhaseByTeam.get(r.team_id) ?? phase, phase));
+  });
   const rankingByTeam = new Map<string, FfbbRankingEntry[]>();
-  (
-    (rankingsRes.data ?? []) as {
-      team_id: string;
-      position: string;
-      label: string;
-      points: string;
-      previous_ranking: number | null;
-      is_own_team: boolean;
-      logo: string | null;
-    }[]
-  ).forEach((r) => {
+  rankingRows.forEach((r) => {
+    if (normalizeFfbbPhase(r.ffbb_phase) !== latestPhaseByTeam.get(r.team_id)) return;
     const list = rankingByTeam.get(r.team_id) ?? [];
     list.push({
       position: r.position,
