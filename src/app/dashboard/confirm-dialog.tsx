@@ -39,7 +39,16 @@ export default function ConfirmDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
         <h3 className="mb-2 font-semibold text-zinc-900">{title}</h3>
-        <p className="mb-4 text-sm text-zinc-600">{message}</p>
+        {/* Retour de Cindy du 29/10 ("audit espace Coach") : `message`
+            (typé ReactNode) contient parfois du contenu bloc -- un <p>
+            (calendar-view.tsx, "Supprimer l'événement") ou même un <div>
+            avec des champs radio (calendar-view.tsx, "série répétée").
+            Un <p> comme enveloppe ne peut contenir aucun des deux en HTML
+            valide (<p> ferme implicitement au premier élément de bloc
+            rencontré) -- React (hydratation) ET les navigateurs le
+            signalent. <div> accepte les deux sans rien changer visuellement
+            (mêmes classes, aucun style propre à <p> utilisé ici). */}
+        <div className="mb-4 text-sm text-zinc-600">{message}</div>
         {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
         <div className="flex items-center gap-2">
           <button
