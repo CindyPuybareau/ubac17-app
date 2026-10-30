@@ -133,6 +133,31 @@ function isHomeMatch(event: Pick<AdminUpcomingEvent, "event_type" | "title" | "i
   return isMatchType(event.event_type) && resolveIsHome(event) === true;
 }
 
+// Retour de Cindy du 30/10 ("filtre Match officiel domicile / extérieur
+// séparé") : MATCH_HOME/MATCH_AWAY n'existent QUE dans "Filtrer par"
+// (event-type-filter-dropdown.tsx) -- jamais une vraie valeur d'event_type
+// en base, jamais proposées à la création d'un événement
+// (EVENT_TYPE_OPTIONS, create-event-form.tsx, intact). Seul MATCH officiel
+// est concerné (jamais amical, retour explicite de Cindy) -- gouverné par
+// l'une des deux selon resolveIsHome, "MATCH" seul ne peut donc plus
+// apparaître dans hiddenEventTypes à partir de maintenant. Un match dont
+// domicile/extérieur est inconnu (resolveIsHome renvoie null, cas
+// rarissime -- voir son commentaire) n'est jamais masqué par ce filtre :
+// mieux vaut un événement non catégorisable encore visible que disparu
+// sans explication.
+function isHiddenByTypeFilter(
+  event: Pick<AdminUpcomingEvent, "event_type" | "title" | "isHome" | "salle">,
+  hiddenTypes: Set<string>
+) {
+  if (event.event_type === "MATCH") {
+    const home = resolveIsHome(event);
+    if (home === true) return hiddenTypes.has("MATCH_HOME");
+    if (home === false) return hiddenTypes.has("MATCH_AWAY");
+    return false;
+  }
+  return hiddenTypes.has(event.event_type ?? "OTHER");
+}
+
 // "Besoin non pourvu" (retour de Cindy du 24/09, "avoir les besoins en
 // organisation en visuel sur le calendrier") : même prédicat que
 // event-volunteer-needs.ts (notifyNewVolunteerNeed, unresolvedNeeds) pour
@@ -1702,7 +1727,7 @@ export default function CalendarView({
     const skipHiddenTypesFilter = view === "officialMatches";
     const afterTypeFilter = skipHiddenTypesFilter
       ? localEvents
-      : localEvents.filter((e) => !hiddenEventTypes.has(e.event_type ?? "OTHER"));
+      : localEvents.filter((e) => !isHiddenByTypeFilter(e, hiddenEventTypes));
     const base = afterTypeFilter
       .filter(matchesTeamFilter)
       // "Domicile seulement" (retour de Cindy du 24/09) : ne garde que les
@@ -1724,7 +1749,7 @@ export default function CalendarView({
     if (!showClubMatches || !clubMatches) return base;
     const ownIds = new Set(localEvents.map((e) => e.id));
     const extra = clubMatches.filter(
-      (e) => !ownIds.has(e.id) && (skipHiddenTypesFilter || !hiddenEventTypes.has(e.event_type ?? "OTHER"))
+      (e) => !ownIds.has(e.id) && (skipHiddenTypesFilter || !isHiddenByTypeFilter(e, hiddenEventTypes))
     );
     return [...base, ...extra].sort(byStartTime);
     // matchesTeamFilter et byStartTime sont des fonctions déclarées dans le

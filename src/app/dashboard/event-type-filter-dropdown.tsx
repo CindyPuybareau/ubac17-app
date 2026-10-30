@@ -15,7 +15,21 @@ import { EVENT_TYPE_OPTIONS } from "./event-style";
 // proposer "Réunion Bureau" à la création) -- une Réunion reste donc
 // toujours visible sur le calendrier, plus jamais masquable par ce
 // filtre, sur les 3 espaces qui partagent ce composant.
-const FILTERABLE_TYPE_OPTIONS = EVENT_TYPE_OPTIONS.filter((t) => t.value !== "REUNION");
+//
+// Retour de Cindy du 30/10 ("match officiel domicile et un match officiel
+// extérieur séparés") : la case "Match officiel" éclatée en deux --
+// MATCH_HOME/MATCH_AWAY, qui n'existent QUE dans ce filtre (jamais une
+// vraie valeur event_type en base, voir isHiddenByTypeFilter/
+// calendar-view.tsx) -- plutôt que de réécrire toute la liste à la main,
+// ce qui dupliquerait les 4 autres libellés déjà dans EVENT_TYPE_OPTIONS.
+const FILTERABLE_TYPE_OPTIONS = EVENT_TYPE_OPTIONS.filter((t) => t.value !== "REUNION").flatMap((t) =>
+  t.value === "MATCH"
+    ? [
+        { value: "MATCH_HOME", label: "Match officiel (domicile)" },
+        { value: "MATCH_AWAY", label: "Match officiel (extérieur)" },
+      ]
+    : [t]
+);
 //
 // hiddenTypes plutôt que "selectedTypes" (à l'inverse de TeamFilterDropdown)
 // : la persistance côté compte (profiles.calendar_hidden_event_types)
