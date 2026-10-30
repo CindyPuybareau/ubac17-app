@@ -25,6 +25,7 @@ export default function SpaceDashboardSummary({
   summary,
   canManagePhoto,
   photoRestrictedTeamIds = [],
+  allTeamsForPhoto,
 }: {
   summary: SpaceDashboardSummaryData;
   // Bureau (toute équipe) ou coach de CETTE équipe précise (voir la policy
@@ -36,6 +37,14 @@ export default function SpaceDashboardSummary({
   // le bouton d'envoi de photo dessus, même quand canManagePhoto est vrai
   // pour le reste.
   photoRestrictedTeamIds?: string[];
+  // Retour de Cindy du 30/10 ("l'ajout de photo... depuis le tableau de
+  // bord, logo ubac en haut à droite") : le Bureau n'a jamais d'équipe
+  // active (dashboard club entier, voir effectiveTeamId plus bas) -- sans
+  // la liste de TOUTES les équipes du club ici, impossible de choisir à
+  // qui envoyer une photo. Coach/Famille ne passent rien (déjà scopés via
+  // activeTeam) : le sélecteur ci-dessous ne s'affiche que si cette prop
+  // est fournie.
+  allTeamsForPhoto?: { id: string; name: string | null; category: string | null; photoUrl: string | null }[];
 }) {
   const [filter, setFilter] = useState<MatchFilter>("official");
   // Retour de Cindy du 20/09 ("mes deux enfants sont mélangés... un coach
@@ -82,7 +91,17 @@ export default function SpaceDashboardSummary({
   // la photo tout juste envoyée pour l'équipe A "collait" aussi à l'équipe
   // B après un changement de pastille.
   const [uploadedPhotoByTeam, setUploadedPhotoByTeam] = useState<Record<string, string>>({});
-  const photoUrl = effectiveTeamId ? (uploadedPhotoByTeam[effectiveTeamId] ?? effectiveBasePhotoUrl) : null;
+  // Équipe choisie pour la photo, indépendamment de l'équipe active des KPI
+  // (activeTeam reste club-wide pour le Bureau, voir allTeamsForPhoto) --
+  // première équipe de la liste par défaut.
+  const [photoPickerTeamId, setPhotoPickerTeamId] = useState<string | undefined>(allTeamsForPhoto?.[0]?.id);
+  const photoTargetTeamId = allTeamsForPhoto
+    ? (allTeamsForPhoto.some((t) => t.id === photoPickerTeamId) ? photoPickerTeamId : allTeamsForPhoto[0]?.id) ?? null
+    : effectiveTeamId;
+  const photoTargetBaseUrl = allTeamsForPhoto
+    ? allTeamsForPhoto.find((t) => t.id === photoTargetTeamId)?.photoUrl ?? null
+    : effectiveBasePhotoUrl;
+  const photoUrl = photoTargetTeamId ? (uploadedPhotoByTeam[photoTargetTeamId] ?? photoTargetBaseUrl) : null;
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -101,7 +120,7 @@ export default function SpaceDashboardSummary({
   async function onPhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (!file || !effectiveTeamId) return;
+    if (!file || !photoTargetTeamId) return;
     if (!file.type.startsWith("image/")) {
       setUploadError("Choisis une image.");
       return;
@@ -111,7 +130,7 @@ export default function SpaceDashboardSummary({
     try {
       const { blob, ext } = await resizeImageForTeamPhoto(file);
       const supabase = createClient();
-      const path = `${effectiveTeamId}/photo.${ext}`;
+      const path = `${photoTargetTeamId}/photo.${ext}`;
       const { error: uploadErr } = await supabase.storage
         .from("team-photos")
         .upload(path, blob, { upsert: true, cacheControl: "3600", contentType: blob.type || file.type });
@@ -124,12 +143,12 @@ export default function SpaceDashboardSummary({
       const { error: updateErr } = await supabase
         .from("teams")
         .update({ photo_url: bustedUrl })
-        .eq("id", effectiveTeamId);
+        .eq("id", photoTargetTeamId);
       if (updateErr) {
         setUploadError("Enregistrement impossible, réessaie.");
         return;
       }
-      setUploadedPhotoByTeam((prev) => ({ ...prev, [effectiveTeamId]: bustedUrl }));
+      setUploadedPhotoByTeam((prev) => ({ ...prev, [photoTargetTeamId]: bustedUrl }));
     } catch {
       setUploadError("Image illisible, réessaie avec une autre photo.");
     } finally {
@@ -268,9 +287,26 @@ export default function SpaceDashboardSummary({
           "raisonnable" plutôt qu'un bandeau très large et écrasé (16/9
           sur toute la largeur du composant, essayé puis retiré) : moins
           de recadrage sur une photo de groupe déjà large. */}
+      {/* Retour de Cindy du 30/10 ("l'ajout de photo... depuis le tableau de
+          bord") : seul le Bureau reçoit allTeamsForPhoto (club entier, pas
+          d'équipe active) -- Coach/Famille restent scopés via activeTeam,
+          ce sélecteur n'apparaît jamais pour eux. Même pastilles que "Mes
+          Équipes" (team-selector-pills.tsx), caché tout seul s'il n'y a
+          qu'une équipe. */}
+      {allTeamsForPhoto && allTeamsForPhoto.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Photo de l&apos;équipe</p>
+          <TeamSelectorPills
+            teams={allTeamsForPhoto.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
+            activeId={photoTargetTeamId ?? undefined}
+            onSelect={setPhotoPickerTeamId}
+          />
+        </div>
+      )}
+
       <div className="flex flex-col gap-3 sm:flex-row">
         <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden rounded-2xl border border-zinc-100 bg-navy shadow-sm sm:w-[58%]">
-          {effectiveTeamId && photoUrl ? (
+          {photoTargetTeamId && photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={photoUrl} alt="" className="h-full w-full object-cover" />
           ) : (
@@ -283,7 +319,7 @@ export default function SpaceDashboardSummary({
               transparent... sans jamais recouvrir de visages") -- jamais
               au centre d'une photo de groupe, contrairement au repli
               ci-dessus (aucune photo, rien à recouvrir). */}
-          {effectiveTeamId && photoUrl && (
+          {photoTargetTeamId && photoUrl && (
             <Image
               src="/logo.png"
               alt=""
@@ -293,14 +329,17 @@ export default function SpaceDashboardSummary({
               className="absolute bottom-2 right-2 h-7 w-7 object-contain opacity-60"
             />
           )}
-          {canManagePhoto && effectiveTeamId && !photoRestrictedTeamIds.includes(effectiveTeamId) && (
+          {/* Retour de Cindy du 30/10 ("logo photo symbole en haut à
+              droite") : déplacé de bottom-2 left-2 vers top-2 right-2,
+              pour les 3 espaces (Bureau/Coach/Famille). */}
+          {canManagePhoto && photoTargetTeamId && !photoRestrictedTeamIds.includes(photoTargetTeamId) && (
             <>
               <button
                 type="button"
                 onClick={() => inputRef.current?.click()}
                 disabled={uploading}
                 title="Changer la photo de l'équipe"
-                className="absolute bottom-2 left-2 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-navy/70 text-white shadow-sm backdrop-blur-sm transition-colors hover:bg-navy-dark disabled:opacity-60"
+                className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-navy/70 text-white shadow-sm backdrop-blur-sm transition-colors hover:bg-navy-dark disabled:opacity-60"
               >
                 <Camera className="h-4 w-4" />
               </button>
