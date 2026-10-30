@@ -3220,11 +3220,31 @@ export default function CalendarView({
                 ""
               }
             />
-          ) : view === "results" || view === "officialMatches" ? (
+          ) : view === "results" ? (
+            // "results" (Famille/Enfant, "matchs officiels + amicaux, avec
+            // score") : jamais retouché par la fusion du 29/10 ci-dessous,
+            // toujours la carte allégée pour tout le monde -- comportement
+            // volontaire et inchangé.
             // gap-4 (voir plus haut, vue "list") : même filet contre le
             // fanion "Spécial" qui déborde au-dessus de sa carte.
             <div className="flex flex-col gap-4">
               {phasedSeasonListEvents.map((event) => renderResultCard(event))}
+            </div>
+          ) : view === "officialMatches" ? (
+            // Bug du 30/10 ("les présences ne s'affichent plus sur les
+            // matchs officiels à venir") : la fusion du 29/10 ("Résultats"
+            // retiré, regroupé sous "Matchs officiels") avait par erreur
+            // fait passer TOUTE la vue "officialMatches" par renderResultCard
+            // (sans présences/bouton, pensé pour un match déjà joué) --
+            // alors que ce commentaire au-dessus de forcedView dit bien
+            // "planning ET résultats réunis". Le choix doit se faire par
+            // ÉVÉNEMENT (déjà joué ou non), pas par vue entière -- même
+            // test (hasAlreadyStarted) que celui utilisé À L'INTÉRIEUR de
+            // renderResultCard pour afficher "Ajouter le score" ou non.
+            <div className="flex flex-col gap-4">
+              {phasedSeasonListEvents.map((event) =>
+                hasAlreadyStarted(event.start_time) ? renderResultCard(event) : renderEventCard(event)
+              )}
             </div>
           ) : (
             <div className="flex flex-col gap-4">
