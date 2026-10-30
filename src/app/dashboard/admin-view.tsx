@@ -289,7 +289,11 @@ export default function AdminView({
           {/* Retour de Cindy du 13/09 : résumé club entier, en premier --
               c'est désormais le vrai contenu de cet onglet, "Envois
               automatiques" reste en dessous, secondaire. */}
-          <SpaceDashboardSummary summary={dashboardSummary} canManagePhoto />
+          <SpaceDashboardSummary
+            summary={dashboardSummary}
+            canManagePhoto
+            allTeamsForPhoto={teams.map((t) => ({ id: t.id, name: t.name, category: t.category, photoUrl: t.photoUrl ?? null }))}
+          />
           <AutomationSettings settings={automationSettings} />
         </div>
       ),
