@@ -252,60 +252,66 @@ export type CalendarRsvpPlayer = {
 // renderEventCard) : lui seul a besoin d'un état local d'ouverture, et un
 // Hook ne peut pas vivre dans une fonction appelée comme un simple
 // callback de rendu.
-// Exportée le 14/09 (retour de Cindy, "duplication de l'événement à venir
-// dans le tableau de bord") : réutilisée telle quelle par DayEventCard
-// (week-strip-banner.tsx), jamais reconstruite à part.
-export function PresentPlayersList({
+// Audit du 29/10 ("rendre le code nickel") : PresentPlayersList/
+// AbsentPlayersList/PendingPlayersList étaient trois composants quasi
+// identiques (même état, même filtrage optimiste, même écriture sur
+// rsvps -- seuls la couleur, le libellé et la destination du clic
+// changeaient). Fusionnés ici en un seul composant interne paramétré par
+// `variant`, avec un wrapper exporté par ancien nom pour ne RIEN changer
+// côté appelants (DayEventCard/week-strip-banner.tsx, les 3 appels plus
+// bas dans ce fichier) : mêmes props, mêmes noms, mêmes classes CSS,
+// même comportement pixel pour pixel -- seule la façon dont c'est écrit
+// une fois en interne change.
+//
+// Historique conservé : `players` arrive déjà scopé par l'appelant
+// (page.tsx, ownTeamRoster/ownFamilyRoster), jamais l'effectif complet
+// d'un événement multi-équipes. `hiddenIds` fait le retrait optimiste au
+// clic (même esprit que rsvp-buttons.tsx) ; se réinitialise dès que
+// `players` change de référence (bug du 27/10, "je reclique sur Raphaël,
+// il ne s'affiche toujours pas absent" -- sans ce reset, un joueur sorti
+// PUIS revenu dans la liste restait caché pour de bon). `onStatusChange`
+// reste optionnel : sans lui (week-strip-banner.tsx), le retrait
+// optimiste local reste le seul filet, comme avant.
+type RsvpPlayersListVariant = "present" | "absent" | "pending";
+
+const RSVP_PLAYERS_LIST_VARIANTS: Record<
+  RsvpPlayersListVariant,
+  { iconColorClass: string; labelSingular: string; labelPlural: string }
+> = {
+  present: {
+    iconColorClass: "text-status-success",
+    labelSingular: "joueur/joueuse présent(e)",
+    labelPlural: "joueurs/joueuses présent(e)s",
+  },
+  absent: {
+    iconColorClass: "text-status-urgent-dark",
+    labelSingular: "joueur/joueuse absent(e)",
+    labelPlural: "joueurs/joueuses absent(e)s",
+  },
+  pending: {
+    iconColorClass: "text-zinc-500",
+    labelSingular: "joueur/joueuse en attente",
+    labelPlural: "joueurs/joueuses en attente",
+  },
+};
+
+type RsvpPlayersListPlayer = { id: string; firstName: string | null; lastName: string | null };
+
+function RsvpPlayersList({
+  variant,
   players,
   eventId,
   canManage = false,
   onStatusChange,
 }: {
-  players: {
-    id: string;
-    firstName: string | null;
-    lastName: string | null;
-  }[];
-  // Retour de Cindy du 27/10 ("le coach puisse le faire aussi, mais
-  // toujours en plus des familles, jamais à leur place") : coach/Bureau
-  // gagne un clic pour basculer un joueur en absent -- la famille garde
-  // toujours son propre bouton Présent/Absent (RsvpButtons/RsvpControl),
-  // inchangé. eventId/canManage optionnels : absents, la liste reste le
-  // simple affichage lecture seule d'avant (week-strip-banner.tsx côté
-  // famille, par ex.).
+  variant: RsvpPlayersListVariant;
+  players: RsvpPlayersListPlayer[];
   eventId?: string;
   canManage?: boolean;
-  // Retour de Cindy du 27/10 ("c'est long, ça ne s'affiche toujours pas") :
-  // laisser le seul rafraîchissement temps réel (realtime-sync.tsx, ~0,8s
-  // de débounce + un aller-retour serveur complet) déplacer le joueur vers
-  // "Absents" se sentait cassé. Permet à l'appelant (renderEventCard,
-  // calendar-view.tsx) de répercuter le geste tout de suite dans sa propre
-  // copie locale (updateLocalRsvpStatus, même mécanisme déjà utilisé par
-  // RsvpButtons) -- optionnel : sans lui (week-strip-banner.tsx, qui n'a
-  // pas cette copie locale), le retrait optimiste de CETTE liste (hiddenIds
-  // ci-dessous) reste le seul filet, comme avant.
-  onStatusChange?: (
-    player: { id: string; firstName: string | null; lastName: string | null },
-    previousStatus: string,
-    newStatus: string
-  ) => void;
+  onStatusChange?: (player: RsvpPlayersListPlayer, previousStatus: string, newStatus: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  // Retrait optimiste de la liste au clic, même esprit que rsvp-buttons.tsx
-  // -- le temps réel (realtime-sync.tsx, table rsvps) rafraîchit ensuite
-  // tout le reste de la page (compteurs, liste "Absents") sans qu'on ait
-  // besoin d'un router.refresh() ici.
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
-  // Bug constaté en direct le 27/10 ("je reclique sur Raphaël, il ne
-  // s'affiche toujours pas absent") : un joueur sorti PUIS revenu dans
-  // CETTE liste (ex. présent -> absent -> présent, deux clics rapprochés)
-  // restait caché -- `hiddenIds` ne s'effaçait jamais une fois posé.
-  // Dès que `players` change de référence (le geste du coach vient de se
-  // répercuter via onStatusChange/updateLocalRsvpStatus, ou un vrai
-  // rafraîchissement temps réel vient d'arriver), ce masquage local n'a
-  // plus de raison d'être : la prop fraîchement reçue fait à nouveau foi.
-  // Même schéma que `prevEventsProp` plus haut dans ce fichier (ajuster
-  // pendant le rendu, pas dans un effet, lint react-hooks/set-state-in-effect).
   const [prevPlayers, setPrevPlayers] = useState(players);
   if (players !== prevPlayers) {
     setPrevPlayers(players);
@@ -314,21 +320,18 @@ export function PresentPlayersList({
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function markAbsent(p: { id: string; firstName: string | null; lastName: string | null }) {
+  async function setStatus(p: RsvpPlayersListPlayer, previousStatus: string, newStatus: "PRESENT" | "ABSENT") {
     if (!eventId) return;
     // Optimiste avant l'écriture (même geste que rsvp-buttons.tsx) :
     // rollback des deux côtés si l'écriture échoue réellement.
     setHiddenIds((prev) => new Set(prev).add(p.id));
-    onStatusChange?.(p, "PRESENT", "ABSENT");
+    onStatusChange?.(p, previousStatus, newStatus);
     setSavingId(p.id);
     setError(null);
     const supabase = createClient();
     const { error: writeError } = await supabase
       .from("rsvps")
-      .upsert(
-        { event_id: eventId, player_id: p.id, status: "ABSENT" },
-        { onConflict: "event_id,player_id" }
-      );
+      .upsert({ event_id: eventId, player_id: p.id, status: newStatus }, { onConflict: "event_id,player_id" });
     setSavingId(null);
     if (writeError) {
       setError(writeError.message);
@@ -337,12 +340,15 @@ export function PresentPlayersList({
         next.delete(p.id);
         return next;
       });
-      onStatusChange?.(p, "ABSENT", "PRESENT");
+      onStatusChange?.(p, newStatus, previousStatus);
     }
   }
 
   const visiblePlayers = players.filter((p) => !hiddenIds.has(p.id));
   if (visiblePlayers.length === 0) return null;
+
+  const { iconColorClass, labelSingular, labelPlural } = RSVP_PLAYERS_LIST_VARIANTS[variant];
+  const isPresent = variant === "present";
 
   return (
     <div className="flex flex-col gap-1.5 border-t border-zinc-100 pt-2">
@@ -351,8 +357,8 @@ export function PresentPlayersList({
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:text-zinc-900"
       >
-        <Users className="h-3.5 w-3.5 shrink-0 text-status-success" />
-        {visiblePlayers.length} {visiblePlayers.length > 1 ? "joueurs/joueuses présent(e)s" : "joueur/joueuse présent(e)"}
+        <Users className={`h-3.5 w-3.5 shrink-0 ${iconColorClass}`} />
+        {visiblePlayers.length} {visiblePlayers.length > 1 ? labelPlural : labelSingular}
         {open ? (
           <ChevronUp className="h-3.5 w-3.5 shrink-0" />
         ) : (
@@ -361,15 +367,64 @@ export function PresentPlayersList({
       </button>
       {open && (
         <div className="flex flex-wrap gap-1.5">
-          {sortByLastName(visiblePlayers, (p) => p.lastName).map((p) =>
-            canManage && eventId ? (
+          {sortByLastName(visiblePlayers, (p) => p.lastName).map((p) => {
+            // "en attente" n'a pas de statut de départ (retour de Cindy du
+            // 27/10) -- deux petits boutons Présent/Absent par joueur, au
+            // lieu d'un seul clic qui togglerait vers une destination
+            // ambiguë comme pour present/absent ci-dessous.
+            if (variant === "pending") {
+              return canManage && eventId ? (
+                <span
+                  key={p.id}
+                  className="inline-flex items-center gap-1 rounded-full bg-zinc-100 py-1 pl-2.5 pr-1 text-xs font-medium text-zinc-600"
+                >
+                  {formatFirstName(p.firstName)}{" "}
+                  <span className="font-bold uppercase">{formatLastName(p.lastName)}</span>
+                  <button
+                    type="button"
+                    disabled={savingId === p.id}
+                    onClick={() => setStatus(p, "PENDING", "PRESENT")}
+                    title="Marquer présent"
+                    className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full text-status-success hover:bg-status-success/20 disabled:opacity-50"
+                  >
+                    <Check className="h-3 w-3 shrink-0" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={savingId === p.id}
+                    onClick={() => setStatus(p, "PENDING", "ABSENT")}
+                    title="Marquer absent"
+                    className="flex h-4 w-4 items-center justify-center rounded-full text-status-urgent-dark hover:bg-status-urgent/20 disabled:opacity-50"
+                  >
+                    <X className="h-3 w-3 shrink-0" />
+                  </button>
+                </span>
+              ) : (
+                <span
+                  key={p.id}
+                  className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-600"
+                >
+                  {formatFirstName(p.firstName)}{" "}
+                  <span className="font-bold uppercase">{formatLastName(p.lastName)}</span>
+                </span>
+              );
+            }
+
+            const colorClass = isPresent
+              ? "bg-status-success/10 text-status-success"
+              : "bg-status-urgent/10 text-status-urgent-dark";
+            const hoverClass = isPresent ? "hover:bg-status-success/20" : "hover:bg-status-urgent/20";
+
+            return canManage && eventId ? (
               <button
                 key={p.id}
                 type="button"
                 disabled={savingId === p.id}
-                onClick={() => markAbsent(p)}
-                title="Marquer absent"
-                className="inline-flex items-center gap-1 rounded-full bg-status-success/10 px-2.5 py-1 text-xs font-medium text-status-success transition-opacity hover:bg-status-success/20 disabled:opacity-50"
+                onClick={() =>
+                  setStatus(p, isPresent ? "PRESENT" : "ABSENT", isPresent ? "ABSENT" : "PRESENT")
+                }
+                title={isPresent ? "Marquer absent" : "Marquer présent"}
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-opacity disabled:opacity-50 ${colorClass} ${hoverClass}`}
               >
                 {formatFirstName(p.firstName)}{" "}
                 <span className="font-bold uppercase">{formatLastName(p.lastName)}</span>
@@ -377,282 +432,38 @@ export function PresentPlayersList({
             ) : (
               <span
                 key={p.id}
-                className="inline-flex items-center gap-1 rounded-full bg-status-success/10 px-2.5 py-1 text-xs font-medium text-status-success"
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${colorClass}`}
               >
                 {formatFirstName(p.firstName)}{" "}
                 <span className="font-bold uppercase">{formatLastName(p.lastName)}</span>
               </span>
-            )
-          )}
+            );
+          })}
         </div>
       )}
       {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   );
+}
+
+// Exportée le 14/09 (retour de Cindy, "duplication de l'événement à venir
+// dans le tableau de bord") : réutilisée telle quelle par DayEventCard
+// (week-strip-banner.tsx), jamais reconstruite à part.
+export function PresentPlayersList(props: Omit<Parameters<typeof RsvpPlayersList>[0], "variant">) {
+  return <RsvpPlayersList variant="present" {...props} />;
 }
 
 // Retour de Cindy du 11/09 ("qui est absent ?") : même principe que
-// PresentPlayersList ci-dessus (repliée par défaut, dépliable), en rouge
-// (status-urgent) plutôt qu'en émeraude -- même charte que le badge
-// "absent" du résumé juste au-dessus sur la carte. `players` arrive déjà
-// scopé par l'appelant (page.tsx, ownTeamRoster/ownFamilyRoster) : jamais
-// l'effectif complet d'un événement multi-équipes, seulement les équipes
-// que ce viewer a le droit de voir.
-// Exportée le 14/09, même raison que PresentPlayersList ci-dessus.
-export function AbsentPlayersList({
-  players,
-  eventId,
-  canManage = false,
-  onStatusChange,
-}: {
-  players: { id: string; firstName: string | null; lastName: string | null }[];
-  // Même ajout que PresentPlayersList ci-dessus, symétrique : un clic
-  // coach/Bureau bascule en présent, toujours en plus (jamais à la place)
-  // du propre bouton de la famille.
-  eventId?: string;
-  canManage?: boolean;
-  // Même raison que PresentPlayersList ci-dessus.
-  onStatusChange?: (
-    player: { id: string; firstName: string | null; lastName: string | null },
-    previousStatus: string,
-    newStatus: string
-  ) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
-  // Bug constaté en direct le 27/10 ("je reclique sur Raphaël, il ne
-  // s'affiche toujours pas absent") : un joueur sorti PUIS revenu dans
-  // CETTE liste (ex. présent -> absent -> présent, deux clics rapprochés)
-  // restait caché -- `hiddenIds` ne s'effaçait jamais une fois posé.
-  // Dès que `players` change de référence (le geste du coach vient de se
-  // répercuter via onStatusChange/updateLocalRsvpStatus, ou un vrai
-  // rafraîchissement temps réel vient d'arriver), ce masquage local n'a
-  // plus de raison d'être : la prop fraîchement reçue fait à nouveau foi.
-  // Même schéma que `prevEventsProp` plus haut dans ce fichier (ajuster
-  // pendant le rendu, pas dans un effet, lint react-hooks/set-state-in-effect).
-  const [prevPlayers, setPrevPlayers] = useState(players);
-  if (players !== prevPlayers) {
-    setPrevPlayers(players);
-    setHiddenIds(new Set());
-  }
-  const [savingId, setSavingId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  async function markPresent(p: { id: string; firstName: string | null; lastName: string | null }) {
-    if (!eventId) return;
-    setHiddenIds((prev) => new Set(prev).add(p.id));
-    onStatusChange?.(p, "ABSENT", "PRESENT");
-    setSavingId(p.id);
-    setError(null);
-    const supabase = createClient();
-    const { error: writeError } = await supabase
-      .from("rsvps")
-      .upsert(
-        { event_id: eventId, player_id: p.id, status: "PRESENT" },
-        { onConflict: "event_id,player_id" }
-      );
-    setSavingId(null);
-    if (writeError) {
-      setError(writeError.message);
-      setHiddenIds((prev) => {
-        const next = new Set(prev);
-        next.delete(p.id);
-        return next;
-      });
-      onStatusChange?.(p, "PRESENT", "ABSENT");
-    }
-  }
-
-  const visiblePlayers = players.filter((p) => !hiddenIds.has(p.id));
-  if (visiblePlayers.length === 0) return null;
-
-  return (
-    <div className="flex flex-col gap-1.5 border-t border-zinc-100 pt-2">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:text-zinc-900"
-      >
-        <Users className="h-3.5 w-3.5 shrink-0 text-status-urgent-dark" />
-        {visiblePlayers.length} {visiblePlayers.length > 1 ? "joueurs/joueuses absent(e)s" : "joueur/joueuse absent(e)"}
-        {open ? (
-          <ChevronUp className="h-3.5 w-3.5 shrink-0" />
-        ) : (
-          <ChevronDown className="h-3.5 w-3.5 shrink-0" />
-        )}
-      </button>
-      {open && (
-        <div className="flex flex-wrap gap-1.5">
-          {sortByLastName(visiblePlayers, (p) => p.lastName).map((p) =>
-            canManage && eventId ? (
-              <button
-                key={p.id}
-                type="button"
-                disabled={savingId === p.id}
-                onClick={() => markPresent(p)}
-                title="Marquer présent"
-                className="inline-flex items-center gap-1 rounded-full bg-status-urgent/10 px-2.5 py-1 text-xs font-medium text-status-urgent-dark transition-opacity hover:bg-status-urgent/20 disabled:opacity-50"
-              >
-                {formatFirstName(p.firstName)}{" "}
-                <span className="font-bold uppercase">{formatLastName(p.lastName)}</span>
-              </button>
-            ) : (
-              <span
-                key={p.id}
-                className="inline-flex items-center gap-1 rounded-full bg-status-urgent/10 px-2.5 py-1 text-xs font-medium text-status-urgent-dark"
-              >
-                {formatFirstName(p.firstName)}{" "}
-                <span className="font-bold uppercase">{formatLastName(p.lastName)}</span>
-              </span>
-            )
-          )}
-        </div>
-      )}
-      {error && <p className="text-xs text-red-600">{error}</p>}
-    </div>
-  );
+// PresentPlayersList ci-dessus, en rouge (status-urgent) plutôt qu'en
+// émeraude.
+export function AbsentPlayersList(props: Omit<Parameters<typeof RsvpPlayersList>[0], "variant">) {
+  return <RsvpPlayersList variant="absent" {...props} />;
 }
 
-// Retour de Cindy du 18/09 ("voir aussi les joueurs en attente, partout où
-// c'est nécessaire") : même principe que PresentPlayersList/
-// AbsentPlayersList ci-dessus, en gris neutre (zinc) plutôt qu'une couleur
-// sémantique -- ne pas répondre n'est ni "bien" (vert) ni "mal" (rouge),
-// juste pas encore fait. Même teinte que le badge "X en attente" du
-// résumé juste au-dessus sur la carte.
-// Exportée, même raison que PresentPlayersList/AbsentPlayersList ci-dessus
-// (réutilisée par DayEventCard, week-strip-banner.tsx).
-export function PendingPlayersList({
-  players,
-  eventId,
-  canManage = false,
-  onStatusChange,
-}: {
-  players: { id: string; firstName: string | null; lastName: string | null }[];
-  // Retour de Cindy du 27/10 ("la plupart des joueurs sont en attente, pas
-  // déjà présents/absents") : contrairement à Present/AbsentPlayersList (un
-  // seul clic suffit, le statut opposé est déjà connu), "en attente" n'a
-  // pas de statut de départ -- deux petits boutons Présent/Absent par
-  // joueur, au lieu d'un seul clic qui togglerait vers une destination
-  // ambiguë.
-  eventId?: string;
-  canManage?: boolean;
-  // Même raison que PresentPlayersList ci-dessus.
-  onStatusChange?: (
-    player: { id: string; firstName: string | null; lastName: string | null },
-    previousStatus: string,
-    newStatus: string
-  ) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
-  // Bug constaté en direct le 27/10 ("je reclique sur Raphaël, il ne
-  // s'affiche toujours pas absent") : un joueur sorti PUIS revenu dans
-  // CETTE liste (ex. présent -> absent -> présent, deux clics rapprochés)
-  // restait caché -- `hiddenIds` ne s'effaçait jamais une fois posé.
-  // Dès que `players` change de référence (le geste du coach vient de se
-  // répercuter via onStatusChange/updateLocalRsvpStatus, ou un vrai
-  // rafraîchissement temps réel vient d'arriver), ce masquage local n'a
-  // plus de raison d'être : la prop fraîchement reçue fait à nouveau foi.
-  // Même schéma que `prevEventsProp` plus haut dans ce fichier (ajuster
-  // pendant le rendu, pas dans un effet, lint react-hooks/set-state-in-effect).
-  const [prevPlayers, setPrevPlayers] = useState(players);
-  if (players !== prevPlayers) {
-    setPrevPlayers(players);
-    setHiddenIds(new Set());
-  }
-  const [savingId, setSavingId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  async function setStatus(
-    p: { id: string; firstName: string | null; lastName: string | null },
-    status: "PRESENT" | "ABSENT"
-  ) {
-    if (!eventId) return;
-    setHiddenIds((prev) => new Set(prev).add(p.id));
-    onStatusChange?.(p, "PENDING", status);
-    setSavingId(p.id);
-    setError(null);
-    const supabase = createClient();
-    const { error: writeError } = await supabase
-      .from("rsvps")
-      .upsert(
-        { event_id: eventId, player_id: p.id, status },
-        { onConflict: "event_id,player_id" }
-      );
-    setSavingId(null);
-    if (writeError) {
-      setError(writeError.message);
-      setHiddenIds((prev) => {
-        const next = new Set(prev);
-        next.delete(p.id);
-        return next;
-      });
-      onStatusChange?.(p, status, "PENDING");
-    }
-  }
-
-  const visiblePlayers = players.filter((p) => !hiddenIds.has(p.id));
-  if (visiblePlayers.length === 0) return null;
-
-  return (
-    <div className="flex flex-col gap-1.5 border-t border-zinc-100 pt-2">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:text-zinc-900"
-      >
-        <Users className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
-        {visiblePlayers.length} {visiblePlayers.length > 1 ? "joueurs/joueuses en attente" : "joueur/joueuse en attente"}
-        {open ? (
-          <ChevronUp className="h-3.5 w-3.5 shrink-0" />
-        ) : (
-          <ChevronDown className="h-3.5 w-3.5 shrink-0" />
-        )}
-      </button>
-      {open && (
-        <div className="flex flex-wrap gap-1.5">
-          {sortByLastName(visiblePlayers, (p) => p.lastName).map((p) =>
-            canManage && eventId ? (
-              <span
-                key={p.id}
-                className="inline-flex items-center gap-1 rounded-full bg-zinc-100 py-1 pl-2.5 pr-1 text-xs font-medium text-zinc-600"
-              >
-                {formatFirstName(p.firstName)}{" "}
-                <span className="font-bold uppercase">{formatLastName(p.lastName)}</span>
-                <button
-                  type="button"
-                  disabled={savingId === p.id}
-                  onClick={() => setStatus(p, "PRESENT")}
-                  title="Marquer présent"
-                  className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full text-status-success hover:bg-status-success/20 disabled:opacity-50"
-                >
-                  <Check className="h-3 w-3 shrink-0" />
-                </button>
-                <button
-                  type="button"
-                  disabled={savingId === p.id}
-                  onClick={() => setStatus(p, "ABSENT")}
-                  title="Marquer absent"
-                  className="flex h-4 w-4 items-center justify-center rounded-full text-status-urgent-dark hover:bg-status-urgent/20 disabled:opacity-50"
-                >
-                  <X className="h-3 w-3 shrink-0" />
-                </button>
-              </span>
-            ) : (
-              <span
-                key={p.id}
-                className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-600"
-              >
-                {formatFirstName(p.firstName)}{" "}
-                <span className="font-bold uppercase">{formatLastName(p.lastName)}</span>
-              </span>
-            )
-          )}
-        </div>
-      )}
-      {error && <p className="text-xs text-red-600">{error}</p>}
-    </div>
-  );
+// Retour de Cindy du 18/09 ("voir aussi les joueurs en attente") : même
+// principe, en gris neutre (zinc) plutôt qu'une couleur sémantique.
+export function PendingPlayersList(props: Omit<Parameters<typeof RsvpPlayersList>[0], "variant">) {
+  return <RsvpPlayersList variant="pending" {...props} />;
 }
 
 // Même principe que PresentPlayersList ci-dessus, en ambre plutôt qu'en
