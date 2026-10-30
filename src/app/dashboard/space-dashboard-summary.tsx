@@ -309,6 +309,7 @@ export default function SpaceDashboardSummary({
             options={allTeamsForPhoto.map((t) => ({ value: t.id, label: teamLabel(t) }))}
             value={photoTargetTeamId ?? allTeamsForPhoto[0].id}
             onChange={setPhotoPickerTeamId}
+            icon={Camera}
           />
         </div>
       )}
