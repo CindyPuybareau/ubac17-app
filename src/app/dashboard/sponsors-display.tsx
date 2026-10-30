@@ -13,7 +13,11 @@ export default function SponsorsDisplay({ sponsors }: { sponsors: SponsorDisplay
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
       <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-        <Handshake className="h-3.5 w-3.5" />
+        {/* Retour de Cindy du 30/10 ("le symbole de sponsors... en bleu
+            ubac") : seule l'icône, pas le libellé -- reste en text-zinc-400
+            comme les autres en-têtes de section (ex. "Nos sponsors" des
+            autres espaces). */}
+        <Handshake className="h-3.5 w-3.5 text-ubac-blue" />
         Nos sponsors
       </p>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
