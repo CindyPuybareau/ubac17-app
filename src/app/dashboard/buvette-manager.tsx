@@ -205,37 +205,43 @@ export default function BuvetteManager({ buvette }: { buvette: AdminBuvette[] })
             return (
               <div
                 key={b.id}
-                className="rounded-2xl border border-zinc-100 bg-white p-3.5 shadow-sm"
+                className="relative rounded-2xl border border-zinc-100 bg-white p-3.5 pr-20 shadow-sm"
               >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex min-w-0 flex-col">
-                    <span className="truncate text-sm font-semibold text-zinc-900">
-                      {b.buvetteDate ? formatLocalDateFr(b.buvetteDate) : ""}
-                    </span>
-                    {b.notes && <span className="text-xs text-zinc-500">{b.notes}</span>}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <span className="rounded-full bg-navy/10 px-2.5 py-0.5 text-xs font-bold text-navy">
-                      {formatAmount(entryTotal(b))}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => openEdit(b)}
-                      title="Modifier"
-                      className="flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeleteTarget(b)}
-                      title="Supprimer"
-                      className="flex h-7 w-7 items-center justify-center rounded-full text-red-400 hover:bg-red-50 hover:text-red-600"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
+                {/* Retour de Cindy du 30/10 ("les montants sont un coup à
+                    gauche un coup à droite... modifier/supprimer en haut à
+                    droite de la carte") : Modifier/Supprimer toujours au
+                    même endroit (coin haut-droit, position absolue), plus
+                    jamais entraînés par flex-wrap selon la longueur de la
+                    note du comptable -- pr-20 réserve leur place sur toute
+                    la hauteur de la carte. Date/note/montant empilés en
+                    dessous, chacun sur sa propre ligne, toujours alignés à
+                    gauche quelle que soit la longueur de la note. */}
+                <div className="absolute right-3 top-3 flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => openEdit(b)}
+                    title="Modifier"
+                    className="flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteTarget(b)}
+                    title="Supprimer"
+                    className="flex h-7 w-7 items-center justify-center rounded-full text-red-400 hover:bg-red-50 hover:text-red-600"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
                 </div>
+
+                <span className="block text-sm font-semibold text-zinc-900">
+                  {b.buvetteDate ? formatLocalDateFr(b.buvetteDate) : ""}
+                </span>
+                {b.notes && <p className="mt-0.5 text-xs text-zinc-500">{b.notes}</p>}
+                <span className="mt-2 inline-block rounded-full bg-navy/10 px-2.5 py-0.5 text-xs font-bold text-navy">
+                  {formatAmount(entryTotal(b))}
+                </span>
 
                 {/* Retour de Cindy du 30/10 ("la décomposition peut être
                     vue en ouvrant le détail") : même patron que
