@@ -77,7 +77,7 @@ import {
 // seul endroit (un oubli sur l'une des 8 copies faisait silencieusement
 // diverger ce qu'un rôle voit par rapport à un autre, voir CLAUDE.md §3).
 const EVENTS_SELECT_COLUMNS =
-  "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, ffbb_phase, series_id, notes, attendance_requested_at, cancelled_at, cancelled_reason, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, teams(id, name, category), collectes(id, prix, payment_link)" as const;
+  "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, ffbb_phase, series_id, notes, attendance_requested_at, cancelled_at, cancelled_reason, team_score, opponent_score, emarque_code, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, teams(id, name, category), collectes(id, prix, payment_link)" as const;
 
 type PlayerRow = {
   id: string;
@@ -485,6 +485,12 @@ export type AdminUpcomingEvent = {
   // deux-là disent qui a gagné.
   teamScore: number | null;
   opponentScore: number | null;
+  // Retour du comptable de Cindy (30/10) : code e-Marque à noter pour
+  // chaque match officiel (MATCH, jamais amical) à domicile -- renseigné
+  // par le Bureau seul (match-emarque-code.tsx), jamais Coach/Famille/
+  // Enfant (calendar-view.tsx, gaté sur allowClubWide comme le reste des
+  // écrans Bureau-only).
+  emarqueCode: string | null;
   location: string | null;
   salle: string | null;
   start_time: string;
@@ -2712,6 +2718,7 @@ export default async function DashboardPage({
         attendanceRequestedAt: e.attendance_requested_at ?? null,
         cancelledAt: e.cancelled_at ?? null,
         cancelledReason: e.cancelled_reason ?? null,
+        emarqueCode: e.emarque_code ?? null,
         teamScore: e.team_score ?? null,
         opponentScore: e.opponent_score ?? null,
         location: e.location,
@@ -3765,6 +3772,7 @@ export default async function DashboardPage({
         attendanceRequestedAt: e.attendance_requested_at ?? null,
         cancelledAt: e.cancelled_at ?? null,
         cancelledReason: e.cancelled_reason ?? null,
+        emarqueCode: e.emarque_code ?? null,
         teamScore: e.team_score ?? null,
         opponentScore: e.opponent_score ?? null,
         location: e.location,
@@ -4507,6 +4515,7 @@ export default async function DashboardPage({
         attendanceRequestedAt: e.attendance_requested_at ?? null,
         cancelledAt: e.cancelled_at ?? null,
         cancelledReason: e.cancelled_reason ?? null,
+        emarqueCode: e.emarque_code ?? null,
         teamScore: e.team_score ?? null,
         opponentScore: e.opponent_score ?? null,
         location: e.location,

@@ -49,6 +49,7 @@ import RsvpButtons from "./rsvp-buttons";
 import ItineraryButton from "./itinerary-button";
 import MatchTasksPanel from "./match-tasks-panel";
 import MatchScore from "./match-score";
+import MatchEmarqueCode from "./match-emarque-code";
 import TeamSelectorPills from "./team-selector-pills";
 import TeamFilterDropdown from "./team-filter-dropdown";
 import EventTypeFilterDropdown from "./event-type-filter-dropdown";
@@ -876,6 +877,12 @@ export default function CalendarView({
     );
   }
 
+  // Même geste optimiste que ci-dessus, pour la saisie du code e-Marque
+  // (match-emarque-code.tsx, retour du comptable de Cindy du 30/10).
+  function updateLocalEventEmarqueCode(eventId: string, emarqueCode: string | null) {
+    setLocalEvents((prev) => prev.map((e) => (e.id === eventId ? { ...e, emarqueCode } : e)));
+  }
+
   const today = new Date();
   const todayKey = toKey(today);
   const router = useRouter();
@@ -1000,7 +1007,7 @@ export default function CalendarView({
     const { data, error } = await supabase
       .from("events")
       .select(
-        "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, ffbb_phase, series_id, notes, team_score, opponent_score, cancelled_at, cancelled_reason, team_id, teams(name)"
+        "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, ffbb_phase, series_id, notes, team_score, opponent_score, emarque_code, cancelled_at, cancelled_reason, team_id, teams(name)"
       )
       .eq("event_type", "MATCH")
       .gte("start_time", windowStart)
@@ -1022,6 +1029,7 @@ export default function CalendarView({
           attendanceRequestedAt: null,
           teamScore: e.team_score,
           opponentScore: e.opponent_score,
+          emarqueCode: e.emarque_code,
           cancelledAt: e.cancelled_at,
           cancelledReason: e.cancelled_reason,
           location: e.location,
@@ -2114,6 +2122,19 @@ export default function CalendarView({
                     updateLocalEventScore(event.id, teamScore, opponentScore)
                   }
                 />
+                {/* Retour du comptable de Cindy (30/10) : code e-Marque,
+                    matchs OFFICIELS (jamais amicaux, isMatchType inclut les
+                    deux) à domicile uniquement -- saisi par le Bureau
+                    (allowClubWide), visible en lecture seule pour
+                    Coach/Famille si déjà renseigné (utile sur place). */}
+                {event.event_type === "MATCH" && resolveIsHome(event) === true && (
+                  <MatchEmarqueCode
+                    eventId={event.id}
+                    code={event.emarqueCode}
+                    canEdit={allowClubWide}
+                    onSaved={(code) => updateLocalEventEmarqueCode(event.id, code)}
+                  />
+                )}
               </>
             ) : (
               <span className="font-semibold text-zinc-900">
@@ -2827,6 +2848,14 @@ export default function CalendarView({
           <span className="w-fit rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-semibold text-zinc-400">
             À venir
           </span>
+        )}
+        {event.event_type === "MATCH" && resolveIsHome(event) === true && (
+          <MatchEmarqueCode
+            eventId={event.id}
+            code={event.emarqueCode}
+            canEdit={allowClubWide}
+            onSaved={(code) => updateLocalEventEmarqueCode(event.id, code)}
+          />
         )}
       </div>
     );
