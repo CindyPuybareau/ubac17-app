@@ -8,6 +8,8 @@ import { resizeImageForTeamPhoto } from "@/lib/image-resize";
 import AnimatedNumber from "./animated-number";
 import { DayEventCard, type WeekStripEvent } from "./week-strip-banner";
 import TeamSelectorPills from "./team-selector-pills";
+import SelectDropdown from "./select-dropdown";
+import { teamLabel } from "@/lib/teams";
 import FfbbRankingTable from "./ffbb-ranking-table";
 import type { SpaceDashboardSummary as SpaceDashboardSummaryData } from "@/lib/space-dashboard";
 
@@ -288,18 +290,25 @@ export default function SpaceDashboardSummary({
           sur toute la largeur du composant, essayé puis retiré) : moins
           de recadrage sur une photo de groupe déjà large. */}
       {/* Retour de Cindy du 30/10 ("l'ajout de photo... depuis le tableau de
-          bord") : seul le Bureau reçoit allTeamsForPhoto (club entier, pas
-          d'équipe active) -- Coach/Famille restent scopés via activeTeam,
-          ce sélecteur n'apparaît jamais pour eux. Même pastilles que "Mes
-          Équipes" (team-selector-pills.tsx), caché tout seul s'il n'y a
-          qu'une équipe. */}
+          bord", puis "c'est lourd tous ces noms d'équipe" en pastilles vu
+          le nombre d'équipes du club) : seul le Bureau reçoit
+          allTeamsForPhoto (club entier, pas d'équipe active) -- Coach/
+          Famille restent scopés via activeTeam, ce sélecteur n'apparaît
+          jamais pour eux. Menu déroulant à sélection unique
+          (select-dropdown.tsx), même composant/habillage que "Toutes les
+          équipes" du Calendrier (TeamFilterDropdown) -- mais celui-là est
+          à sélection MULTIPLE (filtre), alors qu'ici une seule équipe à la
+          fois a un sens (une photo par équipe) : SelectDropdown est son
+          pendant à sélection unique, déjà utilisé ailleurs (cotisation-
+          participants-table.tsx, members-table.tsx) plutôt qu'en réinventer
+          un troisième. */}
       {allTeamsForPhoto && allTeamsForPhoto.length > 0 && (
         <div className="flex flex-col gap-1.5">
           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Photo de l&apos;équipe</p>
-          <TeamSelectorPills
-            teams={allTeamsForPhoto.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
-            activeId={photoTargetTeamId ?? undefined}
-            onSelect={setPhotoPickerTeamId}
+          <SelectDropdown
+            options={allTeamsForPhoto.map((t) => ({ value: t.id, label: teamLabel(t) }))}
+            value={photoTargetTeamId ?? allTeamsForPhoto[0].id}
+            onChange={setPhotoPickerTeamId}
           />
         </div>
       )}
