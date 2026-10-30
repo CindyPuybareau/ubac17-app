@@ -1282,13 +1282,20 @@ export default function CalendarView({
   // plein écran depuis le 28/08 donc ces classes n'ont plus d'effet sur
   // LUI, mais gardées pour ne rien changer au reste du contenu de la carte.
   function eventCardShellClass(
-    event: { event_type: string | null },
+    event: { event_type: string | null; cancelledAt?: string | null },
     style: { border: string },
     variant: "upcoming" | "result"
   ) {
     const isTournament = event.event_type === "TOURNAMENT";
     const prefix =
       variant === "result" ? "relative overflow-hidden " : isTournament ? "relative " : "";
+    // Retour de Cindy du 30/10 ("plus visible au niveau des cartes, en
+    // rouge") : prend le pas sur tournoi/match/entraînement -- "ça
+    // n'a plus lieu" est l'info la plus importante de la carte, avant
+    // même son type.
+    if (event.cancelledAt) {
+      return `${prefix}rounded-2xl border border-status-urgent/30 bg-status-urgent/5 p-4 shadow-sm border-l-4 border-l-status-urgent`;
+    }
     if (isTournament) {
       return `${prefix}rounded-2xl border-2 border-dashed border-ubac-yellow bg-white p-4 shadow-sm`;
     }
@@ -1461,8 +1468,45 @@ export default function CalendarView({
     setCancelEventTarget(null);
     setCancelError(null);
     const cancelledAt = new Date().toISOString();
+    // Retour de Cindy du 30/10 ("tous les joueurs concernés passent en
+    // absents") : présents + absents + en attente réunis -- tout le monde
+    // qui pouvait répondre à CET événement, peu importe sa réponse
+    // précédente (un "présent" sur un événement qui n'a plus lieu n'a plus
+    // de sens). Dédoublonné par id : un joueur d'une équipe sœur/multi-
+    // cible pourrait en théorie apparaître dans deux de ces listes.
+    const concernedPlayers = Array.from(
+      new Map(
+        [...(event.presentPlayers ?? []), ...(event.absentPlayers ?? []), ...(event.pendingPlayers ?? [])].map(
+          (p) => [p.id, p]
+        )
+      ).values()
+    );
     setLocalEvents((prev) =>
-      prev.map((e) => (e.id === event.id ? { ...e, cancelledAt, cancelledReason: reason } : e))
+      prev.map((e) =>
+        e.id === event.id
+          ? {
+              ...e,
+              cancelledAt,
+              cancelledReason: reason,
+              presentPlayers: [],
+              pendingPlayers: [],
+              absentPlayers: concernedPlayers,
+              // Oublié au premier passage (constaté en direct, 30/10) :
+              // "X présents/Y absents/Z en attente" tout en haut de la
+              // carte vient de CE compteur séparé, pas des listes
+              // nominatives ci-dessus (lui reste sur l'effectif complet de
+              // l'événement, voir son commentaire sur AdminUpcomingEvent) --
+              // sans lui, le résumé affichait encore l'ancien total pendant
+              // que la liste "Absent(e)s" dépliée, elle, était déjà à jour.
+              rsvpCounts: {
+                present: 0,
+                absent: e.rsvpCounts.present + e.rsvpCounts.absent + e.rsvpCounts.pending,
+                late: e.rsvpCounts.late,
+                pending: 0,
+              },
+            }
+          : e
+      )
     );
 
     const when = new Date(event.start_time).toLocaleDateString("fr-FR", {
@@ -1488,6 +1532,17 @@ export default function CalendarView({
       .eq("id", event.id);
     if (cancelEventError) {
       console.error("[calendar-view] annulation de l'événement échouée:", cancelEventError);
+    }
+    // Un seul envoi groupé pour tout le monde (jamais une boucle, voir
+    // CLAUDE.md §6) -- même mécanisme d'upsert que rsvp-buttons.tsx.
+    if (concernedPlayers.length > 0) {
+      const { error: rsvpError } = await supabase.from("rsvps").upsert(
+        concernedPlayers.map((p) => ({ event_id: event.id, player_id: p.id, status: "ABSENT" })),
+        { onConflict: "event_id,player_id" }
+      );
+      if (rsvpError) {
+        console.error("[calendar-view] passage en absent des joueurs concernés échoué:", rsvpError);
+      }
     }
     setCancelReasonInput("");
   }
