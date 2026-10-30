@@ -119,6 +119,7 @@ export type AdminBuvette = {
   buvetteDate: string | null;
   cardAmount: number;
   cashAmount: number;
+  otherAmount: number;
   notes: string | null;
 };
 
@@ -1889,7 +1890,7 @@ export default async function DashboardPage({
         () =>
           supabase
             .from("buvette_entries")
-            .select("id, buvette_date, card_amount, cash_amount, notes")
+            .select("id, buvette_date, card_amount, cash_amount, other_amount, notes")
             .order("buvette_date", { ascending: false }),
         // Profils d'accès sur-mesure (retour de Cindy du 05/09) : liste des
         // profils et de leurs briques, pour l'écran de gestion et pour
@@ -2650,6 +2651,7 @@ export default async function DashboardPage({
       buvetteDate: b.buvette_date,
       cardAmount: b.card_amount,
       cashAmount: b.cash_amount,
+      otherAmount: b.other_amount,
       notes: b.notes,
     }));
 
