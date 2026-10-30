@@ -287,7 +287,7 @@ export default function BureauDashboard({
   // Retour de Cindy du 25/10 ("une carte Total Buvette, juste avant Total
   // pénalités") -- même somme que le résumé en haut de buvette-manager.tsx,
   // réaffichée ici sans requête de plus.
-  const buvetteTotal = buvette.reduce((sum, b) => sum + b.cardAmount + b.cashAmount, 0);
+  const buvetteTotal = buvette.reduce((sum, b) => sum + b.cardAmount + b.cashAmount + b.otherAmount, 0);
 
   const activeMembers = members.filter((m) => !m.archivedAt).length;
 

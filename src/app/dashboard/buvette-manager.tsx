@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Coffee, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Coffee, Pencil, Plus, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatLocalDateFr } from "@/lib/local-date";
 import { formatAmount } from "./cotisation-shared";
@@ -13,6 +13,7 @@ type BuvetteForm = {
   buvetteDate: string;
   cardAmount: string;
   cashAmount: string;
+  otherAmount: string;
   notes: string;
 };
 
@@ -24,6 +25,7 @@ const EMPTY_FORM: BuvetteForm = {
   buvetteDate: todayIso(),
   cardAmount: "",
   cashAmount: "",
+  otherAmount: "",
   notes: "",
 };
 
@@ -32,8 +34,13 @@ function toForm(b: AdminBuvette): BuvetteForm {
     buvetteDate: b.buvetteDate ?? todayIso(),
     cardAmount: String(b.cardAmount),
     cashAmount: String(b.cashAmount),
+    otherAmount: String(b.otherAmount),
     notes: b.notes ?? "",
   };
+}
+
+function entryTotal(b: AdminBuvette) {
+  return b.cardAmount + b.cashAmount + b.otherAmount;
 }
 
 // Retour de Cindy du 25/10 ("le comptable puisse ajouter tel jour : X € en
@@ -47,6 +54,20 @@ export default function BuvetteManager({ buvette }: { buvette: AdminBuvette[] })
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminBuvette | null>(null);
+  // Retour de Cindy du 30/10 ("décomposition visible en ouvrant le
+  // détail") : repli par ligne, indépendant du modal d'édition -- plusieurs
+  // lignes peuvent être dépliées à la fois (Set, même principe que
+  // admin-sidebar.tsx), pas de repli forcé des autres à l'ouverture d'une.
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  function toggleExpanded(id: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   const totals = useMemo(
     () =>
@@ -54,8 +75,9 @@ export default function BuvetteManager({ buvette }: { buvette: AdminBuvette[] })
         (acc, b) => ({
           card: acc.card + b.cardAmount,
           cash: acc.cash + b.cashAmount,
+          other: acc.other + b.otherAmount,
         }),
-        { card: 0, cash: 0 }
+        { card: 0, cash: 0, other: 0 }
       ),
     [buvette]
   );
@@ -75,12 +97,13 @@ export default function BuvetteManager({ buvette }: { buvette: AdminBuvette[] })
   async function save() {
     const cardNum = Number(form.cardAmount.replace(",", ".") || "0");
     const cashNum = Number(form.cashAmount.replace(",", ".") || "0");
-    if (Number.isNaN(cardNum) || Number.isNaN(cashNum)) {
+    const otherNum = Number(form.otherAmount.replace(",", ".") || "0");
+    if (Number.isNaN(cardNum) || Number.isNaN(cashNum) || Number.isNaN(otherNum)) {
       setError("Montant invalide.");
       return;
     }
-    if (cardNum === 0 && cashNum === 0) {
-      setError("Renseigne au moins un montant (CB ou espèces).");
+    if (cardNum === 0 && cashNum === 0 && otherNum === 0) {
+      setError("Renseigne au moins un montant (CB, espèces ou autre).");
       return;
     }
     if (!form.buvetteDate) {
@@ -94,6 +117,7 @@ export default function BuvetteManager({ buvette }: { buvette: AdminBuvette[] })
       buvette_date: form.buvetteDate,
       card_amount: cardNum,
       cash_amount: cashNum,
+      other_amount: otherNum,
       notes: form.notes.trim() || null,
     };
     const { error: writeError } =
@@ -157,8 +181,16 @@ export default function BuvetteManager({ buvette }: { buvette: AdminBuvette[] })
             <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-700">
               {formatAmount(totals.cash)} espèces
             </span>
+            {/* Retour de Cindy du 30/10 : jamais eu le cas cette année --
+                pastille cachée tant qu'aucune entrée n'a de montant autre,
+                pour ne pas alourdir l'en-tête pour rien. */}
+            {totals.other > 0 && (
+              <span className="rounded-full bg-violet-500/10 px-2 py-0.5 text-[11px] font-bold text-violet-700">
+                {formatAmount(totals.other)} autre
+              </span>
+            )}
             <span className="rounded-full bg-navy/10 px-2 py-0.5 text-[11px] font-bold text-navy">
-              {formatAmount(totals.card + totals.cash)} au total
+              {formatAmount(totals.card + totals.cash + totals.other)} au total
             </span>
           </p>
         )}
@@ -168,43 +200,73 @@ export default function BuvetteManager({ buvette }: { buvette: AdminBuvette[] })
         <EmptyState icon={Coffee} message="Aucune recette buvette enregistrée pour le moment." />
       ) : (
         <div className="flex flex-col gap-1.5">
-          {buvette.map((b) => (
-            <div
-              key={b.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-zinc-100 bg-white p-3.5 shadow-sm"
-            >
-              <div className="flex min-w-0 flex-col">
-                <span className="truncate text-sm font-semibold text-zinc-900">
-                  {b.buvetteDate ? formatLocalDateFr(b.buvetteDate) : ""}
-                </span>
-                {b.notes && <span className="text-xs text-zinc-500">{b.notes}</span>}
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <span className="rounded-full bg-court-green/10 px-2.5 py-0.5 text-xs font-bold text-court-green">
-                  {formatAmount(b.cardAmount)} CB
-                </span>
-                <span className="rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-bold text-amber-700">
-                  {formatAmount(b.cashAmount)} espèces
-                </span>
+          {buvette.map((b) => {
+            const expanded = expandedIds.has(b.id);
+            return (
+              <div
+                key={b.id}
+                className="rounded-2xl border border-zinc-100 bg-white p-3.5 shadow-sm"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex min-w-0 flex-col">
+                    <span className="truncate text-sm font-semibold text-zinc-900">
+                      {b.buvetteDate ? formatLocalDateFr(b.buvetteDate) : ""}
+                    </span>
+                    {b.notes && <span className="text-xs text-zinc-500">{b.notes}</span>}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="rounded-full bg-navy/10 px-2.5 py-0.5 text-xs font-bold text-navy">
+                      {formatAmount(entryTotal(b))}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => openEdit(b)}
+                      title="Modifier"
+                      className="flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget(b)}
+                      title="Supprimer"
+                      className="flex h-7 w-7 items-center justify-center rounded-full text-red-400 hover:bg-red-50 hover:text-red-600"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Retour de Cindy du 30/10 ("la décomposition peut être
+                    vue en ouvrant le détail") : même patron que
+                    cotisation-row.tsx (bouton Voir/Masquer + chevron),
+                    repli par ligne indépendant du modal Modifier. */}
                 <button
                   type="button"
-                  onClick={() => openEdit(b)}
-                  title="Modifier"
-                  className="flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+                  onClick={() => toggleExpanded(b.id)}
+                  className="mt-2 flex items-center gap-1 text-[11px] font-medium text-zinc-500 hover:text-zinc-700"
                 >
-                  <Pencil className="h-3.5 w-3.5" />
+                  {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                  {expanded ? "Masquer" : "Voir"} le détail
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setDeleteTarget(b)}
-                  title="Supprimer"
-                  className="flex h-7 w-7 items-center justify-center rounded-full text-red-400 hover:bg-red-50 hover:text-red-600"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                {expanded && (
+                  <div className="mt-1.5 flex flex-wrap gap-1.5 border-l border-zinc-200 pl-2.5">
+                    <span className="rounded-full bg-court-green/10 px-2.5 py-0.5 text-xs font-bold text-court-green">
+                      {formatAmount(b.cardAmount)} CB
+                    </span>
+                    <span className="rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-bold text-amber-700">
+                      {formatAmount(b.cashAmount)} espèces
+                    </span>
+                    {b.otherAmount > 0 && (
+                      <span className="rounded-full bg-violet-500/10 px-2.5 py-0.5 text-xs font-bold text-violet-700">
+                        {formatAmount(b.otherAmount)} autre
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -264,6 +326,21 @@ export default function BuvetteManager({ buvette }: { buvette: AdminBuvette[] })
                 />
               </div>
               <div>
+                {/* Retour du comptable de Cindy (30/10) : arrivé par le
+                    passé (chèque), pas encore eu le cas cette année --
+                    champ optionnel, à 0 par défaut comme les deux autres. */}
+                <label className="mb-1 block text-xs font-medium text-zinc-600">
+                  Montant Autre, chèque/virement (€)
+                </label>
+                <input
+                  inputMode="decimal"
+                  value={form.otherAmount}
+                  onChange={(e) => setForm((f) => ({ ...f, otherAmount: e.target.value }))}
+                  placeholder="ex. 20"
+                  className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+                />
+              </div>
+              <div>
                 <label className="mb-1 block text-xs font-medium text-zinc-600">
                   Notes (optionnel)
                 </label>
@@ -301,7 +378,7 @@ export default function BuvetteManager({ buvette }: { buvette: AdminBuvette[] })
             <p className="mb-4 text-sm text-zinc-500">
               La recette du{" "}
               {deleteTarget.buvetteDate ? formatLocalDateFr(deleteTarget.buvetteDate) : "jour"} (
-              {formatAmount(deleteTarget.cardAmount + deleteTarget.cashAmount)}) sera
+              {formatAmount(entryTotal(deleteTarget))}) sera
               définitivement supprimée.
             </p>
             {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
