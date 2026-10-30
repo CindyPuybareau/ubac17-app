@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Clock, Shield } from "lucide-react";
+import { Ban, Clock, Shield } from "lucide-react";
 import { formatEventTime, styleFor } from "@/app/dashboard/event-style";
 import { resolveIsHome } from "@/lib/match-display";
 import { sortTeamsByGroup, teamLabel } from "@/lib/teams";
@@ -73,6 +73,12 @@ function ResultRow({ event }: { event: ChildEvent }) {
         <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${style.badge}`}>
           {style.label}
         </span>
+        {event.cancelledAt && (
+          <span className="flex items-center gap-1 rounded-full bg-status-urgent/10 px-2 py-0.5 text-[10px] font-bold uppercase text-status-urgent-dark">
+            <Ban className="h-3 w-3" />
+            Annulé
+          </span>
+        )}
       </span>
 
       <OpponentDisplay title={event.title} size="sm" />

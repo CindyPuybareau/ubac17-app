@@ -9,6 +9,7 @@ import {
   ChevronUp,
   AlarmClock,
   AlertTriangle,
+  Ban,
   CalendarDays,
   Cake,
   Check,
@@ -25,6 +26,7 @@ import {
   Pencil,
   PartyPopper,
   Plus,
+  RotateCcw,
   Sparkles,
   StickyNote,
   Trash2,
@@ -998,7 +1000,7 @@ export default function CalendarView({
     const { data, error } = await supabase
       .from("events")
       .select(
-        "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, ffbb_phase, series_id, notes, team_score, opponent_score, team_id, teams(name)"
+        "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, ffbb_phase, series_id, notes, team_score, opponent_score, cancelled_at, cancelled_reason, team_id, teams(name)"
       )
       .eq("event_type", "MATCH")
       .gte("start_time", windowStart)
@@ -1020,6 +1022,8 @@ export default function CalendarView({
           attendanceRequestedAt: null,
           teamScore: e.team_score,
           opponentScore: e.opponent_score,
+          cancelledAt: e.cancelled_at,
+          cancelledReason: e.cancelled_reason,
           location: e.location,
           salle: e.salle,
           start_time: e.start_time,
@@ -1324,6 +1328,18 @@ export default function CalendarView({
   // bas.
   const [deleteSeriesScope, setDeleteSeriesScope] = useState<"one" | "following">("one");
 
+  // Retour de Cindy du 30/10 ("un créneau annulé, comité des fêtes") :
+  // distinct de deleteEventTarget -- annuler laisse l'événement en place
+  // (juste marqué), jamais une suppression. Motif obligatoire : cancelError
+  // affiche "motif obligatoire" sans fermer le dialogue tant que
+  // cancelReasonInput est vide (même geste que les erreurs d'écriture
+  // existantes, voir confirmCancelEvent plus bas). Une seule occurrence à
+  // la fois, volontairement -- pas de choix de portée série comme pour
+  // Supprimer/Modifier (besoin ponctuel, pas récurrent).
+  const [cancelEventTarget, setCancelEventTarget] = useState<AdminUpcomingEvent | null>(null);
+  const [cancelReasonInput, setCancelReasonInput] = useState("");
+  const [cancelError, setCancelError] = useState<string | null>(null);
+
   // Retour de Cindy du 12/09 ("Répéter") : même choix qu'à la suppression,
   // mais pour "Modifier" -- editSeriesChoiceTarget porte l'événement en
   // attente de ce choix (avant d'ouvrir CreateEventForm), editScope le choix
@@ -1426,6 +1442,87 @@ export default function CalendarView({
       if (deleteCollecteError) {
         console.error("[calendar-view] suppression de la collecte échouée:", deleteCollecteError);
       }
+    }
+  }
+
+  // Retour de Cindy du 30/10 ("un créneau annulé, comité des fêtes") :
+  // même squelette que confirmDeleteEvent ci-dessus (optimiste avant
+  // l'écriture, push AVANT l'update pour que push_targets_for_event
+  // retrouve encore l'événement) mais un UPDATE, jamais un DELETE --
+  // l'événement reste en place, juste marqué. Motif obligatoire : refuse
+  // de continuer (et affiche l'erreur dans le ConfirmDialog, sans le
+  // fermer) tant que cancelReasonInput est vide.
+  async function confirmCancelEvent(event: AdminUpcomingEvent) {
+    const reason = cancelReasonInput.trim();
+    if (!reason) {
+      setCancelError("Le motif est obligatoire.");
+      return;
+    }
+    setCancelEventTarget(null);
+    setCancelError(null);
+    const cancelledAt = new Date().toISOString();
+    setLocalEvents((prev) =>
+      prev.map((e) => (e.id === event.id ? { ...e, cancelledAt, cancelledReason: reason } : e))
+    );
+
+    const when = new Date(event.start_time).toLocaleDateString("fr-FR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    });
+    const heure = new Date(event.start_time).toLocaleTimeString("fr-FR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    const lieu = event.salle || event.location;
+    await sendEventPush(
+      event.id,
+      `UBAC — ${event.teamName}`,
+      `Annulé : ${when} à ${heure}${lieu ? ` · ${lieu}` : ""} — Motif : ${reason}.`
+    );
+
+    const supabase = createClient();
+    const { error: cancelEventError } = await supabase
+      .from("events")
+      .update({ cancelled_at: cancelledAt, cancelled_reason: reason })
+      .eq("id", event.id);
+    if (cancelEventError) {
+      console.error("[calendar-view] annulation de l'événement échouée:", cancelEventError);
+    }
+    setCancelReasonInput("");
+  }
+
+  // Symétrique de confirmCancelEvent ci-dessus : pas de confirmation
+  // nécessaire (action réversible et peu risquée, à la différence d'une
+  // suppression) -- un clic suffit à rouvrir l'événement.
+  async function reactivateEvent(event: AdminUpcomingEvent) {
+    setLocalEvents((prev) =>
+      prev.map((e) => (e.id === event.id ? { ...e, cancelledAt: null, cancelledReason: null } : e))
+    );
+
+    const when = new Date(event.start_time).toLocaleDateString("fr-FR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    });
+    const heure = new Date(event.start_time).toLocaleTimeString("fr-FR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    const lieu = event.salle || event.location;
+    await sendEventPush(
+      event.id,
+      `UBAC — ${event.teamName}`,
+      `Réactivé : ${when} à ${heure}${lieu ? ` · ${lieu}` : ""} a finalement bien lieu.`
+    );
+
+    const supabase = createClient();
+    const { error: reactivateError } = await supabase
+      .from("events")
+      .update({ cancelled_at: null, cancelled_reason: null })
+      .eq("id", event.id);
+    if (reactivateError) {
+      console.error("[calendar-view] réactivation de l'événement échouée:", reactivateError);
     }
   }
 
@@ -1989,6 +2086,31 @@ export default function CalendarView({
               >
                 <Pencil className="h-4 w-4" />
               </button>
+              {/* Retour de Cindy du 30/10 ("un créneau annulé, comité des
+                  fêtes") : jamais vu avant comme une vraie suppression --
+                  Réactiver si déjà annulé (un clic, pas de confirmation,
+                  action réversible), sinon ouvre le motif obligatoire. */}
+              {event.cancelledAt ? (
+                <button
+                  onClick={() => reactivateEvent(event)}
+                  title="Réactiver l'événement"
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    setCancelEventTarget(event);
+                    setCancelReasonInput("");
+                    setCancelError(null);
+                  }}
+                  title="Annuler l'événement"
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-red-400 hover:bg-red-50 hover:text-red-600"
+                >
+                  <Ban className="h-4 w-4" />
+                </button>
+              )}
               <button
                 onClick={() => {
                   setDeleteEventTarget(event);
@@ -2003,6 +2125,21 @@ export default function CalendarView({
             </div>
           )}
         </div>
+
+        {/* Retour de Cindy du 30/10 : même emplacement/forme que le badge
+            "Besoin non pourvu" plus bas (needsOrganizing), en rouge plutôt
+            qu'ambre. Motif affiché juste en dessous. */}
+        {event.cancelledAt && (
+          <div className="flex flex-col gap-0.5">
+            <span className="flex w-fit items-center gap-1 rounded-full bg-status-urgent/10 px-2 py-0.5 text-[10px] font-bold uppercase text-status-urgent-dark">
+              <Ban className="h-3 w-3 shrink-0" />
+              Annulé
+            </span>
+            {event.cancelledReason && (
+              <p className="text-xs italic text-zinc-500">Motif : {event.cancelledReason}</p>
+            )}
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-500">
           <span className="flex items-center gap-1">
@@ -2578,6 +2715,15 @@ export default function CalendarView({
           >
             {style.label}
           </span>
+          {/* Retour de Cindy du 30/10 : un match annulé avant d'avoir été
+              joué atterrit ici une fois sa date passée (plus de bouton ici,
+              voir renderEventCard pour Annuler/Réactiver). */}
+          {event.cancelledAt && (
+            <span className="flex items-center gap-1 rounded-full bg-status-urgent/10 px-2 py-0.5 text-[10px] font-bold uppercase text-status-urgent-dark">
+              <Ban className="h-3 w-3 shrink-0" />
+              Annulé
+            </span>
+          )}
         </span>
 
         <OpponentDisplay title={event.title} size="sm" />
@@ -2988,12 +3134,26 @@ export default function CalendarView({
                     {visible.map((e) => (
                       <span
                         key={e.id}
-                        title={needsOrganizing(e) ? "Besoin d'organisation non pourvu" : undefined}
+                        title={
+                          e.cancelledAt
+                            ? "Annulé"
+                            : needsOrganizing(e)
+                              ? "Besoin d'organisation non pourvu"
+                              : undefined
+                        }
                         className={`h-1.5 w-1.5 shrink-0 rounded-full ${styleFor(e.event_type).dot} ${
                           // ring-1, jamais ring-2 (retour de Cindy du 24/09,
                           // "trop épais, le faire fin") : un simple trait,
                           // pas un halo épais autour d'une pastille de 6px.
-                          needsOrganizing(e) ? "ring-1 ring-amber-500" : ""
+                          // Annulé prend le pas sur "besoin non pourvu" si
+                          // jamais les deux se combinent (retour de Cindy
+                          // du 30/10) -- un événement annulé n'a plus
+                          // besoin d'être organisé.
+                          e.cancelledAt
+                            ? "ring-1 ring-status-urgent"
+                            : needsOrganizing(e)
+                              ? "ring-1 ring-amber-500"
+                              : ""
                         }`}
                       />
                     ))}
@@ -3005,11 +3165,23 @@ export default function CalendarView({
                     {visible.map((e) => (
                       <span
                         key={e.id}
-                        title={needsOrganizing(e) ? "Besoin d'organisation non pourvu" : undefined}
-                        className={`inline-flex items-center justify-center gap-0.5 truncate whitespace-nowrap rounded px-1 py-0.5 text-[10px] font-semibold leading-none ${styleFor(e.event_type).pill}`}
+                        title={
+                          e.cancelledAt
+                            ? `Annulé${e.cancelledReason ? ` — ${e.cancelledReason}` : ""}`
+                            : needsOrganizing(e)
+                              ? "Besoin d'organisation non pourvu"
+                              : undefined
+                        }
+                        className={`inline-flex items-center justify-center gap-0.5 truncate whitespace-nowrap rounded px-1 py-0.5 text-[10px] font-semibold leading-none ${styleFor(e.event_type).pill} ${
+                          e.cancelledAt ? "line-through opacity-60" : ""
+                        }`}
                       >
-                        {needsOrganizing(e) && (
-                          <AlertTriangle className="h-2.5 w-2.5 shrink-0 text-amber-600" />
+                        {e.cancelledAt ? (
+                          <Ban className="h-2.5 w-2.5 shrink-0 text-status-urgent-dark" />
+                        ) : (
+                          needsOrganizing(e) && (
+                            <AlertTriangle className="h-2.5 w-2.5 shrink-0 text-amber-600" />
+                          )
                         )}
                         {pillLabel(e)}
                       </span>
@@ -3317,6 +3489,41 @@ export default function CalendarView({
           confirmDeleteEvent(deleteEventTarget, deleteCollecteToo, deleteSeriesScope)
         }
         onCancel={() => setDeleteEventTarget(null)}
+      />
+
+      {/* Retour de Cindy du 30/10 ("un créneau annulé, comité des fêtes") :
+          motif obligatoire -- `error` (ConfirmDialog) affiche "Le motif est
+          obligatoire." sans fermer le dialogue tant que cancelReasonInput
+          est vide (voir confirmCancelEvent). Une seule occurrence à la
+          fois, volontairement -- pas de choix de portée série ici. */}
+      <ConfirmDialog
+        open={Boolean(cancelEventTarget)}
+        title="Annuler l'événement ?"
+        message={
+          <div className="flex flex-col gap-2">
+            <p>L&apos;événement reste visible, marqué &laquo;&nbsp;Annulé&nbsp;&raquo; avec le motif ci-dessous.</p>
+            <label className="flex flex-col gap-1 text-sm text-zinc-700">
+              Motif (obligatoire)
+              <textarea
+                value={cancelReasonInput}
+                onChange={(e) => {
+                  setCancelReasonInput(e.target.value);
+                  if (cancelError) setCancelError(null);
+                }}
+                rows={2}
+                placeholder="Ex. Comité des fêtes occupe la salle"
+                className="rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+              />
+            </label>
+          </div>
+        }
+        confirmLabel="Annuler l'événement"
+        error={cancelError}
+        onConfirm={() => cancelEventTarget && confirmCancelEvent(cancelEventTarget)}
+        onCancel={() => {
+          setCancelEventTarget(null);
+          setCancelError(null);
+        }}
       />
 
       {/* Retour de Cindy du 12/09 ("Répéter") : demandé AVANT d'ouvrir

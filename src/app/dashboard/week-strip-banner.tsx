@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlarmClock, Check, Clock, Euro, ExternalLink, MapPin, Sparkles, StickyNote, X } from "lucide-react";
+import { AlarmClock, Ban, Check, Clock, Euro, ExternalLink, MapPin, Sparkles, StickyNote, X } from "lucide-react";
 import {
   styleFor,
   isMatchType,
@@ -64,6 +64,9 @@ export type WeekStripEvent = {
   endTime: string | null;
   impactTime: string | null;
   notes: string | null;
+  // Retour de Cindy du 30/10 ("un créneau annulé") : null = actif.
+  cancelledAt: string | null;
+  cancelledReason: string | null;
   isPaid: boolean;
   paymentLink: string | null;
   location: string | null;
@@ -261,8 +264,16 @@ export function DayEventCard({ event }: { event: WeekStripEvent }) {
             Payant
           </span>
         )}
+        {/* Retour de Cindy du 30/10 ("un créneau annulé") : même badge que
+            renderEventCard (calendar-view.tsx), en rouge plutôt qu'ambre. */}
+        {event.cancelledAt && (
+          <span className="flex items-center gap-1 rounded-full bg-status-urgent/10 px-2 py-0.5 text-[10px] font-bold uppercase text-status-urgent-dark">
+            <Ban className="h-3 w-3" />
+            Annulé
+          </span>
+        )}
       </div>
-      <p className="mt-1 font-semibold text-zinc-900">
+      <p className={`mt-1 font-semibold text-zinc-900 ${event.cancelledAt ? "line-through text-zinc-400" : ""}`}>
         {/* Retour de Cindy du 19/10 : Domicile/Extérieur ne se répète plus
             ici -- il vit désormais, coloré, sur la ligne du lieu juste en
             dessous (MatchVenue), à côté du gymnase. */}
@@ -270,6 +281,9 @@ export function DayEventCard({ event }: { event: WeekStripEvent }) {
           ? (parsed.opponent ?? event.title ?? style.label)
           : (event.title ?? style.label)}
       </p>
+      {event.cancelledAt && event.cancelledReason && (
+        <p className="text-xs italic text-zinc-500">Motif : {event.cancelledReason}</p>
+      )}
       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
         <span>{formatEventTime(event.startTime, event.endTime)}</span>
         {/* Ambre plutôt que gris neutre : même distinction visuelle que

@@ -3,6 +3,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import {
   AlarmClock,
+  Ban,
   Cake,
   Check,
   ChevronDown,
@@ -837,8 +838,16 @@ export function EventRow({
             Payant
           </span>
         )}
+        {/* Retour de Cindy du 30/10 ("un créneau annulé") : lecture seule
+            ici, même badge que calendar-view.tsx/week-strip-banner.tsx. */}
+        {event.cancelledAt && (
+          <span className="flex items-center gap-1 rounded-full bg-status-urgent/10 px-2 py-0.5 text-[10px] font-bold uppercase text-status-urgent-dark">
+            <Ban className="h-3 w-3" />
+            Annulé
+          </span>
+        )}
       </div>
-      <p className="mt-1 font-semibold text-zinc-900">
+      <p className={`mt-1 font-semibold text-zinc-900 ${event.cancelledAt ? "line-through text-zinc-400" : ""}`}>
         {/* Retour de Cindy du 19/10 : Domicile/Extérieur ne se répète plus
             ici -- il vit désormais, coloré, sur la ligne du lieu juste en
             dessous (MatchVenue), à côté du gymnase. */}
@@ -846,6 +855,9 @@ export function EventRow({
           ? (parsed.opponent ?? event.title ?? style.label)
           : (event.title ?? style.label)}
       </p>
+      {event.cancelledAt && event.cancelledReason && (
+        <p className="text-xs italic text-zinc-500">Motif : {event.cancelledReason}</p>
+      )}
       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
         <span>
           {new Date(event.startTime).toLocaleDateString("fr-FR", {

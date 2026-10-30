@@ -166,6 +166,8 @@ export default function SpaceDashboardSummary({
     endTime: e.endTime,
     impactTime: e.impactTime,
     notes: e.notes,
+    cancelledAt: e.cancelledAt,
+    cancelledReason: e.cancelledReason,
     isPaid: e.isPaid,
     paymentLink: e.paymentLink,
     location: e.location,

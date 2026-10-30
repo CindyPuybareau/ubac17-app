@@ -697,6 +697,10 @@ export default function CreateEventForm({
           attendanceRequestedAt: null,
           teamScore: null,
           opponentScore: null,
+          // Jamais annulé à la création (retour de Cindy du 30/10) --
+          // uniquement posé plus tard depuis calendar-view.tsx.
+          cancelledAt: null,
+          cancelledReason: null,
           location: row.location,
           salle: row.salle,
           start_time: row.start_time,
@@ -990,6 +994,8 @@ export default function CreateEventForm({
           attendanceRequestedAt: null,
           teamScore: null,
           opponentScore: null,
+          cancelledAt: null,
+          cancelledReason: null,
           location: inserted.location,
           salle: inserted.salle,
           start_time: inserted.start_time,

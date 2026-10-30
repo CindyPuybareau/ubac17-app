@@ -19,7 +19,7 @@ export async function getClubOfficialMatches(supabase: SupabaseClient): Promise<
   const { data, error } = await supabase
     .from("events")
     .select(
-      "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, team_id, team_score, opponent_score, teams(name)"
+      "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, team_id, team_score, opponent_score, cancelled_at, cancelled_reason, teams(name)"
     )
     .eq("event_type", "MATCH")
     .gte("start_time", windowStart)
@@ -48,6 +48,8 @@ export async function getClubOfficialMatches(supabase: SupabaseClient): Promise<
       teamName: team?.name ?? null,
       teamScore: e.team_score,
       opponentScore: e.opponent_score,
+      cancelledAt: e.cancelled_at,
+      cancelledReason: e.cancelled_reason,
       // Jamais payant (retour de Cindy du 2026-08-25, badge "Payant"
       // seulement côté Enfant/lecture seule) : un match officiel n'est
       // jamais l'événement payant en question.

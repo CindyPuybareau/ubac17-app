@@ -136,7 +136,7 @@ export default async function ChildViewPage() {
       ? supabase
           .from("events")
           .select(
-            "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, team_id, target_team_ids, team_score, opponent_score, teams(name), collectes(id)"
+            "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, team_id, target_team_ids, team_score, opponent_score, cancelled_at, cancelled_reason, teams(name), collectes(id)"
           )
           // Retour d'audit du 28/08 : un événement club ciblant plusieurs
           // équipes précises (target_team_ids) n'a pas de team_id — un
@@ -239,7 +239,7 @@ export default async function ChildViewPage() {
       ? await supabase
           .from("events")
           .select(
-            "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, team_id, target_team_ids, team_score, opponent_score, teams(name), collectes(id)"
+            "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, team_id, target_team_ids, team_score, opponent_score, cancelled_at, cancelled_reason, teams(name), collectes(id)"
           )
           .in("team_id", siblingTeamIds)
           .in("event_type", ["MATCH", "FRIENDLY"])
@@ -343,6 +343,8 @@ export default async function ChildViewPage() {
     target_team_ids: string[] | null;
     team_score: number | null;
     opponent_score: number | null;
+    cancelled_at: string | null;
+    cancelled_reason: string | null;
     teams: { name: string | null } | null;
     collectes: unknown;
   };
@@ -369,6 +371,8 @@ export default async function ChildViewPage() {
     teamName: e.teams?.name ?? null,
     teamScore: e.team_score,
     opponentScore: e.opponent_score,
+    cancelledAt: e.cancelled_at,
+    cancelledReason: e.cancelled_reason,
     // Badge "Payant" uniquement côté Enfant (retour de Cindy du
     // 2026-08-25) : jamais de bouton/lien de paiement dans cet espace,
     // conforme aux autres restrictions déjà en place (pas de RSVP, pas de
