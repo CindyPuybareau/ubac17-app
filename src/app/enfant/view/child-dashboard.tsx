@@ -57,6 +57,10 @@ export type ChildEvent = {
   // lien de paiement affiché ici, voir le commentaire sur isPaid dans
   // enfant/view/page.tsx.
   isPaid: boolean;
+  // Retour de Cindy du 30/10 ("un créneau annulé") : null = actif, lecture
+  // seule ici (l'enfant ne peut ni annuler ni réactiver).
+  cancelledAt: string | null;
+  cancelledReason: string | null;
 };
 
 export type ChildTeammate = {
@@ -207,6 +211,8 @@ export default function ChildDashboard({
     // Pas de notes ici (ChildEvent ne les porte pas) : jamais montrées côté
     // Enfant jusqu'ici, hors périmètre de cette parité de carte.
     notes: null,
+    cancelledAt: e.cancelledAt,
+    cancelledReason: e.cancelledReason,
     isPaid: e.isPaid,
     // Jamais de lien de paiement ici (voir le commentaire sur
     // ChildEvent.isPaid) : le badge "Payant" suffit, aucun bouton "Payer"

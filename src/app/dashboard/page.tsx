@@ -77,7 +77,7 @@ import {
 // seul endroit (un oubli sur l'une des 8 copies faisait silencieusement
 // diverger ce qu'un rôle voit par rapport à un autre, voir CLAUDE.md §3).
 const EVENTS_SELECT_COLUMNS =
-  "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, ffbb_phase, series_id, notes, attendance_requested_at, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, teams(id, name, category), collectes(id, prix, payment_link)" as const;
+  "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, ffbb_phase, series_id, notes, attendance_requested_at, cancelled_at, cancelled_reason, team_score, opponent_score, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, teams(id, name, category), collectes(id, prix, payment_link)" as const;
 
 type PlayerRow = {
   id: string;
@@ -473,6 +473,11 @@ export type AdminUpcomingEvent = {
   // Date de la demande de présences faite par le coach, null si aucune.
   // Déclenche le bandeau "le coach attend ta réponse" côté famille.
   attendanceRequestedAt: string | null;
+  // Retour de Cindy du 30/10 ("un créneau annulé, comité des fêtes") :
+  // null = actif. Posé (avec son motif) depuis calendar-view.tsx, jamais
+  // ailleurs -- l'événement reste visible et modifiable, juste marqué.
+  cancelledAt: string | null;
+  cancelledReason: string | null;
   // Score saisi par le coach après coup — null tant qu'il ne l'a pas
   // renseigné (jamais pour un entraînement). Deux colonnes distinctes
   // plutôt qu'un texte libre : is_home dit déjà domicile/extérieur, ces
@@ -2703,6 +2708,8 @@ export default async function DashboardPage({
         event_type: e.event_type,
         isHome: e.is_home,
         attendanceRequestedAt: e.attendance_requested_at ?? null,
+        cancelledAt: e.cancelled_at ?? null,
+        cancelledReason: e.cancelled_reason ?? null,
         teamScore: e.team_score ?? null,
         opponentScore: e.opponent_score ?? null,
         location: e.location,
@@ -3754,6 +3761,8 @@ export default async function DashboardPage({
         event_type: e.event_type,
         isHome: e.is_home,
         attendanceRequestedAt: e.attendance_requested_at ?? null,
+        cancelledAt: e.cancelled_at ?? null,
+        cancelledReason: e.cancelled_reason ?? null,
         teamScore: e.team_score ?? null,
         opponentScore: e.opponent_score ?? null,
         location: e.location,
@@ -4494,6 +4503,8 @@ export default async function DashboardPage({
         event_type: e.event_type,
         isHome: e.is_home,
         attendanceRequestedAt: e.attendance_requested_at ?? null,
+        cancelledAt: e.cancelled_at ?? null,
+        cancelledReason: e.cancelled_reason ?? null,
         teamScore: e.team_score ?? null,
         opponentScore: e.opponent_score ?? null,
         location: e.location,
@@ -5192,6 +5203,8 @@ export default async function DashboardPage({
       endTime: e.end_time,
       impactTime: e.impactTime,
       notes: e.notes,
+      cancelledAt: e.cancelledAt,
+      cancelledReason: e.cancelledReason,
       isPaid: e.isPaid,
       paymentLink: e.paymentLink,
       location: e.location,
@@ -5228,6 +5241,8 @@ export default async function DashboardPage({
       endTime: e.end_time,
       impactTime: e.impactTime,
       notes: e.notes,
+      cancelledAt: e.cancelledAt,
+      cancelledReason: e.cancelledReason,
       isPaid: e.isPaid,
       paymentLink: e.paymentLink,
       location: e.location,

@@ -62,7 +62,10 @@ export async function GET(request: Request) {
     )
     .gte("start_time", tomorrow.toISOString())
     .lt("start_time", dayAfter.toISOString())
-    .is("reminder_sent_at", null);
+    .is("reminder_sent_at", null)
+    // Retour de Cindy du 30/10 ("un créneau annulé") : jamais de rappel
+    // "c'est demain" pour un match qui n'aura finalement pas lieu.
+    .is("cancelled_at", null);
 
   if (error) {
     // Message générique côté client : le détail exact (colonnes, table)

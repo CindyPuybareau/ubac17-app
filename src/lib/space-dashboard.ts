@@ -45,6 +45,10 @@ export type SpaceDashboardNextEvent = {
   endTime: string | null;
   impactTime: string | null;
   notes: string | null;
+  // Retour de Cindy du 30/10 ("un créneau annulé") : null = actif, même
+  // parité que WeekStripEvent (week-strip-banner.tsx).
+  cancelledAt: string | null;
+  cancelledReason: string | null;
   isPaid: boolean;
   paymentLink: string | null;
   location: string | null;
@@ -317,7 +321,7 @@ export async function getSpaceDashboardSummary(
         let q = supabase
           .from("events")
           .select(
-            "id, title, event_type, start_time, end_time, impact_time, notes, location, salle, is_home, team_id, target_team_ids, teams(name), collectes(payment_link)"
+            "id, title, event_type, start_time, end_time, impact_time, notes, location, salle, is_home, team_id, target_team_ids, cancelled_at, cancelled_reason, teams(name), collectes(payment_link)"
           )
           .gte("start_time", nowIso)
           .lt("start_time", horizonIso)
@@ -491,6 +495,8 @@ export async function getSpaceDashboardSummary(
     is_home: boolean | null;
     team_id: string | null;
     target_team_ids: string[] | null;
+    cancelled_at: string | null;
+    cancelled_reason: string | null;
     teams: { name: string | null } | null;
     // "Événement payant" (voir resolvePaidInfo, page.tsx) : dérivé de la
     // présence d'une collecte rattachée (collectes.event_id), jamais
@@ -692,6 +698,8 @@ export async function getSpaceDashboardSummary(
         endTime: row.end_time,
         impactTime: row.impact_time,
         notes: row.notes,
+        cancelledAt: row.cancelled_at,
+        cancelledReason: row.cancelled_reason,
         isPaid: paidFields.isPaid,
         paymentLink: paidFields.paymentLink,
         location: row.location,
