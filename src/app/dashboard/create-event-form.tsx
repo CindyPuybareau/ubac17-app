@@ -701,6 +701,7 @@ export default function CreateEventForm({
           // uniquement posé plus tard depuis calendar-view.tsx.
           cancelledAt: null,
           cancelledReason: null,
+          emarqueCode: null,
           location: row.location,
           salle: row.salle,
           start_time: row.start_time,
@@ -996,6 +997,7 @@ export default function CreateEventForm({
           opponentScore: null,
           cancelledAt: null,
           cancelledReason: null,
+          emarqueCode: null,
           location: inserted.location,
           salle: inserted.salle,
           start_time: inserted.start_time,
