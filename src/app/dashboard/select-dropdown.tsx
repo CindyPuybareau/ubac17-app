@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, type LucideIcon } from "lucide-react";
 
 export type SelectOption = {
   value: string;
@@ -23,11 +23,18 @@ export default function SelectDropdown({
   value,
   onChange,
   compact = false,
+  icon: Icon,
 }: {
   options: SelectOption[];
   value: string;
   onChange: (value: string) => void;
   compact?: boolean;
+  // Retour de Cindy du 30/10 ("même taille et design que celui d'équipe...
+  // avec un symbole photo devant") : TeamFilterDropdown a toujours une
+  // icône (Users) devant son libellé, ce bouton n'en avait aucune --
+  // optionnel pour ne rien changer aux appelants existants (cotisation-
+  // participants-table.tsx, members-table.tsx) qui n'en passent pas.
+  icon?: LucideIcon;
 }) {
   const [open, setOpen] = useState(false);
   const label = options.find((o) => o.value === value)?.label ?? "";
@@ -46,6 +53,7 @@ export default function SelectDropdown({
           compact ? "px-3 py-1 text-xs" : "px-3 py-1.5 text-sm"
         }`}
       >
+        {Icon && <Icon className={compact ? "h-3.5 w-3.5 shrink-0" : "h-4 w-4 shrink-0"} />}
         <span className="max-w-[45vw] truncate sm:max-w-[180px]">{label}</span>
         <ChevronDown className={compact ? "h-3.5 w-3.5 shrink-0" : "h-4 w-4 shrink-0"} />
       </button>
