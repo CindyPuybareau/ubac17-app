@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Home } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { EVENT_TYPE_OPTIONS } from "./event-style";
 
 // Remplace "Masquer les entraînements" (retour de Cindy du 10/09) : même
@@ -39,22 +39,13 @@ const FILTERABLE_TYPE_OPTIONS = EVENT_TYPE_OPTIONS.filter((t) => t.value !== "RE
 export default function EventTypeFilterDropdown({
   hiddenTypes,
   onChange,
-  homeOnly,
-  onHomeOnlyChange,
 }: {
   hiddenTypes: Set<string>;
   onChange: (next: Set<string>) => void;
-  // "Domicile seulement" (retour de Cindy du 24/09, "doit se trouver dans
-  // l'onglet déroulant 'filtrer par'") : rejoint ce même menu plutôt que
-  // son propre pill séparé -- undefined (Coach/Famille, jamais Bureau)
-  // masque toute la section, ce filtre n'ayant de sens que pour qui voit
-  // tout le club.
-  homeOnly?: boolean;
-  onHomeOnlyChange?: (next: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
 
-  const activeCount = hiddenTypes.size + (homeOnly ? 1 : 0);
+  const activeCount = hiddenTypes.size;
   const label = activeCount > 0 ? `Filtrer par (${activeCount})` : "Filtrer par";
 
   function toggle(value: string) {
@@ -82,21 +73,6 @@ export default function EventTypeFilterDropdown({
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
           <div className="absolute left-0 z-40 mt-2 max-h-80 w-64 overflow-y-auto rounded-2xl border border-zinc-100 bg-white p-3 shadow-lg">
-            {onHomeOnlyChange && (
-              <>
-                <label className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium hover:bg-zinc-50">
-                  <input
-                    type="checkbox"
-                    checked={homeOnly ?? false}
-                    onChange={() => onHomeOnlyChange(!homeOnly)}
-                    className="h-4 w-4 shrink-0 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
-                  />
-                  <Home className="h-3.5 w-3.5 shrink-0 text-ubac-yellow-dark" />
-                  <span>Domicile seulement</span>
-                </label>
-                <div className="my-2 border-t border-zinc-100" />
-              </>
-            )}
             <div className="mb-2 flex gap-2">
               <button
                 onClick={() => onChange(new Set())}
