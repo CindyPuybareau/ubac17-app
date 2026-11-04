@@ -718,9 +718,28 @@ export default function CalendarView({
   // restent inchangées.
   const [localEvents, setLocalEvents] = useState(events);
   const [prevEventsProp, setPrevEventsProp] = useState(events);
+  // Retour de Cindy du 04/11 ("présence qui disparaît en changeant
+  // d'enfant") : `events` change de référence non seulement après un vrai
+  // rafraîchissement serveur, mais aussi dès qu'un appelant à plusieurs
+  // enfants (family-view.tsx, matchesVisibleEvents) le refiltre pour un
+  // autre enfant -- un simple changement de pastille écrasait alors
+  // `localEvents` EN ENTIER avec cette version refiltrée mais toujours
+  // aussi obsolète (le vrai rafraîchissement temps réel n'a pas forcément
+  // eu le temps d'arriver), perdant la réponse de présence tout juste
+  // donnée dès qu'on revenait sur cet enfant. Un événement du nouveau
+  // tableau qui est EXACTEMENT le même objet que la dernière fois
+  // (prevEventsById) n'a, par définition, subi aucun vrai rafraîchissement
+  // serveur depuis -- on garde alors sa version locale (avec ses mises à
+  // jour optimistes) plutôt que de la jeter. Un événement dont l'objet a
+  // changé (vraie donnée serveur neuve, ex. un autre joueur qui répond) est
+  // lui toujours repris tel quel.
   if (events !== prevEventsProp) {
+    const prevEventsById = new Map(prevEventsProp.map((e) => [e.id, e]));
+    const localById = new Map(localEvents.map((e) => [e.id, e]));
     setPrevEventsProp(events);
-    setLocalEvents(events);
+    setLocalEvents(
+      events.map((e) => (prevEventsById.get(e.id) === e ? (localById.get(e.id) ?? e) : e))
+    );
   }
 
   // Retour de Cindy du 16/09 (chantier Suspense, "afficher le contenu
