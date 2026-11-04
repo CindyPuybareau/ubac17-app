@@ -298,28 +298,32 @@ export function DayEventCard({ event }: { event: WeekStripEvent }) {
         )}
       </div>
 
-      {!isMatchType(event.eventType) && (event.location || event.salle) && (
-        <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-zinc-500">
-          {event.location && (
-            <span className="flex items-center gap-1">
-              <MapPin className="h-3 w-3 shrink-0" />
-              {event.location}
-            </span>
-          )}
-          {event.salle && <SalleBadge salle={event.salle} />}
-        </div>
-      )}
-
-      {isMatchType(event.eventType) && (
-        <div className="mt-1 flex flex-wrap text-xs text-zinc-500">
+      {/* Retour de Cindy du 04/11 ("itinéraire à côté de Extérieur pour
+          gagner en place") : fusionné sur la même ligne que le lieu plutôt
+          qu'un bloc ItineraryButton séparé plus bas (voir venue && (...)
+          qui occupait encore sa propre ligne). */}
+      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500">
+        {!isMatchType(event.eventType) && (event.location || event.salle) && (
+          <>
+            {event.location && (
+              <span className="flex items-center gap-1">
+                <MapPin className="h-3 w-3 shrink-0" />
+                {event.location}
+              </span>
+            )}
+            {event.salle && <SalleBadge salle={event.salle} />}
+          </>
+        )}
+        {isMatchType(event.eventType) && (
           <MatchVenue
             isHome={home}
             salle={event.salle}
             location={event.location}
             size="sm"
           />
-        </div>
-      )}
+        )}
+        {venue && <ItineraryButton query={venue} />}
+      </div>
 
       {event.notes && (
         <p className="mt-1 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2.5 py-2 text-xs text-amber-900">
@@ -338,16 +342,6 @@ export function DayEventCard({ event }: { event: WeekStripEvent }) {
           <ExternalLink className="h-3.5 w-3.5 shrink-0" />
           Payer via HelloAsso
         </a>
-      )}
-
-      {/* Rendu seulement si une vraie destination existe (venueQuery) :
-          ItineraryButton renvoie null sinon, mais ce wrapper avec sa marge
-          laisserait quand même un espace vide -- même précaution que les
-          autres blocs conditionnels de cette carte. */}
-      {venue && (
-        <div className="mt-1">
-          <ItineraryButton query={venue} />
-        </div>
       )}
 
       {/* Retour de Cindy du 14/09 ("je souhaiterais que les coachs voient

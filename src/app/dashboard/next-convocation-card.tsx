@@ -4,7 +4,7 @@ import RsvpButtons from "./rsvp-buttons";
 import OpponentDisplay from "./opponent-display";
 import MatchVenue from "./match-venue";
 import SalleBadge from "./salle-badge";
-import NextMatchActions from "./next-match-actions";
+import ItineraryButton from "./itinerary-button";
 import MatchTasksPanel from "./match-tasks-panel";
 import VolunteerNeedsPanel from "./volunteer-needs-panel";
 import OrganisationCard from "./organisation-card";
@@ -87,26 +87,35 @@ export default function NextConvocationCard({
           {formatEventDate(event.start_time)}
         </span>
       </div>
-      {!isMatchType(event.event_type) && (event.location || event.salle) && (
-        <div className="mt-1 flex flex-wrap items-center gap-1 text-sm text-zinc-500">
-          {event.location && (
-            <span className="flex items-center gap-1">
-              <MapPin className="h-4 w-4" />
-              {event.location}
-            </span>
-          )}
-          {event.salle && <SalleBadge salle={event.salle} />}
-        </div>
-      )}
-      {isMatchType(event.event_type) && (
-        <div className="mt-1 flex flex-wrap text-sm text-zinc-500">
+      {/* Retour de Cindy du 04/11 ("itinéraire à côté de Extérieur pour
+          gagner en place") : fusionné sur la même ligne que le lieu --
+          ItineraryButton directement plutôt que via NextMatchActions, dont
+          le `div mt-3` propre aurait désaligné le bouton une fois sur
+          cette même ligne flex. */}
+      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-zinc-500">
+        {!isMatchType(event.event_type) && (event.location || event.salle) && (
+          <>
+            {event.location && (
+              <span className="flex items-center gap-1">
+                <MapPin className="h-4 w-4" />
+                {event.location}
+              </span>
+            )}
+            {event.salle && <SalleBadge salle={event.salle} />}
+          </>
+        )}
+        {isMatchType(event.event_type) && (
           <MatchVenue
             isHome={resolveIsHome(event)}
             salle={event.salle}
             location={event.location}
           />
-        </div>
-      )}
+        )}
+        <ItineraryButton
+          query={venueQuery(event)}
+          className="flex items-center gap-1.5 rounded-full bg-navy px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-navy-dark"
+        />
+      </div>
       {event.notes && (
         <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2.5 py-2 text-xs text-amber-900">
           <StickyNote className="h-3.5 w-3.5 shrink-0 translate-y-0.5" />
@@ -120,7 +129,6 @@ export default function NextConvocationCard({
           currentStatus={status}
         />
       </div>
-      <NextMatchActions venue={venueQuery(event)} />
       {(() => {
         // Règle explicite de Cindy du 2026-08-24 : jamais d'onglet
         // Organisation sur un entraînement, sur aucun espace — même

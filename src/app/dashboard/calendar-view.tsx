@@ -964,6 +964,24 @@ export default function CalendarView({
   // navigateur. Même schéma que calendar-subscribe.tsx (auth.getUser() +
   // repli silencieux sur un raté réseau plutôt qu'un blocage).
   const [hiddenEventTypes, setHiddenEventTypes] = useState<Set<string>>(new Set());
+
+  // Retour du Bureau (réunion, relayée par Cindy du 04/11) : "le plus de
+  // cartes visibles en un clin d'œil" -- une carte Bureau n'affiche que
+  // l'essentiel (badges/titre/score/date/lieu) par défaut, le reste
+  // (présences, bloc Organisation) passe derrière "Voir plus de détails"
+  // (même patron que expandedIds/toggleExpanded, buvette-manager.tsx).
+  // Jamais lu côté Coach/Famille (toujours allowClubWide === false là-bas),
+  // et jamais persisté : repliée par défaut à chaque chargement de page.
+  const [expandedEventIds, setExpandedEventIds] = useState<Set<string>>(new Set());
+  function toggleEventExpanded(id: string) {
+    setExpandedEventIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   const userIdRef = useRef<string | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -1009,16 +1027,6 @@ export default function CalendarView({
         }
       });
   }
-  // "Domicile seulement" (retour de Cindy du 24/09, "voir les matchs à
-  // domicile seulement pour avoir les besoins en organisation en visuel
-  // sur le calendrier") : simple filtre d'affichage, comme hiddenEventTypes
-  // ci-dessus, mais jamais persisté (pas de demande explicite pour ça) --
-  // réinitialisé à chaque ouverture. Réservé au Bureau (isBureau, voir son
-  // passage à EventTypeFilterDropdown plus bas -- case à cocher dans "Filtrer
-  // par", pas son propre pill) : lui seul voit tout le club et a besoin de
-  // filtrer pour repérer les matchs à organiser, Coach/Famille n'ont déjà
-  // que leurs propres matchs sous les yeux.
-  const [homeOnly, setHomeOnly] = useState(false);
   // Retour de Cindy du 12/09 ("Matchs officiels du club") : masqué par
   // défaut (showClubMatches=false) -- un adhérent/parent ne voit alors que
   // son propre calendrier, inchangé. Chargé UNE SEULE FOIS au premier clic
@@ -1728,13 +1736,7 @@ export default function CalendarView({
     const afterTypeFilter = skipHiddenTypesFilter
       ? localEvents
       : localEvents.filter((e) => !isHiddenByTypeFilter(e, hiddenEventTypes));
-    const base = afterTypeFilter
-      .filter(matchesTeamFilter)
-      // "Domicile seulement" (retour de Cindy du 24/09) : ne garde que les
-      // matchs à domicile -- masque donc aussi entraînements, tournois,
-      // réunions, événements club et matchs à l'extérieur, pas seulement
-      // ces derniers.
-      .filter((e) => !homeOnly || isHomeMatch(e));
+    const base = afterTypeFilter.filter(matchesTeamFilter);
     // Retour de Cindy du 12/09 ("Matchs officiels du club") : ajoutés APRÈS
     // matchesTeamFilter, jamais soumis à ce filtre-là -- celui-ci ne parle
     // que "parmi MES équipes, lesquelles afficher", alors que ces matchs-là
@@ -1765,7 +1767,6 @@ export default function CalendarView({
     activeResultsTeamIdResolved,
     showClubMatches,
     clubMatches,
-    homeOnly,
     view,
   ]);
 
@@ -2091,6 +2092,10 @@ export default function CalendarView({
     // Toujours utile plus bas (fanion "Spécial") même si le calcul de
     // cardShellClass ci-dessus est maintenant partagé.
     const isTournament = event.event_type === "TOURNAMENT";
+    // Retour du Bureau (réunion du 04/11) : repliée par défaut UNIQUEMENT
+    // côté Bureau (allowClubWide) -- toujours vrai (donc carte toujours
+    // dépliée, comportement inchangé) pour Coach/Famille.
+    const cardExpanded = !allowClubWide || expandedEventIds.has(event.id);
 
     return (
       <div key={event.id} className={`flex flex-col gap-2 ${cardShellClass}`}>
@@ -2298,27 +2303,53 @@ export default function CalendarView({
             retour à la ligne du flex-wrap, selon la longueur du texte) --
             vrai pour un match (Domicile/Extérieur fusionné via MatchVenue)
             comme pour un entraînement/réunion (lieu/salle seuls). */}
-        {!isMatchType(event.event_type) && (event.location || event.salle) && (
-          <div className="flex flex-wrap items-center gap-1 text-sm text-zinc-500">
-            {event.location && (
-              <span className="flex items-center gap-1">
-                <MapPin className="h-4 w-4" />
-                {event.location}
-              </span>
-            )}
-            {event.salle && <SalleBadge salle={event.salle} />}
-          </div>
-        )}
-        {isMatchType(event.event_type) && (
-          <div className="flex flex-wrap text-sm text-zinc-500">
+        {/* Retour de Cindy du 04/11 ("itinéraire à côté de Extérieur pour
+            gagner en place") : fusionné sur la même ligne flex-wrap que le
+            lieu plutôt qu'un bloc séparé en dessous -- ItineraryButton se
+            masque déjà tout seul (query null) si venueQuery(event) ne
+            trouve rien, pas besoin d'un garde-fou en plus ici. */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500">
+          {!isMatchType(event.event_type) && (event.location || event.salle) && (
+            <>
+              {event.location && (
+                <span className="flex items-center gap-1">
+                  <MapPin className="h-4 w-4" />
+                  {event.location}
+                </span>
+              )}
+              {event.salle && <SalleBadge salle={event.salle} />}
+            </>
+          )}
+          {isMatchType(event.event_type) && (
             <MatchVenue
               isHome={resolveIsHome(event)}
               salle={event.salle}
               location={event.location}
             />
-          </div>
+          )}
+          <ItineraryButton query={venueQuery(event)} />
+        </div>
+
+        {/* Retour du Bureau (réunion du 04/11, relayée par Cindy) : "le
+            plus de cartes visibles en un clin d'œil" -- repliée par
+            défaut côté Bureau uniquement (allowClubWide, toujours faux
+            côté Coach/Famille, voir cardExpanded plus haut). Tout le
+            reste de la carte (notes, tarif, présences, bloc Organisation)
+            passe derrière ce bouton. Même patron que expandedIds/
+            toggleExpanded, buvette-manager.tsx. */}
+        {allowClubWide && (
+          <button
+            type="button"
+            onClick={() => toggleEventExpanded(event.id)}
+            className="flex w-fit items-center gap-1 text-[11px] font-medium text-zinc-500 hover:text-zinc-700"
+          >
+            {cardExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+            {cardExpanded ? "Voir moins" : "Voir plus"} de détails
+          </button>
         )}
 
+        {cardExpanded && (
+          <>
         {/* Écrite par le coach/Bureau à la création ou la modification,
             mais jusqu'ici jamais réaffichée nulle part — une note comme
             "RDV 45 min avant, tenue blanche" partait dans le vide. */}
@@ -2385,8 +2416,6 @@ export default function CalendarView({
             du 2026-08-25) — distinct de "Qui sera là ?" plus bas, qui ne
             parle que de présence à cet événement précis. */}
         {event.isPaid && <PaidParticipantsList players={event.paidParticipants} />}
-
-        <ItineraryButton query={venueQuery(event)} />
 
         {hasRoster && (
           <div className="flex flex-wrap gap-1.5">
@@ -2758,6 +2787,8 @@ export default function CalendarView({
               />
             </OrganisationCard>
           )}
+          </>
+        )}
       </div>
     );
   }
@@ -3074,17 +3105,14 @@ export default function CalendarView({
               filtre par équipe -- puis juste après "Matchs officiels du
               club" (deuxième retour du 12/09, ce dernier passe devant) --
               vérifié sur les 3 espaces (Bureau/Coach/Famille), un seul
-              composant partagé ici. "Domicile seulement" (retour de Cindy
-              du 24/09, "doit se trouver dans l'onglet déroulant 'filtrer
-              par'") : rejoint ce même menu plutôt qu'un pill séparé,
-              réservé au Bureau (isBureau) -- ce filtre n'a de sens que
-              pour qui voit tout le club. */}
+              composant partagé ici. "Domicile seulement" retiré le 04/11
+              (retour de Cindy, "doublon") : le découpage "Match officiel
+              (domicile)"/"(extérieur)" dans ce même menu couvre désormais
+              ce besoin. */}
           {(!forcedView || forcedView === "clubEvents") && (
             <EventTypeFilterDropdown
               hiddenTypes={hiddenEventTypes}
               onChange={updateHiddenEventTypes}
-              homeOnly={isBureau ? homeOnly : undefined}
-              onHomeOnlyChange={isBureau ? setHomeOnly : undefined}
             />
           )}
 

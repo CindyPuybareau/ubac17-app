@@ -36,10 +36,14 @@ export default function ItineraryButton({
         onClick={() => setOpen((v) => !v)}
         className={
           className ??
-          "flex items-center gap-1.5 rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50"
+          // Retour de Cindy du 04/11 ("plus petit le bouton itinéraire") :
+          // réduit une deuxième fois après l'avoir mis à côté de "Extérieur"
+          // -- jusque là identique à la taille d'un gros bouton d'action,
+          // trop lourd collé à du simple texte de lieu.
+          "flex items-center gap-1 rounded-full border border-zinc-200 px-2 py-1 text-[11px] font-semibold text-zinc-600 transition-colors hover:bg-zinc-50"
         }
       >
-        <Navigation className="h-3.5 w-3.5 shrink-0" />
+        <Navigation className="h-3 w-3 shrink-0" />
         Itinéraire
       </button>
 
