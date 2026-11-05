@@ -5321,6 +5321,15 @@ export default async function DashboardPage({
     supabase,
     (openHelperEventsRaw ?? []).map((e) => e.id)
   );
+  // Retour de Cindy du 05/11 ("un entraînement par un entraînement, un pop
+  // up par semaine") : une équipe peut avoir plusieurs occurrences futures
+  // déjà flaggées (toute la saison, voir create-event-form.tsx) -- une
+  // seule carte par équipe affichée à la fois, la PLUS PROCHE
+  // (openHelperEventsRaw déjà trié par start_time croissant, donc le
+  // premier rencontré par team_id est le bon). La suivante prend le
+  // relais d'elle-même une fois celle-ci passée (filtre
+  // gte(start_time, maintenant) plus haut).
+  const seenTeamIds = new Set<string | null>();
   const clubHelperEvents: ClubHelperEvent[] = (openHelperEventsRaw ?? [])
     .map((e) => {
       const need = (openHelperNeedsByEventId[e.id] ?? []).find(
@@ -5330,6 +5339,8 @@ export default async function DashboardPage({
       // voir ACCOMPAGNEMENT_REQUIRED_COUNT) : disparaît simplement, jamais
       // affiché "complet" (retour de Cindy du 04/11).
       if (!need || need.signups.length >= need.requiredCount) return null;
+      if (seenTeamIds.has(e.team_id)) return null;
+      seenTeamIds.add(e.team_id);
       const team = e.teams as unknown as { name: string | null } | null;
       return {
         eventId: e.id,
