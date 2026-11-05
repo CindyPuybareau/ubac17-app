@@ -34,6 +34,7 @@ export default function VolunteerNeedsPanel({
   needs,
   myPlayerIds,
   canManage,
+  canAddNeed = true,
   bare = false,
   onNeedAdded,
 }: {
@@ -41,6 +42,13 @@ export default function VolunteerNeedsPanel({
   needs: VolunteerNeed[];
   myPlayerIds: string[];
   canManage: boolean;
+  // Retour du Bureau du 04/11 : sur un entraînement "ouvert à tout le
+  // club" (calendar-view.tsx), seul le besoin Accompagnement, déjà créé
+  // depuis create-event-form.tsx, doit s'afficher -- jamais la possibilité
+  // d'en ajouter un deuxième quelconque (buvette, goûter...) qui ne
+  // s'afficherait de toute façon nulle part (règle "jamais sur un
+  // entraînement"). true partout ailleurs, comportement inchangé.
+  canAddNeed?: boolean;
   // Sans cadre ni titre propres : utilisé quand l'appelant regroupe ce
   // panneau et MatchTasksPanel sous un seul titre "Organisation" partagé
   // (retour de Cindy du 2026-08-20).
@@ -629,7 +637,7 @@ export default function VolunteerNeedsPanel({
 
       {error && <p className="text-xs text-red-600">{error}</p>}
 
-      {canManage && (
+      {canManage && canAddNeed && (
         <div className="flex flex-col gap-2">
           {addOpen ? (
             <div className="flex flex-col gap-2 rounded-lg border border-zinc-200 bg-white p-2.5">

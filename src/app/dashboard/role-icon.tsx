@@ -2,6 +2,7 @@ import {
   ClipboardList,
   Coffee,
   Flag,
+  HeartHandshake,
   KeyRound,
   Megaphone,
   Shirt,
@@ -24,6 +25,7 @@ export const ROLE_ICONS = {
   KeyRound: { component: KeyRound, label: "Clés", className: "text-zinc-600" },
   Megaphone: { component: Megaphone, label: "Annonce", className: "text-emerald-600" },
   Users: { component: Users, label: "Personnes", className: "text-blue-600" },
+  HeartHandshake: { component: HeartHandshake, label: "Coup de main", className: "text-amber-700" },
 } as const;
 
 export type RoleIconName = keyof typeof ROLE_ICONS;

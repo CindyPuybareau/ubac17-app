@@ -44,6 +44,7 @@ import type { RosterPlayer, TeamWithMembers } from "./team-manager";
 import CoachView from "./coach-view";
 import FamilyView from "./family-view";
 import WeekStripBanner, { type WeekStripEvent } from "./week-strip-banner";
+import ClubHelperBanner, { type ClubHelperEvent } from "./club-helper-banner";
 import type { FamilyTeamCardData } from "./family-team-card";
 import type { BirthdaySource } from "./birthdays";
 import type { AutomationKey } from "./automation-settings";
@@ -61,7 +62,11 @@ import {
   rolesForEventType,
   type EventTasksState,
 } from "./event-tasks";
-import { getVolunteerNeedsByEventId, type VolunteerNeed } from "./event-volunteer-needs";
+import {
+  ACCOMPAGNEMENT_ROLE_CODE,
+  getVolunteerNeedsByEventId,
+  type VolunteerNeed,
+} from "./event-volunteer-needs";
 import { getMatchOfficialRolesByEventId, type MatchOfficialAssignment } from "./match-official-roles";
 import { shouldOfferCarpool } from "./salles";
 import {
@@ -77,7 +82,7 @@ import {
 // seul endroit (un oubli sur l'une des 8 copies faisait silencieusement
 // diverger ce qu'un rôle voit par rapport à un autre, voir CLAUDE.md §3).
 const EVENTS_SELECT_COLUMNS =
-  "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, ffbb_phase, series_id, notes, attendance_requested_at, cancelled_at, cancelled_reason, team_score, opponent_score, emarque_code, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, teams(id, name, category), collectes(id, prix, payment_link)" as const;
+  "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, ffbb_phase, series_id, notes, attendance_requested_at, cancelled_at, cancelled_reason, team_score, opponent_score, emarque_code, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, open_to_club_helpers, teams(id, name, category), collectes(id, prix, payment_link)" as const;
 
 type PlayerRow = {
   id: string;
@@ -561,6 +566,10 @@ export type AdminUpcomingEvent = {
   // qui partagent sinon exactement la même forme. Null pour tout le
   // reste (réunion d'équipe, ou tout autre type d'événement).
   restrictedAudience: "BUREAU" | "COACHS" | null;
+  // Retour du Bureau du 04/11 ("U9 Mixte, un seul coach") : seulement vrai
+  // pour un entraînement explicitement ouvert, voir calendar-view.tsx/
+  // club-helper-banner.tsx.
+  openToClubHelpers: boolean;
   teamName: string;
   rsvpCounts: {
     present: number;
@@ -2739,6 +2748,7 @@ export default async function DashboardPage({
         targetProfileIds: e.target_profile_ids ?? null,
         targetProfileNotes: e.target_profile_notes ?? null,
         restrictedAudience: (e.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
+        openToClubHelpers: Boolean(e.open_to_club_helpers),
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, teamsById),
         rsvpCounts: buildRsvpCounts(rsvpsByEvent, e.id, eventRoster),
         // Retour de Cindy du 30/08 : "qui sera présent" visible partout, pas
@@ -3793,6 +3803,7 @@ export default async function DashboardPage({
         targetProfileIds: e.target_profile_ids ?? null,
         targetProfileNotes: e.target_profile_notes ?? null,
         restrictedAudience: (e.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
+        openToClubHelpers: Boolean(e.open_to_club_helpers),
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, clubTeamById),
         rsvpCounts: buildRsvpCounts(rsvpsByEvent, e.id, eventRoster),
         // Retour de Cindy du 30/08 : "qui sera présent" visible partout,
@@ -4536,6 +4547,7 @@ export default async function DashboardPage({
         targetProfileIds: e.target_profile_ids ?? null,
         targetProfileNotes: e.target_profile_notes ?? null,
         restrictedAudience: (e.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
+        openToClubHelpers: Boolean(e.open_to_club_helpers),
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, teamsById),
         rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
         // Retour de Cindy du 30/09 ("équipes sœurs") : un match de
@@ -5234,6 +5246,7 @@ export default async function DashboardPage({
       carpool: [],
       showCarpool: false,
       needs: coachVolunteerNeedsByEventId[e.id] ?? [],
+      openToClubHelpers: e.openToClubHelpers,
       matchOfficials: coachMatchOfficialRolesByEventId[e.id] ?? [],
       matchOfficialsEnabled: true,
       // Retour de Cindy du 30/09 ("équipes sœurs") -- corrigé après coup
@@ -5276,6 +5289,7 @@ export default async function DashboardPage({
       carpool: carpoolOffersByEventId[e.id] ?? [],
       showCarpool: shouldOfferCarpool(e),
       needs: familyVolunteerNeedsByEventId[e.id] ?? [],
+      openToClubHelpers: e.openToClubHelpers,
       matchOfficials: familyMatchOfficialRolesByEventId[e.id] ?? [],
       matchOfficialsEnabled: true,
     };
@@ -5288,6 +5302,49 @@ export default async function DashboardPage({
   // zéro pour un Bureau pur, donc retirer isAdmin d'ici ne change rien
   // pour lui ; ça répare seulement le cumul (Basile et les futurs cas
   // similaires).
+  // Retour du Bureau du 04/11 ("U9 Mixte, un seul coach pour 25+ enfants") :
+  // requête neuve, minimale, séparée des requêtes Bureau/Coach/Famille
+  // (volontairement scopées par équipe, voir EVENTS_SELECT_COLUMNS plus
+  // haut) -- celles-ci ne verraient jamais un entraînement d'une équipe
+  // dont le viewer ne fait pas partie. Visible par TOUT compte connecté
+  // (contrairement à showHeaderWeekBanner plus bas, qui masque WeekStripBanner
+  // pour un Bureau pur sans équipe coachée/fiche joueur), donc jamais
+  // conditionnée par isCoach/players.length ici.
+  const { data: openHelperEventsRaw } = await supabase
+    .from("events")
+    .select("id, title, event_type, start_time, end_time, salle, location, team_id, teams(name)")
+    .eq("event_type", "TRAINING")
+    .eq("open_to_club_helpers", true)
+    .gte("start_time", new Date().toISOString())
+    .order("start_time", { ascending: true });
+  const openHelperNeedsByEventId = await getVolunteerNeedsByEventId(
+    supabase,
+    (openHelperEventsRaw ?? []).map((e) => e.id)
+  );
+  const clubHelperEvents: ClubHelperEvent[] = (openHelperEventsRaw ?? [])
+    .map((e) => {
+      const need = (openHelperNeedsByEventId[e.id] ?? []).find(
+        (n) => n.roleCode === ACCOMPAGNEMENT_ROLE_CODE
+      );
+      // Pas de besoin créé (incohérence transitoire) ou déjà complet (3/3,
+      // voir ACCOMPAGNEMENT_REQUIRED_COUNT) : disparaît simplement, jamais
+      // affiché "complet" (retour de Cindy du 04/11).
+      if (!need || need.signups.length >= need.requiredCount) return null;
+      const team = e.teams as unknown as { name: string | null } | null;
+      return {
+        eventId: e.id,
+        needId: need.id,
+        teamName: team?.name ?? "Équipe",
+        startTime: e.start_time,
+        eventType: e.event_type,
+        endTime: e.end_time,
+        salle: e.salle,
+        location: e.location,
+        signupNames: need.signups.map((s) => s.playerName),
+      };
+    })
+    .filter((e): e is ClubHelperEvent => e !== null);
+
   const showHeaderWeekBanner = isCoach || players.length > 0;
   const headerWeekEvents: WeekStripEvent[] = showHeaderWeekBanner
     ? Array.from(
@@ -5321,6 +5378,7 @@ export default async function DashboardPage({
           <WeekStripBanner events={headerWeekEvents} />
         </div>
       )}
+      <ClubHelperBanner events={clubHelperEvents} />
       <DashboardTabs tabs={tabs} activeKey={activeTab} clubFunction={clubFunction} />
 
       {/* Cas normalement rare depuis que "Mon espace" couvre aussi un

@@ -207,6 +207,7 @@ export default function SpaceDashboardSummary({
     carpool: [],
     showCarpool: false,
     needs: e.needs,
+    openToClubHelpers: e.openToClubHelpers,
     matchOfficials: e.matchOfficials,
     matchOfficialsEnabled: e.matchOfficialsEnabled,
     readOnlyExternal: e.readOnlyExternal,
