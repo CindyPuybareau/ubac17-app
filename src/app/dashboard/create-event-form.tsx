@@ -8,6 +8,7 @@ import { SALLES } from "./salles";
 import { sendEventPush } from "./event-push";
 import DateTimePicker from "./date-time-picker";
 import RoleIcon from "./role-icon";
+import ConfirmDialog from "./confirm-dialog";
 import {
   Briefcase,
   Calendar,
@@ -28,6 +29,7 @@ import {
   STANDARD_VOLUNTEER_ROLES,
   notifyNewVolunteerNeed,
   volunteerRoleIcon,
+  volunteerRoleLabel,
   type VolunteerNeed,
 } from "./event-volunteer-needs";
 import { useToast } from "./toast-context";
@@ -368,6 +370,18 @@ export default function CreateEventForm({
       count: String(n.requiredCount),
     }))
   );
+  // Retour de Cindy ("quand on supprime quelque chose il faut toujours une
+  // confirmation", suite à la suppression accidentelle d'un besoin
+  // "Accompagnement entraînement" déjà en base) : une ligne jamais
+  // enregistrée (id === null) se retire sans rien demander -- il n'y a
+  // rien à perdre. Une ligne déjà en base passe par cette confirmation,
+  // quel que soit le besoin (buvette, goûter, accompagnement...).
+  const [removeDraftNeedTarget, setRemoveDraftNeedTarget] = useState<{
+    key: string;
+    id: string | null;
+    roleCode: string;
+    customLabel: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   // "Personnes spécifiques" / "+ Inclure aussi..." : liste club entière,
@@ -473,7 +487,27 @@ export default function CreateEventForm({
   }
 
   function removeDraftNeed(key: string) {
-    setDraftNeeds((rows) => rows.filter((r) => r.key !== key));
+    const target = draftNeeds.find((r) => r.key === key);
+    if (!target || target.id === null) {
+      setDraftNeeds((rows) => rows.filter((r) => r.key !== key));
+      if (target?.roleCode === ACCOMPAGNEMENT_ROLE_CODE) setOpenToClubHelpers(false);
+      return;
+    }
+    setRemoveDraftNeedTarget({
+      key: target.key,
+      id: target.id,
+      roleCode: target.roleCode,
+      customLabel: target.customLabel,
+    });
+  }
+
+  function confirmRemoveDraftNeed() {
+    if (!removeDraftNeedTarget) return;
+    setDraftNeeds((rows) => rows.filter((r) => r.key !== removeDraftNeedTarget.key));
+    if (removeDraftNeedTarget.roleCode === ACCOMPAGNEMENT_ROLE_CODE) {
+      setOpenToClubHelpers(false);
+    }
+    setRemoveDraftNeedTarget(null);
   }
 
   function updateDraftNeed(
@@ -1178,6 +1212,7 @@ export default function CreateEventForm({
   if (!open) return null;
 
   return (
+    <>
     <form
       ref={formRef}
       onSubmit={handleSubmit}
@@ -1724,10 +1759,21 @@ export default function CreateEventForm({
               disabled={repeatOpen}
               onChange={(e) => {
                 const checked = e.target.checked;
-                setOpenToClubHelpers(checked);
+                if (!checked) {
+                  // Décocher retire le besoin "Accompagnement entraînement" --
+                  // passe par removeDraftNeed (donc par la confirmation s'il
+                  // est déjà en base) au lieu de le retirer directement.
+                  const existing = draftNeeds.find((r) => r.roleCode === ACCOMPAGNEMENT_ROLE_CODE);
+                  if (existing) {
+                    removeDraftNeed(existing.key);
+                    return;
+                  }
+                  setOpenToClubHelpers(false);
+                  return;
+                }
+                setOpenToClubHelpers(true);
                 setDraftNeeds((rows) => {
                   const rest = rows.filter((r) => r.roleCode !== ACCOMPAGNEMENT_ROLE_CODE);
-                  if (!checked) return rest;
                   const existing = rows.find((r) => r.roleCode === ACCOMPAGNEMENT_ROLE_CODE);
                   return [
                     ...rest,
@@ -1930,6 +1976,19 @@ export default function CreateEventForm({
         </div>
       </div>
     </form>
+    <ConfirmDialog
+      open={removeDraftNeedTarget !== null}
+      title="Retirer ce besoin ?"
+      message={
+        removeDraftNeedTarget
+          ? `"${volunteerRoleLabel(removeDraftNeedTarget.roleCode, removeDraftNeedTarget.customLabel)}" sera retiré à l'enregistrement, avec les inscriptions déjà faites.`
+          : ""
+      }
+      confirmLabel="Retirer"
+      onConfirm={confirmRemoveDraftNeed}
+      onCancel={() => setRemoveDraftNeedTarget(null)}
+    />
+    </>
   );
 }
 
