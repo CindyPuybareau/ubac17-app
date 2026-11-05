@@ -20,6 +20,7 @@ import MatchVenue from "./match-venue";
 import SalleBadge from "./salle-badge";
 import ItineraryButton from "./itinerary-button";
 import { venueQuery } from "./salles";
+import { ACCOMPAGNEMENT_ROLE_CODE } from "./event-volunteer-needs";
 import type { EventRoleType, EventTasksState, CarpoolOffer } from "./event-tasks";
 import type { VolunteerNeed } from "./event-volunteer-needs";
 import type { MatchOfficialAssignment } from "./match-official-roles";
@@ -121,6 +122,10 @@ export type WeekStripEvent = {
   carpool: CarpoolOffer[];
   showCarpool: boolean;
   needs: VolunteerNeed[];
+  // Retour du Bureau du 04/11 ("U9 Mixte, un seul coach") : seul cas où un
+  // entraînement laisse quand même passer un besoin (Accompagnement, voir
+  // isTrainingOpenToHelpers plus haut).
+  openToClubHelpers: boolean;
   // "Organisation match à domicile" (retour de Cindy du 17/09) : même bloc
   // que calendar-view.tsx (MatchOfficialsPanel), gaté sur isMatchType +
   // isHome dans DayEventCard plus bas.
@@ -225,10 +230,17 @@ export function DayEventCard({ event }: { event: WeekStripEvent }) {
       : `rounded-2xl border border-zinc-100 bg-white p-3.5 shadow-sm border-l-4 ${style.border}`;
 
   // Même règle que calendar-view.tsx : jamais d'onglet Organisation pour un
-  // entraînement, même s'il porte un jour un rôle/besoin en base.
+  // entraînement, même s'il porte un jour un rôle/besoin en base -- SAUF le
+  // besoin Accompagnement sur un entraînement explicitement ouvert
+  // (event.openToClubHelpers, retour du Bureau du 04/11), jamais
+  // MatchTasksPanel dans ce cas.
   const isTraining = event.eventType === "TRAINING";
+  const isTrainingOpenToHelpers = isTraining && event.openToClubHelpers;
   const hasTasks = !isTraining && (event.roles.length > 0 || event.showCarpool);
-  const hasNeeds = !isTraining && event.needs.length > 0;
+  const needs = isTrainingOpenToHelpers
+    ? event.needs.filter((n) => n.roleCode === ACCOMPAGNEMENT_ROLE_CODE)
+    : event.needs;
+  const hasNeeds = (!isTraining || isTrainingOpenToHelpers) && needs.length > 0;
   // "Organisation match à domicile" (retour de Cindy du 17/09) : match
   // officiel/amical à domicile seulement, même règle que calendar-view.tsx
   // (isHomeMatch). `home` (resolveIsHome) retombe sur parseMatchTitle si
@@ -424,7 +436,7 @@ export function DayEventCard({ event }: { event: WeekStripEvent }) {
           {hasNeeds && (
             <VolunteerNeedsPanel
               eventId={event.id}
-              needs={event.needs}
+              needs={needs}
               myPlayerIds={event.rsvpPlayers.map((p) => p.id)}
               canManage={false}
               bare
@@ -448,9 +460,10 @@ export function DayEventCard({ event }: { event: WeekStripEvent }) {
         <OrganisationCard>
           <VolunteerNeedsPanel
             eventId={event.id}
-            needs={event.needs}
+            needs={needs}
             myPlayerIds={[]}
             canManage={!event.readOnlyExternal}
+            canAddNeed={!isTrainingOpenToHelpers}
             bare
           />
         </OrganisationCard>

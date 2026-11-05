@@ -239,6 +239,10 @@ export default function ChildDashboard({
     carpool: [],
     showCarpool: false,
     needs: [],
+    // Même frontière de sécurité que needs=[] ci-dessus (retour du Bureau
+    // du 04/11) : l'Enfant n'a jamais ce bloc, même sur un entraînement
+    // ouvert à tout le club.
+    openToClubHelpers: false,
     matchOfficials: [],
     // Même frontière de sécurité que needs=[] ci-dessus (voir le
     // commentaire en tête de fonction) : jamais de panneau "Organisation

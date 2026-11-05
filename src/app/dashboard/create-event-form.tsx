@@ -8,9 +8,22 @@ import { SALLES } from "./salles";
 import { sendEventPush } from "./event-push";
 import DateTimePicker from "./date-time-picker";
 import RoleIcon from "./role-icon";
-import { Briefcase, Calendar, CalendarSync, ChevronDown, ChevronUp, Clock, Euro, Plus, X } from "lucide-react";
+import {
+  Briefcase,
+  Calendar,
+  CalendarSync,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  Euro,
+  HeartHandshake,
+  Plus,
+  X,
+} from "lucide-react";
 import { EVENT_TYPE_OPTIONS, showsImpactTime, styleFor } from "./event-style";
 import {
+  ACCOMPAGNEMENT_REQUIRED_COUNT,
+  ACCOMPAGNEMENT_ROLE_CODE,
   CUSTOM_ROLE_CODE,
   STANDARD_VOLUNTEER_ROLES,
   notifyNewVolunteerNeed,
@@ -252,6 +265,13 @@ export default function CreateEventForm({
     editingEvent?.paidAmount != null ? String(editingEvent.paidAmount) : ""
   );
   const [paidLink, setPaidLink] = useState(() => editingEvent?.paymentLink ?? "");
+  // Retour du Bureau du 04/11 ("U9 Mixte, un seul coach pour 25+ enfants") :
+  // propre à un entraînement, au cas par cas (pas un réglage d'équipe
+  // permanent) -- voir calendar-view.tsx/club-helper-banner.tsx pour ce que
+  // ça déclenche une fois coché.
+  const [openToClubHelpers, setOpenToClubHelpers] = useState(
+    () => editingEvent?.openToClubHelpers ?? false
+  );
   // Portée de l'événement : un choix à plat, direct, plutôt que de faire
   // passer "équipes spécifiques" par un détour via "Tous les groupes" —
   // c'est ce détour qui donnait l'impression qu'on ne pouvait choisir
@@ -723,6 +743,9 @@ export default function CreateEventForm({
           targetProfileIds: row.target_profile_ids,
           targetProfileNotes: row.target_profile_notes,
           restrictedAudience: (row.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
+          // Jamais pour une série (voir le commentaire plus haut, "Répéter")
+          // -- à activer occurrence par occurrence après coup via "Modifier".
+          openToClubHelpers: false,
           teamName,
           rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
         }))
@@ -753,6 +776,7 @@ export default function CreateEventForm({
       target_profile_ids: string[] | null;
       target_profile_notes: { id: string; name: string; note: string }[] | null;
       restricted_audience?: "BUREAU" | "COACHS" | null;
+      open_to_club_helpers: boolean;
     } = {
       title: eventName,
       event_type: effectiveEventType,
@@ -775,6 +799,10 @@ export default function CreateEventForm({
       // état).
       target_profile_ids: effectiveTargetProfileIds,
       target_profile_notes: effectiveTargetProfileNotes,
+      // Retour du Bureau du 04/11 : seulement un entraînement peut être
+      // "ouvert à tout le club pour accompagner" -- jamais vrai pour un
+      // autre type, même si la case a été cochée puis le type changé.
+      open_to_club_helpers: effectiveEventType === "TRAINING" ? openToClubHelpers : false,
     };
     // La portée club-wide/équipes spécifiques n'est modifiable que par qui
     // peut créer un événement club (allowClubWide) — un coach n'a même pas
@@ -805,7 +833,7 @@ export default function CreateEventForm({
       : supabase.from("events").insert(eventPayload);
     const { data: inserted, error } = await query
       .select(
-        "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, ffbb_phase, series_id, notes, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience"
+        "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, ffbb_phase, series_id, notes, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, open_to_club_helpers"
       )
       .single();
 
@@ -983,6 +1011,7 @@ export default function CreateEventForm({
         targetProfileIds: inserted.target_profile_ids,
         targetProfileNotes: inserted.target_profile_notes,
         restrictedAudience: (inserted.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
+        openToClubHelpers: inserted.open_to_club_helpers,
         teamName,
       });
     } else {
@@ -1016,6 +1045,7 @@ export default function CreateEventForm({
           targetProfileIds: inserted.target_profile_ids,
         targetProfileNotes: inserted.target_profile_notes,
         restrictedAudience: (inserted.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
+          openToClubHelpers: inserted.open_to_club_helpers,
           teamName,
           rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
         },
@@ -1040,7 +1070,13 @@ export default function CreateEventForm({
         count: Number(n.count) || 0,
         sortOrder: i,
       }))
-      .filter((n) => n.count > 0);
+      .filter((n) => n.count > 0)
+      // Garde-fou (retour du Bureau du 04/11) : si le type a changé après
+      // coup (un entraînement rebasculé en match, par ex.), le besoin
+      // Accompagnement laissé dans draftNeeds par le préremplissage ne doit
+      // jamais survivre -- cohérent avec open_to_club_helpers, forcé à
+      // false pour tout type hors TRAINING juste au-dessus (eventPayload).
+      .filter((n) => effectiveEventType === "TRAINING" || n.roleCode !== ACCOMPAGNEMENT_ROLE_CODE);
     const needsToInsert = validDraftNeeds.filter((n) => n.id === null);
     const validDraftNeedIds = new Set(validDraftNeeds.map((n) => n.id).filter((id): id is string => id !== null));
     const needsToDelete = existingNeeds
@@ -1664,6 +1700,63 @@ export default function CreateEventForm({
         </div>
       )}
 
+      {/* Retour du Bureau du 04/11 ("U9 Mixte, un seul coach pour 25+
+          enfants") : propre à un entraînement, au cas par cas -- jamais
+          pour une série répétée (même raison/même désactivation que
+          "Événement payant" juste au-dessus : pas encore pris en charge à
+          la création groupée, voir le commentaire sur repeatOpen). Le
+          besoin "Accompagnement entraînement" (plafonné à 3, voir
+          event-volunteer-needs.ts) est géré via le même mécanisme que
+          "Besoins d'organisation" plus bas (draftNeeds) plutôt qu'une
+          écriture séparée -- une case cochée ajoute cette ligne, décochée
+          la retire, et la sauvegarde existante (diff création/mise à
+          jour/suppression) s'en occupe sans code neuf. */}
+      {eventType === "TRAINING" && (
+        <div
+          className={`flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3 ${
+            repeatOpen ? "opacity-50" : ""
+          }`}
+        >
+          <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
+            <input
+              type="checkbox"
+              checked={openToClubHelpers}
+              disabled={repeatOpen}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setOpenToClubHelpers(checked);
+                setDraftNeeds((rows) => {
+                  const rest = rows.filter((r) => r.roleCode !== ACCOMPAGNEMENT_ROLE_CODE);
+                  if (!checked) return rest;
+                  const existing = rows.find((r) => r.roleCode === ACCOMPAGNEMENT_ROLE_CODE);
+                  return [
+                    ...rest,
+                    {
+                      key: existing?.key ?? `accompagnement-${Date.now()}`,
+                      id: existing?.id ?? null,
+                      roleCode: ACCOMPAGNEMENT_ROLE_CODE,
+                      customLabel: "",
+                      count: String(ACCOMPAGNEMENT_REQUIRED_COUNT),
+                    },
+                  ];
+                });
+              }}
+              className="h-4 w-4 rounded border-zinc-300 text-navy focus:ring-navy disabled:opacity-60"
+            />
+            <HeartHandshake className="h-3.5 w-3.5 shrink-0 text-amber-700" />
+            Ouvert à tout le club pour accompagner
+            {repeatOpen ? " (indisponible pour une série répétée)" : ""}
+          </label>
+          {openToClubHelpers && (
+            <p className="text-[11px] text-zinc-400">
+              Visible sur le tableau de bord de tout le monde (Bureau, coachs,
+              familles), même sans enfant dans cette équipe — jusqu&apos;à {ACCOMPAGNEMENT_REQUIRED_COUNT}{" "}
+              personnes peuvent s&apos;inscrire par leur nom.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* "+ Inclure aussi..." : ajout facultatif par-dessus n'importe
           quelle autre portée (équipe, tout le club, Réunion...) -- retour
           de Cindy du 18/09 ("les inclure dans des événements") : le coach
@@ -1717,8 +1810,13 @@ export default function CreateEventForm({
           pour ce type d'événement, Bureau ou équipe -- rien à montrer ici
           plutôt qu'un contrôle qui semblerait actif sans l'être. Retour de
           Cindy du 18/09 ("À faire") : sans objet pour cette portée non
-          plus. */}
-      {!isReunion && !isPersonalTask && (
+          plus. Retour du Bureau du 04/11 : un entraînement a sa propre
+          case "Ouvert à tout le club pour accompagner" juste au-dessus --
+          ce sélecteur générique (buvette/goûter/autre...) resterait un
+          contrôle sans effet visible (règle "jamais sur un entraînement",
+          calendar-view.tsx), donc caché ici plutôt que de laisser croire
+          qu'on peut y ajouter un deuxième besoin quelconque. */}
+      {!isReunion && !isPersonalTask && eventType !== "TRAINING" && (
         <>
       {/* Même liste standard que sur la carte de l'événement (VolunteerNeedsPanel)
           — les deux lisent/écrivent la même table. Retour de Cindy du 10/09 :

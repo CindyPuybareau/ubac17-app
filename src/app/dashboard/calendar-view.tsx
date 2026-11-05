@@ -79,7 +79,11 @@ import {
   type EventTasksState,
 } from "./event-tasks";
 import VolunteerNeedsPanel from "./volunteer-needs-panel";
-import { notifyNewVolunteerNeed, type VolunteerNeed } from "./event-volunteer-needs";
+import {
+  ACCOMPAGNEMENT_ROLE_CODE,
+  notifyNewVolunteerNeed,
+  type VolunteerNeed,
+} from "./event-volunteer-needs";
 import { MATCH_OFFICIAL_ROLES, type MatchOfficialAssignment } from "./match-official-roles";
 import MatchOfficialsPanel from "./match-officials-panel";
 import ConfirmDialog from "./confirm-dialog";
@@ -1104,6 +1108,9 @@ export default function CalendarView({
           // Toujours un MATCH ici (voir le .eq plus haut) -- jamais une
           // Réunion, restrictedAudience ne s'applique donc jamais.
           restrictedAudience: null,
+          // Toujours un MATCH ici -- openToClubHelpers ne concerne que les
+          // entraînements.
+          openToClubHelpers: false,
           teamName: team?.name ?? "Équipe",
           rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
           presentPlayers: [],
@@ -2553,14 +2560,24 @@ export default function CalendarView({
             seulement, jamais la gestion complète. Le bouton Présent/Absent
             juste au-dessus reste lui strictement gardé par
             !event.readOnlyExternal, inchangé. */}
+        {/* Retour du Bureau du 04/11 ("U9 Mixte, un seul coach") : un
+            entraînement explicitement ouvert (event.openToClubHelpers,
+            voir create-event-form.tsx) lève l'exclusion habituelle UNIQUEMENT
+            pour le besoin Accompagnement -- jamais MatchTasksPanel/
+            MatchOfficialsPanel, ni un autre besoin, voir isTrainingOpenToHelpers
+            ci-dessous. */}
         {!canManageEvent &&
           (!event.readOnlyExternal || event.volunteeringOpen) &&
-          event.event_type !== "TRAINING" &&
+          (event.event_type !== "TRAINING" || event.openToClubHelpers) &&
           event.event_type !== "REUNION" &&
           (() => {
-          const roles = rolesForEventType(eventRoles, event.event_type);
-          const hasTasks = roles.length > 0 || shouldOfferCarpool(event);
-          const needs = volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds;
+          const isTrainingOpenToHelpers = event.event_type === "TRAINING" && event.openToClubHelpers;
+          const roles = isTrainingOpenToHelpers ? [] : rolesForEventType(eventRoles, event.event_type);
+          const hasTasks = !isTrainingOpenToHelpers && (roles.length > 0 || shouldOfferCarpool(event));
+          const needsRaw = volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds;
+          const needs = isTrainingOpenToHelpers
+            ? needsRaw.filter((n) => n.roleCode === ACCOMPAGNEMENT_ROLE_CODE)
+            : needsRaw;
           const hasNeeds = needs.length > 0;
           // "Organisation match à domicile" (retour de Cindy du 17/09) :
           // match officiel/amical à domicile seulement, jamais tournoi
@@ -2706,10 +2723,18 @@ export default function CalendarView({
             probablement la plus consultée (retour de Cindy du
             2026-08-21 : "dans le bureau aussi il y en a"). Même règle
             "jamais sur un entraînement" que ci-dessus (retour de Cindy du
-            2026-08-24). Ni entraînement ni Réunion (retour de Cindy du
-            16/09) : une réunion Bureau n'a ni maillots/goûter ni besoin
-            bénévole à gérer. */}
-        {canManageEvent && event.event_type !== "TRAINING" && event.event_type !== "REUNION" && (
+            2026-08-24), SAUF le besoin Accompagnement sur un entraînement
+            ouvert (event.openToClubHelpers, retour du Bureau du 04/11) --
+            voir isTrainingOpenToHelpers plus bas, jamais MatchTasksPanel ni
+            "Ajouter un besoin" dans ce cas. Ni entraînement (hors ce cas)
+            ni Réunion (retour de Cindy du 16/09) : une réunion Bureau n'a
+            ni maillots/goûter ni besoin bénévole à gérer. */}
+        {canManageEvent &&
+          (event.event_type !== "TRAINING" || event.openToClubHelpers) &&
+          event.event_type !== "REUNION" &&
+          (() => {
+          const isTrainingOpenToHelpers = event.event_type === "TRAINING" && event.openToClubHelpers;
+          return (
           <OrganisationCard defaultOpen={organisationDefaultOpen}>
             {organisationLoading ? (
               // Retour de Cindy du 16/09 : cette carte s'affiche toujours
@@ -2738,23 +2763,32 @@ export default function CalendarView({
                     rsvpVisiblePlayers qui se limite à sa propre fiche) et
                     canAssignAnyone pour que le coach affecte maillots/
                     goûter à n'importe quel joueur, pas seulement lui-même. */}
-                <MatchTasksPanel
-                  eventId={event.id}
-                  eventDate={event.start_time}
-                  roster={respondingPlayers}
-                  myPlayerIds={selfPlayerId ? [selfPlayerId] : []}
-                  canAssignAnyone
-                  initialTasks={tasksByEventId[event.id] ?? emptyEventTasks}
-                  initialCarpool={carpoolByEventId[event.id] ?? emptyCarpool}
-                  roles={rolesForEventType(eventRoles, event.event_type)}
-                  showCarpool={shouldOfferCarpool(event)}
-                  bare
-                />
+                {!isTrainingOpenToHelpers && (
+                  <MatchTasksPanel
+                    eventId={event.id}
+                    eventDate={event.start_time}
+                    roster={respondingPlayers}
+                    myPlayerIds={selfPlayerId ? [selfPlayerId] : []}
+                    canAssignAnyone
+                    initialTasks={tasksByEventId[event.id] ?? emptyEventTasks}
+                    initialCarpool={carpoolByEventId[event.id] ?? emptyCarpool}
+                    roles={rolesForEventType(eventRoles, event.event_type)}
+                    showCarpool={shouldOfferCarpool(event)}
+                    bare
+                  />
+                )}
                 <VolunteerNeedsPanel
                 eventId={event.id}
-                needs={volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds}
+                needs={
+                  isTrainingOpenToHelpers
+                    ? (volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds).filter(
+                        (n) => n.roleCode === ACCOMPAGNEMENT_ROLE_CODE
+                      )
+                    : (volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds)
+                }
                 myPlayerIds={[]}
                 canManage
+                canAddNeed={!isTrainingOpenToHelpers}
                 bare
                 onNeedAdded={(n) =>
                   notifyNewVolunteerNeed(createClient(), {
@@ -2770,7 +2804,8 @@ export default function CalendarView({
               </>
             )}
           </OrganisationCard>
-        )}
+          );
+        })()}
         {canManageEvent &&
           event.event_type !== "TRAINING" &&
           event.event_type !== "REUNION" &&

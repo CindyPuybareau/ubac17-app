@@ -72,6 +72,9 @@ export type SpaceDashboardNextEvent = {
   // ci-dessus.
   pendingPlayers: { id: string; firstName: string | null; lastName: string | null }[];
   needs: VolunteerNeed[];
+  // Retour du Bureau du 04/11 ("U9 Mixte, un seul coach") : même champ que
+  // WeekStripEvent (week-strip-banner.tsx), la carte étant partagée.
+  openToClubHelpers: boolean;
   // "Organisation match à domicile" (retour de Cindy du 17/09) : même bloc
   // que WeekStripEvent (week-strip-banner.tsx), la carte étant partagée.
   matchOfficials: MatchOfficialAssignment[];
@@ -321,7 +324,7 @@ export async function getSpaceDashboardSummary(
         let q = supabase
           .from("events")
           .select(
-            "id, title, event_type, start_time, end_time, impact_time, notes, location, salle, is_home, team_id, target_team_ids, cancelled_at, cancelled_reason, teams(name), collectes(payment_link)"
+            "id, title, event_type, start_time, end_time, impact_time, notes, location, salle, is_home, team_id, target_team_ids, cancelled_at, cancelled_reason, open_to_club_helpers, teams(name), collectes(payment_link)"
           )
           .gte("start_time", nowIso)
           .lt("start_time", horizonIso)
@@ -497,6 +500,7 @@ export async function getSpaceDashboardSummary(
     target_team_ids: string[] | null;
     cancelled_at: string | null;
     cancelled_reason: string | null;
+    open_to_club_helpers: boolean | null;
     teams: { name: string | null } | null;
     // "Événement payant" (voir resolvePaidInfo, page.tsx) : dérivé de la
     // présence d'une collecte rattachée (collectes.event_id), jamais
@@ -720,6 +724,7 @@ export async function getSpaceDashboardSummary(
         absentPlayers,
         pendingPlayers,
         needs: needsByEventId[row.id] ?? [],
+        openToClubHelpers: Boolean(row.open_to_club_helpers),
         matchOfficials: matchOfficialsByEventId[row.id] ?? [],
         matchOfficialsEnabled: true,
         readOnlyExternal: Boolean(row.team_id && siblingTeamIdSet.has(row.team_id)),

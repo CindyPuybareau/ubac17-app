@@ -19,6 +19,12 @@ export type StandardVolunteerRole = {
   icon: RoleIconName;
 };
 
+// Retour du Bureau du 04/11 : code stable réutilisé par create-event-form.tsx
+// (case "Ouvert à tout le club pour accompagner") et calendar-view.tsx/
+// *-card.tsx (lever l'exclusion "jamais sur un entraînement" UNIQUEMENT pour
+// ce besoin précis) -- jamais un deuxième endroit où ce code est répété en dur.
+export const ACCOMPAGNEMENT_ROLE_CODE = "ACCOMPAGNEMENT_ENTRAINEMENT";
+
 export const STANDARD_VOLUNTEER_ROLES: StandardVolunteerRole[] = [
   // Retour de Cindy du 13/09 : besoin en premier dans la liste, distinct du
   // "goûter" de event-tasks.ts (JERSEYS/SNACKS, un seul responsable désigné
@@ -29,7 +35,19 @@ export const STANDARD_VOLUNTEER_ROLES: StandardVolunteerRole[] = [
   { code: "BUVETTE", label: "Buvette", icon: "Coffee" },
   { code: "INSTALLATION", label: "Installation / Rangement", icon: "KeyRound" },
   { code: "LAVAGE_MAILLOTS", label: "Lavage maillots", icon: "Shirt" },
+  // Retour du Bureau du 04/11 ("U9 Mixte, un seul coach pour 25+ enfants") :
+  // seul rôle de cette liste proposé sur un ENTRAÎNEMENT (voir
+  // calendar-view.tsx/openToClubHelpers) -- les autres restent réservés aux
+  // matchs/tournois/événements club par 20261014000000_scope_volunteer_
+  // roles_away_from_training.sql, qu'on ne touche pas.
+  { code: ACCOMPAGNEMENT_ROLE_CODE, label: "Accompagnement entraînement", icon: "HeartHandshake" },
 ];
+
+// Plafond fixe (retour de Cindy du 04/11, "3 max, pas besoin d'être
+// pollué") : pas de champ éditable, toujours 3 pour ce besoin précis --
+// la bannière club-wide (club-helper-banner.tsx) masque l'entraînement dès
+// que ce plafond est atteint plutôt que d'afficher "complet".
+export const ACCOMPAGNEMENT_REQUIRED_COUNT = 3;
 
 // Retirés du choix à la création (retour de Cindy du 17/09) : redondants
 // avec "Organisation match officiel" (match-official-roles.ts) -- Table de
@@ -257,6 +275,27 @@ export type VolunteerNeed = {
   requiredCount: number;
   signups: VolunteerSignup[];
 };
+
+// Auto-inscription par nom libre, pour un entraînement "ouvert à tout le
+// club" (retour de Cindy du 04/11) : contrairement à assignGuest()
+// (volunteer-needs-panel.tsx, réservé à qui gère l'événement), ici
+// n'importe quel membre connecté peut s'ajouter lui-même, même sans aucun
+// enfant sur l'équipe concernée -- la policy RLS "self-service guest
+// insert on open trainings" (migration dédiée) n'autorise cet insert QUE
+// si l'événement du besoin porte open_to_club_helpers = true, donc jamais
+// un détournement vers un autre besoin.
+export async function volunteerAsGuest(
+  supabase: SupabaseClient,
+  needId: string,
+  fullName: string
+): Promise<{ error: string | null }> {
+  const { error } = await supabase.from("event_volunteer_signups").insert({
+    need_id: needId,
+    guest_name: fullName,
+    source: "VOLUNTEER",
+  });
+  return { error: error?.message ?? null };
+}
 
 export async function getVolunteerNeedsByEventId(
   supabase: SupabaseClient,
