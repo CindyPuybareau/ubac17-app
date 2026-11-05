@@ -117,8 +117,8 @@ export default function ClubHelperBanner({ events }: { events: ClubHelperEvent[]
       <p className="flex items-center gap-2 text-sm font-bold text-navy">
         <HeartHandshake className="h-4 w-4 shrink-0 text-amber-700" />
         {events.length === 1
-          ? "Un coup de main est demandé"
-          : `Un coup de main est demandé pour ${events.length} entraînements`}
+          ? "Besoin accompagnant pour l'entraînement"
+          : `Besoin accompagnant pour ${events.length} entraînements`}
       </p>
       {events.map((event) => (
         <ClubHelperCard key={event.eventId} event={event} />
