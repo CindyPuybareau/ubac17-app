@@ -88,18 +88,22 @@ function ClubHelperCard({ event }: { event: ClubHelperEvent }) {
       )}
 
       <div className="flex flex-wrap items-center gap-2">
+        {/* Retour de Cindy du 05/11 ("attention au responsive sur tel") :
+            placeholder raccourci + texte réduit (text-xs) des deux côtés --
+            "Ton prénom et nom" se tronquait mal sous ~340px de large. Ligne
+            unique volontairement conservée (jamais agrandir la carte). */}
         <input
           type="text"
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
-          placeholder="Ton prénom et nom"
-          className="min-w-0 flex-1 rounded-lg border border-zinc-200 px-3 py-1.5 text-sm"
+          placeholder="Prénom Nom"
+          className="min-w-0 flex-1 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs"
         />
         <button
           type="button"
           disabled={submitting || !fullName.trim()}
           onClick={submit}
-          className="flex shrink-0 items-center gap-1.5 rounded-full bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-700 disabled:opacity-60"
+          className="flex shrink-0 items-center gap-1.5 rounded-full bg-amber-600 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-700 disabled:opacity-60"
         >
           Je me propose
         </button>
