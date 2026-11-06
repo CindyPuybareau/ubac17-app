@@ -2898,6 +2898,71 @@ export default function CalendarView({
     // "résultats" pour ne pas avoir deux traitements différents du même
     // match selon l'onglet où on le regarde.
     const cardShellClass = eventCardShellClass(event, style, "result");
+
+    // Retour de Cindy du 06/11 ("les cartes dans Matchs officiels ne sont
+    // pas toutes comme demandées") : un match déjà joué passe par CETTE
+    // fonction (jamais renderEventCard, voir son appelant plus bas,
+    // hasAlreadyStarted) -- jusqu'ici jamais compactée comme
+    // renderEventCard, même dans l'onglet "Matchs officiels" où les deux
+    // se côtoient. Même patron qu'au-dessus : contenu extrait une seule
+    // fois, fusionné sur une ligne côté Bureau (allowClubWide), inchangé
+    // (chacun sur sa propre ligne) côté Coach/Famille.
+    const timeRow = (
+      <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-zinc-500">
+        <span className="flex items-center gap-1">
+          <Clock className="h-3 w-3 shrink-0" />
+          {formatEventTime(event.start_time, event.end_time)}
+        </span>
+        {/* Retour de Cindy du 12/09 ("heure d'impact") : même principe
+            que renderEventCard plus haut (showsImpactTime ajouté le
+            28/10, sans effet concret ici -- une carte Résultat n'existe
+            déjà que pour un MATCH, jamais un entraînement, mais garde
+            la même garde-fou que partout ailleurs). */}
+        {event.impactTime && showsImpactTime(event.event_type) && (
+          <span className="flex items-center gap-1 font-semibold text-amber-700">
+            <AlarmClock className="h-3 w-3 shrink-0" />
+            {formatImpactTime(event.impactTime)}
+          </span>
+        )}
+      </span>
+    );
+    // Retour de Cindy du 19/10 ("sous la date et l'heure, partout") :
+    // Domicile/Extérieur fusionné avec le lieu -- cette vue est toujours
+    // un match (MATCH/FRIENDLY).
+    const venueRow = (
+      <span className="flex flex-wrap text-xs text-zinc-500">
+        <MatchVenue
+          isHome={resolveIsHome(event)}
+          salle={event.salle}
+          location={event.location}
+          size="sm"
+        />
+      </span>
+    );
+    const scoreOrUpcoming = alreadyPlayed ? (
+      <MatchScore
+        eventId={event.id}
+        teamScore={event.teamScore}
+        opponentScore={event.opponentScore}
+        canEdit={canManageEvent}
+        onSaved={(teamScore, opponentScore) =>
+          updateLocalEventScore(event.id, teamScore, opponentScore)
+        }
+      />
+    ) : (
+      <span className="w-fit rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-semibold text-zinc-400">
+        À venir
+      </span>
+    );
+    const emarqueField = event.event_type === "MATCH" && resolveIsHome(event) === true && (
+      <MatchEmarqueCode
+        eventId={event.id}
+        code={event.emarqueCode}
+        canEdit={allowClubWide}
+        onSaved={(code) => updateLocalEventEmarqueCode(event.id, code)}
+      />
+    );
+
     return (
       <div key={event.id} className={`flex flex-col gap-1.5 ${cardShellClass}`}>
         {alreadyPlayed && (
@@ -2918,9 +2983,43 @@ export default function CalendarView({
               défaut sa largeur de contenu maximale (min-width: auto), donc
               le nom de l'adversaire le plus long forçait toute la carte —
               et la page entière en mobile — à déborder à droite. */}
-          <span className="min-w-0 truncate text-xs font-semibold uppercase tracking-wide text-zinc-400">
-            {event.teamName}
-          </span>
+          <div
+            className={
+              allowClubWide
+                ? "flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5"
+                : "flex min-w-0 flex-col gap-1.5"
+            }
+          >
+            <span className="min-w-0 truncate text-xs font-semibold uppercase tracking-wide text-ubac-blue">
+              {event.teamName}
+            </span>
+            <span className="flex flex-wrap items-center gap-2">
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${style.badge}`}
+              >
+                {style.label}
+              </span>
+              {/* Retour de Cindy du 30/10 : un match annulé avant d'avoir
+                  été joué atterrit ici une fois sa date passée (plus de
+                  bouton ici, voir renderEventCard pour Annuler/
+                  Réactiver). */}
+              {event.cancelledAt && (
+                <span className="flex items-center gap-1 rounded-full bg-status-urgent/10 px-2 py-0.5 text-[10px] font-bold uppercase text-status-urgent-dark">
+                  <Ban className="h-3 w-3 shrink-0" />
+                  Annulé
+                </span>
+              )}
+            </span>
+            <OpponentDisplay title={event.title} size="sm" />
+            {allowClubWide && (
+              <>
+                {timeRow}
+                {venueRow}
+                {scoreOrUpcoming}
+                {emarqueField}
+              </>
+            )}
+          </div>
           <div className="flex shrink-0 items-center gap-1">
             <span className="whitespace-nowrap text-xs font-bold text-ubac-blue">
               {new Date(event.start_time).toLocaleDateString("fr-FR", {
@@ -2946,77 +3045,13 @@ export default function CalendarView({
           </div>
         </div>
 
-        <span className="flex flex-wrap items-center gap-2">
-          <span
-            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${style.badge}`}
-          >
-            {style.label}
-          </span>
-          {/* Retour de Cindy du 30/10 : un match annulé avant d'avoir été
-              joué atterrit ici une fois sa date passée (plus de bouton ici,
-              voir renderEventCard pour Annuler/Réactiver). */}
-          {event.cancelledAt && (
-            <span className="flex items-center gap-1 rounded-full bg-status-urgent/10 px-2 py-0.5 text-[10px] font-bold uppercase text-status-urgent-dark">
-              <Ban className="h-3 w-3 shrink-0" />
-              Annulé
-            </span>
-          )}
-        </span>
-
-        <OpponentDisplay title={event.title} size="sm" />
-
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-zinc-500">
-          <span className="flex items-center gap-1">
-            <Clock className="h-3 w-3 shrink-0" />
-            {formatEventTime(event.start_time, event.end_time)}
-          </span>
-          {/* Retour de Cindy du 12/09 ("heure d'impact") : même principe
-              que renderEventCard plus haut (showsImpactTime ajouté le
-              28/10, sans effet concret ici -- une carte Résultat n'existe
-              déjà que pour un MATCH, jamais un entraînement, mais garde
-              la même garde-fou que partout ailleurs). */}
-          {event.impactTime && showsImpactTime(event.event_type) && (
-            <span className="flex items-center gap-1 font-semibold text-amber-700">
-              <AlarmClock className="h-3 w-3 shrink-0" />
-              {formatImpactTime(event.impactTime)}
-            </span>
-          )}
-        </div>
-
-        {/* Retour de Cindy du 19/10 ("sous la date et l'heure, partout") :
-            Domicile/Extérieur fusionné avec le lieu, sur sa propre ligne --
-            cette vue est toujours un match (MATCH/FRIENDLY). */}
-        <div className="flex flex-wrap text-xs text-zinc-500">
-          <MatchVenue
-            isHome={resolveIsHome(event)}
-            salle={event.salle}
-            location={event.location}
-            size="sm"
-          />
-        </div>
-
-        {alreadyPlayed ? (
-          <MatchScore
-            eventId={event.id}
-            teamScore={event.teamScore}
-            opponentScore={event.opponentScore}
-            canEdit={canManageEvent}
-            onSaved={(teamScore, opponentScore) =>
-              updateLocalEventScore(event.id, teamScore, opponentScore)
-            }
-          />
-        ) : (
-          <span className="w-fit rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-semibold text-zinc-400">
-            À venir
-          </span>
-        )}
-        {event.event_type === "MATCH" && resolveIsHome(event) === true && (
-          <MatchEmarqueCode
-            eventId={event.id}
-            code={event.emarqueCode}
-            canEdit={allowClubWide}
-            onSaved={(code) => updateLocalEventEmarqueCode(event.id, code)}
-          />
+        {!allowClubWide && (
+          <>
+            {timeRow}
+            {venueRow}
+            {scoreOrUpcoming}
+            {emarqueField}
+          </>
         )}
       </div>
     );
