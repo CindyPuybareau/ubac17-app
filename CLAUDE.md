@@ -11,6 +11,7 @@
 - Les matchs synchronisés ou importés de la FFBB ne doivent JAMAIS être purgés automatiquement.
 - Lors de la ré-actualisation / re-synchronisation des matchs FFBB, utiliser exclusivement un mécanisme de mise à jour/insertion (`UPSERT`).
 - La mise à jour des horaires, scores ou gymnases NE DOIT EN AUCUN CAS supprimer les données d'organisation associées (présences, maillots, goûters, covoiturage).
+- EN CAS DE DOUBLON (changement de lien FFBB vers une autre poule, ou match déjà saisi manuellement avant que la FFBB ne le remonte), LA FFBB FAIT TOUJOURS FOI : l'entrée FFBB est la bonne, l'autre (ancien lien, saisie manuelle) est à retirer. Cela reste toutefois une suppression de données (règle n°1) : jamais automatique, l'utilisateur autorisé la fait lui-même depuis l'interface après identification du doublon.
 
 ## 3. UNICITÉ DU CALENDRIER & FILTRAGE DYNAMIQUE PAR RÔLE (360°)
 Toutes les vues (Bureau, Coach, Parent) consomment LA MÊME source de données (`events`), filtrée dynamiquement :
