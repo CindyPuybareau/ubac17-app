@@ -548,22 +548,20 @@ function PaidParticipantsList({
 // Retour de Cindy du 29/10 ("je veux du propre") : sélecteur Phase 1/Phase 2,
 // jusqu'ici dupliqué quasi à l'identique entre la carte Classement et la
 // carte Matchs/Résultats (même markup, même logique de bouton actif) --
-// un seul composant réutilisé aux deux endroits. `selfStart` distingue le
-// seul vrai écart visuel entre les deux (la carte Classement l'aligne à
-// gauche dans une colonne flex, l'autre non).
+// un seul composant réutilisé aux deux endroits. Retour de Cindy du 06/11
+// ("phase 1 pas le même responsive que phase 2") : l'ancien paramètre
+// `selfStart` (appliqué seulement côté Classement) faisait justement
+// diverger les deux rendus -- toujours aligné à gauche, sans condition,
+// pour que les deux soient strictement identiques.
 function PhaseToggle({
   phase,
   onChange,
-  selfStart,
 }: {
   phase: FfbbPhase;
   onChange: (phase: FfbbPhase) => void;
-  selfStart?: boolean;
 }) {
   return (
-    <div
-      className={`flex w-fit items-center gap-0.5 rounded-full border border-zinc-200 bg-white p-0.5 ${selfStart ? "self-start" : ""}`}
-    >
+    <div className="flex w-fit items-center gap-0.5 self-start rounded-full border border-zinc-200 bg-white p-0.5">
       {([FFBB_PHASE_1, FFBB_PHASE_2] as const).map((p) => (
         <button
           key={p}
@@ -2161,11 +2159,19 @@ export default function CalendarView({
         <ItineraryButton query={venueQuery(event)} />
       </>
     );
+    // Retour de Cindy du 06/11 ("voir plus de détail ne se voit pas
+    // beaucoup... couleur de leur événement respectif") : gris générique
+    // jusqu'ici, invisible au milieu d'une carte déjà chargée en couleurs
+    // -- reprend le texte coloré de la pastille du type (effectiveStyle.pill,
+    // palette de marque déjà centralisée dans event-style.ts, jamais une
+    // nouvelle couleur ici) plutôt que le badge, dont le texte passe en
+    // blanc pour un type "solid" (Réunion) -- illisible sur fond blanc.
+    const toggleColorClass = effectiveStyle.pill.match(/text-\S+/)?.[0] ?? "text-zinc-500";
     const toggleButton = (
       <button
         type="button"
         onClick={() => toggleEventExpanded(event.id)}
-        className="flex w-fit items-center gap-1 text-[11px] font-medium text-zinc-500 hover:text-zinc-700"
+        className={`flex w-fit items-center gap-1 text-[11px] font-semibold hover:opacity-75 ${toggleColorClass}`}
       >
         {cardExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
         {cardExpanded ? "Voir moins" : "Voir plus"} de détails
@@ -2209,7 +2215,13 @@ export default function CalendarView({
                 : "flex min-w-0 flex-col gap-1"
             }
           >
-            <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+            {/* Retour de Cindy du 06/11 ("mettre en bleu ubac pour plus de
+                visibilité") : gris (text-zinc-400) depuis l'origine de la
+                carte, trop discret une fois la pastille juste à côté sur
+                la même ligne compacte (allowClubWide) -- text-ubac-blue
+                même alias que resolveIsHome/MatchVenue plus bas dans ce
+                fichier, pas une nouvelle couleur. */}
+            <span className="text-xs font-semibold uppercase tracking-wide text-ubac-blue">
               {event.teamName}
             </span>
             <span className="flex flex-wrap items-center gap-2">
@@ -3574,7 +3586,7 @@ export default function CalendarView({
               return (
                 <div className="flex flex-col gap-2">
                   {anyPhase2 && (
-                    <PhaseToggle phase={displayPhase} onChange={setRankingPhase} selfStart />
+                    <PhaseToggle phase={displayPhase} onChange={setRankingPhase} />
                   )}
                   {showPhase2NotYetPublished ? (
                     <div className="flex items-start gap-2 rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/60 px-4 py-3">
