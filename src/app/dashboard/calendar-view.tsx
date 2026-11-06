@@ -2267,9 +2267,20 @@ export default function CalendarView({
                 )}
               </>
             ) : (
-              <span className="font-semibold text-zinc-900">
-                {event.title ?? style.label}
-              </span>
+              // Retour de Cindy du 06/11 ("ENTRAÎNEMENT en pastille ET
+              // Entraînement en titre, c'est redondant") : la plupart des
+              // entraînements/réunions n'ont jamais de titre personnalisé
+              // (event.title null) -- le "?? style.label" ci-dessous
+              // retombe alors sur le même texte que la pastille
+              // (reunionLabel) juste au-dessus, répété pour rien. Masqué
+              // seulement quand c'est réellement le même texte -- un
+              // titre personnalisé ("Entraînement renforcement défense")
+              // continue de s'afficher normalement.
+              (event.title ?? style.label) !== reunionLabel && (
+                <span className="font-semibold text-zinc-900">
+                  {event.title ?? style.label}
+                </span>
+              )
             )}
             {allowClubWide && (
               <>
