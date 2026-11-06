@@ -2103,6 +2103,74 @@ export default function CalendarView({
     // côté Bureau (allowClubWide) -- toujours vrai (donc carte toujours
     // dépliée, comportement inchangé) pour Coach/Famille.
     const cardExpanded = !allowClubWide || expandedEventIds.has(event.id);
+    // Retour du Bureau (réunion du 05/11, relayée par Cindy) : "sur
+    // ordinateur, une ligne ou deux max" -- côté Bureau uniquement
+    // (allowClubWide), date/heure et lieu/itinéraire rejoignent la ligne
+    // badges/titre au lieu d'être forcés chacun sur leur propre ligne
+    // pleine largeur (l'ancienne structure, voir plus bas pour Coach/
+    // Famille) : beaucoup de blanc à droite sur un écran large sinon.
+    // Extraits une seule fois ici (jamais dupliqués) pour être replacés
+    // soit dans la ligne fusionnée, soit dans les blocs séparés d'origine.
+    const dateRow = (
+      <span className="flex items-center gap-1">
+        {/* Bleu (retour de Cindy du 2026-08-23) : la petite icône
+            calendrier se fondait dans le texte gris de la date. */}
+        <CalendarDays className="h-4 w-4 text-navy" />
+        {new Date(event.start_time).toLocaleString("fr-FR", {
+          weekday: "short",
+          day: "numeric",
+          month: "short",
+        })}
+        , {formatEventTime(event.start_time, event.end_time)}
+      </span>
+    );
+    // Retour de Cindy du 12/09 ("heure d'impact") : visuellement distincte
+    // de l'heure de début (ambre plutôt que le gris neutre), affichée dès
+    // qu'elle existe. Retour de Cindy du 28/10 : showsImpactTime en plus.
+    const impactTimeRow = event.impactTime && showsImpactTime(event.event_type) && (
+      <span className="flex items-center gap-1 font-semibold text-amber-700">
+        <AlarmClock className="h-4 w-4" />
+        {formatImpactTime(event.impactTime)}
+      </span>
+    );
+    // Retour de Cindy du 19/10 ("le DOM/EXT se cherche dans la carte") +
+    // 04/11 ("itinéraire à côté de Extérieur") : lieu/salle et Itinéraire
+    // toujours groupés ensemble, qu'ils finissent sur la ligne fusionnée
+    // (Bureau) ou leur propre ligne (Coach/Famille) -- jamais éclatés l'un
+    // sans l'autre au hasard du retour à la ligne.
+    const locationRow = (
+      <>
+        {!isMatchType(event.event_type) && (event.location || event.salle) && (
+          <>
+            {event.location && (
+              <span className="flex items-center gap-1">
+                <MapPin className="h-4 w-4" />
+                {event.location}
+              </span>
+            )}
+            {event.salle && <SalleBadge salle={event.salle} />}
+          </>
+        )}
+        {isMatchType(event.event_type) && (
+          <MatchVenue
+            isHome={resolveIsHome(event)}
+            salle={event.salle}
+            location={event.location}
+          />
+        )}
+        <ItineraryButton query={venueQuery(event)} />
+      </>
+    );
+    const toggleButton = (
+      <button
+        type="button"
+        onClick={() => toggleEventExpanded(event.id)}
+        className="flex w-fit items-center gap-1 text-[11px] font-medium text-zinc-500 hover:text-zinc-700"
+      >
+        {cardExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+        {cardExpanded ? "Voir moins" : "Voir plus"} de détails
+      </button>
+    );
 
     return (
       <div key={event.id} className={`flex flex-col gap-2 ${cardShellClass}`}>
@@ -2134,7 +2202,13 @@ export default function CalendarView({
           {/* min-w-0 : même correctif que renderResultCard plus bas — sans
               lui, le nom d'adversaire le plus long forçait toute la carte
               (et l'écran, en mobile) à déborder au lieu de tronquer. */}
-          <div className="flex min-w-0 flex-col gap-1">
+          <div
+            className={
+              allowClubWide
+                ? "flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5"
+                : "flex min-w-0 flex-col gap-1"
+            }
+          >
             <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
               {event.teamName}
             </span>
@@ -2196,6 +2270,18 @@ export default function CalendarView({
               <span className="font-semibold text-zinc-900">
                 {event.title ?? style.label}
               </span>
+            )}
+            {allowClubWide && (
+              <>
+                <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500">
+                  {dateRow}
+                  {impactTimeRow}
+                </span>
+                <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500">
+                  {locationRow}
+                </span>
+                {toggleButton}
+              </>
             )}
           </div>
           {canManageEvent && (
@@ -2273,86 +2359,21 @@ export default function CalendarView({
           </div>
         )}
 
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-500">
-          <span className="flex items-center gap-1">
-            {/* Bleu (retour de Cindy du 2026-08-23) : la petite icône
-                calendrier se fondait dans le texte gris de la date. */}
-            <CalendarDays className="h-4 w-4 text-navy" />
-            {new Date(event.start_time).toLocaleString("fr-FR", {
-              weekday: "short",
-              day: "numeric",
-              month: "short",
-            })}
-            , {formatEventTime(event.start_time, event.end_time)}
-          </span>
-          {/* Retour de Cindy du 12/09 ("heure d'impact") : visuellement
-              distincte de l'heure de début (ambre plutôt que le gris
-              neutre de la ligne date/heure) -- affichée dès qu'elle
-              existe, sur les 4 espaces qui voient cette carte
-              (Bureau/Coach/Famille/Enfant, plus Commissions/Bénévoles via
-              child-calendar-tab.tsx). Retour de Cindy du 28/10 :
-              showsImpactTime en plus -- un entraînement peut porter une
-              vieille valeur jamais purgée (voir create-event-form.tsx),
-              mais ne l'affiche plus jamais, redondante avec son heure de
-              début. */}
-          {event.impactTime && showsImpactTime(event.event_type) && (
-            <span className="flex items-center gap-1 font-semibold text-amber-700">
-              <AlarmClock className="h-4 w-4" />
-              {formatImpactTime(event.impactTime)}
-            </span>
-          )}
-        </div>
-
-        {/* Retour de Cindy du 19/10 ("le DOM/EXT se cherche dans la carte,
-            et l'info est en double" puis "sous la date et l'heure, partout")
-            : lieu/salle toujours sur sa propre ligne sous la date/heure,
-            jamais à la suite sur mobile (dépendait sinon du hasard du
-            retour à la ligne du flex-wrap, selon la longueur du texte) --
-            vrai pour un match (Domicile/Extérieur fusionné via MatchVenue)
-            comme pour un entraînement/réunion (lieu/salle seuls). */}
-        {/* Retour de Cindy du 04/11 ("itinéraire à côté de Extérieur pour
-            gagner en place") : fusionné sur la même ligne flex-wrap que le
-            lieu plutôt qu'un bloc séparé en dessous -- ItineraryButton se
-            masque déjà tout seul (query null) si venueQuery(event) ne
-            trouve rien, pas besoin d'un garde-fou en plus ici. */}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500">
-          {!isMatchType(event.event_type) && (event.location || event.salle) && (
-            <>
-              {event.location && (
-                <span className="flex items-center gap-1">
-                  <MapPin className="h-4 w-4" />
-                  {event.location}
-                </span>
-              )}
-              {event.salle && <SalleBadge salle={event.salle} />}
-            </>
-          )}
-          {isMatchType(event.event_type) && (
-            <MatchVenue
-              isHome={resolveIsHome(event)}
-              salle={event.salle}
-              location={event.location}
-            />
-          )}
-          <ItineraryButton query={venueQuery(event)} />
-        </div>
-
-        {/* Retour du Bureau (réunion du 04/11, relayée par Cindy) : "le
-            plus de cartes visibles en un clin d'œil" -- repliée par
-            défaut côté Bureau uniquement (allowClubWide, toujours faux
-            côté Coach/Famille, voir cardExpanded plus haut). Tout le
-            reste de la carte (notes, tarif, présences, bloc Organisation)
-            passe derrière ce bouton. Même patron que expandedIds/
-            toggleExpanded, buvette-manager.tsx. */}
-        {allowClubWide && (
-          <button
-            type="button"
-            onClick={() => toggleEventExpanded(event.id)}
-            className="flex w-fit items-center gap-1 text-[11px] font-medium text-zinc-500 hover:text-zinc-700"
-          >
-            {cardExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-            {cardExpanded ? "Voir moins" : "Voir plus"} de détails
-          </button>
+        {/* Côté Bureau (allowClubWide), date/heure, lieu/itinéraire et le
+            bouton "Voir plus" vivent déjà dans la ligne titre fusionnée
+            ci-dessus (dateRow/locationRow/toggleButton) -- jamais
+            redoublés ici. Coach/Famille gardent la structure d'origine,
+            chacun sur sa propre ligne pleine largeur. */}
+        {!allowClubWide && (
+          <>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-500">
+              {dateRow}
+              {impactTimeRow}
+            </div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500">
+              {locationRow}
+            </div>
+          </>
         )}
 
         {cardExpanded && (
