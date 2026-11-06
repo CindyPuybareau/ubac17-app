@@ -2303,7 +2303,6 @@ export default function CalendarView({
                 <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500">
                   {locationRow}
                 </span>
-                {toggleButton}
               </>
             )}
           </div>
@@ -2398,6 +2397,14 @@ export default function CalendarView({
             </div>
           </>
         )}
+
+        {/* Retour de Cindy du 06/11 ("parfois en bout de ligne, parfois au
+            milieu... je le veux en bas de carte à gauche") : sorti de la
+            ligne titre fusionnée (dateRow/locationRow juste au-dessus) où
+            sa position dépendait du nombre de badges/date/lieu tenant sur
+            la même ligne -- sur sa propre ligne pleine largeur, toujours
+            au même endroit quel que soit le contenu au-dessus. */}
+        {allowClubWide && toggleButton}
 
         {cardExpanded && (
           <>
