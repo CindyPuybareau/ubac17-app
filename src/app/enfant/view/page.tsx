@@ -136,7 +136,7 @@ export default async function ChildViewPage() {
       ? supabase
           .from("events")
           .select(
-            "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, team_id, target_team_ids, team_score, opponent_score, cancelled_at, cancelled_reason, teams(name), collectes(id)"
+            "id, title, event_type, is_home, location, salle, away_venue_address, start_time, end_time, impact_time, team_id, target_team_ids, team_score, opponent_score, cancelled_at, cancelled_reason, teams(name), collectes(id)"
           )
           // Retour d'audit du 28/08 : un événement club ciblant plusieurs
           // équipes précises (target_team_ids) n'a pas de team_id — un
@@ -239,7 +239,7 @@ export default async function ChildViewPage() {
       ? await supabase
           .from("events")
           .select(
-            "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, team_id, target_team_ids, team_score, opponent_score, cancelled_at, cancelled_reason, teams(name), collectes(id)"
+            "id, title, event_type, is_home, location, salle, away_venue_address, start_time, end_time, impact_time, team_id, target_team_ids, team_score, opponent_score, cancelled_at, cancelled_reason, teams(name), collectes(id)"
           )
           .in("team_id", siblingTeamIds)
           .in("event_type", ["MATCH", "FRIENDLY"])
@@ -336,6 +336,7 @@ export default async function ChildViewPage() {
     is_home: boolean | null;
     location: string | null;
     salle: string | null;
+    away_venue_address: string | null;
     start_time: string;
     end_time: string | null;
     impact_time: string | null;
@@ -363,6 +364,7 @@ export default async function ChildViewPage() {
     isHome: e.is_home,
     location: e.location,
     salle: e.salle,
+    awayVenueAddress: e.away_venue_address,
     startTime: e.start_time,
     endTime: e.end_time,
     impactTime: e.impact_time,

@@ -19,7 +19,7 @@ export async function getClubOfficialMatches(supabase: SupabaseClient): Promise<
   const { data, error } = await supabase
     .from("events")
     .select(
-      "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, team_id, team_score, opponent_score, cancelled_at, cancelled_reason, teams(name)"
+      "id, title, event_type, is_home, location, salle, away_venue_address, start_time, end_time, impact_time, team_id, team_score, opponent_score, cancelled_at, cancelled_reason, teams(name)"
     )
     .eq("event_type", "MATCH")
     .gte("start_time", windowStart)
@@ -37,6 +37,7 @@ export async function getClubOfficialMatches(supabase: SupabaseClient): Promise<
       isHome: e.is_home,
       location: e.location,
       salle: e.salle,
+      awayVenueAddress: e.away_venue_address,
       startTime: e.start_time,
       endTime: e.end_time,
       impactTime: e.impact_time,

@@ -72,6 +72,7 @@ export type WeekStripEvent = {
   paymentLink: string | null;
   location: string | null;
   salle: string | null;
+  awayVenueAddress: string | null;
   isHome: boolean | null;
   teamName: string | null;
   // "Organisation match à domicile" (retour de Cindy du 17/09) : cible la

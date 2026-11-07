@@ -758,12 +758,13 @@ export default function CreateEventForm({
           emarqueCode: null,
           location: row.location,
           salle: row.salle,
+          // Un événement créé ou modifié ici l'est toujours à la main --
+          // jamais synchronisé FFBB (voir ffbbPhase juste en dessous) : pas
+          // d'adresse de salle adverse à attendre ici.
+          awayVenueAddress: null,
           start_time: row.start_time,
           end_time: row.end_time,
           impactTime: row.impact_time,
-          // Un événement créé ou modifié ici l'est toujours à la main --
-          // jamais synchronisé FFBB (voir ffbbPhase sur AdminUpcomingEvent,
-          // page.tsx).
           ffbbPhase: null,
           seriesId: row.series_id,
           notes: row.notes,
@@ -1063,6 +1064,10 @@ export default function CreateEventForm({
           emarqueCode: null,
           location: inserted.location,
           salle: inserted.salle,
+          // Une création n'est jamais encore passée par la synchro FFBB
+          // (seul un match déjà existant peut en avoir une, voir
+          // ffbb-sync.ts) -- jamais d'adresse à ce stade.
+          awayVenueAddress: null,
           start_time: inserted.start_time,
           end_time: inserted.end_time,
           impactTime: inserted.impact_time,

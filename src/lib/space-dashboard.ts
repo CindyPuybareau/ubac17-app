@@ -53,6 +53,7 @@ export type SpaceDashboardNextEvent = {
   paymentLink: string | null;
   location: string | null;
   salle: string | null;
+  awayVenueAddress: string | null;
   isHome: boolean | null;
   teamName: string | null;
   // "Organisation match à domicile" (retour de Cindy du 17/09) : cible la
@@ -324,7 +325,7 @@ export async function getSpaceDashboardSummary(
         let q = supabase
           .from("events")
           .select(
-            "id, title, event_type, start_time, end_time, impact_time, notes, location, salle, is_home, team_id, target_team_ids, cancelled_at, cancelled_reason, open_to_club_helpers, teams(name), collectes(payment_link)"
+            "id, title, event_type, start_time, end_time, impact_time, notes, location, salle, away_venue_address, is_home, team_id, target_team_ids, cancelled_at, cancelled_reason, open_to_club_helpers, teams(name), collectes(payment_link)"
           )
           .gte("start_time", nowIso)
           .lt("start_time", horizonIso)
@@ -495,6 +496,7 @@ export async function getSpaceDashboardSummary(
     notes: string | null;
     location: string | null;
     salle: string | null;
+    away_venue_address: string | null;
     is_home: boolean | null;
     team_id: string | null;
     target_team_ids: string[] | null;
@@ -708,6 +710,7 @@ export async function getSpaceDashboardSummary(
         paymentLink: paidFields.paymentLink,
         location: row.location,
         salle: row.salle,
+        awayVenueAddress: row.away_venue_address,
         isHome: row.is_home,
         teamName: row.teams?.name ?? null,
         teamId: row.team_id,

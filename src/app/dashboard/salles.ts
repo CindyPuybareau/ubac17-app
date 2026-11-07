@@ -55,14 +55,26 @@ export const SALLE_ADDRESS: Record<Salle, string> = {
 };
 
 // Ce qu'on donne au GPS. Une salle du club vaut son adresse postale ; un
-// déplacement garde le lieu tel que le coach l'a saisi, faute de mieux.
+// match dont la FFBB a livré la vraie adresse de la salle (away_venue_address,
+// voir ffbb-sync.ts -- malgré son nom, couvre aussi un match à domicile dont
+// la salle n'était pas renseignée) vaut celle-ci ; faute de mieux, un
+// déplacement garde le lieu tel que le coach l'a saisi -- mais jamais
+// "Domicile"/"Extérieur" seuls (retour de Cindy du 07/11, "les itinéraires
+// ne sont pas bons") : ces deux mots-là ne désignent aucun endroit,
+// les envoyer tels quels à un GPS n'a jamais eu de sens.
 export function venueQuery(event: {
   salle: string | null;
   location: string | null;
+  awayVenueAddress?: string | null;
 }): string | null {
   if (event.salle) {
     const known = SALLES.find((s) => normalize(s) === normalize(event.salle as string));
     if (known) return SALLE_ADDRESS[known];
+  }
+  if (event.awayVenueAddress) return event.awayVenueAddress;
+  const normalizedLocation = normalize(event.location ?? "");
+  if (normalizedLocation === normalize("Extérieur") || normalizedLocation === normalize("Domicile")) {
+    return null;
   }
   const parts = [event.salle, event.location].filter(Boolean);
   return parts.length > 0 ? parts.join(", ") : null;

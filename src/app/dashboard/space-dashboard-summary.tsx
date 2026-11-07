@@ -193,6 +193,7 @@ export default function SpaceDashboardSummary({
     paymentLink: e.paymentLink,
     location: e.location,
     salle: e.salle,
+    awayVenueAddress: e.awayVenueAddress,
     isHome: e.isHome,
     teamName: e.teamName,
     teamId: e.teamId,

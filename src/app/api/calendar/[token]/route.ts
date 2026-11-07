@@ -15,6 +15,7 @@ type FeedRow = {
   is_home: boolean | null;
   location: string | null;
   salle: string | null;
+  away_venue_address: string | null;
   start_time: string;
   end_time: string | null;
   team_name: string;
@@ -61,7 +62,11 @@ function buildIcs(rows: FeedRow[]) {
     // que de s'afficher comme un événement ponctuel sans étendue.
     const endIso =
       row.end_time ?? new Date(new Date(row.start_time).getTime() + 90 * 60000).toISOString();
-    const venue = venueQuery({ salle: row.salle, location: row.location });
+    const venue = venueQuery({
+      salle: row.salle,
+      location: row.location,
+      awayVenueAddress: row.away_venue_address,
+    });
 
     lines.push(
       "BEGIN:VEVENT",
