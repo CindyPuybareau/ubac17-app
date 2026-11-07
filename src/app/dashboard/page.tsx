@@ -82,7 +82,7 @@ import {
 // seul endroit (un oubli sur l'une des 8 copies faisait silencieusement
 // diverger ce qu'un rôle voit par rapport à un autre, voir CLAUDE.md §3).
 const EVENTS_SELECT_COLUMNS =
-  "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, ffbb_phase, series_id, notes, attendance_requested_at, cancelled_at, cancelled_reason, team_score, opponent_score, emarque_code, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, open_to_club_helpers, teams(id, name, category), collectes(id, prix, payment_link)" as const;
+  "id, title, event_type, is_home, location, salle, away_venue_address, start_time, end_time, impact_time, ffbb_phase, series_id, notes, attendance_requested_at, cancelled_at, cancelled_reason, team_score, opponent_score, emarque_code, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, open_to_club_helpers, teams(id, name, category), collectes(id, prix, payment_link)" as const;
 
 type PlayerRow = {
   id: string;
@@ -498,6 +498,11 @@ export type AdminUpcomingEvent = {
   emarqueCode: string | null;
   location: string | null;
   salle: string | null;
+  // Retour de Cindy du 07/11 ("les itinéraires ne sont pas bons") : adresse
+  // réelle de la salle adverse pour un match extérieur, remontée par la
+  // fiche détail FFBB (voir ffbb-sync.ts) -- null tant qu'elle n'a pas
+  // encore été résolue, jamais "Extérieur" (voir salles.ts/venueQuery).
+  awayVenueAddress: string | null;
   start_time: string;
   end_time: string | null;
   // Retour de Cindy du 12/09 ("heure d'impact") : heure à laquelle les
@@ -2732,6 +2737,7 @@ export default async function DashboardPage({
         opponentScore: e.opponent_score ?? null,
         location: e.location,
         salle: e.salle,
+        awayVenueAddress: e.away_venue_address ?? null,
         start_time: e.start_time,
         end_time: e.end_time,
         impactTime: e.impact_time ?? null,
@@ -3787,6 +3793,7 @@ export default async function DashboardPage({
         opponentScore: e.opponent_score ?? null,
         location: e.location,
         salle: e.salle,
+        awayVenueAddress: e.away_venue_address ?? null,
         start_time: e.start_time,
         end_time: e.end_time,
         impactTime: e.impact_time ?? null,
@@ -4531,6 +4538,7 @@ export default async function DashboardPage({
         opponentScore: e.opponent_score ?? null,
         location: e.location,
         salle: e.salle,
+        awayVenueAddress: e.away_venue_address ?? null,
         start_time: e.start_time,
         end_time: e.end_time,
         impactTime: e.impact_time ?? null,
@@ -5232,6 +5240,7 @@ export default async function DashboardPage({
       paymentLink: e.paymentLink,
       location: e.location,
       salle: e.salle,
+      awayVenueAddress: e.awayVenueAddress,
       isHome: e.isHome,
       teamName: e.teamName,
       teamId: e.teamId,
@@ -5271,6 +5280,7 @@ export default async function DashboardPage({
       paymentLink: e.paymentLink,
       location: e.location,
       salle: e.salle,
+      awayVenueAddress: e.awayVenueAddress,
       isHome: e.isHome,
       teamName: e.teamName,
       teamId: e.teamId,

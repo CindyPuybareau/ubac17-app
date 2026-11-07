@@ -1061,7 +1061,7 @@ export default function CalendarView({
     const { data, error } = await supabase
       .from("events")
       .select(
-        "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, ffbb_phase, series_id, notes, team_score, opponent_score, emarque_code, cancelled_at, cancelled_reason, team_id, teams(name)"
+        "id, title, event_type, is_home, location, salle, away_venue_address, start_time, end_time, impact_time, ffbb_phase, series_id, notes, team_score, opponent_score, emarque_code, cancelled_at, cancelled_reason, team_id, teams(name)"
       )
       .eq("event_type", "MATCH")
       .gte("start_time", windowStart)
@@ -1088,6 +1088,7 @@ export default function CalendarView({
           cancelledReason: e.cancelled_reason,
           location: e.location,
           salle: e.salle,
+          awayVenueAddress: e.away_venue_address,
           start_time: e.start_time,
           end_time: e.end_time,
           impactTime: e.impact_time,

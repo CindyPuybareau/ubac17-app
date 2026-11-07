@@ -38,6 +38,7 @@ export type ChildEvent = {
   isHome: boolean | null;
   location: string | null;
   salle: string | null;
+  awayVenueAddress: string | null;
   startTime: string;
   endTime: string | null;
   // Retour de Cindy du 12/09 ("heure d'impact") : voir son commentaire sur
@@ -220,6 +221,7 @@ export default function ChildDashboard({
     paymentLink: null,
     location: e.location,
     salle: e.salle,
+    awayVenueAddress: e.awayVenueAddress,
     isHome: e.isHome,
     teamName: e.teamName,
     teamId: null,

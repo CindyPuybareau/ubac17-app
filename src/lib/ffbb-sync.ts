@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  fetchFfbbMatchVenue,
   fetchFfbbTeamCalendar,
   fetchFfbbTeamPageData,
   fetchFfbbTeamRanking,
@@ -8,6 +9,7 @@ import {
   type FfbbRankingEntry,
 } from "./ffbb";
 import { FFBB_PHASE_1_OR_NULL_FILTER, normalizeFfbbPhase, type FfbbPhase } from "./ffbb-phase";
+import { SALLES } from "@/app/dashboard/salles";
 
 export type FfbbSyncResult =
   | { ok: true; imported: number; updated: number; skipped: number; message?: string }
@@ -127,6 +129,12 @@ async function writeMatchesForTeam(
       // publié le score.
       ownScore: m.ownScore,
       opponentScore: m.opponentScore,
+      isHome: m.isHome,
+      urlCompetition: m.urlCompetition,
+      // Résolue juste en dessous, séquentiellement, SEULEMENT pour les
+      // matchs extérieur qui n'ont encore aucune adresse connue en base
+      // (voir plus bas) -- jamais dans la boucle d'écriture elle-même.
+      awayVenueAddress: null as string | null,
     }));
 
   if (candidates.length > 0) {
@@ -143,7 +151,9 @@ async function writeMatchesForTeam(
     // renuméroté", pas un second match.
     const { data: existingRows, error: existingError } = await supabase
       .from("events")
-      .select("id, external_uid, title, location, start_time, team_score, opponent_score, ffbb_phase")
+      .select(
+        "id, external_uid, title, location, salle, start_time, team_score, opponent_score, ffbb_phase, away_venue_address"
+      )
       .eq("team_id", teamId)
       .eq("event_type", "MATCH");
 
@@ -174,6 +184,63 @@ async function writeMatchesForTeam(
       phaseRows.map((r) => [new Date(r.start_time).getTime(), r])
     );
 
+    // Retour de Cindy du 07/11 ("les itinéraires ne sont pas bons") : va
+    // chercher l'adresse réelle de la salle pour un match, SÉQUENTIELLEMENT
+    // (jamais en parallèle, mêmes égards que le reste de la synchro FFBB)
+    // et SEULEMENT pour un match qui n'a encore aucune adresse connue en
+    // base -- une fois résolue, plus jamais redemandée aux resynchros
+    // suivantes. Purement en mémoire (candidates déjà lu,
+    // existingByUid/existingByStartTime déjà lus ci-dessus) : aucun appel
+    // Supabase ici, avant ou pendant cette boucle -- seul l'unique
+    // INSERT/UPSERT groupé plus bas écrit en base.
+    // opponentVenueCache évite un second aller-retour FFBB si cette même
+    // équipe recroise deux fois le même club adverse dans son calendrier
+    // (match aller/retour) -- portée limitée à CET appel (une équipe),
+    // jamais partagée entre les équipes du script (scripts/sync-ffbb-all.ts
+    // les traite déjà l'une après l'autre, jamais en parallèle).
+    //
+    // Retour de Cindy du 07/11 ("fais aussi les matchs à domicile") : un
+    // match à domicile synchronisé par la FFBB n'a jamais `salle` renseigné
+    // non plus (seul `location: "Domicile"` est posé, voir le .map()
+    // au-dessus) -- "Domicile" seul seul envoyé au GPS est tout aussi
+    // inutile qu'"Extérieur" l'était. Même mécanisme, sans distinction
+    // domicile/extérieur désormais : seul un match dont la salle est déjà
+    // l'une des trois connues du club (SALLES, salles.ts -- adresse déjà
+    // précise, voir venueQuery) saute la résolution FFBB, inutile dans ce
+    // cas précis.
+    const opponentVenueCache = new Map<string, string | null>();
+    for (const c of candidates) {
+      const existing = existingByUid.get(c.externalUid) ?? existingByStartTime.get(new Date(c.startTime).getTime());
+      const hasKnownClubSalle =
+        existing?.salle && SALLES.some((s) => s.toLowerCase() === existing.salle!.toLowerCase());
+      if (hasKnownClubSalle) continue;
+      if (existing?.away_venue_address) continue;
+      if (!c.urlCompetition) continue;
+
+      const opponentKey = c.title.toLowerCase();
+      if (opponentVenueCache.has(opponentKey)) {
+        c.awayVenueAddress = opponentVenueCache.get(opponentKey) ?? null;
+        continue;
+      }
+
+      try {
+        const venue = await fetchFfbbMatchVenue(c.urlCompetition);
+        const resolved =
+          venue && (venue.name || venue.address)
+            ? [venue.name, venue.address].filter(Boolean).join(", ")
+            : null;
+        c.awayVenueAddress = resolved;
+        opponentVenueCache.set(opponentKey, resolved);
+      } catch (e) {
+        // Non bloquant (même esprit que touchSyncedAt plus haut) : une
+        // fiche salle introuvable ou une FFBB momentanément indisponible
+        // ne doit jamais faire échouer toute la synchro du calendrier --
+        // juste laisser ce match sans adresse précise pour cette fois,
+        // retenté à la prochaine synchro (jamais marqué "résolu").
+        console.error(`[ffbb-sync] fiche salle échouée (match ${c.externalUid}):`, e);
+      }
+    }
+
     const toInsert: typeof candidates = [];
     const toUpdate: { id: string; candidate: (typeof candidates)[number] }[] = [];
 
@@ -183,11 +250,19 @@ async function writeMatchesForTeam(
         const scoreChanged =
           c.ownScore != null &&
           (byUid.team_score !== c.ownScore || byUid.opponent_score !== c.opponentScore);
+        // Retour de Cindy du 07/11 ("les itinéraires ne sont pas bons") :
+        // sans cette ligne, une adresse fraîchement résolue juste au-dessus
+        // (awayVenueAddress) repartait dans le vide dès que rien d'autre
+        // n'avait changé sur le match -- jamais ajoutée au lot UPSERT plus
+        // bas, donc jamais écrite en base malgré l'aller-retour FFBB déjà
+        // fait pour l'obtenir.
+        const venueResolved = c.awayVenueAddress != null && byUid.away_venue_address == null;
         if (
           byUid.title !== c.title ||
           byUid.location !== c.location ||
           new Date(byUid.start_time).getTime() !== new Date(c.startTime).getTime() ||
-          scoreChanged
+          scoreChanged ||
+          venueResolved
         ) {
           toUpdate.push({ id: byUid.id, candidate: c });
         }
@@ -216,6 +291,7 @@ async function writeMatchesForTeam(
           // fois pour toutes à l'import, jamais retouchée ensuite --
           // une phase ne change pas de numéro une fois le match créé.
           ffbb_phase: phase,
+          away_venue_address: c.awayVenueAddress,
         }))
       );
       // Retour de Cindy du 01/10 ("regarde les logs") : une erreur ici
@@ -258,6 +334,11 @@ async function writeMatchesForTeam(
             ffbb_phase: phase,
             team_score: c.ownScore ?? existing?.team_score ?? null,
             opponent_score: c.ownScore != null ? c.opponentScore : existing?.opponent_score ?? null,
+            // Jamais écrasée par null une fois connue : reprend la valeur
+            // déjà en base si cette resynchro n'a rien eu de neuf à
+            // résoudre pour ce match (voir la boucle de résolution
+            // ci-dessus, même principe que team_score/opponent_score).
+            away_venue_address: c.awayVenueAddress ?? existing?.away_venue_address ?? null,
           };
         })
       );

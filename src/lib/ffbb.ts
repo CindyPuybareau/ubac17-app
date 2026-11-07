@@ -15,6 +15,13 @@ export type FfbbMatch = {
   // joué, ou que son score n'a pas encore été saisi côté FFBB.
   ownScore: number | null;
   opponentScore: number | null;
+  // Retour de Cindy du 07/11 ("les itinéraires ne sont pas bons") : chemin
+  // relatif vers la fiche détail FFBB de CE match précis ("/ligues/.../
+  // match/200000014592963"), présent dans le même bloc JSON que
+  // date_rencontre (voir parseUrlCompetitionByMatchNumber) -- cette fiche
+  // contient le nom et l'adresse réels de la salle (voir
+  // fetchFfbbMatchVenue), jamais lus depuis la page calendrier elle-même.
+  urlCompetition: string | null;
 };
 
 // Retour de Cindy du 21/09 : la carte "Classement" du calendrier
@@ -148,6 +155,23 @@ function parseDateRencontreMap(html: string): Map<string, string> {
   return map;
 }
 
+// Retour de Cindy du 07/11 ("les itinéraires ne sont pas bons") : même bloc
+// JSON que parseDateRencontreMap ci-dessus (mêmes guillemets échappés selon
+// l'endroit de la page), "url_competition" vient quelques champs après
+// "numero" dans le même objet plat (numeroJournee/resultatEquipe1-2/
+// handicap1-2, jamais un objet imbriqué entre les deux) -- [^{}]*? reste
+// donc à l'intérieur de CET objet, jamais à cheval sur le suivant.
+function parseUrlCompetitionByMatchNumber(html: string): Map<string, string> {
+  const normalized = html.replace(/\\"/g, '"');
+  const re = /"numero":"(\d+)"[^{}]*?"url_competition":"([^"]+)"/g;
+  const map = new Map<string, string>();
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(normalized)) !== null) {
+    map.set(m[1], m[2]);
+  }
+  return map;
+}
+
 // Même bloc JSON que dateRencontreByMatchNumber (voir son commentaire),
 // avec en plus resultatEquipe1/resultatEquipe2 ("null" tant que le match
 // n'est pas joué) et l'identifiant FFBB de chaque équipe -- indispensable
@@ -217,6 +241,7 @@ function parseFfbbTeamPage(
   const $ = cheerio.load(html);
   const matches: FfbbMatch[] = [];
   const dateRencontreByMatchNumber = parseDateRencontreMap(html);
+  const urlCompetitionByMatchNumber = parseUrlCompetitionByMatchNumber(html);
 
   $("div").each((_, el) => {
     const text = $(el).text().trim();
@@ -245,6 +270,7 @@ function parseFfbbTeamPage(
       startTime,
       ownScore: score?.ownScore ?? null,
       opponentScore: score?.opponentScore ?? null,
+      urlCompetition: urlCompetitionByMatchNumber.get(matchNumber) ?? null,
     });
   });
 
@@ -424,6 +450,51 @@ async function fetchFfbbHtml(url: string): Promise<string> {
     );
   }
   return res.text();
+}
+
+export type FfbbMatchVenue = {
+  name: string | null;
+  address: string | null;
+};
+
+// Retour de Cindy du 07/11 ("les itinéraires ne sont pas bons") : la fiche
+// détail d'un match (url_competition, voir FfbbMatch) affiche la salle
+// dans deux blocs "Nom"/"Adresse" en clair, jamais dans le JSON
+// d'hydratation (vérifié en direct sur une vraie fiche) -- le libellé
+// ("Nom"/"Adresse") et sa valeur vivent dans le même bloc parent, value
+// étant le SEUL AUTRE <span> de ce bloc, quelle que soit la profondeur de
+// nesting exacte entre les deux (évite un chemin de sélecteurs CSS figé,
+// fragile au moindre changement de mise en page côté FFBB).
+function parseFfbbMatchVenuePage(html: string): FfbbMatchVenue | null {
+  const $ = cheerio.load(html);
+  let name: string | null = null;
+  let address: string | null = null;
+
+  $("span").each((_, el) => {
+    const label = $(el).text().trim();
+    if (label !== "Nom" && label !== "Adresse") return;
+    const valueSpan = $(el).parent().find("span").not(el).first();
+    const value = valueSpan.text().trim();
+    if (!value) return;
+    if (label === "Nom") name = value;
+    else address = value;
+  });
+
+  if (!name && !address) return null;
+  return { name, address };
+}
+
+// Un seul fetch, réservé aux matchs extérieur jamais encore résolus (voir
+// ffbb-sync.ts, away_venue_address déjà connue = jamais rappelée) --
+// jamais dans une boucle qui toucherait la base, uniquement vers la FFBB.
+// `urlCompetition` est un chemin relatif ("/ligues/.../match/...") : la
+// fiche équipe (fetchFfbbTeamCalendar) et la fiche match partagent le même
+// hôte competitions.ffbb.com, donc les mêmes garde-fous (assertFfbbUrl,
+// en-têtes navigateur, délai) via fetchFfbbHtml.
+export async function fetchFfbbMatchVenue(urlCompetition: string): Promise<FfbbMatchVenue | null> {
+  const absoluteUrl = new URL(urlCompetition, "https://competitions.ffbb.com").toString();
+  const html = await fetchFfbbHtml(absoluteUrl);
+  return parseFfbbMatchVenuePage(html);
 }
 
 export async function fetchFfbbTeamCalendar(url: string): Promise<FfbbMatch[]> {
