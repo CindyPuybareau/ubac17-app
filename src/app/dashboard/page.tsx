@@ -1167,7 +1167,6 @@ export default async function DashboardPage({
   });
 
   const isAdmin = Boolean(adminResult.data);
-  const clubFunction = adminResult.data?.club_function ?? null;
   let ownPlayerId = ownPlayerRowResult.data?.id ?? null;
 
   // Retour de Cindy du 08/10 ("trombinoscope officiels... concerne les
@@ -5400,7 +5399,7 @@ export default async function DashboardPage({
         </div>
       )}
       <ClubHelperBanner events={clubHelperEvents} />
-      <DashboardTabs tabs={tabs} activeKey={activeTab} clubFunction={clubFunction} />
+      <DashboardTabs tabs={tabs} activeKey={activeTab} />
 
       {/* Cas normalement rare depuis que "Mon espace" couvre aussi un
           adulte inscrit sans enfant (voir le merge de playerRows plus
