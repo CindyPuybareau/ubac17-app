@@ -11,6 +11,32 @@ import { ToastProvider } from "./toast-context";
 import MobileMenuButton from "./mobile-menu-button";
 import RealtimeSync from "./realtime-sync";
 
+// Retour de Cindy du 12/09 ("le badge de rôle doit rester au-dessus des
+// onglets Bureau/Mon équipe, quel que soit celui sélectionné"), déplacé ici
+// le 08/11 ("au-dessus de Bonjour Basile") depuis dashboard-tabs.tsx : le
+// rôle d'une personne au Bureau ne dépend ni de l'onglet actif ni du
+// sélecteur d'espace -- il vit désormais dans ce bandeau partagé, calculé
+// une seule fois. Les libellés stockés (club_function, voir
+// BUREAU_ROLE_OPTIONS dans member-detail-modal.tsx) restent inchangés en
+// base -- seule leur présentation ici est raccourcie/harmonisée (accord au
+// féminin sur "adjointe", "Vice-" plutôt que "... Adjoint" pour rester
+// court sur toutes les fonctions). Une valeur historique qui ne
+// correspondrait à aucune de ces options (saisie libre d'avant ce
+// catalogue) s'affiche telle quelle plutôt que de disparaître
+// silencieusement.
+const BUREAU_ROLE_LABELS: Record<string, string> = {
+  "Président / Vice-Président": "Président / Vice-président",
+  "Trésorier / Trésorier Adjoint": "Trésorier / Vice-trésorier",
+  "Secrétaire / Secrétaire Adjoint": "Secrétaire / Secrétaire adjointe",
+  "Membre du Bureau": "Membre du Bureau",
+  "Comité directeur": "Comité directeur",
+};
+
+function bureauRoleLabel(clubFunction: string | null | undefined) {
+  if (!clubFunction) return null;
+  return BUREAU_ROLE_LABELS[clubFunction] ?? clubFunction;
+}
+
 // Retour de Cindy du 15/09 ("basile encore entre chaque espace") : le
 // header (logo, avatar, "Bonjour" + prénom, icônes) vivait dans page.tsx,
 // donc chaque changement d'onglet (?tab=...) le recalculait et le
@@ -43,7 +69,7 @@ export default async function DashboardLayout({
     redirect("/connexion");
   }
 
-  const [profileResult, ownPlayerRowResult] = await Promise.all([
+  const [profileResult, ownPlayerRowResult, adminResult] = await Promise.all([
     supabase
       .from("profiles")
       .select("first_name, avatar_url")
@@ -54,13 +80,25 @@ export default async function DashboardLayout({
       .select("first_name")
       .eq("profile_id", user.id)
       .maybeSingle(),
+    // Retour de Cindy du 08/11 ("rôle au-dessus de Bonjour Basile") : le
+    // badge de rôle Bureau vivait dans dashboard-tabs.tsx (recalculé à
+    // chaque ?tab=...) ; il rejoint ici le reste du bandeau, qui ne dépend
+    // pas de l'onglet actif (voir le commentaire plus haut sur ce layout).
+    // En minuscules : club_administrators.email est toujours stocké ainsi
+    // (20260918010000), user.email reflète la casse tapée à l'inscription.
+    supabase
+      .from("club_administrators")
+      .select("club_function")
+      .eq("email", (user.email ?? "").toLowerCase())
+      .maybeSingle(),
   ]);
 
-  logQueryErrors("layout dashboard (header)", { profileResult, ownPlayerRowResult });
+  logQueryErrors("layout dashboard (header)", { profileResult, ownPlayerRowResult, adminResult });
 
   const profile = profileResult.data;
   const ownPlayerRow = ownPlayerRowResult.data;
   const displayFirstName = profile?.first_name ?? ownPlayerRow?.first_name ?? null;
+  const roleLabel = bureauRoleLabel(adminResult.data?.club_function ?? null);
 
   return (
     <MobileNavProvider>
@@ -96,6 +134,22 @@ export default async function DashboardLayout({
                 <div className="flex min-w-0 items-center gap-3">
                   <AvatarUpload userId={user.id} avatarUrl={profile?.avatar_url ?? null} name={displayFirstName} size="lg" />
                   <div className="min-w-0">
+                    {roleLabel && (
+                      // Retour de Cindy du 08/11 ("décalage avec Bonjour
+                      // Basile", "texte pas centré dans la pastille") :
+                      // -ml-2 compense exactement le px-2 de la pastille
+                      // pour que SON TEXTE (pas son contour arrondi) démarre
+                      // à la même abscisse que "Bonjour"/le prénom juste en
+                      // dessous. leading-none seul ne suffisait pas : même
+                      // à hauteur de ligne 1, la police réserve plus
+                      // d'espace sous la ligne de base (prévu pour des
+                      // jambages absents en majuscules) qu'au-dessus --
+                      // pt/pb asymétriques (au lieu de py-0.5) pour
+                      // compenser à l'œil, police légèrement réduite (9px).
+                      <span className="mb-1 -ml-2 inline-flex w-fit items-center rounded-full bg-white/15 px-2 pb-[3px] pt-1 text-[9px] font-semibold uppercase leading-none tracking-wide text-white">
+                        {roleLabel}
+                      </span>
+                    )}
                     <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">
                       Bonjour
                     </p>

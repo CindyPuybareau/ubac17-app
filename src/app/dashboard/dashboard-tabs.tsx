@@ -34,32 +34,6 @@ export type DashboardTab = {
   icon?: keyof typeof TAB_ICONS;
 };
 
-// Retour de Cindy du 12/09 ("le badge de rôle doit rester au-dessus des
-// onglets Bureau/Mon équipe, quel que soit celui sélectionné") : ce badge
-// vivait jusqu'ici dans admin-view.tsx ("Espace Bureau · <rôle>"), affiché
-// SOUS les onglets -- alors que le rôle d'une personne au Bureau ne dépend
-// pas de l'onglet qu'elle regarde. Le préfixe "Espace Bureau ·" disparaît
-// aussi : redondant, l'onglet "Bureau" juste en dessous dit déjà où on est.
-// Les libellés stockés (club_function, voir BUREAU_ROLE_OPTIONS dans
-// member-detail-modal.tsx) restent inchangés en base -- seule leur
-// présentation ici est raccourcie/harmonisée (accord au féminin sur
-// "adjointe", "Vice-" plutôt que "... Adjoint" pour rester court sur toutes
-// les fonctions). Une valeur historique qui ne correspondrait à aucune de
-// ces options (saisie libre d'avant ce catalogue) s'affiche telle quelle
-// plutôt que de disparaître silencieusement.
-const BUREAU_ROLE_LABELS: Record<string, string> = {
-  "Président / Vice-Président": "Président / Vice-président",
-  "Trésorier / Trésorier Adjoint": "Trésorier / Vice-trésorier",
-  "Secrétaire / Secrétaire Adjoint": "Secrétaire / Secrétaire adjointe",
-  "Membre du Bureau": "Membre du Bureau",
-  "Comité directeur": "Comité directeur",
-};
-
-function bureauRoleLabel(clubFunction: string | null | undefined) {
-  if (!clubFunction) return null;
-  return BUREAU_ROLE_LABELS[clubFunction] ?? clubFunction;
-}
-
 // Repère de chargement aux couleurs du club (logo qui pulse + barre de
 // progression), repris à l'identique de dashboard/loading.tsx. Retour de
 // Cindy du 06/09 ("c'est moche... logo avec chargement bien placé,
@@ -104,13 +78,9 @@ function SpaceLoadingIndicator() {
 export default function DashboardTabs({
   tabs,
   activeKey,
-  clubFunction = null,
 }: {
   tabs: DashboardTab[];
   activeKey: string | null;
-  // Retour de Cindy du 12/09 : voir bureauRoleLabel ci-dessus. Absent
-  // (undefined/null) pour qui n'est pas au Bureau -- aucun badge affiché.
-  clubFunction?: string | null;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -133,7 +103,6 @@ export default function DashboardTabs({
   }
 
   const current = tabs.find((t) => t.key === activeKey) ?? tabs[0];
-  const roleLabel = bureauRoleLabel(clubFunction);
 
   // Retour de Cindy du 05/09 ("le délai au clic est long") : router.push
   // (contrairement à un <Link>) ne préchauffe rien tout seul. Survoler un
@@ -162,14 +131,21 @@ export default function DashboardTabs({
 
   return (
     <div className="flex flex-col gap-4">
-      {roleLabel && (
-        <span className="inline-flex w-fit items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ubac-yellow/15 px-3 py-1 text-xs font-semibold uppercase leading-none text-ubac-yellow-dark">
-          {roleLabel}
-        </span>
-      )}
-
       {tabs.length > 1 && (
-        <div className="flex flex-wrap gap-2">
+        // Retour de Cindy du 08/11 ("le sélecteur d'espace se confond avec
+        // Créer un événement") : l'onglet actif et les boutons d'action
+        // (ex. "Créer un événement", calendar-view.tsx) partageaient le même
+        // doré plein -- rien ne distinguait "changer d'espace" de "faire une
+        // action" au premier regard. Le doré reste LA seule couleur
+        // d'action de l'appli (inchangé partout ailleurs) ; seul ce
+        // sélecteur passe au bleu nuit (déjà la couleur de marque du club,
+        // bandeau/titres -- aucun nouvel accent introduit) et gagne un
+        // encadré dédié pour se lire comme une navigation. Le badge de
+        // rôle (ex. "Secrétaire / Secrétaire adjointe") ne vit plus ici --
+        // il est remonté dans le bandeau partagé (layout.tsx), au-dessus de
+        // "Bonjour <prénom>", pour ne plus dépendre de l'onglet actif ni de
+        // cet encadré. Maquette validée par Cindy avant implémentation.
+        <div className="flex w-full flex-wrap gap-2 rounded-2xl border border-navy/20 bg-navy/5 p-2.5">
           {tabs.map((tab) => {
             const isActive = current.key === tab.key;
             const Icon = tab.icon ? TAB_ICONS[tab.icon] : null;
@@ -181,30 +157,18 @@ export default function DashboardTabs({
                 onFocus={() => handlePrefetch(tab.key)}
                 onTouchStart={() => handlePrefetch(tab.key)}
                 disabled={isPending}
-                // Retour de Cindy du 11/09 ("façon segmented control") :
-                // fond plein doré (pas juste un ton translucide + bordure
-                // comme avant) pour l'onglet actif, texte/icône navy --
-                // contraste vérifié à 6,8:1 (seuil WCAG AA icônes : 3:1),
-                // largement supérieur à du blanc sur ce même doré (1,6:1,
-                // illisible). py-2 (au lieu de py-1.5) : zone tactile un
-                // peu plus généreuse sur mobile, tout en gardant la forme
-                // pilule. whitespace-nowrap + shrink-0 sur l'icône :
-                // icône et texte ne se chevauchent jamais, même sur petit
-                // écran.
+                // py-2 : zone tactile généreuse sur mobile, tout en
+                // gardant la forme pilule. whitespace-nowrap + shrink-0
+                // sur l'icône : icône et texte ne se chevauchent jamais,
+                // même sur petit écran.
                 className={`flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-2 text-sm font-medium transition-colors disabled:opacity-60 ${
                   isActive
-                    ? "border-transparent bg-ubac-yellow text-navy"
-                    : // Retour de Cindy du 29/08 ("les onglets se fondent dans le
-                      // fond") : sans fond propre, un onglet non actif (bordure
-                      // grise très claire, aucun remplissage) se distinguait à
-                      // peine du fond crème général de l'appli (--background,
-                      // globals.css) — même correctif déjà en place ailleurs
-                      // pour ce genre de pastille (team-selector-pills.tsx).
-                      "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
+                    ? "border-transparent bg-navy text-white"
+                    : "border-navy/25 bg-transparent text-navy hover:bg-navy/10"
                 }`}
               >
                 {Icon && (
-                  <Icon className={`h-4 w-4 shrink-0 ${isActive ? "text-navy" : "text-zinc-400"}`} />
+                  <Icon className={`h-4 w-4 shrink-0 ${isActive ? "text-white" : "text-navy/70"}`} />
                 )}
                 {tab.label}
                 {displayedPendingKey === tab.key ? "…" : ""}

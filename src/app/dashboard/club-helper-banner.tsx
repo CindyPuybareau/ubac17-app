@@ -1,11 +1,64 @@
 "use client";
 
-import { useState } from "react";
-import { HeartHandshake } from "lucide-react";
+import { useState, useSyncExternalStore } from "react";
+import { HeartHandshake, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { volunteerAsGuest } from "./event-volunteer-needs";
 import { formatEventTime, styleFor } from "./event-style";
 import SalleBadge from "./salle-badge";
+
+// Retour de Cindy du 08/11 ("pénible de la voir à chaque fois si on n'est
+// pas intéressé") : fermeture par entraînement (pas par appareil entier),
+// en localStorage -- préférence d'affichage propre à ce navigateur, jamais
+// une donnée du club (rien à persister en base, rien à synchroniser entre
+// comptes). Un NOUVEAU besoin (autre entraînement ouvert) reste visible :
+// seul celui explicitement fermé disparaît.
+//
+// Petit store externe (plutôt qu'un useState + useEffect classique) : ce
+// composant est rendu côté serveur (page.tsx est un composant serveur),
+// donc le premier rendu client doit être IDENTIQUE au HTML serveur (aucun
+// accès à localStorage possible là-bas) sous peine d'avertissement
+// d'hydratation. useSyncExternalStore est fait pour exactement ce cas --
+// getServerSnapshot fournit l'état "rien de fermé" pour le rendu serveur et
+// la passe d'hydratation, getSnapshot prend le relais juste après, côté
+// client uniquement.
+const DISMISSED_KEY = "ubac:dismissed-club-helper-events";
+const EMPTY_DISMISSED: Set<string> = new Set();
+let dismissedCache: Set<string> | null = null;
+const dismissedListeners = new Set<() => void>();
+
+function loadDismissed(): Set<string> {
+  if (dismissedCache) return dismissedCache;
+  try {
+    const raw = window.localStorage.getItem(DISMISSED_KEY);
+    dismissedCache = raw ? new Set(JSON.parse(raw) as string[]) : new Set();
+  } catch {
+    dismissedCache = new Set();
+  }
+  return dismissedCache;
+}
+
+function dismissEvent(eventId: string) {
+  const current = loadDismissed();
+  if (current.has(eventId)) return;
+  dismissedCache = new Set(current).add(eventId);
+  try {
+    window.localStorage.setItem(DISMISSED_KEY, JSON.stringify([...dismissedCache]));
+  } catch {
+    // Stockage indisponible (navigation privée, quota...) : la fermeture ne
+    // survit pas au rechargement, tant pis -- jamais bloquant pour autant.
+  }
+  dismissedListeners.forEach((listener) => listener());
+}
+
+function subscribeDismissed(listener: () => void) {
+  dismissedListeners.add(listener);
+  return () => dismissedListeners.delete(listener);
+}
+
+function getDismissedServerSnapshot(): Set<string> {
+  return EMPTY_DISMISSED;
+}
 
 // Retour du Bureau du 04/11 ("U9 Mixte, un seul coach pour 25+ enfants") :
 // un entraînement explicitement ouvert (open_to_club_helpers, voir
@@ -32,7 +85,7 @@ export type ClubHelperEvent = {
   signupNames: string[];
 };
 
-function ClubHelperCard({ event }: { event: ClubHelperEvent }) {
+function ClubHelperCard({ event, onDismiss }: { event: ClubHelperEvent; onDismiss: () => void }) {
   const [names, setNames] = useState(event.signupNames);
   const [fullName, setFullName] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -60,8 +113,16 @@ function ClubHelperCard({ event }: { event: ClubHelperEvent }) {
   const style = styleFor(event.eventType);
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl bg-white px-3 py-2.5">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="relative flex flex-col gap-2 rounded-xl bg-white px-3 py-2.5">
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="Fermer ce besoin d'accompagnant"
+        className="absolute right-2 top-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+      <div className="flex flex-wrap items-center gap-2 pr-7">
         <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${style.badge}`}>
           {style.label}
         </span>
@@ -114,7 +175,10 @@ function ClubHelperCard({ event }: { event: ClubHelperEvent }) {
 }
 
 export default function ClubHelperBanner({ events }: { events: ClubHelperEvent[] }) {
-  if (events.length === 0) return null;
+  const dismissedIds = useSyncExternalStore(subscribeDismissed, loadDismissed, getDismissedServerSnapshot);
+
+  const visibleEvents = events.filter((event) => !dismissedIds.has(event.eventId));
+  if (visibleEvents.length === 0) return null;
 
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-amber-400/50 bg-amber-50 p-4">
@@ -122,8 +186,8 @@ export default function ClubHelperBanner({ events }: { events: ClubHelperEvent[]
         <HeartHandshake className="h-4 w-4 shrink-0 text-amber-700" />
         Besoin accompagnant
       </p>
-      {events.map((event) => (
-        <ClubHelperCard key={event.eventId} event={event} />
+      {visibleEvents.map((event) => (
+        <ClubHelperCard key={event.eventId} event={event} onDismiss={() => dismissEvent(event.eventId)} />
       ))}
     </div>
   );
