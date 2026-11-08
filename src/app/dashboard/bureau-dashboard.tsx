@@ -209,59 +209,24 @@ function KpiCard({
 // résumé. Entièrement dérivée des données déjà chargées pour les autres
 // onglets (cotisations, membres, équipes, calendrier) : aucune requête
 // supplémentaire pour cette première version.
-export default function BureauDashboard({
+// Retour du Bureau (08/11, relayé par Cindy) : ces 6 cartes vivaient ici,
+// sous l'onglet "Calendrier" (voir admin-view.tsx, key "home") -- déplacées
+// dans l'onglet "Tableau de bord" (key "dashboard"), en tout premier,
+// toujours visibles sans avoir à dérouler le calendrier. Composant à part
+// (plutôt qu'un morceau de BureauDashboard ci-dessous) pour que les deux
+// onglets ne portent chacun que ce qui les concerne vraiment : BureauDashboard
+// garde le calendrier et ses propres alertes (sponsors/licences à
+// renouveler), ce composant ne porte que les indicateurs chiffrés.
+export function BureauKpiGrid({
   cotisations,
   members,
-  events,
-  createTeams,
-  birthdayMembers,
-  eventRoles,
-  volunteerNeedsByEventId,
-  sponsors,
   penalites,
   buvette,
-  ownPlayerId = null,
-  rsvpStatusByKey = {},
 }: {
   cotisations: AdminCotisation[];
   members: AdminMember[];
-  events: AdminUpcomingEvent[];
-  // Le calendrier complet vit désormais sous ce résumé plutôt que dans son
-  // propre onglet séparé (retour de Cindy du 2026-08-21 : "l'onglet
-  // accueil devrait être calendrier et intégrer l'onglet existant
-  // 'calendrier'") — mêmes props que l'ancien onglet Calendrier du Bureau.
-  createTeams: AdminMemberTeam[];
-  birthdayMembers: BirthdaySource[];
-  eventRoles: EventRoleType[];
-  volunteerNeedsByEventId: Record<string, VolunteerNeed[]>;
-  // Remplace la carte "Documents à renouveler" (retour de Cindy du
-  // 2026-08-22 : "pas d'intérêt") — voir sponsors-manager.tsx pour la
-  // gestion complète (ajout/modification/suppression).
-  sponsors: AdminSponsor[];
-  // Nouvelle carte "Pénalités" (retour de Cindy du 2026-08-22), juste
-  // après "Montant en attente" — même famille de chiffre (un montant en
-  // euros restant à encaisser), voir penalites-manager.tsx pour la saisie.
   penalites: AdminPenalite[];
-  // Retour de Cindy du 25/10 ("une carte Total Buvette, juste avant
-  // Total pénalités") -- voir buvette-manager.tsx pour la saisie.
   buvette: AdminBuvette[];
-  // Retour de Cindy du 16/09 ("Réunion Bureau") : propre fiche joueur de
-  // qui consulte -- transmis à CalendarView pour qu'un membre du Bureau
-  // puisse répondre présent/absent pour lui-même sur une Réunion (jamais
-  // fourni jusqu'ici pour ce calendrier, qui n'en avait pas besoin avant
-  // ce type d'événement).
-  ownPlayerId?: string | null;
-  // Retour de Cindy du 30/09 ("Basile Lamouret, secrétaire/coach/joueur, ne
-  // peut pas répondre présent depuis son espace Bureau") : ownPlayerId
-  // ci-dessus était déjà transmis à CalendarView (selfPlayerId), mais le
-  // prop `rsvp` (le pool joueurs + statuts sur lequel ce filtre s'applique)
-  // n'était lui-même JAMAIS transmis -- respondingPlayers restait donc
-  // toujours vide, pour absolument tout le monde, quel que soit son rôle
-  // (le correctif du 16/09 n'était que la moitié du branchement). Même
-  // `statusByKey` déjà calculé pour "Bilan de la saison"
-  // (adminRsvpStatusByKey, page.tsx), réutilisé tel quel ici -- aucune
-  // requête de plus.
-  rsvpStatusByKey?: Record<string, string>;
 }) {
   // Même périmètre que l'onglet Cotisations & Licences (KpiHeader) : les
   // stages/événements/boutique (collecteId non nul) ont leur propre suivi
@@ -291,6 +256,167 @@ export default function BureauDashboard({
 
   const activeMembers = members.filter((m) => !m.archivedAt).length;
 
+  // Retour de Cindy du 30/08 : "Pénalités" seul ne disait pas si c'était le
+  // total ou juste le restant à encaisser — remplacé par le total de
+  // TOUTES les pénalités du club (réglées ou non), libellé "Total
+  // pénalités" pour lever l'ambiguïté. Le détail réglé/non réglé reste
+  // visible pénalité par pénalité dans l'onglet Pénalités
+  // (penalites-manager.tsx).
+  const penalitesTotalAmount = penalites.reduce((sum, p) => sum + p.amount, 0);
+
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <KpiCard
+        icon={Users}
+        iconClass="text-navy"
+        iconBgClass="bg-navy/10"
+        value={activeMembers}
+        kind="integer"
+        label="Membres actifs"
+        href="/dashboard?tab=admin&section=members"
+        sectionKey="members"
+      />
+      {/* Retour de Cindy du 09/09 (phase 1 UX, couleurs sémantiques) :
+          ces trois cartes ("Cotisations en attente", "Montant en
+          attente", "Total pénalités" juste après) restent
+          VOLONTAIREMENT en dehors de la migration status-* -- le 07/09,
+          Cindy avait explicitement demandé de les distinguer (rose vs
+          rouge) parce qu'elles se confondaient trop, toutes en rose à
+          l'époque. Les repasser toutes en status-urgent (leur vraie
+          signification -- "argent dû") réintroduirait exactement cette
+          confusion. Cette grille de cartes fonctionne comme une petite
+          palette catégorielle propre à chaque indicateur (comme
+          "Total évènements payants" en or, "Membres actifs" en
+          navy), pas comme une liste de statuts où la cohérence
+          prime -- à la différence des badges détaillés (une ligne de
+          cotisation, une pénalité individuelle...) déjà migrés. */}
+      <KpiCard
+        icon={Wallet}
+        iconClass="text-rose-600"
+        iconBgClass="bg-rose-500/10"
+        value={pending.length}
+        kind="integer"
+        label="Cotisations en attente"
+        href="/dashboard?tab=admin&section=cotisations-licences"
+        sectionKey="cotisations-licences"
+        cornerBadge={pending.length > 0 && <RelanceRedirectButton />}
+      />
+      <KpiCard
+        icon={Wallet}
+        iconClass="text-amber-700"
+        iconBgClass="bg-amber-500/10"
+        value={pendingAmount}
+        kind="amount"
+        label="Montant en attente"
+        href="/dashboard?tab=admin&section=cotisations-licences"
+        sectionKey="cotisations-licences"
+      />
+      {/* Retour de Cindy du 25/10 ("ajouter Total évènements payants
+          juste avant Total pénalités, information importante sur la
+          page d'atterrissage") : même teinte or de marque que les
+          tickets/billets d'événement ailleurs dans l'appli
+          (collecte-type-style, cotisations-manager.tsx), jamais réutilisée
+          par les 3 cartes "argent dû" (rose/ambre/rouge) à côté -- celle-ci
+          annonce un montant déjà encaissé, pas une dette. */}
+      <KpiCard
+        icon={Ticket}
+        iconClass="text-ubac-yellow-dark"
+        iconBgClass="bg-ubac-yellow/15"
+        value={collecteCotisationsTotal}
+        kind="amount"
+        label="Total évènements payants"
+        href="/dashboard?tab=admin&section=cotisations-evenements"
+        sectionKey="cotisations-evenements"
+      />
+      {/* Retour de Cindy du 25/10 ("une carte Total Buvette, juste avant
+          Total pénalités") : même esprit que "Total évènements payants"
+          juste au-dessus (un montant déjà encaissé, pas une dette) --
+          vert plutôt qu'or pour les distinguer d'un coup d'œil. */}
+      <KpiCard
+        icon={Coffee}
+        iconClass="text-court-green"
+        iconBgClass="bg-court-green/10"
+        value={buvetteTotal}
+        kind="amount"
+        label="Total Buvette"
+        href="/dashboard?tab=admin&section=cotisations-buvette"
+        sectionKey="cotisations-buvette"
+      />
+      <KpiCard
+        icon={Gavel}
+        // Rouge plutôt que le rose déjà utilisé par "Cotisations en
+        // attente" juste à côté (retour du 07/09, "rouge pour
+        // pénalités") -- les deux cartes partageaient jusqu'ici
+        // exactement la même couleur, impossible à distinguer d'un coup
+        // d'œil malgré des sujets différents.
+        iconClass="text-red-600"
+        iconBgClass="bg-red-500/10"
+        value={penalitesTotalAmount}
+        kind="amount"
+        label="Total pénalités"
+        href="/dashboard?tab=admin&section=cotisations-penalites"
+        sectionKey="cotisations-penalites"
+        // Retour de Cindy du 09/09 (couleurs sémantiques) : status-success
+        // (globals.css) plutôt qu'emerald codé en dur -- même vert que
+        // "présent"/"payé" ailleurs dans l'appli pour ce même "tout va
+        // bien".
+        zeroState={{
+          icon: CheckCircle2,
+          iconClass: "text-status-success",
+          iconBgClass: "bg-status-success/10",
+          cardClass: "border-status-success/30 bg-status-success/10",
+        }}
+      />
+    </div>
+  );
+}
+
+export default function BureauDashboard({
+  members,
+  events,
+  createTeams,
+  birthdayMembers,
+  eventRoles,
+  volunteerNeedsByEventId,
+  sponsors,
+  ownPlayerId = null,
+  rsvpStatusByKey = {},
+}: {
+  members: AdminMember[];
+  events: AdminUpcomingEvent[];
+  // Le calendrier complet vit désormais sous ce résumé plutôt que dans son
+  // propre onglet séparé (retour de Cindy du 2026-08-21 : "l'onglet
+  // accueil devrait être calendrier et intégrer l'onglet existant
+  // 'calendrier'") — mêmes props que l'ancien onglet Calendrier du Bureau.
+  createTeams: AdminMemberTeam[];
+  birthdayMembers: BirthdaySource[];
+  eventRoles: EventRoleType[];
+  volunteerNeedsByEventId: Record<string, VolunteerNeed[]>;
+  // Remplace la carte "Documents à renouveler" (retour de Cindy du
+  // 2026-08-22 : "pas d'intérêt") — voir sponsors-manager.tsx pour la
+  // gestion complète (ajout/modification/suppression).
+  sponsors: AdminSponsor[];
+  // Retour de Cindy du 16/09 ("Réunion Bureau") : propre fiche joueur de
+  // qui consulte -- transmis à CalendarView pour qu'un membre du Bureau
+  // puisse répondre présent/absent pour lui-même sur une Réunion (jamais
+  // fourni jusqu'ici pour ce calendrier, qui n'en avait pas besoin avant
+  // ce type d'événement).
+  ownPlayerId?: string | null;
+  // Retour de Cindy du 30/09 ("Basile Lamouret, secrétaire/coach/joueur, ne
+  // peut pas répondre présent depuis son espace Bureau") : ownPlayerId
+  // ci-dessus était déjà transmis à CalendarView (selfPlayerId), mais le
+  // prop `rsvp` (le pool joueurs + statuts sur lequel ce filtre s'applique)
+  // n'était lui-même JAMAIS transmis -- respondingPlayers restait donc
+  // toujours vide, pour absolument tout le monde, quel que soit son rôle
+  // (le correctif du 16/09 n'était que la moitié du branchement). Même
+  // `statusByKey` déjà calculé pour "Bilan de la saison"
+  // (adminRsvpStatusByKey, page.tsx), réutilisé tel quel ici -- aucune
+  // requête de plus.
+  rsvpStatusByKey?: Record<string, string>;
+}) {
+  // Même périmètre que l'onglet Cotisations & Licences (KpiHeader) : les
+  // stages/événements/boutique (collecteId non nul) ont leur propre suivi
+  // dans l'onglet Collectes, pas la peine de les mélanger ici.
   // Retour de Cindy du 30/09 : voir le commentaire sur `rsvpStatusByKey`
   // plus haut -- un seul élément (soi-même), jamais toute l'équipe (le
   // Bureau gère les présences des autres depuis ses propres outils, pas
@@ -303,14 +429,6 @@ export default function BureauDashboard({
   const selfRsvpPlayers = ownPlayerId
     ? [{ id: ownPlayerId, name: formatPersonName(ownMember?.firstName ?? null, ownMember?.lastName ?? null, "Moi"), teamIds: [] as string[] }]
     : [];
-
-  // Retour de Cindy du 30/08 : "Pénalités" seul ne disait pas si c'était le
-  // total ou juste le restant à encaisser — remplacé par le total de
-  // TOUTES les pénalités du club (réglées ou non), libellé "Total
-  // pénalités" pour lever l'ambiguïté. Le détail réglé/non réglé reste
-  // visible pénalité par pénalité dans l'onglet Pénalités
-  // (penalites-manager.tsx).
-  const penalitesTotalAmount = penalites.reduce((sum, p) => sum + p.amount, 0);
 
   // Même fenêtre "à surveiller" que les licences/certificats médicaux
   // ci-dessous : un sponsor sans date de renouvellement connue n'apparaît
@@ -325,117 +443,12 @@ export default function BureauDashboard({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Retour de Cindy du 12/09 : "Envois automatiques" déménage dans
-          "Tableau de bord" (admin-view.tsx) -- vivait ici avant. */}
-      {/* Historique : "Équipes sans coach" retirée (2026-08-22) ;
-          "Renouvellement Sponsors" retirée à son tour le 25/10 (remplacée
-          par "Total évènements payants" puis "Total Buvette", ajoutées le
-          même jour juste avant "Total pénalités") -- 6 cartes aujourd'hui,
-          lg:grid-cols-6 pour tenir sur une seule rangée en bureau. */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <KpiCard
-          icon={Users}
-          iconClass="text-navy"
-          iconBgClass="bg-navy/10"
-          value={activeMembers}
-          kind="integer"
-          label="Membres actifs"
-          href="/dashboard?tab=admin&section=members"
-          sectionKey="members"
-        />
-        {/* Retour de Cindy du 09/09 (phase 1 UX, couleurs sémantiques) :
-            ces trois cartes ("Cotisations en attente", "Montant en
-            attente", "Total pénalités" juste après) restent
-            VOLONTAIREMENT en dehors de la migration status-* -- le 07/09,
-            Cindy avait explicitement demandé de les distinguer (rose vs
-            rouge) parce qu'elles se confondaient trop, toutes en rose à
-            l'époque. Les repasser toutes en status-urgent (leur vraie
-            signification -- "argent dû") réintroduirait exactement cette
-            confusion. Cette grille de cartes fonctionne comme une petite
-            palette catégorielle propre à chaque indicateur (comme
-            "Total évènements payants" en or, "Membres actifs" en
-            navy), pas comme une liste de statuts où la cohérence
-            prime -- à la différence des badges détaillés (une ligne de
-            cotisation, une pénalité individuelle...) déjà migrés. */}
-        <KpiCard
-          icon={Wallet}
-          iconClass="text-rose-600"
-          iconBgClass="bg-rose-500/10"
-          value={pending.length}
-          kind="integer"
-          label="Cotisations en attente"
-          href="/dashboard?tab=admin&section=cotisations-licences"
-          sectionKey="cotisations-licences"
-          cornerBadge={pending.length > 0 && <RelanceRedirectButton />}
-        />
-        <KpiCard
-          icon={Wallet}
-          iconClass="text-amber-700"
-          iconBgClass="bg-amber-500/10"
-          value={pendingAmount}
-          kind="amount"
-          label="Montant en attente"
-          href="/dashboard?tab=admin&section=cotisations-licences"
-          sectionKey="cotisations-licences"
-        />
-        {/* Retour de Cindy du 25/10 ("ajouter Total évènements payants
-            juste avant Total pénalités, information importante sur la
-            page d'atterrissage") : même teinte or de marque que les
-            tickets/billets d'événement ailleurs dans l'appli
-            (collecte-type-style, cotisations-manager.tsx), jamais réutilisée
-            par les 3 cartes "argent dû" (rose/ambre/rouge) à côté -- celle-ci
-            annonce un montant déjà encaissé, pas une dette. */}
-        <KpiCard
-          icon={Ticket}
-          iconClass="text-ubac-yellow-dark"
-          iconBgClass="bg-ubac-yellow/15"
-          value={collecteCotisationsTotal}
-          kind="amount"
-          label="Total évènements payants"
-          href="/dashboard?tab=admin&section=cotisations-evenements"
-          sectionKey="cotisations-evenements"
-        />
-        {/* Retour de Cindy du 25/10 ("une carte Total Buvette, juste avant
-            Total pénalités") : même esprit que "Total évènements payants"
-            juste au-dessus (un montant déjà encaissé, pas une dette) --
-            vert plutôt qu'or pour les distinguer d'un coup d'œil. */}
-        <KpiCard
-          icon={Coffee}
-          iconClass="text-court-green"
-          iconBgClass="bg-court-green/10"
-          value={buvetteTotal}
-          kind="amount"
-          label="Total Buvette"
-          href="/dashboard?tab=admin&section=cotisations-buvette"
-          sectionKey="cotisations-buvette"
-        />
-        <KpiCard
-          icon={Gavel}
-          // Rouge plutôt que le rose déjà utilisé par "Cotisations en
-          // attente" juste à côté (retour du 07/09, "rouge pour
-          // pénalités") -- les deux cartes partageaient jusqu'ici
-          // exactement la même couleur, impossible à distinguer d'un coup
-          // d'œil malgré des sujets différents.
-          iconClass="text-red-600"
-          iconBgClass="bg-red-500/10"
-          value={penalitesTotalAmount}
-          kind="amount"
-          label="Total pénalités"
-          href="/dashboard?tab=admin&section=cotisations-penalites"
-          sectionKey="cotisations-penalites"
-          // Retour de Cindy du 09/09 (couleurs sémantiques) : status-success
-          // (globals.css) plutôt qu'emerald codé en dur -- même vert que
-          // "présent"/"payé" ailleurs dans l'appli pour ce même "tout va
-          // bien".
-          zeroState={{
-            icon: CheckCircle2,
-            iconClass: "text-status-success",
-            iconBgClass: "bg-status-success/10",
-            cardClass: "border-status-success/30 bg-status-success/10",
-          }}
-        />
-      </div>
-
+      {/* Retour du Bureau (08/11, relayé par Cindy) : les 6 cartes
+          "Membres actifs"/"Cotisations en attente"/... qui vivaient ici
+          sont passées dans l'onglet "Tableau de bord" -- voir
+          BureauKpiGrid, plus haut dans ce fichier, et son appel dans
+          admin-view.tsx. Cet onglet ("Calendrier") ne garde que le
+          calendrier et ses propres alertes. */}
       {/* Retour de Cindy du 09/09 (phase 1 UX, couleurs sémantiques) :
           status-pending (globals.css) plutôt qu'orange codé en dur --
           l'audit avait relevé que ce bandeau et celui des licences/

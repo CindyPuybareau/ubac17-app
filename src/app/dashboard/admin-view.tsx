@@ -38,7 +38,7 @@ import SponsorsManager from "./sponsors-manager";
 import InventoryManager from "./inventory-manager";
 import BuvetteManager from "./buvette-manager";
 import SponsorsDisplay from "./sponsors-display";
-import BureauDashboard from "./bureau-dashboard";
+import BureauDashboard, { BureauKpiGrid } from "./bureau-dashboard";
 import AutomationSettings, { type AutomationKey } from "./automation-settings";
 import SpaceDashboardSummary from "./space-dashboard-summary";
 import type { SpaceDashboardSummary as SpaceDashboardSummaryData } from "@/lib/space-dashboard";
@@ -286,6 +286,16 @@ export default function AdminView({
       icon: <LayoutDashboard className={iconClass} />,
       content: (
         <div className="flex flex-col gap-4">
+          {/* Retour du Bureau (08/11, relayé par Cindy) : "toujours en
+              premier, visible au clic sur Tableau de bord" -- déplacées
+              depuis l'onglet "Calendrier" (BureauDashboard), avant même le
+              résumé club entier ci-dessous. */}
+          <BureauKpiGrid
+            cotisations={cotisations}
+            members={members}
+            penalites={penalites}
+            buvette={buvette}
+          />
           {/* Retour de Cindy du 13/09 : résumé club entier, en premier --
               c'est désormais le vrai contenu de cet onglet, "Envois
               automatiques" reste en dessous, secondaire. */}
@@ -309,7 +319,6 @@ export default function AdminView({
       content: (
         <div className="flex flex-col gap-4">
           <BureauDashboard
-            cotisations={cotisations}
             members={members}
             events={upcomingEvents}
             createTeams={teamRefs}
@@ -317,8 +326,6 @@ export default function AdminView({
             eventRoles={eventRoles}
             volunteerNeedsByEventId={volunteerNeedsByEventId}
             sponsors={sponsors}
-            penalites={penalites}
-            buvette={buvette}
             ownPlayerId={ownPlayerId}
             rsvpStatusByKey={rsvpStatusByKey}
           />
