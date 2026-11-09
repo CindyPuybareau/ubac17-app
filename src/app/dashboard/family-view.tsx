@@ -7,11 +7,10 @@ import {
   LogOut,
   ScrollText,
   Shield,
-  ShoppingBag,
   Users,
 } from "lucide-react";
 import DocumentsPanel from "@/components/club-documents";
-import { BOUTIQUE_URL } from "./boutique";
+import BoutiqueCard from "./boutique-card";
 import { avatarColor } from "@/lib/avatar-color";
 import { sortTeamsByGroup, groupTeamsByPrimarySecondary, getSiblingTeamIds } from "@/lib/teams";
 import CalendarView, { type CalendarRsvpPlayer } from "./calendar-view";
@@ -337,6 +336,14 @@ export default function FamilyView({
       icon: <LayoutDashboard className={iconClass} />,
       content: (
         <div className="flex flex-col gap-4">
+          {/* Retour du Bureau (09/11, relayé par Cindy) : "Affiches" (pas
+              encore construites, voir le plan validé) rejoindront cette
+              même rangée, à côté de la Boutique -- flex-wrap dès
+              maintenant pour les accueillir sans retoucher ce conteneur. */}
+          <div className="flex flex-wrap gap-3">
+            <BoutiqueCard />
+          </div>
+
           {/* Retour de Cindy du 13/09 : résumé de cette équipe (ou de
               l'union des équipes des enfants affichés), en premier --
               canManagePhoto=false : envoyer la photo d'une équipe reste
@@ -381,7 +388,10 @@ export default function FamilyView({
       // la barre du bas mobile (retour de Cindy du 2026-08-21) —
       // "Calendrier" tout court, comme dans les 3 autres espaces
       // (Bureau/Coach/Enfant), en plus d'être cohérent partout.
-      label: "Calendrier",
+      // Retour du Bureau (09/11, relayé par Cindy) : "Calendrier général",
+      // pour lever toute ambiguïté avec le bandeau "Cette semaine"
+      // désormais aussi présent dans le Tableau de bord (voir plus haut).
+      label: "Calendrier général",
       icon: <CalendarDays className={iconClass} />,
       content: (
         <div className="flex flex-col gap-4">
@@ -446,7 +456,9 @@ export default function FamilyView({
       // enfant, aplati ici en item direct plutôt que garder un sous-menu
       // à une seule entrée.
       key: "matches",
-      label: "Matchs officiels",
+      // Retour du Bureau (09/11, relayé par Cindy) : "Championnat", même
+      // contenu (tout le calendrier officiel + le Classement).
+      label: "Championnat",
       icon: <Shield className={iconClass} />,
       content: (
         <CalendarView
@@ -473,14 +485,10 @@ export default function FamilyView({
         />
       ),
     },
-    {
-      // Un lien externe, pas un onglet de contenu (voir href sur AdminSection).
-      key: "boutique",
-      label: "Boutique en ligne",
-      icon: <ShoppingBag className={iconClass} />,
-      content: null,
-      href: BOUTIQUE_URL,
-    },
+    // Retour du Bureau (09/11, relayé par Cindy) : "Boutique en ligne"
+    // quittait ici le menu -- elle vit désormais en carte dans l'onglet
+    // "Tableau de bord" (voir BoutiqueCard, plus haut), aux côtés des
+    // futures "Affiches".
     {
       // Tout à la fin du menu (retour de Cindy du 2026-08-22) — déplacé
       // depuis la bande bleue.

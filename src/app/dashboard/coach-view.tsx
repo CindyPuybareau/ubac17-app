@@ -9,14 +9,13 @@ import {
   RefreshCw,
   ScrollText,
   Shield,
-  ShoppingBag,
   Trophy,
   Users,
 } from "lucide-react";
 import DocumentsPanel from "@/components/club-documents";
 import ClubReportsSection from "./club-reports-section";
 import Cd17LigueSection from "./cd17-ligue-section";
-import { BOUTIQUE_URL } from "./boutique";
+import BoutiqueCard from "./boutique-card";
 import {
   getSiblingTeamIds,
   groupTeamsByPrimarySecondary,
@@ -278,6 +277,14 @@ export default function CoachView({
       icon: <LayoutDashboard className={iconClass} />,
       content: (
         <div className="flex flex-col gap-4">
+          {/* Retour du Bureau (09/11, relayé par Cindy) : "Affiches" (pas
+              encore construites, voir le plan validé) rejoindront cette
+              même rangée, à côté de la Boutique -- flex-wrap dès
+              maintenant pour les accueillir sans retoucher ce conteneur. */}
+          <div className="flex flex-wrap gap-3">
+            <BoutiqueCard />
+          </div>
+
           {/* Retour de Cindy du 13/09 : résumé de la ou des équipes
               coachées, en premier -- canManagePhoto toujours vrai ici, ce
               coach est bien celui de l'équipe unique éventuellement
@@ -317,7 +324,10 @@ export default function CoachView({
     },
     {
       key: "calendar",
-      label: "Calendrier",
+      // Retour du Bureau (09/11, relayé par Cindy) : "Calendrier général",
+      // pour lever toute ambiguïté avec le bandeau "Cette semaine"
+      // désormais aussi présent dans le Tableau de bord (voir plus haut).
+      label: "Calendrier général",
       icon: <CalendarDays className={iconClass} />,
       content: (
         <div className="flex flex-col gap-4">
@@ -451,7 +461,9 @@ export default function CoachView({
       children: [
         {
           key: "matches-official",
-          label: "Matchs officiels",
+          // Retour du Bureau (09/11, relayé par Cindy) : "Championnat",
+          // cohérent avec Bureau/Famille.
+          label: "Championnat",
           icon: <Shield className={iconClass} />,
           content: (
             <CalendarView
@@ -566,14 +578,9 @@ export default function CoachView({
           icon: <Package className={iconClass} />,
           content: <InventoryManager items={inventoryItems} />,
         },
-        {
-          // Un lien externe, pas un onglet de contenu (voir href sur AdminSection).
-          key: "boutique",
-          label: "Boutique en ligne",
-          icon: <ShoppingBag className={iconClass} />,
-          content: null,
-          href: BOUTIQUE_URL,
-        },
+        // Retour du Bureau (09/11, relayé par Cindy) : "Boutique en ligne"
+        // quittait ici le menu -- elle vit désormais en carte dans l'onglet
+        // "Tableau de bord" (voir BoutiqueCard, plus haut).
       ],
     },
     {
