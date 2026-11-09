@@ -12,7 +12,6 @@ import {
   Package,
   ScrollText,
   Shield,
-  ShoppingBag,
   Tag,
   Ticket,
   TrendingUp,
@@ -24,7 +23,8 @@ import {
 import DocumentsPanel from "@/components/club-documents";
 import ClubReportsSection from "./club-reports-section";
 import Cd17LigueSection from "./cd17-ligue-section";
-import { BOUTIQUE_SALES_URL, BOUTIQUE_URL } from "./boutique";
+import { BOUTIQUE_SALES_URL } from "./boutique";
+import BoutiqueCard from "./boutique-card";
 import TeamManager, { type Person, type TeamWithMembers } from "./team-manager";
 import ImportInscriptions from "./import-inscriptions";
 import ImportPlanning from "./import-planning";
@@ -296,6 +296,13 @@ export default function AdminView({
             penalites={penalites}
             buvette={buvette}
           />
+          {/* Retour du Bureau (09/11, relayé par Cindy) : "Affiches" (pas
+              encore construites, voir le plan validé) rejoindront cette
+              même rangée, à côté de la Boutique -- flex-wrap dès
+              maintenant pour les accueillir sans retoucher ce conteneur. */}
+          <div className="flex flex-wrap gap-3">
+            <BoutiqueCard salesUrl={BOUTIQUE_SALES_URL} />
+          </div>
           {/* Retour de Cindy du 13/09 : résumé club entier, en premier --
               c'est désormais le vrai contenu de cet onglet, "Envois
               automatiques" reste en dessous, secondaire. */}
@@ -314,7 +321,11 @@ export default function AdminView({
       // planning complet. Reste l'onglet d'ouverture par défaut malgré sa
       // position 2 dans ce tableau (voir defaultActiveKey plus bas).
       key: "home",
-      label: "Calendrier",
+      // Retour du Bureau (09/11, relayé par Cindy) : "Calendrier général",
+      // cohérent avec Coach/Famille, pour lever toute ambiguïté avec le
+      // bandeau "Cette semaine" désormais aussi présent dans le Tableau de
+      // bord (voir plus haut).
+      label: "Calendrier général",
       icon: <CalendarDays className={iconClass} />,
       content: (
         <div className="flex flex-col gap-4">
@@ -499,7 +510,9 @@ export default function AdminView({
       children: [
         {
           key: "matches-official",
-          label: "Matchs officiels",
+          // Retour du Bureau (09/11, relayé par Cindy) : "Championnat",
+          // cohérent avec Coach/Famille.
+          label: "Championnat",
           icon: <Shield className={iconClass} />,
           content: (
             <CalendarView
@@ -641,37 +654,22 @@ export default function AdminView({
           content: <InventoryManager items={inventoryItems} />,
         },
         {
-          // Retour de Cindy du 09/09 : devient un sous-menu (comme
-          // Paiements/Matchs & Résultats) plutôt qu'un lien direct --
-          // "Boutique en ligne" (vitrine publique, inchangée) rejoint
-          // "Suivi des ventes" (espace commerçant du même site, réservé
-          // au Bureau : identifiant/mot de passe personnels de Cindy,
-          // jamais stockés ni vus par l'appli -- chacun se connecte avec
-          // son propre compte, exactement comme pour "Boutique en
-          // ligne"). key inchangée ("boutique") pour ne pas casser un
-          // lien profond "?section=boutique" déjà partagé -- même
-          // précaution que "cotisations"/"Paiements" plus haut.
+          // Retour du Bureau (09/11, relayé par Cindy) : "Boutique en
+          // ligne" (vitrine publique) quitte ce sous-menu -- elle vit
+          // désormais en carte dans l'onglet "Tableau de bord" (voir
+          // BoutiqueCard). Il ne restait plus qu'un seul enfant
+          // ("Suivi des ventes", espace commerçant réservé au Bureau :
+          // identifiant/mot de passe personnels de Cindy, jamais stockés
+          // ni vus par l'appli) -- aplati ici en item direct plutôt que
+          // garder un sous-menu à une seule entrée (même principe que
+          // "Résultats" retiré de "Matchs" le 29/10). key inchangée
+          // ("boutique") pour ne pas casser un lien profond
+          // "?section=boutique" déjà partagé.
           key: "boutique",
-          label: "Boutique",
-          icon: <ShoppingBag className={iconClass} />,
+          label: "Suivi des ventes",
+          icon: <TrendingUp className={iconClass} />,
           content: null,
-          children: [
-            {
-              // Un lien externe, pas un onglet de contenu (voir href sur AdminSection).
-              key: "boutique-en-ligne",
-              label: "Boutique en ligne",
-              icon: <ShoppingBag className={iconClass} />,
-              content: null,
-              href: BOUTIQUE_URL,
-            },
-            {
-              key: "boutique-ventes",
-              label: "Suivi des ventes",
-              icon: <TrendingUp className={iconClass} />,
-              content: null,
-              href: BOUTIQUE_SALES_URL,
-            },
-          ],
+          href: BOUTIQUE_SALES_URL,
         },
       ],
     },

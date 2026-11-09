@@ -12,8 +12,11 @@
 // (admin-view.tsx).
 export const BRIQUE_GROUPS: { label: string; briques: { key: string; label: string }[] }[] = [
   {
-    label: "Calendrier",
-    briques: [{ key: "calendrier", label: "Calendrier" }],
+    // Retour du Bureau (09/11, relayé par Cindy) : libellé mis à jour en
+    // même temps que l'onglet (admin-view.tsx) -- clé DB inchangée
+    // ("calendrier"), seul le texte affiché change.
+    label: "Calendrier général",
+    briques: [{ key: "calendrier", label: "Calendrier général" }],
   },
   {
     // Retour de Cindy du 12/09 : compteurs simples (membres, équipes,
@@ -33,12 +36,13 @@ export const BRIQUE_GROUPS: { label: string; briques: { key: string; label: stri
     briques: [{ key: "equipes", label: "Équipes" }],
   },
   {
-    // Retour de Cindy du 29/10 ("Résultats n'a plus d'intérêt") : libellés
-    // mis à jour en même temps que l'onglet retiré -- la clé DB
-    // "matchs_resultats" reste inchangée (contrainte CHECK en base,
-    // access_profile_briques), seul le texte affiché change.
-    label: "Matchs officiels",
-    briques: [{ key: "matchs_resultats", label: "Matchs officiels" }],
+    // Retour de Cindy du 29/10 ("Résultats n'a plus d'intérêt") puis retour
+    // du Bureau (09/11, "Championnat") : libellés mis à jour en même temps
+    // que l'onglet -- la clé DB "matchs_resultats" reste inchangée
+    // (contrainte CHECK en base, access_profile_briques), seul le texte
+    // affiché change.
+    label: "Championnat",
+    briques: [{ key: "matchs_resultats", label: "Championnat" }],
   },
   {
     label: "Paiements",
