@@ -280,6 +280,20 @@ export default function ChildDashboard({
       content: (
         <div className="flex flex-col gap-4">
           <SpaceDashboardSummary summary={dashboardSummary} canManagePhoto={false} />
+
+          {/* Retour de Cindy du 09/11 ("basculer le bandeau 'Cette semaine'
+              dans le Tableau de bord, pas l'ajouter en plus", étendu à
+              l'Espace Enfant) : vivait dans l'en-tête (voir plus bas, et son
+              retrait du JSX de l'en-tête) -- même bandeau, même habillage
+              (texte blanc/jaune conçu pour un fond marine, repris ici à
+              l'identique), visible seulement ici désormais. Toujours
+              affiché (pas de condition showHeaderWeekBanner ici,
+              contrairement aux 3 autres espaces) : un enfant a par
+              construction toujours au moins une équipe/des événements. */}
+          <div className="rounded-2xl bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-4 shadow-md sm:px-6 sm:py-5">
+            <WeekStripBanner events={headerWeekEvents} />
+          </div>
+
           {/* Retour de Cindy du 24/09 ("vérifier que ce soit visible pour
               tout les espaces... elle représente l'onglet Bureau Cotisations
               & Licences, c'est son reflet") : même paire de cartes que côté
@@ -294,7 +308,9 @@ export default function ChildDashboard({
     },
     {
       key: "calendar",
-      label: "Calendrier",
+      // Retour du Bureau (09/11, relayé par Cindy) : "Calendrier général",
+      // cohérent avec Bureau/Coach/Famille.
+      label: "Calendrier général",
       icon: <CalendarDays className={iconClass} />,
       content: (
         <div className="flex flex-col gap-4">
@@ -379,7 +395,9 @@ export default function ChildDashboard({
       // retiré partout, y compris ici ; sans lui ce groupe n'avait plus
       // qu'un seul enfant, aplati en item direct.
       key: "matches",
-      label: "Matchs officiels",
+      // Retour du Bureau (09/11, relayé par Cindy) : "Championnat", même
+      // contenu, cohérent avec Bureau/Coach/Famille.
+      label: "Championnat",
       icon: <Shield className={iconClass} />,
       content: (
         <ChildResultsTab
@@ -444,22 +462,14 @@ export default function ChildDashboard({
           className="pointer-events-none absolute -right-2 top-1/2 h-36 w-36 -translate-y-1/2 bg-contain bg-right bg-no-repeat opacity-40 sm:h-44 sm:w-44"
           style={{ backgroundImage: "url(/logo.png)" }}
         />
-        {/* Retour de Cindy du 2026-08-25 ("toujours pas bon tout doit etre
-            aligné"), même correctif que page.tsx : la grille 1fr/auto/1fr
-            essayée avant ne tombait toujours pas au centre réel. Photo et
-            icônes redeviennent une simple ligne flex justify-between
-            (déjà correcte en pratique), et le bandeau devient une
-            superposition (absolute, left-1/2 -translate-x-1/2) centrée
-            sur ce conteneur relatif — centrage géométrique garanti,
-            indépendant de la largeur de la photo/des icônes. */}
-        {/* Retour de Cindy du 07/09 ("sur tablette, ça se chevauche"),
-            même correctif que page.tsx (espace Bureau/Coach/Famille) :
-            passer en ligne dès sm: (640px) alors que le bandeau "Cette
-            semaine" juste en dessous reste maintenant empilé (donc plus
-            haut) jusqu'à lg: faisait chevaucher Bonjour/prénom et le
-            bandeau sur tablette. Repoussé à lg: partout ici pour rester
-            cohérent. */}
-        <div className="relative mx-auto flex w-full max-w-[1600px] flex-col gap-3 lg:min-h-[3.5rem] lg:flex-row lg:items-center lg:justify-between">
+        {/* Retour de Cindy du 09/11 ("basculer le bandeau 'Cette semaine'
+            dans le Tableau de bord") : le bandeau ne vit plus ici -- toute
+            la mise en page qui l'accueillait (empilement sur mobile/
+            tablette pour lui laisser sa propre ligne, superposition
+            centrée à lg:...) disparaît avec lui, cette ligne redevient une
+            simple ligne flex justify-between, comme l'en-tête partagé des
+            3 autres espaces (dashboard/layout.tsx). */}
+        <div className="relative mx-auto flex w-full max-w-[1600px] flex-row items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <ChildAvatarUpload avatarUrl={avatarUrl} name={firstName} />
             <div className="min-w-0">
@@ -482,13 +492,6 @@ export default function ChildDashboard({
             <OrgChartButton />
             <ChildNotificationBell initialNotifications={notifications} initialEnabled={notificationsEnabled} />
             <ChildLogoutButton />
-          </div>
-          {/* Retour de Cindy du 2026-08-25 : "CETTE SEMAINE" se retrouvait
-              coupé en haut de l'en-tête — même correctif que page.tsx,
-              inset-y-0 + flex + items-center centre à l'intérieur de la
-              vraie hauteur du conteneur, jamais au-delà. */}
-          <div className="lg:absolute lg:inset-y-0 lg:left-1/2 lg:flex lg:max-w-[calc(100%-18rem)] lg:-translate-x-1/2 lg:items-center">
-            <WeekStripBanner events={headerWeekEvents} />
           </div>
         </div>
       </header>

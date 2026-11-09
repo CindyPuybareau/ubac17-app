@@ -26,6 +26,7 @@ import PenalitesCard from "./penalites-card";
 import ChildAccessManager from "./child-access-manager";
 import SpaceDashboardSummary from "./space-dashboard-summary";
 import type { SpaceDashboardSummary as SpaceDashboardSummaryData } from "@/lib/space-dashboard";
+import WeekStripBanner, { type WeekStripEvent } from "./week-strip-banner";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import SponsorsDisplay from "./sponsors-display";
 import type {
@@ -109,6 +110,8 @@ export default function FamilyView({
   sponsorDisplay = [],
   dashboardSummary,
   officialsTrombinoscopePath,
+  headerWeekEvents,
+  showHeaderWeekBanner,
 }: {
   events: AdminUpcomingEvent[];
   rsvpPlayers: CalendarRsvpPlayer[];
@@ -142,6 +145,14 @@ export default function FamilyView({
   // transmis à DocumentsPanel (lecture seule, jamais d'envoi côté Famille)
   // et à CalendarView (bouton sur la carte de match à domicile).
   officialsTrombinoscopePath?: string | null;
+  // Retour de Cindy du 09/11 ("basculer le bandeau 'Cette semaine' dans le
+  // Tableau de bord, pas l'ajouter en plus") : vivait au-dessus des 3
+  // onglets Bureau/Coach/Famille (page.tsx), visible quel que soit l'onglet
+  // ouvert -- rendu désormais ici, uniquement dans l'onglet "Tableau de
+  // bord". Données et condition d'affichage inchangées (même calcul
+  // qu'avant, juste déplacé), voir page.tsx.
+  headerWeekEvents: WeekStripEvent[];
+  showHeaderWeekBanner: boolean;
 }) {
   const iconClass = "h-4 w-4 shrink-0";
 
@@ -350,6 +361,17 @@ export default function FamilyView({
               réservé au Bureau/coach (voir la policy du bucket
               team-photos), jamais à un parent ou un joueur. */}
           <SpaceDashboardSummary summary={dashboardSummary} canManagePhoto={false} />
+
+          {/* Retour de Cindy du 09/11 ("basculer le bandeau 'Cette semaine'
+              dans le Tableau de bord, pas l'ajouter en plus") : même
+              bandeau, même habillage que lorsqu'il vivait au-dessus des
+              onglets (texte blanc/jaune conçu pour un fond marine, repris
+              ici à l'identique) -- visible seulement ici désormais. */}
+          {showHeaderWeekBanner && (
+            <div className="rounded-2xl bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-4 shadow-md sm:px-6 sm:py-5">
+              <WeekStripBanner events={headerWeekEvents} />
+            </div>
+          )}
 
           {/* Retour de Cindy du 24/09 ("il serait pas mal que les parents
               ait le bilan d'assiduité de leurs enfants aussi... dans le
