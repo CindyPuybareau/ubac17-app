@@ -42,6 +42,7 @@ import BureauDashboard, { BureauKpiGrid } from "./bureau-dashboard";
 import AutomationSettings, { type AutomationKey } from "./automation-settings";
 import SpaceDashboardSummary from "./space-dashboard-summary";
 import type { SpaceDashboardSummary as SpaceDashboardSummaryData } from "@/lib/space-dashboard";
+import WeekStripBanner, { type WeekStripEvent } from "./week-strip-banner";
 import type {
   AdminAccessProfile,
   AdminBuvette,
@@ -93,6 +94,8 @@ export default function AdminView({
   ownPlayerId = null,
   trombinoscopeByTeamId,
   officialsTrombinoscopePath,
+  headerWeekEvents,
+  showHeaderWeekBanner,
 }: {
   // Profils d'accès sur-mesure (retour de Cindy du 05/09, étape 3) : null
   // pour un Bureau complet (comportement historique, inchangé) ; sinon, la
@@ -158,6 +161,14 @@ export default function AdminView({
   // CalendarView (bouton sur la carte de match, bandeau "Organisation
   // match à domicile").
   officialsTrombinoscopePath?: string | null;
+  // Retour de Cindy du 09/11 ("basculer le bandeau 'Cette semaine' dans le
+  // Tableau de bord, pas l'ajouter en plus") : vivait au-dessus des 3
+  // onglets Bureau/Coach/Famille (page.tsx), visible quel que soit l'onglet
+  // ouvert -- rendu désormais ici, uniquement dans l'onglet "Tableau de
+  // bord". Données et condition d'affichage inchangées (même calcul
+  // qu'avant, juste déplacé), voir page.tsx.
+  headerWeekEvents: WeekStripEvent[];
+  showHeaderWeekBanner: boolean;
 }) {
   const teamRefs = teams.map((t) => ({
     id: t.id,
@@ -311,6 +322,18 @@ export default function AdminView({
             canManagePhoto
             allTeamsForPhoto={teams.map((t) => ({ id: t.id, name: t.name, category: t.category, photoUrl: t.photoUrl ?? null }))}
           />
+
+          {/* Retour de Cindy du 09/11 ("basculer le bandeau 'Cette semaine'
+              dans le Tableau de bord, pas l'ajouter en plus") : même
+              bandeau, même habillage que lorsqu'il vivait au-dessus des
+              onglets (texte blanc/jaune conçu pour un fond marine, repris
+              ici à l'identique) -- visible seulement ici désormais. */}
+          {showHeaderWeekBanner && (
+            <div className="rounded-2xl bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-4 shadow-md sm:px-6 sm:py-5">
+              <WeekStripBanner events={headerWeekEvents} />
+            </div>
+          )}
+
           <AutomationSettings settings={automationSettings} />
         </div>
       ),
@@ -501,10 +524,11 @@ export default function AdminView({
       // formaient un sous-menu (comme Cotisations) au lieu d'un bouton
       // interne sur la page. Retour de Cindy du 29/10 ("Résultats n'a
       // plus d'intérêt") : "Résultats" retiré -- ce groupe garde ses deux
-      // autres enfants ("Matchs officiels", "FFBB"), label mis à jour en
-      // conséquence (plus de "& Résultats").
+      // autres enfants ("Championnat", "FFBB"). Retour de Cindy du 09/11
+      // ("ça me gêne d'avoir juste 'Matchs' dans le menu") : "Matchs
+      // officiels", pour rester explicite même en groupe parent replié.
       key: "matches",
-      label: "Matchs",
+      label: "Matchs officiels",
       icon: <Shield className={iconClass} />,
       content: null,
       children: [

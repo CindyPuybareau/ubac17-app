@@ -43,7 +43,7 @@ import AdminView from "./admin-view";
 import type { RosterPlayer, TeamWithMembers } from "./team-manager";
 import CoachView from "./coach-view";
 import FamilyView from "./family-view";
-import WeekStripBanner, { type WeekStripEvent } from "./week-strip-banner";
+import { type WeekStripEvent } from "./week-strip-banner";
 import ClubHelperBanner, { type ClubHelperEvent } from "./club-helper-banner";
 import type { FamilyTeamCardData } from "./family-team-card";
 import type { BirthdaySource } from "./birthdays";
@@ -4918,6 +4918,26 @@ export default async function DashboardPage({
       }))
     : [];
 
+  // Retour de Cindy du 09/11 ("basculer le bandeau 'Cette semaine' dans le
+  // Tableau de bord, pas l'ajouter en plus") : calculé ici (avant les blocs
+  // Bureau/Coach/Famille ci-dessous, qui en ont chacun besoin pour le
+  // transmettre à leur propre vue) plutôt que juste avant le `return` comme
+  // avant -- buildCoachWeekEvent/buildFamilyWeekEvent restent définies plus
+  // bas (hoisting des déclarations `function`, aucun souci d'ordre), mais
+  // les données qu'elles ferment (coachEvents, familyEvents, et tout ce
+  // qu'elles lisent) doivent déjà exister à cet endroit du fichier.
+  const showHeaderWeekBanner = isCoach || players.length > 0;
+  const headerWeekEvents: WeekStripEvent[] = showHeaderWeekBanner
+    ? Array.from(
+        new Map(
+          [
+            ...coachEvents.map((e): [string, WeekStripEvent] => [e.id, buildCoachWeekEvent(e)]),
+            ...familyEvents.map((e): [string, WeekStripEvent] => [e.id, buildFamilyWeekEvent(e)]),
+          ]
+        ).values()
+      )
+    : [];
+
   const tabs: DashboardTab[] = [];
 
   // Retour de Cindy du 29/08, après discussion : plus aucun repli/fusion
@@ -5019,6 +5039,8 @@ export default async function DashboardPage({
         sponsorDisplay={sponsorDisplay}
         dashboardSummary={dashboardSummary}
         officialsTrombinoscopePath={officialsTrombinoscopePath}
+        headerWeekEvents={headerWeekEvents}
+        showHeaderWeekBanner={showHeaderWeekBanner}
       />
     );
   }
@@ -5084,6 +5106,8 @@ export default async function DashboardPage({
             ownPlayerId={ownPlayerId}
             trombinoscopeByTeamId={adminTrombinoscopeByTeamId}
             officialsTrombinoscopePath={officialsTrombinoscopePath}
+            headerWeekEvents={headerWeekEvents}
+            showHeaderWeekBanner={showHeaderWeekBanner}
           />
         ) : null,
     });
@@ -5147,6 +5171,8 @@ export default async function DashboardPage({
             dashboardSummary={coachDashboardSummary}
             trombinoscopeByTeamId={coachTrombinoscopeByTeamId}
             officialsTrombinoscopePath={officialsTrombinoscopePath}
+            headerWeekEvents={headerWeekEvents}
+            showHeaderWeekBanner={showHeaderWeekBanner}
           />
         ) : null,
     });
@@ -5365,39 +5391,16 @@ export default async function DashboardPage({
     })
     .filter((e): e is ClubHelperEvent => e !== null);
 
-  const showHeaderWeekBanner = isCoach || players.length > 0;
-  const headerWeekEvents: WeekStripEvent[] = showHeaderWeekBanner
-    ? Array.from(
-        new Map(
-          [
-            ...coachEvents.map((e): [string, WeekStripEvent] => [e.id, buildCoachWeekEvent(e)]),
-            ...familyEvents.map((e): [string, WeekStripEvent] => [e.id, buildFamilyWeekEvent(e)]),
-          ]
-        ).values()
-      )
-    : [];
-
   return (
     <>
       <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
-      {/* Bandeau "Cette semaine" (retour de Cindy/Sandrine Manzelle du
-          2026-08-24, affiné le 2026-09-01 pour le cumul Bureau+coach
-          +joueur) : voir showHeaderWeekBanner plus haut. Sorti du header le
-          15/09 (voir layout.tsx du dashboard) : ses données dépendent du
-          calcul Coach/Famille propre à l'onglet actif, donc reste ici plutôt
-          que dans le layout partagé -- ce n'est donc plus une superposition
-          centrée dans le bandeau bleu (changement visuel assumé sur grand
-          écran uniquement, validé avec Cindy), mais un bloc normal au-dessus
-          des onglets. */}
-      {/* WeekStripBanner est stylé en texte blanc/jaune (conçu pour le fond
-          marine du header, voir week-strip-banner.tsx) -- ce fond est donc
-          repris ici à l'identique, sinon le texte serait illisible sur le
-          fond clair de la page. */}
-      {showHeaderWeekBanner && (
-        <div className="rounded-2xl bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-4 shadow-md sm:px-6 sm:py-5">
-          <WeekStripBanner events={headerWeekEvents} />
-        </div>
-      )}
+      {/* Retour de Cindy du 09/11 ("basculer le bandeau 'Cette semaine' dans
+          le Tableau de bord, pas l'ajouter en plus") : ne vit plus ici,
+          au-dessus des onglets Bureau/Coach/Famille (où il restait visible
+          quel que soit l'onglet ouvert) -- chaque espace le rend désormais
+          lui-même, dans son propre onglet "Tableau de bord" uniquement (voir
+          headerWeekEvents/showHeaderWeekBanner, calculés plus haut et
+          transmis à AdminView/CoachView/FamilyView). */}
       <ClubHelperBanner events={clubHelperEvents} />
       <DashboardTabs tabs={tabs} activeKey={activeTab} />
 

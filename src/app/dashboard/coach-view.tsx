@@ -26,6 +26,7 @@ import CalendarView from "./calendar-view";
 import CalendarSubscribe from "./calendar-subscribe";
 import SpaceDashboardSummary from "./space-dashboard-summary";
 import type { SpaceDashboardSummary as SpaceDashboardSummaryData } from "@/lib/space-dashboard";
+import WeekStripBanner, { type WeekStripEvent } from "./week-strip-banner";
 import CoachTeams from "./coach-teams";
 import PenalitesCard from "./penalites-card";
 import CoachFfbb from "./coach-ffbb";
@@ -72,6 +73,8 @@ export default function CoachView({
   dashboardSummary,
   trombinoscopeByTeamId,
   officialsTrombinoscopePath,
+  headerWeekEvents,
+  showHeaderWeekBanner,
 }: {
   teams: TeamWithMembers[];
   events: AdminUpcomingEvent[];
@@ -133,6 +136,14 @@ export default function CoachView({
   // transmis à DocumentsPanel et CalendarView, jamais d'envoi possible ici
   // (canManageOfficialsTrombinoscope réservé à admin-view.tsx).
   officialsTrombinoscopePath?: string | null;
+  // Retour de Cindy du 09/11 ("basculer le bandeau 'Cette semaine' dans le
+  // Tableau de bord, pas l'ajouter en plus") : vivait au-dessus des 3
+  // onglets Bureau/Coach/Famille (page.tsx), visible quel que soit l'onglet
+  // ouvert -- rendu désormais ici, uniquement dans l'onglet "Tableau de
+  // bord". Données et condition d'affichage inchangées (même calcul
+  // qu'avant, juste déplacé), voir page.tsx.
+  headerWeekEvents: WeekStripEvent[];
+  showHeaderWeekBanner: boolean;
 }) {
   // Créer / modifier / supprimer un événement n'est permis que pour les
   // équipes réellement entraînées : proposer celle où l'utilisateur n'est
@@ -299,6 +310,18 @@ export default function CoachView({
             canManagePhoto
             photoRestrictedTeamIds={siblingTeamIds}
           />
+
+          {/* Retour de Cindy du 09/11 ("basculer le bandeau 'Cette semaine'
+              dans le Tableau de bord, pas l'ajouter en plus") : même
+              bandeau, même habillage que lorsqu'il vivait au-dessus des
+              onglets (texte blanc/jaune conçu pour un fond marine, repris
+              ici à l'identique) -- visible seulement ici désormais. */}
+          {showHeaderWeekBanner && (
+            <div className="rounded-2xl bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-4 shadow-md sm:px-6 sm:py-5">
+              <WeekStripBanner events={headerWeekEvents} />
+            </div>
+          )}
+
           {/* Retour de Cindy du 28/10 ("un coach doit pouvoir voir les
               pénalités de ses joueurs, payée ou non, sur le Tableau de
               bord") : `penalites` ci-dessous est déjà le même tableau
@@ -452,10 +475,12 @@ export default function CoachView({
       // bouton interne sur la page — moins de contrôles empilés quand il
       // y a aussi le sélecteur d'équipe à afficher. Retour de Cindy du
       // 29/10 ("Résultats n'a plus d'intérêt") : "Résultats" retiré --
-      // ce groupe garde ses deux autres enfants ("Matchs officiels",
-      // "FFBB"), label mis à jour en conséquence.
+      // ce groupe garde ses deux autres enfants ("Championnat", "FFBB").
+      // Retour de Cindy du 09/11 ("ça me gêne d'avoir juste 'Matchs' dans
+      // le menu") : "Matchs officiels", pour rester explicite même en
+      // groupe parent replié.
       key: "matches",
-      label: "Matchs",
+      label: "Matchs officiels",
       icon: <Shield className={iconClass} />,
       content: null,
       children: [
