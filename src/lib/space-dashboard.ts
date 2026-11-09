@@ -6,7 +6,7 @@ import { runBatched, Semaphore } from "./batch";
 import { listTeamsForOfficialMatches } from "./teams";
 import { getCachedTeams } from "./reference-cache";
 import type { FfbbRankingEntry } from "./ffbb";
-import { normalizeFfbbPhase } from "./ffbb-phase";
+import { normalizeFfbbPhase, type FfbbPhase } from "./ffbb-phase";
 
 // "Tableau de bord" (retour de Cindy du 13/09, "ce que tu mettrais dans le
 // tableau de bord... photo d'équipe, nombre de joueurs, matchs officiels/
@@ -122,6 +122,13 @@ export type SpaceDashboardTeamStats = {
   // le reste, jamais un nouvel appel FFBB. Vide pour une équipe mère sans
   // lien FFBB (U13M, U18M, Séniors M...), comme official/friendly plus haut.
   ranking: FfbbRankingEntry[];
+  // Retour de Cindy du 09/11 ("le classement correspond à quoi, phase 2 ?
+  // ce serait bien de l'indiquer") : cette vignette montre déjà toujours la
+  // phase la plus récente (voir le commentaire du 28/10 sur
+  // latestPhaseByTeam, juste en dessous) -- jamais affichée jusqu'ici.
+  // Phase 1 par défaut (ranking vide : la valeur n'a alors aucune
+  // importance, FfbbRankingTable ne rend rien).
+  rankingPhase: FfbbPhase;
 };
 
 export type SpaceDashboardSummary = {
@@ -454,6 +461,7 @@ export async function getSpaceDashboardSummary(
             official: stats?.official ?? { ...EMPTY_MATCH_STATS },
             friendly: stats?.friendly ?? { ...EMPTY_MATCH_STATS },
             ranking: rankingByTeam.get(id) ?? [],
+            rankingPhase: normalizeFfbbPhase(latestPhaseByTeam.get(id)),
             // Rempli plus bas (nextEventsByTeamId), une fois le jour propre
             // à CETTE équipe calculé -- voir le retour de Cindy du 20/09
             // au-dessus de SpaceDashboardTeamStats.

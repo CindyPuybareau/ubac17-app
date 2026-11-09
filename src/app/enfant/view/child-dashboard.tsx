@@ -279,7 +279,11 @@ export default function ChildDashboard({
       icon: <LayoutDashboard className={iconClass} />,
       content: (
         <div className="flex flex-col gap-4">
-          <SpaceDashboardSummary summary={dashboardSummary} canManagePhoto={false} />
+          <SpaceDashboardSummary
+            summary={dashboardSummary}
+            canManagePhoto={false}
+            weekEvents={headerWeekEvents}
+          />
 
           {/* Retour de Cindy du 09/11 ("basculer le bandeau 'Cette semaine'
               dans le Tableau de bord, pas l'ajouter en plus", étendu à

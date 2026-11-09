@@ -360,7 +360,11 @@ export default function FamilyView({
               canManagePhoto=false : envoyer la photo d'une équipe reste
               réservé au Bureau/coach (voir la policy du bucket
               team-photos), jamais à un parent ou un joueur. */}
-          <SpaceDashboardSummary summary={dashboardSummary} canManagePhoto={false} />
+          <SpaceDashboardSummary
+            summary={dashboardSummary}
+            canManagePhoto={false}
+            weekEvents={headerWeekEvents}
+          />
 
           {/* Retour de Cindy du 09/11 ("basculer le bandeau 'Cette semaine'
               dans le Tableau de bord, pas l'ajouter en plus") : même

@@ -801,10 +801,13 @@ export function EventRow({
   // fanion "Spécial").
   const isTournament = event.eventType === "TOURNAMENT";
   const isOfficialMatch = event.eventType === "MATCH";
+  // Retour de Cindy du 09/11 ("le trait des matchs officiels est trop
+  // épais, comme les entraînements partout dans l'appli") : border-l-8
+  // ramené à border-l-4.
   const shellClass = isTournament
     ? "relative rounded-2xl border-2 border-dashed border-ubac-yellow bg-white p-3.5 shadow-sm"
     : isOfficialMatch
-      ? `rounded-2xl border border-navy/15 bg-white p-3.5 shadow-sm border-l-8 ${style.border}`
+      ? `rounded-2xl border border-navy/15 bg-white p-3.5 shadow-sm border-l-4 ${style.border}`
       : `rounded-2xl border border-zinc-100 bg-white p-3.5 shadow-sm border-l-4 ${style.border}`;
 
   const alreadyPlayed = new Date(event.startTime).getTime() < new Date().getTime();

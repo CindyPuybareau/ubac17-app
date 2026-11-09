@@ -53,10 +53,13 @@ export default function NextConvocationCard({
   // même ici où tout est déjà en alerte jaune.
   const isTournament = event.event_type === "TOURNAMENT";
   const isOfficialMatch = event.event_type === "MATCH";
+  // Retour de Cindy du 09/11 ("le trait des matchs officiels est trop
+  // épais, comme les entraînements partout dans l'appli") : border-l-8
+  // ramené à border-l-4.
   const shellClass = isTournament
     ? "relative rounded-2xl border-2 border-dashed border-ubac-yellow bg-ubac-yellow/5 p-5 shadow-sm"
     : isOfficialMatch
-      ? "rounded-2xl border border-navy/15 bg-ubac-yellow/5 p-5 shadow-sm border-l-8 border-l-navy"
+      ? "rounded-2xl border border-navy/15 bg-ubac-yellow/5 p-5 shadow-sm border-l-4 border-l-navy"
       : "rounded-2xl border border-ubac-yellow/40 bg-ubac-yellow/5 p-5 shadow-sm";
 
   return (

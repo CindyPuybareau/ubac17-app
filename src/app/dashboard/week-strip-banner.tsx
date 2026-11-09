@@ -152,6 +152,21 @@ function startOfDay(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
+// Semaine calendaire (lundi -> dimanche) contenant aujourd'hui. Extraite ici
+// (retour de Cindy du 09/11, cartes "Entraînement(s)/Match(s) de la
+// semaine") pour que week-training-match-cards.tsx utilise exactement la
+// même semaine que ce bandeau plutôt qu'un second calcul qui pourrait un
+// jour diverger -- une seule vérité "cette semaine" dans toute l'appli.
+export function getCurrentWeekRange(): { weekStart: Date; weekEnd: Date } {
+  const today = startOfDay(new Date());
+  const mondayOffset = (today.getDay() + 6) % 7; // lundi = 0 ... dimanche = 6
+  const weekStart = new Date(today);
+  weekStart.setDate(weekStart.getDate() - mondayOffset);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 7);
+  return { weekStart, weekEnd };
+}
+
 function isSameDay(a: Date, b: Date) {
   return (
     a.getFullYear() === b.getFullYear() &&
@@ -224,10 +239,15 @@ export function DayEventCard({ event }: { event: WeekStripEvent }) {
   const venue = venueQuery(event);
   const isTournament = event.eventType === "TOURNAMENT";
   const isOfficialMatch = event.eventType === "MATCH";
+  // Retour de Cindy du 09/11 ("le trait à gauche des matchs officiels est
+  // plus gros que celui des entraînements, faire pareil -- sur toutes les
+  // cartes matchs officiels de l'appli") : border-l-8 ramené à border-l-4,
+  // même épaisseur que le reste (entraînements, tournois...) -- plus aucune
+  // carte de l'appli n'a de trait plus épais que les autres.
   const shellClass = isTournament
     ? "relative rounded-2xl border-2 border-dashed border-ubac-yellow bg-white p-3.5 shadow-sm"
     : isOfficialMatch
-      ? `rounded-2xl border border-navy/15 bg-white p-3.5 shadow-sm border-l-8 ${style.border}`
+      ? `rounded-2xl border border-navy/15 bg-white p-3.5 shadow-sm border-l-4 ${style.border}`
       : `rounded-2xl border border-zinc-100 bg-white p-3.5 shadow-sm border-l-4 ${style.border}`;
 
   // Même règle que calendar-view.tsx : jamais d'onglet Organisation pour un
@@ -489,11 +509,7 @@ export default function WeekStripBanner({ events }: { events: WeekStripEvent[] }
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   const today = startOfDay(new Date());
-  const mondayOffset = (today.getDay() + 6) % 7; // lundi = 0 ... dimanche = 6
-  const weekStart = new Date(today);
-  weekStart.setDate(weekStart.getDate() - mondayOffset);
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekEnd.getDate() + 7);
+  const { weekStart, weekEnd } = getCurrentWeekRange();
 
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(weekStart);

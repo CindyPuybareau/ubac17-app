@@ -168,10 +168,13 @@ export default function PendingRsvpPopup({
             // de Cindy du 07/09 : "le rendre aussi joli que la carte
             // evenement concerné") -- liseré coloré par type d'événement
             // + badge, repris de week-strip-banner.tsx/child-calendar-tab.tsx.
+            // Retour de Cindy du 09/11 ("le trait des matchs officiels est
+            // trop épais, comme les entraînements partout dans l'appli") :
+            // border-l-8 ramené à border-l-4.
             const shellClass = isTournament
               ? "relative rounded-xl border-2 border-dashed border-ubac-yellow bg-white p-3"
               : isOfficialMatch
-                ? `rounded-xl border border-navy/15 bg-white p-3 border-l-8 ${style.border}`
+                ? `rounded-xl border border-navy/15 bg-white p-3 border-l-4 ${style.border}`
                 : `rounded-xl border border-zinc-100 bg-white p-3 border-l-4 ${style.border}`;
             return (
               <div key={`${item.event.id}-${item.id}`} className={shellClass}>

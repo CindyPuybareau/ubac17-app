@@ -585,8 +585,6 @@ export default function CalendarView({
   contactEmailByPlayerId,
   allowClubWide = false,
   birthdayMembers = [],
-  scopeTeams = [],
-  scopeTeamRoleById,
   eventRoles = [],
   selfPlayerId = null,
   forcedView,
@@ -614,18 +612,6 @@ export default function CalendarView({
   // défaut).
   isBureau?: boolean;
   birthdayMembers?: BirthdaySource[];
-  // Équipes dont ce calendrier montre les événements. Affiché tel quel :
-  // sans cette ligne, un calendrier vide ne dit pas s'il ne couvre rien ou
-  // s'il n'y a simplement rien de programmé.
-  scopeTeams?: { id: string; name: string | null; category: string | null }[];
-  // Retour de Cindy du 2026-09-02 (Basile, "le texte ne va pas") : côté
-  // Coach, scopeTeams mélange volontairement les équipes coachées et celle
-  // où la personne n'est QUE joueuse (son propre calendrier de joueur ne
-  // doit pas disparaître selon l'onglet — voir coach-view.tsx) — mais
-  // "Événements de X, Y, Z" à plat laissait croire que tout était coaché,
-  // sous un onglet nommé "Équipes coachées". Optionnel : sans lui (Bureau,
-  // Famille), le texte reste une simple liste comme avant.
-  scopeTeamRoleById?: Record<string, "COACH" | "PLAYER">;
   // Retour de Cindy du 16/09 (chantier Suspense, "afficher le contenu
   // principal tout de suite") : ces trois props ne sont plus lues -- ce
   // composant va lui-même chercher tasks/carpool/besoins via
@@ -1365,13 +1351,20 @@ export default function CalendarView({
     if (isTournament) {
       return `${prefix}rounded-2xl border-2 border-dashed border-ubac-yellow bg-white p-4 shadow-sm`;
     }
-    if (event.event_type === "MATCH" || event.event_type === "REUNION") {
-      // Même bordure épaisse qu'un match officiel (retour de Cindy du
-      // 16/09, "ressortir des autres événements") : signale "important",
-      // pas un simple entraînement -- combinée au badge plein (voir
-      // style.badge/typeStyles.REUNION dans event-style.ts) plutôt qu'à la
-      // pastille pastel partagée par les autres types.
+    if (event.event_type === "REUNION") {
+      // Bordure épaisse (retour de Cindy du 16/09, "ressortir des autres
+      // événements") : signale "important", pas un simple entraînement --
+      // combinée au badge plein (voir style.badge/typeStyles.REUNION dans
+      // event-style.ts) plutôt qu'à la pastille pastel partagée par les
+      // autres types. Retour de Cindy du 09/11 ("le trait des matchs
+      // officiels est trop épais") : un match officiel partageait jusqu'ici
+      // cette même épaisseur -- désormais séparé ci-dessous, lui ramené à
+      // border-l-4 comme le reste. REUNION, pas visée par cette demande,
+      // garde border-l-8.
       return `${prefix}rounded-2xl border border-navy/15 bg-white p-4 shadow-sm border-l-8 ${style.border}`;
+    }
+    if (event.event_type === "MATCH") {
+      return `${prefix}rounded-2xl border border-navy/15 bg-white p-4 shadow-sm border-l-4 ${style.border}`;
     }
     return `${prefix}rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm border-l-4 ${style.border}`;
   }
@@ -3274,41 +3267,13 @@ export default function CalendarView({
         </div>
       </div>
 
-      {scopeTeams.length > 0 &&
-        (() => {
-          // scopeTeamRoleById absent (Bureau/Famille) : simple liste, comme
-          // avant — retour de Cindy du 2026-09-02 pour le cas où il est
-          // fourni (Coach), voir le commentaire sur ce prop plus haut.
-          if (!scopeTeamRoleById) {
-            return (
-              <p className="flex flex-wrap items-center gap-1.5 text-xs text-zinc-500">
-                <Users className="h-3.5 w-3.5 shrink-0" />
-                Événements de {scopeTeams.map((t) => teamLabel(t)).join(", ")}
-              </p>
-            );
-          }
-          const coached = scopeTeams.filter((t) => scopeTeamRoleById[t.id] !== "PLAYER");
-          const playedOnly = scopeTeams.filter((t) => scopeTeamRoleById[t.id] === "PLAYER");
-          return (
-            <p className="flex flex-wrap items-center gap-1.5 text-xs text-zinc-500">
-              <Users className="h-3.5 w-3.5 shrink-0" />
-              Événements de{" "}
-              {coached.length > 0 && (
-                <>
-                  {coached.map((t) => teamLabel(t)).join(", ")} (coaché
-                  {coached.length > 1 ? "es" : "e"})
-                </>
-              )}
-              {coached.length > 0 && playedOnly.length > 0 && " et "}
-              {playedOnly.length > 0 && (
-                <>
-                  {playedOnly.map((t) => teamLabel(t)).join(", ")} (joué
-                  {playedOnly.length > 1 ? "es" : "e"})
-                </>
-              )}
-            </p>
-          );
-        })()}
+      {/* Retour de Cindy du 09/11 ("redondant, on a déjà le bouton au clic
+          qui nous indique l'équipe") : cette ligne "Événements de X, Y, Z
+          (coachée/jouée)" vivait ici, juste sous la barre d'outils -- les
+          pastilles de filtre par équipe juste au-dessus disent déjà la même
+          chose. Supprimée (scopeTeams/scopeTeamRoleById retirés de ce
+          composant en même temps, plus aucun autre usage -- voir
+          coach-view.tsx, seul appelant à les avoir jamais transmis). */}
 
       {createTeams && createTeams.length > 0 && (
         <CreateEventForm

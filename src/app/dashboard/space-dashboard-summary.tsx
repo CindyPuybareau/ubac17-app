@@ -9,8 +9,9 @@ import AnimatedNumber from "./animated-number";
 import { DayEventCard, type WeekStripEvent } from "./week-strip-banner";
 import TeamSelectorPills from "./team-selector-pills";
 import SelectDropdown from "./select-dropdown";
-import { teamLabel } from "@/lib/teams";
+import { looseFamilyKey, splitTeamName, teamLabel } from "@/lib/teams";
 import FfbbRankingTable from "./ffbb-ranking-table";
+import WeekTrainingMatchCards from "./week-training-match-cards";
 import type { SpaceDashboardSummary as SpaceDashboardSummaryData } from "@/lib/space-dashboard";
 
 type MatchFilter = "official" | "friendly" | "all";
@@ -28,6 +29,7 @@ export default function SpaceDashboardSummary({
   canManagePhoto,
   photoRestrictedTeamIds = [],
   allTeamsForPhoto,
+  weekEvents,
 }: {
   summary: SpaceDashboardSummaryData;
   // Bureau (toute équipe) ou coach de CETTE équipe précise (voir la policy
@@ -47,6 +49,20 @@ export default function SpaceDashboardSummary({
   // activeTeam) : le sélecteur ci-dessous ne s'affiche que si cette prop
   // est fournie.
   allTeamsForPhoto?: { id: string; name: string | null; category: string | null; photoUrl: string | null }[];
+  // Retour de Cindy du 09/11 ("tout est mélangé pour Basile... le tri
+  // devrait se faire pour chaque équipe") : les cartes "Entraînement(s)/
+  // Match(s) de la semaine" vivent maintenant ICI (plus en bloc séparé chez
+  // l'appelant) précisément pour partager `effectiveTeamId` avec le
+  // classement/les KPI juste au-dessus -- un premier essai en bloc sibling,
+  // nourri par la liste globale (coach + famille fusionnés, jamais filtrée
+  // par équipe), mélangeait les entraînements/matchs de TOUTES les équipes
+  // de la personne quel que soit le pastille sélectionnée. `weekEvents`
+  // peut donc rester la même liste large (même coach+famille fusionnés) :
+  // le filtre par `effectiveTeamId` ci-dessous exclut déjà tout ce qui
+  // n'appartient pas à l'équipe active, peu importe sa provenance. Non
+  // fourni (Bureau, club entier, jamais ces cartes) : repli sur l'ancien
+  // bloc "prochain événement" ci-dessous, inchangé.
+  weekEvents?: WeekStripEvent[];
 }) {
   const [filter, setFilter] = useState<MatchFilter>("official");
   // Retour de Cindy du 20/09 ("mes deux enfants sont mélangés... un coach
@@ -86,6 +102,43 @@ export default function SpaceDashboardSummary({
   // entier) -- une équipe mère sans lien FFBB (U13M, U18M...) a aussi un
   // tableau vide, FfbbRankingTable ne rend alors rien (voir son garde-fou).
   const effectiveRanking = activeTeam ? activeTeam.ranking : [];
+  const effectiveRankingPhase = activeTeam?.rankingPhase;
+  // Retour de Cindy du 09/11 ("les entraînements des Séniors M sont
+  // regroupés... U18M pareil, il faudrait qu'on les voie") : vérifié en
+  // base -- Séniors 1/Séniors 2 et U18M-1/U18M-2 n'ont ELLES-MÊMES aucun
+  // entraînement, toute la saison est au nom de l'équipe mère partagée
+  // ("Séniors M"/"U18M"), que cette personne porte déjà dans son effectif
+  // (team_players) -- donc déjà présente dans `weekEvents`, juste exclue
+  // par le simple filtre `teamId === effectiveTeamId`. U13M-1/U13M-2, à
+  // l'inverse, ont chacune leurs propres séances distinctes (vérifié en
+  // base aussi) : rien à compléter pour elles, le filtre simple suffit déjà
+  // -- d'où ce repli CONDITIONNEL (seulement si l'équipe active n'a
+  // elle-même aucun entraînement), jamais un ajout systématique de la mère.
+  // Résolution par NOM (looseFamilyKey, lib/teams.ts -- même règle que
+  // getSiblingTeamIds/getTrombinoscopeTeamId), jamais un nom d'équipe codé
+  // en dur : une future équipe mère/déclinaisons suivant le même principe
+  // en bénéficie automatiquement.
+  const effectiveWeekEvents = (() => {
+    if (!weekEvents || !effectiveTeamId) return [];
+    const ownEvents = weekEvents.filter((e) => e.teamId === effectiveTeamId);
+    if (ownEvents.some((e) => e.eventType === "TRAINING") || !activeTeam?.teamName) {
+      return ownEvents;
+    }
+    const base = looseFamilyKey(activeTeam.teamName);
+    const motherTeamId = weekEvents.find(
+      (e) =>
+        e.teamId &&
+        e.teamId !== effectiveTeamId &&
+        e.teamName &&
+        splitTeamName(e.teamName).rank === 0 &&
+        looseFamilyKey(e.teamName) === base
+    )?.teamId;
+    if (!motherTeamId) return ownEvents;
+    const motherTrainings = weekEvents.filter(
+      (e) => e.teamId === motherTeamId && e.eventType === "TRAINING"
+    );
+    return [...ownEvents, ...motherTrainings];
+  })();
   const effectiveBasePhotoUrl = activeTeam ? activeTeam.photoUrl : summary.photoUrl;
   // Photo envoyée pendant cette visite, par équipe -- remplace l'ancien
   // état unique (photoUrl) devenu insuffisant dès qu'on peut changer
@@ -404,20 +457,24 @@ export default function SpaceDashboardSummary({
           synchronisé chaque lundi, aucun appel FFBB ici. Ne rend rien pour
           le Bureau (effectiveRanking toujours []) ni pour une équipe mère
           sans lien FFBB. */}
-      <FfbbRankingTable entries={effectiveRanking} />
+      <FfbbRankingTable entries={effectiveRanking} phase={effectiveRankingPhase} />
 
-      {nextEventsForCards.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-            {nextDayLabel}
-            {nextEventsForCards.length > 1 ? ` · ${nextEventsForCards.length} événements` : ""}
-          </p>
-          <div className="flex flex-col gap-2">
-            {nextEventsForCards.map((event) => (
-              <DayEventCard key={event.id} event={event} />
-            ))}
+      {weekEvents ? (
+        <WeekTrainingMatchCards events={effectiveWeekEvents} />
+      ) : (
+        nextEventsForCards.length > 0 && (
+          <div className="flex flex-col gap-1.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+              {nextDayLabel}
+              {nextEventsForCards.length > 1 ? ` · ${nextEventsForCards.length} événements` : ""}
+            </p>
+            <div className="flex flex-col gap-2">
+              {nextEventsForCards.map((event) => (
+                <DayEventCard key={event.id} event={event} />
+              ))}
+            </div>
           </div>
-        </div>
+        )
       )}
     </div>
   );
