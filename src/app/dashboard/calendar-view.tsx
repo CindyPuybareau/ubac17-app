@@ -3135,24 +3135,15 @@ export default function CalendarView({
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <button
-                onClick={() => step(1)}
-                onMouseEnter={() => prefetchMonth(nextMonthDate)}
-                onFocus={() => prefetchMonth(nextMonthDate)}
-                onTouchStart={() => prefetchMonth(nextMonthDate)}
-                aria-label="Suivant"
-                disabled={isMonthPending}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-navy text-white transition-colors hover:bg-navy-dark disabled:opacity-60"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
               {/* Bouton "Aujourd'hui" retiré (retour de Cindy du 10/09) :
                   redondant avec la case du jour déjà surlignée dans la
                   grille du mois. La fonction "revenir au mois courant"
                   (utile après avoir navigué ailleurs) est conservée en
                   fusionnant avec la navigation de mois -- le libellé du
                   mois lui-même redevient cliquable, mêmes préchargements
-                  au survol que l'ancien bouton. */}
+                  au survol que l'ancien bouton. Retour de Cindy du 09/11 :
+                  replacé ENTRE les deux flèches (au lieu d'après les
+                  deux) -- "‹ Novembre 2026 ›", pas "‹ › Novembre 2026". */}
               <button
                 type="button"
                 onClick={goToday}
@@ -3164,6 +3155,17 @@ export default function CalendarView({
                 className="rounded-full px-1.5 py-0.5 text-sm font-semibold capitalize text-zinc-900 transition-colors hover:bg-zinc-100 disabled:opacity-60"
               >
                 {headerLabel}
+              </button>
+              <button
+                onClick={() => step(1)}
+                onMouseEnter={() => prefetchMonth(nextMonthDate)}
+                onFocus={() => prefetchMonth(nextMonthDate)}
+                onTouchStart={() => prefetchMonth(nextMonthDate)}
+                aria-label="Suivant"
+                disabled={isMonthPending}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-navy text-white transition-colors hover:bg-navy-dark disabled:opacity-60"
+              >
+                <ChevronRight className="h-4 w-4" />
               </button>
             </div>
           )}
