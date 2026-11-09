@@ -3083,6 +3083,27 @@ export default function CalendarView({
 
   return (
     <div className="flex w-full max-w-full min-w-0 flex-col gap-4">
+      {/* Retour de Cindy du 09/11 ("les équipes doivent être sous les
+          espaces, pas après Créer un événement/le mois") : le même
+          sélecteur qu'avant (TeamSelectorPills, jamais le dropdown Bureau --
+          voir isBureau ci-dessous), simplement sorti de la barre d'outils et
+          placé en premier, dans un encart jaune clair qui reprend le même
+          gabarit (arrondi, bordure, fond teinté) que le bandeau du
+          sélecteur d'espace juste au-dessus (dashboard-tabs.tsx). Jamais
+          pour le Bureau : il voit déjà tout le club par construction, "mes
+          équipes" n'a pas de sens ici -- son propre filtre (dropdown,
+          toutes les équipes du club) reste lui à sa place habituelle, plus
+          bas, inchangé. */}
+      {!forcedView && !isBureau && resultsTeams && resultsTeams.length > 1 && (
+        <div className="rounded-2xl border border-ubac-yellow/35 bg-ubac-yellow/10 p-2">
+          <TeamSelectorPills
+            teams={sortedResultsTeams}
+            activeId={activeResultsTeamIdResolved}
+            onSelect={setActiveResultsTeamId}
+          />
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           {/* Retour de Cindy du 2026-08-22 : l'action principale de l'écran
@@ -3149,30 +3170,19 @@ export default function CalendarView({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Retour de Cindy du 09/09 ("le calendrier devient illisible...
-              sans filtre par équipe visible") : même sélecteur que les
-              vues Résultats/Matchs/Événements plus bas (TeamFilterDropdown/
-              TeamSelectorPills), jusqu'ici jamais montré pour Mois/Liste --
-              alors que c'est justement là que plusieurs équipes chargées le
-              même jour rendaient la grille illisible ("+1", "+4"). Masqué
-              sur les pages dédiées (forcedView) : elles ont déjà leur
-              propre sélecteur plus bas, pas la peine de le doubler ici. */}
-          {!forcedView && resultsTeams && resultsTeams.length > 1 && (
+          {/* Retour de Cindy du 09/11 : ce même sélecteur vit maintenant
+              dans l'encart jaune juste au-dessus (voir plus haut) pour
+              Coach/Famille -- ne reste ici QUE pour le Bureau, qui garde
+              son dropdown "toutes les équipes du club" à son emplacement
+              habituel (jamais déplacé dans l'encart, voir isBureau). */}
+          {!forcedView && isBureau && resultsTeams && resultsTeams.length > 1 && (
             <div className="w-full sm:w-auto">
-              {resultsTeamSelector === "dropdown" ? (
-                <TeamFilterDropdown
-                  teams={sortedResultsTeams}
-                  selectedIds={selectedResultTeamIds}
-                  onChange={setSelectedResultTeamIds}
-                  compact
-                />
-              ) : (
-                <TeamSelectorPills
-                  teams={sortedResultsTeams}
-                  activeId={activeResultsTeamIdResolved}
-                  onSelect={setActiveResultsTeamId}
-                />
-              )}
+              <TeamFilterDropdown
+                teams={sortedResultsTeams}
+                selectedIds={selectedResultTeamIds}
+                onChange={setSelectedResultTeamIds}
+                compact
+              />
             </div>
           )}
 
