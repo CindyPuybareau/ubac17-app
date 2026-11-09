@@ -284,13 +284,25 @@ export default function SpaceDashboardSummary({
       </div>
 
       {/* Retour de Cindy du 14/09 ("je me suis trompée, pardon, paysage !") :
-          empilé sur mobile (photo pleine largeur en haut, ratio paysage
-          raisonnable, grille KPI 2x2 dessous) -- côte à côte à partir de
-          sm: (photo ~58% de la largeur, pour respecter son ratio naturel
-          plutôt que l'écraser, grille sur le reste). aspect-[4/3] --
+          empilé sur mobile uniquement (photo pleine largeur en haut, ratio
+          paysage raisonnable, grille KPI 2x2 dessous). aspect-[4/3] --
           "raisonnable" plutôt qu'un bandeau très large et écrasé (16/9
           sur toute la largeur du composant, essayé puis retiré) : moins
-          de recadrage sur une photo de groupe déjà large. */}
+          de recadrage sur une photo de groupe déjà large.
+          Retour de Cindy du 09/11 ("sur PC elle s'affiche en beaucoup trop
+          grosse", puis "trop gros aussi sur tablette", puis "deux KPI à
+          droite de l'image plutôt, et deux autres qui passent en bas si
+          pas de place") : photo à largeur FIXE (sm:w-56) dès sm: (640px),
+          jamais une proportion de la largeur disponible qui la faisait
+          grandir sans limite sur grand écran. Les KPI, eux, passent d'une
+          grille à colonnes fixes (2 ou 4) à une grille "auto-fit" --
+          chaque pastille réclame au moins 110px, autant de colonnes que
+          l'espace restant (une fois la photo retirée) peut en accueillir,
+          le reste passe à la ligne tout seul. Plus besoin de choisir un
+          palier fixe "4 par ligne à partir de telle largeur" : sur
+          tablette (peu de place à côté de la photo), 2 pastilles tiennent
+          par ligne ; sur grand écran, les 4 tiennent sur une seule ligne,
+          sans rien coder de plus pour ce cas précis. */}
       {/* Retour de Cindy du 30/10 ("l'ajout de photo... depuis le tableau de
           bord", puis "c'est lourd tous ces noms d'équipe" en pastilles vu
           le nombre d'équipes du club) : seul le Bureau reçoit
@@ -317,7 +329,7 @@ export default function SpaceDashboardSummary({
       )}
 
       <div className="flex flex-col gap-3 sm:flex-row">
-        <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden rounded-2xl border border-zinc-100 bg-navy shadow-sm sm:w-[58%]">
+        <div className="relative mx-auto aspect-[4/3] w-full max-w-sm shrink-0 overflow-hidden rounded-2xl border border-zinc-100 bg-navy shadow-sm sm:mx-0 sm:w-56 sm:max-w-none">
           {photoTargetTeamId && photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={photoUrl} alt="" className="h-full w-full object-cover" />
@@ -360,7 +372,7 @@ export default function SpaceDashboardSummary({
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-2.5 sm:flex-1 sm:grid-cols-2">
+        <div className="grid grid-cols-2 gap-2.5 sm:flex-1 sm:grid-cols-[repeat(auto-fit,minmax(110px,1fr))]">
           <KpiTile icon={Users} iconClass="text-navy" iconBgClass="bg-navy/10" value={effectivePlayerCount} label="Joueurs" />
           <KpiTile
             icon={Trophy}
