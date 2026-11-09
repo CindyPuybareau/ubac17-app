@@ -45,10 +45,13 @@ function ResultRow({ event }: { event: ChildEvent }) {
   // liseré fin.
   const isTournament = event.eventType === "TOURNAMENT";
   const isOfficialMatch = event.eventType === "MATCH";
+  // Retour de Cindy du 09/11 ("le trait des matchs officiels est trop
+  // épais, comme les entraînements partout dans l'appli") : border-l-8
+  // ramené à border-l-4.
   const shellClass = isTournament
     ? "relative overflow-hidden rounded-2xl border-2 border-dashed border-ubac-yellow bg-white p-4 shadow-sm"
     : isOfficialMatch
-      ? `relative overflow-hidden rounded-2xl border border-navy/15 bg-white p-4 shadow-sm border-l-8 ${style.border}`
+      ? `relative overflow-hidden rounded-2xl border border-navy/15 bg-white p-4 shadow-sm border-l-4 ${style.border}`
       : `relative overflow-hidden rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm border-l-4 ${style.border}`;
 
   return (

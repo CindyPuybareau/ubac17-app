@@ -309,6 +309,7 @@ export default function CoachView({
             summary={dashboardSummary}
             canManagePhoto
             photoRestrictedTeamIds={siblingTeamIds}
+            weekEvents={headerWeekEvents}
           />
 
           {/* Retour de Cindy du 09/11 ("basculer le bandeau 'Cette semaine'
@@ -360,14 +361,6 @@ export default function CoachView({
             rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
             contactEmailByPlayerId={contactEmailByPlayerId}
             birthdayMembers={birthdayMembers}
-            // Retour de Cindy du 10/09 (bug Basile) : createTeams plutôt que
-            // teams.map(...) -- "Équipes coachées" ne doit montrer QUE les
-            // équipes réellement coachées, jamais celles où il n'est que
-            // joueur (déjà dans son onglet "Mon équipe" à part entière, voir
-            // resultsTeamsForCalendar ci-dessus pour le même correctif sur
-            // le filtre par équipe).
-            scopeTeams={createTeams}
-            scopeTeamRoleById={teamRoleByTeamId}
             // Retour de Cindy du 10/09 (fusion Calendrier/Événements) :
             // manquait ici alors que "Événements" (retiré plus bas) l'avait
             // déjà -- un coach qui encadre plusieurs équipes n'avait aucun
@@ -495,10 +488,6 @@ export default function CoachView({
               events={events}
               createTeams={createTeams}
               rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
-              // Retour de Cindy du 10/09 (bug Basile) : createTeams, même
-              // correctif que sur "Calendrier" ci-dessus.
-              scopeTeams={createTeams}
-              scopeTeamRoleById={teamRoleByTeamId}
               forcedView="officialMatches"
               resultsTeams={resultsTeamsForOfficialMatchesWithSiblings}
               selfPlayerId={ownPlayerId}

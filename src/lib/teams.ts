@@ -193,7 +193,15 @@ export function groupTeamsByPrimarySecondary<
 // genre finale retirés) plutôt que de toucher splitTeamName/
 // groupTeamsByPrimarySecondary eux-mêmes, utilisés ailleurs (Calendrier)
 // où ce cas n'a jamais été signalé comme un problème.
-function looseFamilyKey(label: string): string {
+// Exportée (retour de Cindy du 09/11, "les entraînements des Séniors M
+// sont regroupés, U18M pareil -- il faudrait qu'on les voie") : même clé
+// que getSiblingTeamIds/getTrombinoscopeTeamId, réutilisée telle quelle par
+// space-dashboard-summary.tsx pour retrouver, à partir du NOM d'une équipe
+// mère rencontrée dans les événements déjà chargés (jamais un nouvel appel
+// réseau), si elle est la mère de la déclinaison actuellement affichée --
+// jamais une table dédiée "mère/déclinaison" à maintenir à part, ce même
+// découpage par nom sert déjà cet usage ailleurs dans l'appli.
+export function looseFamilyKey(label: string): string {
   return label
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")

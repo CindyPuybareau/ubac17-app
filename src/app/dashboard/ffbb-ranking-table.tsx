@@ -1,5 +1,6 @@
 import { ListOrdered, Minus, TrendingDown, TrendingUp } from "lucide-react";
 import type { FfbbRankingEntry } from "@/lib/ffbb";
+import { FFBB_PHASE_2, type FfbbPhase } from "@/lib/ffbb-phase";
 
 // Retour de Cindy du 01/10 ("le classement apparaisse dans le tableau de
 // bord aussi") : rendu extrait tel quel de calendar-view.tsx (Matchs &
@@ -9,11 +10,22 @@ import type { FfbbRankingEntry } from "@/lib/ffbb";
 export default function FfbbRankingTable({
   entries,
   label,
+  phase,
 }: {
   entries: FfbbRankingEntry[];
   // Nom de secours si aucune ligne n'est marquée isOwnTeam (ne devrait pas
   // arriver en pratique, la FFBB marque toujours l'équipe consultée).
   label?: string;
+  // Retour de Cindy du 09/11 ("le classement correspond à quoi, phase 2 ?
+  // ce serait bien de l'indiquer") : retour de Cindy du 28/10 (voir
+  // space-dashboard.ts) avait volontairement écarté un vrai sélecteur
+  // Phase 1/Phase 2 ici, faute de place pour un onglet -- cette vignette
+  // montre déjà toujours la phase la plus récente, juste sans le dire.
+  // Un simple badge (pas un sélecteur) règle la demande sans revenir sur
+  // ce choix : rien sous Phase 1 (valeur implicite, l'immense majorité des
+  // classements toute l'année), "Phase 2" seulement une fois celle-ci
+  // commencée.
+  phase?: FfbbPhase;
 }) {
   if (entries.length === 0) return null;
 
@@ -29,6 +41,11 @@ export default function FfbbRankingTable({
       <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-900">
         <ListOrdered className="h-4 w-4 shrink-0 text-navy" />
         Classement{cardLabel}
+        {phase === FFBB_PHASE_2 && (
+          <span className="rounded-full bg-ubac-yellow/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-ubac-yellow-dark">
+            Phase 2
+          </span>
+        )}
       </p>
       <div className="flex flex-col gap-1">
         {entries.map((entry) => {
