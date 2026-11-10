@@ -55,7 +55,7 @@ export default function WeekTrainingMatchCards({ events }: { events: WeekStripEv
           </p>
           <div className="flex flex-col gap-2">
             {trainings.map((e) => (
-              <DayEventCard key={e.id} event={e} />
+              <DayEventCard key={e.id} event={e} showDate />
             ))}
           </div>
         </div>
@@ -68,7 +68,7 @@ export default function WeekTrainingMatchCards({ events }: { events: WeekStripEv
           </p>
           <div className="flex flex-col gap-2">
             {matches.map((e) => (
-              <DayEventCard key={e.id} event={e} />
+              <DayEventCard key={e.id} event={e} showDate />
             ))}
           </div>
         </div>
