@@ -20,10 +20,15 @@ export default function ExcluSponsorCard({ sponsors }: { sponsors: SponsorDispla
 
   return (
     <>
+      {/* Retour de Cindy du 11/11 ("exclu sponsor même taille que boutique
+          en ligne", puis "s'agrandissent pour être toujours à hauteur du
+          diaporama") : même min-h fixe ET même h-full que BoutiqueCard
+          (boutique-card.tsx, voir son commentaire pour le détail des
+          deux). */}
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex flex-col items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-ubac-yellow via-ubac-yellow to-ubac-yellow-dark px-4 py-4 text-center shadow-sm transition-opacity hover:opacity-90"
+        className="flex h-full min-h-[120px] w-full flex-col items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-ubac-yellow via-ubac-yellow to-ubac-yellow-dark px-4 py-4 text-center shadow-sm transition-opacity hover:opacity-90"
       >
         <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/25">
           <Gift className="h-5 w-5 shrink-0 text-navy" />

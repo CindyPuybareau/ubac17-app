@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, Megaphone, X } from "lucide-react";
 import type { FeaturedHighlight } from "@/lib/featured-highlights";
-import { ACTION_CARD_ITEM_CLASSES, HIGHLIGHTS_GRID_CLASSES } from "./kpi-grid-classes";
 
 // Retour de Cindy du 10/11 ("2 côte à côte", puis "il serait bien de
 // toutes les voir avec des flèches à partir de la 3ème") : jusqu'à 2
@@ -72,16 +71,17 @@ export default function FeaturedHighlightsCard({
   // (bg-white/90) + icône navy -- se détachait mal sur les affiches/fonds
   // sombres, le blanc tranche sur n'importe quelle image.
   //
-  // Retour de Cindy du 11/11 ("aligné sur PC... sur une même ligne", puis
-  // "le diaporama... ne prend plus toute la largeur des autres cartes en
-  // haut et en bas, c'est moche") : w-full/sm:w-auto, comme
-  // HIGHLIGHTS_GRID_CLASSES juste en dessous -- sur téléphone, ce
-  // composant prend toute la largeur de sa ligne (replié sous Boutique/
-  // Exclu sponsor par flex-wrap, voir admin-view.tsx) ; à partir de sm,
-  // il se redimensionne à son seul contenu pour tenir sur la même ligne
-  // que Boutique/Exclu sponsor.
+  // Retour de Cindy du 11/11 ("boutique et sponsor en dessous et à côté
+  // de ces 2 cartes le diaporama, pour ne pas qu'il y ait un gros vide à
+  // droite de l'écran") : ce composant est maintenant placé comme une
+  // cellule qui occupe TOUT le reste de la rangée Boutique/Exclu sponsor
+  // (DESKTOP_HIGHLIGHTS_SPAN_CLASSES, admin-view.tsx & cie) -- w-full
+  // partout, toujours : la grille interne juste en dessous se redivise
+  // naturellement sur la largeur réelle qu'on lui donne (pleine largeur
+  // sur téléphone, 2 ou 5 colonnes KPI sur tablette/PC), jamais besoin
+  // de connaître cette largeur à l'avance.
   return (
-    <div className="relative w-full sm:w-auto">
+    <div className="relative w-full">
       {canRotate && (
         <button
           type="button"
@@ -92,7 +92,7 @@ export default function FeaturedHighlightsCard({
           <ChevronLeft className="h-4 w-4" />
         </button>
       )}
-      <div className={HIGHLIGHTS_GRID_CLASSES}>
+      <div className="grid w-full grid-cols-2 gap-4">
         {visible.map((h, i) => (
           // Clé composite (id + position) : en fenêtre glissante, la MÊME
           // affiche peut réapparaître à une position différente d'un cran
@@ -172,14 +172,11 @@ function SingleHighlightCard({
     </div>
   );
 
-  // Retour de Cindy du 11/11 ("boutique et exclu sponsor même taille que
-  // les diapo sur PC et tablette", "non sur téléphone on laisse comme
-  // avant") : ACTION_CARD_ITEM_CLASSES (kpi-grid-classes.ts), aucune
-  // largeur sur téléphone (la grille 2 colonnes du parent dicte la
-  // taille, comme BureauKpiGrid), largeur fixe identique à Boutique/
-  // Exclu sponsor à partir de sm.
+  // w-full : remplit sa cellule de grille (voir le parent, juste
+  // au-dessus) -- jamais de largeur fixe, la grille parente redivise
+  // déjà la largeur réelle disponible à chaque palier.
   return (
-    <div className={`relative aspect-[3/4] rounded-2xl shadow-sm ${ACTION_CARD_ITEM_CLASSES}`}>
+    <div className="relative aspect-[3/4] w-full rounded-2xl shadow-sm">
       {href ? (
         <a
           href={href}
