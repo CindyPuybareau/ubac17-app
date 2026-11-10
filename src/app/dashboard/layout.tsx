@@ -146,7 +146,16 @@ export default async function DashboardLayout({
                       // jambages absents en majuscules) qu'au-dessus --
                       // pt/pb asymétriques (au lieu de py-0.5) pour
                       // compenser à l'œil, police légèrement réduite (9px).
-                      <span className="mb-1 -ml-2 inline-flex w-fit items-center rounded-full bg-white/15 px-2 pb-[3px] pt-1 text-[9px] font-semibold uppercase leading-none tracking-wide text-white">
+                      // Retour de Cindy du 10/11 ("Secrétaire / Secrétaire
+                      // adjointe" coupé/replié sur 2 lignes, nom réduit à
+                      // "Bas...") : le plus long des libellés de rôle
+                      // (BUREAU_ROLE_LABELS) n'avait ni troncature ni
+                      // whitespace-nowrap -- repliait sur 2 lignes au lieu
+                      // de suivre la même dégradation propre que le prénom
+                      // juste en dessous (déjà truncate). max-w-full pour
+                      // se limiter à la largeur réellement dispo (le parent
+                      // min-w-0 l'autorise déjà à rétrécir).
+                      <span className="mb-1 -ml-2 inline-flex max-w-full items-center truncate whitespace-nowrap rounded-full bg-white/15 px-2 pb-[3px] pt-1 text-[9px] font-semibold uppercase leading-none tracking-wide text-white">
                         {roleLabel}
                       </span>
                     )}
