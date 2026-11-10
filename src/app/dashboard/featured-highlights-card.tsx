@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, Megaphone, X } from "lucide-react";
 import type { FeaturedHighlight } from "@/lib/featured-highlights";
-import { DASHBOARD_CARD_WIDTH_CLASSES, HIGHLIGHTS_GRID_CLASSES } from "./kpi-grid-classes";
+import { ACTION_CARD_ITEM_CLASSES, HIGHLIGHTS_GRID_CLASSES } from "./kpi-grid-classes";
 
 // Retour de Cindy du 10/11 ("2 côte à côte", puis "il serait bien de
 // toutes les voir avec des flèches à partir de la 3ème") : jusqu'à 2
@@ -72,14 +72,16 @@ export default function FeaturedHighlightsCard({
   // (bg-white/90) + icône navy -- se détachait mal sur les affiches/fonds
   // sombres, le blanc tranche sur n'importe quelle image.
   //
-  // Retour de Cindy du 11/11 ("aligné sur PC, boutique/sponsors/diaporama
-  // sur une même ligne") : plus de w-full ici -- ce composant vit
-  // désormais comme un enfant flex de plus (voir admin-view.tsx & cie),
-  // à côté du bloc Boutique/Exclu sponsor, pas en-dessous dans sa propre
-  // rangée pleine largeur. Sa taille reste bornée par
-  // HIGHLIGHTS_GRID_CLASSES (max-w-lg) juste en dessous.
+  // Retour de Cindy du 11/11 ("aligné sur PC... sur une même ligne", puis
+  // "le diaporama... ne prend plus toute la largeur des autres cartes en
+  // haut et en bas, c'est moche") : w-full/sm:w-auto, comme
+  // HIGHLIGHTS_GRID_CLASSES juste en dessous -- sur téléphone, ce
+  // composant prend toute la largeur de sa ligne (replié sous Boutique/
+  // Exclu sponsor par flex-wrap, voir admin-view.tsx) ; à partir de sm,
+  // il se redimensionne à son seul contenu pour tenir sur la même ligne
+  // que Boutique/Exclu sponsor.
   return (
-    <div className="relative">
+    <div className="relative w-full sm:w-auto">
       {canRotate && (
         <button
           type="button"
@@ -171,12 +173,13 @@ function SingleHighlightCard({
   );
 
   // Retour de Cindy du 11/11 ("boutique et exclu sponsor même taille que
-  // les diapo sur PC et tablette") : DASHBOARD_CARD_WIDTH_CLASSES
-  // (kpi-grid-classes.ts), largeur partagée avec BoutiqueCard/
-  // ExcluSponsorCard -- jamais w-full (dépendait d'un parent grid, voir
-  // le commentaire sur HIGHLIGHTS_GRID_CLASSES).
+  // les diapo sur PC et tablette", "non sur téléphone on laisse comme
+  // avant") : ACTION_CARD_ITEM_CLASSES (kpi-grid-classes.ts), aucune
+  // largeur sur téléphone (la grille 2 colonnes du parent dicte la
+  // taille, comme BureauKpiGrid), largeur fixe identique à Boutique/
+  // Exclu sponsor à partir de sm.
   return (
-    <div className={`relative aspect-[3/4] rounded-2xl shadow-sm ${DASHBOARD_CARD_WIDTH_CLASSES}`}>
+    <div className={`relative aspect-[3/4] rounded-2xl shadow-sm ${ACTION_CARD_ITEM_CLASSES}`}>
       {href ? (
         <a
           href={href}
