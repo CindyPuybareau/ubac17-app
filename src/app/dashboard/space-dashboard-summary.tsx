@@ -104,26 +104,27 @@ export default function SpaceDashboardSummary({
   const effectiveRanking = activeTeam ? activeTeam.ranking : [];
   const effectiveRankingPhase = activeTeam?.rankingPhase;
   // Retour de Cindy du 09/11 ("les entraînements des Séniors M sont
-  // regroupés... U18M pareil, il faudrait qu'on les voie") : vérifié en
-  // base -- Séniors 1/Séniors 2 et U18M-1/U18M-2 n'ont ELLES-MÊMES aucun
-  // entraînement, toute la saison est au nom de l'équipe mère partagée
-  // ("Séniors M"/"U18M"), que cette personne porte déjà dans son effectif
-  // (team_players) -- donc déjà présente dans `weekEvents`, juste exclue
-  // par le simple filtre `teamId === effectiveTeamId`. U13M-1/U13M-2, à
-  // l'inverse, ont chacune leurs propres séances distinctes (vérifié en
-  // base aussi) : rien à compléter pour elles, le filtre simple suffit déjà
-  // -- d'où ce repli CONDITIONNEL (seulement si l'équipe active n'a
-  // elle-même aucun entraînement), jamais un ajout systématique de la mère.
-  // Résolution par NOM (looseFamilyKey, lib/teams.ts -- même règle que
-  // getSiblingTeamIds/getTrombinoscopeTeamId), jamais un nom d'équipe codé
-  // en dur : une future équipe mère/déclinaisons suivant le même principe
-  // en bénéficie automatiquement.
+  // regroupés... U18M pareil, il faudrait qu'on les voie"), puis du 10/11
+  // ("les u13m-1 font leur entraînement dans l'équipe mère U13M et on ne
+  // le voit pas") : repli d'abord fait CONDITIONNEL (seulement si la
+  // déclinaison active n'avait elle-même AUCUN entraînement cette
+  // semaine-là), sur la base d'une vérification en base qui ne tenait que
+  // pour Séniors 1/2 et U18M-1/2 (aucune séance propre, tout au nom de la
+  // mère). Revérifié le 10/11 : TOUS les joueurs de U13M-1/U13M-2 (comme
+  // Séniors 1/2 et U18M-1/2) sont EUX AUSSI inscrits dans l'équipe mère
+  // (team_players) -- U13M-1 a donc bien sa propre séance ET s'entraîne
+  // aussi avec la mère U13M, les deux coexistent la même semaine. Le repli
+  // devient donc inconditionnel (toujours cumuler les entraînements de la
+  // mère à ceux, propres ou non, de la déclinaison), plus seulement un
+  // filet de sécurité pour "zéro séance propre". Résolution par NOM
+  // (looseFamilyKey, lib/teams.ts -- même règle que getSiblingTeamIds/
+  // getTrombinoscopeTeamId), jamais un nom d'équipe codé en dur : une
+  // future équipe mère/déclinaisons suivant le même principe en bénéficie
+  // automatiquement.
   const effectiveWeekEvents = (() => {
     if (!weekEvents || !effectiveTeamId) return [];
     const ownEvents = weekEvents.filter((e) => e.teamId === effectiveTeamId);
-    if (ownEvents.some((e) => e.eventType === "TRAINING") || !activeTeam?.teamName) {
-      return ownEvents;
-    }
+    if (!activeTeam?.teamName) return ownEvents;
     const base = looseFamilyKey(activeTeam.teamName);
     const motherTeamId = weekEvents.find(
       (e) =>
