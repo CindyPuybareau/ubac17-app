@@ -23,8 +23,15 @@ export default function BoutiqueCard({
 }: {
   salesUrl?: string;
 }) {
+  // Retour de Cindy du 10/11 ("même taille que les KPI du dessus, sur
+  // tous les espaces") : plus de taille fixe (carrée) ni de prop
+  // Bureau-only -- cette carte vit désormais TOUJOURS dans la grille
+  // partagée KPI_GRID_CLASSES (featured-highlights-card.tsx), identique
+  // aux 4 espaces, donc toujours calée sur la cellule de grille comme
+  // KpiCard (bureau-dashboard.tsx), que de vraies KPI existent ou non à
+  // côté (Coach/Famille/Enfant n'en ont pas, la grille reste la même).
   return (
-    <div className="flex aspect-[3/4] w-32 shrink-0 flex-col items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-navy via-navy to-navy-dark p-3 text-center shadow-sm sm:w-36">
+    <div className="flex flex-col items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-4 text-center shadow-sm">
       <a
         href={BOUTIQUE_URL}
         target="_blank"

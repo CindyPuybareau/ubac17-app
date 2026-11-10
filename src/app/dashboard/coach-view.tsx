@@ -16,6 +16,10 @@ import DocumentsPanel from "@/components/club-documents";
 import ClubReportsSection from "./club-reports-section";
 import Cd17LigueSection from "./cd17-ligue-section";
 import BoutiqueCard from "./boutique-card";
+import ExcluSponsorCard from "./exclu-sponsor-card";
+import FeaturedHighlightsCard from "./featured-highlights-card";
+import { KPI_GRID_CLASSES } from "./kpi-grid-classes";
+import type { FeaturedHighlight } from "@/lib/featured-highlights";
 import {
   getSiblingTeamIds,
   groupTeamsByPrimarySecondary,
@@ -75,6 +79,7 @@ export default function CoachView({
   officialsTrombinoscopePath,
   headerWeekEvents,
   showHeaderWeekBanner,
+  featuredHighlights,
 }: {
   teams: TeamWithMembers[];
   events: AdminUpcomingEvent[];
@@ -144,6 +149,9 @@ export default function CoachView({
   // qu'avant, juste déplacé), voir page.tsx.
   headerWeekEvents: WeekStripEvent[];
   showHeaderWeekBanner: boolean;
+  // Retour de Cindy du 10/11 ("Événements à la une") : club entier,
+  // actives seulement -- carte Tableau de bord, à côté de BoutiqueCard.
+  featuredHighlights: FeaturedHighlight[];
 }) {
   // Créer / modifier / supprimer un événement n'est permis que pour les
   // équipes réellement entraînées : proposer celle où l'utilisateur n'est
@@ -288,12 +296,20 @@ export default function CoachView({
       icon: <LayoutDashboard className={iconClass} />,
       content: (
         <div className="flex flex-col gap-4">
-          {/* Retour du Bureau (09/11, relayé par Cindy) : "Affiches" (pas
-              encore construites, voir le plan validé) rejoindront cette
-              même rangée, à côté de la Boutique -- flex-wrap dès
-              maintenant pour les accueillir sans retoucher ce conteneur. */}
-          <div className="flex flex-wrap gap-3">
+          {/* Retour de Cindy du 10/11 ("meme taille que les KPI, sur
+              tous les espaces") : même grille partagée KPI_GRID_CLASSES
+              qu'admin-view.tsx/bureau-dashboard.tsx, même sans KPI
+              côté Coach. */}
+          <div className={KPI_GRID_CLASSES}>
             <BoutiqueCard />
+            <ExcluSponsorCard sponsors={sponsorDisplay} />
+          </div>
+          {/* Retour de Cindy du 10/11 ("centrer le diaporama, aussi large
+              que la carte du bas, aligné") : sa propre section pleine
+              largeur, centrée, alignée sur SpaceDashboardSummary juste
+              en dessous. */}
+          <div className="flex w-full items-center justify-center gap-3">
+            <FeaturedHighlightsCard highlights={featuredHighlights} calendarSectionKey="calendar" />
           </div>
 
           {/* Retour de Cindy du 13/09 : résumé de la ou des équipes

@@ -45,6 +45,11 @@ const WATCHED_TABLES = [
   // doivent voir sans F5) -- oubliée ici jusqu'ici, même catégorie d'oubli
   // que event_volunteer_needs ci-dessus.
   "penalites",
+  // Retour de Cindy du 10/11 ("Événements à la une") : Bureau seul écrit,
+  // mais explicitement demandé en direct pour tout le monde (ex. une
+  // affiche complète/supprimée doit disparaître du Tableau de bord sans
+  // F5) -- contrairement à sponsors juste au-dessus, jamais ajoutée là.
+  "featured_highlights",
 ] as const;
 
 // Mounted once at the dashboard root (src/app/dashboard/page.tsx) so it

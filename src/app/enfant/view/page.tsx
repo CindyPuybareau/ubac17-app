@@ -6,6 +6,7 @@ import { computePlayerYearStatus } from "@/lib/season";
 import { teamOrClubWideFilter } from "@/app/dashboard/family-data";
 import { getClubOfficialMatches } from "@/lib/club-official-matches";
 import { getSpaceDashboardSummary } from "@/lib/space-dashboard";
+import { getActiveFeaturedHighlights } from "@/lib/featured-highlights";
 import { computeSeasonParticipation } from "@/app/dashboard/season-bilan";
 import { getCachedTeams } from "@/lib/reference-cache";
 import { getSiblingTeamIds, splitTeamName } from "@/lib/teams";
@@ -116,6 +117,7 @@ export default async function ChildViewPage() {
     notifRes,
     clubOfficialMatches,
     rawDashboardSummary,
+    featuredHighlights,
   ] = await Promise.all([
     teamIds.length > 0
       ? supabase.from("teams").select("id, name, category").in("id", teamIds)
@@ -194,6 +196,12 @@ export default async function ChildViewPage() {
     // ligne, effectif vide, plus aucun présent/absent. Sans risque ici :
     // déjà hors RLS par construction, voir space-dashboard.ts.
     getSpaceDashboardSummary(supabase, teamIds, "coach", [], undefined, true),
+    // Retour de Cindy du 10/11 ("Événements à la une") : club entier, même
+    // source que Bureau/Coach/Famille (lib/featured-highlights.ts) --
+    // supabase ici est service_role (voir plus haut), ignore de toute
+    // façon la policy RLS "select all" (ouverte à tous), aucun souci de
+    // visibilité.
+    getActiveFeaturedHighlights(supabase),
   ]);
   // Retour de Cindy du 05/10 ("je souhaiterais de la lecture seule... cela
   // laisse croire qu'ils peuvent le faire") : neutralisation déjà en place
@@ -677,6 +685,7 @@ export default async function ChildViewPage() {
       presentPlayersByEventId={presentPlayersByEventId}
       absentPlayersByEventId={absentPlayersByEventId}
       pendingPlayersByEventId={pendingPlayersByEventId}
+      featuredHighlights={featuredHighlights}
     />
   );
 }
