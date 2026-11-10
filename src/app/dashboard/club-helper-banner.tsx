@@ -114,11 +114,18 @@ function ClubHelperCard({ event, onDismiss }: { event: ClubHelperEvent; onDismis
 
   return (
     <div className="relative flex flex-col gap-2 rounded-xl bg-white px-3 py-2.5">
+      {/* Retour de Cindy du 10/11 ("la croix pour fermer ne se voit pas
+          assez... dans un carré blanc") : noyée dans le coin de la carte
+          blanche (fond blanc sur fond blanc, juste une icône grise sans
+          contour) -- repoussée hors de la carte (-right-2 -top-2, au lieu
+          de right-2 top-2) pour retomber sur le fond ambré de l'encart,
+          avec son propre carré blanc (bg-white + ombre + contour) qui
+          tranche enfin dessus. */}
       <button
         type="button"
         onClick={onDismiss}
         aria-label="Fermer ce besoin d'accompagnant"
-        className="absolute right-2 top-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
+        className="absolute -right-2 -top-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-500 shadow-sm transition-colors hover:bg-zinc-100 hover:text-zinc-700"
       >
         <X className="h-3.5 w-3.5" />
       </button>
