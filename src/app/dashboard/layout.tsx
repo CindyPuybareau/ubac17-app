@@ -147,15 +147,17 @@ export default async function DashboardLayout({
                       // pt/pb asymétriques (au lieu de py-0.5) pour
                       // compenser à l'œil, police légèrement réduite (9px).
                       // Retour de Cindy du 10/11 ("Secrétaire / Secrétaire
-                      // adjointe" coupé/replié sur 2 lignes, nom réduit à
-                      // "Bas...") : le plus long des libellés de rôle
-                      // (BUREAU_ROLE_LABELS) n'avait ni troncature ni
-                      // whitespace-nowrap -- repliait sur 2 lignes au lieu
-                      // de suivre la même dégradation propre que le prénom
-                      // juste en dessous (déjà truncate). max-w-full pour
-                      // se limiter à la largeur réellement dispo (le parent
-                      // min-w-0 l'autorise déjà à rétrécir).
-                      <span className="mb-1 -ml-2 inline-flex max-w-full items-center truncate whitespace-nowrap rounded-full bg-white/15 px-2 pb-[3px] pt-1 text-[9px] font-semibold uppercase leading-none tracking-wide text-white">
+                      // adjointe" coupé") : d'abord tronqué avec "..." comme
+                      // le prénom juste en dessous -- Cindy veut le texte
+                      // ENTIER, jamais coupé, pour ce badge précis (contenu
+                      // réglementaire/officiel, contrairement au prénom où
+                      // "Bas..." reste compréhensible). Repli sur 2 lignes
+                      // assumé pour le plus long des libellés de rôle
+                      // (BUREAU_ROLE_LABELS) -- rounded-lg plutôt que
+                      // rounded-full (un vrai pilule sur 2 lignes donnerait
+                      // des coins disproportionnés), leading-tight pour
+                      // garder les 2 lignes lisibles sans les coller.
+                      <span className="mb-1 -ml-2 inline-block w-fit max-w-full rounded-lg bg-white/15 px-2 py-1 text-[9px] font-semibold uppercase leading-tight tracking-wide text-white">
                         {roleLabel}
                       </span>
                     )}
