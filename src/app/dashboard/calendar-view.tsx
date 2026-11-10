@@ -3087,21 +3087,21 @@ export default function CalendarView({
           espaces, pas après Créer un événement/le mois") : le même
           sélecteur qu'avant (TeamSelectorPills, jamais le dropdown Bureau --
           voir isBureau ci-dessous), simplement sorti de la barre d'outils et
-          placé en premier, dans un encart jaune clair qui reprend le même
-          gabarit (arrondi, bordure, fond teinté) que le bandeau du
-          sélecteur d'espace juste au-dessus (dashboard-tabs.tsx). Jamais
-          pour le Bureau : il voit déjà tout le club par construction, "mes
+          placé en premier. L'encart jaune clair (même gabarit que le
+          bandeau du sélecteur d'espace juste au-dessus, dashboard-
+          tabs.tsx) vit directement dans TeamSelectorPills (retour de
+          Cindy, "cette présentation doit aussi se faire sur toutes les
+          pages concernées") -- pas de wrapper à dupliquer ici. Jamais pour
+          le Bureau : il voit déjà tout le club par construction, "mes
           équipes" n'a pas de sens ici -- son propre filtre (dropdown,
           toutes les équipes du club) reste lui à sa place habituelle, plus
           bas, inchangé. */}
       {!forcedView && !isBureau && resultsTeams && resultsTeams.length > 1 && (
-        <div className="rounded-2xl border border-ubac-yellow/35 bg-ubac-yellow/10 p-2">
-          <TeamSelectorPills
-            teams={sortedResultsTeams}
-            activeId={activeResultsTeamIdResolved}
-            onSelect={setActiveResultsTeamId}
-          />
-        </div>
+        <TeamSelectorPills
+          teams={sortedResultsTeams}
+          activeId={activeResultsTeamIdResolved}
+          onSelect={setActiveResultsTeamId}
+        />
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
