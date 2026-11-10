@@ -30,8 +30,24 @@ export default function BoutiqueCard({
   // aux 4 espaces, donc toujours calée sur la cellule de grille comme
   // KpiCard (bureau-dashboard.tsx), que de vraies KPI existent ou non à
   // côté (Coach/Famille/Enfant n'en ont pas, la grille reste la même).
+  //
+  // Retour de Cindy du 11/11 ("exclu sponsor même taille que boutique en
+  // ligne") : min-h fixe -- côté Bureau, le lien "Suivi des ventes" en
+  // plus (salesUrl, 3 lignes) rendait cette carte visiblement plus haute
+  // qu'Exclu sponsor (2 lignes, jamais ce lien) une fois les deux côte à
+  // côte/empilées. Même valeur partagée avec exclu-sponsor-card.tsx.
+  //
+  // Retour de Cindy du 11/11 ("boutique/sponsor s'agrandissent pour être
+  // toujours à hauteur du diaporama") : h-full en plus du min-h --
+  // empilée avec Exclu sponsor dans une colonne elle-même étirée à la
+  // hauteur du diaporama (grid, align-items stretch par défaut,
+  // admin-view.tsx & cie), cette carte doit remplir TOUTE la part de
+  // hauteur qui lui revient (chaque carte en flex-1 dans cette colonne),
+  // pas seulement sa hauteur minimale -- sinon un vide apparaît en
+  // dessous sur grand écran (le diaporama grandit avec l'écran, pas ces
+  // deux cartes au contenu fixe).
   return (
-    <div className="flex flex-col items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-4 text-center shadow-sm">
+    <div className="flex h-full min-h-[120px] w-full flex-col items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-4 text-center shadow-sm">
       <a
         href={BOUTIQUE_URL}
         target="_blank"

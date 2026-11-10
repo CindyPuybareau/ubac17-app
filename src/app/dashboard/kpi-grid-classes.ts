@@ -1,38 +1,42 @@
-// Retour de Cindy du 10/11 ("Boutique/Sponsors/diaporama même taille que
-// les KPI, sur tous les espaces") : mêmes points de rupture EXACTS que
-// BureauKpiGrid (bureau-dashboard.tsx) -- réservée à BureauKpiGrid
-// lui-même désormais (6 vraies KPI remplissent réellement les 6
-// colonnes à partir de lg). Ne plus réutiliser ailleurs : voir
-// ACTION_CARD_ITEM_CLASSES ci-dessous.
+// Mêmes points de rupture que BureauKpiGrid (bureau-dashboard.tsx) --
+// réservée à BureauKpiGrid lui-même (6 vraies KPI remplissent réellement
+// les 6 colonnes à partir de lg).
 export const KPI_GRID_CLASSES = "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6";
 
-// Retour de Cindy du 11/11 (plusieurs allers-retours : "même taille que
-// les diapo sur PC et tablette", "non sur téléphone on laisse comme
-// avant", puis "le diaporama... ne prend plus toute la largeur des
-// autres cartes en haut et en bas, c'est moche") : sur téléphone,
-// Boutique/Exclu sponsor ET le diaporama doivent TOUS LES TROIS garder
-// leur ancien comportement (grille 2 colonnes PLEINE LARGEUR, comme
-// BureauKpiGrid juste au-dessus) -- jamais de largeur fixe à ce palier,
-// sous peine de rangées plus étroites que le reste de la page. À partir
-// de sm (tablette/PC), les trois passent à une largeur fixe IDENTIQUE
-// (ACTION_CARD_ITEM_CLASSES ci-dessous) pour pouvoir tenir sur une même
-// ligne, alignée à gauche.
+// Retour de Cindy du 11/11 (plusieurs allers-retours sur cette rangée) :
+// disposition retenue --
+// - Sur téléphone : Boutique + Exclu sponsor CÔTE À CÔTE en pleine
+//   largeur (comme BureauKpiGrid), diaporama EN DESSOUS dans sa propre
+//   rangée pleine largeur -- deux blocs indépendants, cachés à partir de
+//   sm (MOBILE_ACTION_ROW_CLASSES / MOBILE_HIGHLIGHTS_WRAPPER_CLASSES).
+// - À partir de sm (tablette/PC) : Boutique/Exclu sponsor EMPILÉS (l'un
+//   sous l'autre) dans UNE SEULE cellule, large comme UNE SEULE carte
+//   KPI ("même taille que les KPI... en largeur") ; le diaporama occupe
+//   le RESTE de la rangée (DESKTOP_HIGHLIGHTS_SPAN_CLASSES), pour ne
+//   jamais laisser de grand vide à droite de l'écran.
 //
-// D'où le changement de `display` au point de rupture (grid -> flex) :
-// sur téléphone, grid-cols-2 + w-full réplique exactement BureauKpiGrid ;
-// à partir de sm, la rangée devient un simple flex pour accueillir des
-// largeurs FIXES par carte.
-export const ACTION_CARDS_GRID_CLASSES = "grid w-full grid-cols-2 gap-3 sm:w-auto sm:flex";
+// Même grille EXACTE que KPI_GRID_CLASSES (sm:grid-cols-3 lg:grid-cols-6)
+// pour que la première cellule (Boutique/Exclu sponsor empilés) ait
+// EXACTEMENT la largeur d'une carte KPI à chaque palier -- le base
+// grid-cols-2 est omis ici (ce bloc est caché sur téléphone).
+export const DESKTOP_ROW_CLASSES = "hidden gap-4 sm:grid sm:grid-cols-3 lg:grid-cols-6";
 
-// Même principe que ACTION_CARDS_GRID_CLASSES ci-dessus, pour le
-// diaporama (featured-highlights-card.tsx) -- gap légèrement plus
-// généreux (affiches, pas de simples boutons).
-export const HIGHLIGHTS_GRID_CLASSES = "grid w-full grid-cols-2 gap-4 sm:w-auto sm:flex";
+// Diaporama à partir de sm : occupe tout le reste de DESKTOP_ROW_CLASSES
+// (3 colonnes - 1 pour Boutique/Exclu sponsor = 2 ; 6 colonnes - 1 = 5).
+// FeaturedHighlightsCard gère déjà sa propre grille interne (toujours
+// w-full, voir featured-highlights-card.tsx) : elle se redivise
+// naturellement sur la largeur réelle de cette cellule, qu'elle soit
+// large de 2 ou 5 colonnes.
+export const DESKTOP_HIGHLIGHTS_SPAN_CLASSES = "col-span-2 lg:col-span-5";
 
-// Enveloppe chaque carte (Boutique, Exclu sponsor, chaque affiche du
-// diaporama) à l'intérieur des deux rangées ci-dessus -- AUCUNE largeur
-// sur téléphone (la grille 2 colonnes du parent dicte déjà la taille,
-// comme BureauKpiGrid), largeur FIXE identique pour les trois à partir
-// de sm (une seule constante, jamais trois valeurs recopiées qui
-// finiraient par diverger).
-export const ACTION_CARD_ITEM_CLASSES = "sm:w-40 sm:shrink-0 lg:w-44";
+// Rangées mobile uniquement (cachées à partir de sm, voir
+// DESKTOP_ROW_CLASSES ci-dessus).
+// Boutique + Exclu sponsor : grid-cols-2 pleine largeur, comme
+// BureauKpiGrid à ce palier (ce sont deux cartes simples, pas de
+// grille interne propre -- cette grille est portée par l'appelant).
+export const MOBILE_ACTION_ROW_CLASSES = "grid grid-cols-2 gap-3 sm:hidden";
+
+// Diaporama : simple enveloppe de visibilité -- FeaturedHighlightsCard
+// porte déjà sa propre grille interne pleine largeur (w-full
+// grid-cols-2), pas besoin d'une grille supplémentaire ici.
+export const MOBILE_HIGHLIGHTS_WRAPPER_CLASSES = "sm:hidden";

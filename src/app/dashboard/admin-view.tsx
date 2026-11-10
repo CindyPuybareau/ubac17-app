@@ -27,7 +27,12 @@ import Cd17LigueSection from "./cd17-ligue-section";
 import { BOUTIQUE_SALES_URL } from "./boutique";
 import BoutiqueCard from "./boutique-card";
 import ExcluSponsorCard from "./exclu-sponsor-card";
-import { ACTION_CARD_ITEM_CLASSES, ACTION_CARDS_GRID_CLASSES } from "./kpi-grid-classes";
+import {
+  DESKTOP_HIGHLIGHTS_SPAN_CLASSES,
+  DESKTOP_ROW_CLASSES,
+  MOBILE_ACTION_ROW_CLASSES,
+  MOBILE_HIGHLIGHTS_WRAPPER_CLASSES,
+} from "./kpi-grid-classes";
 import FeaturedHighlightsCard from "./featured-highlights-card";
 import FeaturedHighlightsManager from "./featured-highlights-manager";
 import type { FeaturedHighlight } from "@/lib/featured-highlights";
@@ -325,27 +330,46 @@ export default function AdminView({
             penalites={penalites}
             buvette={buvette}
           />
-          {/* Retour de Cindy du 11/11 ("on remet à gauche, boutique/exclu
-              sponsor même taille que les diapo sur PC et tablette", puis
-              "non sur téléphone on laisse comme avant !") : Boutique/
-              Exclu sponsor et le diaporama fusionnés en UNE SEULE rangée
-              alignée à gauche, qui replie proprement sur mobile
-              (flex-wrap) -- où Boutique/Exclu sponsor retrouvent leur
-              ancienne grille 2 colonnes (ACTION_CARDS_GRID_CLASSES passe
-              de grid à flex à partir de sm, voir kpi-grid-classes.ts) :
-              la largeur assortie au diaporama ne joue qu'à partir de
-              sm/tablette. Même structure reprise dans coach-view.tsx/
-              family-view.tsx. */}
-          <div className="flex flex-wrap items-start gap-4">
-            <div className={ACTION_CARDS_GRID_CLASSES}>
-              <div className={ACTION_CARD_ITEM_CLASSES}>
+          {/* Retour de Cindy du 11/11 ("boutique et sponsor en dessous [l'un
+              de l'autre] et à côté de ces 2 cartes le diaporama, pour ne
+              pas qu'il y ait un gros vide à droite de l'écran" + "même
+              taille que les KPI plus haut en largeur") :
+              - Téléphone : Boutique/Exclu sponsor côte à côte pleine
+                largeur (comme avant), diaporama en dessous, sa propre
+                rangée pleine largeur -- inchangé.
+              - À partir de sm (tablette/PC) : Boutique/Exclu sponsor
+                EMPILÉS dans une seule cellule large comme UNE carte KPI
+                (même grille que KPI_GRID_CLASSES), le diaporama occupe
+                tout le reste de la rangée -- jamais de grand vide à
+                droite. Même structure reprise dans coach-view.tsx/
+                family-view.tsx. Voir kpi-grid-classes.ts pour le détail. */}
+          <div className={MOBILE_ACTION_ROW_CLASSES}>
+            <BoutiqueCard salesUrl={BOUTIQUE_SALES_URL} />
+            <ExcluSponsorCard sponsors={sponsorDisplay} />
+          </div>
+          <div className={MOBILE_HIGHLIGHTS_WRAPPER_CLASSES}>
+            <FeaturedHighlightsCard highlights={featuredHighlights} calendarSectionKey="home" />
+          </div>
+          <div className={DESKTOP_ROW_CLASSES}>
+            {/* Retour de Cindy du 11/11 ("boutique/sponsor s'agrandissent
+                pour être toujours à hauteur du diaporama") : h-full (la
+                grille étire déjà cette colonne à la hauteur du
+                diaporama, align-items stretch par défaut) + flex-1 sur
+                chaque carte pour qu'elles se partagent cette hauteur à
+                parts égales, au lieu de ne remplir que leur contenu --
+                BoutiqueCard/ExcluSponsorCard ont elles-mêmes h-full
+                (voir ces fichiers), donc grandissent pour de vrai. */}
+            <div className="flex h-full flex-col gap-3">
+              <div className="flex-1">
                 <BoutiqueCard salesUrl={BOUTIQUE_SALES_URL} />
               </div>
-              <div className={ACTION_CARD_ITEM_CLASSES}>
+              <div className="flex-1">
                 <ExcluSponsorCard sponsors={sponsorDisplay} />
               </div>
             </div>
-            <FeaturedHighlightsCard highlights={featuredHighlights} calendarSectionKey="home" />
+            <div className={DESKTOP_HIGHLIGHTS_SPAN_CLASSES}>
+              <FeaturedHighlightsCard highlights={featuredHighlights} calendarSectionKey="home" />
+            </div>
           </div>
           {/* Retour de Cindy du 13/09 : résumé club entier, en premier --
               c'est désormais le vrai contenu de cet onglet, "Envois

@@ -18,7 +18,12 @@ import Cd17LigueSection from "./cd17-ligue-section";
 import BoutiqueCard from "./boutique-card";
 import ExcluSponsorCard from "./exclu-sponsor-card";
 import FeaturedHighlightsCard from "./featured-highlights-card";
-import { ACTION_CARD_ITEM_CLASSES, ACTION_CARDS_GRID_CLASSES } from "./kpi-grid-classes";
+import {
+  DESKTOP_HIGHLIGHTS_SPAN_CLASSES,
+  DESKTOP_ROW_CLASSES,
+  MOBILE_ACTION_ROW_CLASSES,
+  MOBILE_HIGHLIGHTS_WRAPPER_CLASSES,
+} from "./kpi-grid-classes";
 import type { FeaturedHighlight } from "@/lib/featured-highlights";
 import {
   getSiblingTeamIds,
@@ -296,21 +301,31 @@ export default function CoachView({
       icon: <LayoutDashboard className={iconClass} />,
       content: (
         <div className="flex flex-col gap-4">
-          {/* Retour de Cindy du 11/11 ("on remet à gauche, boutique/exclu
-              sponsor même taille que les diapo", puis "non sur téléphone
-              on laisse comme avant !") : voir admin-view.tsx pour le
-              détail -- grille 2 colonnes sur téléphone (comme avant),
-              largeur assortie au diaporama à partir de sm. */}
-          <div className="flex flex-wrap items-start gap-4">
-            <div className={ACTION_CARDS_GRID_CLASSES}>
-              <div className={ACTION_CARD_ITEM_CLASSES}>
+          {/* Retour de Cindy du 11/11 ("boutique et sponsor en dessous et à
+              côté le diaporama" + "même taille que les KPI en largeur") :
+              voir admin-view.tsx pour le détail du correctif. */}
+          <div className={MOBILE_ACTION_ROW_CLASSES}>
+            <BoutiqueCard />
+            <ExcluSponsorCard sponsors={sponsorDisplay} />
+          </div>
+          <div className={MOBILE_HIGHLIGHTS_WRAPPER_CLASSES}>
+            <FeaturedHighlightsCard highlights={featuredHighlights} calendarSectionKey="calendar" />
+          </div>
+          <div className={DESKTOP_ROW_CLASSES}>
+            {/* Retour de Cindy du 11/11 ("boutique/sponsor s'agrandissent
+                pour être toujours à hauteur du diaporama") : voir
+                admin-view.tsx pour le détail. */}
+            <div className="flex h-full flex-col gap-3">
+              <div className="flex-1">
                 <BoutiqueCard />
               </div>
-              <div className={ACTION_CARD_ITEM_CLASSES}>
+              <div className="flex-1">
                 <ExcluSponsorCard sponsors={sponsorDisplay} />
               </div>
             </div>
-            <FeaturedHighlightsCard highlights={featuredHighlights} calendarSectionKey="calendar" />
+            <div className={DESKTOP_HIGHLIGHTS_SPAN_CLASSES}>
+              <FeaturedHighlightsCard highlights={featuredHighlights} calendarSectionKey="calendar" />
+            </div>
           </div>
 
           {/* Retour de Cindy du 13/09 : résumé de la ou des équipes
