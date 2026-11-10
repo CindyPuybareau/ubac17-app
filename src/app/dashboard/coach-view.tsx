@@ -18,7 +18,7 @@ import Cd17LigueSection from "./cd17-ligue-section";
 import BoutiqueCard from "./boutique-card";
 import ExcluSponsorCard from "./exclu-sponsor-card";
 import FeaturedHighlightsCard from "./featured-highlights-card";
-import { KPI_GRID_CLASSES } from "./kpi-grid-classes";
+import { ACTION_CARDS_GRID_CLASSES } from "./kpi-grid-classes";
 import type { FeaturedHighlight } from "@/lib/featured-highlights";
 import {
   getSiblingTeamIds,
@@ -296,11 +296,11 @@ export default function CoachView({
       icon: <LayoutDashboard className={iconClass} />,
       content: (
         <div className="flex flex-col gap-4">
-          {/* Retour de Cindy du 10/11 ("meme taille que les KPI, sur
-              tous les espaces") : même grille partagée KPI_GRID_CLASSES
-              qu'admin-view.tsx/bureau-dashboard.tsx, même sans KPI
-              côté Coach. */}
-          <div className={KPI_GRID_CLASSES}>
+          {/* Retour de Cindy du 11/11 ("sur pc c'est moche au niveau
+              responsive") : ACTION_CARDS_GRID_CLASSES (kpi-grid-classes.ts),
+              toujours 2 colonnes fixes -- voir admin-view.tsx pour le
+              détail du correctif (plus de vide béant sur grand écran). */}
+          <div className={ACTION_CARDS_GRID_CLASSES}>
             <BoutiqueCard />
             <ExcluSponsorCard sponsors={sponsorDisplay} />
           </div>
