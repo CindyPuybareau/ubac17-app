@@ -130,49 +130,42 @@ export default async function DashboardLayout({
                 className="pointer-events-none absolute -right-2 top-1/2 h-28 w-28 -translate-y-1/2 bg-contain bg-right bg-no-repeat opacity-25 sm:h-36 sm:w-36"
                 style={{ backgroundImage: "url(/logo.png)" }}
               />
-              <div className="relative mx-auto flex w-full max-w-[1600px] flex-row items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <AvatarUpload userId={user.id} avatarUrl={profile?.avatar_url ?? null} name={displayFirstName} size="lg" />
-                  <div className="min-w-0">
-                    {roleLabel && (
-                      // Retour de Cindy du 08/11 ("décalage avec Bonjour
-                      // Basile", "texte pas centré dans la pastille") :
-                      // -ml-2 compense exactement le px-2 de la pastille
-                      // pour que SON TEXTE (pas son contour arrondi) démarre
-                      // à la même abscisse que "Bonjour"/le prénom juste en
-                      // dessous. leading-none seul ne suffisait pas : même
-                      // à hauteur de ligne 1, la police réserve plus
-                      // d'espace sous la ligne de base (prévu pour des
-                      // jambages absents en majuscules) qu'au-dessus --
-                      // pt/pb asymétriques (au lieu de py-0.5) pour
-                      // compenser à l'œil, police légèrement réduite (9px).
-                      // Retour de Cindy du 10/11 ("Secrétaire / Secrétaire
-                      // adjointe" coupé") : d'abord tronqué avec "..." comme
-                      // le prénom juste en dessous -- Cindy veut le texte
-                      // ENTIER, jamais coupé, pour ce badge précis (contenu
-                      // réglementaire/officiel, contrairement au prénom où
-                      // "Bas..." reste compréhensible). Repli sur 2 lignes
-                      // assumé pour le plus long des libellés de rôle
-                      // (BUREAU_ROLE_LABELS) -- rounded-lg plutôt que
-                      // rounded-full (un vrai pilule sur 2 lignes donnerait
-                      // des coins disproportionnés), leading-tight pour
-                      // garder les 2 lignes lisibles sans les coller.
-                      <span className="mb-1 -ml-2 inline-block w-fit max-w-full rounded-lg bg-white/15 px-2 py-1 text-[9px] font-semibold uppercase leading-tight tracking-wide text-white">
-                        {roleLabel}
-                      </span>
-                    )}
-                    <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">
-                      Bonjour
-                    </p>
-                    <h1 className="truncate text-xl font-bold text-white sm:text-2xl">
-                      {displayFirstName ? formatFirstName(displayFirstName) : "adhérent·e"}
-                    </h1>
+              <div className="relative mx-auto flex w-full max-w-[1600px] flex-col gap-1.5">
+                {roleLabel && (
+                  // Retour de Cindy du 10/11 ("une seule ligne, pourquoi le
+                  // couper ?") : coincé dans l'étroite colonne à côté de
+                  // l'avatar (80px) et des icônes à droite, "Secrétaire /
+                  // Secrétaire adjointe" (le plus long des libellés de rôle,
+                  // BUREAU_ROLE_LABELS) n'avait tout simplement pas la place
+                  // de tenir sur une ligne, à aucune taille de police
+                  // raisonnable -- ni tronqué (refusé le 10/11, Cindy veut
+                  // le texte entier), ni replié sur plusieurs lignes (refusé
+                  // juste après, "pourquoi le couper"). Sa propre ligne,
+                  // pleine largeur du bandeau (plus de contrainte de la
+                  // colonne avatar+icônes), au lieu d'être coincé dans la
+                  // colonne de texte sous l'avatar : largement assez de
+                  // place pour tenir sur une ligne, même sur mobile étroit.
+                  <span className="inline-block w-fit max-w-full rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-semibold uppercase leading-none tracking-wide text-white">
+                    {roleLabel}
+                  </span>
+                )}
+                <div className="flex flex-row items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <AvatarUpload userId={user.id} avatarUrl={profile?.avatar_url ?? null} name={displayFirstName} size="lg" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">
+                        Bonjour
+                      </p>
+                      <h1 className="truncate text-xl font-bold text-white sm:text-2xl">
+                        {displayFirstName ? formatFirstName(displayFirstName) : "adhérent·e"}
+                      </h1>
+                    </div>
                   </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <OrgChartButton />
-                  <NotificationBell />
-                  <MobileMenuButton />
+                  <div className="flex shrink-0 items-center gap-1">
+                    <OrgChartButton />
+                    <NotificationBell />
+                    <MobileMenuButton />
+                  </div>
                 </div>
               </div>
             </header>
