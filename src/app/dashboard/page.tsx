@@ -1149,10 +1149,21 @@ export default async function DashboardPage({
       // player registered under their own account — Séniors, Loisirs...
       // — was previously invisible to every branch below and landed on
       // the empty "Aucun espace" message despite being validly linked).
+      // team_players(team_id) embarqué dans la même requête (retour de
+      // Cindy du 09/11, Julien Ruske/président qui voit un onglet "Mon
+      // équipe" alors qu'il n'est rattaché à aucune équipe) : sa fiche
+      // players existe bel et bien (licence club "Dirigeant"), mais sans
+      // ligne team_players -- `license_type` seul s'est révélé un mauvais
+      // signal (Taillandier/Delcroix/Charpenteau ont aussi la licence
+      // "Dirigeant" mais appartiennent réellement à une équipe), donc le
+      // critère retenu est l'appartenance réelle, pas le libellé de
+      // licence. select() imbriqué plutôt qu'une requête séparée après
+      // coup : zéro aller-retour de plus, RLS "select team_players for own
+      // context" couvre déjà is_own_player(player_id).
       () =>
         supabase
           .from("players")
-          .select("id, first_name, last_name, category, profile_id, avatar_url")
+          .select("id, first_name, last_name, category, profile_id, avatar_url, team_players(team_id)")
           .eq("profile_id", user.id)
           .maybeSingle(),
       ],
@@ -1431,7 +1442,12 @@ export default async function DashboardPage({
   // filtre "doublon avec une équipe déjà coachée" ne s'applique qu'une fois
   // cet onglet réellement actif et familyPromise exécutée en entier ; ici,
   // ça ne sert qu'à décider si le bouton doit apparaître ou non).
-  const hasOwnTeamTab = ownPlayerId !== null;
+  // Retour de Cindy du 09/11 : ownPlayerId !== null ne suffit plus seul --
+  // voir le commentaire sur la requête ownPlayerRowResult plus haut
+  // (fiche "Dirigeant" sans équipe réelle). ownTeamMemberships vient de la
+  // même requête déjà exécutée, aucun aller-retour de plus.
+  const ownTeamMemberships = (ownPlayerRowResult.data as { team_players?: { team_id: string }[] } | null)?.team_players ?? [];
+  const hasOwnTeamTab = ownPlayerId !== null && ownTeamMemberships.length > 0;
   // Retour de Cindy du 05/09 (Basile, qui coache déjà toutes les équipes
   // de ses deux enfants) : la première version de ce contrôle ("y a-t-il ne
   // serait-ce qu'un enfant ?") ne suffisait pas -- si le VRAI filtre plus

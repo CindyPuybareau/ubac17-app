@@ -22,6 +22,16 @@ export type TeamSelectorEntry = {
 // qu'une icône nue, actif = fond teinté + anneau plutôt qu'un aplat navy
 // plein, en gardant toutes les infos déjà là (icône de rôle, libellé,
 // badge Coach/Joueur).
+//
+// Retour de Cindy du 09/11 ("cette présentation faite dans le calendrier
+// doit aussi se faire sur toutes les pages concernées : tableau de bord,
+// équipe...") : l'encart jaune clair (même esprit que le bandeau du
+// sélecteur d'espace, dashboard-tabs.tsx) vit maintenant ICI plutôt que
+// recopié par chaque appelant (calendar-view.tsx, space-dashboard-
+// summary.tsx, coach-teams.tsx, season-bilan-panel.tsx) -- une seule
+// source, impossible à désynchroniser d'une page à l'autre. Le garde-fou
+// `teams.length <= 1` ci-dessous fait aussi disparaître l'encart, pas
+// seulement les pastilles : jamais de boîte vide.
 export default function TeamSelectorPills({
   teams,
   activeId,
@@ -36,7 +46,7 @@ export default function TeamSelectorPills({
   if (teams.length <= 1) return null;
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-2 rounded-2xl border border-ubac-yellow/35 bg-ubac-yellow/10 p-2">
       {teams.map((t) => {
         const isActive = activeId === t.id;
         // Couleur de la pastille dérivée du rôle — même logique que le
