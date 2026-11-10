@@ -27,7 +27,7 @@ import Cd17LigueSection from "./cd17-ligue-section";
 import { BOUTIQUE_SALES_URL } from "./boutique";
 import BoutiqueCard from "./boutique-card";
 import ExcluSponsorCard from "./exclu-sponsor-card";
-import { ACTION_CARDS_GRID_CLASSES } from "./kpi-grid-classes";
+import { ACTION_CARD_ITEM_CLASSES, ACTION_CARDS_GRID_CLASSES } from "./kpi-grid-classes";
 import FeaturedHighlightsCard from "./featured-highlights-card";
 import FeaturedHighlightsManager from "./featured-highlights-manager";
 import type { FeaturedHighlight } from "@/lib/featured-highlights";
@@ -325,23 +325,26 @@ export default function AdminView({
             penalites={penalites}
             buvette={buvette}
           />
-          {/* Retour de Cindy du 11/11 ("sur pc c'est moche au niveau
-              responsive") : ACTION_CARDS_GRID_CLASSES (kpi-grid-classes.ts)
-              -- toujours exactement 2 cartes ici, grille fixée à 2
-              colonnes plutôt que la grille KPI 2/3/6 qui laissait un vide
-              béant à droite sur grand écran (colonnes 3 à 6 jamais
-              remplies). Même constante reprise dans coach-view.tsx/
+          {/* Retour de Cindy du 11/11 ("on remet à gauche, boutique/exclu
+              sponsor même taille que les diapo sur PC et tablette", puis
+              "non sur téléphone on laisse comme avant !") : Boutique/
+              Exclu sponsor et le diaporama fusionnés en UNE SEULE rangée
+              alignée à gauche, qui replie proprement sur mobile
+              (flex-wrap) -- où Boutique/Exclu sponsor retrouvent leur
+              ancienne grille 2 colonnes (ACTION_CARDS_GRID_CLASSES passe
+              de grid à flex à partir de sm, voir kpi-grid-classes.ts) :
+              la largeur assortie au diaporama ne joue qu'à partir de
+              sm/tablette. Même structure reprise dans coach-view.tsx/
               family-view.tsx. */}
-          <div className={ACTION_CARDS_GRID_CLASSES}>
-            <BoutiqueCard salesUrl={BOUTIQUE_SALES_URL} />
-            <ExcluSponsorCard sponsors={sponsorDisplay} />
-          </div>
-          {/* Retour de Cindy du 10/11 ("centrer le diaporama, aussi large
-              que la carte du bas, aligné") : sort de la petite rangée
-              Boutique (carrée désormais) pour sa propre section pleine
-              largeur, centrée, alignée sur SpaceDashboardSummary
-              juste en dessous. */}
-          <div className="flex w-full items-center justify-center gap-3">
+          <div className="flex flex-wrap items-start gap-4">
+            <div className={ACTION_CARDS_GRID_CLASSES}>
+              <div className={ACTION_CARD_ITEM_CLASSES}>
+                <BoutiqueCard salesUrl={BOUTIQUE_SALES_URL} />
+              </div>
+              <div className={ACTION_CARD_ITEM_CLASSES}>
+                <ExcluSponsorCard sponsors={sponsorDisplay} />
+              </div>
+            </div>
             <FeaturedHighlightsCard highlights={featuredHighlights} calendarSectionKey="home" />
           </div>
           {/* Retour de Cindy du 13/09 : résumé club entier, en premier --

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, Megaphone, X } from "lucide-react";
 import type { FeaturedHighlight } from "@/lib/featured-highlights";
-import { HIGHLIGHTS_GRID_CLASSES } from "./kpi-grid-classes";
+import { DASHBOARD_CARD_WIDTH_CLASSES, HIGHLIGHTS_GRID_CLASSES } from "./kpi-grid-classes";
 
 // Retour de Cindy du 10/11 ("2 côte à côte", puis "il serait bien de
 // toutes les voir avec des flèches à partir de la 3ème") : jusqu'à 2
@@ -71,8 +71,15 @@ export default function FeaturedHighlightsCard({
   // visibilité") : fond navy (bg-navy/80) remplacé par un disque blanc
   // (bg-white/90) + icône navy -- se détachait mal sur les affiches/fonds
   // sombres, le blanc tranche sur n'importe quelle image.
+  //
+  // Retour de Cindy du 11/11 ("aligné sur PC, boutique/sponsors/diaporama
+  // sur une même ligne") : plus de w-full ici -- ce composant vit
+  // désormais comme un enfant flex de plus (voir admin-view.tsx & cie),
+  // à côté du bloc Boutique/Exclu sponsor, pas en-dessous dans sa propre
+  // rangée pleine largeur. Sa taille reste bornée par
+  // HIGHLIGHTS_GRID_CLASSES (max-w-lg) juste en dessous.
   return (
-    <div className="relative w-full">
+    <div className="relative">
       {canRotate && (
         <button
           type="button"
@@ -163,8 +170,13 @@ function SingleHighlightCard({
     </div>
   );
 
+  // Retour de Cindy du 11/11 ("boutique et exclu sponsor même taille que
+  // les diapo sur PC et tablette") : DASHBOARD_CARD_WIDTH_CLASSES
+  // (kpi-grid-classes.ts), largeur partagée avec BoutiqueCard/
+  // ExcluSponsorCard -- jamais w-full (dépendait d'un parent grid, voir
+  // le commentaire sur HIGHLIGHTS_GRID_CLASSES).
   return (
-    <div className="relative aspect-[3/4] w-full rounded-2xl shadow-sm">
+    <div className={`relative aspect-[3/4] rounded-2xl shadow-sm ${DASHBOARD_CARD_WIDTH_CLASSES}`}>
       {href ? (
         <a
           href={href}

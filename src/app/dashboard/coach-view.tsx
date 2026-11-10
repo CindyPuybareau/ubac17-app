@@ -18,7 +18,7 @@ import Cd17LigueSection from "./cd17-ligue-section";
 import BoutiqueCard from "./boutique-card";
 import ExcluSponsorCard from "./exclu-sponsor-card";
 import FeaturedHighlightsCard from "./featured-highlights-card";
-import { ACTION_CARDS_GRID_CLASSES } from "./kpi-grid-classes";
+import { ACTION_CARD_ITEM_CLASSES, ACTION_CARDS_GRID_CLASSES } from "./kpi-grid-classes";
 import type { FeaturedHighlight } from "@/lib/featured-highlights";
 import {
   getSiblingTeamIds,
@@ -296,19 +296,20 @@ export default function CoachView({
       icon: <LayoutDashboard className={iconClass} />,
       content: (
         <div className="flex flex-col gap-4">
-          {/* Retour de Cindy du 11/11 ("sur pc c'est moche au niveau
-              responsive") : ACTION_CARDS_GRID_CLASSES (kpi-grid-classes.ts),
-              toujours 2 colonnes fixes -- voir admin-view.tsx pour le
-              détail du correctif (plus de vide béant sur grand écran). */}
-          <div className={ACTION_CARDS_GRID_CLASSES}>
-            <BoutiqueCard />
-            <ExcluSponsorCard sponsors={sponsorDisplay} />
-          </div>
-          {/* Retour de Cindy du 10/11 ("centrer le diaporama, aussi large
-              que la carte du bas, aligné") : sa propre section pleine
-              largeur, centrée, alignée sur SpaceDashboardSummary juste
-              en dessous. */}
-          <div className="flex w-full items-center justify-center gap-3">
+          {/* Retour de Cindy du 11/11 ("on remet à gauche, boutique/exclu
+              sponsor même taille que les diapo", puis "non sur téléphone
+              on laisse comme avant !") : voir admin-view.tsx pour le
+              détail -- grille 2 colonnes sur téléphone (comme avant),
+              largeur assortie au diaporama à partir de sm. */}
+          <div className="flex flex-wrap items-start gap-4">
+            <div className={ACTION_CARDS_GRID_CLASSES}>
+              <div className={ACTION_CARD_ITEM_CLASSES}>
+                <BoutiqueCard />
+              </div>
+              <div className={ACTION_CARD_ITEM_CLASSES}>
+                <ExcluSponsorCard sponsors={sponsorDisplay} />
+              </div>
+            </div>
             <FeaturedHighlightsCard highlights={featuredHighlights} calendarSectionKey="calendar" />
           </div>
 
