@@ -38,11 +38,22 @@ export default function FfbbRankingTable({
 
   return (
     <div className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
-      <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-900">
-        <ListOrdered className="h-4 w-4 shrink-0 text-navy" />
-        Classement{cardLabel}
+      {/* Retour de Cindy du 10/11 ("phase 2 sur mobile ne va pas en
+          responsive") : "Classement — ANGOULINS UBAC" (texte brut, pas de
+          span propre) et le badge "Phase 2" vivaient comme deux items d'un
+          même flex row -- une fois le nom long assez pour passer à la
+          ligne, le badge restait "accroché" au milieu du texte replié au
+          lieu de descendre proprement dessous. Titre+icône isolés dans
+          leur propre span (qui peut replier son texte sans toucher au
+          badge), badge à part avec shrink-0, flex-wrap sur la ligne entière
+          pour qu'il tombe sous le titre si la place manque. */}
+      <p className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-zinc-900">
+        <span className="flex items-center gap-2">
+          <ListOrdered className="h-4 w-4 shrink-0 text-navy" />
+          Classement{cardLabel}
+        </span>
         {phase === FFBB_PHASE_2 && (
-          <span className="rounded-full bg-ubac-yellow/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-ubac-yellow-dark">
+          <span className="shrink-0 rounded-full bg-ubac-yellow/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-ubac-yellow-dark">
             Phase 2
           </span>
         )}
@@ -55,19 +66,27 @@ export default function FfbbRankingTable({
               ? entry.previousRanking - positionNumber
               : 0;
           return (
+            // Retour de Cindy du 10/11 ("le nom des équipes dans le
+            // classement aussi coupé, police plus petite peut-être ?") :
+            // text-sm -> text-xs et gap-2 -> gap-1.5 sur toute la ligne
+            // (pas seulement le nom) pour garder tout aligné -- rend
+            // quelques caractères de plus visibles avant la troncature
+            // (toujours nécessaire, certains noms FFBB restent trop longs
+            // pour tenir en entier sur mobile, ex. "IE - CTC NORD
+            // ROCHELAIS BASKET - SAINT-XANDRE").
             <div
               key={`${entry.position}-${entry.label}`}
-              className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm ${
+              className={`flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs ${
                 entry.isOwnTeam ? "bg-court-green/10 font-semibold text-court-green" : "text-zinc-700"
               }`}
             >
-              <span className="w-5 shrink-0 text-center tabular-nums text-zinc-500">{entry.position}</span>
+              <span className="w-4 shrink-0 text-center tabular-nums text-zinc-500">{entry.position}</span>
               {trend > 0 ? (
-                <TrendingUp className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                <TrendingUp className="h-3 w-3 shrink-0 text-emerald-500" />
               ) : trend < 0 ? (
-                <TrendingDown className="h-3.5 w-3.5 shrink-0 text-red-500" />
+                <TrendingDown className="h-3 w-3 shrink-0 text-red-500" />
               ) : (
-                <Minus className="h-3.5 w-3.5 shrink-0 text-zinc-300" />
+                <Minus className="h-3 w-3 shrink-0 text-zinc-300" />
               )}
               <span className="flex-1 truncate">{entry.label}</span>
               <span className="shrink-0 tabular-nums text-zinc-500">{entry.points} pts</span>
