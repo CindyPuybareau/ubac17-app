@@ -183,6 +183,60 @@ export default function FamilyView({
     ? selectedPlayerId
     : (rsvpPlayers[0]?.id ?? null);
   const hasSeveralChildren = rsvpPlayers.length > 1;
+
+  // Retour de Cindy du 10/11 ("dans le tableau de bord quand je clique sur
+  // léonie, rien ne se passe... ça fait doublon avec les boutons équipe
+  // plus bas") : ce sélecteur ne pilotait jamais la carte photo/équipe/
+  // classement en haut du Tableau de bord (SpaceDashboardSummary, qui a
+  // son propre sélecteur PAR ÉQUIPE, voir plus bas) -- seulement
+  // FamilyAttendanceSummary/FamilyCotisationCard/PenalitesCard, rendues
+  // bien plus bas sur ce même onglet. Extrait ici pour être rendu à CET
+  // endroit précis sur "Tableau de bord" (juste au-dessus de ces 3
+  // encarts) plutôt qu'en haut de page près de la photo, tout en restant
+  // le contentHeader habituel (juste au-dessus du contenu actif) sur les
+  // autres onglets (Calendrier, Mes Équipes...). Toujours la même règle du
+  // 22/08 : jamais de vue combinée, un seul enfant affiché à la fois.
+  const childSelector = hasSeveralChildren ? (
+    <div className="flex flex-col items-start gap-2">
+      <span className="inline-flex w-fit items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ubac-yellow/15 px-3 py-1 text-xs font-semibold uppercase leading-none text-ubac-yellow-dark">
+        <Users className="h-3.5 w-3.5 shrink-0" />
+        {rsvpPlayers.length > 1 ? "Mes enfants" : "Enfant"}
+      </span>
+      <div className="flex flex-wrap items-center gap-2">
+        {rsvpPlayers.map((p) => {
+          const isActive = resolvedSelectedPlayerId === p.id;
+          const color = avatarColor(p.id);
+          return (
+            <button
+              key={p.id}
+              onClick={() => setSelectedPlayerId(p.id)}
+              className={`flex items-center gap-2 rounded-full border py-1 pl-1 pr-3 text-sm font-medium transition-colors ${
+                isActive
+                  ? "border-navy/30 bg-navy/10 ring-2 ring-navy/20"
+                  : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
+              }`}
+            >
+              {p.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={p.avatarUrl}
+                  alt=""
+                  className="h-6 w-6 shrink-0 rounded-full object-cover"
+                />
+              ) : (
+                <span
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${color}`}
+                >
+                  {p.name.charAt(0).toUpperCase()}
+                </span>
+              )}
+              <span className={isActive ? "font-semibold text-navy" : ""}>{p.name}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  ) : null;
   const visiblePlayers = useMemo(
     () =>
       resolvedSelectedPlayerId
@@ -384,21 +438,30 @@ export default function FamilyView({
               page de "Mon équipe"/"Mes enfants" (situation administrative)
               rejoignent ici la vraie vue d'ensemble de l'espace, plutôt
               qu'un onglet dédié au planning d'équipe. Cotisation juste sous
-              le bilan de présence (retour de Cindy du 24/09). */}
-          <div className="grid grid-cols-1 gap-4 border-t border-zinc-100 pt-4 sm:grid-cols-2 lg:grid-cols-3">
-            <FamilyAttendanceSummary
-              events={visibleEvents}
-              players={visiblePlayers}
-              rsvpStatusByKey={rsvpStatusByKey}
-            />
-            <FamilyCotisationCard cotisations={visibleCotisations} />
-            <EventCotisationsCard cotisations={visibleCotisations} />
-            <PenalitesCard
-              title="Mes pénalités"
-              penalites={visiblePenalites}
-              showPlayerName={hasSeveralChildren}
-              emptyLabel="Aucune pénalité."
-            />
+              le bilan de présence (retour de Cindy du 24/09).
+              Retour de Cindy du 10/11 : le sélecteur d'enfant (childSelector,
+              défini plus haut) vit maintenant juste ici -- seul endroit de
+              cet onglet qu'il pilote réellement (jamais la carte photo/
+              équipe/classement au-dessus, qui a son propre sélecteur par
+              équipe). Absent du haut de page pour ne plus donner l'impression
+              d'un doublon avec "Mes Équipes". */}
+          <div className="flex flex-col gap-4 border-t border-zinc-100 pt-4">
+            {childSelector}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <FamilyAttendanceSummary
+                events={visibleEvents}
+                players={visiblePlayers}
+                rsvpStatusByKey={rsvpStatusByKey}
+              />
+              <FamilyCotisationCard cotisations={visibleCotisations} />
+              <EventCotisationsCard cotisations={visibleCotisations} />
+              <PenalitesCard
+                title="Mes pénalités"
+                penalites={visiblePenalites}
+                showPlayerName={hasSeveralChildren}
+                emptyLabel="Aucune pénalité."
+              />
+            </div>
           </div>
 
           {/* Retour de Cindy du 24/09 ("Accès enfant au dessus du calendrier
@@ -563,73 +626,11 @@ export default function FamilyView({
         // la page ni du menu — même emplacement que les autres sélecteurs
         // pill de l'appli (TeamSelectorPills), via contentHeader plutôt
         // qu'un bloc affiché avant AdminSidebar.
-        contentHeader={
-          hasSeveralChildren ? (
-            // Retour de Cindy du 13/09 ("au niveau du responsive
-            // téléphone... mes enfants sous mon signet") : le signet et la
-            // première pastille se disputaient la même ligne sur un écran
-            // étroit, la coupe entre les deux tombant n'importe où selon le
-            // nombre d'enfants (parfois entre le signet et Raphaël, parfois
-            // entre Raphaël et Léonie) -- flex-col les empile proprement
-            // l'un sous l'autre, ici comme partout où ce même bloc sert
-            // (voir juste en dessous : "Mon équipe" ET "Mes enfants"
-            // réutilisent ce composant tel quel).
-            <div className="flex flex-col items-start gap-2">
-              {/* Retour de Cindy du 12/09 ("ce texte plat... un signet
-                  sympa") : même habillage que le badge "Espace Bureau"
-                  (admin-view.tsx) plutôt qu'un simple texte gris, pour
-                  rester assorti au reste de l'appli. Pluriel/singulier
-                  selon le nombre réel d'enfants -- même principe que le
-                  libellé de l'onglet "Mon enfant"/"Mes enfants"
-                  (page.tsx) ; en pratique toujours au pluriel ici, ce
-                  bloc n'existant que si hasSeveralChildren. */}
-              <span className="inline-flex w-fit items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ubac-yellow/15 px-3 py-1 text-xs font-semibold uppercase leading-none text-ubac-yellow-dark">
-                <Users className="h-3.5 w-3.5 shrink-0" />
-                {rsvpPlayers.length > 1 ? "Mes enfants" : "Enfant"}
-              </span>
-              <div className="flex flex-wrap items-center gap-2">
-                {rsvpPlayers.map((p) => {
-                  const isActive = resolvedSelectedPlayerId === p.id;
-                  const color = avatarColor(p.id);
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() => setSelectedPlayerId(p.id)}
-                      className={`flex items-center gap-2 rounded-full border py-1 pl-1 pr-3 text-sm font-medium transition-colors ${
-                        isActive
-                          ? "border-navy/30 bg-navy/10 ring-2 ring-navy/20"
-                          : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
-                      }`}
-                    >
-                      {/* Photo de l'enfant si elle existe (players.avatar_url,
-                          mise en ligne depuis son propre Espace Enfant),
-                          sinon repli sur une initiale colorée — même
-                          principe que les coéquipiers dans child-team-tab.tsx.
-                          Retour de Cindy du 2026-08-24 : "faire comme la
-                          capture en y incrémentant les images qu'ils
-                          mettent sur leur espace". */}
-                      {p.avatarUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={p.avatarUrl}
-                          alt=""
-                          className="h-6 w-6 shrink-0 rounded-full object-cover"
-                        />
-                      ) : (
-                        <span
-                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${color}`}
-                        >
-                          {p.name.charAt(0).toUpperCase()}
-                        </span>
-                      )}
-                      <span className={isActive ? "font-semibold text-navy" : ""}>{p.name}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : undefined
-        }
+        // Retour de Cindy du 10/11 : absent du Tableau de bord ("dashboard")
+        // -- il y est rendu ailleurs, juste au-dessus des encarts qu'il
+        // pilote réellement (voir childSelector, défini plus haut, et son
+        // usage dans l'onglet "Tableau de bord" ci-dessus).
+        contentHeader={(activeKey) => (activeKey === "dashboard" ? null : childSelector)}
       />
     </div>
   );
