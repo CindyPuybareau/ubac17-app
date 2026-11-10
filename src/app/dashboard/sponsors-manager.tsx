@@ -483,12 +483,21 @@ export default function SponsorsManager({ sponsors }: { sponsors: AdminSponsor[]
                     </span>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
+                    {/* Retour de Cindy du 11/11 ("je n'arrive plus à
+                        remonter ou descendre des sponsors") : le fond ne
+                        se voyait qu'au survol (hover), invisible au doigt
+                        sur tablette/mobile -- un bouton sans retour visuel
+                        permanent peut sembler désactivé. Fond gris clair
+                        permanent désormais (comme les boutons Modifier/
+                        Supprimer juste à côté restaient, eux, bien
+                        identifiables grâce à leur icône de couleur), la
+                        fonction elle-même n'a jamais changé. */}
                     <button
                       type="button"
                       onClick={() => moveSponsor(index, -1)}
                       disabled={index === 0 || movingId !== null}
                       title="Faire remonter"
-                      className="flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 disabled:opacity-30"
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 text-zinc-500 hover:bg-zinc-200 hover:text-zinc-700 disabled:bg-transparent disabled:opacity-30"
                     >
                       <ArrowUp className="h-3.5 w-3.5" />
                     </button>
@@ -497,7 +506,7 @@ export default function SponsorsManager({ sponsors }: { sponsors: AdminSponsor[]
                       onClick={() => moveSponsor(index, 1)}
                       disabled={index === sponsors.length - 1 || movingId !== null}
                       title="Faire descendre"
-                      className="flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 disabled:opacity-30"
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 text-zinc-500 hover:bg-zinc-200 hover:text-zinc-700 disabled:bg-transparent disabled:opacity-30"
                     >
                       <ArrowDown className="h-3.5 w-3.5" />
                     </button>

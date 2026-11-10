@@ -27,7 +27,7 @@ import Cd17LigueSection from "./cd17-ligue-section";
 import { BOUTIQUE_SALES_URL } from "./boutique";
 import BoutiqueCard from "./boutique-card";
 import ExcluSponsorCard from "./exclu-sponsor-card";
-import { KPI_GRID_CLASSES } from "./kpi-grid-classes";
+import { ACTION_CARDS_GRID_CLASSES } from "./kpi-grid-classes";
 import FeaturedHighlightsCard from "./featured-highlights-card";
 import FeaturedHighlightsManager from "./featured-highlights-manager";
 import type { FeaturedHighlight } from "@/lib/featured-highlights";
@@ -325,13 +325,14 @@ export default function AdminView({
             penalites={penalites}
             buvette={buvette}
           />
-          {/* Retour de Cindy du 10/11 ("boutique/sponsors même taille que
-              les KPI, sur tous les espaces") : grille partagée
-              KPI_GRID_CLASSES (kpi-grid-classes.ts), identique à
-              BureauKpiGrid juste au-dessus -- plus de prop Bureau-only,
-              cette même grille est reprise à l'identique dans
-              coach-view.tsx/family-view.tsx/child-dashboard.tsx. */}
-          <div className={KPI_GRID_CLASSES}>
+          {/* Retour de Cindy du 11/11 ("sur pc c'est moche au niveau
+              responsive") : ACTION_CARDS_GRID_CLASSES (kpi-grid-classes.ts)
+              -- toujours exactement 2 cartes ici, grille fixée à 2
+              colonnes plutôt que la grille KPI 2/3/6 qui laissait un vide
+              béant à droite sur grand écran (colonnes 3 à 6 jamais
+              remplies). Même constante reprise dans coach-view.tsx/
+              family-view.tsx. */}
+          <div className={ACTION_CARDS_GRID_CLASSES}>
             <BoutiqueCard salesUrl={BOUTIQUE_SALES_URL} />
             <ExcluSponsorCard sponsors={sponsorDisplay} />
           </div>
