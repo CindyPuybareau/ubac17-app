@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   ListOrdered,
   LogOut,
+  Megaphone,
   Package,
   ScrollText,
   Shield,
@@ -25,6 +26,11 @@ import ClubReportsSection from "./club-reports-section";
 import Cd17LigueSection from "./cd17-ligue-section";
 import { BOUTIQUE_SALES_URL } from "./boutique";
 import BoutiqueCard from "./boutique-card";
+import ExcluSponsorCard from "./exclu-sponsor-card";
+import { KPI_GRID_CLASSES } from "./kpi-grid-classes";
+import FeaturedHighlightsCard from "./featured-highlights-card";
+import FeaturedHighlightsManager from "./featured-highlights-manager";
+import type { FeaturedHighlight } from "@/lib/featured-highlights";
 import TeamManager, { type Person, type TeamWithMembers } from "./team-manager";
 import ImportInscriptions from "./import-inscriptions";
 import ImportPlanning from "./import-planning";
@@ -51,6 +57,7 @@ import type {
   AdminCotisation,
   AdminInventoryItem,
   AdminMember,
+  AdminFeaturedHighlight,
   AdminPenalite,
   AdminSponsor,
   AdminUpcomingEvent,
@@ -96,6 +103,9 @@ export default function AdminView({
   officialsTrombinoscopePath,
   headerWeekEvents,
   showHeaderWeekBanner,
+  featuredHighlights,
+  featuredHighlightsAdmin,
+  featuredHighlightsEventOptions,
 }: {
   // Profils d'accès sur-mesure (retour de Cindy du 05/09, étape 3) : null
   // pour un Bureau complet (comportement historique, inchangé) ; sinon, la
@@ -169,6 +179,14 @@ export default function AdminView({
   // qu'avant, juste déplacé), voir page.tsx.
   headerWeekEvents: WeekStripEvent[];
   showHeaderWeekBanner: boolean;
+  // Retour de Cindy du 10/11 ("Événements à la une") : club entier, actives
+  // seulement -- carte Tableau de bord, à côté de BoutiqueCard.
+  featuredHighlights: FeaturedHighlight[];
+  // Liste complète (actives + expirées) + options d'événements à
+  // rattacher, pour l'écran de gestion (Vie du club → Événements à la
+  // une, Bureau uniquement).
+  featuredHighlightsAdmin: AdminFeaturedHighlight[];
+  featuredHighlightsEventOptions: AdminUpcomingEvent[];
 }) {
   const teamRefs = teams.map((t) => ({
     id: t.id,
@@ -307,12 +325,23 @@ export default function AdminView({
             penalites={penalites}
             buvette={buvette}
           />
-          {/* Retour du Bureau (09/11, relayé par Cindy) : "Affiches" (pas
-              encore construites, voir le plan validé) rejoindront cette
-              même rangée, à côté de la Boutique -- flex-wrap dès
-              maintenant pour les accueillir sans retoucher ce conteneur. */}
-          <div className="flex flex-wrap gap-3">
+          {/* Retour de Cindy du 10/11 ("boutique/sponsors même taille que
+              les KPI, sur tous les espaces") : grille partagée
+              KPI_GRID_CLASSES (kpi-grid-classes.ts), identique à
+              BureauKpiGrid juste au-dessus -- plus de prop Bureau-only,
+              cette même grille est reprise à l'identique dans
+              coach-view.tsx/family-view.tsx/child-dashboard.tsx. */}
+          <div className={KPI_GRID_CLASSES}>
             <BoutiqueCard salesUrl={BOUTIQUE_SALES_URL} />
+            <ExcluSponsorCard sponsors={sponsorDisplay} />
+          </div>
+          {/* Retour de Cindy du 10/11 ("centrer le diaporama, aussi large
+              que la carte du bas, aligné") : sort de la petite rangée
+              Boutique (carrée désormais) pour sa propre section pleine
+              largeur, centrée, alignée sur SpaceDashboardSummary
+              juste en dessous. */}
+          <div className="flex w-full items-center justify-center gap-3">
+            <FeaturedHighlightsCard highlights={featuredHighlights} calendarSectionKey="home" />
           </div>
           {/* Retour de Cindy du 13/09 : résumé club entier, en premier --
               c'est désormais le vrai contenu de cet onglet, "Envois
@@ -587,6 +616,20 @@ export default function AdminView({
           label: "Sponsors",
           icon: <Handshake className={iconClass} />,
           content: <SponsorsManager sponsors={sponsors} />,
+        },
+        {
+          // Retour de Cindy du 10/11 ("Événements à la une") : Bureau
+          // uniquement (jamais dans coach-view.tsx, qui n'a que Documents
+          // dans "Vie du club" -- même restriction que Sponsors).
+          key: "featured-highlights",
+          label: "Événements à la une",
+          icon: <Megaphone className={iconClass} />,
+          content: (
+            <FeaturedHighlightsManager
+              highlights={featuredHighlightsAdmin}
+              eventOptions={featuredHighlightsEventOptions}
+            />
+          ),
         },
         {
           // Retour de Cindy du 25/08 : le Bureau voit les 3 documents

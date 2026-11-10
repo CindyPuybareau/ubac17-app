@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Clock, Undo2, X } from "lucide-react";
+import { Check, Clock, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
   SEGMENT_ABSENT_ON,
@@ -84,25 +84,6 @@ export default function RsvpControl({
     setStatus(next);
   }
 
-  // Revenir à "en attente", c'est supprimer la ligne : l'app lit déjà
-  // l'absence de réponse ainsi. Utile en cas de faute de frappe.
-  async function clearAnswer() {
-    setSaving(true);
-    setError(null);
-    const supabase = createClient();
-    const { error: deleteError } = await supabase
-      .from("rsvps")
-      .delete()
-      .eq("event_id", eventId)
-      .eq("player_id", playerId);
-    setSaving(false);
-    if (deleteError) {
-      setError("Annulation impossible, réessaie.");
-      return;
-    }
-    setStatus("PENDING");
-  }
-
   const badge = badgeFor(status);
 
   return (
@@ -120,7 +101,10 @@ export default function RsvpControl({
       </div>
 
       {/* Segmented control : les deux réponses sont un même choix, pas deux
-          actions indépendantes — les enfermer dans un seul cadre le dit. */}
+          actions indépendantes — les enfermer dans un seul cadre le dit.
+          Retour de Cindy du 11/11 ("annuler n'est pas utile, soit un enfant
+          est présent soit il est absent") : plus de 3e bouton "Annuler"
+          (retour à "en attente"), un choix binaire seulement. */}
       <div className={SEGMENT_GROUP}>
         <button
           type="button"
@@ -144,22 +128,6 @@ export default function RsvpControl({
           <X className="h-3.5 w-3.5 shrink-0" />
           Absent
         </button>
-
-        {/* Ne s'affiche qu'une fois une réponse donnée : il n'y a rien à
-            annuler tant qu'on n'a pas répondu — utile en cas de faute de
-            frappe plutôt qu'une vraie absence. */}
-        {status !== "PENDING" && (
-          <button
-            type="button"
-            disabled={saving}
-            onClick={clearAnswer}
-            title="Revenir à « en attente »"
-            className={`${SEGMENT_BUTTON} ${SEGMENT_OFF}`}
-          >
-            <Undo2 className="h-3.5 w-3.5 shrink-0" />
-            Annuler
-          </button>
-        )}
       </div>
 
       {error && <p className="text-xs text-red-600">{error}</p>}

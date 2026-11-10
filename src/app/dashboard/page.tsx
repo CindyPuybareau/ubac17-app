@@ -7,6 +7,7 @@ import { formatFirstName, formatPersonName } from "@/lib/names";
 import { EMAIL_REPLY_TO } from "@/lib/email";
 import { localDateFromParts } from "@/lib/local-date";
 import { getSpaceDashboardSummary, type SpaceDashboardSummary } from "@/lib/space-dashboard";
+import { getActiveFeaturedHighlights } from "@/lib/featured-highlights";
 import {
   getCachedTeams,
   getCachedCategoryTariffs,
@@ -145,6 +146,26 @@ export type AdminSponsor = {
   websiteUrl: string | null;
   contractType: string | null;
   sortOrder: number;
+  // Retour de Cindy du 10/11 ("Exclu sponsor") : offre/remise membre déjà
+  // proposée par le sponsor (ex. "10€ offerts dès 50€ d'achat"), purement
+  // optionnelle -- exposée club entier via sponsor_display (voir
+  // SponsorDisplay plus bas), contrairement au contrat/contact.
+  offerText: string | null;
+};
+
+// Retour de Cindy du 10/11 ("Événements à la une") : liste COMPLÈTE
+// (actives + expirées) pour l'écran de gestion Bureau -- distincte de
+// FeaturedHighlight (lib/featured-highlights.ts), qui ne porte que les
+// actives pour l'affichage carte/carrousel des 4 espaces.
+export type AdminFeaturedHighlight = {
+  id: string;
+  title: string;
+  imageUrl: string | null;
+  linkUrl: string | null;
+  eventId: string | null;
+  eventTitle: string | null;
+  endDate: string | null;
+  sortOrder: number;
 };
 
 // Retour de Cindy du 16/10 ("Inventaire") : liste libre de matériel club,
@@ -165,6 +186,15 @@ export type SponsorDisplay = {
   name: string;
   logoUrl: string;
   websiteUrl: string | null;
+  // Retour de Cindy du 10/11 ("Exclu sponsor") : offre/remise membre,
+  // purement optionnelle -- un sponsor sans offre reste affiché (nom +
+  // logo), seule cette ligne ne s'affiche pas (voir exclu-sponsor-card.tsx).
+  offerText: string | null;
+  // Retour de Cindy du 11/11 ("on doit aussi avoir le telephone des
+  // sponsors pour le joindre facilement") : SEUL contact_phone est exposé
+  // club entier (jamais contact_name/contact_email, qui restent
+  // Bureau-only -- voir AdminSponsor plus bas).
+  contactPhone: string | null;
 };
 
 // Profils d'accès sur-mesure (retour de Cindy du 05/09, reprise du sujet
@@ -1188,6 +1218,14 @@ export default async function DashboardPage({
   const officialsTrombinoscopePath =
     officialsTrombinoscopeRes.data?.officials_trombinoscope_path ?? null;
 
+  // Retour de Cindy du 10/11 ("Événements à la une") : club entier, lu une
+  // seule fois ici (comme officialsTrombinoscopePath juste au-dessus)
+  // plutôt que par espace -- jamais mis en cache (contrairement à ce
+  // dernier) pour que la disparition d'une affiche expirée/supprimée se
+  // reflète en direct via Realtime (realtime-sync.tsx), pas jusqu'à 45s
+  // plus tard.
+  const featuredHighlights = await getActiveFeaturedHighlights(supabase);
+
   // Profil d'accès sur-mesure (retour de Cindy du 05/09, étape 3) : si CE
   // compte Bureau a un access_profile_id, son espace Bureau ne doit
   // afficher que les briques cochées pour ce profil-là -- null reste
@@ -1612,7 +1650,7 @@ export default async function DashboardPage({
     () =>
       supabase
         .from("sponsor_display")
-        .select("id, name, logo_url, website_url")
+        .select("id, name, logo_url, website_url, offer_text, contact_phone")
         .order("sort_order", { ascending: true }),
     ],
     dbLimit
@@ -1625,6 +1663,8 @@ export default async function DashboardPage({
     name: s.name,
     logoUrl: s.logo_url,
     websiteUrl: s.website_url,
+    offerText: s.offer_text,
+    contactPhone: s.contact_phone,
   }));
 
   const convocationCards = convocationCardsRaw.filter(
@@ -1691,6 +1731,7 @@ export default async function DashboardPage({
   let adminSeasonVolunteerGuestEntries: SeasonGuestVolunteer[] = [];
   let adminMembers: AdminMember[] = [];
   let adminSponsors: AdminSponsor[] = [];
+  let adminFeaturedHighlights: AdminFeaturedHighlight[] = [];
   let adminInventoryItems: AdminInventoryItem[] = [];
   let adminPenalites: AdminPenalite[] = [];
   let adminBuvette: AdminBuvette[] = [];
@@ -1779,6 +1820,7 @@ export default async function DashboardPage({
       categoryTariffsRes,
       clubSettingsRes,
       sponsorsRes,
+      featuredHighlightsAdminRes,
       inventoryRes,
       penalitesRes,
       buvetteRes,
@@ -1901,13 +1943,23 @@ export default async function DashboardPage({
           supabase
             .from("sponsors")
             .select(
-              "id, name, contact_name, contact_email, contact_phone, renewal_date, notes, logo_url, website_url, contract_type, sort_order"
+              "id, name, contact_name, contact_email, contact_phone, renewal_date, notes, logo_url, website_url, contract_type, sort_order, offer_text"
             )
             // Retour de Cindy du 29/08 : trié par ordre d'affichage choisi
             // (flèches monter/descendre, sponsors-manager.tsx) plutôt que
             // par date de renouvellement — cette liste doit refléter
             // exactement l'ordre montré partout ailleurs pour que les
             // flèches aient un sens.
+            .order("sort_order", { ascending: true }),
+        // Retour de Cindy du 10/11 ("Événements à la une") : liste COMPLÈTE
+        // (actives + expirées) pour l'écran de gestion
+        // (featured-highlights-manager.tsx, Bureau uniquement) --
+        // distincte de featuredHighlights plus haut (club entier, actives
+        // seulement, lue hors de ce bloc Bureau-only).
+        () =>
+          supabase
+            .from("featured_highlights")
+            .select("id, title, image_url, link_url, event_id, end_date, sort_order, events(title)")
             .order("sort_order", { ascending: true }),
         // Retour de Cindy du 16/10 ("Inventaire") : liste libre de matériel
         // club, club entier (jamais filtrée par équipe) — même table pour
@@ -2643,7 +2695,22 @@ export default async function DashboardPage({
       websiteUrl: s.website_url,
       contractType: s.contract_type,
       sortOrder: s.sort_order,
+      offerText: s.offer_text,
     }));
+
+    adminFeaturedHighlights = (featuredHighlightsAdminRes.data ?? []).map((h) => {
+      const event = h.events as unknown as { title: string } | null;
+      return {
+        id: h.id,
+        title: h.title,
+        imageUrl: h.image_url,
+        linkUrl: h.link_url,
+        eventId: h.event_id,
+        eventTitle: event?.title ?? null,
+        endDate: h.end_date,
+        sortOrder: h.sort_order,
+      };
+    });
 
     adminInventoryItems = (inventoryRes.data ?? []).map((i) => ({
       id: i.id,
@@ -5057,6 +5124,7 @@ export default async function DashboardPage({
         officialsTrombinoscopePath={officialsTrombinoscopePath}
         headerWeekEvents={headerWeekEvents}
         showHeaderWeekBanner={showHeaderWeekBanner}
+        featuredHighlights={featuredHighlights}
       />
     );
   }
@@ -5124,6 +5192,9 @@ export default async function DashboardPage({
             officialsTrombinoscopePath={officialsTrombinoscopePath}
             headerWeekEvents={headerWeekEvents}
             showHeaderWeekBanner={showHeaderWeekBanner}
+            featuredHighlights={featuredHighlights}
+            featuredHighlightsAdmin={adminFeaturedHighlights}
+            featuredHighlightsEventOptions={adminUpcomingEvents}
           />
         ) : null,
     });
@@ -5189,6 +5260,7 @@ export default async function DashboardPage({
             officialsTrombinoscopePath={officialsTrombinoscopePath}
             headerWeekEvents={headerWeekEvents}
             showHeaderWeekBanner={showHeaderWeekBanner}
+            featuredHighlights={featuredHighlights}
           />
         ) : null,
     });

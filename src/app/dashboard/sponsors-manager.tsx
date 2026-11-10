@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowUp, Handshake, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Gift, Handshake, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { resizeImageForLogo } from "@/lib/image-resize";
 import { formatLocalDateFr } from "@/lib/local-date";
@@ -31,6 +31,7 @@ type SponsorForm = {
   contactPhone: string;
   renewalDate: string;
   notes: string;
+  offerText: string;
 };
 
 const EMPTY_FORM: SponsorForm = {
@@ -43,6 +44,7 @@ const EMPTY_FORM: SponsorForm = {
   contactPhone: "",
   renewalDate: "",
   notes: "",
+  offerText: "",
 };
 
 function toForm(sponsor: AdminSponsor): SponsorForm {
@@ -56,6 +58,7 @@ function toForm(sponsor: AdminSponsor): SponsorForm {
     contactPhone: sponsor.contactPhone ?? "",
     renewalDate: sponsor.renewalDate ?? "",
     notes: sponsor.notes ?? "",
+    offerText: sponsor.offerText ?? "",
   };
 }
 
@@ -149,6 +152,7 @@ export default function SponsorsManager({ sponsors }: { sponsors: AdminSponsor[]
       contact_phone: form.contactPhone.trim() || null,
       renewal_date: form.renewalDate || null,
       notes: form.notes.trim() || null,
+      offer_text: form.offerText.trim() || null,
     };
     const { error: writeError } =
       editing !== "new" && editing
@@ -345,6 +349,23 @@ export default function SponsorsManager({ sponsors }: { sponsors: AdminSponsor[]
               />
             </div>
 
+            <div className="sm:col-span-2">
+              {/* Retour de Cindy du 10/11 ("Exclu sponsor") : offre/remise
+                  membre déjà proposée par ce sponsor -- purement optionnelle,
+                  visible par TOUT le club (carte "Exclu sponsor", 4 espaces
+                  sauf Enfant comme le reste des sponsors) dès qu'elle est
+                  renseignée, contrairement au contrat/contact ci-dessous. */}
+              <label className="mb-1 block text-xs font-medium text-zinc-600">
+                Offre / remise membre (visible par tout le club)
+              </label>
+              <input
+                placeholder="Ex. 10€ offerts dès 50€ d'achat"
+                value={form.offerText}
+                onChange={(e) => setForm((f) => ({ ...f, offerText: e.target.value }))}
+                className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+              />
+            </div>
+
             <div>
               <label className="mb-1 block text-xs font-medium text-zinc-600">
                 Date de renouvellement
@@ -510,6 +531,12 @@ export default function SponsorsManager({ sponsors }: { sponsors: AdminSponsor[]
                     </span>
                   )}
                 </div>
+                {sponsor.offerText && (
+                  <p className="flex items-center gap-1 text-xs font-semibold text-ubac-yellow-dark">
+                    <Gift className="h-3 w-3 shrink-0" />
+                    {sponsor.offerText}
+                  </p>
+                )}
                 {contact && <p className="text-xs text-zinc-500">{contact}</p>}
                 {sponsor.notes && <p className="text-xs text-zinc-400">{sponsor.notes}</p>}
               </div>

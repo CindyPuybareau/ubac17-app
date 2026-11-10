@@ -13,6 +13,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { formatPersonName } from "@/lib/names";
+import { KPI_GRID_CLASSES } from "./kpi-grid-classes";
 import { formatLocalDateFr } from "@/lib/local-date";
 import { balanceDue, computeStatus } from "./cotisation-shared";
 import AnimatedNumber from "./animated-number";
@@ -265,7 +266,7 @@ export function BureauKpiGrid({
   const penalitesTotalAmount = penalites.reduce((sum, p) => sum + p.amount, 0);
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+    <div className={KPI_GRID_CLASSES}>
       <KpiCard
         icon={Users}
         iconClass="text-navy"

@@ -16,6 +16,8 @@ import PenalitesCard from "@/app/dashboard/penalites-card";
 import FamilyCotisationCard from "@/app/dashboard/family-cotisation-card";
 import EventCotisationsCard from "@/app/dashboard/event-cotisations-card";
 import SpaceDashboardSummary from "@/app/dashboard/space-dashboard-summary";
+import FeaturedHighlightsCard from "@/app/dashboard/featured-highlights-card";
+import type { FeaturedHighlight } from "@/lib/featured-highlights";
 import type { SpaceDashboardSummary as SpaceDashboardSummaryData } from "@/lib/space-dashboard";
 import type { AdminCotisation } from "@/app/dashboard/page";
 import type { PlayerYearStatus } from "@/lib/season";
@@ -134,6 +136,7 @@ export default function ChildDashboard({
   presentPlayersByEventId,
   absentPlayersByEventId,
   pendingPlayersByEventId,
+  featuredHighlights,
 }: {
   firstName: string | null;
   avatarUrl: string | null;
@@ -193,6 +196,11 @@ export default function ChildDashboard({
   presentPlayersByEventId: Record<string, { id: string; firstName: string | null; lastName: string | null }[]>;
   absentPlayersByEventId: Record<string, { id: string; firstName: string | null; lastName: string | null }[]>;
   pendingPlayersByEventId: Record<string, { id: string; firstName: string | null; lastName: string | null }[]>;
+  // Retour de Cindy du 10/11 ("Événements à la une") : même source que
+  // Bureau/Coach/Famille (lib/featured-highlights.ts, club entier,
+  // actives seulement) -- jamais de Boutique ici (l'espace Enfant n'en a
+  // jamais eu, hors sujet), seulement cette carte.
+  featuredHighlights: FeaturedHighlight[];
 }) {
   const teammatesOnly = teammates.filter((t) => !t.isSelf);
 
@@ -224,7 +232,15 @@ export default function ChildDashboard({
     awayVenueAddress: e.awayVenueAddress,
     isHome: e.isHome,
     teamName: e.teamName,
-    teamId: null,
+    // Correctif du 11/11 : était codé en dur à `null`, ce qui empêchait
+    // TOUJOURS les cartes "Entraînement(s)/Match(s) de la semaine"
+    // d'apparaître ici (space-dashboard-summary.tsx filtre
+    // effectiveWeekEvents par `e.teamId === effectiveTeamId`, qui ne peut
+    // jamais matcher `null`) -- retour de Cindy du 11/11 ("les enfants
+    // doivent aussi avoir... leur cartes prochains matchs et prochain
+    // entraînement de la semaine"). ChildEvent porte déjà ce champ, aucune
+    // requête supplémentaire nécessaire.
+    teamId: e.teamId,
     source: "coach",
     rsvpPlayers: [],
     // Retour de Cindy du 14/09 ("les enfants n'ont pas les présents/
@@ -250,6 +266,15 @@ export default function ChildDashboard({
     // commentaire en tête de fonction) : jamais de panneau "Organisation
     // match à domicile" gérable dans l'Espace Enfant.
     matchOfficialsEnabled: false,
+    // Correctif du 11/11 (audit "checker toute l'appli") : sans ce champ,
+    // teamId désormais réel (ci-dessus) + source "coach" faisaient
+    // apparaître les listes "Présents/Absents/En attente" du bandeau
+    // (week-strip-banner.tsx) avec canManage=true -- un enfant pouvait en
+    // théorie voir des boutons "Marquer présent/absent" sur ses
+    // coéquipiers. RLS aurait bloqué l'écriture (aucune session Supabase
+    // côté Enfant), mais le bouton n'avait jamais à apparaître du tout,
+    // même frontière de sécurité que matchOfficialsEnabled=false ci-dessus.
+    readOnlyExternal: true,
   }));
 
   const thisMonth = new Date().getMonth();
@@ -279,6 +304,13 @@ export default function ChildDashboard({
       icon: <LayoutDashboard className={iconClass} />,
       content: (
         <div className="flex flex-col gap-4">
+          {/* Retour de Cindy du 10/11 ("centrer le diaporama, aussi large
+              que la carte du bas, aligné") : section pleine largeur,
+              centrée, alignée sur SpaceDashboardSummary juste en
+              dessous -- jamais de Boutique côté Enfant (hors sujet). */}
+          <div className="flex w-full items-center justify-center gap-3">
+            <FeaturedHighlightsCard highlights={featuredHighlights} calendarSectionKey="calendar" />
+          </div>
           <SpaceDashboardSummary
             summary={dashboardSummary}
             canManagePhoto={false}

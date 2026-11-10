@@ -123,6 +123,56 @@ export async function resizeImageForTeamPhoto(file: File): Promise<ResizedImage>
   return fallback;
 }
 
+// Affiche "Événement à la une" (retour de Cindy du 10/11) : souvent
+// portrait (une vraie affiche de soirée/tournoi), contrairement à la
+// photo d'équipe en bandeau -- mêmes bornes larges que
+// resizeImageForTeamPhoto (pas de recadrage ici non plus, CSS
+// object-cover s'en charge à l'affichage, featured-highlights-card.tsx)
+// mais plus hautes pour ne pas écraser un vrai poster vertical.
+const MAX_HIGHLIGHT_WIDTH = 720;
+const MAX_HIGHLIGHT_HEIGHT = 960;
+
+export async function resizeImageForHighlight(file: File): Promise<ResizedImage> {
+  const fallback: ResizedImage = {
+    blob: file,
+    ext: file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg",
+  };
+
+  const bitmap = await createImageBitmap(file).catch(() => null);
+  if (!bitmap) return fallback;
+
+  const scale = Math.min(1, MAX_HIGHLIGHT_WIDTH / bitmap.width, MAX_HIGHLIGHT_HEIGHT / bitmap.height);
+  const targetWidth = Math.round(bitmap.width * scale);
+  const targetHeight = Math.round(bitmap.height * scale);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    bitmap.close();
+    return fallback;
+  }
+  ctx.drawImage(bitmap, 0, 0, bitmap.width, bitmap.height, 0, 0, targetWidth, targetHeight);
+  bitmap.close();
+
+  const webpBlob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, "image/webp", QUALITY)
+  );
+  if (webpBlob && webpBlob.type === "image/webp") {
+    return { blob: webpBlob, ext: "webp" };
+  }
+
+  const jpegBlob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, "image/jpeg", QUALITY)
+  );
+  if (jpegBlob) {
+    return { blob: jpegBlob, ext: "jpg" };
+  }
+
+  return fallback;
+}
+
 // Même principe que resizeImageForAvatar (WebP avec repli JPEG, fichier
 // d'origine renvoyé tel quel si indécodable) mais sans recadrage carré —
 // voir MAX_LOGO_WIDTH/HEIGHT ci-dessus.
