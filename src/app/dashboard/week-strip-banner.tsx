@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlarmClock, Ban, Check, Clock, Euro, ExternalLink, MapPin, Sparkles, StickyNote, X } from "lucide-react";
+import { AlarmClock, Ban, CalendarDays, Check, Clock, Euro, ExternalLink, MapPin, Sparkles, StickyNote, X } from "lucide-react";
 import {
   styleFor,
   isMatchType,
@@ -232,7 +232,21 @@ function weekSummary(events: WeekStripEvent[], weekStart: Date, weekEnd: Date): 
 // Exportée le 13/09 (retour de Cindy, carte "Prochain événement" complète
 // dans le nouveau Tableau de bord) : réutilisée telle quelle par
 // space-dashboard-summary.tsx, jamais dupliquée.
-export function DayEventCard({ event }: { event: WeekStripEvent }) {
+export function DayEventCard({
+  event,
+  showDate = false,
+}: {
+  event: WeekStripEvent;
+  // Retour de Cindy du 10/11 ("dans le tableau de bord on n'a pas les
+  // dates des entraînements et matchs... on est un peu perdu") :
+  // WeekTrainingMatchCards (plusieurs cartes de jours différents listées
+  // à la suite, sans sélecteur de jour au-dessus) réutilise cette même
+  // carte que WeekStripBanner -- où elle n'a jamais affiché le jour, son
+  // propre sélecteur de jour juste au-dessus suffisait déjà à le dire.
+  // Optionnel plutôt que systématique pour ne rien changer là où ce
+  // contexte existe déjà (WeekStripBanner, jamais appelé avec ce prop).
+  showDate?: boolean;
+}) {
   const style = styleFor(event.eventType);
   const parsed = parseMatchTitle(event.title);
   const home = resolveIsHome(event);
@@ -318,7 +332,17 @@ export function DayEventCard({ event }: { event: WeekStripEvent }) {
         <p className="text-xs italic text-zinc-500">Motif : {event.cancelledReason}</p>
       )}
       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
-        <span>{formatEventTime(event.startTime, event.endTime)}</span>
+        <span className="flex items-center gap-1">
+          {showDate && (
+            <>
+              <CalendarDays className="h-3.5 w-3.5 shrink-0 text-navy" />
+              <span className="capitalize font-semibold text-zinc-700">
+                {new Date(event.startTime).toLocaleDateString("fr-FR", { weekday: "long" })}
+              </span>
+            </>
+          )}
+          {formatEventTime(event.startTime, event.endTime)}
+        </span>
         {/* Ambre plutôt que gris neutre : même distinction visuelle que
             renderEventCard (calendar-view.tsx) entre l'heure de début et
             l'heure d'arrivée demandée. Retour de Cindy du 28/10 :
