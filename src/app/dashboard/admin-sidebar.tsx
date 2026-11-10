@@ -111,9 +111,16 @@ export default function AdminSidebar({
   // Bloc rendu au-dessus du contenu de l'onglet actif, dans la colonne de
   // contenu — jamais au-dessus de toute la page ni du menu (retour de
   // Cindy du 2026-08-22, sélecteur d'enfant côté Famille : "au-dessus de
-  // l'encart entraînement, pas au-dessus du menu"). Visible sur tous les
-  // onglets puisqu'il vit ici plutôt que dans un `content` particulier.
-  contentHeader?: ReactNode;
+  // l'encart entraînement, pas au-dessus du menu").
+  // Retour de Cindy du 10/11 ("Tableau de bord... ça fait doublon avec les
+  // boutons équipe plus bas") : ce sélecteur ne pilotait rien en haut du
+  // Tableau de bord (photo/équipe/classement, qui a son propre sélecteur
+  // par équipe) -- seulement les encarts de présence/cotisation/pénalités
+  // plus bas sur CE même onglet. D'où la forme fonction : chaque appelant
+  // peut masquer ce bloc pour un onglet donné (ou en changer le contenu),
+  // au lieu d'un unique ReactNode forcément identique "sur tous les
+  // onglets puisqu'il vit ici plutôt que dans un `content` particulier".
+  contentHeader?: ReactNode | ((activeKey: string) => ReactNode);
   // Retour de Cindy du 13/09 ("tableau de bord en position une mais
   // ouverture sur l'onglet 2 calendrier") : l'ORDRE d'affichage dans le
   // menu (sections) et l'onglet ouvert PAR DÉFAUT sont deux choses
@@ -363,7 +370,7 @@ export default function AdminSidebar({
           restait bloqué sur la toute première valeur cliquée, quel que
           soit le sous-onglet choisi ensuite. */}
       <div className="min-w-0 flex-1 flex-col gap-4 flex">
-        {contentHeader}
+        {typeof contentHeader === "function" ? contentHeader(current.key) : contentHeader}
         <Fragment key={current.key}>{current.content}</Fragment>
       </div>
 
