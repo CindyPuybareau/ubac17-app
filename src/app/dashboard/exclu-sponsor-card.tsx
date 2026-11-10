@@ -54,7 +54,13 @@ export default function ExcluSponsorCard({ sponsors }: { sponsors: SponsorDispla
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="flex flex-col gap-2.5 overflow-y-auto p-4">
+            {/* Retour de Cindy du 11/11 ("je ne souhaite pas de flèche
+                haut/bas, pouvoir scroller") : scrollbar native de l'OS
+                remplacée par la même scrollbar fine personnalisée que
+                members-table.tsx (pas de boutons flèche, juste un
+                "pouce" discret) -- simple liste qui scrolle, sans
+                contrôle de navigation séparé. */}
+            <div className="flex flex-col gap-2.5 overflow-y-auto p-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-300 [&::-webkit-scrollbar-track]:bg-transparent">
               {sponsors.map((s) => (
                 <div
                   key={s.id}
