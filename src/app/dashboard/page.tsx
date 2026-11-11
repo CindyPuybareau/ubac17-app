@@ -2346,6 +2346,18 @@ export default async function DashboardPage({
         { id: t.id, name: t.name, category: t.category },
       ])
     );
+    // is_demo (retour de Cindy du 11/11, "les joueurs démo ne se voient
+    // pas sur la vraie appli rassure moi ?") : teams/getCachedTeams filtre
+    // déjà l'équipe démo de l'onglet "Équipes" (adminTeams plus haut), mais
+    // l'onglet "Membres" (adminMembers plus bas) listait TOUS les joueurs
+    // de la table players sans le moindre filtre -- Noah/Léa/le roster
+    // fictif y apparaissaient donc en clair pour tout le Bureau. Un joueur
+    // compte comme démo ici seulement si TOUTES ses équipes le sont (même
+    // logique que le filtre "doublon équipe coachée" de myChildrenRsvpPlayers
+    // plus bas, appliqué à is_demo plutôt qu'à coachedTeamIds).
+    const demoTeamIds = new Set(
+      (teamsRes.data ?? []).filter((t) => t.is_demo).map((t) => t.id)
+    );
     const teamsByPlayerId = new Map<string, AdminMemberTeam[]>();
     // burnedByPlayerId (agrégat OU sur toutes les lignes du joueur) est
     // déjà calculé plus haut, avant rosterByTeam -- voir son commentaire.
@@ -2371,6 +2383,15 @@ export default async function DashboardPage({
     teamsByPlayerId.forEach((list, playerId) => {
       teamsByPlayerId.set(playerId, sortTeamsByGroup(list));
     });
+    // Un joueur sans la moindre équipe (ex. fiche "Dirigeant") n'est
+    // jamais démo par ce seul fait -- seule une équipe explicitement
+    // démo (ou une union exclusivement démo) le qualifie, voir demoTeamIds
+    // plus haut.
+    const demoPlayerIds = new Set(
+      Array.from(teamsByPlayerId.entries())
+        .filter(([, teams]) => teams.length > 0 && teams.every((t) => demoTeamIds.has(t.id)))
+        .map(([playerId]) => playerId)
+    );
     const parentIdsByPlayerId = new Map<string, string[]>();
     (parentPlayerRes.data ?? []).forEach((pp) => {
       const list = parentIdsByPlayerId.get(pp.player_id) ?? [];
@@ -2425,7 +2446,9 @@ export default async function DashboardPage({
       clubStatusByPlayerId.set(playerId, c.statut);
     });
 
-    adminMembers = (playersRes.data ?? []).map((row) => {
+    adminMembers = (playersRes.data ?? [])
+      .filter((row) => !demoPlayerIds.has((row as { id: string }).id))
+      .map((row) => {
       const player = row as {
         id: string;
         first_name: string | null;
