@@ -6,6 +6,7 @@ import { ChevronDown, ChevronUp, Coffee, Pencil, Plus, Trash2, X } from "lucide-
 import { createClient } from "@/lib/supabase/client";
 import { formatLocalDateFr } from "@/lib/local-date";
 import { formatAmount } from "./cotisation-shared";
+import ConfirmDialog from "./confirm-dialog";
 import EmptyState from "./empty-state";
 import type { AdminBuvette } from "./page";
 
@@ -371,42 +372,25 @@ export default function BuvetteManager({ buvette }: { buvette: AdminBuvette[] })
         </div>
       )}
 
-      {deleteTarget && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => !saving && setDeleteTarget(null)}
-        >
-          <div
-            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="mb-2 font-semibold text-zinc-900">Supprimer cette recette ?</h3>
-            <p className="mb-4 text-sm text-zinc-500">
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Supprimer cette recette ?"
+        message={
+          deleteTarget && (
+            <>
               La recette du{" "}
               {deleteTarget.buvetteDate ? formatLocalDateFr(deleteTarget.buvetteDate) : "jour"} (
-              {formatAmount(entryTotal(deleteTarget))}) sera
-              définitivement supprimée.
-            </p>
-            {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
-            <div className="flex gap-2">
-              <button
-                onClick={() => setDeleteTarget(null)}
-                disabled={saving}
-                className="flex-1 rounded-full border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-50"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={confirmDelete}
-                disabled={saving}
-                className="flex-1 rounded-full bg-red-500 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-red-600 disabled:opacity-50"
-              >
-                {saving ? "Suppression..." : "Supprimer"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              {formatAmount(entryTotal(deleteTarget))}) sera définitivement supprimée.
+            </>
+          )
+        }
+        confirmLabel="Supprimer"
+        pending={saving}
+        pendingLabel="Suppression..."
+        error={error}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

@@ -12,40 +12,71 @@ import { resizeImageForAvatar } from "@/lib/image-resize";
 // next/image : le domaine du bucket Supabase Storage n'est pas whitelisté
 // dans next.config, et la taille fixe/petite de l'avatar rend
 // l'optimisation automatique peu utile ici.
+//
+// Partagé avec l'Espace Enfant (userId absent) : même rendu, seul l'envoi
+// diffère -- pas de session Supabase côté navigateur pour un enfant (voir
+// child-session.ts), donc FormData vers /api/child-avatar plutôt qu'un
+// appel direct à Supabase Storage.
 export default function AvatarUpload({
   userId,
   avatarUrl,
   name,
-  size = "md",
 }: {
-  userId: string;
+  userId?: string;
   avatarUrl: string | null;
   name: string | null;
-  size?: "md" | "lg";
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Affichage optimiste (retour de Cindy du 2026-08-22, "l'affichage après
-  // l'import de la photo est trèèèèèès long") : la page dashboard charge
-  // beaucoup de données, et router.refresh() re-render tout l'arbre
-  // Server Component avec les nouvelles props une fois SEULEMENT ce
-  // rechargement complet terminé — la nouvelle photo n'apparaissait donc
-  // qu'après plusieurs secondes, alors que l'envoi lui-même est rapide.
-  // En gardant l'URL localement et en l'affichant tout de suite, la photo
-  // change à l'instant ; router.refresh() continue en arrière-plan pour
-  // que le reste de la page (et un futur rechargement) reflète la même
-  // valeur, sans plus jamais bloquer l'affichage.
-  // Nettoyage du 21/10 (lint react-hooks/set-state-in-effect, même schéma
-  // que calendar-view.tsx/localEvents) : ajuste pendant le rendu plutôt
-  // que dans un effet après coup -- `prevAvatarUrlProp` ne sert qu'à
-  // détecter le changement, jamais lu ailleurs.
+  // l'import de la photo est trèèèèèès long") : router.refresh() re-render
+  // tout l'arbre Server Component une fois SEULEMENT le rechargement
+  // complet terminé -- la nouvelle photo est donc affichée tout de suite
+  // localement, router.refresh() continuant en arrière-plan.
+  // Ajusté pendant le rendu plutôt que dans un effet (lint
+  // react-hooks/set-state-in-effect, nettoyage du 21/10).
   const [localAvatarUrl, setLocalAvatarUrl] = useState(avatarUrl);
   const [prevAvatarUrlProp, setPrevAvatarUrlProp] = useState(avatarUrl);
   if (avatarUrl !== prevAvatarUrlProp) {
     setPrevAvatarUrlProp(avatarUrl);
     setLocalAvatarUrl(avatarUrl);
+  }
+
+  // Compte connecté : envoi direct dans le bucket "avatars", toujours le
+  // même nom par utilisateur (upsert, pas de fichiers orphelins), puis
+  // profiles.avatar_url avec un paramètre anti-cache (même chemin qu'avant).
+  async function uploadForProfile(id: string, blob: Blob, ext: string, fileType: string): Promise<string | null> {
+    const supabase = createClient();
+    const path = `${id}/avatar.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from("avatars")
+      .upload(path, blob, { upsert: true, cacheControl: "3600", contentType: blob.type || fileType });
+    if (uploadError) {
+      setError("Envoi impossible, réessaie.");
+      return null;
+    }
+    const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+    const bustedUrl = `${data.publicUrl}?t=${Date.now()}`;
+    const { error: updateError } = await supabase.from("profiles").update({ avatar_url: bustedUrl }).eq("id", id);
+    if (updateError) {
+      setError("Enregistrement impossible, réessaie.");
+      return null;
+    }
+    return bustedUrl;
+  }
+
+  async function uploadForChild(blob: Blob, ext: string): Promise<string | null> {
+    const formData = new FormData();
+    formData.append("file", blob, `avatar.${ext}`);
+    const res = await fetch("/api/child-avatar", { method: "POST", body: formData });
+    const body = (await res.json().catch(() => null)) as { url?: string; error?: string } | null;
+    if (!res.ok) {
+      setError(body?.error ?? "Envoi impossible, réessaie.");
+      return null;
+    }
+    return body?.url ?? null;
   }
 
   async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -60,45 +91,17 @@ export default function AvatarUpload({
     }
     setUploading(true);
     setError(null);
-    const supabase = createClient();
-    // try/finally (retour d'audit du 28/08, même motif que le bouton de
-    // connexion bloqué du 18/08) : resizeImageForAvatar n'était couvert
-    // par aucun filet — un fichier corrompu ou trop volumineux pour le
-    // canvas laissait "uploading" à true pour toujours, bouton figé
-    // jusqu'au rechargement complet, sans aucun message.
+    // try/finally (retour d'audit du 28/08) : un fichier corrompu ou trop
+    // volumineux pour le canvas laissait "uploading" à true pour toujours.
     try {
-      // Recadré en carré et réencodé en WebP (retour d'audit du 2026-08-25,
-      // "format .gif non optimisé") : jamais affiché à plus de 96px, pas
-      // besoin d'envoyer le fichier d'origine tel quel — voir image-resize.ts.
+      // Recadré en carré et réencodé en WebP (retour d'audit du 2026-08-25) :
+      // jamais affiché à plus de 96px -- voir image-resize.ts.
       const { blob, ext } = await resizeImageForAvatar(file);
-      // Toujours le même nom par utilisateur (upsert) : une nouvelle photo
-      // remplace l'ancienne au lieu d'accumuler des fichiers orphelins dans
-      // le bucket.
-      const path = `${userId}/avatar.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from("avatars")
-        .upload(path, blob, { upsert: true, cacheControl: "3600", contentType: blob.type || file.type });
-      if (uploadError) {
-        setError("Envoi impossible, réessaie.");
-        return;
-      }
-      const { data } = supabase.storage.from("avatars").getPublicUrl(path);
-      // Casse le cache navigateur : même chemin de fichier qu'avant (upsert),
-      // sans ce paramètre l'ancienne photo resterait affichée après un
-      // remplacement.
-      const bustedUrl = `${data.publicUrl}?t=${Date.now()}`;
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({ avatar_url: bustedUrl })
-        .eq("id", userId);
-      if (updateError) {
-        setError("Enregistrement impossible, réessaie.");
-        return;
-      }
-      // Affiché tout de suite, sans attendre router.refresh() ci-dessous
-      // (voir commentaire plus haut) — c'est ce qui rendait le changement de
-      // photo si lent à se voir.
-      setLocalAvatarUrl(bustedUrl);
+      const newUrl = userId
+        ? await uploadForProfile(userId, blob, ext, file.type)
+        : await uploadForChild(blob, ext);
+      if (!newUrl) return;
+      setLocalAvatarUrl(newUrl);
       router.refresh();
     } catch {
       setError("Image illisible, réessaie avec une autre photo.");
@@ -108,27 +111,22 @@ export default function AvatarUpload({
   }
 
   const initial = name?.trim()?.[0]?.toUpperCase() ?? "?";
-  const dimensionClass = size === "lg" ? "h-20 w-20 sm:h-24 sm:w-24" : "h-14 w-14";
-  const textClass = size === "lg" ? "text-2xl sm:text-3xl" : "text-lg";
 
   return (
     <div className="relative shrink-0">
-      <div
-        className={`overflow-hidden rounded-full border-4 border-white bg-amber-100 shadow-md ${dimensionClass}`}
-      >
+      <div className="h-20 w-20 overflow-hidden rounded-full border-4 border-white bg-amber-100 shadow-md sm:h-24 sm:w-24">
         {localAvatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={localAvatarUrl} alt="" className="h-full w-full object-cover" />
         ) : (
-          <span className={`flex h-full w-full items-center justify-center font-bold text-navy ${textClass}`}>
+          <span className="flex h-full w-full items-center justify-center text-2xl font-bold text-navy sm:text-3xl">
             {initial}
           </span>
         )}
       </div>
       {/* Icône plus discrète (retour de Cindy du 2026-08-22, "sur
           téléphone, l'icône appareil photo prend trop de place sur mon
-          image") : plus petite, décalée vers l'extérieur du rond (déborde
-          un peu du cadre plutôt que de s'écraser dessus) et fond
+          image") : plus petite, décalée vers l'extérieur du rond et fond
           semi-transparent pour laisser deviner la photo en dessous. */}
       <button
         type="button"
@@ -139,13 +137,7 @@ export default function AvatarUpload({
       >
         <Camera className="h-3 w-3" />
       </button>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        onChange={onFileChange}
-        className="hidden"
-      />
+      <input ref={inputRef} type="file" accept="image/*" onChange={onFileChange} className="hidden" />
       {error && (
         <p className="absolute left-1/2 top-full mt-1 w-max max-w-[10rem] -translate-x-1/2 text-center text-[11px] font-medium text-red-600">
           {error}

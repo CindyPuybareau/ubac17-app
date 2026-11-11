@@ -54,6 +54,18 @@ const nextConfig: NextConfig = {
   // le couper complètement.
   devIndicators: false,
 
+  // Audit du 11/11 ("fluide au clic") : un espace déjà affiché (Bureau/
+  // Coach/Mon équipe/Mes enfants) est réutilisé 30s par le navigateur au
+  // lieu d'être entièrement recalculé côté serveur à chaque aller-retour
+  // entre onglets (défaut Next.js : 0s). Jamais de donnée périmée après
+  // une modification : router.refresh() (après chaque enregistrement, et
+  // via realtime-sync.tsx pour les modifications des autres) vide ce cache.
+  experimental: {
+    staleTimes: {
+      dynamic: 30,
+    },
+  },
+
   async headers() {
     return [
       {
