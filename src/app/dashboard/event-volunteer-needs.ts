@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { chunkedQuery, runBatched, type Semaphore } from "@/lib/batch";
+import { chunkedQuery, type Semaphore } from "@/lib/batch";
 import { formatPersonName } from "@/lib/names";
 import { sendTeamPush } from "@/lib/push-notify-client";
 import type { RoleIconName } from "./role-icon";
@@ -151,95 +151,6 @@ export async function notifyNewVolunteerNeed(
     body,
     url: "/dashboard",
   });
-}
-
-// Retour de Cindy du 17/09 ("un petit bouton... côté coach") : relance
-// manuelle, en plus de la relance automatique à J-7 (bureau-alerts/route.ts,
-// runVolunteerNeedReminders) -- même texte, même ciblage, réutilisés à
-// l'identique pour que les deux canaux racontent la même chose. Volontairement
-// indépendante du marqueur reminder_sent_at de l'automatique (jamais lue ni
-// écrite ici) : Basile peut relancer autant de fois qu'il veut sans jamais
-// empêcher (ni être empêché par) le rappel automatique à J-7, décidé avec
-// Cindy plutôt qu'un compteur à gérer. eventId seul ne suffit pas ici
-// (contrairement à notifyNewVolunteerNeed, appelé juste après un insert où
-// l'appelant a déjà tout sous la main) : cette fonction est déclenchée bien
-// plus tard, depuis le panneau qui ne connaît que l'event_id -- va donc
-// chercher elle-même team_id/target_team_ids/titre/date.
-export async function notifyVolunteerNeedReminder(
-  supabase: SupabaseClient,
-  eventId: string,
-  needs: VolunteerNeed[]
-): Promise<{ error: string | null }> {
-  const { data: settings } = await supabase
-    .from("club_settings")
-    .select("volunteer_need_alerts_enabled")
-    .eq("id", true)
-    .maybeSingle();
-  if (!settings?.volunteer_need_alerts_enabled) {
-    return {
-      error:
-        "Les notifications de besoins bénévoles sont désactivées (Paramètres → Automatisations).",
-    };
-  }
-
-  const unresolvedNeeds = needs.filter((n) => n.requiredCount - n.signups.length > 0);
-  if (unresolvedNeeds.length === 0) {
-    return { error: null };
-  }
-
-  const { data: event, error: eventError } = await supabase
-    .from("events")
-    .select("title, start_time, team_id, target_team_ids")
-    .eq("id", eventId)
-    .maybeSingle();
-  if (eventError || !event) {
-    return { error: "Événement introuvable." };
-  }
-
-  const dateLabel = new Date(event.start_time).toLocaleDateString("fr-FR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    timeZone: "Europe/Paris",
-  });
-  const title = "Besoin bénévole non pourvu";
-
-  // Retour de l'audit du 05/10 ("il faut revoir les requêtes") : un
-  // besoin après l'autre (jusqu'à 3 requêtes + un envoi push chacun) --
-  // volume limité ici (bouton manuel "Relancer", un seul événement à la
-  // fois), mais même défaut que les boucles cron ci-dessus. runBatched
-  // (lib/batch.ts, limite 4) parallélise sans rien changer au résultat.
-  await runBatched(
-    unresolvedNeeds.map((need) => async () => {
-      const roleLabel = volunteerRoleLabel(need.roleCode, need.customLabel);
-      const remaining = need.requiredCount - need.signups.length;
-      const body = `${roleLabel} — encore ${remaining} place${remaining > 1 ? "s" : ""} pour ${
-        event.title ?? "un événement"
-      } du ${dateLabel}.`;
-
-      await supabase.from("notifications").insert({
-        team_id: event.team_id,
-        target_team_ids: event.target_team_ids,
-        event_id: eventId,
-        title,
-        body,
-        url: "/dashboard",
-        category: "ORGANISATION_NEED",
-      });
-
-      // Retour de Cindy du 17/09 ("je veux des push réels pour...").
-      await sendTeamPush({
-        teamId: event.team_id,
-        targetTeamIds: event.target_team_ids,
-        title,
-        body,
-        url: "/dashboard",
-      });
-    }),
-    4
-  );
-
-  return { error: null };
 }
 
 export function volunteerRoleIcon(roleCode: string): RoleIconName {

@@ -20,7 +20,6 @@ import {
   LayoutGrid,
   List,
   Lock,
-  Mail,
   MapPin,
   ListOrdered,
   Pencil,
@@ -35,7 +34,6 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatAmount } from "./cotisation-shared";
-import { buildGmailComposeLink } from "@/lib/email";
 import EmptyState from "./empty-state";
 import FfbbRankingTable from "./ffbb-ranking-table";
 import { FFBB_PHASE_1, FFBB_PHASE_2, normalizeFfbbPhase, type FfbbPhase } from "@/lib/ffbb-phase";
@@ -1688,25 +1686,6 @@ export default function CalendarView({
     );
   }
 
-  function relanceMailto(event: AdminUpcomingEvent) {
-    if (!rsvp || !contactEmailByPlayerId || !event.teamId) return null;
-    const emails = rsvp.players
-      .filter((p) => event.teamId && p.teamIds.includes(event.teamId))
-      .map((p) => contactEmailByPlayerId[p.id])
-      .filter((e): e is string => Boolean(e));
-    if (emails.length === 0) return null;
-    const when = `${new Date(event.start_time).toLocaleString("fr-FR", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-    })}, ${formatEventTime(event.start_time, event.end_time)}`;
-    return buildGmailComposeLink({
-      bcc: emails.join(","),
-      subject: `UBAC - Convocation ${event.teamName}`,
-      body: `Bonjour,\n\nMerci de confirmer votre présence pour : ${event.title ?? styleFor(event.event_type).label}, le ${when}${event.location ? ` (${event.location})` : ""}.\n\nSportivement,\nLe coach`,
-    });
-  }
-
   // Source unique des filtres "Masquer les entraînements" ET équipe
   // (retour de Cindy du 09/09, ajouté ici pour que la grille du mois/le
   // panneau du jour/la liste Événements en bénéficient aussi) : localEvents
@@ -2055,7 +2034,6 @@ export default function CalendarView({
             (event.targetTeamIds?.some((id) => p.teamIds.includes(id)) ?? false)
         )
       : [];
-    const mailto = relanceMailto(event);
     const canManageEvent = canManageThisEvent(event);
     // Une famille voit tous ses enfants concernés (respondingPlayers peut
     // en contenir plusieurs). Un coach, lui, ne doit jamais voir le bouton
@@ -2302,17 +2280,6 @@ export default function CalendarView({
           </div>
           {canManageEvent && (
             <div className="flex shrink-0 items-center gap-1">
-              {mailto && (
-                <a
-                  href={mailto}
-                  target="_blank"
-                  rel="noreferrer"
-                  title="Relancer les convoqués"
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
-                >
-                  <Mail className="h-4 w-4" />
-                </a>
-              )}
               <button
                 onClick={() => startEditingEvent(event)}
                 title="Modifier"

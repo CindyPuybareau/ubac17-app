@@ -81,6 +81,25 @@ export default function RequestAttendanceButton({
     );
   }
 
+  // Retour de Cindy du 11/11 ("les boutons relancer... pas utile, les
+  // coachs font les relances via WhatsApp") : la demande initiale reste
+  // (toujours utile pour faire apparaître le bandeau de réponse chez les
+  // familles), mais une fois envoyée, plus de second clic pour relancer --
+  // juste la date de la demande, affichée comme ci-dessous.
+  if (sentAt) {
+    return (
+      <span className="flex shrink-0 flex-col items-end gap-1">
+        <span className="text-[11px] text-zinc-400">
+          Demandé le{" "}
+          {new Date(sentAt).toLocaleDateString("fr-FR", {
+            day: "numeric",
+            month: "short",
+          })}
+        </span>
+      </span>
+    );
+  }
+
   return (
     <span className="flex shrink-0 flex-col items-end gap-1">
       <button
@@ -90,21 +109,8 @@ export default function RequestAttendanceButton({
         className="flex items-center gap-1.5 rounded-full bg-ubac-yellow px-3.5 py-2 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
       >
         <BellRing className="h-4 w-4 shrink-0" />
-        {saving
-          ? "Envoi..."
-          : sentAt
-            ? "Relancer les familles"
-            : "Demander les présences"}
+        {saving ? "Envoi..." : "Demander les présences"}
       </button>
-      {sentAt && (
-        <span className="text-[11px] text-zinc-400">
-          Demandé le{" "}
-          {new Date(sentAt).toLocaleDateString("fr-FR", {
-            day: "numeric",
-            month: "short",
-          })}
-        </span>
-      )}
       {error && <span className="text-[11px] text-red-600">{error}</span>}
     </span>
   );

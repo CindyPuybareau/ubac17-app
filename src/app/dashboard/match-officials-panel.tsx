@@ -1,17 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, ShieldCheck, UserPlus, X } from "lucide-react";
+import { ShieldCheck, UserPlus, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatPersonName } from "@/lib/names";
 import RoleIcon from "./role-icon";
-import { useToast } from "./toast-context";
 import {
   MATCH_OFFICIAL_ROLES,
   REFEREE_ROLE_CODES,
   REFEREE_CONFIRMED_LABEL,
   notifyMatchOfficialAssigned,
-  notifyMatchOfficialReminder,
   type MatchOfficialAssignment,
   type MatchOfficialRoleCode,
 } from "./match-official-roles";
@@ -54,8 +52,6 @@ export default function MatchOfficialsPanel({
 
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
-  const [relancing, setRelancing] = useState(false);
-  const { showToast } = useToast();
 
   // Chargées à la demande (jamais pour un simple joueur/parent lecture
   // seule, qui n'utilise que "Se proposer" -- voir selfIdentity plus bas)
@@ -168,28 +164,6 @@ export default function MatchOfficialsPanel({
     await assignGuest(roleCode, REFEREE_CONFIRMED_LABEL, null);
   }
 
-  // "Relancer" (retour de Cindy du 17/09, "également comme besoin classique
-  // avec notif cloche et push") : même bouton manuel que
-  // volunteer-needs-panel.tsx (relanceNeeds), jamais désactivé après un
-  // premier clic -- même principe, pas de compteur de relances à gérer.
-  async function relance() {
-    setRelancing(true);
-    setError(null);
-    const { error: relanceError } = await notifyMatchOfficialReminder(createClient(), {
-      eventId,
-      eventTitle,
-      startTime,
-      teamId,
-      assignments: localAssignments,
-    });
-    setRelancing(false);
-    if (relanceError) {
-      setError(relanceError);
-      return;
-    }
-    showToast("Relance envoyée aux personnes concernées.");
-  }
-
   async function unassign(assignment: MatchOfficialAssignment) {
     setPending(assignment.id);
     setError(null);
@@ -204,35 +178,8 @@ export default function MatchOfficialsPanel({
     }
   }
 
-  const hasUnfilledRole = MATCH_OFFICIAL_ROLES.some(
-    (r) => !localAssignments.some((a) => a.roleCode === r.code)
-  );
-
   return (
     <div className="flex flex-col gap-1.5">
-      {/* Retour de Cindy du 17/09 ("en haut à droite à l'intérieur des
-          onglets concernés", puis "remonter les besoins à hauteur du
-          bouton") : pas de libellé interne (redondant avec le titre
-          "Organisation match officiel" de la carte) -- ce rang ne porte
-          plus que "Relancer", toujours en haut à gauche (retour de Cindy,
-          "pardon, en fait en haut à gauche") ;
-          gap-1.5 du conteneur racine (au lieu de 2.5) rapproche la liste
-          des rôles de ce bouton plutôt que de laisser un blanc entre eux.
-          flex-wrap : reste correct même très étroit (mobile), le bouton
-          passe sous le reste plutôt que déborder. */}
-      {canManage && hasUnfilledRole && (
-        <div className="flex flex-wrap items-center">
-          <button
-            type="button"
-            disabled={relancing}
-            onClick={relance}
-            className="flex w-fit items-center gap-1 rounded-full bg-ubac-yellow px-3 py-1.5 text-xs font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
-          >
-            <Bell className="h-3.5 w-3.5" />
-            {relancing ? "Envoi..." : "Relancer"}
-          </button>
-        </div>
-      )}
       <div className="flex flex-col gap-2">
         {MATCH_OFFICIAL_ROLES.map((role) => {
           const assignment = localAssignments.find((a) => a.roleCode === role.code);

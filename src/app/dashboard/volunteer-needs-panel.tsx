@@ -1,16 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bell, Check, Minus, Plus, Trash2, X } from "lucide-react";
+import { Check, Minus, Plus, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import RoleIcon from "./role-icon";
 import ConfirmDialog from "./confirm-dialog";
-import { useToast } from "./toast-context";
 import { formatPersonName } from "@/lib/names";
 import {
   CUSTOM_ROLE_CODE,
   STANDARD_VOLUNTEER_ROLES,
-  notifyVolunteerNeedReminder,
   volunteerRoleIcon,
   volunteerRoleLabel,
   type VolunteerNeed,
@@ -70,8 +68,6 @@ export default function VolunteerNeedsPanel({
   const [newRoleCode, setNewRoleCode] = useState(STANDARD_VOLUNTEER_ROLES[0].code);
   const [newCustomLabel, setNewCustomLabel] = useState("");
   const [newCount, setNewCount] = useState("1");
-  const [relancing, setRelancing] = useState(false);
-  const { showToast } = useToast();
 
   // Retour de Cindy du 18/09 ("les coachs et le bureau puissent rechercher
   // un membre et l'attribuer... si un message WhatsApp envoyé je fais la
@@ -417,27 +413,6 @@ export default function VolunteerNeedsPanel({
     setAddOpen(false);
   }
 
-  // Retour de Cindy du 17/09 ("un petit bouton... côté coach") : relance à
-  // la demande, en plus de celle automatique à J-7 (voir
-  // notifyVolunteerNeedReminder) -- jamais désactivé après un premier clic,
-  // décidé avec Cindy plutôt qu'un compteur de relances à gérer.
-  async function relanceNeeds() {
-    setRelancing(true);
-    setError(null);
-    const supabase = createClient();
-    const { error: relanceError } = await notifyVolunteerNeedReminder(
-      supabase,
-      eventId,
-      localNeeds
-    );
-    setRelancing(false);
-    if (relanceError) {
-      setError(relanceError);
-      return;
-    }
-    showToast("Relance envoyée aux personnes concernées.");
-  }
-
   if (localNeeds.length === 0 && !canManage) return null;
 
   return (
@@ -450,22 +425,6 @@ export default function VolunteerNeedsPanel({
     >
       {(!bare || canManage) && (
         <div className="flex flex-wrap items-center gap-2">
-          {/* Retour de Cindy du 17/09 ("en haut à gauche à l'intérieur des
-              onglets concernés") : déplacé depuis le bas de la carte,
-              premier élément du rang pour rester en haut à GAUCHE (pas de
-              ml-auto/justify-between, qui l'auraient poussé à droite) --
-              n'a de sens que s'il reste au moins un besoin non pourvu. */}
-          {canManage && localNeeds.some((n) => remainingSlots(n) > 0) && (
-            <button
-              type="button"
-              disabled={relancing}
-              onClick={relanceNeeds}
-              className="flex w-fit items-center gap-1 rounded-full bg-ubac-yellow px-3 py-1.5 text-xs font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
-            >
-              <Bell className="h-3.5 w-3.5" />
-              {relancing ? "Envoi..." : "Relancer"}
-            </button>
-          )}
           {!bare && (
             <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
               Besoins d&apos;organisation
