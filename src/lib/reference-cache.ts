@@ -30,7 +30,12 @@ export const getCachedTeams = unstable_cache(
     return supabase
       .from("teams")
       .select(
-        "id, name, category, ffbb_url, ffbb_url_phase2, ffbb_last_synced_at, pending_coach_names, sort_order, photo_url, trombinoscope_path"
+        // is_demo (retour de Cindy du 11/11, compte démo) : lu ici pour
+        // que page.tsx puisse exclure l'équipe démo des listes "toutes
+        // les équipes" club-wide (adminTeams, TeamManager) -- jamais de
+        // l'équipe elle-même pour le compte démo qui la coache/joue,
+        // résolue ailleurs par team_coaches/parent_player.
+        "id, name, category, ffbb_url, ffbb_url_phase2, ffbb_last_synced_at, pending_coach_names, sort_order, photo_url, trombinoscope_path, is_demo"
       )
       .order("sort_order", { ascending: true, nullsFirst: false })
       .order("category");

@@ -2305,19 +2305,29 @@ export default async function DashboardPage({
       adminTrombinoscopeByTeamId[t.id] = trombinoscopePathByOwnerId.get(ownerId) ?? null;
     });
 
-    adminTeams = (teamsRes.data ?? []).map((t) => ({
-      id: t.id,
-      name: t.name,
-      category: t.category,
-      ffbb_url: t.ffbb_url,
-      ffbb_url_phase2: t.ffbb_url_phase2,
-      ffbb_last_synced_at: t.ffbb_last_synced_at,
-      players: rosterByTeam.get(t.id) ?? [],
-      coaches: coachesByTeam.get(t.id) ?? [],
-      pendingCoaches: pendingCoachesByTeam.get(t.id) ?? [],
-      pendingCoachNames: t.pending_coach_names,
-      photoUrl: t.photo_url,
-    }));
+    // is_demo (retour de Cindy du 11/11, "ça ne doit pas apparaître dans
+    // notre application de tous les jours") : seul endroit où un filtre
+    // explicite est nécessaire -- canonicalTeamRefs/le catalogue club-wide
+    // côté Coach/Famille (allClubTeamsRes, plus bas) excluent déjà toute
+    // équipe sans sort_order, et l'équipe démo n'en a volontairement
+    // jamais. Ce tableau-ci (TeamManager, onglet "Équipes" du Bureau),
+    // lui, ne filtrait rien du tout sur sort_order -- l'équipe démo y
+    // apparaîtrait donc sans ce filtre dédié.
+    adminTeams = (teamsRes.data ?? [])
+      .filter((t) => !t.is_demo)
+      .map((t) => ({
+        id: t.id,
+        name: t.name,
+        category: t.category,
+        ffbb_url: t.ffbb_url,
+        ffbb_url_phase2: t.ffbb_url_phase2,
+        ffbb_last_synced_at: t.ffbb_last_synced_at,
+        players: rosterByTeam.get(t.id) ?? [],
+        coaches: coachesByTeam.get(t.id) ?? [],
+        pendingCoaches: pendingCoachesByTeam.get(t.id) ?? [],
+        pendingCoachNames: t.pending_coach_names,
+        photoUrl: t.photo_url,
+      }));
     allProfilesForAdmin = profilesRes.data ?? [];
     canonicalTeamRefs = (teamsRes.data ?? [])
       .filter((t) => t.sort_order !== null)
