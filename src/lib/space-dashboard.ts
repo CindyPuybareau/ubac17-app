@@ -256,8 +256,22 @@ export async function getSpaceDashboardSummary(
   // NeedsByEventId n'accepte qu'un vrai Semaphore, jamais un nombre.
   const semaphore = dbLimit instanceof Semaphore ? dbLimit : new Semaphore(dbLimit);
 
+  // is_demo (retour de Cindy du 11/11, "199 joueurs alors qu'on a 193
+  // membres... y a pas de la démo dans la vraie appli ?") : ce résumé club
+  // entier (teamIds null, Bureau) ne filtrait l'équipe démo nulle part --
+  // ni le compteur "Joueurs" (players sans jointure équipe), ni "Matchs
+  // joués/Victoires/Points marqués" (events sans filtre d'équipe pour ce
+  // cas précis). getCachedTeams (reference-cache.ts, caché 45s) : zéro
+  // aller-retour de plus dans l'immense majorité des cas. Une équipe
+  // précise (Coach/Famille, teamIds non null) n'a de toute façon jamais
+  // l'équipe démo dans SA PROPRE liste -- sans effet pour elle.
+  const demoTeamIds =
+    teamIds === null
+      ? new Set((await getCachedTeams()).data?.filter((t) => t.is_demo).map((t) => t.id) ?? [])
+      : new Set<string>();
+
   const nowIso = new Date().toISOString();
-  const [rosterRes, teamCountRes, teamsMetaRes, rankingsRes, matchesRes, upcomingRes] = await runBatched(
+  const [rosterRes, teamCountRes, teamsMetaRes, rankingsRes, matchesRes, upcomingRes, demoPlayerLinksRes] = await runBatched(
     [
       () =>
         teamIds === null
@@ -265,7 +279,7 @@ export async function getSpaceDashboardSummary(
           : supabase.from("team_players").select("player_id, team_id").in("team_id", teamIds),
       () =>
         teamIds === null
-          ? supabase.from("teams").select("id", { count: "exact", head: true })
+          ? supabase.from("teams").select("id", { count: "exact", head: true }).eq("is_demo", false)
           : Promise.resolve({ count: null, data: null, error: null }),
       // Retour de Cindy du 20/09 ("données séparées pour chaque équipe") :
       // élargie de "juste la photo de l'équipe unique" à "nom/catégorie/
@@ -341,13 +355,24 @@ export async function getSpaceDashboardSummary(
         if (teamIds !== null) q = q.in("team_id", teamIds);
         return q;
       },
+      // Démo (voir demoTeamIds plus haut) : liste des joueurs de l'équipe
+      // démo, pour les soustraire du compteur "Joueurs" club entier --
+      // minuscule (une poignée de lignes), jamais pour Coach/Famille.
+      () =>
+        teamIds === null && demoTeamIds.size > 0
+          ? supabase.from("team_players").select("player_id").in("team_id", Array.from(demoTeamIds))
+          : Promise.resolve({ data: [] as { player_id: string }[], error: null }),
     ],
     semaphore
   );
 
+  const demoPlayerCount = new Set(
+    ((demoPlayerLinksRes as { data: { player_id: string }[] | null }).data ?? []).map((r) => r.player_id)
+  ).size;
+
   const playerCount =
     teamIds === null
-      ? (rosterRes as { count: number | null }).count ?? 0
+      ? Math.max(0, ((rosterRes as { count: number | null }).count ?? 0) - demoPlayerCount)
       : new Set(
           ((rosterRes as { data: { player_id: string }[] | null }).data ?? []).map((r) => r.player_id)
         ).size;
@@ -355,13 +380,24 @@ export async function getSpaceDashboardSummary(
   const official = { ...EMPTY_MATCH_STATS };
   const friendly = { ...EMPTY_MATCH_STATS };
   (
-    (matchesRes.data ?? []) as { event_type: string; team_score: number | null; opponent_score: number | null }[]
-  ).forEach((m) => {
-    const bucket = m.event_type === "MATCH" ? official : friendly;
-    bucket.played += 1;
-    bucket.points += m.team_score ?? 0;
-    if ((m.team_score ?? 0) > (m.opponent_score ?? 0)) bucket.won += 1;
-  });
+    (matchesRes.data ?? []) as {
+      event_type: string;
+      team_score: number | null;
+      opponent_score: number | null;
+      team_id: string | null;
+    }[]
+  )
+    // Démo (voir demoTeamIds plus haut) : un match de l'équipe démo ne
+    // compte ni dans "Matchs joués", ni "Victoires", ni "Points marqués"
+    // du club entier -- sans effet pour Coach/Famille (teamIds n'inclut
+    // jamais l'équipe démo pour un vrai compte).
+    .filter((m) => !m.team_id || !demoTeamIds.has(m.team_id))
+    .forEach((m) => {
+      const bucket = m.event_type === "MATCH" ? official : friendly;
+      bucket.played += 1;
+      bucket.points += m.team_score ?? 0;
+      if ((m.team_score ?? 0) > (m.opponent_score ?? 0)) bucket.won += 1;
+    });
 
   // Retour de Cindy du 20/09 ("mes deux enfants sont mélangés... données
   // séparées pour chaque équipe") : même lignes que playerCount/official/
