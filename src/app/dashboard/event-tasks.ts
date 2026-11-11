@@ -55,26 +55,8 @@ function fullName(p: { first_name: string | null; last_name: string | null }) {
   return formatPersonName(p.first_name, p.last_name);
 }
 
-// Le catalogue de rôles du club, hors rôles archivés, dans l'ordre voulu.
-export async function getEventRoleTypes(
-  supabase: SupabaseClient
-): Promise<EventRoleType[]> {
-  const { data } = await supabase
-    .from("event_role_types")
-    .select("code, label, icon, event_types, sort_order")
-    .is("archived_at", null)
-    .order("sort_order");
-
-  return (data ?? []).map((r) => ({
-    code: r.code as string,
-    label: r.label as string,
-    icon: (r.icon as string | null) ?? null,
-    eventTypes: (r.event_types as string[] | null) ?? [],
-    sortOrder: (r.sort_order as number | null) ?? 100,
-  }));
-}
-
-// Même catalogue, mis en cache 60s : "read event_role_types" est
+// Le catalogue de rôles du club, hors rôles archivés, dans l'ordre voulu,
+// mis en cache 60s : "read event_role_types" est
 // `using (true)` (aucune donnée sensible, identique pour tout le monde),
 // et pourtant re-interrogé à CHAQUE chargement du tableau de bord, pour
 // TOUS les rôles (Bureau/Coach/Famille) — un aller-retour réseau de plus

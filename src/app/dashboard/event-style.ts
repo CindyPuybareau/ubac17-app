@@ -5,7 +5,6 @@
 // cartes du coach sont des composants serveur, elles ont besoin de ces
 // fonctions pour de vrai.
 
-import type { AdminUpcomingEvent } from "./page";
 
 export const EVENT_TYPE_OPTIONS: { value: string; label: string }[] = [
   { value: "TRAINING", label: "Entraînement" },
@@ -147,9 +146,4 @@ export function formatEventTime(startIso: string, endIso: string | null) {
 export function formatImpactTime(impactIso: string) {
   const d = new Date(impactIso);
   return `Arrivée ${d.getHours()}h${String(d.getMinutes()).padStart(2, "0")}`;
-}
-
-export function eventMapsQuery(event: Pick<AdminUpcomingEvent, "salle" | "location">) {
-  const parts = [event.salle, event.location].filter(Boolean);
-  return parts.length > 0 ? parts.join(", ") : null;
 }

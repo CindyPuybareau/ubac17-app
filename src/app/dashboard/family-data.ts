@@ -49,17 +49,6 @@ export function unionRoster<T extends { id: string }>(rosterByTeam: Map<string, 
   );
 }
 
-// Prochaine convocation d'un joueur lié au compte courant — soi-même
-// compris (voir page.tsx, ownPlayerRow) : un adulte inscrit lui-même
-// (Séniors, Loisirs...) a aussi sa propre carte. Partagé entre family-view
-// (tous les enfants) et coach-organisation (le coach lui-même, sur une
-// équipe qu'il ne coache pas — voir ownPlayerNextEvent dans page.tsx).
-export type ConvocationCard = {
-  player: { id: string; name: string; category: string | null; isSelf: boolean };
-  event: UpcomingEvent;
-  status: string;
-};
-
 export type RsvpCounts = {
   present: number;
   pending: number;
@@ -116,35 +105,6 @@ export async function getNextEventForTeams(
 
   if (error) console.error("[getNextEventForTeams] échec:", error);
   return data;
-}
-
-export async function getPlayerTeamIds(
-  supabase: SupabaseClient,
-  playerId: string
-): Promise<string[]> {
-  const { data, error } = await supabase
-    .from("team_players")
-    .select("team_id")
-    .eq("player_id", playerId);
-
-  if (error) console.error("[getPlayerTeamIds] échec:", error);
-  return (data ?? []).map((row) => row.team_id as string);
-}
-
-export async function getPlayerRsvpStatus(
-  supabase: SupabaseClient,
-  eventId: string,
-  playerId: string
-): Promise<string> {
-  const { data, error } = await supabase
-    .from("rsvps")
-    .select("status")
-    .eq("event_id", eventId)
-    .eq("player_id", playerId)
-    .maybeSingle();
-
-  if (error) console.error("[getPlayerRsvpStatus] échec:", error);
-  return data?.status ?? "PENDING";
 }
 
 export async function getTeamRoster(

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { Mail } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { chunkedQuery, runBatched, Semaphore } from "@/lib/batch";
 import { logQueryErrors } from "@/lib/query-errors";
 import { formatFirstName, formatPersonName } from "@/lib/names";
@@ -51,8 +51,6 @@ import type { BirthdaySource } from "./birthdays";
 import type { AutomationKey } from "./automation-settings";
 import {
   getNextEventForTeams,
-  getPlayerRsvpStatus,
-  getPlayerTeamIds,
   teamOrClubWideOrProfileFilter,
   unionRoster,
 } from "./family-data";
@@ -1132,13 +1130,38 @@ export default async function DashboardPage({
   const eventsWindowStart = new Date(
     Date.now() - 183 * 24 * 60 * 60 * 1000
   ).toISOString();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   if (!user) {
     redirect("/connexion");
   }
+
+  // Club entier, communs aux trois espaces et indépendants de tout le reste
+  // (rôle, équipes...) : lancés dès maintenant en arrière-plan, attendus
+  // seulement au moment de construire les onglets (voir plus bas) -- ils
+  // bloquaient jusqu'ici, chacun à son tour, tout le reste de la page.
+  // getActiveFeaturedHighlights jamais mis en cache (contrairement au
+  // trombinoscope) pour qu'une affiche expirée/supprimée disparaisse en
+  // direct via Realtime (retour de Cindy du 10/11, "Événements à la une").
+  const officialsTrombinoscopePromise = getCachedOfficialsTrombinoscopePath();
+  const featuredHighlightsPromise = getActiveFeaturedHighlights(supabase);
+  // Bannière "Accompagnants" (voir clubHelperEvents tout en bas) : même
+  // principe -- deux allers-retours qui s'exécutaient en tout dernier, seuls.
+  const openHelperPromise = (async () => {
+    const { data: openHelperEventsRaw } = await supabase
+      .from("events")
+      .select("id, title, event_type, start_time, end_time, salle, location, team_id, teams(name)")
+      .eq("event_type", "TRAINING")
+      .eq("open_to_club_helpers", true)
+      .gte("start_time", new Date().toISOString())
+      .order("start_time", { ascending: true });
+    const openHelperNeedsByEventId = await getVolunteerNeedsByEventId(
+      supabase,
+      (openHelperEventsRaw ?? []).map((e) => e.id),
+      dbLimit
+    );
+    return { openHelperEventsRaw, openHelperNeedsByEventId };
+  })();
 
   // Retour de Cindy du 20/09 (panne de connexions) : ce petit groupe de 4
   // requêtes échappait au Semaphore(9) partagé (dbLimit, défini juste
@@ -1209,22 +1232,6 @@ export default async function DashboardPage({
 
   const isAdmin = Boolean(adminResult.data);
   let ownPlayerId = ownPlayerRowResult.data?.id ?? null;
-
-  // Retour de Cindy du 08/10 ("trombinoscope officiels... concerne les
-  // parents, les coachs et le bureau") : un seul chemin, club entier --
-  // lu une fois ici (caché 45s, service role) plutôt que dans chacun des
-  // trois blocs Bureau/Coach/Famille, puisque les trois en ont besoin.
-  const officialsTrombinoscopeRes = await getCachedOfficialsTrombinoscopePath();
-  const officialsTrombinoscopePath =
-    officialsTrombinoscopeRes.data?.officials_trombinoscope_path ?? null;
-
-  // Retour de Cindy du 10/11 ("Événements à la une") : club entier, lu une
-  // seule fois ici (comme officialsTrombinoscopePath juste au-dessus)
-  // plutôt que par espace -- jamais mis en cache (contrairement à ce
-  // dernier) pour que la disparition d'une affiche expirée/supprimée se
-  // reflète en direct via Realtime (realtime-sync.tsx), pas jusqu'à 45s
-  // plus tard.
-  const featuredHighlights = await getActiveFeaturedHighlights(supabase);
 
   // Profil d'accès sur-mesure (retour de Cindy du 05/09, étape 3) : si CE
   // compte Bureau a un access_profile_id, son espace Bureau ne doit
@@ -1456,6 +1463,35 @@ export default async function DashboardPage({
     avatarUrl: p.avatar_url,
   }));
 
+  // Équipes de chaque fiche liée (soi + enfants) : UNE requête partagée,
+  // lancée tout de suite, plutôt qu'une requête par fiche redemandée à trois
+  // endroits (onglet "Mes enfants", prochaine convocation, bloc Famille) --
+  // CLAUDE.md §6.
+  const playerTeamIdsPromise: Promise<Map<string, string[]>> = (async () => {
+    const byPlayer = new Map<string, string[]>();
+    if (players.length === 0) return byPlayer;
+    const [{ data, error }] = await runBatched(
+      [
+        () =>
+          supabase
+            .from("team_players")
+            .select("player_id, team_id")
+            .in(
+              "player_id",
+              players.map((p) => p.id)
+            ),
+      ],
+      dbLimit
+    );
+    if (error) console.error("[dashboard] équipes des fiches liées :", error);
+    (data ?? []).forEach((r) => {
+      const list = byPlayer.get(r.player_id) ?? [];
+      list.push(r.team_id);
+      byPlayer.set(r.player_id, list);
+    });
+    return byPlayer;
+  })();
+
   // Retour de Cindy du 04/09 ("il a trois espaces, pourquoi ça bug") : un
   // compte qui cumule Bureau + Coach + Famille faisait construire et
   // envoyer les TROIS espaces en entier à chaque connexion, alors qu'un
@@ -1502,12 +1538,9 @@ export default async function DashboardPage({
     // Retour de Cindy du 20/09 (panne de connexions) : un fan-out en
     // Promise.all brut, une requête par enfant candidat, échappait au
     // Semaphore(9) partagé.
-    const childCandidateTeamIdsList = await runBatched(
-      childCandidates.map((p) => () => getPlayerTeamIds(supabase, p.id)),
-      dbLimit
-    );
-    hasChildrenTab = childCandidates.some((_, i) => {
-      const teamIds = childCandidateTeamIdsList[i];
+    const teamIdsByPlayer = await playerTeamIdsPromise;
+    hasChildrenTab = childCandidates.some((p) => {
+      const teamIds = teamIdsByPlayer.get(p.id) ?? [];
       return !(teamIds.length > 0 && teamIds.every((id) => coachedTeamIds.has(id)));
     });
   }
@@ -1555,6 +1588,53 @@ export default async function DashboardPage({
   const familyDataActive =
     players.length > 0 &&
     (onlyOneEspace || activeTab === "own-team" || activeTab === "children" || bureauDataLoaded);
+
+  // Tableau de bord Bureau (club entier) : ne dépend de rien d'autre que de
+  // l'onglet actif -- lancé dès maintenant, en parallèle de tout le reste,
+  // au lieu d'attendre la fin de adminPromise/coachPromise/familyPromise
+  // (il démarrait jusqu'ici tout en bas de la page, seul).
+  const adminDashboardSummaryPromise =
+    isAdmin && activeTab === "admin"
+      ? getSpaceDashboardSummary(supabase, null, "bureau", [], dbLimit)
+      : null;
+  // Même principe pour le Coach, démarré dans coachPromise dès que ses
+  // équipes sont connues (voir plus bas).
+  let coachDashboardSummaryPromise: Promise<SpaceDashboardSummary> | null = null;
+  // Et pour "Mon équipe"/"Mes enfants" : ne dépend que des équipes de
+  // chaque fiche (playerTeamIdsPromise) et du catalogue en cache -- mêmes
+  // sous-ensembles que myTeamRsvpPlayers/myChildrenRsvpPlayers plus bas
+  // (soi seul / enfants hors équipes déjà coachées), enrichis de leurs
+  // équipes sœurs (retour de Cindy du 30/09).
+  const familyDashboardSummaryPromise: Promise<SpaceDashboardSummary> | null =
+    activeTab === "own-team" || activeTab === "children"
+      ? Promise.all([playerTeamIdsPromise, getCachedTeams()]).then(([teamIdsByPlayer, teamsRes]) => {
+          const clubTeams = teamsRes.data ?? [];
+          const subset = players
+            .map((p) => ({ id: p.id, name: p.name, isSelf: p.isSelf, teamIds: teamIdsByPlayer.get(p.id) ?? [] }))
+            .filter((p) =>
+              activeTab === "own-team"
+                ? p.isSelf
+                : !p.isSelf && !(p.teamIds.length > 0 && p.teamIds.every((id) => coachedTeamIds.has(id)))
+            );
+          const baseIds = Array.from(new Set(subset.flatMap((p) => p.teamIds)));
+          const siblings = Array.from(
+            new Set(
+              clubTeams
+                .filter((t) => baseIds.includes(t.id))
+                .flatMap((t) => getSiblingTeamIds(t, clubTeams))
+            )
+          ).filter((id) => !baseIds.includes(id));
+          return getSpaceDashboardSummary(
+            supabase,
+            [...baseIds, ...siblings],
+            "family",
+            subset,
+            dbLimit,
+            false,
+            siblings
+          );
+        })
+      : null;
 
   // Retour de Cindy du 05/09 ("le calendrier ralentit tout") : les
   // entraînements récurrents (2-3 par semaine et par équipe, toute la
@@ -1626,17 +1706,20 @@ export default async function DashboardPage({
   ] = await runBatched(
     [
     // Priority zone: next convocation per linked player.
-    () =>
-      runBatched(
+    // Seul event.id sert ensuite (priorityEventIds) : le statut de présence
+    // que chaque carte relisait ici n'était plus lu par personne depuis le
+    // retrait de la carte "Prochaine convocation" -- une requête de moins
+    // par fiche, et les équipes viennent de playerTeamIdsPromise (partagée).
+    async () => {
+      const teamIdsByPlayer = await playerTeamIdsPromise;
+      return runBatched(
         players.map((p) => async () => {
-          const teamIds = await getPlayerTeamIds(supabase, p.id);
-          const event = await getNextEventForTeams(supabase, teamIds);
-          if (!event) return null;
-          const status = await getPlayerRsvpStatus(supabase, event.id, p.id);
-          return { player: p, event, status };
+          const event = await getNextEventForTeams(supabase, teamIdsByPlayer.get(p.id) ?? []);
+          return event ? { player: p, event } : null;
         }),
         dbLimit
-      ),
+      );
+    },
     // Catalogue des roles d organisation, commun au club et lu par les
     // trois espaces. Version mise en cache 60s (voir getEventRoleTypesCached,
     // event-tasks.ts) : identique pour tout le monde, pas la peine de la
@@ -2916,11 +2999,6 @@ export default async function DashboardPage({
   // résolu (propre ou hérité de la mère).
   const coachTrombinoscopeByTeamId: Record<string, string | null> = {};
   let coachEvents: AdminUpcomingEvent[] = [];
-  // Retour de Cindy du 30/09 ("équipes sœurs") : ids des déclinaisons
-  // sœurs des équipes coachées (U13M-1↔U13M-2...) -- réutilisé à la fois
-  // pour la requête matchs dédiée ci-dessous ET pour élargir le Tableau de
-  // bord (getSpaceDashboardSummary, plus bas dans ce fichier).
-  let coachSiblingTeamIds: string[] = [];
   let coachRsvpPlayers: { id: string; name: string; teamIds: string[] }[] = [];
   let coachSeasonVolunteerTallyByPlayerId: Record<string, SeasonVolunteerTally> = {};
   let coachSeasonVolunteerGuestEntries: SeasonGuestVolunteer[] = [];
@@ -2958,11 +3036,36 @@ export default async function DashboardPage({
     // "Organisation & Bilan") : le bilan bénévoles a besoin des eventIds de
     // la saison (coachEventIds), pas encore connus à ce stade -- calculé
     // plus bas, une fois coachEventIds résolu.
-    const ownTeamIds = ownPlayerId ? await getPlayerTeamIds(supabase, ownPlayerId) : [];
+    // Déjà connues via la détection de rôle (ownTeamMemberships, embed
+    // team_players) -- plus besoin d'un aller-retour de plus ici.
+    const ownTeamIds = ownTeamMemberships.map((m) => m.team_id);
     const coachCalendarTeamIds = Array.from(
       new Set([...coachedTeamIds, ...ownTeamIds])
     );
     const ownOnlyTeamIds = ownTeamIds.filter((id) => !coachedTeamIds.includes(id));
+
+    // Tableau de bord Coach, lancé dès ici en parallèle du gros lot
+    // ci-dessous (voir adminDashboardSummaryPromise) : ne dépend que des
+    // équipes coachées et de leurs équipes sœurs, calculées en mémoire à
+    // partir du catalogue d'équipes déjà en cache 45s -- même calcul que
+    // coachSiblingTeamIds plus bas (même catalogue, mêmes exclusions).
+    if (activeTab === "coach") {
+      coachDashboardSummaryPromise = getCachedTeams().then((res) => {
+        const clubTeams = (res.data ?? []).filter((t) => t.sort_order !== null);
+        const siblings = Array.from(
+          new Set(coachedTeams.flatMap((t) => getSiblingTeamIds(t, clubTeams)))
+        ).filter((id) => !coachCalendarTeamIds.includes(id));
+        return getSpaceDashboardSummary(
+          supabase,
+          [...coachedTeamIds, ...siblings],
+          "coach",
+          [],
+          dbLimit,
+          false,
+          siblings
+        );
+      });
+    }
 
     // Retour de Cindy du 04/09 ("pourquoi ça bug quand on a plusieurs
     // espaces") : un compte Bureau + Coach (comme Basile après son ajout au
@@ -3167,7 +3270,6 @@ export default async function DashboardPage({
       new Set(coachedTeams.flatMap((t) => getSiblingTeamIds(t, allClubTeamsRes.data ?? [])))
     ).filter((id) => !coachCalendarTeamIds.includes(id));
     const siblingTeamIdSet = new Set(siblingTeamIds);
-    coachSiblingTeamIds = siblingTeamIds;
     // Matchs officiels ET amicaux des équipes sœurs (jamais les
     // entraînements), même fenêtre que le reste -- consultation seule (voir
     // readOnlyExternal plus bas). Une seule requête de plus, SEULEMENT si ce
@@ -4007,13 +4109,9 @@ export default async function DashboardPage({
 
   const familyPromise = (async () => {
   if (familyDataActive) {
-    // Retour de Cindy du 20/09 (panne de connexions) : fan-out en
-    // Promise.all brut, une requête par enfant, échappait au Semaphore(9)
-    // partagé.
-    const playerTeamIdsList = await runBatched(
-      players.map((p) => () => getPlayerTeamIds(supabase, p.id)),
-      dbLimit
-    );
+    // Équipes de chaque fiche : requête unique partagée (playerTeamIdsPromise).
+    const teamIdsByPlayer = await playerTeamIdsPromise;
+    const playerTeamIdsList = players.map((p) => teamIdsByPlayer.get(p.id) ?? []);
     familyRsvpPlayers = players.map((p, i) => ({
       id: p.id,
       // Prénom réel plutôt que "Toi" (retour de Cindy du 2026-08-24,
@@ -5062,6 +5160,15 @@ export default async function DashboardPage({
       )
     : [];
 
+  // Lancées tout en haut (voir officialsTrombinoscopePromise), déjà
+  // terminées depuis longtemps à ce stade dans l'immense majorité des cas.
+  const [officialsTrombinoscopeRes, featuredHighlights] = await Promise.all([
+    officialsTrombinoscopePromise,
+    featuredHighlightsPromise,
+  ]);
+  const officialsTrombinoscopePath =
+    officialsTrombinoscopeRes.data?.officials_trombinoscope_path ?? null;
+
   const tabs: DashboardTab[] = [];
 
   // Retour de Cindy du 29/08, après discussion : plus aucun repli/fusion
@@ -5108,39 +5215,16 @@ export default async function DashboardPage({
   // par sous-ensemble précis (own-team vs children), pas sur toute la
   // fratrie combinée, pour ne jamais montrer à "Mon équipe" la sœur d'une
   // équipe d'un enfant (et inversement).
-  function siblingTeamIdsFor(baseIds: string[]): string[] {
-    return Array.from(
-      new Set(
-        familyAllClubTeams
-          .filter((t) => baseIds.includes(t.id))
-          .flatMap((t) => getSiblingTeamIds(t, familyAllClubTeams))
-      )
-    ).filter((id) => !baseIds.includes(id));
-  }
-  const familyOwnTeamBaseIds = Array.from(new Set(myTeamRsvpPlayers.flatMap((p) => p.teamIds)));
-  const familyOwnTeamSiblingIds =
-    activeTab === "own-team" ? siblingTeamIdsFor(familyOwnTeamBaseIds) : [];
-  const familyOwnTeamDashboardSummary = await getSpaceDashboardSummary(
-    supabase,
-    activeTab === "own-team" ? [...familyOwnTeamBaseIds, ...familyOwnTeamSiblingIds] : [],
-    "family",
-    activeTab === "own-team" ? myTeamRsvpPlayers : [],
-    dbLimit,
-    false,
-    familyOwnTeamSiblingIds
-  );
-  const familyChildrenBaseIds = Array.from(new Set(myChildrenRsvpPlayers.flatMap((p) => p.teamIds)));
-  const familyChildrenSiblingIds =
-    activeTab === "children" ? siblingTeamIdsFor(familyChildrenBaseIds) : [];
-  const familyChildrenDashboardSummary = await getSpaceDashboardSummary(
-    supabase,
-    activeTab === "children" ? [...familyChildrenBaseIds, ...familyChildrenSiblingIds] : [],
-    "family",
-    activeTab === "children" ? myChildrenRsvpPlayers : [],
-    dbLimit,
-    false,
-    familyChildrenSiblingIds
-  );
+  // Calculé et lancé tout en haut (familyDashboardSummaryPromise), pour
+  // l'onglet actif seulement ; l'autre reçoit le repli à zéro sans requête.
+  const emptyFamilySummary = await getSpaceDashboardSummary(supabase, [], "family", [], dbLimit);
+  const activeFamilySummary = familyDashboardSummaryPromise
+    ? await familyDashboardSummaryPromise
+    : emptyFamilySummary;
+  const familyOwnTeamDashboardSummary =
+    activeTab === "own-team" ? activeFamilySummary : emptyFamilySummary;
+  const familyChildrenDashboardSummary =
+    activeTab === "children" ? activeFamilySummary : emptyFamilySummary;
 
   function buildFamilyView(
     rsvpPlayers: typeof familyRsvpPlayers,
@@ -5181,18 +5265,13 @@ export default async function DashboardPage({
   // (ce qui redemande la page avec ?tab=... et fait de LUI l'actif).
   if (isAdmin) {
     // Retour de Cindy du 13/09 ("ce que tu mettrais dans le tableau de
-    // bord") : club entier (teamIds null), seulement quand cet onglet est
-    // réellement affiché -- [] plutôt que null sinon fait rendre à
-    // getSpaceDashboardSummary son repli à zéro sans la moindre requête
-    // (voir son court-circuit dans space-dashboard.ts), même discipline
-    // que le reste de ce bloc (activeTab === "admin" ? ... : null).
-    const adminDashboardSummary = await getSpaceDashboardSummary(
-      supabase,
-      activeTab === "admin" ? null : [],
-      "bureau",
-      [],
-      dbLimit
-    );
+    // bord") : club entier, seulement quand cet onglet est réellement
+    // affiché -- lancé tout en haut (adminDashboardSummaryPromise) ; []
+    // sinon fait rendre à getSpaceDashboardSummary son repli à zéro sans la
+    // moindre requête (voir son court-circuit dans space-dashboard.ts).
+    const adminDashboardSummary = adminDashboardSummaryPromise
+      ? await adminDashboardSummaryPromise
+      : await getSpaceDashboardSummary(supabase, [], "bureau", [], dbLimit);
     tabs.push({
       key: "admin",
       label: "Bureau",
@@ -5248,19 +5327,13 @@ export default async function DashboardPage({
     // joueur, celles-là vivent dans "Mon équipe". Même discipline que
     // adminDashboardSummary plus haut : requête seulement pour l'onglet
     // actif.
-    const coachDashboardSummary = await getSpaceDashboardSummary(
-      supabase,
-      // Retour de Cindy du 30/09 ("équipes sœurs") : coachSiblingTeamIds
-      // (calculé dans coachPromise, hissé pour survivre au bloc) ajoute les
-      // déclinaisons sœurs -- vide tant que coachPromise n'a pas tourné
-      // (onglet pas actif), sans effet dans ce cas (activeTab !== "coach").
-      activeTab === "coach" ? [...coachedTeams.map((t) => t.id), ...coachSiblingTeamIds] : [],
-      "coach",
-      [],
-      dbLimit,
-      false,
-      activeTab === "coach" ? coachSiblingTeamIds : []
-    );
+    // Retour de Cindy du 30/09 ("équipes sœurs") : équipes coachées +
+    // déclinaisons sœurs, lancé dans coachPromise dès que ces équipes sont
+    // connues (coachDashboardSummaryPromise) -- repli à zéro sans requête
+    // quand l'onglet Coach n'est pas l'actif.
+    const coachDashboardSummary = coachDashboardSummaryPromise
+      ? await coachDashboardSummaryPromise
+      : await getSpaceDashboardSummary(supabase, [], "coach", [], dbLimit);
     tabs.push({
       key: "coach",
       // Retour de Cindy du 29/08 : "Équipe" tout court prêtait à confusion
@@ -5473,18 +5546,9 @@ export default async function DashboardPage({
   // dont le viewer ne fait pas partie. Visible par TOUT compte connecté
   // (contrairement à showHeaderWeekBanner plus bas, qui masque WeekStripBanner
   // pour un Bureau pur sans équipe coachée/fiche joueur), donc jamais
-  // conditionnée par isCoach/players.length ici.
-  const { data: openHelperEventsRaw } = await supabase
-    .from("events")
-    .select("id, title, event_type, start_time, end_time, salle, location, team_id, teams(name)")
-    .eq("event_type", "TRAINING")
-    .eq("open_to_club_helpers", true)
-    .gte("start_time", new Date().toISOString())
-    .order("start_time", { ascending: true });
-  const openHelperNeedsByEventId = await getVolunteerNeedsByEventId(
-    supabase,
-    (openHelperEventsRaw ?? []).map((e) => e.id)
-  );
+  // conditionnée par isCoach/players.length ici. Lancée tout en haut de la
+  // page (openHelperPromise), jamais attendue avant ce point.
+  const { openHelperEventsRaw, openHelperNeedsByEventId } = await openHelperPromise;
   // Retour de Cindy du 05/11 ("un entraînement par un entraînement, un pop
   // up par semaine") : une équipe peut avoir plusieurs occurrences futures
   // déjà flaggées (toute la saison, voir create-event-form.tsx) -- une

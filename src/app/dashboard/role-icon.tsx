@@ -30,8 +30,6 @@ export const ROLE_ICONS = {
 
 export type RoleIconName = keyof typeof ROLE_ICONS;
 
-export const ROLE_ICON_NAMES = Object.keys(ROLE_ICONS) as RoleIconName[];
-
 function resolve(icon: string | null) {
   return ROLE_ICONS[(icon ?? "") as RoleIconName] ?? ROLE_ICONS.ClipboardList;
 }
