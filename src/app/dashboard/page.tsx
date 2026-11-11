@@ -2023,6 +2023,19 @@ export default async function DashboardPage({
       accessProfilesRes,
     });
 
+    // is_demo (retour de Cindy du 11/11, "des faux entraînements/matchs...
+    // non visible par notre vraie appli ?") : is_club_admin() autorise déjà
+    // le Bureau à lire TOUS les événements sans restriction d'équipe (RLS
+    // "select events (consolidated)", voulu pour l'accès 100% club -- voir
+    // CLAUDE.md §3) -- les deux requêtes events ci-dessus (matchs/
+    // entraînements) ne filtrent donc par aucune équipe non plus,
+    // contrairement à adminTeams/adminMembers déjà protégés. Calculé une
+    // seule fois ici, réutilisé pour le filtre juste en dessous ET pour
+    // celui d'adminMembers plus loin (teamsById), plutôt que recalculé.
+    const demoTeamIds = new Set(
+      (teamsRes.data ?? []).filter((t) => t.is_demo).map((t) => t.id)
+    );
+
     const clubSettingsRow = clubSettingsRes.data as Record<AutomationKey, boolean> | null;
     adminAutomationSettings = {
       match_reminder_enabled: Boolean(clubSettingsRow?.match_reminder_enabled),
@@ -2186,7 +2199,9 @@ export default async function DashboardPage({
     const adminEventsData = [
       ...(upcomingEventsRes.data ?? []),
       ...(upcomingTrainingsRes.data ?? []),
-    ].sort((a, b) => a.start_time.localeCompare(b.start_time));
+    ]
+      .filter((e) => !e.team_id || !demoTeamIds.has(e.team_id))
+      .sort((a, b) => a.start_time.localeCompare(b.start_time));
 
     // Each team's next upcoming event (adminEventsData is ordered
     // ascending) drives the roster table's "Statut Présence" badge, so a
@@ -2346,18 +2361,11 @@ export default async function DashboardPage({
         { id: t.id, name: t.name, category: t.category },
       ])
     );
-    // is_demo (retour de Cindy du 11/11, "les joueurs démo ne se voient
-    // pas sur la vraie appli rassure moi ?") : teams/getCachedTeams filtre
-    // déjà l'équipe démo de l'onglet "Équipes" (adminTeams plus haut), mais
-    // l'onglet "Membres" (adminMembers plus bas) listait TOUS les joueurs
-    // de la table players sans le moindre filtre -- Noah/Léa/le roster
-    // fictif y apparaissaient donc en clair pour tout le Bureau. Un joueur
-    // compte comme démo ici seulement si TOUTES ses équipes le sont (même
-    // logique que le filtre "doublon équipe coachée" de myChildrenRsvpPlayers
-    // plus bas, appliqué à is_demo plutôt qu'à coachedTeamIds).
-    const demoTeamIds = new Set(
-      (teamsRes.data ?? []).filter((t) => t.is_demo).map((t) => t.id)
-    );
+    // demoTeamIds déjà calculé plus haut (juste après logQueryErrors,
+    // réutilisé ici pour la même raison : un joueur compte comme démo
+    // seulement si TOUTES ses équipes le sont -- même logique que le
+    // filtre "doublon équipe coachée" de myChildrenRsvpPlayers plus bas,
+    // appliqué à is_demo plutôt qu'à coachedTeamIds).
     const teamsByPlayerId = new Map<string, AdminMemberTeam[]>();
     // burnedByPlayerId (agrégat OU sur toutes les lignes du joueur) est
     // déjà calculé plus haut, avant rosterByTeam -- voir son commentaire.
