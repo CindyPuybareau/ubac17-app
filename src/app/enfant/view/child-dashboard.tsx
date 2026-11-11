@@ -21,7 +21,7 @@ import type { FeaturedHighlight } from "@/lib/featured-highlights";
 import type { SpaceDashboardSummary as SpaceDashboardSummaryData } from "@/lib/space-dashboard";
 import type { AdminCotisation } from "@/app/dashboard/page";
 import type { PlayerYearStatus } from "@/lib/season";
-import ChildAvatarUpload from "./child-avatar-upload";
+import AvatarUpload from "@/app/dashboard/avatar-upload";
 import ChildTileMenu from "./child-tile-menu";
 import { formatFirstName } from "@/lib/names";
 import { localDateFromParts } from "@/lib/local-date";
@@ -507,7 +507,7 @@ export default function ChildDashboard({
             3 autres espaces (dashboard/layout.tsx). */}
         <div className="relative mx-auto flex w-full max-w-[1600px] flex-row items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <ChildAvatarUpload avatarUrl={avatarUrl} name={firstName} />
+            <AvatarUpload avatarUrl={avatarUrl} name={firstName} />
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">
                 Bonjour

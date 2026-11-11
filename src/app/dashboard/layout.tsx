@@ -148,7 +148,7 @@ export default async function DashboardLayout({
                 )}
                 <div className="flex flex-row items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">
-                    <AvatarUpload userId={user.id} avatarUrl={profile?.avatar_url ?? null} name={displayFirstName} size="lg" />
+                    <AvatarUpload userId={user.id} avatarUrl={profile?.avatar_url ?? null} name={displayFirstName} />
                     <div className="min-w-0">
                       <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">
                         Bonjour
