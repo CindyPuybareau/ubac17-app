@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, type LucideIcon } from "lucide-react";
+import { Check, Copy } from "lucide-react";
 
 // Retour de Cindy du 11/09 ("le bouton copier doit être identique
 // partout") : un seul composant pour "Copier le lien d'accès enfant"
@@ -71,30 +71,3 @@ export default function CopyLinkButton({
   );
 }
 
-// Icône d'action secondaire (ex. "Configurer les accès") — plus visible
-// que l'ancien simple trait gris : fond circulaire discret + info-bulle,
-// même teinte navy que le reste de la charte plutôt qu'un gris clair sans
-// contraste.
-export function IconActionButton({
-  icon: Icon,
-  label,
-  onClick,
-  className = "",
-}: {
-  icon: LucideIcon;
-  label: string;
-  onClick: () => void;
-  className?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={label}
-      aria-label={label}
-      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-navy/5 text-navy transition-colors hover:bg-navy/15 ${className}`}
-    >
-      <Icon className="h-4 w-4" />
-    </button>
-  );
-}

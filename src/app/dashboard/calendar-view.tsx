@@ -580,7 +580,6 @@ export default function CalendarView({
   events,
   createTeams,
   rsvp,
-  contactEmailByPlayerId,
   allowClubWide = false,
   birthdayMembers = [],
   eventRoles = [],
@@ -597,7 +596,6 @@ export default function CalendarView({
     players: CalendarRsvpPlayer[];
     statusByKey: Record<string, string>;
   };
-  contactEmailByPlayerId?: Record<string, string>;
   allowClubWide?: boolean;
   // Retour de Cindy du 12/09 ("il faut que tout espace qui ne soit pas
   // bureau puisse avoir ce petit oeil") : createTeams/canManage ne

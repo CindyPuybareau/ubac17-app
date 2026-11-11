@@ -621,10 +621,35 @@ export async function getSpaceDashboardSummary(
     // (VolunteerNeedsPanel, calendar-view.tsx...) -- jamais une requête
     // event_volunteer_needs/signups dupliquée ici. Un seul appel pour
     // TOUS les événements du jour plutôt qu'un par carte.
-    const needsByEventId = await getVolunteerNeedsByEventId(supabase, eventIds, semaphore);
-    // "Organisation match à domicile" (retour de Cindy du 17/09) : même
-    // principe que needsByEventId juste au-dessus.
-    const matchOfficialsByEventId = await getMatchOfficialRolesByEventId(supabase, eventIds, semaphore);
+    // "Organisation match à domicile" (retour de Cindy du 17/09) :
+    // matchOfficialsByEventId, même principe que needsByEventId.
+    //
+    // Ces quatre lectures (besoins, officiels, liens d'effectif, présences)
+    // ne dépendent que de eventIds/teamIds, jamais les unes des autres --
+    // lancées ensemble plutôt qu'à la queue leu leu (elles s'enchaînaient
+    // jusqu'ici une par une), toujours sous le même plafond partagé
+    // (semaphore). Seuls les noms de l'effectif (plus bas) attendent les
+    // liens.
+    let linksQuery = supabase.from("team_players").select("team_id, player_id");
+    if (teamIds !== null) linksQuery = linksQuery.in("team_id", teamIds);
+    // Une seule requête rsvps pour tous les événements du jour à la fois,
+    // sur TOUT l'effectif (retour de Cindy du 13/09, "pour les parents
+    // pouvoir y répondre ici") -- jamais un 2e .in("player_id", ...) en plus
+    // de .in("event_id", ...) : même classe de bug que l'incident du 30/08
+    // (batch.ts), une URL démesurée sur un effectif de club entier. eventIds
+    // reste petit (un seul jour), donc seul lui filtre côté requête ; le
+    // rapprochement par joueur se fait en mémoire plus bas.
+    const [needsByEventId, matchOfficialsByEventId, [{ data: linkRows }, { data: rsvpRows }]] = await Promise.all([
+      getVolunteerNeedsByEventId(supabase, eventIds, semaphore),
+      getMatchOfficialRolesByEventId(supabase, eventIds, semaphore),
+      runBatched(
+        [
+          () => linksQuery,
+          () => supabase.from("rsvps").select("event_id, player_id, status").in("event_id", eventIds),
+        ],
+        semaphore
+      ),
+    ]);
 
     // Retour de Cindy du 14/09 ("les coachs voient les présents/absents...
     // duplication de l'événement à venir") : même bloc compteurs +
@@ -649,9 +674,6 @@ export async function getSpaceDashboardSummary(
     // filtrés), family_teammate_roster donne les noms (vue dédiée,
     // conçue pour être lisible par le Bureau ET tout parent/coach d'un
     // coéquipier).
-    let linksQuery = supabase.from("team_players").select("team_id, player_id");
-    if (teamIds !== null) linksQuery = linksQuery.in("team_id", teamIds);
-    const [{ data: linkRows }] = await runBatched([() => linksQuery], semaphore);
     const rosterPlayerIds = Array.from(new Set((linkRows ?? []).map((r) => r.player_id)));
     // trustedRosterAccess (service_role, Espace Enfant) : la vue plus haut
     // ne peut rien renvoyer sans auth.uid()/auth.jwt() -- lecture directe
@@ -695,18 +717,6 @@ export async function getSpaceDashboardSummary(
     });
     const fullRoster = Array.from(rosterByPlayerId.values());
 
-    // Une seule requête rsvps pour tous les événements du jour à la fois,
-    // sur TOUT l'effectif (retour de Cindy du 13/09, "pour les parents
-    // pouvoir y répondre ici" + celui du 14/09 ci-dessus) -- jamais un 2e
-    // .in("player_id", ...) en plus de .in("event_id", ...) : même classe
-    // de bug que l'incident du 30/08 (batch.ts), une URL démesurée sur un
-    // effectif de club entier. eventIds reste petit (un seul jour), donc
-    // seul lui filtre côté requête ; le rapprochement par joueur se fait
-    // en mémoire juste en dessous.
-    const [{ data: rsvpRows }] = await runBatched(
-      [() => supabase.from("rsvps").select("event_id, player_id, status").in("event_id", eventIds)],
-      semaphore
-    );
     const statusByEventAndPlayer = new Map<string, string>();
     ((rsvpRows ?? []) as { event_id: string; player_id: string; status: string }[]).forEach((r) => {
       statusByEventAndPlayer.set(`${r.event_id}:${r.player_id}`, r.status);

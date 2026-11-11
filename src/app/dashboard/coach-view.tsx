@@ -391,7 +391,6 @@ export default function CoachView({
             events={events}
             createTeams={createTeams}
             rsvp={{ players: rsvpPlayers, statusByKey: rsvpStatusByKey }}
-            contactEmailByPlayerId={contactEmailByPlayerId}
             birthdayMembers={birthdayMembers}
             // Retour de Cindy du 10/09 (fusion Calendrier/Événements) :
             // manquait ici alors que "Événements" (retiré plus bas) l'avait

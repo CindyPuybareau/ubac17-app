@@ -60,6 +60,13 @@ export default function RealtimeSync() {
   const router = useRouter();
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Onglet en arrière-plan (autre onglet, appli minimisée, écran verrouillé) :
+  // personne ne regarde, inutile de recalculer tout le tableau de bord côté
+  // serveur à chaque modification faite ailleurs dans le club -- on note
+  // juste qu'un rafraîchissement est dû, et on le fait UNE fois au retour.
+  // Même principe que notification-bell.tsx (retour de Cindy du 19/09).
+  const pendingWhileHiddenRef = useRef(false);
+
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase.channel("dashboard-sync");
@@ -69,6 +76,10 @@ export default function RealtimeSync() {
         "postgres_changes",
         { event: "*", schema: "public", table },
         () => {
+          if (document.visibilityState !== "visible") {
+            pendingWhileHiddenRef.current = true;
+            return;
+          }
           if (timeoutRef.current) clearTimeout(timeoutRef.current);
           timeoutRef.current = setTimeout(() => {
             router.refresh();
@@ -79,8 +90,17 @@ export default function RealtimeSync() {
 
     channel.subscribe();
 
+    function onVisibilityChange() {
+      if (document.visibilityState === "visible" && pendingWhileHiddenRef.current) {
+        pendingWhileHiddenRef.current = false;
+        router.refresh();
+      }
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       supabase.removeChannel(channel);
     };
   }, [router]);
