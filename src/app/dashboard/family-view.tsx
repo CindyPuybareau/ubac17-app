@@ -122,7 +122,11 @@ export default function FamilyView({
   headerWeekEvents,
   showHeaderWeekBanner,
   featuredHighlights,
+  showChildAccess = true,
 }: {
+  // Bloc "Accès enfant" (audit visuel du 12/11) : voir buildFamilyView
+  // (page.tsx) -- uniquement dans "Mes enfants" quand cet onglet existe.
+  showChildAccess?: boolean;
   events: AdminUpcomingEvent[];
   rsvpPlayers: CalendarRsvpPlayer[];
   rsvpStatusByKey: Record<string, string>;
@@ -459,7 +463,7 @@ export default function FamilyView({
               ici à l'identique) -- visible seulement ici désormais. */}
           {showHeaderWeekBanner && (
             <div className="rounded-2xl bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-4 shadow-md sm:px-6 sm:py-5">
-              <WeekStripBanner events={headerWeekEvents} />
+              <WeekStripBanner events={headerWeekEvents} title="Ma semaine" />
             </div>
           )}
 
@@ -498,7 +502,7 @@ export default function FamilyView({
 
           {/* Retour de Cindy du 24/09 ("Accès enfant au dessus du calendrier
               UBAC") : les deux réglages restent groupés tout en bas. */}
-          <ChildAccessManager />
+          {showChildAccess && <ChildAccessManager />}
           <CalendarSubscribe />
         </div>
       ),

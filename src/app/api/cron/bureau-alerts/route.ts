@@ -7,7 +7,7 @@ import {
   sendCotisationRelances,
 } from "@/lib/cotisation-relance";
 import { volunteerRoleLabel } from "@/app/dashboard/event-volunteer-needs";
-import { resolveTeamPushSubscriptions, sendWebPush } from "@/lib/push-targets";
+import { resolveBureauPushSubscriptions, resolveTeamPushSubscriptions, sendWebPush } from "@/lib/push-targets";
 import { runBatched } from "@/lib/batch";
 
 // Une pénalité encore due n'est jamais relancée plus souvent que ça — pas
@@ -254,6 +254,10 @@ async function runPenaliteRelances(supabase: ReturnType<typeof createServiceClie
   return { sent, skippedNoEmail, checked };
 }
 
+// Un besoin relancé ce matin, pour le récapitulatif Bureau (voir
+// runVolunteerNeedReminders).
+type RemindedNeed = { roleLabel: string; remaining: number; eventId: string };
+
 type VolunteerEventRow = {
   id: string;
   title: string | null;
@@ -308,7 +312,7 @@ async function runVolunteerNeedRemindersForStage(
     .lt("start_time", dayAfter.toISOString());
 
   if (eventsError || !eventsData || eventsData.length === 0) {
-    return { sent: 0, checked: 0 };
+    return { sent: 0, checked: 0, reminded: [] as RemindedNeed[] };
   }
 
   const events = eventsData as VolunteerEventRow[];
@@ -321,7 +325,7 @@ async function runVolunteerNeedRemindersForStage(
     .is(stage.column, null);
 
   if (needsError || !needsData || needsData.length === 0) {
-    return { sent: 0, checked: 0 };
+    return { sent: 0, checked: 0, reminded: [] as RemindedNeed[] };
   }
 
   const needs = needsData as VolunteerNeedRow[];
@@ -361,6 +365,7 @@ async function runVolunteerNeedRemindersForStage(
   }
 
   let sent = 0;
+  const reminded: RemindedNeed[] = [];
   // Retour de l'audit du 05/10 ("il faut revoir les requêtes") : même
   // correctif que les deux fonctions précédentes.
   await runBatched(
@@ -379,6 +384,7 @@ async function runVolunteerNeedRemindersForStage(
         month: "long",
         timeZone: "Europe/Paris",
       });
+      reminded.push({ roleLabel, remaining, eventId: event.id });
       const title = "Besoin bénévole non pourvu";
       const body = `${roleLabel} — encore ${remaining} place${remaining > 1 ? "s" : ""} pour ${
         event.title ?? "un événement"
@@ -422,7 +428,7 @@ async function runVolunteerNeedRemindersForStage(
     4
   );
 
-  return { sent, checked: needs.length };
+  return { sent, checked: needs.length, reminded };
 }
 
 async function runVolunteerNeedReminders(supabase: ReturnType<typeof createServiceClient>) {
@@ -439,6 +445,38 @@ async function runVolunteerNeedReminders(supabase: ReturnType<typeof createServi
     runVolunteerNeedRemindersForStage(supabase, { daysAhead: 7, column: "reminder_sent_at" }),
     runVolunteerNeedRemindersForStage(supabase, { daysAhead: 3, column: "reminder_sent_at_j3" }),
   ]);
+
+  // Récapitulatif Bureau (audit visuel du 12/11, validé par Cindy) : UNE
+  // notification par jour au lieu d'une par besoin -- les relances besoin
+  // par besoin ci-dessus restent adressées aux familles des équipes
+  // concernées, mais n'arrivent plus dans la cloche du Bureau (voir la
+  // migration 20261112110000_bureau_notifications_only_actionable.sql).
+  const reminded = [...j7.reminded, ...j3.reminded];
+  if (reminded.length > 0) {
+    const places = reminded.reduce((sum, r) => sum + r.remaining, 0);
+    const eventCount = new Set(reminded.map((r) => r.eventId)).size;
+    const byRole = new Map<string, number>();
+    reminded.forEach((r) => byRole.set(r.roleLabel, (byRole.get(r.roleLabel) ?? 0) + r.remaining));
+    const detail = Array.from(byRole.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([label, n]) => (n > 1 ? `${label} ×${n}` : label))
+      .join(", ");
+    const title = "Besoins bénévoles à pourvoir";
+    const body = `${places} place${places > 1 ? "s" : ""} à trouver sur ${eventCount} événement${
+      eventCount > 1 ? "s" : ""
+    } (dans 3 et 7 jours) : ${detail}.`;
+    const { error: digestError } = await supabase
+      .from("notifications")
+      .insert({ restricted_audience: "BUREAU", title, body, url: "/dashboard" });
+    if (digestError) {
+      console.error("[bureau-alerts] récapitulatif Bureau échoué:", digestError);
+    }
+    try {
+      await sendWebPush(await resolveBureauPushSubscriptions(supabase), { title, body, url: "/dashboard" });
+    } catch (pushError) {
+      console.error("[bureau-alerts] push récapitulatif Bureau échoué:", pushError);
+    }
+  }
 
   return { sent: j7.sent + j3.sent, checked: j7.checked + j3.checked };
 }

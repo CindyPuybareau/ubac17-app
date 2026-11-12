@@ -4,13 +4,11 @@ import { useMemo, useState, type ReactNode } from "react";
 import {
   AlarmClock,
   Ban,
-  Cake,
-  Check,
+  Cake,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronUp,
-  Clock,
+  ChevronUp,
   Euro,
   Eye,
   Home,
@@ -18,10 +16,17 @@ import {
   List,
   MapPin,
   PartyPopper,
-  Sparkles,
-  Users,
-  X,
+  Sparkles,
 } from "lucide-react";
+import {
+  RSVP_PILL_BASE,
+  RSVP_PILL_CLASSES,
+  RSVP_PILL_CLICKABLE,
+  RSVP_PILL_OPEN,
+  RsvpPillIcon,
+  rsvpPillLabel,
+  type RsvpPillVariant,
+} from "@/app/dashboard/rsvp-pills";
 import {
   styleFor,
   isMatchType,
@@ -610,140 +615,70 @@ function BirthdayRow({ name }: { name: string | null }) {
 // seul (pas de nom de famille dans une liste de présences — l'onglet Mon
 // Équipe montre déjà qui est qui, voir child-team-tab.tsx).
 function AttendanceSummary({ attendance }: { attendance: { name: string | null; status: string }[] }) {
-  const [open, setOpen] = useState(false);
-  // Retour de Cindy du 11/09 ("qui est absent ?") : état séparé, pour que
-  // déplier les absents ne déplie pas aussi les présents et vice versa.
-  const [absentOpen, setAbsentOpen] = useState(false);
-  // Retour de Cindy du 18/09 ("voir aussi les joueurs en attente, partout
-  // où c'est nécessaire") : même principe que absentOpen ci-dessus.
-  const [pendingOpen, setPendingOpen] = useState(false);
+  // Audit visuel du 12/11 ("pas de doublons d'informations") : les
+  // pastilles sont cliquables et déplient les prénoms, une à la fois --
+  // plus de seconde ligne "8 joueurs/joueuses présent(e)s" répétant le même
+  // chiffre (présents : 25/08, absents : 11/09, en attente : 18/09).
+  const [openVariant, setOpenVariant] = useState<"present" | "absent" | "pending" | null>(null);
   const present = attendance.filter((a) => a.status === "PRESENT");
   const late = attendance.filter((a) => a.status === "LATE");
   const absent = attendance.filter((a) => a.status === "ABSENT");
   const pending = attendance.filter((a) => a.status === "PENDING" || (a.status !== "PRESENT" && a.status !== "LATE" && a.status !== "ABSENT"));
-  const presentAndLate = [...present, ...late];
+  // Les retardataires seront là : listés avec les présents, comme avant.
+  const namesByVariant = { present: [...present, ...late], absent, pending };
+  const pills: { variant: RsvpPillVariant; count: number }[] = [
+    { variant: "present", count: present.length },
+    ...(late.length > 0 ? [{ variant: "late" as const, count: late.length }] : []),
+    { variant: "absent", count: absent.length },
+    { variant: "pending", count: pending.length },
+  ];
 
   return (
-    <div className="mt-3 flex flex-col gap-1.5 border-t border-zinc-100 pt-3">
+    <div className="mt-3 flex flex-col gap-2 border-t border-zinc-100 pt-3">
       <div className="flex flex-wrap gap-1.5">
-        {/* Retour de Cindy du 09/09 (phase 1 UX, couleurs sémantiques) :
-            status-* (globals.css) plutôt qu'emerald/amber/red codées en
-            dur -- même migration que calendar-view.tsx (AttendanceSummary,
-            équivalent Bureau/Coach de ce résumé côté Enfant). */}
-        <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-status-success/10 px-2 py-0.5 text-xs font-semibold leading-none text-status-success">
-          <Check className="h-3 w-3" />
-          {present.length} présent{present.length > 1 ? "s" : ""}
-        </span>
-        {late.length > 0 && (
-          <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-status-pending/10 px-2 py-0.5 text-xs font-semibold leading-none text-status-pending-dark">
-            <Clock className="h-3 w-3" />
-            {late.length} en retard
-          </span>
-        )}
-        <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-status-urgent/10 px-2 py-0.5 text-xs font-semibold leading-none text-status-urgent-dark">
-          <X className="h-3 w-3" />
-          {absent.length} absent{absent.length > 1 ? "s" : ""}
-        </span>
-        <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold leading-none text-zinc-600">
-          <Clock className="h-3 w-3" />
-          {pending.length} en attente
-        </span>
+        {pills.map(({ variant, count }) => {
+          const content = (
+            <>
+              <RsvpPillIcon variant={variant} />
+              {rsvpPillLabel(variant, count)}
+            </>
+          );
+          if (variant === "late" || count === 0) {
+            return (
+              <span key={variant} className={`${RSVP_PILL_BASE} ${RSVP_PILL_CLASSES[variant]}`}>
+                {content}
+              </span>
+            );
+          }
+          const isOpen = openVariant === variant;
+          return (
+            <button
+              key={variant}
+              type="button"
+              aria-expanded={isOpen}
+              onClick={() => setOpenVariant(isOpen ? null : variant)}
+              className={`${RSVP_PILL_BASE} ${RSVP_PILL_CLASSES[variant]} ${RSVP_PILL_CLICKABLE} ${
+                isOpen ? RSVP_PILL_OPEN : ""
+              }`}
+            >
+              {content}
+              {isOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+            </button>
+          );
+        })}
       </div>
-      {presentAndLate.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:text-zinc-900"
-          >
-            <Users className="h-3.5 w-3.5 shrink-0 text-status-success" />
-            {presentAndLate.length}{" "}
-            {presentAndLate.length > 1 ? "joueurs/joueuses présent(e)s" : "joueur/joueuse présent(e)"}
-            {open ? <ChevronUp className="h-3.5 w-3.5 shrink-0" /> : <ChevronDown className="h-3.5 w-3.5 shrink-0" />}
-          </button>
-          {open && (
-            <div className="flex flex-wrap gap-1.5">
-              {[...presentAndLate]
-                .sort((a, b) => formatFirstName(a.name).localeCompare(formatFirstName(b.name), "fr"))
-                .map((a, i) => (
-                  <span
-                    key={i}
-                    className="inline-flex items-center gap-1 rounded-full bg-status-success/10 px-2.5 py-1 text-xs font-medium text-status-success"
-                  >
-                    {formatFirstName(a.name)}
-                  </span>
-                ))}
-            </div>
-          )}
-        </div>
-      )}
-      {/* Retour de Cindy du 11/09 ("qui est absent ?") : même principe que
-          présent/en retard ci-dessus, en rouge (status-urgent). */}
-      {absent.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          <button
-            type="button"
-            onClick={() => setAbsentOpen((v) => !v)}
-            className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:text-zinc-900"
-          >
-            <Users className="h-3.5 w-3.5 shrink-0 text-status-urgent-dark" />
-            {absent.length}{" "}
-            {absent.length > 1 ? "joueurs/joueuses absent(e)s" : "joueur/joueuse absent(e)"}
-            {absentOpen ? (
-              <ChevronUp className="h-3.5 w-3.5 shrink-0" />
-            ) : (
-              <ChevronDown className="h-3.5 w-3.5 shrink-0" />
-            )}
-          </button>
-          {absentOpen && (
-            <div className="flex flex-wrap gap-1.5">
-              {[...absent]
-                .sort((a, b) => formatFirstName(a.name).localeCompare(formatFirstName(b.name), "fr"))
-                .map((a, i) => (
-                  <span
-                    key={i}
-                    className="inline-flex items-center gap-1 rounded-full bg-status-urgent/10 px-2.5 py-1 text-xs font-medium text-status-urgent-dark"
-                  >
-                    {formatFirstName(a.name)}
-                  </span>
-                ))}
-            </div>
-          )}
-        </div>
-      )}
-      {/* Retour de Cindy du 18/09 ("voir aussi les joueurs en attente") :
-          même principe que présent/absent ci-dessus, en gris neutre --
-          même teinte que le badge "X en attente" plus haut. */}
-      {pending.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          <button
-            type="button"
-            onClick={() => setPendingOpen((v) => !v)}
-            className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:text-zinc-900"
-          >
-            <Users className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
-            {pending.length}{" "}
-            {pending.length > 1 ? "joueurs/joueuses en attente" : "joueur/joueuse en attente"}
-            {pendingOpen ? (
-              <ChevronUp className="h-3.5 w-3.5 shrink-0" />
-            ) : (
-              <ChevronDown className="h-3.5 w-3.5 shrink-0" />
-            )}
-          </button>
-          {pendingOpen && (
-            <div className="flex flex-wrap gap-1.5">
-              {[...pending]
-                .sort((a, b) => formatFirstName(a.name).localeCompare(formatFirstName(b.name), "fr"))
-                .map((a, i) => (
-                  <span
-                    key={i}
-                    className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-600"
-                  >
-                    {formatFirstName(a.name)}
-                  </span>
-                ))}
-            </div>
-          )}
+      {openVariant && (
+        <div className="flex flex-wrap gap-1.5">
+          {[...namesByVariant[openVariant]]
+            .sort((a, b) => formatFirstName(a.name).localeCompare(formatFirstName(b.name), "fr"))
+            .map((a, i) => (
+              <span
+                key={i}
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${RSVP_PILL_CLASSES[openVariant]}`}
+              >
+                {formatFirstName(a.name)}
+              </span>
+            ))}
         </div>
       )}
     </div>
@@ -896,7 +831,7 @@ export function EventRow({
           />
         </div>
       )}
-      {attendance && attendance.length > 0 && <AttendanceSummary attendance={attendance} />}
+      {attendance && attendance.length > 0 && !event.cancelledAt && <AttendanceSummary attendance={attendance} />}
       {extra}
     </div>
   );

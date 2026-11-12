@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import webpush from "web-push";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 
 // Envoi côté serveur : la clé privée VAPID ne doit jamais atteindre le
 // navigateur. Le ciblage passe par push_targets_for_event, qui vérifie
@@ -24,11 +25,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Non connecté." }, { status: 401 });
   }
 
-  const { eventId, title, body, url } = (await request.json()) as {
+  const { eventId, title, body, url, kind } = (await request.json()) as {
     eventId?: string;
     title?: string;
     body?: string;
     url?: string;
+    // "change" : appel après modification d'horaire/lieu (create-event-form.tsx).
+    kind?: "change";
   };
   if (!eventId) {
     return NextResponse.json({ error: "eventId manquant." }, { status: 400 });
@@ -45,7 +48,32 @@ export async function POST(request: Request) {
   // l'envoi push (best-effort, jamais bloquant) — un parent qui ouvre son
   // espace plus tard doit retrouver l'alerte même s'il n'était abonné à
   // rien au moment de l'envoi.
-  try {
+  //
+  // Audit visuel du 12/11 ("une seule notification par changement") : une
+  // modification d'horaire/lieu est DÉJÀ inscrite dans la cloche par le
+  // déclencheur SQL notify_event_change ("Événement modifié : nouvelle
+  // heure...", plus précis, et qui couvre aussi la synchro FFBB) -- cette
+  // route en ajoutait une seconde ("UBAC — équipe : Changement..."). Pour un
+  // changement, on n'écrit donc l'historique que si le déclencheur ne l'a
+  // pas fait (interrupteur Bureau coupé) ; le push vers les téléphones,
+  // lui, part toujours.
+  let historyAlreadyWritten = false;
+  if (kind === "change") {
+    try {
+      const { data: recent } = await createServiceClient()
+        .from("notifications")
+        .select("id")
+        .eq("event_id", eventId)
+        .eq("title", "Événement modifié")
+        .gte("created_at", new Date(Date.now() - 2 * 60 * 1000).toISOString())
+        .limit(1);
+      historyAlreadyWritten = (recent ?? []).length > 0;
+    } catch {
+      // Dans le doute, on écrit : mieux vaut un doublon qu'une alerte perdue.
+    }
+  }
+
+  if (!historyAlreadyWritten) try {
     const { data: eventRow } = await supabase
       .from("events")
       .select("team_id, target_team_ids, target_profile_ids, event_type, restricted_audience")

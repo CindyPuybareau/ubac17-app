@@ -5239,12 +5239,19 @@ export default async function DashboardPage({
   const familyChildrenDashboardSummary =
     activeTab === "children" ? activeFamilySummary : emptyFamilySummary;
 
+  // showChildAccess (audit visuel du 12/11) : le bloc "Accès enfant" ne vit
+  // que dans "Mes enfants" -- il était aussi répété dans "Mon équipe" d'un
+  // parent qui joue lui-même. Gardé dans "Mon équipe" seulement quand
+  // l'onglet "Mes enfants" n'existe pas (enfants déjà couverts par une
+  // équipe coachée, voir hasChildrenTab) : sinon il deviendrait introuvable.
   function buildFamilyView(
     rsvpPlayers: typeof familyRsvpPlayers,
-    dashboardSummary: SpaceDashboardSummary
+    dashboardSummary: SpaceDashboardSummary,
+    showChildAccess: boolean
   ) {
     return (
       <FamilyView
+        showChildAccess={showChildAccess}
         events={familyEvents}
         rsvpPlayers={rsvpPlayers}
         rsvpStatusByKey={familyRsvpStatusByKey}
@@ -5356,7 +5363,10 @@ export default async function DashboardPage({
       // coachedTeams (connu avant coachPromise) plutôt que
       // coachTeamsWithRoster (vide tant que ce bloc n'a pas tourné) : le
       // libellé reste correct même quand cet onglet n'est pas l'actif.
-      label: coachedTeams.length > 1 ? "Équipes coachées" : "Équipe coachée",
+      // Audit visuel du 12/11 : "Coach" tout court -- "Équipes coachées"
+      // était coupé sur téléphone ("Équipes coachées...") et "Coach" ne se
+      // confond pas avec "Mon équipe".
+      label: "Coach",
       // Retour de Cindy du 11/09 : même icône que le rond "Coach"
       // (team-selector-pills.tsx).
       icon: "clipboard",
@@ -5410,7 +5420,7 @@ export default async function DashboardPage({
       icon: "shirt",
       content:
         activeTab === "own-team"
-          ? buildFamilyView(myTeamRsvpPlayers, familyOwnTeamDashboardSummary)
+          ? buildFamilyView(myTeamRsvpPlayers, familyOwnTeamDashboardSummary, !hasChildrenTab)
           : null,
     });
   }
@@ -5431,7 +5441,7 @@ export default async function DashboardPage({
       icon: "users",
       content:
         activeTab === "children"
-          ? buildFamilyView(myChildrenRsvpPlayers, familyChildrenDashboardSummary)
+          ? buildFamilyView(myChildrenRsvpPlayers, familyChildrenDashboardSummary, true)
           : null,
     });
   }

@@ -29,10 +29,18 @@ import {
   Sparkles,
   StickyNote,
   Trash2,
-  Users,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import {
+  RSVP_PILL_BASE,
+  RSVP_PILL_CLASSES,
+  RSVP_PILL_CLICKABLE,
+  RSVP_PILL_OPEN,
+  RsvpPillIcon,
+  rsvpPillLabel,
+  type RsvpPillVariant,
+} from "./rsvp-pills";
 import { formatAmount } from "./cotisation-shared";
 import EmptyState from "./empty-state";
 import FfbbRankingTable from "./ffbb-ranking-table";
@@ -304,26 +312,6 @@ export type CalendarRsvpPlayer = {
 // optimiste local reste le seul filet, comme avant.
 type RsvpPlayersListVariant = "present" | "absent" | "pending";
 
-const RSVP_PLAYERS_LIST_VARIANTS: Record<
-  RsvpPlayersListVariant,
-  { iconColorClass: string; labelSingular: string; labelPlural: string }
-> = {
-  present: {
-    iconColorClass: "text-status-success",
-    labelSingular: "joueur/joueuse présent(e)",
-    labelPlural: "joueurs/joueuses présent(e)s",
-  },
-  absent: {
-    iconColorClass: "text-status-urgent-dark",
-    labelSingular: "joueur/joueuse absent(e)",
-    labelPlural: "joueurs/joueuses absent(e)s",
-  },
-  pending: {
-    iconColorClass: "text-zinc-500",
-    labelSingular: "joueur/joueuse en attente",
-    labelPlural: "joueurs/joueuses en attente",
-  },
-};
 
 type RsvpPlayersListPlayer = { id: string; firstName: string | null; lastName: string | null };
 
@@ -340,7 +328,6 @@ function RsvpPlayersList({
   canManage?: boolean;
   onStatusChange?: (player: RsvpPlayersListPlayer, previousStatus: string, newStatus: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [prevPlayers, setPrevPlayers] = useState(players);
   if (players !== prevPlayers) {
@@ -377,25 +364,10 @@ function RsvpPlayersList({
   const visiblePlayers = players.filter((p) => !hiddenIds.has(p.id));
   if (visiblePlayers.length === 0) return null;
 
-  const { iconColorClass, labelSingular, labelPlural } = RSVP_PLAYERS_LIST_VARIANTS[variant];
   const isPresent = variant === "present";
 
   return (
-    <div className="flex flex-col gap-1.5 border-t border-zinc-100 pt-2">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:text-zinc-900"
-      >
-        <Users className={`h-3.5 w-3.5 shrink-0 ${iconColorClass}`} />
-        {visiblePlayers.length} {visiblePlayers.length > 1 ? labelPlural : labelSingular}
-        {open ? (
-          <ChevronUp className="h-3.5 w-3.5 shrink-0" />
-        ) : (
-          <ChevronDown className="h-3.5 w-3.5 shrink-0" />
-        )}
-      </button>
-      {open && (
+    <div className="flex flex-col gap-1.5">
         <div className="flex flex-wrap gap-1.5">
           {sortByLastName(visiblePlayers, (p) => p.lastName).map((p) => {
             // "en attente" n'a pas de statut de départ (retour de Cindy du
@@ -470,30 +442,96 @@ function RsvpPlayersList({
             );
           })}
         </div>
-      )}
       {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   );
 }
 
-// Exportée le 14/09 (retour de Cindy, "duplication de l'événement à venir
-// dans le tableau de bord") : réutilisée telle quelle par DayEventCard
-// (week-strip-banner.tsx), jamais reconstruite à part.
-export function PresentPlayersList(props: Omit<Parameters<typeof RsvpPlayersList>[0], "variant">) {
-  return <RsvpPlayersList variant="present" {...props} />;
-}
-
-// Retour de Cindy du 11/09 ("qui est absent ?") : même principe que
-// PresentPlayersList ci-dessus, en rouge (status-urgent) plutôt qu'en
-// émeraude.
-export function AbsentPlayersList(props: Omit<Parameters<typeof RsvpPlayersList>[0], "variant">) {
-  return <RsvpPlayersList variant="absent" {...props} />;
-}
-
-// Retour de Cindy du 18/09 ("voir aussi les joueurs en attente") : même
-// principe, en gris neutre (zinc) plutôt qu'une couleur sémantique.
-export function PendingPlayersList(props: Omit<Parameters<typeof RsvpPlayersList>[0], "variant">) {
-  return <RsvpPlayersList variant="pending" {...props} />;
+// Bloc présences d'une carte d'événement (audit visuel du 12/11) : les
+// pastilles "8 présents · 2 absents · 1 en attente" sont cliquables et
+// déplient la liste des noms correspondante, une à la fois. Remplace
+// l'ancien affichage en double (pastilles + trois lignes dépliables
+// "8 joueurs/joueuses présent(e)s..." répétant les mêmes chiffres).
+// Exporté : même bloc sur le calendrier (renderEventCard) et sur les
+// cartes du tableau de bord (week-strip-banner.tsx), jamais reconstruit.
+// Les compteurs viennent de l'appelant (counts) : ils peuvent dépasser la
+// liste nominative quand celle-ci est scopée (voir RsvpPlayersList) --
+// une pastille sans nom à montrer reste alors un simple badge.
+export function RsvpAttendance({
+  counts,
+  presentPlayers,
+  absentPlayers,
+  pendingPlayers,
+  eventId,
+  canManage = false,
+  onStatusChange,
+}: {
+  counts: { present: number; late: number; absent: number; pending: number };
+  presentPlayers: RsvpPlayersListPlayer[];
+  absentPlayers: RsvpPlayersListPlayer[];
+  pendingPlayers: RsvpPlayersListPlayer[];
+  eventId?: string;
+  canManage?: boolean;
+  onStatusChange?: (player: RsvpPlayersListPlayer, previousStatus: string, newStatus: string) => void;
+}) {
+  const [openVariant, setOpenVariant] = useState<RsvpPlayersListVariant | null>(null);
+  const playersByVariant: Record<RsvpPlayersListVariant, RsvpPlayersListPlayer[]> = {
+    present: presentPlayers,
+    absent: absentPlayers,
+    pending: pendingPlayers,
+  };
+  const pills: { variant: RsvpPillVariant; count: number }[] = [
+    { variant: "present", count: counts.present },
+    ...(counts.late > 0 ? [{ variant: "late" as const, count: counts.late }] : []),
+    { variant: "absent", count: counts.absent },
+    { variant: "pending", count: counts.pending },
+  ];
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap gap-1.5">
+        {pills.map(({ variant, count }) => {
+          const names = variant === "late" ? [] : playersByVariant[variant];
+          const content = (
+            <>
+              <RsvpPillIcon variant={variant} />
+              {rsvpPillLabel(variant, count)}
+            </>
+          );
+          if (variant === "late" || names.length === 0) {
+            return (
+              <span key={variant} className={`${RSVP_PILL_BASE} ${RSVP_PILL_CLASSES[variant]}`}>
+                {content}
+              </span>
+            );
+          }
+          const isOpen = openVariant === variant;
+          return (
+            <button
+              key={variant}
+              type="button"
+              aria-expanded={isOpen}
+              onClick={() => setOpenVariant(isOpen ? null : variant)}
+              className={`${RSVP_PILL_BASE} ${RSVP_PILL_CLASSES[variant]} ${RSVP_PILL_CLICKABLE} ${
+                isOpen ? RSVP_PILL_OPEN : ""
+              }`}
+            >
+              {content}
+              {isOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+            </button>
+          );
+        })}
+      </div>
+      {openVariant && (
+        <RsvpPlayersList
+          variant={openVariant}
+          players={playersByVariant[openVariant]}
+          eventId={eventId}
+          canManage={canManage}
+          onStatusChange={onStatusChange}
+        />
+      )}
+    </div>
+  );
 }
 
 // Même principe que PresentPlayersList ci-dessus, en ambre plutôt qu'en
@@ -2434,64 +2472,25 @@ export default function CalendarView({
             parle que de présence à cet événement précis. */}
         {event.isPaid && <PaidParticipantsList players={event.paidParticipants} />}
 
-        {hasRoster && (
-          <div className="flex flex-wrap gap-1.5">
-            <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-status-success/10 px-2 py-0.5 text-xs font-semibold leading-none text-status-success">
-              <Check className="h-3 w-3" />
-              {rsvpCounts.present} présent
-              {rsvpCounts.present > 1 ? "s" : ""}
-            </span>
-            {rsvpCounts.late > 0 && (
-              <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-status-pending/10 px-2 py-0.5 text-xs font-semibold leading-none text-status-pending-dark">
-                <Clock className="h-3 w-3" />
-                {rsvpCounts.late} en retard
-              </span>
-            )}
-            <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-status-urgent/10 px-2 py-0.5 text-xs font-semibold leading-none text-status-urgent-dark">
-              <X className="h-3 w-3" />
-              {rsvpCounts.absent} absent
-              {rsvpCounts.absent > 1 ? "s" : ""}
-            </span>
-            <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold leading-none text-zinc-600">
-              <Clock className="h-3 w-3" />
-              {rsvpCounts.pending} en attente
-            </span>
-          </div>
+        {/* Présences (audit visuel du 12/11) : pastilles cliquables qui
+            déplient les noms -- "Qui sera là ?" (30/08), "qui est
+            absent ?" (11/09), "les joueurs en attente" (18/09), sans la
+            seconde ligne qui répétait chaque chiffre. Un événement annulé
+            n'affiche plus de présences du tout (le badge "Annulé" et le
+            motif suffisent). */}
+        {hasRoster && !event.cancelledAt && (
+          <RsvpAttendance
+            counts={rsvpCounts}
+            presentPlayers={event.presentPlayers ?? []}
+            absentPlayers={event.absentPlayers ?? []}
+            pendingPlayers={event.pendingPlayers ?? []}
+            eventId={event.id}
+            canManage={canManageEvent}
+            onStatusChange={(p, previousStatus, newStatus) =>
+              updateLocalRsvpStatus(event.id, p.id, p.firstName ?? "", previousStatus, newStatus, p.lastName)
+            }
+          />
         )}
-
-        {/* "Qui sera là ?" — retour de Cindy du 30/08 : visible sur tous
-            les espaces (Bureau/Coach/Famille), plus seulement côté Famille
-            comme avant (voir presentPlayers sur AdminUpcomingEvent). */}
-        <PresentPlayersList
-          players={event.presentPlayers ?? []}
-          eventId={event.id}
-          canManage={canManageEvent}
-          onStatusChange={(p, previousStatus, newStatus) =>
-            updateLocalRsvpStatus(event.id, p.id, p.firstName ?? "", previousStatus, newStatus, p.lastName)
-          }
-        />
-
-        {/* Retour de Cindy du 11/09 ("qui est absent ?") : même endroit,
-            juste après "Qui sera là ?". */}
-        <AbsentPlayersList
-          players={event.absentPlayers ?? []}
-          eventId={event.id}
-          canManage={canManageEvent}
-          onStatusChange={(p, previousStatus, newStatus) =>
-            updateLocalRsvpStatus(event.id, p.id, p.firstName ?? "", previousStatus, newStatus, p.lastName)
-          }
-        />
-
-        {/* Retour de Cindy du 18/09 ("voir aussi les joueurs en attente") :
-            même endroit, juste après "Qui est absent ?". */}
-        <PendingPlayersList
-          players={event.pendingPlayers ?? []}
-          eventId={event.id}
-          canManage={canManageEvent}
-          onStatusChange={(p, previousStatus, newStatus) =>
-            updateLocalRsvpStatus(event.id, p.id, p.firstName ?? "", previousStatus, newStatus, p.lastName)
-          }
-        />
 
         {/* Plus d'appel express ici pour une équipe gérée : le coach ne
             répond pas à la place des familles, il leur demande de le
@@ -2504,7 +2503,7 @@ export default function CalendarView({
             rempart de sécurité supplémentaire (rsvpVisiblePlayers est déjà
             normalement vide sur un match sœur, mais readOnlyExternal
             garantit qu'aucun bouton de réponse n'apparaît jamais dessus). */}
-        {!canManageEvent && !event.readOnlyExternal && rsvpVisiblePlayers.length > 0 && (
+        {!canManageEvent && !event.readOnlyExternal && !event.cancelledAt && rsvpVisiblePlayers.length > 0 && (
           <div className="flex flex-col gap-2 border-t border-zinc-100 pt-2">
             {rsvpVisiblePlayers.map((p) => {
               const playerStatus =
