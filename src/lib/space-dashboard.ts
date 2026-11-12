@@ -164,14 +164,16 @@ export type SpaceDashboardSummary = {
   seasonLabel: string;
   // Retour de Cindy du 12/11 ("taux de présence aux entraînements... repère
   // les équipes qui décrochent") : Bureau uniquement (club entier, teamIds
-  // null), mois en cours, entraînements déjà passés et non annulés. rate =
-  // présents / (présents + absents), sans compter les non-réponses. lowest :
-  // l'équipe au taux le plus bas, parmi celles qui ont au moins
-  // MIN_ANSWERS_FOR_LOWEST réponses (évite de pointer une équipe sur 2
-  // réponses). null hors Bureau, ou sans aucune réponse ce mois-ci.
+  // null), mois en cours, entraînements déjà passés et non annulés.
+  // Décision de Cindy du 12/11 ("un non-votant est considéré comme absent") :
+  // rate = présents / places attendues (effectif x entraînements) -- le
+  // premier calcul, sur les seules réponses, donnait 100 % aux Babys avec
+  // 10 réponses sur 27 enfants. lowest/highest : équipes au taux le plus
+  // bas/haut, parmi celles qui ont au moins MIN_EXPECTED_FOR_RANKING places
+  // attendues. null hors Bureau, ou sans entraînement passé ce mois-ci.
   trainingAttendance: {
     rate: number;
-    answers: number;
+    expected: number;
     lowest: { teamName: string; rate: number } | null;
     // Retour de Cindy du 12/11 : l'équipe la PLUS présente, en vert
     // au-dessus de la moins présente -- même seuil de réponses.
@@ -179,7 +181,7 @@ export type SpaceDashboardSummary = {
   } | null;
 };
 
-const MIN_ANSWERS_FOR_LOWEST = 10;
+const MIN_EXPECTED_FOR_RANKING = 10;
 
 const EMPTY_MATCH_STATS = { played: 0, points: 0, won: 0 };
 
@@ -381,12 +383,12 @@ export async function getSpaceDashboardSummary(
           ? supabase.from("team_players").select("player_id").in("team_id", Array.from(demoTeamIds))
           : Promise.resolve({ data: [] as { player_id: string }[], error: null }),
       // Présence aux entraînements (Bureau, 12/11) : agrégée en base, une
-      // ligne par équipe (voir la migration training_attendance_by_team).
+      // ligne par équipe (voir la migration training_presence_by_team).
       () => {
         if (teamIds !== null) return Promise.resolve({ data: null, error: null });
         const now = new Date();
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-        return supabase.rpc("training_attendance_by_team", { p_from: monthStart, p_to: nowIso });
+        return supabase.rpc("training_presence_by_team", { p_from: monthStart, p_to: nowIso });
       },
     ],
     semaphore
@@ -827,18 +829,17 @@ export async function getSpaceDashboardSummary(
   let trainingAttendance: SpaceDashboardSummary["trainingAttendance"] = null;
   if (teamIds === null) {
     const rows = (
-      (attendanceRes as { data: { team_id: string; present_count: number; absent_count: number }[] | null }).data ?? []
+      (attendanceRes as { data: { team_id: string; present_count: number; expected_count: number }[] | null }).data ?? []
     ).filter((r) => !demoTeamIds.has(r.team_id));
     const present = rows.reduce((sum, r) => sum + r.present_count, 0);
-    const answers = rows.reduce((sum, r) => sum + r.present_count + r.absent_count, 0);
-    if (answers > 0) {
+    const expected = rows.reduce((sum, r) => sum + r.expected_count, 0);
+    if (expected > 0) {
       const teamNameById = new Map(((await getCachedTeams()).data ?? []).map((t) => [t.id, t.name]));
       let lowest: { teamName: string; rate: number } | null = null;
       let highest: { teamName: string; rate: number } | null = null;
       for (const r of rows) {
-        const teamAnswers = r.present_count + r.absent_count;
-        if (teamAnswers < MIN_ANSWERS_FOR_LOWEST) continue;
-        const rate = (r.present_count / teamAnswers) * 100;
+        if (r.expected_count < MIN_EXPECTED_FOR_RANKING) continue;
+        const rate = Math.min(100, (r.present_count / r.expected_count) * 100);
         const entry = { teamName: teamNameById.get(r.team_id) ?? "Équipe", rate };
         if (!lowest || rate < lowest.rate) lowest = entry;
         if (!highest || rate > highest.rate) highest = entry;
@@ -849,7 +850,7 @@ export async function getSpaceDashboardSummary(
         lowest = null;
         highest = null;
       }
-      trainingAttendance = { rate: (present / answers) * 100, answers, lowest, highest };
+      trainingAttendance = { rate: Math.min(100, (present / expected) * 100), expected, lowest, highest };
     }
   }
 
