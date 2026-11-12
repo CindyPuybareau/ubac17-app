@@ -38,10 +38,13 @@ export default function WeekTrainingMatchCards({ events }: { events: WeekStripEv
 
   if (trainings.length === 0 && matches.length === 0) return null;
 
+  // Retour de Cindy du 12/11 ("désolidariser les matchs de la semaine et
+  // les entraînements de la semaine") : chacun dans son propre cadre
+  // blanc -- côte à côte sur grand écran, l'un sous l'autre sur téléphone.
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       {trainings.length > 0 && (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
           {/* Retour de Cindy du 09/11 ("coloré vert pour les entraînements
               et bleu pour les matchs"), précisé aussitôt après ("texte en
               noir... comme Classement, juste icône coloré") : seule l'icône
@@ -61,7 +64,7 @@ export default function WeekTrainingMatchCards({ events }: { events: WeekStripEv
         </div>
       )}
       {matches.length > 0 && (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
           <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-900">
             <Trophy className="h-3.5 w-3.5 shrink-0 text-navy" />
             Match{matches.length > 1 ? "s" : ""} de la semaine

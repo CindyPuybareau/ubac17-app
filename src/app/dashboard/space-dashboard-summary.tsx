@@ -488,11 +488,13 @@ export default function SpaceDashboardSummary({
 
     </div>
 
-    {hasWeekContent && (
+    {/* Coach/Famille/Enfant : WeekTrainingMatchCards pose lui-même un
+        cadre par section (entraînements / matchs, 12/11). Bureau : un cadre
+        pour le prochain jour d'événements. */}
+    {hasWeekContent && weekEvents && <WeekTrainingMatchCards events={effectiveWeekEvents} />}
+    {hasWeekContent && !weekEvents && (
       <div className="flex flex-col gap-3 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
-      {weekEvents ? (
-        <WeekTrainingMatchCards events={effectiveWeekEvents} />
-      ) : (
+      {(
         nextEventsForCards.length > 0 && (
           <div className="flex flex-col gap-1.5">
             <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
