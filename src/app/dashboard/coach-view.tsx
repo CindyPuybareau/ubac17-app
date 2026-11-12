@@ -328,6 +328,17 @@ export default function CoachView({
             </div>
           </div>
 
+          {/* Retour de Cindy du 09/11 ("basculer le bandeau 'Cette semaine'
+              dans le Tableau de bord, pas l'ajouter en plus") : même
+              bandeau, même habillage que lorsqu'il vivait au-dessus des
+              onglets (texte blanc/jaune conçu pour un fond marine, repris
+              ici à l'identique) -- visible seulement ici désormais. */}
+          {showHeaderWeekBanner && (
+            <div className="rounded-2xl bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-4 shadow-md sm:px-6 sm:py-5">
+              <WeekStripBanner events={headerWeekEvents} title="Ma semaine" />
+            </div>
+          )}
+
           {/* Retour de Cindy du 13/09 : résumé de la ou des équipes
               coachées, en premier -- canManagePhoto toujours vrai ici, ce
               coach est bien celui de l'équipe unique éventuellement
@@ -343,17 +354,6 @@ export default function CoachView({
             photoRestrictedTeamIds={siblingTeamIds}
             weekEvents={headerWeekEvents}
           />
-
-          {/* Retour de Cindy du 09/11 ("basculer le bandeau 'Cette semaine'
-              dans le Tableau de bord, pas l'ajouter en plus") : même
-              bandeau, même habillage que lorsqu'il vivait au-dessus des
-              onglets (texte blanc/jaune conçu pour un fond marine, repris
-              ici à l'identique) -- visible seulement ici désormais. */}
-          {showHeaderWeekBanner && (
-            <div className="rounded-2xl bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-4 shadow-md sm:px-6 sm:py-5">
-              <WeekStripBanner events={headerWeekEvents} title="Ma semaine" />
-            </div>
-          )}
 
           {/* Retour de Cindy du 28/10 ("un coach doit pouvoir voir les
               pénalités de ses joueurs, payée ou non, sur le Tableau de

@@ -445,17 +445,6 @@ export default function FamilyView({
             </div>
           </div>
 
-          {/* Retour de Cindy du 13/09 : résumé de cette équipe (ou de
-              l'union des équipes des enfants affichés), en premier --
-              canManagePhoto=false : envoyer la photo d'une équipe reste
-              réservé au Bureau/coach (voir la policy du bucket
-              team-photos), jamais à un parent ou un joueur. */}
-          <SpaceDashboardSummary
-            summary={dashboardSummary}
-            canManagePhoto={false}
-            weekEvents={headerWeekEvents}
-          />
-
           {/* Retour de Cindy du 09/11 ("basculer le bandeau 'Cette semaine'
               dans le Tableau de bord, pas l'ajouter en plus") : même
               bandeau, même habillage que lorsqu'il vivait au-dessus des
@@ -466,6 +455,17 @@ export default function FamilyView({
               <WeekStripBanner events={headerWeekEvents} title="Ma semaine" />
             </div>
           )}
+
+          {/* Retour de Cindy du 13/09 : résumé de cette équipe (ou de
+              l'union des équipes des enfants affichés), en premier --
+              canManagePhoto=false : envoyer la photo d'une équipe reste
+              réservé au Bureau/coach (voir la policy du bucket
+              team-photos), jamais à un parent ou un joueur. */}
+          <SpaceDashboardSummary
+            summary={dashboardSummary}
+            canManagePhoto={false}
+            weekEvents={headerWeekEvents}
+          />
 
           {/* Retour de Cindy du 24/09 ("il serait pas mal que les parents
               ait le bilan d'assiduité de leurs enfants aussi... dans le
