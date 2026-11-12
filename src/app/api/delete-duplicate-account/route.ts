@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { normalizeNameForMatching } from "@/lib/names";
+import { isMinor, isSafeToDelete } from "@/lib/unlinked-accounts";
 
 // Retour de Cindy du 12/11 ("les comptes en double, on peut les supprimer ?
 // une croix par exemple") : écran Bureau "Comptes à rattacher"
@@ -53,11 +54,11 @@ export async function POST(request: Request) {
   }
 
   const [profileRes, ownFicheRes, parentRes, coachRes, linkedFichesRes] = await Promise.all([
-    service.from("profiles").select("id, first_name, last_name, email").eq("id", profileId).maybeSingle(),
+    service.from("profiles").select("id, first_name, last_name, email, last_login_at").eq("id", profileId).maybeSingle(),
     service.from("players").select("id").eq("profile_id", profileId).limit(1),
     service.from("parent_player").select("player_id").eq("parent_id", profileId).limit(1),
     service.from("team_coaches").select("team_id").eq("coach_id", profileId).limit(1),
-    service.from("players").select("first_name, last_name, profile_id").not("profile_id", "is", null),
+    service.from("players").select("first_name, last_name, profile_id, birth_date").not("profile_id", "is", null),
   ]);
   if (profileRes.error || ownFicheRes.error || parentRes.error || coachRes.error || linkedFichesRes.error) {
     return NextResponse.json({ error: "Vérification impossible, réessaie." }, { status: 500 });
@@ -88,20 +89,43 @@ export async function POST(request: Request) {
 
   const first = normalizeNameForMatching(profile.first_name);
   const last = normalizeNameForMatching(profile.last_name);
-  const isDuplicate =
-    Boolean(first) &&
-    Boolean(last) &&
-    (linkedFichesRes.data ?? []).some((p) => {
-      if (p.profile_id === profileId) return false;
-      const pFirst = normalizeNameForMatching(p.first_name);
-      const pLast = normalizeNameForMatching(p.last_name);
-      return (pFirst === first && pLast === last) || (pFirst === last && pLast === first);
-    });
-  if (reason === "duplicate" && !isDuplicate) {
+  const keptFiche =
+    first && last
+      ? (linkedFichesRes.data ?? []).find((p) => {
+          if (p.profile_id === profileId) return false;
+          const pFirst = normalizeNameForMatching(p.first_name);
+          const pLast = normalizeNameForMatching(p.last_name);
+          return (pFirst === first && pLast === last) || (pFirst === last && pLast === first);
+        })
+      : undefined;
+  if (reason === "duplicate" && !keptFiche) {
     return NextResponse.json(
       { error: "Aucune fiche de cette personne n'a d'autre compte : ce n'est pas un doublon." },
       { status: 409 }
     );
+  }
+
+  // Incident du 12/11 (Julien RUSKE) : jamais supprimer le compte que la
+  // personne utilise réellement -- même règle que l'écran (isSafeToDelete).
+  if (reason === "duplicate" && keptFiche) {
+    const { data: keptProfile } = await service
+      .from("profiles")
+      .select("last_login_at")
+      .eq("id", keptFiche.profile_id)
+      .maybeSingle();
+    const safe = isSafeToDelete(profile.last_login_at, {
+      childFiche: isMinor(keptFiche.birth_date),
+      lastLoginAt: keptProfile?.last_login_at ?? null,
+    });
+    if (!safe) {
+      return NextResponse.json(
+        {
+          error:
+            "Suppression refusée : ce compte sert à la personne pour se connecter (plus récemment que l'autre), ou il peut s'agir d'un parent.",
+        },
+        { status: 409 }
+      );
+    }
   }
 
   const { error: deleteError } = await service.auth.admin.deleteUser(profileId);
