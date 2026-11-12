@@ -1,0 +1,14 @@
+-- Retour de Cindy du 12/11 ("feuilles de match... visibles par le Bureau
+-- et les coachs seulement... on ne met que le lien du Drive") : lien du
+-- dossier Google Drive où le comptable dépose les feuilles de match.
+-- Affiché sur les cartes de MATCH OFFICIEL des onglets Bureau et Coach
+-- uniquement (match-sheets-context.tsx) ; modifiable par le Bureau
+-- (Matchs officiels → FFBB). club_settings reste lisible par le Bureau
+-- seul (RLS inchangée) : le lien est lu côté serveur et transmis aux seuls
+-- onglets autorisés (reference-cache.ts, page.tsx).
+--
+-- La valeur elle-même n'est volontairement PAS écrite ici : un lien de
+-- dossier Drive partagé n'a rien à faire dans le code source. Elle a été
+-- saisie directement en base le 12/11, et se modifie depuis l'écran Bureau.
+-- Additif uniquement.
+alter table public.club_settings add column if not exists match_sheets_url text;

@@ -75,6 +75,7 @@ import {
 } from "./season-bilan";
 import { computeUnlinkedAccounts, type UnlinkedAccount } from "@/lib/unlinked-accounts";
 import SelfLinkForm from "./self-link-form";
+import { MatchSheetsProvider } from "./match-sheets-context";
 
 // Retour de Cindy du 29/10 ("je veux du propre") : cette liste de colonnes
 // était recopiée à la main dans 8 requêtes `.select(...)` events quasi
@@ -5182,6 +5183,11 @@ export default async function DashboardPage({
   ]);
   const officialsTrombinoscopePath =
     officialsTrombinoscopeRes.data?.officials_trombinoscope_path ?? null;
+  // Feuilles de match (12/11) : lien Drive, transmis UNIQUEMENT aux onglets
+  // Bureau et Coach (MatchSheetsProvider ci-dessous) -- jamais aux espaces
+  // Famille/Mon équipe/Enfant.
+  const matchSheetsUrl =
+    (officialsTrombinoscopeRes.data as { match_sheets_url?: string | null } | null)?.match_sheets_url ?? null;
 
   const tabs: DashboardTab[] = [];
 
@@ -5301,6 +5307,7 @@ export default async function DashboardPage({
       icon: "shield",
       content:
         activeTab === "admin" ? (
+          <MatchSheetsProvider url={matchSheetsUrl}>
           <AdminView
             dashboardSummary={adminDashboardSummary}
             allowedBriques={viewerAllowedBriques}
@@ -5338,6 +5345,7 @@ export default async function DashboardPage({
             featuredHighlightsAdmin={adminFeaturedHighlights}
             featuredHighlightsEventOptions={adminUpcomingEvents}
           />
+          </MatchSheetsProvider>
         ) : null,
     });
   }
@@ -5373,6 +5381,7 @@ export default async function DashboardPage({
       icon: "clipboard",
       content:
         activeTab === "coach" ? (
+          <MatchSheetsProvider url={matchSheetsUrl}>
           <CoachView
             teams={coachTeamsWithRoster}
             events={coachEvents}
@@ -5401,6 +5410,7 @@ export default async function DashboardPage({
             showHeaderWeekBanner={showHeaderWeekBanner}
             featuredHighlights={featuredHighlights}
           />
+          </MatchSheetsProvider>
         ) : null,
     });
   }
