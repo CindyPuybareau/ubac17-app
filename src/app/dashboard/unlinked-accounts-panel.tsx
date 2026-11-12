@@ -120,7 +120,10 @@ export default function UnlinkedAccountsPanel({
       const res = await fetch("/api/delete-duplicate-account", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profileId: deleteTarget.profileId }),
+        body: JSON.stringify({
+          profileId: deleteTarget.profileId,
+          reason: deleteTarget.duplicateOf ? "duplicate" : "not-member",
+        }),
       });
       const body = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
@@ -189,20 +192,26 @@ export default function UnlinkedAccountsPanel({
                         : "Jamais connecté"}
                     </p>
                   </div>
-                  {account.duplicateOf && (
                     <button
                       type="button"
                       onClick={() => {
                         setError(null);
                         setDeleteTarget(account);
                       }}
-                      aria-label={`Supprimer le compte en double ${account.email ?? name}`}
-                      title="Supprimer ce compte en double"
+                      aria-label={
+                        account.duplicateOf
+                          ? `Supprimer le compte en double ${account.email ?? name}`
+                          : `Supprimer le compte ${account.email ?? name} (ne fait pas partie du club)`
+                      }
+                      title={
+                        account.duplicateOf
+                          ? "Supprimer ce compte en double"
+                          : "Supprimer ce compte (ne fait pas partie du club)"
+                      }
                       className="-mr-1 -mt-1 shrink-0 rounded-full p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600"
                     >
                       <X className="h-4 w-4" />
                     </button>
-                  )}
                 </div>
                 <p className="break-all text-xs text-zinc-500">
                   {account.email}
@@ -369,12 +378,15 @@ export default function UnlinkedAccountsPanel({
 
       <ConfirmDialog
         open={deleteTarget !== null}
-        title="Supprimer ce compte en double ?"
+        title={deleteTarget?.duplicateOf ? "Supprimer ce compte en double ?" : "Supprimer ce compte ?"}
         message={
           deleteTarget ? (
             <>
               Le compte <strong>{deleteTarget.email}</strong> sera supprimé définitivement : on ne pourra plus se
               connecter avec cette adresse.
+              {!deleteTarget.duplicateOf && (
+                <> À faire uniquement si cette personne ne fait pas partie du club (ni membre, ni parent).</>
+              )}
               {deleteTarget.duplicateOf && (
                 <>
                   {" "}
