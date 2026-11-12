@@ -69,8 +69,8 @@ export default function SelfLinkForm() {
       <div className="flex flex-wrap gap-2">
         {(
           [
-            { value: "parent", label: "Je suis parent du joueur" },
-            { value: "self", label: "Je suis le joueur" },
+            { value: "parent", label: "Je suis parent" },
+            { value: "self", label: "C'est ma propre fiche (joueur, coach, dirigeant)" },
           ] as const
         ).map((opt) => (
           <button
@@ -88,15 +88,15 @@ export default function SelfLinkForm() {
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600">
-          Prénom du joueur
+          {role === "parent" ? "Prénom de l'enfant" : "Ton prénom"}
           <input required value={firstName} onChange={(e) => setFirstName(e.target.value)} className={inputClass} />
         </label>
         <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600">
-          Nom du joueur
+          {role === "parent" ? "Nom de l'enfant" : "Ton nom"}
           <input required value={lastName} onChange={(e) => setLastName(e.target.value)} className={inputClass} />
         </label>
         <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600">
-          Date de naissance du joueur
+          {role === "parent" ? "Date de naissance de l'enfant" : "Ta date de naissance"}
           <input
             required
             type="date"
