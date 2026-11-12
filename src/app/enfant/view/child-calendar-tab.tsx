@@ -30,6 +30,7 @@ import {
 import {
   styleFor,
   isMatchType,
+  isRedundantEventTitle,
   formatEventTime,
   formatImpactTime,
   showsImpactTime,
@@ -785,6 +786,7 @@ export function EventRow({
           </span>
         )}
       </div>
+      {(isMatchType(event.eventType) || !isRedundantEventTitle(event.title, style.label)) && (
       <p className={`mt-1 font-semibold text-zinc-900 ${event.cancelledAt ? "line-through text-zinc-400" : ""}`}>
         {/* Retour de Cindy du 19/10 : Domicile/Extérieur ne se répète plus
             ici -- il vit désormais, coloré, sur la ligne du lieu juste en
@@ -793,6 +795,7 @@ export function EventRow({
           ? (parsed.opponent ?? event.title ?? style.label)
           : (event.title ?? style.label)}
       </p>
+      )}
       {event.cancelledAt && event.cancelledReason && (
         <p className="text-xs italic text-zinc-500">Motif : {event.cancelledReason}</p>
       )}

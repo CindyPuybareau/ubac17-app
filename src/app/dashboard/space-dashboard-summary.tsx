@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import Image from "next/image";
-import { Camera, Percent, Users, ShieldCheck, Trophy } from "lucide-react";
+import { Camera, Dumbbell, Percent, Users, ShieldCheck, Trophy } from "lucide-react";
 import { uploadTeamPhoto } from "@/lib/team-photo-upload";
 import AnimatedNumber from "./animated-number";
 import { DayEventCard, type WeekStripEvent } from "./week-strip-banner";
@@ -408,6 +408,38 @@ export default function SpaceDashboardSummary({
         </div>
       </div>
       {uploadError && <p className="text-xs text-red-600">{uploadError}</p>}
+
+      {/* Retour de Cindy du 12/11 ("taux de présence aux entraînements...
+          repère les équipes qui décrochent") : Bureau seulement (fourni
+          uniquement pour le club entier, voir lib/space-dashboard.ts).
+          Bloc à part plutôt qu'une 5e pastille : le filtre Officiels/
+          Amicaux/Tous ci-dessus ne s'applique pas aux entraînements. */}
+      {!showPhoto && summary.trainingAttendance && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-zinc-100 bg-white px-4 py-3 shadow-sm">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-court-green/10">
+            <Dumbbell className="h-4 w-4 text-court-green" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-lg font-bold text-zinc-900">
+              <AnimatedNumber value={summary.trainingAttendance.rate} kind="percent" />
+              <span className="ml-1.5 text-sm font-medium text-zinc-500">de présence aux entraînements ce mois-ci</span>
+            </p>
+            <p className="text-xs text-zinc-500">
+              Sur {summary.trainingAttendance.answers} réponses (présents et absents, sans les non-réponses).
+              {summary.trainingAttendance.lowest && (
+                <>
+                  {" "}
+                  Équipe la plus en retrait :{" "}
+                  <span className="font-semibold text-status-urgent-dark">
+                    {summary.trainingAttendance.lowest.teamName} ({Math.round(summary.trainingAttendance.lowest.rate)} %)
+                  </span>
+                  .
+                </>
+              )}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Retour de Cindy du 01/10 ("le classement apparaisse dans le
           tableau de bord aussi") : même composant que Matchs & Résultats
