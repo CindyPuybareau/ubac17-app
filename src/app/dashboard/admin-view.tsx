@@ -377,15 +377,6 @@ export default function AdminView({
               <FeaturedHighlightsCard highlights={featuredHighlights} calendarSectionKey="home" />
             </div>
           </div>
-          {/* Retour de Cindy du 13/09 : résumé club entier, en premier --
-              c'est désormais le vrai contenu de cet onglet, "Envois
-              automatiques" reste en dessous, secondaire. */}
-          <SpaceDashboardSummary
-            summary={dashboardSummary}
-            canManagePhoto
-            allTeamsForPhoto={teams.map((t) => ({ id: t.id, name: t.name, category: t.category, photoUrl: t.photoUrl ?? null }))}
-          />
-
           {/* Retour de Cindy du 09/11 ("basculer le bandeau 'Cette semaine'
               dans le Tableau de bord, pas l'ajouter en plus") : même
               bandeau, même habillage que lorsqu'il vivait au-dessus des
@@ -396,6 +387,15 @@ export default function AdminView({
               <WeekStripBanner events={headerWeekEvents} />
             </div>
           )}
+
+          {/* Retour de Cindy du 13/09 : résumé club entier, en premier --
+              c'est désormais le vrai contenu de cet onglet, "Envois
+              automatiques" reste en dessous, secondaire. */}
+          <SpaceDashboardSummary
+            summary={dashboardSummary}
+            canManagePhoto
+            allTeamsForPhoto={teams.map((t) => ({ id: t.id, name: t.name, category: t.category, photoUrl: t.photoUrl ?? null }))}
+          />
 
           <AutomationSettings settings={automationSettings} />
         </div>

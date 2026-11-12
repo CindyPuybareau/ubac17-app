@@ -18,20 +18,30 @@ import { createContext, useContext, useState, type ReactNode } from "react";
 // consomme (bascule sa section active) puis l'efface aussitôt -- pour
 // qu'une seconde demande de la MÊME clé plus tard reste bien détectée
 // comme un changement.
+//
+// activeSection (audit visuel du 12/11) : dans l'autre sens, la section
+// réellement affichée par AdminSidebar, publiée pour un composant rendu
+// HORS du menu -- le bandeau "Besoin accompagnant" (club-helper-banner.tsx),
+// désormais visible uniquement sur le Calendrier général.
 const SectionNavContext = createContext<{
   requestedSection: string | null;
   requestSection: (key: string) => void;
   clearRequestedSection: () => void;
+  activeSection: string | null;
+  setActiveSection: (key: string | null) => void;
 } | null>(null);
 
 export function SectionNavProvider({ children }: { children: ReactNode }) {
   const [requestedSection, setRequestedSection] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<string | null>(null);
   return (
     <SectionNavContext.Provider
       value={{
         requestedSection,
         requestSection: setRequestedSection,
         clearRequestedSection: () => setRequestedSection(null),
+        activeSection,
+        setActiveSection,
       }}
     >
       {children}
@@ -50,6 +60,8 @@ export function useSectionNav() {
       requestedSection: null,
       requestSection: () => {},
       clearRequestedSection: () => {},
+      activeSection: null,
+      setActiveSection: () => {},
     }
   );
 }

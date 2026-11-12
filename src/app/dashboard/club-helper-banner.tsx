@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { volunteerAsGuest } from "./event-volunteer-needs";
 import { formatEventTime, styleFor } from "./event-style";
 import SalleBadge from "./salle-badge";
+import { useSectionNav } from "./section-nav-context";
 
 // Retour de Cindy du 08/11 ("pénible de la voir à chaque fois si on n'est
 // pas intéressé") : fermeture par entraînement (pas par appareil entier),
@@ -181,9 +182,17 @@ function ClubHelperCard({ event, onDismiss }: { event: ClubHelperEvent; onDismis
   );
 }
 
+// Retour de Cindy du 12/11 ("visible seulement sur le Calendrier général,
+// là il est partout... c'est chiant") : clés de la section Calendrier
+// général dans chaque espace (Bureau "home", Coach "calendar", Famille
+// "planning" -- voir defaultActiveKey de chaque vue).
+const CALENDAR_SECTION_KEYS = new Set(["home", "calendar", "planning"]);
+
 export default function ClubHelperBanner({ events }: { events: ClubHelperEvent[] }) {
   const dismissedIds = useSyncExternalStore(subscribeDismissed, loadDismissed, getDismissedServerSnapshot);
+  const { activeSection } = useSectionNav();
 
+  if (!activeSection || !CALENDAR_SECTION_KEYS.has(activeSection)) return null;
   const visibleEvents = events.filter((event) => !dismissedIds.has(event.eventId));
   if (visibleEvents.length === 0) return null;
 

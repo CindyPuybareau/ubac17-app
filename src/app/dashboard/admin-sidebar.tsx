@@ -197,7 +197,12 @@ export default function AdminSidebar({
   // fonctionnerait (le bon contenu s'affiche, `active` ne dépend pas de
   // `expanded`) mais le sous-menu resterait visuellement fermé autour de
   // la ligne en surbrillance.
-  const { requestedSection, clearRequestedSection } = useSectionNav();
+  const { requestedSection, clearRequestedSection, setActiveSection } = useSectionNav();
+  // Section affichée, publiée pour le bandeau "Besoin accompagnant"
+  // (audit visuel du 12/11, voir section-nav-context.tsx).
+  useEffect(() => {
+    setActiveSection(active);
+  }, [active, setActiveSection]);
   useEffect(() => {
     if (!requestedSection) return;
     // requestAnimationFrame plutôt qu'un setState direct dans le corps de

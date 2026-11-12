@@ -301,12 +301,6 @@ export default function ChildDashboard({
           <div className="flex w-full items-center justify-center gap-3">
             <FeaturedHighlightsCard highlights={featuredHighlights} calendarSectionKey="calendar" />
           </div>
-          <SpaceDashboardSummary
-            summary={dashboardSummary}
-            canManagePhoto={false}
-            weekEvents={headerWeekEvents}
-          />
-
           {/* Retour de Cindy du 09/11 ("basculer le bandeau 'Cette semaine'
               dans le Tableau de bord, pas l'ajouter en plus", étendu à
               l'Espace Enfant) : vivait dans l'en-tête (voir plus bas, et son
@@ -319,6 +313,12 @@ export default function ChildDashboard({
           <div className="rounded-2xl bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-4 shadow-md sm:px-6 sm:py-5">
             <WeekStripBanner events={headerWeekEvents} title="Ma semaine" />
           </div>
+
+          <SpaceDashboardSummary
+            summary={dashboardSummary}
+            canManagePhoto={false}
+            weekEvents={headerWeekEvents}
+          />
         </div>
       ),
     },
