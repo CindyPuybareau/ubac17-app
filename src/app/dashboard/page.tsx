@@ -74,6 +74,7 @@ import {
   type SeasonVolunteerTally,
 } from "./season-bilan";
 import { computeUnlinkedAccounts, type UnlinkedAccount } from "@/lib/unlinked-accounts";
+import SelfLinkForm from "./self-link-form";
 
 // Retour de Cindy du 29/10 ("je veux du propre") : cette liste de colonnes
 // était recopiée à la main dans 8 requêtes `.select(...)` events quasi
@@ -5637,8 +5638,8 @@ export default async function DashboardPage({
             C&apos;est généralement parce que l&apos;adresse email utilisée ici (
             <span className="font-medium text-zinc-800">{user.email}</span>)
             diffère de celle donnée lors de l&apos;inscription au club. Rien
-            d&apos;inquiétant : le Bureau peut relier ton compte en quelques
-            secondes depuis sa fiche.
+            d&apos;inquiétant : relie-le toi-même ci-dessous, ou demande au
+            Bureau.
           </p>
           <a
             href={`mailto:${EMAIL_REPLY_TO}?subject=${encodeURIComponent(
@@ -5651,6 +5652,9 @@ export default async function DashboardPage({
             <Mail className="h-3.5 w-3.5 shrink-0" />
             Contacter le Bureau
           </a>
+          {/* Retour de Cindy du 12/11 : se relier soi-même avec la date
+              de naissance du joueur (voir self-link-form.tsx). */}
+          <SelfLinkForm />
         </div>
       )}
       </div>
