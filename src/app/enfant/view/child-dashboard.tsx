@@ -13,13 +13,10 @@ import type { AdminSection } from "@/app/dashboard/admin-sidebar";
 import DocumentsPanel from "@/components/club-documents";
 import OrgChartButton from "@/app/dashboard/org-chart-button";
 import PenalitesCard from "@/app/dashboard/penalites-card";
-import FamilyCotisationCard from "@/app/dashboard/family-cotisation-card";
-import EventCotisationsCard from "@/app/dashboard/event-cotisations-card";
 import SpaceDashboardSummary from "@/app/dashboard/space-dashboard-summary";
 import FeaturedHighlightsCard from "@/app/dashboard/featured-highlights-card";
 import type { FeaturedHighlight } from "@/lib/featured-highlights";
 import type { SpaceDashboardSummary as SpaceDashboardSummaryData } from "@/lib/space-dashboard";
-import type { AdminCotisation } from "@/app/dashboard/page";
 import type { PlayerYearStatus } from "@/lib/season";
 import AvatarUpload from "@/app/dashboard/avatar-upload";
 import ChildTileMenu from "./child-tile-menu";
@@ -130,7 +127,6 @@ export default function ChildDashboard({
   notifications,
   notificationsEnabled,
   penalites,
-  cotisations,
   dashboardSummary,
   rsvpCountsByEventId,
   presentPlayersByEventId,
@@ -171,12 +167,6 @@ export default function ChildDashboard({
   // Lecture seule (retour de Cindy du 2026-08-22, "près de Bilan de
   // présence") : saisies par le Bureau, jamais modifiables ici.
   penalites: ChildPenalite[];
-  // "Cotisation & Licence" / "Événements payants" (retour de Cindy du 24/09) :
-  // même AdminCotisation que Bureau/Famille (enfant/view/page.tsx construit
-  // la forme à la main, service_role, un seul enfant) -- FamilyCotisationCard/
-  // EventCotisationsCard filtrent déjà en interne par collecteId, réutilisées
-  // telles quelles (même précédent que PenalitesCard ci-dessus).
-  cotisations: AdminCotisation[];
   // Retour de Cindy du 14/09 ("les enfants aussi doivent avoir leur joli
   // tableau de bord") : même résumé (photo d'équipe, saison, matchs
   // joués/points/victoires, prochains événements) que Bureau/Coach/
@@ -327,17 +317,7 @@ export default function ChildDashboard({
               contrairement aux 3 autres espaces) : un enfant a par
               construction toujours au moins une équipe/des événements. */}
           <div className="rounded-2xl bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-4 shadow-md sm:px-6 sm:py-5">
-            <WeekStripBanner events={headerWeekEvents} />
-          </div>
-
-          {/* Retour de Cindy du 24/09 ("vérifier que ce soit visible pour
-              tout les espaces... elle représente l'onglet Bureau Cotisations
-              & Licences, c'est son reflet") : même paire de cartes que côté
-              Famille (family-view.tsx), la licence toujours visible, les
-              événements payants à part. */}
-          <div className="grid grid-cols-1 gap-4 border-t border-zinc-100 pt-4 sm:grid-cols-2">
-            <FamilyCotisationCard cotisations={cotisations} />
-            <EventCotisationsCard cotisations={cotisations} />
+            <WeekStripBanner events={headerWeekEvents} title="Ma semaine" />
           </div>
         </div>
       ),

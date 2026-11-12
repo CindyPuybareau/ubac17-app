@@ -351,7 +351,7 @@ export default function CoachView({
               ici à l'identique) -- visible seulement ici désormais. */}
           {showHeaderWeekBanner && (
             <div className="rounded-2xl bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-4 shadow-md sm:px-6 sm:py-5">
-              <WeekStripBanner events={headerWeekEvents} />
+              <WeekStripBanner events={headerWeekEvents} title="Ma semaine" />
             </div>
           )}
 

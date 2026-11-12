@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlarmClock, Ban, CalendarDays, Check, Clock, Euro, ExternalLink, MapPin, Sparkles, StickyNote, X } from "lucide-react";
+import { AlarmClock, Ban, CalendarDays, Euro, ExternalLink, MapPin, Sparkles, StickyNote } from "lucide-react";
 import {
   styleFor,
   isMatchType,
@@ -9,7 +9,7 @@ import {
   formatImpactTime,
   showsImpactTime,
 } from "@/app/dashboard/event-style";
-import { PresentPlayersList, AbsentPlayersList, PendingPlayersList } from "@/app/dashboard/calendar-view";
+import { RsvpAttendance } from "@/app/dashboard/calendar-view";
 import { parseMatchTitle, resolveIsHome } from "@/lib/match-display";
 import RsvpControl from "./rsvp-control";
 import MatchTasksPanel from "./match-tasks-panel";
@@ -288,6 +288,9 @@ export function DayEventCard({
   // individuel plus bas.
   const { present, absent, late, pending } = event.rsvpCounts;
   const hasRoster = present + absent + late + pending > 0;
+  // Présent/Absent individuel (Famille) : sans objet sur un événement
+  // annulé (audit visuel du 12/11).
+  const isCancelled = Boolean(event.cancelledAt);
 
   return (
     <div className={shellClass}>
@@ -403,49 +406,25 @@ export function DayEventCard({
 
       {/* Retour de Cindy du 14/09 ("je souhaiterais que les coachs voient
           les présents ou absents... duplication de l'événement à venir") :
-          même bloc compteurs + listes nominatives dépliables que
-          renderEventCard (calendar-view.tsx), sur tous les espaces. */}
-      {hasRoster && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-status-success/10 px-2 py-0.5 text-xs font-semibold leading-none text-status-success">
-            <Check className="h-3 w-3" />
-            {present} présent{present > 1 ? "s" : ""}
-          </span>
-          {late > 0 && (
-            <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-status-pending/10 px-2 py-0.5 text-xs font-semibold leading-none text-status-pending-dark">
-              <Clock className="h-3 w-3" />
-              {late} en retard
-            </span>
-          )}
-          <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-status-urgent/10 px-2 py-0.5 text-xs font-semibold leading-none text-status-urgent-dark">
-            <X className="h-3 w-3" />
-            {absent} absent{absent > 1 ? "s" : ""}
-          </span>
-          <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold leading-none text-zinc-600">
-            <Clock className="h-3 w-3" />
-            {pending} en attente
-          </span>
+          même bloc présences que renderEventCard (calendar-view.tsx), sur
+          tous les espaces -- pastilles cliquables depuis l'audit visuel du
+          12/11, et rien du tout sur un événement annulé. */}
+      {hasRoster && !event.cancelledAt && (
+        <div className="mt-2">
+          <RsvpAttendance
+            counts={event.rsvpCounts}
+            presentPlayers={event.presentPlayers}
+            absentPlayers={event.absentPlayers}
+            pendingPlayers={event.pendingPlayers}
+            eventId={event.id}
+            canManage={(event.source === "coach" || event.source === "bureau") && !event.readOnlyExternal}
+          />
         </div>
       )}
-      <PresentPlayersList
-        players={event.presentPlayers}
-        eventId={event.id}
-        canManage={(event.source === "coach" || event.source === "bureau") && !event.readOnlyExternal}
-      />
-      <AbsentPlayersList
-        players={event.absentPlayers}
-        eventId={event.id}
-        canManage={(event.source === "coach" || event.source === "bureau") && !event.readOnlyExternal}
-      />
-      <PendingPlayersList
-        players={event.pendingPlayers}
-        eventId={event.id}
-        canManage={(event.source === "coach" || event.source === "bureau") && !event.readOnlyExternal}
-      />
 
       {/* Présent/Absent : uniquement côté Famille, un enfant à la fois
           (même composant que family-attendance-requests.tsx). */}
-      {event.source === "family" && event.rsvpPlayers.length > 0 && (
+      {event.source === "family" && !isCancelled && event.rsvpPlayers.length > 0 && (
         <div className="mt-2 flex flex-col gap-2">
           {event.rsvpPlayers.map((p) => (
             <RsvpControl
@@ -529,7 +508,16 @@ export function DayEventCard({
   );
 }
 
-export default function WeekStripBanner({ events }: { events: WeekStripEvent[] }) {
+// title (audit visuel du 12/11) : "Ma semaine" dans les espaces
+// personnels (Coach, Famille, Enfant) ; "Cette semaine" par défaut, gardé
+// pour le Bureau, qui voit tout le club.
+export default function WeekStripBanner({
+  events,
+  title = "Cette semaine",
+}: {
+  events: WeekStripEvent[];
+  title?: string;
+}) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   const today = startOfDay(new Date());
@@ -590,7 +578,7 @@ export default function WeekStripBanner({ events }: { events: WeekStripEvent[] }
             grand et gras, plutôt qu'une simple ligne discrète. */}
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-ubac-yellow">
-            Cette semaine
+            {title}
           </p>
           <p className="mt-0.5 text-lg font-bold text-white">{summary}</p>
         </div>

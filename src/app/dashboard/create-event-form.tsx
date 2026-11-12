@@ -999,7 +999,8 @@ export default function CreateEventForm({
         sendEventPush(
           inserted.id,
           `UBAC — ${editingEvent.teamName}`,
-          `Changement : ${when} à ${heure}${lieu ? ` · ${lieu}` : ""}.`
+          `Changement : ${when} à ${heure}${lieu ? ` · ${lieu}` : ""}.`,
+          "change"
         );
       }
     } else {
