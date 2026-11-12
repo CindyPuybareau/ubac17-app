@@ -249,7 +249,15 @@ export default function SpaceDashboardSummary({
         })
     : "";
 
+  // Retour de Cindy du 12/11 ("désolidariser les entraînements et matchs
+  // de la semaine de Saison 2026-2027") : deux cadres distincts -- la
+  // saison (statistiques, classement, présence) d'un côté, la semaine
+  // (entraînements/matchs, ou le prochain jour côté Bureau) de l'autre. Le
+  // sélecteur d'équipe, en tête du premier cadre, pilote toujours les deux.
+  const hasWeekContent = weekEvents ? effectiveWeekEvents.length > 0 : nextEventsForCards.length > 0;
+
   return (
+    <>
     <div className="flex flex-col gap-3 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
       {/* Retour de Cindy du 14/09 ("nos photos de groupe sont en format
           portrait... têtes coupées, le badge de saison cache une partie
@@ -426,11 +434,13 @@ export default function SpaceDashboardSummary({
               <Dumbbell className="h-4 w-4 text-court-green" />
             </span>
             <div>
+              {/* Retour de Cindy du 12/11 ("pas beau sur petit écran") :
+                  libellé court au-dessus, "de présence" à côté du chiffre --
+                  plus de phrase qui se coupe sur trois lignes. */}
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Entraînements du mois</p>
               <p className="text-xl font-bold leading-tight text-zinc-900">
                 <AnimatedNumber value={summary.trainingAttendance.rate} kind="percent" />
-              </p>
-              <p className="text-[11px] text-zinc-500">
-                Présence aux entraînements <span className="whitespace-nowrap">· ce mois-ci</span>
+                <span className="ml-1 text-sm font-medium text-zinc-500">de présence</span>
               </p>
             </div>
           </div>
@@ -476,6 +486,10 @@ export default function SpaceDashboardSummary({
           sans lien FFBB. */}
       <FfbbRankingTable entries={effectiveRanking} phase={effectiveRankingPhase} />
 
+    </div>
+
+    {hasWeekContent && (
+      <div className="flex flex-col gap-3 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
       {weekEvents ? (
         <WeekTrainingMatchCards events={effectiveWeekEvents} />
       ) : (
@@ -493,7 +507,9 @@ export default function SpaceDashboardSummary({
           </div>
         )
       )}
-    </div>
+      </div>
+    )}
+    </>
   );
 }
 
