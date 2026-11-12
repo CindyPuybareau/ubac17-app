@@ -54,6 +54,14 @@ const nextConfig: NextConfig = {
   // le couper complètement.
   devIndicators: false,
 
+  // Identifiant du build, figé dans le code client ET serveur au moment du
+  // build (audit du 12/11) -- voir src/app/api/version/route.ts et
+  // version-watcher.tsx. Le commit déployé sur Vercel (variable système
+  // disponible pendant le build) ; "local" en développement.
+  env: {
+    APP_BUILD_ID: process.env.VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_DEPLOYMENT_ID || "local",
+  },
+
   // Audit du 11/11 ("fluide au clic") : un espace déjà affiché (Bureau/
   // Coach/Mon équipe/Mes enfants) est réutilisé 30s par le navigateur au
   // lieu d'être entièrement recalculé côté serveur à chaque aller-retour

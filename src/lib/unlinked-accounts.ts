@@ -42,7 +42,9 @@ export type UnlinkedAccount = {
   // Même personne qu'une fiche DÉJÀ reliée à un autre compte : ce compte
   // est un doublon (2e adresse e-mail), pas un parent -- cas réels vus au
   // 12/11. On l'affiche pour information, sans rien proposer de relier.
-  duplicateOf: { playerName: string; email: string | null } | null;
+  // childFiche : la fiche est celle d'un mineur -- doublon OU parent ayant
+  // saisi le nom de son enfant, le Bureau tranche.
+  duplicateOf: { playerName: string; email: string | null; childFiche: boolean } | null;
 };
 
 type PlayerRow = {
@@ -144,7 +146,21 @@ export function computeUnlinkedAccounts({
         duplicateOf = {
           playerName: [p.first_name, p.last_name].filter(Boolean).join(" "),
           email: emailByProfileId.get(p.profile_id) ?? null,
+          childFiche: isMinor(p.birth_date),
         };
+        // Fiche d'enfant : ce compte peut aussi être un PARENT qui a tapé
+        // le nom de son enfant à l'inscription (cas réel vu au 12/11 :
+        // compte "Noa Dobek" créé avec l'adresse du père).
+        if (isMinor(p.birth_date)) {
+          suggestions.push({
+            playerId: p.id,
+            firstName: p.first_name,
+            lastName: p.last_name,
+            birthDate: p.birth_date,
+            kind: "parent",
+            reason: "A peut-être saisi le nom de son enfant à l'inscription",
+          });
+        }
         continue;
       }
       if (sameFull) {
@@ -188,10 +204,11 @@ export function computeUnlinkedAccounts({
     // Le compte correspond à une fiche de MINEUR (ado avec son propre
     // compte) : un mineur n'est le parent de personne -- les fiches au même
     // nom de famille sont ses frères et sœurs (cas réel vu au 12/11).
-    // Un doublon (voir duplicateOf) n'est pas non plus un parent.
+    // Doublon possible (voir duplicateOf) : seule la piste "parent de cet
+    // enfant" est gardée, jamais les autres fiches au même nom de famille.
     const isMinorAccount = suggestions.some((s) => s.kind === "self" && isMinor(s.birthDate));
     const kept = duplicateOf
-      ? []
+      ? suggestions.filter((s) => s.reason.startsWith("A peut-être"))
       : isMinorAccount
         ? suggestions.filter((s) => s.kind === "self")
         : suggestions;
