@@ -43,6 +43,8 @@ import CotisationsManager from "./cotisations-manager";
 import CalendarView from "./calendar-view";
 import { listTeamsForOfficialMatches, listTeamTrombinoscopes, splitTeamName } from "@/lib/teams";
 import MembersTable from "./members-table";
+import UnlinkedAccountsPanel from "./unlinked-accounts-panel";
+import type { UnlinkedAccount } from "@/lib/unlinked-accounts";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import FfbbManager from "./ffbb-manager";
 import SponsorsManager from "./sponsors-manager";
@@ -93,6 +95,7 @@ export default function AdminView({
   inventoryItems,
   sponsorDisplay,
   accessProfiles,
+  unlinkedAccounts,
   penalites,
   buvette,
   automationSettings,
@@ -136,6 +139,9 @@ export default function AdminView({
   inventoryItems: AdminInventoryItem[];
   sponsorDisplay: SponsorDisplay[];
   accessProfiles: AdminAccessProfile[];
+  // Audit des connexions du 12/11 : comptes créés mais reliés à aucune
+  // fiche -- voir lib/unlinked-accounts.ts et unlinked-accounts-panel.tsx.
+  unlinkedAccounts: UnlinkedAccount[];
   penalites: AdminPenalite[];
   // Retour de Cindy du 25/10 ("onglet Buvette dans Paiements") : recette
   // jour par jour (CB/Sumup + espèces) -- voir buvette-manager.tsx.
@@ -429,7 +435,10 @@ export default function AdminView({
       label: "Membres",
       icon: <Contact className={iconClass} />,
       content: (
-        <MembersTable members={members} teams={canonicalTeamRefs} accessProfiles={accessProfiles} />
+        <div className="flex flex-col gap-4">
+          <UnlinkedAccountsPanel accounts={unlinkedAccounts} members={members} />
+          <MembersTable members={members} teams={canonicalTeamRefs} accessProfiles={accessProfiles} />
+        </div>
       ),
     },
     {
