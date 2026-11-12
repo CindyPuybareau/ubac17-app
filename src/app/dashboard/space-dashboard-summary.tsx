@@ -420,23 +420,21 @@ export default function SpaceDashboardSummary({
             <Dumbbell className="h-4 w-4 text-court-green" />
           </span>
           <div className="min-w-0 flex-1">
+            {/* Retour de Cindy du 12/11 ("c'est long... pourquoi 231 ?") :
+                le nombre de réponses était un détail de calcul, retiré --
+                deux lignes courtes seulement. */}
             <p className="text-lg font-bold text-zinc-900">
               <AnimatedNumber value={summary.trainingAttendance.rate} kind="percent" />
-              <span className="ml-1.5 text-sm font-medium text-zinc-500">de présence aux entraînements ce mois-ci</span>
+              <span className="ml-1.5 text-sm font-medium text-zinc-500">présence aux entraînements ce mois-ci</span>
             </p>
-            <p className="text-xs text-zinc-500">
-              Sur {summary.trainingAttendance.answers} réponses (présents et absents, sans les non-réponses).
-              {summary.trainingAttendance.lowest && (
-                <>
-                  {" "}
-                  Équipe la plus en retrait :{" "}
-                  <span className="font-semibold text-status-urgent-dark">
-                    {summary.trainingAttendance.lowest.teamName} ({Math.round(summary.trainingAttendance.lowest.rate)} %)
-                  </span>
-                  .
-                </>
-              )}
-            </p>
+            {summary.trainingAttendance.lowest && (
+              <p className="text-xs text-zinc-500">
+                Plus en retrait :{" "}
+                <span className="font-semibold text-status-urgent-dark">
+                  {summary.trainingAttendance.lowest.teamName} ({Math.round(summary.trainingAttendance.lowest.rate)} %)
+                </span>
+              </p>
+            )}
           </div>
         </div>
       )}
