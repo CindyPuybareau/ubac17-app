@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { FileText, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { ACTION_CHIP_BASE, ACTION_CHIP_COLORS } from "./action-chip";
 
 // Retour de Cindy du 12/11 ("feuilles de match... visibles par le Bureau
 // et les coachs seulement... et si on ne met que le lien du Drive ?") : le
@@ -30,10 +31,13 @@ export function MatchSheetsLink({ eventType }: { eventType: string | null }) {
       target="_blank"
       rel="noreferrer"
       title="Feuilles de match (Google Drive)"
-      className="inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-full border border-zinc-200 px-2 py-0.5 text-[11px] font-medium text-zinc-600 transition-colors hover:border-navy/40 hover:text-navy"
+      className={`${ACTION_CHIP_BASE} ${ACTION_CHIP_COLORS.green}`}
     >
-      <FileText className="h-3 w-3 shrink-0" />
-      Feuilles de match
+      <FileText className="h-3.5 w-3.5 shrink-0" />
+      {/* Libellé court sur téléphone : Score + e-Marque + Feuilles tiennent
+          sur une ligne même sur un petit écran (360px). */}
+      <span className="sm:hidden">Feuilles</span>
+      <span className="hidden sm:inline">Feuilles de match</span>
     </a>
   );
 }

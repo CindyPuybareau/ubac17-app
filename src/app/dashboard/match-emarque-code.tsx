@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, Pencil, QrCode, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { ACTION_CHIP_BASE, ACTION_CHIP_COLORS } from "./action-chip";
 
 // Retour du comptable de Cindy (30/10, via Cindy) : il lui faut le code
 // e-Marque de chaque match officiel à domicile -- même patron que
@@ -93,10 +94,11 @@ export default function MatchEmarqueCode({
       <button
         type="button"
         onClick={openEdit}
-        className="flex w-fit items-center gap-1 rounded-full border border-dashed border-ubac-yellow-dark/50 px-2 py-0.5 text-[11px] font-medium text-ubac-yellow-dark transition-colors hover:border-ubac-yellow-dark hover:bg-ubac-yellow/10"
+        title="Ajouter le code e-Marque"
+        className={`${ACTION_CHIP_BASE} ${ACTION_CHIP_COLORS.yellow}`}
       >
-        <QrCode className="h-3 w-3" />
-        Ajouter le code e-Marque
+        <QrCode className="h-3.5 w-3.5" />
+        e-Marque
       </button>
     );
   }

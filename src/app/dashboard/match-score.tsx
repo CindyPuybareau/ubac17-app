@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, Pencil, Trophy, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { ACTION_CHIP_BASE, ACTION_CHIP_COLORS } from "./action-chip";
 
 // Piste n°6 de l'audit : le coach saisit le score à la main juste après le
 // match, en deux clics — ouvrir le mini-formulaire, valider. Pas d'import
@@ -129,10 +130,11 @@ export default function MatchScore({
       <button
         type="button"
         onClick={openEdit}
-        className="flex w-fit items-center gap-1 rounded-full border border-dashed border-zinc-300 px-2 py-0.5 text-[11px] font-medium text-zinc-400 transition-colors hover:border-zinc-400 hover:text-zinc-600"
+        title="Ajouter le score"
+        className={`${ACTION_CHIP_BASE} ${ACTION_CHIP_COLORS.blue}`}
       >
-        <Trophy className="h-3 w-3" />
-        Ajouter le score
+        <Trophy className="h-3.5 w-3.5" />
+        Score
       </button>
     );
   }
