@@ -173,6 +173,9 @@ export type SpaceDashboardSummary = {
     rate: number;
     answers: number;
     lowest: { teamName: string; rate: number } | null;
+    // Retour de Cindy du 12/11 : l'équipe la PLUS présente, en vert
+    // au-dessus de la moins présente -- même seuil de réponses.
+    highest: { teamName: string; rate: number } | null;
   } | null;
 };
 
@@ -831,15 +834,22 @@ export async function getSpaceDashboardSummary(
     if (answers > 0) {
       const teamNameById = new Map(((await getCachedTeams()).data ?? []).map((t) => [t.id, t.name]));
       let lowest: { teamName: string; rate: number } | null = null;
+      let highest: { teamName: string; rate: number } | null = null;
       for (const r of rows) {
         const teamAnswers = r.present_count + r.absent_count;
         if (teamAnswers < MIN_ANSWERS_FOR_LOWEST) continue;
         const rate = (r.present_count / teamAnswers) * 100;
-        if (!lowest || rate < lowest.rate) {
-          lowest = { teamName: teamNameById.get(r.team_id) ?? "Équipe", rate };
-        }
+        const entry = { teamName: teamNameById.get(r.team_id) ?? "Équipe", rate };
+        if (!lowest || rate < lowest.rate) lowest = entry;
+        if (!highest || rate > highest.rate) highest = entry;
       }
-      trainingAttendance = { rate: (present / answers) * 100, answers, lowest };
+      // Une seule équipe éligible : elle serait à la fois la plus et la
+      // moins présente -- rien à comparer, on n'affiche ni l'une ni l'autre.
+      if (lowest && highest && lowest.teamName === highest.teamName) {
+        lowest = null;
+        highest = null;
+      }
+      trainingAttendance = { rate: (present / answers) * 100, answers, lowest, highest };
     }
   }
 
