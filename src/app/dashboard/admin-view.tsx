@@ -1,6 +1,7 @@
 import {
   Building2,
   CalendarDays,
+  Camera,
   Coffee,
   Contact,
   Gavel,
@@ -44,6 +45,7 @@ import CalendarView from "./calendar-view";
 import { listTeamsForOfficialMatches, listTeamTrombinoscopes, splitTeamName } from "@/lib/teams";
 import MembersTable from "./members-table";
 import UnlinkedAccountsPanel from "./unlinked-accounts-panel";
+import TeamPhotosManager from "./team-photos-manager";
 import type { UnlinkedAccount } from "@/lib/unlinked-accounts";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import FfbbManager from "./ffbb-manager";
@@ -391,11 +393,7 @@ export default function AdminView({
           {/* Retour de Cindy du 13/09 : résumé club entier, en premier --
               c'est désormais le vrai contenu de cet onglet, "Envois
               automatiques" reste en dessous, secondaire. */}
-          <SpaceDashboardSummary
-            summary={dashboardSummary}
-            canManagePhoto
-            allTeamsForPhoto={teams.map((t) => ({ id: t.id, name: t.name, category: t.category, photoUrl: t.photoUrl ?? null }))}
-          />
+          <SpaceDashboardSummary summary={dashboardSummary} canManagePhoto={false} showPhoto={false} />
 
           <AutomationSettings settings={automationSettings} />
         </div>
@@ -669,6 +667,18 @@ export default function AdminView({
           ),
         },
         {
+          // Retour de Cindy du 12/11 (option A) : l'envoi des photos
+          // d'équipe quitte le tableau de bord Bureau pour cet écran dédié.
+          key: "team-photos",
+          label: "Photos d'équipe",
+          icon: <Camera className={iconClass} />,
+          content: (
+            <TeamPhotosManager
+              teams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category, photoUrl: t.photoUrl ?? null }))}
+            />
+          ),
+        },
+        {
           // Retour de Cindy du 25/08 : le Bureau voit les 3 documents
           // (comme partout ailleurs dans l'app, le Bureau a une vision à
           // 100%) — voir club-documents.tsx pour le contenu et la
@@ -824,6 +834,8 @@ export default function AdminView({
     "cotisations-buvette": "cotisations",
     "matches-official": "matchs_resultats",
     sponsors: "sponsors",
+    // Photos d'équipe (12/11) : même brique que l'onglet Équipes.
+    "team-photos": "equipes",
   };
   const documentsVisible =
     !isRestricted ||
