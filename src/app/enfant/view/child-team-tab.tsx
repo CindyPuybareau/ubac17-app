@@ -34,7 +34,7 @@ export default function ChildTeamTab({
 
   return (
     <div className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
-      <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+      <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-900">
         <Users className="h-3.5 w-3.5 text-navy" />
         {title}
       </p>

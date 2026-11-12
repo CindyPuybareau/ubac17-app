@@ -27,7 +27,7 @@ export default function EventCotisationsCard({
 
   return (
     <div className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm sm:p-5">
-      <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+      <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-900">
         <Ticket className="h-3.5 w-3.5 text-ubac-yellow-dark" />
         Événements payants
       </p>

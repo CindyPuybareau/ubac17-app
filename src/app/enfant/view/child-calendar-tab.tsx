@@ -519,7 +519,7 @@ export default function ChildCalendarTab({
 
       {view === "month" && (
         <div className="flex flex-col gap-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-900">
             {selectedKey === todayKey
               ? "Aujourd'hui"
               : selectedDate.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
@@ -559,7 +559,7 @@ export default function ChildCalendarTab({
           )}
           {upcoming.length > 0 && (
             <div className="flex flex-col gap-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">À venir</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-900">À venir</p>
               <div className="flex flex-col gap-4">
                 {upcoming.map((e) => (
                   <EventRow
@@ -575,7 +575,7 @@ export default function ChildCalendarTab({
           )}
           {past.length > 0 && (
             <div className="flex flex-col gap-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Passés</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-900">Passés</p>
               <div className="flex flex-col gap-4">
                 {past.map((e) => (
                   <EventRow

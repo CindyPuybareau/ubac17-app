@@ -23,7 +23,7 @@ export default function FamilyAttendanceSummary({
 }) {
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm sm:p-5">
-      <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+      <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-900">
         <CalendarCheck2 className="h-3.5 w-3.5 text-blue-700" />
         Bilan de présence
       </p>

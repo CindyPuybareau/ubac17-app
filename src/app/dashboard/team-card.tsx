@@ -994,7 +994,7 @@ export default function TeamCard({
       </div>
       <div className="mt-3">
         <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-900">
             Membres
             <span className="ml-1.5 font-medium normal-case tracking-normal text-zinc-400">
               ({visibleMembers.length + (legacyPendingCoachRow ? 1 : 0)}

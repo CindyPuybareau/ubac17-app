@@ -12,7 +12,7 @@ export default function SponsorsDisplay({ sponsors }: { sponsors: SponsorDisplay
 
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
-      <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+      <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-900">
         {/* Retour de Cindy du 30/10 ("le symbole de sponsors... en bleu
             ubac") : seule l'icône, pas le libellé -- reste en text-zinc-400
             comme les autres en-têtes de section (ex. "Nos sponsors" des
