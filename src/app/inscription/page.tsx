@@ -156,6 +156,14 @@ export default function InscriptionPage() {
               onChange={(e) => setEmail(e.target.value)}
               className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-ubac-blue focus:outline-none focus:ring-1 focus:ring-ubac-blue"
             />
+            {/* Audit des connexions du 12/11 : 30 des 31 comptes "vides"
+                avaient été créés avec une adresse absente de toute fiche --
+                l'appli ne relie un compte à sa fiche (ou à celle de son
+                enfant) que par cette adresse. */}
+            <p className="mt-1 text-xs text-zinc-500">
+              Utilise l&apos;adresse e-mail donnée au club lors de l&apos;inscription (licence) : ton
+              espace et celui de tes enfants s&apos;affichent alors automatiquement.
+            </p>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-zinc-700">

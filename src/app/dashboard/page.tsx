@@ -73,6 +73,7 @@ import {
   type SeasonGuestVolunteer,
   type SeasonVolunteerTally,
 } from "./season-bilan";
+import { computeUnlinkedAccounts, type UnlinkedAccount } from "@/lib/unlinked-accounts";
 
 // Retour de Cindy du 29/10 ("je veux du propre") : cette liste de colonnes
 // était recopiée à la main dans 8 requêtes `.select(...)` events quasi
@@ -1819,6 +1820,7 @@ export default async function DashboardPage({
   let adminPenalites: AdminPenalite[] = [];
   let adminBuvette: AdminBuvette[] = [];
   let adminAccessProfiles: AdminAccessProfile[] = [];
+  let adminUnlinkedAccounts: UnlinkedAccount[] = [];
   // The Membres table's team pickers (filter + "Modifier le profil") only
   // offer teams with a sort_order set — any future leftover/legacy import
   // row without one is excluded here (though still visible in the
@@ -2483,6 +2485,17 @@ export default async function DashboardPage({
         .filter(([, teams]) => teams.length > 0 && teams.every((t) => demoTeamIds.has(t.id)))
         .map(([playerId]) => playerId)
     );
+    // "Comptes à rattacher" (audit des connexions du 12/11) : calculé en
+    // mémoire depuis les tables déjà chargées ci-dessus, aucune requête en
+    // plus -- voir lib/unlinked-accounts.ts.
+    adminUnlinkedAccounts = computeUnlinkedAccounts({
+      players: playersRes.data ?? [],
+      profiles: profilesRes.data ?? [],
+      parentLinks: parentPlayerRes.data ?? [],
+      coachLinks: teamCoachesRes.data ?? [],
+      adminEmails: (clubAdminsRes.data ?? []).map((a) => a.email),
+      excludedPlayerIds: demoPlayerIds,
+    });
     const parentIdsByPlayerId = new Map<string, string[]>();
     (parentPlayerRes.data ?? []).forEach((pp) => {
       const list = parentIdsByPlayerId.get(pp.player_id) ?? [];
@@ -5298,6 +5311,7 @@ export default async function DashboardPage({
             inventoryItems={adminInventoryItems}
             sponsorDisplay={sponsorDisplay}
             accessProfiles={adminAccessProfiles}
+            unlinkedAccounts={adminUnlinkedAccounts}
             penalites={adminPenalites}
             buvette={adminBuvette}
             automationSettings={adminAutomationSettings}

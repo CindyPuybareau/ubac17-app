@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Check, Lightbulb, Search, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatPersonName } from "@/lib/names";
+import { normalizePhone } from "@/lib/phone";
 
 type LinkedParent = { id: string; firstName: string | null; lastName: string | null; email: string | null };
 type ProfileMatch = { id: string; firstName: string | null; lastName: string | null; email: string | null; phone: string | null };
@@ -12,18 +13,8 @@ type ProfileMatch = { id: string; firstName: string | null; lastName: string | n
 // ont l'email d'un tiers comme contact) : le seul mécanisme existant
 // (handle_new_user, trigger d'inscription) relie un parent à un enfant
 // UNIQUEMENT par correspondance d'email — rien s'il ne correspond à
-// personne, même si le bon compte existe déjà avec le bon téléphone.
-// Comparaison volontairement simple (9 derniers chiffres significatifs,
-// +33/0 de tête ignorés) : suffisant pour rapprocher "0611223344" et
-// "+33611223344", pas la peine d'une lib de parsing téléphonique pour un
-// signal qui reste de toute façon une SUGGESTION, jamais appliqué seul.
-function normalizePhone(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  const digits = raw.replace(/[^\d+]/g, "");
-  if (!digits) return null;
-  const trimmed = digits.replace(/^\+?33/, "").replace(/^0/, "");
-  return trimmed.length >= 6 ? trimmed : null;
-}
+// personne, même si le bon compte existe déjà avec le bon téléphone
+// (comparaison des téléphones : voir lib/phone.ts).
 
 // Section "Compte(s) parent relié(s)" de la fiche Membre (onglet "Parents
 // & Urgence") : le rattachement automatique par email reste la règle
