@@ -415,22 +415,33 @@ export default function SpaceDashboardSummary({
           Bloc à part plutôt qu'une 5e pastille : le filtre Officiels/
           Amicaux/Tous ci-dessus ne s'applique pas aux entraînements. */}
       {!showPhoto && summary.trainingAttendance && (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-zinc-100 bg-white px-4 py-3 shadow-sm">
+        <div className="flex items-start gap-3 rounded-2xl border border-zinc-100 bg-white px-4 py-3 shadow-sm">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-court-green/10">
             <Dumbbell className="h-4 w-4 text-court-green" />
           </span>
-          <div className="min-w-0 flex-1">
-            {/* Retour de Cindy du 12/11 ("c'est long... pourquoi 231 ?") :
-                le nombre de réponses était un détail de calcul, retiré --
-                deux lignes courtes seulement. */}
-            <p className="text-lg font-bold text-zinc-900">
+          {/* Retour de Cindy du 12/11 (capture téléphone : libellé et nom
+              d'équipe coupés en plein milieu) : le chiffre seul sur sa
+              ligne, le libellé dessous, puis une ligne par équipe -- le
+              nom + taux ne se coupe jamais (whitespace-nowrap). Équipe la
+              plus présente en vert, au-dessus de la moins présente en
+              rouge. */}
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <p className="text-lg font-bold leading-tight text-zinc-900">
               <AnimatedNumber value={summary.trainingAttendance.rate} kind="percent" />
-              <span className="ml-1.5 text-sm font-medium text-zinc-500">présence aux entraînements ce mois-ci</span>
             </p>
+            <p className="text-sm text-zinc-500">Présence aux entraînements ce mois-ci</p>
+            {summary.trainingAttendance.highest && (
+              <p className="mt-1 text-xs text-zinc-500">
+                Équipe la plus présente :{" "}
+                <span className="whitespace-nowrap font-semibold text-status-success">
+                  {summary.trainingAttendance.highest.teamName} ({Math.round(summary.trainingAttendance.highest.rate)} %)
+                </span>
+              </p>
+            )}
             {summary.trainingAttendance.lowest && (
               <p className="text-xs text-zinc-500">
                 Équipe la moins présente :{" "}
-                <span className="font-semibold text-status-urgent-dark">
+                <span className="whitespace-nowrap font-semibold text-status-urgent-dark">
                   {summary.trainingAttendance.lowest.teamName} ({Math.round(summary.trainingAttendance.lowest.rate)} %)
                 </span>
               </p>

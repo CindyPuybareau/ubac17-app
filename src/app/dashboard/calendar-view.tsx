@@ -2316,13 +2316,16 @@ export default function CalendarView({
             )}
           </div>
           {canManageEvent && (
-            <div className="flex shrink-0 items-center gap-1">
+            // Retour de Cindy du 12/11 ("icônes trop grosses, pas assez en haut à
+            // droite") : boutons 28px au lieu de 32px, icônes 14px, collés au
+            // coin de la carte (marges négatives) -- même zone de clic utile.
+            <div className="-mr-2 -mt-2 flex shrink-0 items-center">
               <button
                 onClick={() => startEditingEvent(event)}
                 title="Modifier"
-                className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+                className="flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
               >
-                <Pencil className="h-4 w-4" />
+                <Pencil className="h-3.5 w-3.5" />
               </button>
               {/* Retour de Cindy du 30/10 ("un créneau annulé, comité des
                   fêtes") : jamais vu avant comme une vraie suppression --
@@ -2332,9 +2335,9 @@ export default function CalendarView({
                 <button
                   onClick={() => reactivateEvent(event)}
                   title="Réactiver l'événement"
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
                 >
-                  <RotateCcw className="h-4 w-4" />
+                  <RotateCcw className="h-3.5 w-3.5" />
                 </button>
               ) : (
                 <button
@@ -2344,9 +2347,9 @@ export default function CalendarView({
                     setCancelError(null);
                   }}
                   title="Annuler l'événement"
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-red-400 hover:bg-red-50 hover:text-red-600"
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-red-400 hover:bg-red-50 hover:text-red-600"
                 >
-                  <Ban className="h-4 w-4" />
+                  <Ban className="h-3.5 w-3.5" />
                 </button>
               )}
               <button
@@ -2356,9 +2359,9 @@ export default function CalendarView({
                   setDeleteSeriesScope("one");
                 }}
                 title="Supprimer"
-                className="flex h-8 w-8 items-center justify-center rounded-full text-red-400 hover:bg-red-50 hover:text-red-600"
+                className="flex h-7 w-7 items-center justify-center rounded-full text-red-400 hover:bg-red-50 hover:text-red-600"
               >
-                <Trash2 className="h-4 w-4" />
+                <Trash2 className="h-3.5 w-3.5" />
               </button>
             </div>
           )}
