@@ -3490,7 +3490,7 @@ export default function CalendarView({
                 key={item.kind === "event" ? item.event.id : `bday-${item.member.id}`}
                 className="flex flex-col gap-1"
               >
-                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-900">
                   {toKey(item.date) === todayKey
                     ? "Aujourd'hui"
                     : item.date.toLocaleDateString("fr-FR", {
@@ -3695,7 +3695,7 @@ export default function CalendarView({
 
       {view === "month" && (
       <div className="flex flex-col gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+        <p className="text-xs font-semibold uppercase tracking-wide text-zinc-900">
           {selectedKey === todayKey
             ? "Aujourd'hui"
             : selectedDate.toLocaleDateString("fr-FR", {

@@ -437,7 +437,7 @@ export default function SpaceDashboardSummary({
               {/* Retour de Cindy du 12/11 ("pas beau sur petit écran") :
                   libellé court au-dessus, "de présence" à côté du chiffre --
                   plus de phrase qui se coupe sur trois lignes. */}
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Entraînements du mois</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-700">Entraînements du mois</p>
               <p className="text-xl font-bold leading-tight text-zinc-900">
                 <AnimatedNumber value={summary.trainingAttendance.rate} kind="percent" />
                 <span className="ml-1 text-sm font-medium text-zinc-500">de présence</span>
@@ -497,7 +497,7 @@ export default function SpaceDashboardSummary({
       {(
         nextEventsForCards.length > 0 && (
           <div className="flex flex-col gap-1.5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-900">
               {nextDayLabel}
               {nextEventsForCards.length > 1 ? ` · ${nextEventsForCards.length} événements` : ""}
             </p>

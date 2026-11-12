@@ -65,7 +65,7 @@ function StatCard({
 
   return (
     <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
-      <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+      <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-900">
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ubac-yellow/20 text-ubac-yellow-dark">
           {icon}
         </span>
