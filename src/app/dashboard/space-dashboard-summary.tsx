@@ -2,14 +2,12 @@
 
 import { useRef, useState } from "react";
 import Image from "next/image";
-import { Camera, Users, ShieldCheck, Trophy } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-import { resizeImageForTeamPhoto } from "@/lib/image-resize";
+import { Camera, Percent, Users, ShieldCheck, Trophy } from "lucide-react";
+import { uploadTeamPhoto } from "@/lib/team-photo-upload";
 import AnimatedNumber from "./animated-number";
 import { DayEventCard, type WeekStripEvent } from "./week-strip-banner";
 import TeamSelectorPills from "./team-selector-pills";
-import SelectDropdown from "./select-dropdown";
-import { looseFamilyKey, splitTeamName, teamLabel } from "@/lib/teams";
+import { looseFamilyKey, splitTeamName } from "@/lib/teams";
 import FfbbRankingTable from "./ffbb-ranking-table";
 import WeekTrainingMatchCards from "./week-training-match-cards";
 import type { SpaceDashboardSummary as SpaceDashboardSummaryData } from "@/lib/space-dashboard";
@@ -28,7 +26,7 @@ export default function SpaceDashboardSummary({
   summary,
   canManagePhoto,
   photoRestrictedTeamIds = [],
-  allTeamsForPhoto,
+  showPhoto = true,
   weekEvents,
 }: {
   summary: SpaceDashboardSummaryData;
@@ -41,14 +39,12 @@ export default function SpaceDashboardSummary({
   // le bouton d'envoi de photo dessus, même quand canManagePhoto est vrai
   // pour le reste.
   photoRestrictedTeamIds?: string[];
-  // Retour de Cindy du 30/10 ("l'ajout de photo... depuis le tableau de
-  // bord, logo ubac en haut à droite") : le Bureau n'a jamais d'équipe
-  // active (dashboard club entier, voir effectiveTeamId plus bas) -- sans
-  // la liste de TOUTES les équipes du club ici, impossible de choisir à
-  // qui envoyer une photo. Coach/Famille ne passent rien (déjà scopés via
-  // activeTeam) : le sélecteur ci-dessous ne s'affiche que si cette prop
-  // est fournie.
-  allTeamsForPhoto?: { id: string; name: string | null; category: string | null; photoUrl: string | null }[];
+  // Retour de Cindy du 12/11 ("le Bureau n'a pas besoin des photos d'équipe
+  // dans son tableau de bord") : false côté Bureau -- ni photo, ni pastille
+  // "Joueurs" (doublon de "Membres actifs" juste au-dessus). L'envoi des
+  // photos par le Bureau vit désormais dans Vie du club → Photos d'équipe
+  // (team-photos-manager.tsx) ; les coachs gardent leur bouton ici.
+  showPhoto?: boolean;
   // Retour de Cindy du 09/11 ("tout est mélangé pour Basile... le tri
   // devrait se faire pour chaque équipe") : les cartes "Entraînement(s)/
   // Match(s) de la semaine" vivent maintenant ICI (plus en bloc séparé chez
@@ -147,16 +143,8 @@ export default function SpaceDashboardSummary({
   // la photo tout juste envoyée pour l'équipe A "collait" aussi à l'équipe
   // B après un changement de pastille.
   const [uploadedPhotoByTeam, setUploadedPhotoByTeam] = useState<Record<string, string>>({});
-  // Équipe choisie pour la photo, indépendamment de l'équipe active des KPI
-  // (activeTeam reste club-wide pour le Bureau, voir allTeamsForPhoto) --
-  // première équipe de la liste par défaut.
-  const [photoPickerTeamId, setPhotoPickerTeamId] = useState<string | undefined>(allTeamsForPhoto?.[0]?.id);
-  const photoTargetTeamId = allTeamsForPhoto
-    ? (allTeamsForPhoto.some((t) => t.id === photoPickerTeamId) ? photoPickerTeamId : allTeamsForPhoto[0]?.id) ?? null
-    : effectiveTeamId;
-  const photoTargetBaseUrl = allTeamsForPhoto
-    ? allTeamsForPhoto.find((t) => t.id === photoTargetTeamId)?.photoUrl ?? null
-    : effectiveBasePhotoUrl;
+  const photoTargetTeamId = effectiveTeamId;
+  const photoTargetBaseUrl = effectiveBasePhotoUrl;
   const photoUrl = photoTargetTeamId ? (uploadedPhotoByTeam[photoTargetTeamId] ?? photoTargetBaseUrl) : null;
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -177,39 +165,15 @@ export default function SpaceDashboardSummary({
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file || !photoTargetTeamId) return;
-    if (!file.type.startsWith("image/")) {
-      setUploadError("Choisis une image.");
-      return;
-    }
     setUploading(true);
     setUploadError(null);
-    try {
-      const { blob, ext } = await resizeImageForTeamPhoto(file);
-      const supabase = createClient();
-      const path = `${photoTargetTeamId}/photo.${ext}`;
-      const { error: uploadErr } = await supabase.storage
-        .from("team-photos")
-        .upload(path, blob, { upsert: true, cacheControl: "3600", contentType: blob.type || file.type });
-      if (uploadErr) {
-        setUploadError("Envoi impossible, réessaie.");
-        return;
-      }
-      const { data } = supabase.storage.from("team-photos").getPublicUrl(path);
-      const bustedUrl = `${data.publicUrl}?t=${Date.now()}`;
-      const { error: updateErr } = await supabase
-        .from("teams")
-        .update({ photo_url: bustedUrl })
-        .eq("id", photoTargetTeamId);
-      if (updateErr) {
-        setUploadError("Enregistrement impossible, réessaie.");
-        return;
-      }
-      setUploadedPhotoByTeam((prev) => ({ ...prev, [photoTargetTeamId]: bustedUrl }));
-    } catch {
-      setUploadError("Image illisible, réessaie avec une autre photo.");
-    } finally {
-      setUploading(false);
+    const result = await uploadTeamPhoto(photoTargetTeamId, file);
+    setUploading(false);
+    if ("error" in result) {
+      setUploadError(result.error);
+      return;
     }
+    setUploadedPhotoByTeam((prev) => ({ ...prev, [photoTargetTeamId]: result.url }));
   }
 
   // Retour de Cindy du 13/09 ("la carte prochain événement ne doit pas
@@ -357,32 +321,8 @@ export default function SpaceDashboardSummary({
           tablette (peu de place à côté de la photo), 2 pastilles tiennent
           par ligne ; sur grand écran, les 4 tiennent sur une seule ligne,
           sans rien coder de plus pour ce cas précis. */}
-      {/* Retour de Cindy du 30/10 ("l'ajout de photo... depuis le tableau de
-          bord", puis "c'est lourd tous ces noms d'équipe" en pastilles vu
-          le nombre d'équipes du club) : seul le Bureau reçoit
-          allTeamsForPhoto (club entier, pas d'équipe active) -- Coach/
-          Famille restent scopés via activeTeam, ce sélecteur n'apparaît
-          jamais pour eux. Menu déroulant à sélection unique
-          (select-dropdown.tsx), même composant/habillage que "Toutes les
-          équipes" du Calendrier (TeamFilterDropdown) -- mais celui-là est
-          à sélection MULTIPLE (filtre), alors qu'ici une seule équipe à la
-          fois a un sens (une photo par équipe) : SelectDropdown est son
-          pendant à sélection unique, déjà utilisé ailleurs (cotisation-
-          participants-table.tsx, members-table.tsx) plutôt qu'en réinventer
-          un troisième. */}
-      {allTeamsForPhoto && allTeamsForPhoto.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Photo de l&apos;équipe</p>
-          <SelectDropdown
-            options={allTeamsForPhoto.map((t) => ({ value: t.id, label: teamLabel(t) }))}
-            value={photoTargetTeamId ?? allTeamsForPhoto[0].id}
-            onChange={setPhotoPickerTeamId}
-            icon={Camera}
-          />
-        </div>
-      )}
-
       <div className="flex flex-col gap-3 sm:flex-row">
+        {showPhoto && (
         <div className="relative mx-auto aspect-[4/3] w-full max-w-sm shrink-0 overflow-hidden rounded-2xl border border-zinc-100 bg-navy shadow-sm sm:mx-0 sm:w-56 sm:max-w-none">
           {photoTargetTeamId && photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -425,9 +365,26 @@ export default function SpaceDashboardSummary({
             </>
           )}
         </div>
+        )}
 
         <div className="grid grid-cols-2 gap-2.5 sm:flex-1 sm:grid-cols-[repeat(auto-fit,minmax(110px,1fr))]">
-          <KpiTile icon={Users} iconClass="text-navy" iconBgClass="bg-navy/10" value={effectivePlayerCount} label="Joueurs" />
+          {/* Retour de Cindy du 12/11 ("à la place du nombre de joueurs, une
+              stat, par exemple 50 % de matchs gagnés") : côté Bureau (sans
+              photo), le taux de victoire remplace "Joueurs", qui doublait
+              "Membres actifs" juste au-dessus. Suit le filtre Officiels/
+              Amicaux/Tous comme les trois autres pastilles. */}
+          {showPhoto ? (
+            <KpiTile icon={Users} iconClass="text-navy" iconBgClass="bg-navy/10" value={effectivePlayerCount} label="Joueurs" />
+          ) : (
+            <KpiTile
+              icon={Percent}
+              iconClass="text-navy"
+              iconBgClass="bg-navy/10"
+              value={stats.played > 0 ? (stats.won / stats.played) * 100 : 0}
+              kind="percent"
+              label="Matchs gagnés"
+            />
+          )}
           <KpiTile
             icon={Trophy}
             iconClass="text-ubac-yellow-dark"
@@ -486,12 +443,14 @@ function KpiTile({
   iconClass,
   iconBgClass,
   value,
+  kind = "integer",
   label,
 }: {
   icon: typeof Users;
   iconClass: string;
   iconBgClass: string;
   value: number;
+  kind?: "integer" | "percent";
   label: string;
 }) {
   return (
@@ -500,7 +459,7 @@ function KpiTile({
         <Icon className={`h-3.5 w-3.5 shrink-0 ${iconClass}`} />
       </span>
       <p className="text-base font-bold text-zinc-900 sm:text-lg">
-        <AnimatedNumber value={value} kind="integer" />
+        <AnimatedNumber value={value} kind={kind} />
       </p>
       <p className="text-[10px] font-medium leading-tight text-zinc-500 sm:text-[11px]">{label}</p>
     </div>
