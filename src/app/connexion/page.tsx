@@ -4,8 +4,17 @@ import { useState, type FormEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { appleEmailVariants } from "@/lib/apple-email-aliases";
 import PasswordInput from "@/components/password-input";
 import AuthTabs from "@/components/auth-tabs";
+
+// Adresse sans compte, pour un lien de connexion rapide (shouldCreateUser:
+// false) : Supabase répond "otp_disabled" ("Signups not allowed for otp"),
+// vérifié le 12/11 -- et non "user_not_found" comme supposé jusqu'ici, ce
+// qui affichait à tort "Un problème est survenu" pour une adresse inconnue.
+function isUnknownAddress(code: string | undefined) {
+  return code === "otp_disabled" || code === "user_not_found";
+}
 
 export default function ConnexionPage() {
   const [mode, setMode] = useState<"password" | "otp">("password");
@@ -27,10 +36,20 @@ export default function ConnexionPage() {
     // par Cindy le 2026-08-18 sur mobile).
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({
+      let { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
+      // Adresse Apple (12/11, voir lib/apple-email-aliases.ts) : même boîte
+      // sous @icloud.com / @me.com / @mac.com -- on essaie les variantes,
+      // l'une après l'autre, seulement si l'adresse tapée est refusée.
+      if (error?.code === "invalid_credentials") {
+        for (const variant of appleEmailVariants(email)) {
+          const retry = await supabase.auth.signInWithPassword({ email: variant, password });
+          error = retry.error;
+          if (!error || error.code !== "invalid_credentials") break;
+        }
+      }
 
       // Retour de Cindy du 16/09 ("j'ai peur", mot de passe pourtant bon) :
       // TOUTE erreur ici affichait "mot de passe incorrect", y compris un
@@ -90,20 +109,31 @@ export default function ConnexionPage() {
     // doit jamais laisser le bouton bloqué sans message.
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          shouldCreateUser: false,
-          emailRedirectTo: `${window.location.origin}/lien-de-connexion`,
-        },
-      });
+      const sendLink = (target: string) =>
+        supabase.auth.signInWithOtp({
+          email: target,
+          options: {
+            shouldCreateUser: false,
+            emailRedirectTo: `${window.location.origin}/lien-de-connexion`,
+          },
+        });
+      let { error } = await sendLink(email);
+      // Adresse Apple (12/11) : même essai des variantes que pour le mot de
+      // passe ci-dessus, uniquement si aucun compte n'existe sous l'adresse
+      // tapée -- le lien arrive de toute façon dans la même boîte.
+      if (isUnknownAddress(error?.code)) {
+        for (const variant of appleEmailVariants(email)) {
+          ({ error } = await sendLink(variant));
+          if (!isUnknownAddress(error?.code)) break;
+        }
+      }
 
       // "Utilisateur introuvable" ne doit jamais fuiter (voir le commentaire
       // au-dessus) — mais un vrai échec technique (limite de débit Supabase,
       // panne réseau) mérite un vrai message : sans ce contrôle d'erreur, la
       // personne croyait un email parti alors qu'aucun n'était jamais
       // envoyé, sans aucun moyen de le savoir.
-      if (error && error.code !== "user_not_found") {
+      if (error && !isUnknownAddress(error.code)) {
         setError("Un problème est survenu, réessaie dans quelques instants.");
         return;
       }
