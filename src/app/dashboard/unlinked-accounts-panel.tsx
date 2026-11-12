@@ -192,6 +192,7 @@ export default function UnlinkedAccountsPanel({
                         : "Jamais connecté"}
                     </p>
                   </div>
+                  {account.canDelete && (
                     <button
                       type="button"
                       onClick={() => {
@@ -212,6 +213,7 @@ export default function UnlinkedAccountsPanel({
                     >
                       <X className="h-4 w-4" />
                     </button>
+                  )}
                 </div>
                 <p className="break-all text-xs text-zinc-500">
                   {account.email}
@@ -226,8 +228,10 @@ export default function UnlinkedAccountsPanel({
                     {account.duplicateOf.playerName} a déjà un compte relié à sa fiche
                     {account.duplicateOf.email ? ` (${account.duplicateOf.email})` : ""}.{" "}
                     {account.duplicateOf.childFiche
-                      ? "Si ce compte est celui d'un parent qui a tapé le nom de son enfant (regarde l'adresse e-mail), relie-le comme parent ci-dessous. Sinon, la croix supprime ce compte en double."
-                      : "La personne peut se connecter avec cette autre adresse : la croix supprime ce compte en double."}
+                      ? "Si ce compte est celui d'un parent qui a tapé le nom de son enfant (regarde l'adresse e-mail), relie-le comme parent ci-dessous."
+                      : account.canDelete
+                        ? "La personne peut se connecter avec cette autre adresse : la croix supprime ce compte en double."
+                        : "Attention : c'est CE compte que la personne utilise le plus récemment pour se connecter -- ne pas le supprimer."}
                   </p>
                 )}
 

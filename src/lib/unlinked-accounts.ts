@@ -44,7 +44,14 @@ export type UnlinkedAccount = {
   // 12/11. On l'affiche pour information, sans rien proposer de relier.
   // childFiche : la fiche est celle d'un mineur -- doublon OU parent ayant
   // saisi le nom de son enfant, le Bureau tranche.
-  duplicateOf: { playerName: string; email: string | null; childFiche: boolean } | null;
+  duplicateOf: { playerName: string; email: string | null; childFiche: boolean; lastLoginAt: string | null } | null;
+  // Incident du 12/11 (Julien RUSKE, vice-président, déconnecté) : son
+  // compte "en double" était en réalité celui qu'il utilisait, l'autre
+  // n'avait plus servi depuis août. Suppression proposée UNIQUEMENT quand
+  // c'est sans risque : jamais pour un "doublon ou parent ?" (fiche
+  // d'enfant), jamais si ce compte s'est connecté plus récemment que celui
+  // qu'on garde (ou si celui qu'on garde ne s'est jamais connecté).
+  canDelete: boolean;
 };
 
 type PlayerRow = {
@@ -93,6 +100,19 @@ function playerPhones(p: PlayerRow): Set<string> {
   return new Set(raw.map(normalizePhone).filter((x): x is string => Boolean(x)));
 }
 
+// Voir canDelete (type UnlinkedAccount). Exportée : même règle revérifiée
+// côté serveur (/api/delete-duplicate-account).
+export function isSafeToDelete(
+  accountLastLoginAt: string | null,
+  duplicateOf: { childFiche: boolean; lastLoginAt: string | null } | null
+): boolean {
+  if (!duplicateOf) return true; // "ne fait pas partie du club" : décision explicite du Bureau
+  if (duplicateOf.childFiche) return false;
+  if (!accountLastLoginAt) return true; // ce compte n'a jamais servi
+  if (!duplicateOf.lastLoginAt) return false; // l'autre n'a jamais servi : c'est celui-ci qui sert
+  return new Date(accountLastLoginAt).getTime() <= new Date(duplicateOf.lastLoginAt).getTime();
+}
+
 export function computeUnlinkedAccounts({
   players,
   profiles,
@@ -120,6 +140,7 @@ export function computeUnlinkedAccounts({
   const candidates = players.filter((p) => !p.archived_at && !excludedPlayerIds.has(p.id));
   const phonesByPlayerId = new Map(candidates.map((p) => [p.id, playerPhones(p)]));
   const emailByProfileId = new Map(profiles.map((p) => [p.id, p.email]));
+  const lastLoginByProfileId = new Map(profiles.map((p) => [p.id, p.last_login_at]));
 
   const result: UnlinkedAccount[] = [];
   for (const account of profiles) {
@@ -147,6 +168,7 @@ export function computeUnlinkedAccounts({
           playerName: [p.first_name, p.last_name].filter(Boolean).join(" "),
           email: emailByProfileId.get(p.profile_id) ?? null,
           childFiche: isMinor(p.birth_date),
+          lastLoginAt: lastLoginByProfileId.get(p.profile_id) ?? null,
         };
         // Fiche d'enfant : ce compte peut aussi être un PARENT qui a tapé
         // le nom de son enfant à l'inscription (cas réel vu au 12/11 :
@@ -228,6 +250,7 @@ export function computeUnlinkedAccounts({
       lastLoginAt: account.last_login_at,
       suggestions: kept.slice(0, MAX_SUGGESTIONS),
       duplicateOf,
+      canDelete: isSafeToDelete(account.last_login_at, duplicateOf),
     });
   }
 
