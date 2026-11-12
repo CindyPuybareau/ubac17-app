@@ -20,7 +20,7 @@ const MESSAGES: Record<string, string> = {
 };
 
 export default function SelfLinkForm() {
-  const [role, setRole] = useState<"self" | "parent">("parent");
+  const [role, setRole] = useState<"self" | "parent">("self");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [birthDate, setBirthDate] = useState("");
@@ -66,11 +66,12 @@ export default function SelfLinkForm() {
         <Link2 className="h-4 w-4 shrink-0 text-navy" />
         Relier mon compte moi-même
       </p>
+      <p className="text-xs font-medium text-zinc-600">Ce compte est pour :</p>
       <div className="flex flex-wrap gap-2">
         {(
           [
-            { value: "parent", label: "Je suis parent" },
-            { value: "self", label: "C'est ma propre fiche (joueur, coach, dirigeant)" },
+            { value: "self", label: "Moi" },
+            { value: "parent", label: "Mon enfant" },
           ] as const
         ).map((opt) => (
           <button
@@ -86,6 +87,7 @@ export default function SelfLinkForm() {
           </button>
         ))}
       </div>
+      {role === "self" && <p className="-mt-1 text-xs text-zinc-500">Joueur, coach ou dirigeant.</p>}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600">
           {role === "parent" ? "Prénom de l'enfant" : "Ton prénom"}
