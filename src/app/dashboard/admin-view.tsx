@@ -46,6 +46,7 @@ import { listTeamsForOfficialMatches, listTeamTrombinoscopes, splitTeamName } fr
 import MembersTable from "./members-table";
 import UnlinkedAccountsPanel from "./unlinked-accounts-panel";
 import TeamPhotosManager from "./team-photos-manager";
+import { MatchSheetsLinkSetting } from "./match-sheets-context";
 import type { UnlinkedAccount } from "@/lib/unlinked-accounts";
 import AdminSidebar, { type AdminSection } from "./admin-sidebar";
 import FfbbManager from "./ffbb-manager";
@@ -628,6 +629,7 @@ export default function AdminView({
                   même filtre que Matchs officiels -- une mère (U13M, U18M,
                   Séniors M...) n'a jamais de lien FFBB à gérer, elle ne
                   joue jamais elle-même. */}
+              <MatchSheetsLinkSetting />
               <FfbbManager teams={listTeamsForOfficialMatches(teams)} />
               <ImportInscriptions />
               <ImportPlanning existingTeams={teamRefs} />

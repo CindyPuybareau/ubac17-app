@@ -11,6 +11,7 @@ import {
   showsImpactTime,
 } from "@/app/dashboard/event-style";
 import { RsvpAttendance } from "@/app/dashboard/calendar-view";
+import { MatchSheetsLink } from "./match-sheets-context";
 import { parseMatchTitle, resolveIsHome } from "@/lib/match-display";
 import RsvpControl from "./rsvp-control";
 import MatchTasksPanel from "./match-tasks-panel";
@@ -379,6 +380,8 @@ export function DayEventCard({
           )}
           {venue && <ItineraryButton query={venue} />}
         </span>
+        {/* Feuilles de match (12/11) : Bureau/Coach seulement. */}
+        <MatchSheetsLink eventType={event.eventType} />
       </div>
       {event.cancelledAt && event.cancelledReason && (
         <p className="mt-1 text-xs italic text-zinc-500">Motif : {event.cancelledReason}</p>

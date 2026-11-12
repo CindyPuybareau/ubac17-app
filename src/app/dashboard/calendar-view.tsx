@@ -56,6 +56,7 @@ import ItineraryButton from "./itinerary-button";
 import MatchTasksPanel from "./match-tasks-panel";
 import MatchScore from "./match-score";
 import MatchEmarqueCode from "./match-emarque-code";
+import { MatchSheetsLink } from "./match-sheets-context";
 import TeamSelectorPills from "./team-selector-pills";
 import TeamFilterDropdown from "./team-filter-dropdown";
 import EventTypeFilterDropdown from "./event-type-filter-dropdown";
@@ -2286,6 +2287,9 @@ export default function CalendarView({
                     onSaved={(code) => updateLocalEventEmarqueCode(event.id, code)}
                   />
                 )}
+                {/* Feuilles de match (12/11) : Bureau/Coach seulement, voir
+                    match-sheets-context.tsx. */}
+                <MatchSheetsLink eventType={event.event_type} />
               </>
             ) : (
               // Retour de Cindy du 06/11 ("ENTRAÎNEMENT en pastille ET
@@ -2998,6 +3002,7 @@ export default function CalendarView({
                 {venueRow}
                 {scoreOrUpcoming}
                 {emarqueField}
+                <MatchSheetsLink eventType={event.event_type} />
               </>
             )}
           </div>
@@ -3032,6 +3037,7 @@ export default function CalendarView({
             {venueRow}
             {scoreOrUpcoming}
             {emarqueField}
+                <MatchSheetsLink eventType={event.event_type} />
           </>
         )}
       </div>

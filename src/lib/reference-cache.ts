@@ -77,7 +77,9 @@ export const getCachedOfficialsTrombinoscopePath = unstable_cache(
     const supabase = createServiceClient();
     return supabase
       .from("club_settings")
-      .select("officials_trombinoscope_path")
+      // match_sheets_url (12/11) : lien Drive des feuilles de match, même
+      // ligne -- fourni ensuite aux seuls onglets Bureau/Coach (page.tsx).
+      .select("officials_trombinoscope_path, match_sheets_url")
       .eq("id", true)
       .maybeSingle();
   },
