@@ -2177,6 +2177,39 @@ export default function CalendarView({
     // nouvelle couleur ici) plutôt que le badge, dont le texte passe en
     // blanc pour un type "solid" (Réunion) -- illisible sur fond blanc.
     const toggleColorClass = effectiveStyle.pill.match(/text-\S+/)?.[0] ?? "text-zinc-500";
+    // Retour de Cindy du 12/11 (capture téléphone : "Ajouter le score",
+    // code e-Marque et "Feuilles de match" jamais au même endroit d'une
+    // carte à l'autre, coincés entre l'adversaire et la date) : sur
+    // téléphone, ces actions vivent toutes ensemble sur une ligne en bas de
+    // carte, toujours dans le même ordre ; inchangé dès sm:.
+    const matchHasScore = event.teamScore != null && event.opponentScore != null;
+    const matchScoreField = (
+      <MatchScore
+        eventId={event.id}
+        teamScore={event.teamScore}
+        opponentScore={event.opponentScore}
+        canEdit={canManageEvent}
+        onSaved={(teamScore, opponentScore) => updateLocalEventScore(event.id, teamScore, opponentScore)}
+      />
+    );
+    const matchActions = isMatchType(event.event_type) && (
+      <>
+        {!matchHasScore && matchScoreField}
+        {/* Retour du comptable de Cindy (30/10) : code e-Marque, matchs
+            OFFICIELS à domicile uniquement -- saisi par le Bureau
+            (allowClubWide), lecture seule ailleurs si déjà renseigné. */}
+        {event.event_type === "MATCH" && resolveIsHome(event) === true && (
+          <MatchEmarqueCode
+            eventId={event.id}
+            code={event.emarqueCode}
+            canEdit={allowClubWide}
+            onSaved={(code) => updateLocalEventEmarqueCode(event.id, code)}
+          />
+        )}
+        {/* Feuilles de match (12/11) : Bureau/Coach seulement. */}
+        <MatchSheetsLink eventType={event.event_type} />
+      </>
+    );
     const toggleButton = (
       <button
         type="button"
@@ -2265,31 +2298,13 @@ export default function CalendarView({
             {isMatchType(event.event_type) ? (
               <>
                 <OpponentDisplay title={event.title} size="sm" />
-                <MatchScore
-                  eventId={event.id}
-                  teamScore={event.teamScore}
-                  opponentScore={event.opponentScore}
-                  canEdit={canManageEvent}
-                  onSaved={(teamScore, opponentScore) =>
-                    updateLocalEventScore(event.id, teamScore, opponentScore)
-                  }
-                />
-                {/* Retour du comptable de Cindy (30/10) : code e-Marque,
-                    matchs OFFICIELS (jamais amicaux, isMatchType inclut les
-                    deux) à domicile uniquement -- saisi par le Bureau
-                    (allowClubWide), visible en lecture seule pour
-                    Coach/Famille si déjà renseigné (utile sur place). */}
-                {event.event_type === "MATCH" && resolveIsHome(event) === true && (
-                  <MatchEmarqueCode
-                    eventId={event.id}
-                    code={event.emarqueCode}
-                    canEdit={allowClubWide}
-                    onSaved={(code) => updateLocalEventEmarqueCode(event.id, code)}
-                  />
-                )}
-                {/* Feuilles de match (12/11) : Bureau/Coach seulement, voir
-                    match-sheets-context.tsx. */}
-                <MatchSheetsLink eventType={event.event_type} />
+                {/* Score déjà saisi : une information, reste à côté de
+                    l'adversaire sur tous les écrans. */}
+                {matchHasScore && matchScoreField}
+                {/* Actions (ajouter le score, code e-Marque, feuilles de
+                    match) : dans la ligne sur grand écran ; sur téléphone,
+                    regroupées en bas de carte (matchActionsMobile). */}
+                <span className="hidden sm:contents">{matchActions}</span>
               </>
             ) : (
               // Retour de Cindy du 06/11 ("ENTRAÎNEMENT en pastille ET
@@ -2428,6 +2443,10 @@ export default function CalendarView({
         {/* Événement annulé (retour de Cindy du 12/11) : plus rien à
             déplier -- présences et réponses n'ont plus de sens, le motif
             est déjà affiché au-dessus. */}
+        {isMatchType(event.event_type) && (
+          <div className="flex flex-wrap items-center gap-2 empty:hidden sm:hidden">{matchActions}</div>
+        )}
+
         {allowClubWide && !event.cancelledAt && toggleButton}
 
         {cardExpanded && (
