@@ -301,92 +301,88 @@ export function DayEventCard({
           Spécial
         </span>
       )}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${style.badge}`}>
-          {style.label}
+      {/* Retour de Cindy du 12/11 ("fais comme celle du calendrier : une
+          seule ligne sur grand écran, une belle répartition sur petit
+          écran, trop de blanc à droite sur tablette") : même disposition
+          que renderEventCard (calendar-view.tsx) -- équipe, pastille,
+          titre, date/heure, lieu + itinéraire dans UNE ligne qui se
+          replie d'elle-même ; chaque groupe (date/heure, lieu +
+          itinéraire) reste d'un seul tenant, jamais coupé au milieu. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <span className="flex flex-wrap items-center gap-2">
+          {event.teamName && (
+            <span className="text-xs font-semibold uppercase tracking-wide text-ubac-blue">{event.teamName}</span>
+          )}
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${style.badge}`}>
+            {style.label}
+          </span>
+          {/* Même badge "Payant" que renderEventCard (calendar-view.tsx). */}
+          {event.isPaid && (
+            <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-800">
+              <Euro className="h-3 w-3" />
+              Payant
+            </span>
+          )}
+          {/* Retour de Cindy du 30/10 ("un créneau annulé"). */}
+          {event.cancelledAt && (
+            <span className="flex items-center gap-1 rounded-full bg-status-urgent/10 px-2 py-0.5 text-[10px] font-bold uppercase text-status-urgent-dark">
+              <Ban className="h-3 w-3" />
+              Annulé
+            </span>
+          )}
         </span>
-        {event.teamName && <span className="text-xs font-semibold text-zinc-500">{event.teamName}</span>}
-        {/* Même badge "Payant" que renderEventCard (calendar-view.tsx) --
-            visible sur toutes les cartes qui montrent celle-ci, pas
-            seulement côté Famille (Bureau/Coach doivent savoir aussi). */}
-        {event.isPaid && (
-          <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-800">
-            <Euro className="h-3 w-3" />
-            Payant
+        {/* Retour de Cindy du 19/10 : Domicile/Extérieur vit sur le lieu
+            (MatchVenue), pas dans le titre. Titre masqué quand il ne fait
+            que répéter la pastille (12/11). */}
+        {(isMatchType(event.eventType) || !isRedundantEventTitle(event.title, style.label)) && (
+          <span className={`font-semibold text-zinc-900 ${event.cancelledAt ? "line-through text-zinc-400" : ""}`}>
+            {isMatchType(event.eventType)
+              ? (parsed.opponent ?? event.title ?? style.label)
+              : (event.title ?? style.label)}
           </span>
         )}
-        {/* Retour de Cindy du 30/10 ("un créneau annulé") : même badge que
-            renderEventCard (calendar-view.tsx), en rouge plutôt qu'ambre. */}
-        {event.cancelledAt && (
-          <span className="flex items-center gap-1 rounded-full bg-status-urgent/10 px-2 py-0.5 text-[10px] font-bold uppercase text-status-urgent-dark">
-            <Ban className="h-3 w-3" />
-            Annulé
+        <span className="flex items-center gap-x-3 whitespace-nowrap text-sm text-zinc-500">
+          <span className="flex items-center gap-1">
+            {showDate && (
+              <>
+                <CalendarDays className="h-3.5 w-3.5 shrink-0 text-navy" />
+                <span className="capitalize font-semibold text-zinc-700">
+                  {new Date(event.startTime).toLocaleDateString("fr-FR", { weekday: "long" })}
+                </span>
+              </>
+            )}
+            {formatEventTime(event.startTime, event.endTime)}
           </span>
-        )}
-      </div>
-      {(isMatchType(event.eventType) || !isRedundantEventTitle(event.title, style.label)) && (
-      <p className={`mt-1 font-semibold text-zinc-900 ${event.cancelledAt ? "line-through text-zinc-400" : ""}`}>
-        {/* Retour de Cindy du 19/10 : Domicile/Extérieur ne se répète plus
-            ici -- il vit désormais, coloré, sur la ligne du lieu juste en
-            dessous (MatchVenue), à côté du gymnase. */}
-        {isMatchType(event.eventType)
-          ? (parsed.opponent ?? event.title ?? style.label)
-          : (event.title ?? style.label)}
-      </p>
-      )}
-      {event.cancelledAt && event.cancelledReason && (
-        <p className="text-xs italic text-zinc-500">Motif : {event.cancelledReason}</p>
-      )}
-      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
-        <span className="flex items-center gap-1">
-          {showDate && (
+          {/* Heure d'arrivée en ambre (même distinction que renderEventCard). */}
+          {event.impactTime && showsImpactTime(event.eventType) && (
+            <span className="flex items-center gap-1 font-semibold text-amber-700">
+              <AlarmClock className="h-3 w-3" />
+              {formatImpactTime(event.impactTime)}
+            </span>
+          )}
+        </span>
+        {/* Lieu + itinéraire toujours ensemble (retour du 04/11). */}
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-zinc-500">
+          {!isMatchType(event.eventType) && (event.location || event.salle) && (
             <>
-              <CalendarDays className="h-3.5 w-3.5 shrink-0 text-navy" />
-              <span className="capitalize font-semibold text-zinc-700">
-                {new Date(event.startTime).toLocaleDateString("fr-FR", { weekday: "long" })}
-              </span>
+              {event.location && (
+                <span className="flex items-center gap-1">
+                  <MapPin className="h-3.5 w-3.5 shrink-0" />
+                  {event.location}
+                </span>
+              )}
+              {event.salle && <SalleBadge salle={event.salle} />}
             </>
           )}
-          {formatEventTime(event.startTime, event.endTime)}
+          {isMatchType(event.eventType) && (
+            <MatchVenue isHome={home} salle={event.salle} location={event.location} size="sm" />
+          )}
+          {venue && <ItineraryButton query={venue} />}
         </span>
-        {/* Ambre plutôt que gris neutre : même distinction visuelle que
-            renderEventCard (calendar-view.tsx) entre l'heure de début et
-            l'heure d'arrivée demandée. Retour de Cindy du 28/10 :
-            showsImpactTime en plus, même raison que calendar-view.tsx. */}
-        {event.impactTime && showsImpactTime(event.eventType) && (
-          <span className="flex items-center gap-1 font-semibold text-amber-700">
-            <AlarmClock className="h-3 w-3" />
-            {formatImpactTime(event.impactTime)}
-          </span>
-        )}
       </div>
-
-      {/* Retour de Cindy du 04/11 ("itinéraire à côté de Extérieur pour
-          gagner en place") : fusionné sur la même ligne que le lieu plutôt
-          qu'un bloc ItineraryButton séparé plus bas (voir venue && (...)
-          qui occupait encore sa propre ligne). */}
-      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500">
-        {!isMatchType(event.eventType) && (event.location || event.salle) && (
-          <>
-            {event.location && (
-              <span className="flex items-center gap-1">
-                <MapPin className="h-3 w-3 shrink-0" />
-                {event.location}
-              </span>
-            )}
-            {event.salle && <SalleBadge salle={event.salle} />}
-          </>
-        )}
-        {isMatchType(event.eventType) && (
-          <MatchVenue
-            isHome={home}
-            salle={event.salle}
-            location={event.location}
-            size="sm"
-          />
-        )}
-        {venue && <ItineraryButton query={venue} />}
-      </div>
+      {event.cancelledAt && event.cancelledReason && (
+        <p className="mt-1 text-xs italic text-zinc-500">Motif : {event.cancelledReason}</p>
+      )}
 
       {event.notes && (
         <p className="mt-1 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2.5 py-2 text-xs text-amber-900">
