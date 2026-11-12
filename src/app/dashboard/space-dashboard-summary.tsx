@@ -429,7 +429,7 @@ export default function SpaceDashboardSummary({
             </p>
             {summary.trainingAttendance.lowest && (
               <p className="text-xs text-zinc-500">
-                Plus en retrait :{" "}
+                Équipe la moins présente :{" "}
                 <span className="font-semibold text-status-urgent-dark">
                   {summary.trainingAttendance.lowest.teamName} ({Math.round(summary.trainingAttendance.lowest.rate)} %)
                 </span>
