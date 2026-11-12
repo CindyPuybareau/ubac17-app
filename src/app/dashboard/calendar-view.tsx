@@ -2119,7 +2119,7 @@ export default function CalendarView({
     // Extraits une seule fois ici (jamais dupliqués) pour être replacés
     // soit dans la ligne fusionnée, soit dans les blocs séparés d'origine.
     const dateRow = (
-      <span className="flex items-center gap-1">
+      <span className="flex items-center gap-1 whitespace-nowrap">
         {/* Bleu (retour de Cindy du 2026-08-23) : la petite icône
             calendrier se fondait dans le texte gris de la date. */}
         <CalendarDays className="h-4 w-4 text-navy" />
@@ -2304,7 +2304,7 @@ export default function CalendarView({
               )
             )}
             {allowClubWide && (
-              <>
+              <span className="hidden sm:contents">
                 <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500">
                   {dateRow}
                   {impactTimeRow}
@@ -2312,7 +2312,7 @@ export default function CalendarView({
                 <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500">
                   {locationRow}
                 </span>
-              </>
+              </span>
             )}
           </div>
           {canManageEvent && (
@@ -2364,6 +2364,22 @@ export default function CalendarView({
           )}
         </div>
 
+        {/* Retour de Cindy du 12/11 (capture téléphone : "le retour à la
+            ligne n'est pas beau") : sur téléphone, date et lieu quittent la
+            colonne du titre -- coincée à côté des 3 icônes Modifier/Annuler/
+            Supprimer, elle coupait "18h15 – 19h45" ou le nom du gymnase en
+            plein milieu -- pour leurs propres lignes pleine largeur sous
+            l'en-tête. Inchangé dès sm: (ligne fusionnée ci-dessus). */}
+        {allowClubWide && (
+          <div className="flex flex-col gap-1 text-sm text-zinc-500 sm:hidden">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              {dateRow}
+              {impactTimeRow}
+            </div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">{locationRow}</div>
+          </div>
+        )}
+
         {/* Retour de Cindy du 30/10 : même emplacement/forme que le badge
             "Besoin non pourvu" plus bas (needsOrganizing), en rouge plutôt
             qu'ambre. Motif affiché juste en dessous. */}
@@ -2402,7 +2418,10 @@ export default function CalendarView({
             sa position dépendait du nombre de badges/date/lieu tenant sur
             la même ligne -- sur sa propre ligne pleine largeur, toujours
             au même endroit quel que soit le contenu au-dessus. */}
-        {allowClubWide && toggleButton}
+        {/* Événement annulé (retour de Cindy du 12/11) : plus rien à
+            déplier -- présences et réponses n'ont plus de sens, le motif
+            est déjà affiché au-dessus. */}
+        {allowClubWide && !event.cancelledAt && toggleButton}
 
         {cardExpanded && (
           <>
