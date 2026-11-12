@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import Image from "next/image";
-import { Camera, Dumbbell, Percent, Users, ShieldCheck, Trophy } from "lucide-react";
+import { Camera, Dumbbell, Percent, Users, ShieldCheck, TrendingDown, TrendingUp, Trophy } from "lucide-react";
 import { uploadTeamPhoto } from "@/lib/team-photo-upload";
 import AnimatedNumber from "./animated-number";
 import { DayEventCard, type WeekStripEvent } from "./week-strip-banner";
@@ -415,38 +415,56 @@ export default function SpaceDashboardSummary({
           Bloc à part plutôt qu'une 5e pastille : le filtre Officiels/
           Amicaux/Tous ci-dessus ne s'applique pas aux entraînements. */}
       {!showPhoto && summary.trainingAttendance && (
-        <div className="flex items-start gap-3 rounded-2xl border border-zinc-100 bg-white px-4 py-3 shadow-sm">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-court-green/10">
-            <Dumbbell className="h-4 w-4 text-court-green" />
-          </span>
-          {/* Retour de Cindy du 12/11 (capture téléphone : libellé et nom
-              d'équipe coupés en plein milieu) : le chiffre seul sur sa
-              ligne, le libellé dessous, puis une ligne par équipe -- le
-              nom + taux ne se coupe jamais (whitespace-nowrap). Équipe la
-              plus présente en vert, au-dessus de la moins présente en
-              rouge. */}
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <p className="text-lg font-bold leading-tight text-zinc-900">
-              <AnimatedNumber value={summary.trainingAttendance.rate} kind="percent" />
-            </p>
-            <p className="text-sm text-zinc-500">Présence aux entraînements ce mois-ci</p>
-            {summary.trainingAttendance.highest && (
-              <p className="mt-1 text-xs text-zinc-500">
-                Équipe la plus présente :{" "}
-                <span className="whitespace-nowrap font-semibold text-status-success">
-                  {summary.trainingAttendance.highest.teamName} ({Math.round(summary.trainingAttendance.highest.rate)} %)
-                </span>
+        // Retour de Cindy du 12/11 ("bof en responsive texte") : le chiffre
+        // et son libellé d'un côté, les deux équipes en pastilles de
+        // l'autre (sous le chiffre sur téléphone) -- plus de phrases qui se
+        // coupent. Deux cases côte à côte : étiquette en petit au-dessus,
+        // équipe + taux dessous (le taux ne se sépare jamais du "·").
+        <div className="flex flex-col gap-3 rounded-2xl border border-zinc-100 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-court-green/10">
+              <Dumbbell className="h-4 w-4 text-court-green" />
+            </span>
+            <div>
+              <p className="text-xl font-bold leading-tight text-zinc-900">
+                <AnimatedNumber value={summary.trainingAttendance.rate} kind="percent" />
               </p>
-            )}
-            {summary.trainingAttendance.lowest && (
-              <p className="text-xs text-zinc-500">
-                Équipe la moins présente :{" "}
-                <span className="whitespace-nowrap font-semibold text-status-urgent-dark">
-                  {summary.trainingAttendance.lowest.teamName} ({Math.round(summary.trainingAttendance.lowest.rate)} %)
-                </span>
+              <p className="text-[11px] text-zinc-500">
+                Présence aux entraînements <span className="whitespace-nowrap">· ce mois-ci</span>
               </p>
-            )}
+            </div>
           </div>
+          {/* Nom d'équipe toujours sur une seule ligne (retour de Cindy du
+              12/11) : les deux cases passent l'une sous l'autre sur un très
+              petit écran plutôt que de couper "Loisirs Mixtes". */}
+          {(summary.trainingAttendance.highest || summary.trainingAttendance.lowest) && (
+            <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 sm:min-w-[18rem]">
+              {summary.trainingAttendance.highest && (
+                <div className="rounded-lg bg-status-success/10 px-2.5 py-1.5">
+                  <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-status-success">
+                    <TrendingUp className="h-3 w-3 shrink-0" />
+                    Plus présente
+                  </p>
+                  <p className="whitespace-nowrap text-[11px] font-semibold text-zinc-900">
+                    {summary.trainingAttendance.highest.teamName}{" "}
+                    <span className="whitespace-nowrap">· {Math.round(summary.trainingAttendance.highest.rate)} %</span>
+                  </p>
+                </div>
+              )}
+              {summary.trainingAttendance.lowest && (
+                <div className="rounded-lg bg-status-urgent/10 px-2.5 py-1.5">
+                  <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-status-urgent-dark">
+                    <TrendingDown className="h-3 w-3 shrink-0" />
+                    Moins présente
+                  </p>
+                  <p className="whitespace-nowrap text-[11px] font-semibold text-zinc-900">
+                    {summary.trainingAttendance.lowest.teamName}{" "}
+                    <span className="whitespace-nowrap">· {Math.round(summary.trainingAttendance.lowest.rate)} %</span>
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
