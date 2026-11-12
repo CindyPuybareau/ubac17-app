@@ -13,22 +13,20 @@ import { RefreshCw } from "lucide-react";
 // l'instance JS déjà chargée qui ne sait pas qu'une version plus récente
 // existe.
 //
-// Détection sans aucune infrastructure dédiée : chaque script <script
-// src="/_next/static/chunks/...xxxx.js"> porte un nom haché sur son
-// contenu -- tenté d'abord avec le buildId Next.js classique
-// (__NEXT_DATA__.buildId), qui n'existe tout simplement pas avec l'App
-// Router + Turbopack (vérifié : absent du HTML servi). L'empreinte
-// retenue est donc la liste triée des chemins <script src> réellement
-// présents sur la page -- n'importe quel changement de code fait changer
-// au moins un de ces chemins, un vrai déploiement les change presque
-// tous. Comparée à celle d'une page fraîchement récupérée (jamais depuis
-// le cache du navigateur, cache: "no-store", même route que celle
-// affichée pour rester une comparaison juste).
+// Détection (audit du 12/11) : l'identifiant du build figé dans CE code
+// (APP_BUILD_ID, next.config.ts) comparé à celui que renvoie
+// /api/version, servi par le déploiement actuellement en ligne.
+// Remplace l'ancienne méthode, qui re-téléchargeait la page affichée en
+// entier pour comparer ses <script> : sur le tableau de bord, chaque
+// vérification relançait tout le calcul serveur (des dizaines de lectures
+// en base, ~5 s) -- et ce à chaque retour sur l'appli, un geste très
+// fréquent sur mobile (changer d'appli, verrouiller l'écran). Constaté le
+// 12/11 : un onglet basculant souvent de visibilité rechargeait ainsi le
+// tableau de bord toutes les 6 secondes.
 //
-// Vérifié à la reprise (visibilitychange, le moment le plus courant où une
-// PWA "rouvre" sans jamais vraiment recharger) et, en repli, toutes les 15
+// Vérifié à la reprise (visibilitychange) et, en repli, toutes les 15
 // minutes tant que l'onglet reste au premier plan (sessions longues, ex.
-// suivi d'un match).
+// suivi d'un match) -- jamais plus d'une fois toutes les 5 minutes.
 //
 // Bannière plutôt que rechargement automatique : arracher la page sous les
 // pieds de quelqu'un qui répond présent/absent ou remplit un formulaire
@@ -39,55 +37,27 @@ import { RefreshCw } from "lucide-react";
 // mobile, où changer d'appli/verrouiller l'écran déclenche
 // `visibilitychange` très souvent) -- retour à cette version simple,
 // jamais reprise depuis.
-function scriptPathsFromHtml(html: string): string[] {
-  const paths: string[] = [];
-  const re = /<script[^>]+src="([^"]+)"/g;
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(html))) {
-    paths.push(match[1]);
-  }
-  return paths;
-}
-
-function currentScriptPaths(): string[] {
-  return Array.from(document.scripts)
-    .map((s) => {
-      if (!s.src) return null;
-      try {
-        // .src est une URL absolue (propriété DOM), le HTML brut donne des
-        // chemins relatifs -- il faut la même forme des deux côtés, sinon
-        // chaque comparaison "diffère" à tort dès la première vérification.
-        return new URL(s.src, window.location.origin).pathname;
-      } catch {
-        return null;
-      }
-    })
-    .filter((p): p is string => Boolean(p));
-}
-
-function fingerprint(paths: string[]): string {
-  return [...paths].sort().join("|");
-}
+const MY_BUILD_ID = process.env.APP_BUILD_ID;
+const MIN_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
 export default function VersionWatcher() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
 
   useEffect(() => {
-    const myFingerprint = fingerprint(currentScriptPaths());
-    // Rien à comparer si la page elle-même n'a chargé aucun script décelé
-    // (cas dégénéré, jamais rencontré en pratique) -- pas de fausse alerte
-    // à partir de rien.
-    if (!myFingerprint) return;
+    // En local ("local") ou sans identifiant : rien à comparer.
+    if (!MY_BUILD_ID || MY_BUILD_ID === "local") return;
 
     let cancelled = false;
+    let lastCheckAt = Date.now();
+
     async function checkForUpdate() {
+      if (Date.now() - lastCheckAt < MIN_CHECK_INTERVAL_MS) return;
+      lastCheckAt = Date.now();
       try {
-        const res = await fetch(window.location.pathname + window.location.search, {
-          cache: "no-store",
-        });
-        const html = await res.text();
-        const latestFingerprint = fingerprint(scriptPathsFromHtml(html));
-        if (!cancelled && latestFingerprint && latestFingerprint !== myFingerprint) {
+        const res = await fetch("/api/version", { cache: "no-store" });
+        if (!res.ok) return;
+        const { id } = (await res.json()) as { id?: string | null };
+        if (!cancelled && id && id !== MY_BUILD_ID) {
           setUpdateAvailable(true);
         }
       } catch {

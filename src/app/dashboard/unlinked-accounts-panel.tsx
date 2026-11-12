@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronUp, Link2, Search, UserRound, Users } from "lucide-react";
+import { ChevronDown, ChevronUp, Link2, Search, UserRound, Users, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatPersonName, normalizeNameForMatching } from "@/lib/names";
 import { isMinor, type UnlinkedAccount } from "@/lib/unlinked-accounts";
@@ -45,6 +45,9 @@ export default function UnlinkedAccountsPanel({
   const [searchFor, setSearchFor] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [pending, setPending] = useState<PendingLink | null>(null);
+  // Compte en double à supprimer (retour de Cindy du 12/11, "une croix") --
+  // voir /api/delete-duplicate-account pour les garde-fous serveur.
+  const [deleteTarget, setDeleteTarget] = useState<UnlinkedAccount | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -109,6 +112,32 @@ export default function UnlinkedAccountsPanel({
     router.refresh();
   }
 
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/delete-duplicate-account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profileId: deleteTarget.profileId }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setError(body.error ?? "Suppression impossible, réessaie.");
+        return;
+      }
+    } catch {
+      setError("Suppression impossible, vérifie ta connexion et réessaie.");
+      return;
+    } finally {
+      setSaving(false);
+    }
+    showToast(`Compte ${deleteTarget.email ?? ""} supprimé.`);
+    setDeleteTarget(null);
+    router.refresh();
+  }
+
   function askLink(account: UnlinkedAccount, playerId: string, playerName: string, kind: "self" | "parent") {
     setError(null);
     setPending({ account, playerId, playerName, kind });
@@ -129,7 +158,7 @@ export default function UnlinkedAccountsPanel({
             {duplicateCount > 0 && (
               <span className="font-normal text-zinc-500">
                 {" "}
-                · {duplicateCount} en double
+                · {duplicateCount} doublon{duplicateCount > 1 ? "s" : ""} possible{duplicateCount > 1 ? "s" : ""}
               </span>
             )}
           </span>
@@ -151,13 +180,29 @@ export default function UnlinkedAccountsPanel({
             const searching = searchFor === account.profileId;
             return (
               <li key={account.profileId} className="rounded-xl border border-zinc-100 bg-white p-3">
-                <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-                  <p className="text-sm font-semibold text-zinc-900">{name}</p>
-                  <p className="text-xs text-zinc-500">
-                    {account.lastLoginAt
-                      ? `Dernière connexion le ${formatLocalDateFr(account.lastLoginAt.slice(0, 10))}`
-                      : "Jamais connecté"}
-                  </p>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                    <p className="text-sm font-semibold text-zinc-900">{name}</p>
+                    <p className="text-xs text-zinc-500">
+                      {account.lastLoginAt
+                        ? `Dernière connexion le ${formatLocalDateFr(account.lastLoginAt.slice(0, 10))}`
+                        : "Jamais connecté"}
+                    </p>
+                  </div>
+                  {account.duplicateOf && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setError(null);
+                        setDeleteTarget(account);
+                      }}
+                      aria-label={`Supprimer le compte en double ${account.email ?? name}`}
+                      title="Supprimer ce compte en double"
+                      className="-mr-1 -mt-1 shrink-0 rounded-full p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
                 <p className="break-all text-xs text-zinc-500">
                   {account.email}
@@ -166,10 +211,14 @@ export default function UnlinkedAccountsPanel({
 
                 {account.duplicateOf && (
                   <p className="mt-2 rounded-lg bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
-                    <span className="font-semibold text-zinc-800">Compte en double :</span>{" "}
+                    <span className="font-semibold text-zinc-800">
+                      {account.duplicateOf.childFiche ? "Doublon ou parent ?" : "Compte en double :"}
+                    </span>{" "}
                     {account.duplicateOf.playerName} a déjà un compte relié à sa fiche
-                    {account.duplicateOf.email ? ` (${account.duplicateOf.email})` : ""}. Inutile de relier
-                    celui-ci : la personne peut se connecter avec cette autre adresse.
+                    {account.duplicateOf.email ? ` (${account.duplicateOf.email})` : ""}.{" "}
+                    {account.duplicateOf.childFiche
+                      ? "Si ce compte est celui d'un parent qui a tapé le nom de son enfant (regarde l'adresse e-mail), relie-le comme parent ci-dessous. Sinon, la croix supprime ce compte en double."
+                      : "La personne peut se connecter avec cette autre adresse : la croix supprime ce compte en double."}
                   </p>
                 )}
 
@@ -314,6 +363,47 @@ export default function UnlinkedAccountsPanel({
         onConfirm={confirmLink}
         onCancel={() => {
           setPending(null);
+          setError(null);
+        }}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Supprimer ce compte en double ?"
+        message={
+          deleteTarget ? (
+            <>
+              Le compte <strong>{deleteTarget.email}</strong> sera supprimé définitivement : on ne pourra plus se
+              connecter avec cette adresse.
+              {deleteTarget.duplicateOf && (
+                <>
+                  {" "}
+                  {deleteTarget.duplicateOf.playerName} garde son compte
+                  {deleteTarget.duplicateOf.email ? (
+                    <>
+                      {" "}
+                      <strong>{deleteTarget.duplicateOf.email}</strong>
+                    </>
+                  ) : null}
+                  , relié à sa fiche.
+                  {deleteTarget.duplicateOf.childFiche && (
+                    <span className="mt-2 block font-medium text-red-700">
+                      Vérifie l&apos;adresse : si c&apos;est celle d&apos;un parent, annule et relie-le plutôt
+                      comme parent.
+                    </span>
+                  )}
+                </>
+              )}
+            </>
+          ) : null
+        }
+        confirmLabel="Supprimer"
+        pending={saving}
+        pendingLabel="Suppression..."
+        error={error}
+        onConfirm={confirmDelete}
+        onCancel={() => {
+          setDeleteTarget(null);
           setError(null);
         }}
       />
