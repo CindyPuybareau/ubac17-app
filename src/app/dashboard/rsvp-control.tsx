@@ -58,6 +58,12 @@ export default function RsvpControl({
   const [error, setError] = useState<string | null>(null);
 
   async function save(next: Status) {
+    // Affichage optimiste (retour de Cindy du 12/11, "vérifier la
+    // réactivité") : le bouton bascule tout de suite, comme rsvp-buttons.tsx
+    // côté calendrier -- jusqu'ici il attendait la réponse du serveur
+    // (0,3 à 0,5 s). Retour à l'état précédent si l'écriture échoue.
+    const previous = status;
+    setStatus(next);
     setSaving(true);
     setError(null);
     const supabase = createClient();
@@ -78,10 +84,9 @@ export default function RsvpControl({
     if (writeError) {
       // Message générique par le passé, sans la vraie cause — même
       // correctif que rsvp-buttons.tsx (retour de Cindy du 2026-08-20).
+      setStatus(previous);
       setError(writeError.message);
-      return;
     }
-    setStatus(next);
   }
 
   const badge = badgeFor(status);
