@@ -16,9 +16,12 @@ import { normalizeNameForMatching } from "@/lib/names";
 //     ni enfant (parent_player), ni équipe coachée (team_coaches), ni
 //     accès Bureau (club_administrators) -- aucune donnée du club ne
 //     dépend de lui ;
-//  3. c'est bien un DOUBLON : une fiche au même prénom + nom (ou inversés)
-//     est déjà reliée à un AUTRE compte, avec lequel la personne peut se
-//     connecter.
+//  3. motif "duplicate" : c'est bien un DOUBLON -- une fiche au même
+//     prénom + nom (ou inversés) est déjà reliée à un AUTRE compte, avec
+//     lequel la personne peut se connecter.
+//     motif "not-member" (retour de Cindy du 12/11, "ni membre ni rien") :
+//     le Bureau atteste que la personne ne fait pas partie du club --
+//     seuls les garde-fous 1 et 2 s'appliquent.
 // Ce que la suppression emporte (cascade en base) : la ligne profiles, ses
 // abonnements push et ses notifications lues -- rien d'autre.
 export async function POST(request: Request) {
@@ -34,8 +37,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Réservé au Bureau." }, { status: 403 });
   }
 
-  const { profileId } = (await request.json().catch(() => ({}))) as { profileId?: string };
-  if (!profileId || profileId === user.id) {
+  const { profileId, reason = "duplicate" } = (await request.json().catch(() => ({}))) as {
+    profileId?: string;
+    reason?: "duplicate" | "not-member";
+  };
+  if (!profileId || profileId === user.id || (reason !== "duplicate" && reason !== "not-member")) {
     return NextResponse.json({ error: "Compte invalide." }, { status: 400 });
   }
 
@@ -91,7 +97,7 @@ export async function POST(request: Request) {
       const pLast = normalizeNameForMatching(p.last_name);
       return (pFirst === first && pLast === last) || (pFirst === last && pLast === first);
     });
-  if (!isDuplicate) {
+  if (reason === "duplicate" && !isDuplicate) {
     return NextResponse.json(
       { error: "Aucune fiche de cette personne n'a d'autre compte : ce n'est pas un doublon." },
       { status: 409 }
