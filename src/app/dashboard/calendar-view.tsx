@@ -75,6 +75,7 @@ import {
   formatImpactTime,
   homeAwayLabel,
   isMatchType,
+  isRedundantEventTitle,
   showsImpactTime,
   styleFor,
 } from "./event-style";
@@ -2296,7 +2297,7 @@ export default function CalendarView({
               // seulement quand c'est réellement le même texte -- un
               // titre personnalisé ("Entraînement renforcement défense")
               // continue de s'afficher normalement.
-              (event.title ?? style.label) !== reunionLabel && (
+              !isRedundantEventTitle(event.title, reunionLabel) && (
                 <span className="font-semibold text-zinc-900">
                   {event.title ?? style.label}
                 </span>

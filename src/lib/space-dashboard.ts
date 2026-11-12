@@ -162,7 +162,21 @@ export type SpaceDashboardSummary = {
   // vide si rien à venir.
   nextEvents: SpaceDashboardNextEvent[];
   seasonLabel: string;
+  // Retour de Cindy du 12/11 ("taux de présence aux entraînements... repère
+  // les équipes qui décrochent") : Bureau uniquement (club entier, teamIds
+  // null), mois en cours, entraînements déjà passés et non annulés. rate =
+  // présents / (présents + absents), sans compter les non-réponses. lowest :
+  // l'équipe au taux le plus bas, parmi celles qui ont au moins
+  // MIN_ANSWERS_FOR_LOWEST réponses (évite de pointer une équipe sur 2
+  // réponses). null hors Bureau, ou sans aucune réponse ce mois-ci.
+  trainingAttendance: {
+    rate: number;
+    answers: number;
+    lowest: { teamName: string; rate: number } | null;
+  } | null;
 };
+
+const MIN_ANSWERS_FOR_LOWEST = 10;
 
 const EMPTY_MATCH_STATS = { played: 0, points: 0, won: 0 };
 
@@ -236,6 +250,7 @@ export async function getSpaceDashboardSummary(
   // clairement).
   if (teamIds !== null && teamIds.length === 0) {
     return {
+      trainingAttendance: null,
       byTeam: [],
       photoUrl: null,
       singleTeamId: null,
@@ -271,7 +286,7 @@ export async function getSpaceDashboardSummary(
       : new Set<string>();
 
   const nowIso = new Date().toISOString();
-  const [rosterRes, teamCountRes, teamsMetaRes, rankingsRes, matchesRes, upcomingRes, demoPlayerLinksRes] = await runBatched(
+  const [rosterRes, teamCountRes, teamsMetaRes, rankingsRes, matchesRes, upcomingRes, demoPlayerLinksRes, attendanceRes] = await runBatched(
     [
       () =>
         teamIds === null
@@ -362,6 +377,14 @@ export async function getSpaceDashboardSummary(
         teamIds === null && demoTeamIds.size > 0
           ? supabase.from("team_players").select("player_id").in("team_id", Array.from(demoTeamIds))
           : Promise.resolve({ data: [] as { player_id: string }[], error: null }),
+      // Présence aux entraînements (Bureau, 12/11) : agrégée en base, une
+      // ligne par équipe (voir la migration training_attendance_by_team).
+      () => {
+        if (teamIds !== null) return Promise.resolve({ data: null, error: null });
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+        return supabase.rpc("training_attendance_by_team", { p_from: monthStart, p_to: nowIso });
+      },
     ],
     semaphore
   );
@@ -798,7 +821,30 @@ export async function getSpaceDashboardSummary(
     t.nextEvents = nextEventsByTeamId.get(t.teamId) ?? [];
   });
 
+  let trainingAttendance: SpaceDashboardSummary["trainingAttendance"] = null;
+  if (teamIds === null) {
+    const rows = (
+      (attendanceRes as { data: { team_id: string; present_count: number; absent_count: number }[] | null }).data ?? []
+    ).filter((r) => !demoTeamIds.has(r.team_id));
+    const present = rows.reduce((sum, r) => sum + r.present_count, 0);
+    const answers = rows.reduce((sum, r) => sum + r.present_count + r.absent_count, 0);
+    if (answers > 0) {
+      const teamNameById = new Map(((await getCachedTeams()).data ?? []).map((t) => [t.id, t.name]));
+      let lowest: { teamName: string; rate: number } | null = null;
+      for (const r of rows) {
+        const teamAnswers = r.present_count + r.absent_count;
+        if (teamAnswers < MIN_ANSWERS_FOR_LOWEST) continue;
+        const rate = (r.present_count / teamAnswers) * 100;
+        if (!lowest || rate < lowest.rate) {
+          lowest = { teamName: teamNameById.get(r.team_id) ?? "Équipe", rate };
+        }
+      }
+      trainingAttendance = { rate: (present / answers) * 100, answers, lowest };
+    }
+  }
+
   return {
+    trainingAttendance,
     byTeam,
     photoUrl: (singleTeamId && teamsMetaById.get(singleTeamId)?.photo_url) ?? null,
     singleTeamId,

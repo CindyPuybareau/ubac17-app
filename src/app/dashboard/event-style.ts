@@ -147,3 +147,19 @@ export function formatImpactTime(impactIso: string) {
   const d = new Date(impactIso);
   return `Arrivée ${d.getHours()}h${String(d.getMinutes()).padStart(2, "0")}`;
 }
+
+// Retour de Cindy du 06/11 puis du 12/11 ("une pastille Entraînement ET un
+// titre Entraînement, c'est redondant") : vrai quand le titre ne fait que
+// répéter le libellé de la pastille (casse, accents et espaces ignorés --
+// "ENTRAINEMENT", "entraînement "...), ou qu'il n'y a pas de titre du tout.
+// Un titre personnalisé ("Entraînement shooting") n'est jamais concerné.
+export function isRedundantEventTitle(title: string | null, pillLabel: string) {
+  if (!title) return true;
+  const norm = (v: string) =>
+    v
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "");
+  return norm(title) === norm(pillLabel);
+}
