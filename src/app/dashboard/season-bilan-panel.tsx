@@ -190,7 +190,10 @@ export default function SeasonBilanPanel({
         {visibleTeams.map(({ team, roster }) => {
           const participation = participationByTeamId[team.id];
           return (
-            <div key={team.id} className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm sm:p-5">
+            // Téléphone : pas de cadre blanc autour (retour de Cindy du
+            // 13/11) -- les cartes par personne reposent directement sur le
+            // fond, comme les cartes du calendrier, et gagnent en largeur.
+            <div key={team.id} className="md:rounded-2xl md:border md:border-zinc-100 md:bg-white md:p-5 md:shadow-sm">
               <p className="mb-1 text-sm font-semibold text-zinc-900">
                 {team.name ?? "Équipe"}
                 {team.category && team.category !== team.name && (
