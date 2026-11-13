@@ -1052,7 +1052,7 @@ export default function MemberDetailModal({
                 key={t.key}
                 onClick={() => setTab(t.key)}
                 className={`flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[11px] font-semibold transition-colors sm:shrink-0 sm:flex-row sm:gap-1.5 sm:whitespace-nowrap sm:rounded-full sm:px-2.5 sm:text-xs md:text-sm ${
-                  active ? "bg-navy text-white" : "bg-navy/5 text-navy hover:bg-navy/10"
+                  active ? "border border-navy bg-navy text-white" : "border border-navy/25 bg-navy/5 text-navy hover:border-navy/40 hover:bg-navy/10"
                 }`}
               >
                 <Icon className="h-3.5 w-3.5 shrink-0" />
