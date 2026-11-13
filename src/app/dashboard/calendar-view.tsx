@@ -853,6 +853,12 @@ export default function CalendarView({
   // aucune requête de plus. false tant que organisationLoading (on ne sait
   // pas encore), jamais un faux "tout est pourvu" pendant le chargement.
   function needsOrganizing(e: AdminUpcomingEvent) {
+    // Match d'une autre équipe via "Matchs officiels du club" (13/11) :
+    // seuls ses rôles d'Organisation match à domicile comptent.
+    if (e.readOnlyExternal && !e.volunteeringOpen && e.officialsVolunteeringOpen) {
+      if (!clubOfficialsByEventId || !isHomeMatch(e) || e.cancelledAt) return false;
+      return hasUnmetOrganisationNeeds(emptyVolunteerNeeds, clubOfficialsByEventId[e.id] ?? emptyMatchOfficials);
+    }
     if (organisationLoading || !isHomeMatch(e)) return false;
     return hasUnmetOrganisationNeeds(
       volunteerNeedsByEventId[e.id] ?? emptyVolunteerNeeds,
@@ -1142,10 +1148,55 @@ export default function CalendarView({
           // basé sur le TYPE d'événement, pas sur qui y est inscrit -- sans ce
           // marqueur elle s'afficherait quand même, vide et inutilisable).
           readOnlyExternal: true,
+          // Retour de Cindy du 13/11 : "je me propose" pour l'Organisation
+          // match à domicile uniquement (voir officialsVolunteeringOpen,
+          // page.tsx).
+          officialsVolunteeringOpen: true,
         };
       })
     );
   }
+
+  // Rôles "Organisation match à domicile" des matchs du club affichés
+  // (13/11) : chargés à part, une seule fois par liste de matchs, et
+  // seulement pour les matchs à domicile à venir non annulés -- jamais pour
+  // tout le club en permanence.
+  // Calcul simple à chaque rendu (quelques dizaines de matchs au plus) :
+  // seule la clé texte ci-dessous déclenche le chargement.
+  const clubHomeMatchIds =
+    showClubMatches && clubMatches
+      ? clubMatches
+          .filter((e) => !e.cancelledAt && isHomeMatch(e) && new Date(e.start_time) > today)
+          .map((e) => e.id)
+      : [];
+  const clubHomeMatchIdsKey = clubHomeMatchIds.join(",");
+  const [clubOfficials, setClubOfficials] = useState<{
+    forKey: string;
+    byEventId: Record<string, MatchOfficialAssignment[]>;
+  } | null>(null);
+  useEffect(() => {
+    if (clubHomeMatchIds.length === 0) return;
+    let cancelled = false;
+    fetch("/api/event-organisation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventIds: clubHomeMatchIds }),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data) {
+          setClubOfficials({ forKey: clubHomeMatchIdsKey, byEventId: data.matchOfficialRolesByEventId ?? {} });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // clubHomeMatchIdsKey : même principe que organisationEventIdsKey.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clubHomeMatchIdsKey]);
+  const clubOfficialsByEventId =
+    clubOfficials?.forKey === clubHomeMatchIdsKey ? clubOfficials.byEventId : null;
 
   // Le calendrier s'ouvre sur la grille : on veut d'abord voir le mois.
   // La liste chronologique reste à un clic pour répondre à "c'est quoi la
@@ -2622,11 +2673,34 @@ export default function CalendarView({
             MatchOfficialsPanel, ni un autre besoin, voir isTrainingOpenToHelpers
             ci-dessous. */}
         {!canManageEvent &&
-          (!event.readOnlyExternal || event.volunteeringOpen) &&
+          (!event.readOnlyExternal || event.volunteeringOpen || event.officialsVolunteeringOpen) &&
           (event.event_type !== "TRAINING" || event.openToClubHelpers) &&
           event.event_type !== "REUNION" &&
           (() => {
           const isTrainingOpenToHelpers = event.event_type === "TRAINING" && event.openToClubHelpers;
+          // Match d'une autre équipe ouvert via "Matchs officiels du club"
+          // (13/11) : SEULEMENT l'Organisation match à domicile.
+          const officialsOnly = Boolean(
+            event.readOnlyExternal && !event.volunteeringOpen && event.officialsVolunteeringOpen
+          );
+          if (officialsOnly) {
+            if (!isHomeMatch(event) || event.cancelledAt) return null;
+            if (!clubOfficialsByEventId) {
+              return <div className="mt-3 h-11 animate-pulse rounded-2xl bg-zinc-100" />;
+            }
+            return (
+              <OrganisationCard defaultOpen={false} variant="terracotta">
+                <MatchOfficialsPanel
+                  eventId={event.id}
+                  eventTitle={event.title}
+                  startTime={event.start_time}
+                  teamId={event.teamId}
+                  assignments={clubOfficialsByEventId[event.id] ?? emptyMatchOfficials}
+                  canManage={false}
+                />
+              </OrganisationCard>
+            );
+          }
           const roles = isTrainingOpenToHelpers ? [] : rolesForEventType(eventRoles, event.event_type);
           const hasTasks = !isTrainingOpenToHelpers && (roles.length > 0 || shouldOfferCarpool(event));
           const needsRaw = volunteerNeedsByEventId[event.id] ?? emptyVolunteerNeeds;

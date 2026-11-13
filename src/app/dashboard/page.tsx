@@ -662,6 +662,14 @@ export type AdminUpcomingEvent = {
   // pour ne pas ouvrir le bénévolat à n'importe quel match du club parcouru
   // via ce bouton.
   volunteeringOpen?: boolean;
+  // Retour de Cindy du 13/11 (demande d'un salarié) : sur les matchs
+  // officiels à domicile des AUTRES équipes, affichés via "Matchs officiels
+  // du club" (calendar-view.tsx), un adhérent peut se proposer pour
+  // l'"Organisation match à domicile" (arbitrage, table de marque,
+  // responsable de salle) -- et uniquement celle-là : jamais les besoins
+  // bénévoles, le covoiturage ni les présences de l'équipe. Posé
+  // uniquement côté client sur ces matchs-là.
+  officialsVolunteeringOpen?: boolean;
 };
 
 // Un mineur ne peut jamais afficher le badge Bureau (voir bureauRole
