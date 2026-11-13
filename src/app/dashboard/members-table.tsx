@@ -810,17 +810,11 @@ export default function MembersTable({
             value={teamFilter}
             onChange={setTeamFilter}
           />
-          <label className="flex items-center gap-1.5 text-xs font-medium text-zinc-500">
-            <input
-              type="checkbox"
-              checked={showArchived}
-              onChange={(e) => setShowArchived(e.target.checked)}
-              className="h-3.5 w-3.5 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
-            />
-            Archivés
-          </label>
-          <span className="ml-auto shrink-0 text-xs font-medium text-zinc-400">
+          {/* "Afficher les archivés" est dans le menu ⋯ (retour de Cindy du
+              13/11) ; rappel ici tant que c'est coché. */}
+          <span className="ml-auto shrink-0 text-right text-xs font-medium text-zinc-400">
             {filtered.length} membre{filtered.length > 1 ? "s" : ""}
+            {showArchived && <span className="block text-[11px] text-zinc-500">archivés inclus</span>}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -873,6 +867,18 @@ export default function MembersTable({
                     <FileText className="h-4 w-4 shrink-0" />
                     Exporter (Excel)
                   </button>
+                  <label className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-zinc-700 hover:bg-zinc-50">
+                    <input
+                      type="checkbox"
+                      checked={showArchived}
+                      onChange={(e) => {
+                        setShowArchived(e.target.checked);
+                        setToolsMenuOpen(false);
+                      }}
+                      className="h-4 w-4 shrink-0 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
+                    />
+                    Afficher les archivés
+                  </label>
                 </div>
               </>
             )}
