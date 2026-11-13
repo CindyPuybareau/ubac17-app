@@ -147,13 +147,24 @@ export default function MatchScore({
         ? "bg-red-100 text-red-700"
         : "bg-zinc-100 text-zinc-600";
 
+  // Retour de Cindy du 13/11 ("un peu de fun") : le verdict en clair
+  // (Victoire / Défaite), le score en gros et l'écart -- une victoire et une
+  // défaite ne se ressemblent plus.
   return (
-    <div className="flex items-center gap-1.5">
-      <span
-        className={`font-numeric rounded-full px-2.5 py-0.5 text-sm font-bold ${resultClass}`}
-      >
-        {teamScore} – {opponentScore}
+    <div className="flex flex-wrap items-center gap-2">
+      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${resultClass}`}>
+        {diff > 0 ? "Victoire" : diff < 0 ? "Défaite" : "Nul"}
       </span>
+      <span className="font-numeric text-lg font-extrabold leading-none tabular-nums text-zinc-900">
+        <span className={diff > 0 ? "text-green-700" : undefined}>{teamScore}</span>
+        <span className="mx-1 text-zinc-300">–</span>
+        <span className={diff < 0 ? "text-red-700" : undefined}>{opponentScore}</span>
+      </span>
+      {diff !== 0 && (
+        <span className={`text-[11px] font-semibold tabular-nums ${diff > 0 ? "text-green-700" : "text-red-600"}`}>
+          {diff > 0 ? `+${diff}` : diff}
+        </span>
+      )}
       {canEdit && (
         <button
           type="button"

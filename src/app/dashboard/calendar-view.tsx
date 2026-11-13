@@ -2975,7 +2975,18 @@ export default function CalendarView({
     // artistique du 2026-08-23), gardée cohérente entre "à venir" et
     // "résultats" pour ne pas avoir deux traitements différents du même
     // match selon l'onglet où on le regarde.
-    const cardShellClass = eventCardShellClass(event, style, "result");
+    // Retour de Cindy du 13/11 ("un peu de fun") : bande de gauche verte pour
+    // une victoire, rouge pour une défaite, dès que le score est saisi.
+    const hasResult =
+      alreadyPlayed && !event.cancelledAt && event.teamScore !== null && event.opponentScore !== null;
+    const resultBorder = hasResult
+      ? (event.teamScore as number) > (event.opponentScore as number)
+        ? "border-l-emerald-500"
+        : (event.teamScore as number) < (event.opponentScore as number)
+          ? "border-l-red-500"
+          : style.border
+      : style.border;
+    const cardShellClass = eventCardShellClass(event, { border: resultBorder }, "result");
 
     // Retour de Cindy du 06/11 ("les cartes dans Matchs officiels ne sont
     // pas toutes comme demandées") : un match déjà joué passe par CETTE
