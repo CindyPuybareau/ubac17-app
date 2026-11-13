@@ -6,12 +6,16 @@ import {
   AlertTriangle,
   Copy,
   Flame,
+  Mail,
+  MessageCircle,
+  Phone,
   Shield,
   Trash2,
   User,
   Users,
   X,
 } from "lucide-react";
+import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { createClient } from "@/lib/supabase/client";
 import { formatPersonName } from "@/lib/names";
 import { formatLocalDateFr } from "@/lib/local-date";
@@ -44,11 +48,14 @@ const BUREAU_ROLE_OPTIONS = [
   COMMITTEE_ROLE_LABEL,
 ];
 
+// short : libellé affiché sur téléphone (retour de Cindy du 13/11, "le 4e
+// onglet était coupé, barre de défilement") -- les quatre tiennent alors
+// sur une ligne ; libellé complet dès sm:.
 const TABS = [
-  { key: "identity", label: "Identité", icon: User },
-  { key: "license", label: "Licence & Équipe", icon: Shield },
-  { key: "family", label: "Parents & Urgence", icon: Users },
-  { key: "medical", label: "Santé & Chartes", icon: AlertTriangle },
+  { key: "identity", label: "Identité", short: "Identité", icon: User },
+  { key: "license", label: "Licence & Équipe", short: "Licence", icon: Shield },
+  { key: "family", label: "Parents & Urgence", short: "Parents", icon: Users },
+  { key: "medical", label: "Santé & Chartes", short: "Santé", icon: AlertTriangle },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -118,6 +125,37 @@ export function Field({
         />
       )}
     </div>
+  );
+}
+
+// Actions de contact en un appui (retour de Cindy du 13/11 : "le plus
+// fréquent, c'est chercher un numéro pour appeler ou écrire") -- appeler,
+// WhatsApp, e-mail. Rien si la coordonnée est vide ou invalide.
+const QUICK_ACTION_CLASS =
+  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors";
+
+function PhoneActions({ phone, label }: { phone: string; label?: string }) {
+  const digits = phone.replace(/[^\d+]/g, "");
+  if (digits.replace(/\D/g, "").length < 8) return null;
+  const whatsapp = buildWhatsAppLink(phone, "Bonjour,");
+  return (
+    <>
+      <a href={`tel:${digits}`} className={`${QUICK_ACTION_CLASS} border-navy/20 text-navy hover:bg-navy/5`}>
+        <Phone className="h-3.5 w-3.5 shrink-0" />
+        {label ? `Appeler ${label}` : "Appeler"}
+      </a>
+      {whatsapp && (
+        <a
+          href={whatsapp}
+          target="_blank"
+          rel="noreferrer"
+          className={`${QUICK_ACTION_CLASS} border-emerald-200 text-emerald-700 hover:bg-emerald-50`}
+        >
+          <MessageCircle className="h-3.5 w-3.5 shrink-0" />
+          WhatsApp
+        </a>
+      )}
+    </>
   );
 }
 
@@ -453,6 +491,18 @@ export default function MemberDetailModal({
   });
 
   const editable = !readOnly;
+  // Modifications non enregistrées (retour de Cindy du 13/11) : voir
+  // onInputCapture sur le corps de la fiche ; fermer demande alors
+  // confirmation plutôt que de perdre la saisie.
+  const [dirty, setDirty] = useState(false);
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
+  function requestClose() {
+    if (dirty && editable) {
+      setCloseConfirmOpen(true);
+      return;
+    }
+    onClose();
+  }
   // Champs hors coordonnées de contact (nom, naissance, catégorie,
   // licence, notes médicales...) : coupés pour un coach, voir
   // canEditFullProfile ci-dessus.
@@ -934,8 +984,10 @@ export default function MemberDetailModal({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-xl">
+    // Plein écran sur téléphone, fenêtre plus large sur ordinateur (retour
+    // de Cindy du 13/11).
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 sm:p-4">
+      <div className="flex h-full w-full flex-col bg-white shadow-xl sm:h-auto sm:max-h-[85vh] sm:max-w-2xl sm:rounded-2xl lg:max-w-4xl">
         <div className="flex items-center justify-between border-b border-zinc-100 px-5 py-4">
           <div>
             <h3 className="flex items-center gap-1.5 font-semibold text-zinc-900">
@@ -967,7 +1019,8 @@ export default function MemberDetailModal({
               {linkCopied && <span className="text-xs font-medium text-emerald-600">Copié !</span>}
             </button>
             <button
-              onClick={onClose}
+              onClick={requestClose}
+              title="Fermer"
               className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
             >
               <X className="h-4 w-4" />
@@ -975,7 +1028,22 @@ export default function MemberDetailModal({
           </div>
         </div>
 
-        <div className="flex flex-nowrap items-center gap-1 overflow-x-auto border-b border-zinc-100 px-3 py-2 md:justify-between">
+        {(form.registrationPhone.trim() || form.registrationEmail.trim()) && (
+          <div className="flex flex-wrap items-center gap-2 border-b border-zinc-100 px-5 py-2.5">
+            {form.registrationPhone.trim() && <PhoneActions phone={form.registrationPhone} />}
+            {form.registrationEmail.trim() && (
+              <a
+                href={`mailto:${form.registrationEmail.trim()}`}
+                className={`${QUICK_ACTION_CLASS} border-zinc-200 text-zinc-700 hover:bg-zinc-50`}
+              >
+                <Mail className="h-3.5 w-3.5 shrink-0" />
+                E-mail
+              </a>
+            )}
+          </div>
+        )}
+
+        <div className="grid grid-cols-4 gap-1 border-b border-zinc-100 px-3 py-2 sm:flex sm:flex-nowrap sm:items-center md:justify-between">
           {TABS.map((t) => {
             const Icon = t.icon;
             const active = tab === t.key;
@@ -983,20 +1051,28 @@ export default function MemberDetailModal({
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
-                className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1.5 text-xs font-semibold transition-colors md:text-sm ${
+                className={`flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[11px] font-semibold transition-colors sm:shrink-0 sm:flex-row sm:gap-1.5 sm:whitespace-nowrap sm:rounded-full sm:px-2.5 sm:text-xs md:text-sm ${
                   active ? "bg-navy text-white" : "text-zinc-500 hover:bg-zinc-100"
                 }`}
               >
                 <Icon className="h-3.5 w-3.5 shrink-0" />
-                {t.label}
+                <span className="truncate sm:hidden">{t.short}</span>
+                <span className="hidden sm:inline">{t.label}</span>
               </button>
             );
           })}
         </div>
 
-        <div ref={tabBodyRef} className="flex-1 overflow-y-auto px-5 py-4">
+        <div
+          ref={tabBodyRef}
+          className="flex-1 overflow-y-auto px-5 py-4"
+          // Toute saisie dans la fiche (champ, liste, case à cocher) marque
+          // des modifications non enregistrées (retour de Cindy du 13/11).
+          onInputCapture={() => setDirty(true)}
+          onChangeCapture={() => setDirty(true)}
+        >
           {tab === "identity" && (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <Field
                 label="Prénom"
                 value={form.firstName}
@@ -1033,6 +1109,7 @@ export default function MemberDetailModal({
               />
               <Field
                 label="Téléphone"
+                type="tel"
                 value={form.registrationPhone}
                 editable={editable}
                 onChange={(v) => set("registrationPhone", v)}
@@ -1091,18 +1168,34 @@ export default function MemberDetailModal({
                 onChange={(v) => set("secondaryEmail", v)}
               />
               <div />
-              <Field
-                label="Mère / conjointe"
-                value={form.motherPhone}
-                editable={editable}
-                onChange={(v) => set("motherPhone", v)}
-              />
-              <Field
-                label="Père / conjoint"
-                value={form.fatherPhone}
-                editable={editable}
-                onChange={(v) => set("fatherPhone", v)}
-              />
+              <div className="flex flex-col gap-1.5">
+                <Field
+                  label="Mère / conjointe"
+                  type="tel"
+                  value={form.motherPhone}
+                  editable={editable}
+                  onChange={(v) => set("motherPhone", v)}
+                />
+                {form.motherPhone.trim() && (
+                  <div className="flex flex-wrap gap-1.5">
+                    <PhoneActions phone={form.motherPhone} />
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Field
+                  label="Père / conjoint"
+                  type="tel"
+                  value={form.fatherPhone}
+                  editable={editable}
+                  onChange={(v) => set("fatherPhone", v)}
+                />
+                {form.fatherPhone.trim() && (
+                  <div className="flex flex-wrap gap-1.5">
+                    <PhoneActions phone={form.fatherPhone} />
+                  </div>
+                )}
+              </div>
               <div className="sm:col-span-2">
                 <Field
                   label="Autres téléphones"
@@ -1543,21 +1636,27 @@ export default function MemberDetailModal({
         {editable && (
           <div className="border-t border-zinc-100 px-5 py-3">
             {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
-            <div className="flex items-center gap-2">
+            {dirty && !saving && (
+              <p className="mb-2 text-xs font-medium text-amber-700">Modifications non enregistrées</p>
+            )}
+            <div className="flex items-center gap-3">
+              {/* Plus discret qu'un gros bouton rouge à côté d'Enregistrer
+                  (retour de Cindy du 13/11, risque de mauvais appui) ;
+                  confirmation inchangée. */}
               {onArchive && !archivedAt && (
                 <button
                   type="button"
                   onClick={() => setArchiveConfirmOpen(true)}
-                  className="flex shrink-0 items-center gap-1.5 rounded-full border border-red-200 px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+                  className="flex shrink-0 items-center gap-1 text-xs font-medium text-zinc-400 transition-colors hover:text-red-600"
                 >
-                  <Trash2 className="h-4 w-4" />
-                  Archiver ce membre
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Archiver
                 </button>
               )}
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="min-w-0 flex-1 rounded-full bg-ubac-yellow px-4 py-2 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
+                className="min-w-0 flex-1 rounded-full bg-ubac-yellow px-4 py-2.5 text-sm font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark disabled:opacity-60"
               >
                 {saving ? "Enregistrement..." : "Enregistrer"}
               </button>
@@ -1565,6 +1664,18 @@ export default function MemberDetailModal({
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={closeConfirmOpen}
+        title="Fermer sans enregistrer ?"
+        message="Les modifications faites sur cette fiche seront perdues."
+        confirmLabel="Fermer sans enregistrer"
+        onConfirm={() => {
+          setCloseConfirmOpen(false);
+          onClose();
+        }}
+        onCancel={() => setCloseConfirmOpen(false)}
+      />
 
       <ConfirmDialog
         open={archiveConfirmOpen}
