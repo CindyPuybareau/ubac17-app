@@ -31,7 +31,6 @@ import {
   StickyNote,
   Sun,
   Trash2,
-  Trophy,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -69,6 +68,7 @@ import WeekendStrip, {
 } from "./weekend-strip";
 import MatchCountdown from "./match-countdown";
 import BirthdayCelebration from "./birthday-celebration";
+import { BirthdayCorner, DaySymbols, SymbolLegend, symbolFor, type DaySymbolItem } from "./day-symbols";
 import TeamFilterDropdown from "./team-filter-dropdown";
 import EventTypeFilterDropdown from "./event-type-filter-dropdown";
 import { sendEventPush } from "./event-push";
@@ -3719,39 +3719,34 @@ export default function CalendarView({
             // fond crème général de l'appli — teinte nettement plus soutenue
             // ici pour rester visible au premier coup d'œil.
             const holiday = schoolHolidayFor(d);
-            // Calendrier "fun" (13/11) : jours passés plus pâles, trophée
-            // sur les jours de match (un seul par jour, quel que soit le
-            // nombre de matchs). Le résultat colore le trophée lui-même
-            // (retour de Cindy du 13/11, "les points dépassent") : vert =
-            // victoire(s), rouge = défaite(s), jaune = pas encore joué ou
-            // journée mêlant victoire et défaite.
+            // Calendrier "fun" (13/11) : jours passés plus pâles. Retour de
+            // Cindy du 13/11 ("au lieu des points, un joli symbole... clair
+            // pour tous les espaces") : un symbole par type d'événement, avec
+            // un chiffre s'il y en a plusieurs (DaySymbols, day-symbols.tsx,
+            // partagé avec l'espace Enfant) ; le résultat d'un match colore
+            // son symbole (vert / rouge) ; gâteau d'anniversaire à part, en bas
+            // à droite de la case.
             const isPast = key < todayKey;
-            const dayMatches = dayEvents.filter(
-              (e) => !e.cancelledAt && (isMatchType(e.event_type) || e.event_type === "TOURNAMENT")
-            );
-            const scored = showResultDots
-              ? dayMatches.filter((e) => e.teamScore !== null && e.opponentScore !== null)
-              : [];
-            const wins = scored.filter((e) => (e.teamScore as number) > (e.opponentScore as number)).length;
-            const losses = scored.filter((e) => (e.teamScore as number) < (e.opponentScore as number)).length;
-            const trophy =
-              scored.length > 0 && scored.length === dayMatches.length && wins === scored.length
-                ? { className: "text-emerald-600", label: wins > 1 ? `${wins} victoires` : "Victoire" }
-                : scored.length > 0 && scored.length === dayMatches.length && losses === scored.length
-                  ? { className: "text-red-500", label: losses > 1 ? `${losses} défaites` : "Défaite" }
-                  : scored.length > 0
-                    ? {
-                        className: "text-ubac-yellow-dark",
-                        label: `${wins} victoire${wins > 1 ? "s" : ""}, ${losses} défaite${losses > 1 ? "s" : ""}`,
-                      }
-                    : { className: "text-ubac-yellow-dark", label: "Jour de match" };
+            const symbolItems: DaySymbolItem[] = dayEvents.map((e) => ({
+              eventType: e.event_type,
+              cancelled: Boolean(e.cancelledAt),
+              ring: !e.cancelledAt && needsOrganizing(e) ? "warn" : null,
+              result:
+                showResultDots && e.teamScore !== null && e.opponentScore !== null
+                  ? e.teamScore > e.opponentScore
+                    ? "win"
+                    : e.teamScore < e.opponentScore
+                      ? "loss"
+                      : "draw"
+                  : null,
+            }));
 
             return (
               <button
                 key={key}
                 onClick={() => setSelectedDate(d)}
                 title={holiday ?? undefined}
-                className={`flex min-h-[52px] w-full min-w-0 flex-col items-start gap-1 rounded-lg border p-1 text-left transition-colors sm:min-h-[104px] sm:rounded-xl sm:p-2 ${
+                className={`relative flex min-h-[52px] w-full min-w-0 flex-col items-start gap-1 rounded-lg border p-1 text-left transition-colors sm:min-h-[104px] sm:rounded-xl sm:p-2 ${
                   isSelected
                     ? "border-navy bg-navy/5"
                     : holiday
@@ -3761,107 +3756,74 @@ export default function CalendarView({
                   isToday ? "ring-2 ring-ubac-yellow ring-offset-1" : ""
                 }`}
               >
-                <span className="flex w-full min-w-0 items-center gap-0.5">
-                  {/* Rond du jour assez grand pour deux chiffres (retour de
-                      Cindy du 13/11, "rond jaune pas centré au chiffre"). */}
-                  <span
-                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold leading-none tabular-nums sm:h-6 sm:w-6 sm:text-xs ${
-                      isToday ? "bg-ubac-yellow text-navy" : "text-zinc-700"
-                    }`}
-                  >
-                    {d.getDate()}
-                  </span>
-                  {dayMatches.length > 0 && (
-                    <span title={trophy.label} className="flex shrink-0">
-                      <Trophy className={`h-2.5 w-2.5 sm:h-3 sm:w-3 ${trophy.className}`} aria-label={trophy.label} />
-                    </span>
-                  )}
+                {/* Rond du jour assez grand pour deux chiffres (retour de
+                    Cindy du 13/11, "rond jaune pas centré au chiffre"). */}
+                <span
+                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold leading-none tabular-nums sm:h-6 sm:w-6 sm:text-xs ${
+                    isToday ? "bg-ubac-yellow text-navy" : "text-zinc-700"
+                  }`}
+                >
+                  {d.getDate()}
                 </span>
                 <div className="flex w-full min-w-0 flex-col gap-0.5">
-                  {/* gap-1 plutôt que gap-0.5 (retour de Cindy du 24/09,
-                      "écarter un peu les points") : laisse un peu de place
-                      à l'anneau des pastilles "besoin non pourvu" juste en
-                      dessous, sans quoi il collait aux pastilles voisines. */}
-                  <div className="flex flex-wrap gap-1 sm:hidden">
-                    {visible.map((e) => (
-                      <span
-                        key={e.id}
-                        title={
-                          e.cancelledAt
-                            ? "Annulé"
-                            : needsOrganizing(e)
-                              ? "Besoin d'organisation non pourvu"
-                              : undefined
-                        }
-                        className={`h-1.5 w-1.5 shrink-0 rounded-full ${styleFor(e.event_type).dot} ${
-                          // ring-1, jamais ring-2 (retour de Cindy du 24/09,
-                          // "trop épais, le faire fin") : un simple trait,
-                          // pas un halo épais autour d'une pastille de 6px.
-                          // Annulé prend le pas sur "besoin non pourvu" si
-                          // jamais les deux se combinent (retour de Cindy
-                          // du 30/10) -- un événement annulé n'a plus
-                          // besoin d'être organisé.
-                          e.cancelledAt
-                            ? "ring-1 ring-status-urgent"
-                            : needsOrganizing(e)
-                              ? "ring-1 ring-amber-500"
-                              : ""
-                        }`}
-                      />
-                    ))}
-                    {dayBirthdays.length > 0 &&
-                      (isBureau ? (
-                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-purple-400" />
-                      ) : (
-                        <Cake className="h-2.5 w-2.5 shrink-0 text-purple-500" aria-label="Anniversaire" />
-                      ))}
+                  <div className="sm:hidden">
+                    <DaySymbols items={symbolItems} />
                   </div>
                   <div className="hidden sm:flex sm:flex-col sm:gap-0.5">
-                    {visible.map((e) => (
-                      <span
-                        key={e.id}
-                        title={
-                          e.cancelledAt
-                            ? `Annulé${e.cancelledReason ? ` — ${e.cancelledReason}` : ""}`
-                            : needsOrganizing(e)
-                              ? "Besoin d'organisation non pourvu"
-                              : undefined
-                        }
-                        className={`inline-flex items-center justify-center gap-0.5 truncate whitespace-nowrap rounded px-1 py-0.5 text-[10px] font-semibold leading-none ${styleFor(e.event_type).pill} ${
-                          e.cancelledAt ? "line-through opacity-60" : ""
-                        }`}
-                      >
-                        {e.cancelledAt ? (
-                          <Ban className="h-2.5 w-2.5 shrink-0 text-status-urgent-dark" />
-                        ) : (
-                          needsOrganizing(e) && (
+                    {visible.map((e) => {
+                      const { Icon } = symbolFor(e.event_type);
+                      return (
+                        <span
+                          key={e.id}
+                          title={
+                            e.cancelledAt
+                              ? `Annulé${e.cancelledReason ? ` — ${e.cancelledReason}` : ""}`
+                              : needsOrganizing(e)
+                                ? "Besoin d'organisation non pourvu"
+                                : undefined
+                          }
+                          className={`inline-flex items-center justify-center gap-0.5 truncate whitespace-nowrap rounded px-1 py-0.5 text-[10px] font-semibold leading-none ${styleFor(e.event_type).pill} ${
+                            e.cancelledAt ? "line-through opacity-60" : ""
+                          }`}
+                        >
+                          {e.cancelledAt ? (
+                            <Ban className="h-2.5 w-2.5 shrink-0 text-status-urgent-dark" />
+                          ) : needsOrganizing(e) ? (
                             <AlertTriangle className="h-2.5 w-2.5 shrink-0 text-amber-600" />
-                          )
-                        )}
-                        {pillLabel(e)}
-                      </span>
-                    ))}
-                    {dayBirthdays.length > 0 && (
-                      <span className="inline-flex items-center justify-center gap-0.5 truncate whitespace-nowrap rounded bg-purple-100 px-1 py-0.5 text-[10px] font-semibold leading-none text-purple-700">
-                        <Cake className="h-2.5 w-2.5 shrink-0" />
-                        {dayBirthdays.length === 1
-                          ? formatFirstName(dayBirthdays[0].firstName)
-                          : `${dayBirthdays.length} anniv.`}
-                      </span>
+                          ) : (
+                            <Icon className="h-2.5 w-2.5 shrink-0" />
+                          )}
+                          {pillLabel(e)}
+                        </span>
+                      );
+                    })}
+                    {overflow > 0 && (
+                      <span className="text-[10px] font-semibold text-zinc-400">+{overflow}</span>
                     )}
                   </div>
-                  {overflow > 0 && (
-                    <span className="text-[9px] font-semibold text-zinc-400 sm:text-[10px]">
-                      +{overflow}
-                    </span>
-                  )}
                 </div>
+                {/* Anniversaires : à part, en haut à droite (retour de Cindy du
+                    13/11), pour tous les espaces -- Bureau compris. Gâteau
+                    seul sur téléphone, gâteau + prénom sur grand écran. */}
+                <span className="sm:hidden">
+                  <BirthdayCorner count={dayBirthdays.length} />
+                </span>
+                {dayBirthdays.length > 0 && (
+                  <span className="absolute right-2 top-3 hidden max-w-[55%] items-center gap-0.5 truncate whitespace-nowrap rounded bg-pink-100 px-1 py-0.5 text-[10px] font-semibold leading-none text-pink-700 sm:inline-flex">
+                    <Cake className="h-2.5 w-2.5 shrink-0" />
+                    {dayBirthdays.length === 1
+                      ? formatFirstName(dayBirthdays[0].firstName)
+                      : "Anniversaires"}
+                  </span>
+                )}
               </button>
             );
           })}
         </div>
       </div>
       )}
+
+      {view === "month" && <SymbolLegend showWarn />}
 
       {view === "list" && (
         // gap-4 (retour de Cindy du 2026-08-25, "pas assez de marges entre
