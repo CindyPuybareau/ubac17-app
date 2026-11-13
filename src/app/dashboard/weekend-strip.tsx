@@ -183,30 +183,25 @@ export default function WeekendStrip({
       >
         <span className="flex min-w-0 items-center gap-3">
           <span
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full shadow-sm ${
-              "bg-ubac-yellow text-navy"
-            }`}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ubac-yellow text-navy shadow-sm"
           >
             {isClub ? <Megaphone className="h-4 w-4" /> : <Trophy className="h-4 w-4" />}
           </span>
           <span className="flex min-w-0 flex-col leading-tight">
-            <span className={`whitespace-nowrap text-[10px] font-semibold uppercase tracking-wide text-ubac-yellow`}>
+            <span className="truncate text-[10px] font-semibold uppercase tracking-wide text-ubac-yellow">
               {isClub ? "Venez encourager !" : "Ce week-end au club"}
             </span>
             <span className="truncate whitespace-nowrap text-sm font-bold text-white min-[400px]:text-base">
               {isClub
                 ? `${shown.length} match${shown.length > 1 ? "s" : ""} à domicile ce WE`
-                : `${shown.length} match${shown.length > 1 ? "s" : ""}`}
+                : // Bureau : "dont N à domicile" dans le titre plutôt qu'une
+                  // pastille à part qui chevauchait le texte sur téléphone
+                  // (retour de Cindy du 13/11).
+                  `${shown.length} match${shown.length > 1 ? "s" : ""}${homeCount > 0 ? ` dont ${homeCount} à domicile` : ""}`}
             </span>
           </span>
         </span>
         <span className="flex shrink-0 items-center gap-2">
-          {!isClub && homeCount > 0 && (
-            <span className="inline-flex h-6 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full bg-white/15 px-2.5 text-[11px] font-semibold leading-none text-white">
-              <Home className="h-3 w-3" />
-              {homeCount} à domicile
-            </span>
-          )}
           <ChevronDown
             className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""} text-white/80`}
           />

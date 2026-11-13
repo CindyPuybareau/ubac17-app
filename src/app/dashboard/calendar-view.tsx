@@ -3721,23 +3721,30 @@ export default function CalendarView({
             const holiday = schoolHolidayFor(d);
             // Calendrier "fun" (13/11) : jours passés plus pâles, trophée
             // sur les jours de match (un seul par jour, quel que soit le
-            // nombre de matchs), point vert/rouge par résultat connu.
+            // nombre de matchs). Le résultat colore le trophée lui-même
+            // (retour de Cindy du 13/11, "les points dépassent") : vert =
+            // victoire(s), rouge = défaite(s), jaune = pas encore joué ou
+            // journée mêlant victoire et défaite.
             const isPast = key < todayKey;
             const dayMatches = dayEvents.filter(
               (e) => !e.cancelledAt && (isMatchType(e.event_type) || e.event_type === "TOURNAMENT")
             );
-            const dayResults = showResultDots
-              ? dayMatches
-                  .filter((e) => e.teamScore !== null && e.opponentScore !== null)
-                  .slice(0, 3)
-                  .map((e) =>
-                    (e.teamScore as number) > (e.opponentScore as number)
-                      ? { id: e.id, className: "bg-emerald-500", label: "Victoire" }
-                      : (e.teamScore as number) < (e.opponentScore as number)
-                        ? { id: e.id, className: "bg-red-500", label: "Défaite" }
-                        : { id: e.id, className: "bg-zinc-400", label: "Nul" }
-                  )
+            const scored = showResultDots
+              ? dayMatches.filter((e) => e.teamScore !== null && e.opponentScore !== null)
               : [];
+            const wins = scored.filter((e) => (e.teamScore as number) > (e.opponentScore as number)).length;
+            const losses = scored.filter((e) => (e.teamScore as number) < (e.opponentScore as number)).length;
+            const trophy =
+              scored.length > 0 && scored.length === dayMatches.length && wins === scored.length
+                ? { className: "text-emerald-600", label: wins > 1 ? `${wins} victoires` : "Victoire" }
+                : scored.length > 0 && scored.length === dayMatches.length && losses === scored.length
+                  ? { className: "text-red-500", label: losses > 1 ? `${losses} défaites` : "Défaite" }
+                  : scored.length > 0
+                    ? {
+                        className: "text-ubac-yellow-dark",
+                        label: `${wins} victoire${wins > 1 ? "s" : ""}, ${losses} défaite${losses > 1 ? "s" : ""}`,
+                      }
+                    : { className: "text-ubac-yellow-dark", label: "Jour de match" };
 
             return (
               <button
@@ -3765,15 +3772,10 @@ export default function CalendarView({
                     {d.getDate()}
                   </span>
                   {dayMatches.length > 0 && (
-                    <Trophy className="h-2.5 w-2.5 shrink-0 text-ubac-yellow-dark sm:h-3 sm:w-3" aria-label="Jour de match" />
+                    <span title={trophy.label} className="flex shrink-0">
+                      <Trophy className={`h-2.5 w-2.5 sm:h-3 sm:w-3 ${trophy.className}`} aria-label={trophy.label} />
+                    </span>
                   )}
-                  {dayResults.map((r) => (
-                    <span
-                      key={r.id}
-                      title={r.label}
-                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${r.className}`}
-                    />
-                  ))}
                 </span>
                 <div className="flex w-full min-w-0 flex-col gap-0.5">
                   {/* gap-1 plutôt que gap-0.5 (retour de Cindy du 24/09,
