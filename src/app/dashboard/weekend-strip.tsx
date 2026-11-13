@@ -166,30 +166,35 @@ export default function WeekendStrip({
   }));
 
   return (
-    <div className={`overflow-hidden rounded-2xl border bg-white shadow-sm ${isClub ? "border-ubac-yellow/60" : "border-navy/10"}`}>
+    <div className={`overflow-hidden rounded-2xl border bg-white shadow-sm border-navy/10`}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left ${
-          isClub ? "bg-ubac-yellow" : "bg-gradient-to-br from-navy via-navy to-navy-dark"
+          // Même bandeau bleu marine pour tous (retour de Cindy du 13/11,
+          // "pas sexy ce bloc jaune") : le jaune club reste en accent
+          // (icône, petit titre, liseré).
+          isClub
+            ? "border-b-2 border-ubac-yellow bg-gradient-to-br from-navy via-navy to-navy-dark"
+            : "bg-gradient-to-br from-navy via-navy to-navy-dark"
         }`}
       >
         <span className="flex min-w-0 items-center gap-3">
           <span
             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full shadow-sm ${
-              isClub ? "bg-navy text-ubac-yellow" : "bg-ubac-yellow text-navy"
+              "bg-ubac-yellow text-navy"
             }`}
           >
             {isClub ? <Megaphone className="h-4 w-4" /> : <Trophy className="h-4 w-4" />}
           </span>
           <span className="flex min-w-0 flex-col leading-tight">
-            <span className={`whitespace-nowrap text-[10px] font-semibold uppercase tracking-wide ${isClub ? "text-navy/70" : "text-ubac-yellow"}`}>
-              {isClub ? "Ce week-end, venez encourager !" : "Ce week-end au club"}
+            <span className={`whitespace-nowrap text-[10px] font-semibold uppercase tracking-wide text-ubac-yellow`}>
+              {isClub ? "Venez encourager !" : "Ce week-end au club"}
             </span>
-            <span className={`text-base font-bold ${isClub ? "text-navy" : "text-white"}`}>
+            <span className="truncate whitespace-nowrap text-base font-bold text-white">
               {isClub
-                ? `${shown.length} match${shown.length > 1 ? "s" : ""} à domicile`
+                ? `${shown.length} match${shown.length > 1 ? "s" : ""} à domicile ce WE`
                 : `${shown.length} match${shown.length > 1 ? "s" : ""}`}
             </span>
           </span>
@@ -202,7 +207,7 @@ export default function WeekendStrip({
             </span>
           )}
           <ChevronDown
-            className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""} ${isClub ? "text-navy/70" : "text-white/80"}`}
+            className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""} text-white/80`}
           />
         </span>
       </button>
