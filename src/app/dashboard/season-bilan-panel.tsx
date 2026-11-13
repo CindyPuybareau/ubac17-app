@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Users } from "lucide-react";
+import { Dumbbell, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getCurrentSeasonWindow } from "@/lib/season";
 import { sortTeamsByGroup, teamLabel } from "@/lib/teams";
@@ -267,26 +267,42 @@ function TeamParticipationSummary({
       });
     }
   });
-  const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : one}`;
-  const parts = [
-    plural(trainings, "entraînement", "entraînements"),
-    totals.official > 0 ? plural(totals.official, "match officiel", "matchs officiels") : null,
-    totals.friendly > 0 ? plural(totals.friendly, "amical", "amicaux") : null,
-    totals.tournament > 0 ? plural(totals.tournament, "tournoi", "tournois") : null,
-    totals.other > 0 ? plural(totals.other, "autre rendez-vous", "autres rendez-vous") : null,
-  ].filter(Boolean);
+  // Même présentation que la carte "Entraînements du mois" du tableau de
+  // bord (retour de Cindy du 13/11, "on peut mieux présenter... comme sur
+  // le tableau de bord") : grand pourcentage avec son petit titre, puis le
+  // nombre de rendez-vous de la saison en cases.
+  const counts = [
+    { key: "training", label: trainings > 1 ? "Entraînements" : "Entraînement", value: trainings },
+    { key: "official", label: totals.official > 1 ? "Matchs officiels" : "Match officiel", value: totals.official },
+    { key: "friendly", label: totals.friendly > 1 ? "Amicaux" : "Amical", value: totals.friendly },
+    { key: "tournament", label: totals.tournament > 1 ? "Tournois" : "Tournoi", value: totals.tournament },
+    { key: "other", label: "Autres", value: totals.other },
+  ].filter((c) => c.key === "training" || c.value > 0);
   const rate = expected > 0 ? Math.round((present / expected) * 100) : null;
-  const rateColor =
-    rate === null ? "" : rate < 50 ? "text-red-600" : rate < 80 ? "text-amber-600" : "text-emerald-700";
   return (
-    <p className="mb-3 text-xs text-zinc-500">
-      {parts.join(" · ")}
-      {rate !== null && (
-        <>
-          {" · "}
-          <span className={`font-semibold ${rateColor}`}>{rate} % de présence</span> aux entraînements
-        </>
-      )}
-    </p>
+    <div className="mb-3 flex flex-col gap-3 rounded-2xl border border-zinc-100 bg-white px-4 py-3 shadow-sm md:flex-row md:items-center md:justify-between md:shadow-none">
+      <div className="flex items-center gap-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-court-green/10">
+          <Dumbbell className="h-4 w-4 text-court-green" />
+        </span>
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-700">Entraînements de la saison</p>
+          <p className="text-xl font-bold leading-tight text-zinc-900">
+            {rate === null ? "—" : `${rate} %`}
+            <span className="ml-1 text-sm font-medium text-zinc-500">de présence</span>
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {counts.map((c) => (
+          <div key={c.key} className="min-w-fit flex-1 rounded-lg bg-zinc-50 px-2.5 py-1.5 md:flex-none">
+            <p className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+              {c.label}
+            </p>
+            <p className="text-sm font-bold tabular-nums text-zinc-900">{c.value}</p>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
