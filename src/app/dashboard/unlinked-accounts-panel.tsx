@@ -147,7 +147,7 @@ export default function UnlinkedAccountsPanel({
   }
 
   return (
-    <div className="rounded-2xl border border-ubac-yellow/40 bg-ubac-yellow/10 p-4">
+    <div className="rounded-2xl border border-ubac-yellow/40 bg-ubac-yellow/10 px-4 py-3">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -171,10 +171,14 @@ export default function UnlinkedAccountsPanel({
           {open ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
         </span>
       </button>
-      <p className="mt-1 text-xs text-zinc-600">
-        Ces personnes ont créé un compte avec une adresse e-mail qui ne figure sur aucune fiche : elles voient
-        un espace vide. Choisis leur fiche (ou celle de leur enfant) pour les relier.
-      </p>
+      {/* Explication seulement une fois déplié (retour de Cindy du 13/11 :
+          replié, l'encadré prenait 4 lignes en haut de Membres sur téléphone). */}
+      {open && (
+        <p className="mt-1 text-xs text-zinc-600">
+          Ces personnes ont créé un compte avec une adresse e-mail qui ne figure sur aucune fiche : elles voient
+          un espace vide. Choisis leur fiche (ou celle de leur enfant) pour les relier.
+        </p>
+      )}
 
       {open && (
         <ul className="mt-3 flex flex-col gap-2">
