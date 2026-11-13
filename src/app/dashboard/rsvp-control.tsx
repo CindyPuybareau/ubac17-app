@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, Clock, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import PresentBurst from "./present-burst";
 import AbsenceReasonField, { clearAbsenceReason } from "./absence-reason-field";
 import {
   SEGMENT_ABSENT_ON,
@@ -122,13 +123,15 @@ export default function RsvpControl({
         <button
           type="button"
           disabled={saving}
+          key={popKey}
           onClick={() => save("PRESENT")}
-          className={`${SEGMENT_BUTTON} ${
+          className={`${SEGMENT_BUTTON} relative ${popKey > 0 ? "animate-ubac-button-pop" : ""} ${
             status === "PRESENT" ? SEGMENT_PRESENT_ON : SEGMENT_OFF
           }`}
         >
-          <Check key={popKey} className={`h-3.5 w-3.5 shrink-0 ${popKey > 0 ? "animate-ubac-pop" : ""}`} />
+          <Check className="h-3.5 w-3.5 shrink-0" />
           Présent
+          <PresentBurst burstKey={popKey} />
         </button>
         <button
           type="button"
