@@ -2,9 +2,10 @@
 
 import { useRef, useState } from "react";
 import Image from "next/image";
-import { Camera, Dumbbell, Percent, Users, ShieldCheck, TrendingDown, TrendingUp, Trophy } from "lucide-react";
+import { Camera, Percent, Users, ShieldCheck, TrendingDown, TrendingUp, Trophy } from "lucide-react";
 import { uploadTeamPhoto } from "@/lib/team-photo-upload";
 import AnimatedNumber from "./animated-number";
+import { AttendanceHero } from "./attendance-hero";
 import { DayEventCard, type WeekStripEvent } from "./week-strip-banner";
 import TeamSelectorPills from "./team-selector-pills";
 import { looseFamilyKey, splitTeamName } from "@/lib/teams";
@@ -423,55 +424,36 @@ export default function SpaceDashboardSummary({
           Bloc à part plutôt qu'une 5e pastille : le filtre Officiels/
           Amicaux/Tous ci-dessus ne s'applique pas aux entraînements. */}
       {!showPhoto && summary.trainingAttendance && (
-        // Retour de Cindy du 12/11 ("bof en responsive texte") : le chiffre
-        // et son libellé d'un côté, les deux équipes en pastilles de
-        // l'autre (sous le chiffre sur téléphone) -- plus de phrases qui se
-        // coupent. Deux cases côte à côte : étiquette en petit au-dessus,
-        // équipe + taux dessous (le taux ne se sépare jamais du "·").
-        <div className="flex flex-col gap-3 rounded-2xl border border-zinc-100 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-court-green/10">
-              <Dumbbell className="h-4 w-4 text-court-green" />
-            </span>
-            <div>
-              {/* Retour de Cindy du 12/11 ("pas beau sur petit écran") :
-                  libellé court au-dessus, "de présence" à côté du chiffre --
-                  plus de phrase qui se coupe sur trois lignes. */}
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-700">Entraînements du mois</p>
-              <p className="text-xl font-bold leading-tight text-zinc-900">
-                <AnimatedNumber value={summary.trainingAttendance.rate} kind="percent" />
-                <span className="ml-1 text-sm font-medium text-zinc-500">de présence</span>
-              </p>
-            </div>
-          </div>
-          {/* Nom d'équipe toujours sur une seule ligne (retour de Cindy du
-              12/11) : les deux cases passent l'une sous l'autre sur un très
-              petit écran plutôt que de couper "Loisirs Mixtes". */}
+        // Retour de Cindy du 13/11 ("haaa voilà ! on peut le faire aussi
+        // comme ça dans le tableau de bord") : même bandeau que le résumé
+        // d'équipe du Bilan de la saison (attendance-hero.tsx) -- anneau
+        // coloré + verdict -- puis les équipes la plus / la moins présentes
+        // en cases à icône. Empilé sur téléphone ; bandeau à gauche et
+        // équipes à droite sur ordinateur. Nom d'équipe sur une seule ligne
+        // (retour du 12/11).
+        <div className="overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm md:flex md:items-stretch">
+          <AttendanceHero
+            title="Entraînements du mois"
+            rate={summary.trainingAttendance.rate}
+            className="md:min-w-[18rem]"
+          />
           {(summary.trainingAttendance.highest || summary.trainingAttendance.lowest) && (
-            <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 sm:min-w-[18rem]">
+            <div className="grid grid-cols-1 gap-2 p-3 min-[400px]:grid-cols-2 md:flex-1 md:content-center md:px-4">
               {summary.trainingAttendance.highest && (
-                <div className="rounded-lg bg-status-success/10 px-2.5 py-1.5">
-                  <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-status-success">
-                    <TrendingUp className="h-3 w-3 shrink-0" />
-                    Plus présente
-                  </p>
-                  <p className="whitespace-nowrap text-[11px] font-semibold text-zinc-900">
-                    {summary.trainingAttendance.highest.teamName}{" "}
-                    <span className="whitespace-nowrap">· {Math.round(summary.trainingAttendance.highest.rate)} %</span>
-                  </p>
-                </div>
+                <TeamRankTile
+                  label="Plus présente"
+                  teamName={summary.trainingAttendance.highest.teamName}
+                  rate={summary.trainingAttendance.highest.rate}
+                  tone="success"
+                />
               )}
               {summary.trainingAttendance.lowest && (
-                <div className="rounded-lg bg-status-urgent/10 px-2.5 py-1.5">
-                  <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-status-urgent-dark">
-                    <TrendingDown className="h-3 w-3 shrink-0" />
-                    Moins présente
-                  </p>
-                  <p className="whitespace-nowrap text-[11px] font-semibold text-zinc-900">
-                    {summary.trainingAttendance.lowest.teamName}{" "}
-                    <span className="whitespace-nowrap">· {Math.round(summary.trainingAttendance.lowest.rate)} %</span>
-                  </p>
-                </div>
+                <TeamRankTile
+                  label="Moins présente"
+                  teamName={summary.trainingAttendance.lowest.teamName}
+                  rate={summary.trainingAttendance.lowest.rate}
+                  tone="urgent"
+                />
               )}
             </div>
           )}
@@ -539,6 +521,39 @@ function KpiTile({
         <AnimatedNumber value={value} kind={kind} />
       </p>
       <p className="text-[10px] font-medium leading-tight text-zinc-500 sm:text-[11px]">{label}</p>
+    </div>
+  );
+}
+
+// Équipe la plus / la moins présente sous le bandeau "Entraînements du
+// mois" (retour de Cindy du 13/11) : icône ronde, petite étiquette, nom
+// d'équipe et taux en gras à droite.
+function TeamRankTile({
+  label,
+  teamName,
+  rate,
+  tone,
+}: {
+  label: string;
+  teamName: string;
+  rate: number;
+  tone: "success" | "urgent";
+}) {
+  const Icon = tone === "success" ? TrendingUp : TrendingDown;
+  const colors =
+    tone === "success"
+      ? { box: "bg-status-success/10", icon: "bg-status-success/15 text-status-success", text: "text-status-success" }
+      : { box: "bg-status-urgent/10", icon: "bg-status-urgent/15 text-status-urgent-dark", text: "text-status-urgent-dark" };
+  return (
+    <div className={`flex items-center gap-2.5 rounded-xl px-3 py-2 ${colors.box}`}>
+      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${colors.icon}`}>
+        <Icon className="h-4 w-4" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className={`text-[10px] font-semibold uppercase tracking-wide ${colors.text}`}>{label}</p>
+        <p className="whitespace-nowrap text-sm font-semibold text-zinc-900">{teamName}</p>
+      </div>
+      <span className={`shrink-0 text-base font-bold tabular-nums ${colors.text}`}>{Math.round(rate)} %</span>
     </div>
   );
 }
