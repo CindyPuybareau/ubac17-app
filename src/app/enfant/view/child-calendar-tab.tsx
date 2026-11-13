@@ -4,11 +4,11 @@ import { useMemo, useState, type ReactNode } from "react";
 import {
   AlarmClock,
   Ban,
-  Cake,
+  Cake,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronUp,
+  ChevronUp,
   Euro,
   Eye,
   Home,
@@ -16,7 +16,7 @@ import {
   List,
   MapPin,
   PartyPopper,
-  Sparkles,
+  Sparkles,
 } from "lucide-react";
 import {
   RSVP_PILL_BASE,
@@ -45,6 +45,13 @@ import { groupTeamsByPrimarySecondary, teamLabel } from "@/lib/teams";
 import { schoolHolidayFor } from "@/lib/school-holidays";
 import MatchResultCelebration from "@/components/match-result-celebration";
 import WeekendStrip, { buildWeekendMatches } from "@/app/dashboard/weekend-strip";
+import {
+  BirthdayCorner,
+  DaySymbols,
+  SymbolLegend,
+  symbolFor,
+  type DaySymbolItem,
+} from "@/app/dashboard/day-symbols";
 import type { ChildEvent, ChildTeammate } from "./child-dashboard";
 
 // Même grille mensuelle que le calendrier Parent (calendar-view.tsx) —
@@ -463,13 +470,29 @@ export default function ChildCalendarTab({
               // la date -- aucune donnée de plus. La sélection prime
               // toujours sur la teinte, même règle que là-bas.
               const holiday = schoolHolidayFor(d);
+              // Symboles par type (retour de Cindy du 13/11), mêmes que les
+              // autres espaces (day-symbols.tsx) : contour doré = match à
+              // domicile, couleur verte / rouge = match gagné / perdu.
+              const symbolItems: DaySymbolItem[] = dayEvents.map((e) => ({
+                eventType: e.eventType,
+                cancelled: Boolean(e.cancelledAt),
+                ring: !e.cancelledAt && isHomeMatch(e) ? "home" : null,
+                result:
+                  e.teamScore !== null && e.opponentScore !== null
+                    ? e.teamScore > e.opponentScore
+                      ? "win"
+                      : e.teamScore < e.opponentScore
+                        ? "loss"
+                        : "draw"
+                    : null,
+              }));
 
               return (
                 <button
                   key={key}
                   onClick={() => setSelectedDate(d)}
                   title={holiday ?? undefined}
-                  className={`flex min-h-[52px] w-full min-w-0 flex-col items-start gap-1 rounded-lg border p-1 text-left transition-colors sm:min-h-[104px] sm:rounded-xl sm:p-2 ${
+                  className={`relative flex min-h-[52px] w-full min-w-0 flex-col items-start gap-1 rounded-lg border p-1 text-left transition-colors sm:min-h-[104px] sm:rounded-xl sm:p-2 ${
                     isSelected
                       ? "border-navy bg-navy/5"
                       : holiday
@@ -478,66 +501,55 @@ export default function ChildCalendarTab({
                   } ${!isCurrentMonth ? "opacity-40" : ""}`}
                 >
                   <span
-                    className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold sm:h-6 sm:w-6 sm:text-xs ${
+                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold leading-none tabular-nums sm:h-6 sm:w-6 sm:text-xs ${
                       isToday ? "bg-ubac-yellow text-navy" : "text-zinc-700"
                     }`}
                   >
                     {d.getDate()}
                   </span>
                   <div className="flex w-full min-w-0 flex-col gap-0.5">
-                    <div className="flex flex-wrap gap-1 sm:hidden">
-                      {visible.map((e) => (
-                        <span
-                          key={e.id}
-                          title={isHomeMatch(e) ? "Match à domicile" : undefined}
-                          className={`h-1.5 w-1.5 shrink-0 rounded-full ${styleFor(e.eventType).dot} ${
-                            // Retour de Cindy du 25/09 ("pastilles rondes
-                            // dorées pour les matchs à domicile") : anneau
-                            // fin, même esprit que le "besoin non pourvu"
-                            // ambré côté Bureau (calendar-view.tsx), mais en
-                            // doré et sur une autre condition -- jamais les
-                            // deux en même temps ici (pas de données de
-                            // besoins sur ce calendrier).
-                            isHomeMatch(e) ? "ring-1 ring-ubac-yellow" : ""
-                          }`}
-                        />
-                      ))}
-                      {dayBirthdays.length > 0 && (
-                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-purple-400" />
-                      )}
+                    <div className="sm:hidden">
+                      <DaySymbols items={symbolItems} />
                     </div>
                     <div className="hidden sm:flex sm:flex-col sm:gap-0.5">
-                      {visible.map((e) => (
-                        <span
-                          key={e.id}
-                          title={isHomeMatch(e) ? "Match à domicile" : undefined}
-                          className={`inline-flex items-center justify-center gap-0.5 truncate whitespace-nowrap rounded px-1 py-0.5 text-[10px] font-semibold leading-none ${styleFor(e.eventType).pill} ${
-                            isHomeMatch(e) ? "ring-1 ring-ubac-yellow" : ""
-                          }`}
-                        >
-                          {isHomeMatch(e) && <Home className="h-2.5 w-2.5 shrink-0" />}
-                          {pillLabel(e)}
-                        </span>
-                      ))}
-                      {dayBirthdays.length > 0 && (
-                        <span className="inline-flex items-center justify-center gap-0.5 truncate whitespace-nowrap rounded bg-purple-100 px-1 py-0.5 text-[10px] font-semibold leading-none text-purple-700">
-                          <Cake className="h-2.5 w-2.5 shrink-0" />
-                          {dayBirthdays.length === 1
-                            ? formatFirstName(dayBirthdays[0].firstName)
-                            : `${dayBirthdays.length} anniv.`}
-                        </span>
-                      )}
+                      {visible.map((e) => {
+                        const { Icon } = symbolFor(e.eventType);
+                        return (
+                          <span
+                            key={e.id}
+                            title={isHomeMatch(e) ? "Match à domicile" : undefined}
+                            className={`inline-flex items-center justify-center gap-0.5 truncate whitespace-nowrap rounded px-1 py-0.5 text-[10px] font-semibold leading-none ${styleFor(e.eventType).pill} ${
+                              isHomeMatch(e) ? "ring-1 ring-ubac-yellow" : ""
+                            }`}
+                          >
+                            {isHomeMatch(e) ? <Home className="h-2.5 w-2.5 shrink-0" /> : <Icon className="h-2.5 w-2.5 shrink-0" />}
+                            {pillLabel(e)}
+                          </span>
+                        );
+                      })}
+                      {overflow > 0 && <span className="text-[10px] font-semibold text-zinc-400">+{overflow}</span>}
                     </div>
-                    {overflow > 0 && (
-                      <span className="text-[9px] font-semibold text-zinc-400 sm:text-[10px]">+{overflow}</span>
-                    )}
                   </div>
+                  {/* Anniversaires à part, en haut à droite (retour de Cindy du 13/11). */}
+                  <span className="sm:hidden">
+                    <BirthdayCorner count={dayBirthdays.length} />
+                  </span>
+                  {dayBirthdays.length > 0 && (
+                    <span className="absolute right-2 top-3 hidden max-w-[55%] items-center gap-0.5 truncate whitespace-nowrap rounded bg-pink-100 px-1 py-0.5 text-[10px] font-semibold leading-none text-pink-700 sm:inline-flex">
+                      <Cake className="h-2.5 w-2.5 shrink-0" />
+                      {dayBirthdays.length === 1
+                        ? formatFirstName(dayBirthdays[0].firstName)
+                        : "Anniversaires"}
+                    </span>
+                  )}
                 </button>
               );
             })}
           </div>
         </div>
       )}
+
+      {view === "month" && <SymbolLegend showHome />}
 
       {view === "month" && (
         <div className="flex flex-col gap-2">
