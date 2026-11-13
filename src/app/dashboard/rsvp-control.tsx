@@ -56,8 +56,12 @@ export default function RsvpControl({
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Petit rebond de la coche au clic sur "Présent" (retour de Cindy du
+  // 13/11) : la clé change à chaque clic, ce qui rejoue l'animation.
+  const [popKey, setPopKey] = useState(0);
 
   async function save(next: Status) {
+    if (next === "PRESENT") setPopKey((k) => k + 1);
     // Affichage optimiste (retour de Cindy du 12/11, "vérifier la
     // réactivité") : le bouton bascule tout de suite, comme rsvp-buttons.tsx
     // côté calendrier -- jusqu'ici il attendait la réponse du serveur
@@ -119,7 +123,7 @@ export default function RsvpControl({
             status === "PRESENT" ? SEGMENT_PRESENT_ON : SEGMENT_OFF
           }`}
         >
-          <Check className="h-3.5 w-3.5 shrink-0" />
+          <Check key={popKey} className={`h-3.5 w-3.5 shrink-0 ${popKey > 0 ? "animate-ubac-pop" : ""}`} />
           Présent
         </button>
         <button
