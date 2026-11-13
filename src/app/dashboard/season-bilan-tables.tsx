@@ -413,7 +413,102 @@ export function VolunteerTable({
   const columnCount = CLASSIQUE_COLUMNS.length + OFFICIAL_COLUMNS.length + 2 /* covoiturage, total */ + 1 /* nom */;
 
   return (
-    <div className="w-full overflow-x-auto rounded-xl border border-zinc-100">
+    <>
+      {/* Téléphone (retour de Cindy du 13/11, "ça scrolle de droite à
+          gauche, pas top") : une carte par personne, avec seulement les
+          rôles qu'elle a réellement tenus -- chaque rôle reste nommé à part
+          (jamais regroupés, retour du 24/09). Tableau complet dès md:. */}
+      <div className="flex flex-col gap-2 md:hidden">
+        <div className="flex items-center gap-1.5 text-xs text-zinc-500">
+          Trier par
+          {(
+            [
+              { key: "total", label: "Participations" },
+              { key: "name", label: "Nom" },
+            ] as const
+          ).map((o) => (
+            <button
+              key={o.key}
+              type="button"
+              onClick={() => toggleSort(o.key)}
+              className={`rounded-full border px-2.5 py-1 font-semibold transition-colors ${
+                sortKey === o.key
+                  ? "border-navy bg-navy text-white"
+                  : "border-navy/25 bg-navy/5 text-navy hover:bg-navy/10"
+              }`}
+            >
+              {o.label}
+              {sortKey === o.key && <span className="ml-1 text-[10px]">{sortDir === "asc" ? "▲" : "▼"}</span>}
+            </button>
+          ))}
+        </div>
+        {rows.length === 0 ? (
+          <p className="py-4 text-center text-sm text-zinc-400">Aucun joueur dans cette équipe</p>
+        ) : (
+          <ul className="divide-y divide-zinc-100 rounded-xl border border-zinc-100">
+            {rows.map((r) => {
+              const roles = [
+                ...CLASSIQUE_COLUMNS.map((role) => ({
+                  key: `role:${role.code}`,
+                  label: role.label,
+                  icon: <RoleIcon icon={role.icon} className="h-3 w-3 shrink-0" />,
+                  count: r.tally.byRoleCode[role.code] ?? 0,
+                  colorClass: "bg-emerald-50 text-emerald-700",
+                })),
+                ...OFFICIAL_COLUMNS.map((role) => ({
+                  key: `official:${role.code}`,
+                  label: role.label,
+                  icon: <RoleIcon icon={role.icon} className="h-3 w-3 shrink-0" />,
+                  count: r.tally.byOfficialCode[role.code] ?? 0,
+                  colorClass: "bg-terracotta/10 text-terracotta-dark",
+                })),
+                {
+                  key: "covoiturage",
+                  label: "Covoiturage",
+                  icon: <Car className="h-3 w-3 shrink-0" />,
+                  count: r.tally.covoiturage,
+                  colorClass: "bg-blue-50 text-blue-700",
+                },
+              ].filter((role) => role.count > 0);
+              return (
+                <li key={r.id} className="flex flex-col gap-1.5 px-3 py-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="flex min-w-0 items-center gap-1.5 text-sm font-semibold text-zinc-900">
+                      <span className="truncate">{r.name}</span>
+                      {r.isGuest && (
+                        <span className="shrink-0 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                          Invité·e
+                        </span>
+                      )}
+                    </p>
+                    <span
+                      className={`shrink-0 text-xs font-semibold tabular-nums ${r.total === 0 ? "text-zinc-400" : "text-zinc-900"}`}
+                    >
+                      {r.total === 0 ? "Aucune" : `${r.total} participation${r.total > 1 ? "s" : ""}`}
+                    </span>
+                  </div>
+                  {roles.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {roles.map((role) => (
+                        <span
+                          key={role.key}
+                          className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ${role.colorClass}`}
+                        >
+                          {role.icon}
+                          <span className="font-medium">{role.label}</span>
+                          <span>×{role.count}</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+    <div className="hidden w-full overflow-x-auto rounded-xl border border-zinc-100 md:block">
       <table className="w-full table-auto border-collapse text-sm">
         <thead>
           <tr className="border-b border-zinc-100 bg-zinc-50 text-left text-xs font-semibold text-zinc-400">
@@ -503,5 +598,6 @@ export function VolunteerTable({
         </tbody>
       </table>
     </div>
+    </>
   );
 }
