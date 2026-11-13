@@ -26,6 +26,7 @@ import { ACCOMPAGNEMENT_ROLE_CODE } from "./event-volunteer-needs";
 import type { EventRoleType, EventTasksState, CarpoolOffer } from "./event-tasks";
 import type { VolunteerNeed } from "./event-volunteer-needs";
 import type { MatchOfficialAssignment } from "./match-official-roles";
+import MatchCountdown from "./match-countdown";
 
 // Bandeau "Cette semaine" intégré directement dans l'en-tête bleu marine
 // (direction artistique validée par Cindy le 2026-08-24, sur maquette :
@@ -330,6 +331,10 @@ export function DayEventCard({
               <Ban className="h-3 w-3" />
               Annulé
             </span>
+          )}
+          {/* Compte à rebours (retour de Cindy du 13/11, "un peu de fun"). */}
+          {(isMatchType(event.eventType) || isTournament) && !event.cancelledAt && (
+            <MatchCountdown startTime={event.startTime} endTime={event.endTime} />
           )}
         </span>
         {/* Retour de Cindy du 19/10 : Domicile/Extérieur vit sur le lieu
