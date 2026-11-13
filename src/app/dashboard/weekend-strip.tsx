@@ -11,8 +11,7 @@ import { SALLES } from "./salles";
 //   par jour, adversaire en entier, Domicile / Extérieur.
 // - "club" (Coach / Famille / Enfant) : "Venez encourager !" -- seulement
 //   les matchs officiels À DOMICILE de TOUT le club ce week-end, même ceux
-//   d'équipes qui ne les concernent pas ("ils peuvent venir"), ouvert par
-//   défaut.
+//   d'équipes qui ne les concernent pas ("ils peuvent venir").
 // Un appui sur un match ouvre son jour dans la grille du mois (quand le
 // calendrier le permet).
 export type WeekendMatch = {
@@ -148,7 +147,9 @@ export default function WeekendStrip({
   variant?: "bureau" | "club";
 }) {
   const isClub = variant === "club";
-  const [open, setOpen] = useState(isClub);
+  // Toujours replié à l'ouverture, sur tous les espaces (retour de Cindy du
+  // 13/11) : on le déplie seulement si on le souhaite.
+  const [open, setOpen] = useState(false);
   const shown = isClub ? matches.filter((m) => m.isHome === true) : matches;
   if (shown.length === 0) return null;
 
