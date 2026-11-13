@@ -18,6 +18,7 @@ export default function WhatsAppDirectButton({
   message,
   playerId,
   className,
+  iconClassName,
 }: {
   phone: string | null | undefined;
   message: string;
@@ -26,6 +27,9 @@ export default function WhatsAppDirectButton({
   // envoyé puisqu'il n'y a ici aucune étape de modification avant l'envoi.
   playerId?: string;
   className?: string;
+  // Taille de l'icône quand le bouton est agrandi (rond Appeler/WhatsApp des
+  // cartes Membres sur téléphone, 13/11).
+  iconClassName?: string;
 }) {
   const link = buildWhatsAppLink(phone, message);
   if (!link) return null;
@@ -59,7 +63,7 @@ export default function WhatsAppDirectButton({
         "inline-flex shrink-0 items-center rounded-full p-1 text-emerald-600 transition-colors hover:bg-emerald-50"
       }
     >
-      <MessageCircle className="h-3.5 w-3.5 shrink-0" />
+      <MessageCircle className={iconClassName ?? "h-3.5 w-3.5 shrink-0"} />
     </a>
   );
 }
