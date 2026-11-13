@@ -44,6 +44,7 @@ import { formatFirstName } from "@/lib/names";
 import { groupTeamsByPrimarySecondary, teamLabel } from "@/lib/teams";
 import { schoolHolidayFor } from "@/lib/school-holidays";
 import MatchResultCelebration from "@/components/match-result-celebration";
+import WeekendStrip, { buildWeekendMatches } from "@/app/dashboard/weekend-strip";
 import type { ChildEvent, ChildTeammate } from "./child-dashboard";
 
 // Même grille mensuelle que le calendrier Parent (calendar-view.tsx) —
@@ -308,8 +309,29 @@ export default function ChildCalendarTab({
     .filter((e) => hasAlreadyStarted(e.startTime))
     .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
 
+  // "Venez encourager !" (retour de Cindy du 13/11) : matchs officiels à
+  // domicile de tout le club ce week-end -- clubOfficialMatches est déjà
+  // chargé avec la page, aucune requête de plus.
+  const weekendMatches = buildWeekendMatches(
+    [...events, ...extraClubMatches].map((e) => ({
+      id: e.id,
+      eventType: e.eventType,
+      startTime: e.startTime,
+      endTime: e.endTime,
+      title: e.title,
+      teamName: e.teamName,
+      isHome: e.isHome,
+      salle: e.salle,
+      location: e.location,
+      awayVenueAddress: e.awayVenueAddress,
+      cancelledAt: e.cancelledAt,
+    })),
+    today
+  );
+
   return (
     <div className="flex flex-col gap-4">
+      <WeekendStrip matches={weekendMatches} variant="club" />
       {groupedTeams.length > 1 && (
         <div className="flex flex-wrap gap-2">
           {groupedTeams.map(({ primary }) => {
