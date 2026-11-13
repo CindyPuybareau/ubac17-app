@@ -14,26 +14,36 @@ export function AttendanceHero({
   title,
   rate,
   className = "",
+  subtitle = "de présence en moyenne",
+  tone = "club",
 }: {
   title: string;
   // 0-100, null quand aucun entraînement n'a eu lieu sur la période.
   rate: number | null;
   className?: string;
+  subtitle?: string;
+  // "personal" (Famille / Enfant, retour de Cindy du 13/11) : verdicts
+  // encourageants plutôt qu'un "À surveiller" adressé à un enfant.
+  tone?: "club" | "personal";
 }) {
+  const labels =
+    tone === "personal"
+      ? { low: "Chaque entraînement compte", mid: "Bonne présence", high: "Super assiduité !" }
+      : { low: "À surveiller", mid: "Correct", high: "Excellent" };
   const verdict =
     rate === null
       ? null
       : rate < 50
-        ? { label: "À surveiller", className: "bg-red-500/20 text-red-200" }
+        ? { label: labels.low, className: "bg-red-500/20 text-red-200" }
         : rate < 80
-          ? { label: "Correct", className: "bg-amber-400/20 text-amber-200" }
-          : { label: "Excellent", className: "bg-emerald-400/20 text-emerald-200" };
+          ? { label: labels.mid, className: "bg-amber-400/20 text-amber-200" }
+          : { label: labels.high, className: "bg-emerald-400/20 text-emerald-200" };
   return (
     <div className={`flex items-center gap-4 bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-4 ${className}`}>
       <ProgressRing rate={rate} />
       <div className="min-w-0">
         <p className="text-[10px] font-semibold uppercase tracking-wide text-ubac-yellow">{title}</p>
-        <p className="mt-0.5 text-sm font-medium text-white/85">de présence en moyenne</p>
+        <p className="mt-0.5 text-sm font-medium text-white/85">{subtitle}</p>
         {verdict && (
           <span className={`mt-1.5 inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${verdict.className}`}>
             {verdict.label}
@@ -80,6 +90,39 @@ export function ProgressRing({ rate, strokeClassName }: { rate: number | null; s
       <span className="absolute inset-0 flex items-center justify-center text-lg font-bold tabular-nums text-white">
         {rate === null ? "—" : <AnimatedNumber value={rate} kind="percent" />}
       </span>
+    </div>
+  );
+}
+
+// Cases "matchs" sous le bandeau (Famille / Enfant, retour de Cindy du
+// 13/11) : icône de couleur, présent / total en gros, type en dessous --
+// même famille que les cases du résumé d'équipe du Bilan de la saison.
+// Seuls les types qui ont eu au moins un rendez-vous apparaissent.
+export type PresenceTile = {
+  key: string;
+  label: string;
+  present: number;
+  total: number;
+  icon: React.ReactNode;
+  toneClassName: string;
+};
+
+export function PresenceTiles({ tiles }: { tiles: PresenceTile[] }) {
+  const shown = tiles.filter((t) => t.total > 0);
+  if (shown.length === 0) return null;
+  const cols = shown.length === 1 ? "grid-cols-1" : shown.length === 2 || shown.length === 4 ? "grid-cols-2" : "grid-cols-3";
+  return (
+    <div className={`grid gap-2 ${cols}`}>
+      {shown.map((t) => (
+        <div key={t.key} className="flex flex-col items-center gap-1 rounded-xl bg-zinc-50 px-1.5 py-2 text-center">
+          <span className={`flex h-7 w-7 items-center justify-center rounded-full ${t.toneClassName}`}>{t.icon}</span>
+          <span className="text-lg font-bold leading-none tabular-nums text-zinc-900">
+            {t.present}
+            <span className="text-sm font-semibold text-zinc-400">/{t.total}</span>
+          </span>
+          <span className="text-[11px] font-medium leading-tight text-zinc-500">{t.label}</span>
+        </div>
+      ))}
     </div>
   );
 }

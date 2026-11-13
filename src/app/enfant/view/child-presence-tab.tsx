@@ -1,14 +1,15 @@
-import type { ReactNode } from "react";
-import { Activity, Handshake, Sparkles, Trophy } from "lucide-react";
+import { Handshake, Sparkles, Trophy } from "lucide-react";
+import { AttendanceHero, PresenceTiles } from "@/app/dashboard/attendance-hero";
 import type { ChildAttendanceStats } from "./child-dashboard";
 
 // Remplace l'ancien onglet "Défis" (badges à débloquer, jugé trop
-// enfantin) : de vrais compteurs d'assiduité, calculés côté serveur à
-// partir des RSVP passés de l'enfant (page.tsx) — mêmes données que
-// l'ancien badge "Assidu", juste présentées comme un bilan plutôt qu'un
-// jeu. Matchs officiels/amicaux/tournois séparés (retour de Cindy du
-// 24/09, même détail que Bureau/Coach) plutôt qu'un seul chiffre "Présence
-// aux matchs" qui les mélangeait.
+// enfantin) : de vrais compteurs d'assiduité, calculés côté serveur
+// (page.tsx, fonction season_participation, saison en cours). Matchs
+// officiels/amicaux/tournois séparés (retour de Cindy du 24/09).
+//
+// Retour de Cindy du 13/11 ("un peu de fun") : même bandeau que le Bilan
+// de la saison et le tableau de bord -- anneau de progression, verdict
+// encourageant -- puis les matchs en cases à icône.
 export default function ChildPresenceTab({
   trainings,
   official,
@@ -20,74 +21,52 @@ export default function ChildPresenceTab({
   friendly: ChildAttendanceStats;
   tournament: ChildAttendanceStats;
 }) {
+  const rate = trainings.total > 0 ? (trainings.present / trainings.total) * 100 : null;
+  const hasMatches = official.total + friendly.total + tournament.total > 0;
   return (
-    <div className="flex flex-col gap-4">
-      <StatCard
-        icon={<Activity className="h-5 w-5" />}
-        label="Présence aux entraînements"
-        stats={trainings}
-        emptyLabel="Aucun entraînement passé pour le moment."
+    <div className="overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm">
+      <AttendanceHero
+        title="Mes entraînements de la saison"
+        rate={rate}
+        tone="personal"
+        subtitle={
+          trainings.total > 0
+            ? `${trainings.present} présence${trainings.present > 1 ? "s" : ""} sur ${trainings.total} entraînement${trainings.total > 1 ? "s" : ""}`
+            : "Aucun entraînement passé pour le moment"
+        }
       />
-      <StatCard
-        icon={<Trophy className="h-5 w-5" />}
-        label="Présence aux matchs officiels"
-        stats={official}
-        emptyLabel="Aucun match officiel passé pour le moment."
-      />
-      <StatCard
-        icon={<Handshake className="h-5 w-5" />}
-        label="Présence aux matchs amicaux"
-        stats={friendly}
-        emptyLabel="Aucun match amical passé pour le moment."
-      />
-      <StatCard
-        icon={<Sparkles className="h-5 w-5" />}
-        label="Présence aux tournois"
-        stats={tournament}
-        emptyLabel="Aucun tournoi passé pour le moment."
-      />
-    </div>
-  );
-}
-
-function StatCard({
-  icon,
-  label,
-  stats,
-  emptyLabel,
-}: {
-  icon: ReactNode;
-  label: string;
-  stats: ChildAttendanceStats;
-  emptyLabel: string;
-}) {
-  const pct = stats.total > 0 ? Math.round((stats.present / stats.total) * 100) : null;
-
-  return (
-    <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
-      <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-900">
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ubac-yellow/20 text-ubac-yellow-dark">
-          {icon}
-        </span>
-        {label}
-      </p>
-
-      {stats.total === 0 ? (
-        <p className="mt-3 text-sm text-zinc-500">{emptyLabel}</p>
-      ) : (
-        <>
-          <p className="mt-3 flex items-baseline gap-1">
-            <span className="text-3xl font-bold text-navy">{stats.present}</span>
-            <span className="text-lg font-semibold text-zinc-400">/{stats.total} séances</span>
-          </p>
-          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-zinc-100">
-            <div
-              className="h-full rounded-full bg-ubac-yellow-dark transition-all"
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-          <p className="mt-1.5 text-xs text-zinc-400">{pct}% de présence</p>
-        </>
+      {hasMatches && (
+        <div className="flex flex-col gap-2 p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Mes matchs</p>
+          <PresenceTiles
+            tiles={[
+              {
+                key: "official",
+                label: "Officiels",
+                present: official.present,
+                total: official.total,
+                icon: <Trophy className="h-3.5 w-3.5" />,
+                toneClassName: "bg-navy/10 text-navy",
+              },
+              {
+                key: "friendly",
+                label: "Amicaux",
+                present: friendly.present,
+                total: friendly.total,
+                icon: <Handshake className="h-3.5 w-3.5" />,
+                toneClassName: "bg-blue-50 text-blue-600",
+              },
+              {
+                key: "tournament",
+                label: "Tournois",
+                present: tournament.present,
+                total: tournament.total,
+                icon: <Sparkles className="h-3.5 w-3.5" />,
+                toneClassName: "bg-ubac-yellow/20 text-ubac-yellow-dark",
+              },
+            ]}
+          />
+        </div>
       )}
     </div>
   );
