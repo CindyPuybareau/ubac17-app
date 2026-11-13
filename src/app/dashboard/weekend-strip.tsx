@@ -1,17 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Home, Megaphone, Trophy } from "lucide-react";
-import MatchCountdown from "./match-countdown";
+import { ChevronDown, Home, MapPin, Trophy } from "lucide-react";
 
-// "Ce week-end au club" en haut du calendrier (retour de Cindy du 13/11,
-// "calendrier fun, funky et sexy") : les matchs du week-end qui vient (ou
-// en cours), matchs à domicile en premier.
-// - Coach / Famille / Enfant : petites cartes qu'on fait défiler du doigt,
-//   avec compte à rebours et "Venez encourager !" sur les matchs à domicile.
-// - Bureau (17 équipes, "le calendrier va être saturé") : une seule ligne de
-//   résumé "14 matchs · 5 à domicile", dépliable en liste compacte.
-// Un appui sur un match sélectionne son jour dans la grille du mois.
+// "Ce week-end au club" en haut du Calendrier général du Bureau (retour de
+// Cindy du 13/11). D'abord prévue aussi pour Coach / Famille, retirée
+// ("pas utile, on vient puisqu'on est concerné" -- leurs matchs sont déjà
+// dans leur calendrier et "Ma semaine"). Résumé sur une ligne
+// ("10 matchs · 4 à domicile"), qui se déplie en liste par jour : heure,
+// équipe, adversaire EN ENTIER sur sa propre ligne (jamais coupé), bande
+// verte pour un match à domicile. Domicile d'abord, puis par heure. Un
+// appui sur un match ouvre son jour dans la grille du mois.
 export type WeekendMatch = {
   id: string;
   dayKey: string;
@@ -23,131 +22,124 @@ export type WeekendMatch = {
   isTournament: boolean;
 };
 
-function dayTime(iso: string) {
-  const d = new Date(iso);
-  const day = d.toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", weekday: "short" });
-  const time = d.toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" });
-  return `${day.charAt(0).toUpperCase()}${day.slice(1)} ${time.replace(":", "h")}`;
+function timeLabel(iso: string) {
+  return new Date(iso)
+    .toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" })
+    .replace(":", "h");
+}
+
+function dayLabel(iso: string) {
+  const label = new Date(iso).toLocaleDateString("fr-FR", {
+    timeZone: "Europe/Paris",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 export default function WeekendStrip({
   matches,
-  compact,
   onSelectDay,
 }: {
   matches: WeekendMatch[];
-  // Bureau : résumé dépliable plutôt que des cartes.
-  compact: boolean;
   onSelectDay: (dayKey: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   if (matches.length === 0) return null;
 
-  // Domicile d'abord, puis par heure.
-  const sorted = [...matches].sort((a, b) => {
-    const homeA = a.isHome === true ? 0 : 1;
-    const homeB = b.isHome === true ? 0 : 1;
-    return homeA - homeB || a.startTime.localeCompare(b.startTime);
-  });
   const homeCount = matches.filter((m) => m.isHome === true).length;
-
-  const title = (
-    <span className="flex items-center gap-2">
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ubac-yellow text-navy">
-        <Trophy className="h-3.5 w-3.5" />
-      </span>
-      <span className="flex flex-col leading-tight">
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-ubac-yellow">Ce week-end au club</span>
-        <span className="text-sm font-semibold text-white">
-          {matches.length} match{matches.length > 1 ? "s" : ""}
-          {homeCount > 0 && (
-            <span className="font-normal text-white/80">
-              {" "}
-              · {homeCount} à domicile
-            </span>
-          )}
-        </span>
-      </span>
-    </span>
-  );
-
-  if (compact) {
-    return (
-      <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-navy via-navy to-navy-dark shadow-sm">
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
-        >
-          {title}
-          <span className="flex items-center gap-1 text-xs font-medium text-white/80">
-            {open ? "Masquer" : "Voir"}
-            {open ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-          </span>
-        </button>
-        {open && (
-          <ul className="divide-y divide-zinc-100 bg-white">
-            {sorted.map((m) => (
-              <li key={m.id}>
-                <button
-                  type="button"
-                  onClick={() => onSelectDay(m.dayKey)}
-                  className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-zinc-50"
-                >
-                  <span className="w-20 shrink-0 text-xs font-semibold text-zinc-500">{dayTime(m.startTime)}</span>
-                  <span className="min-w-0 flex-1 truncate">
-                    <span className="font-semibold text-ubac-blue">{m.teamName}</span>
-                    {m.opponent && <span className="text-zinc-700"> · {m.opponent}</span>}
-                  </span>
-                  {m.isHome === true && (
-                    <span className="flex shrink-0 items-center gap-1 rounded-full bg-court-green/10 px-2 py-0.5 text-[10px] font-bold uppercase text-court-green">
-                      <Home className="h-3 w-3" />
-                      Domicile
-                    </span>
-                  )}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    );
-  }
+  // Par jour (samedi puis dimanche), domicile d'abord dans chaque jour.
+  const days = Array.from(new Set([...matches].sort((a, b) => a.startTime.localeCompare(b.startTime)).map((m) => m.dayKey)));
+  const byDay = days.map((dayKey) => ({
+    dayKey,
+    matches: matches
+      .filter((m) => m.dayKey === dayKey)
+      .sort((a, b) => {
+        const homeA = a.isHome === true ? 0 : 1;
+        const homeB = b.isHome === true ? 0 : 1;
+        return homeA - homeB || a.startTime.localeCompare(b.startTime);
+      }),
+  }));
 
   return (
-    <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-navy via-navy to-navy-dark p-3 shadow-sm">
-      <div className="px-1 pb-2.5">{title}</div>
-      <div className="-mx-3 flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-3 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {sorted.map((m) => (
-          <button
-            key={m.id}
-            type="button"
-            onClick={() => onSelectDay(m.dayKey)}
-            className={`flex w-[13.5rem] shrink-0 snap-start flex-col gap-1.5 rounded-xl p-3 text-left shadow-sm transition-transform active:scale-[0.98] ${
-              m.isHome === true ? "bg-ubac-yellow text-navy" : "bg-white text-zinc-900"
-            }`}
-          >
-            <span className="flex items-center justify-between gap-2">
-              <span className={`truncate text-[11px] font-bold uppercase tracking-wide ${m.isHome === true ? "text-navy" : "text-ubac-blue"}`}>
-                {m.teamName}
-              </span>
-              <MatchCountdown startTime={m.startTime} endTime={m.endTime} onYellow={m.isHome === true} />
+    <div className="overflow-hidden rounded-2xl border border-navy/10 bg-white shadow-sm">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-3 bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-3 text-left"
+      >
+        <span className="flex min-w-0 items-center gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ubac-yellow text-navy shadow-sm">
+            <Trophy className="h-4 w-4" />
+          </span>
+          <span className="flex min-w-0 flex-col leading-tight">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-ubac-yellow">Ce week-end au club</span>
+            <span className="text-base font-bold text-white">
+              {matches.length} match{matches.length > 1 ? "s" : ""}
             </span>
-            <span className="truncate text-sm font-bold">{m.isTournament ? "Tournoi" : (m.opponent ?? "Match")}</span>
-            <span className={`text-xs font-medium ${m.isHome === true ? "text-navy/80" : "text-zinc-500"}`}>
-              {dayTime(m.startTime)}
-              {m.isHome === true ? " · À domicile" : m.isHome === false ? " · Extérieur" : ""}
+          </span>
+        </span>
+        <span className="flex shrink-0 items-center gap-2">
+          {homeCount > 0 && (
+            <span className="flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold text-white">
+              <Home className="h-3 w-3" />
+              {homeCount} à domicile
             </span>
-            {m.isHome === true && (
-              <span className="mt-0.5 flex w-fit items-center gap-1 rounded-full bg-navy px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-ubac-yellow">
-                <Megaphone className="h-3 w-3" />
-                Venez encourager !
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
+          )}
+          <ChevronDown className={`h-4 w-4 text-white/80 transition-transform ${open ? "rotate-180" : ""}`} />
+        </span>
+      </button>
+
+      {open && (
+        <div className="flex flex-col gap-3 p-3">
+          {byDay.map(({ dayKey, matches: dayMatches }) => (
+            <div key={dayKey} className="flex flex-col gap-1.5">
+              <p className="px-1 text-[11px] font-bold uppercase tracking-wide text-zinc-900">
+                {dayLabel(dayMatches[0].startTime)}
+              </p>
+              <div className="grid grid-cols-1 gap-1.5 md:grid-cols-2">
+                {dayMatches.map((m) => {
+                  const home = m.isHome === true;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => onSelectDay(m.dayKey)}
+                      className={`flex items-start gap-3 rounded-xl border border-l-4 px-3 py-2 text-left transition-colors hover:bg-zinc-50 ${
+                        home ? "border-court-green/20 border-l-court-green bg-court-green/5" : "border-zinc-100 border-l-navy/30 bg-white"
+                      }`}
+                    >
+                      <span className="w-12 shrink-0 pt-0.5 text-sm font-bold tabular-nums text-navy">
+                        {timeLabel(m.startTime)}
+                      </span>
+                      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-bold uppercase tracking-wide text-ubac-blue">{m.teamName}</span>
+                          <span
+                            className={`flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                              home ? "bg-court-green text-white" : "bg-zinc-100 text-zinc-500"
+                            }`}
+                          >
+                            {home ? <Home className="h-3 w-3" /> : <MapPin className="h-3 w-3" />}
+                            {home ? "Domicile" : m.isHome === false ? "Extérieur" : "Lieu ?"}
+                          </span>
+                        </span>
+                        {/* Adversaire en entier, sur sa propre ligne (retour
+                            de Cindy du 13/11, "on ne voit rien des matchs"). */}
+                        <span className="break-words text-sm font-semibold leading-snug text-zinc-900">
+                          {m.isTournament ? "Tournoi" : (m.opponent ?? "Match")}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -3405,8 +3405,10 @@ export default function CalendarView({
         />
       )}
 
-      {!forcedView && (view === "month" || view === "list") && (
-        <WeekendStrip matches={weekendMatches} compact={isBureau} onSelectDay={selectDayKey} />
+      {/* Bureau seulement (retour de Cindy du 13/11) : Coach / Famille ont
+          déjà leurs propres matchs sous les yeux. */}
+      {!forcedView && isBureau && (view === "month" || view === "list") && (
+        <WeekendStrip matches={weekendMatches} onSelectDay={selectDayKey} />
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
