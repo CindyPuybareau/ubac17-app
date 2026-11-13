@@ -46,7 +46,9 @@ export function AttendanceHero({
 
 // Anneau de progression : se remplit à l'apparition (sauf "réduire les
 // animations"), le pourcentage grimpe en même temps (AnimatedNumber).
-function ProgressRing({ rate }: { rate: number | null }) {
+// strokeClassName : couleur imposée (bandeau "matchs", toujours jaune club) ;
+// sinon couleur selon le taux (présence).
+export function ProgressRing({ rate, strokeClassName }: { rate: number | null; strokeClassName?: string }) {
   const [shown, setShown] = useState(0);
   useEffect(() => {
     const frame = requestAnimationFrame(() => setShown(rate ?? 0));
@@ -55,7 +57,10 @@ function ProgressRing({ rate }: { rate: number | null }) {
   const radius = 30;
   const circumference = 2 * Math.PI * radius;
   const stroke =
-    rate === null ? "stroke-white/30" : rate < 50 ? "stroke-red-400" : rate < 80 ? "stroke-amber-400" : "stroke-emerald-400";
+    rate === null
+      ? "stroke-white/30"
+      : (strokeClassName ??
+        (rate < 50 ? "stroke-red-400" : rate < 80 ? "stroke-amber-400" : "stroke-emerald-400"));
   return (
     <div className="relative h-[76px] w-[76px] shrink-0">
       <svg viewBox="0 0 76 76" className="h-full w-full -rotate-90" aria-hidden>

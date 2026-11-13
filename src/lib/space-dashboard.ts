@@ -102,6 +102,20 @@ export type SpaceDashboardNextEvent = {
 // aucune séparation par équipe n'a de sens là) ou contient une seule
 // équipe (le résumé plat existant suffit déjà, voir singleTeamId/photoUrl/
 // playerCount/official/friendly ci-dessous, inchangés pour ce cas).
+// Retour de Cindy du 13/11 ("un peu de fun") : derniers matchs joués (score
+// saisi), du plus récent au plus ancien -- pastilles V/D "forme du moment"
+// du tableau de bord. Au plus RECENT_RESULTS_PER_TYPE par type (officiels
+// / amicaux) : le composant choisit selon le filtre Officiels/Amicaux/Tous.
+export type SpaceDashboardRecentResult = {
+  id: string;
+  eventType: "MATCH" | "FRIENDLY";
+  startTime: string;
+  title: string | null;
+  teamName: string | null;
+  teamScore: number;
+  opponentScore: number;
+};
+
 export type SpaceDashboardTeamStats = {
   teamId: string;
   teamName: string | null;
@@ -110,6 +124,7 @@ export type SpaceDashboardTeamStats = {
   playerCount: number;
   official: { played: number; points: number; won: number };
   friendly: { played: number; points: number; won: number };
+  recentResults: SpaceDashboardRecentResult[];
   // Retour de Cindy du 20/09 ("je n'ai pas les prochains événements des
   // U13M ni des U13M-1") : le prochain événement de CETTE équipe
   // précisément (son propre jour le plus proche, pas celui, partagé, de
@@ -155,6 +170,9 @@ export type SpaceDashboardSummary = {
   // Bureau).
   official: { played: number; points: number; won: number };
   friendly: { played: number; points: number; won: number };
+  // Club entier (Bureau) ou toutes les équipes de la personne : voir
+  // SpaceDashboardRecentResult.
+  recentResults: SpaceDashboardRecentResult[];
   // Retour de Cindy du 14/09 ("le bureau n'a pas qu'un seul entraînement de
   // prévu cette semaine... si plusieurs événements dans la journée, pouvoir
   // les visualiser") : TOUS les événements du jour le plus proche (pas
@@ -184,6 +202,17 @@ export type SpaceDashboardSummary = {
 const MIN_EXPECTED_FOR_RANKING = 10;
 
 const EMPTY_MATCH_STATS = { played: 0, points: 0, won: 0 };
+
+const RECENT_RESULTS_PER_TYPE = 10;
+
+// Garde les RECENT_RESULTS_PER_TYPE plus récents de chaque type, du plus
+// récent au plus ancien.
+function keepRecentResults(list: SpaceDashboardRecentResult[]): SpaceDashboardRecentResult[] {
+  const sorted = [...list].sort((a, b) => b.startTime.localeCompare(a.startTime));
+  const official = sorted.filter((r) => r.eventType === "MATCH").slice(0, RECENT_RESULTS_PER_TYPE);
+  const friendly = sorted.filter((r) => r.eventType === "FRIENDLY").slice(0, RECENT_RESULTS_PER_TYPE);
+  return [...official, ...friendly].sort((a, b) => b.startTime.localeCompare(a.startTime));
+}
 
 // Retour de Cindy du 13/09 : même bug/même correctif que respondingPlayers
 // (calendar-view.tsx) -- teamId ET target_team_ids tous deux vides encode
@@ -263,6 +292,7 @@ export async function getSpaceDashboardSummary(
       teamCount: null,
       official: { ...EMPTY_MATCH_STATS },
       friendly: { ...EMPTY_MATCH_STATS },
+      recentResults: [],
       nextEvents: [],
       seasonLabel,
     };
@@ -343,7 +373,7 @@ export async function getSpaceDashboardSummary(
       () => {
         let q = supabase
           .from("events")
-          .select("event_type, team_score, opponent_score, team_id")
+          .select("id, event_type, team_score, opponent_score, team_id, start_time, title, teams(name)")
           .in("event_type", ["MATCH", "FRIENDLY"])
           .gte("start_time", startIso)
           .lt("start_time", endIso)
@@ -405,16 +435,30 @@ export async function getSpaceDashboardSummary(
           ((rosterRes as { data: { player_id: string }[] | null }).data ?? []).map((r) => r.player_id)
         ).size;
 
+  type MatchRow = {
+    id: string;
+    event_type: string;
+    team_score: number | null;
+    opponent_score: number | null;
+    team_id: string | null;
+    start_time: string;
+    title: string | null;
+    teams: { name: string | null } | { name: string | null }[] | null;
+  };
+  const matchRows = (matchesRes.data ?? []) as unknown as MatchRow[];
+  const toRecentResult = (m: MatchRow): SpaceDashboardRecentResult => ({
+    id: m.id,
+    eventType: m.event_type === "MATCH" ? "MATCH" : "FRIENDLY",
+    startTime: m.start_time,
+    title: m.title,
+    teamName: (Array.isArray(m.teams) ? m.teams[0]?.name : m.teams?.name) ?? null,
+    teamScore: m.team_score ?? 0,
+    opponentScore: m.opponent_score ?? 0,
+  });
   const official = { ...EMPTY_MATCH_STATS };
   const friendly = { ...EMPTY_MATCH_STATS };
-  (
-    (matchesRes.data ?? []) as {
-      event_type: string;
-      team_score: number | null;
-      opponent_score: number | null;
-      team_id: string | null;
-    }[]
-  )
+  const clubRecent: SpaceDashboardRecentResult[] = [];
+  matchRows
     // Démo (voir demoTeamIds plus haut) : un match de l'équipe démo ne
     // compte ni dans "Matchs joués", ni "Victoires", ni "Points marqués"
     // du club entier -- sans effet pour Coach/Famille (teamIds n'inclut
@@ -425,7 +469,9 @@ export async function getSpaceDashboardSummary(
       bucket.played += 1;
       bucket.points += m.team_score ?? 0;
       if ((m.team_score ?? 0) > (m.opponent_score ?? 0)) bucket.won += 1;
+      clubRecent.push(toRecentResult(m));
     });
+  const recentResults = keepRecentResults(clubRecent);
 
   // Retour de Cindy du 20/09 ("mes deux enfants sont mélangés... données
   // séparées pour chaque équipe") : même lignes que playerCount/official/
@@ -450,20 +496,18 @@ export async function getSpaceDashboardSummary(
   });
   const matchStatsByTeam = new Map<
     string,
-    { official: typeof EMPTY_MATCH_STATS; friendly: typeof EMPTY_MATCH_STATS }
+    {
+      official: typeof EMPTY_MATCH_STATS;
+      friendly: typeof EMPTY_MATCH_STATS;
+      recent: SpaceDashboardRecentResult[];
+    }
   >();
-  (
-    (matchesRes.data ?? []) as {
-      event_type: string;
-      team_score: number | null;
-      opponent_score: number | null;
-      team_id: string | null;
-    }[]
-  ).forEach((m) => {
+  matchRows.forEach((m) => {
     if (!m.team_id) return;
     const entry =
       matchStatsByTeam.get(m.team_id) ??
-      { official: { ...EMPTY_MATCH_STATS }, friendly: { ...EMPTY_MATCH_STATS } };
+      { official: { ...EMPTY_MATCH_STATS }, friendly: { ...EMPTY_MATCH_STATS }, recent: [] };
+    entry.recent.push(toRecentResult(m));
     const bucket = m.event_type === "MATCH" ? entry.official : entry.friendly;
     bucket.played += 1;
     bucket.points += m.team_score ?? 0;
@@ -524,6 +568,7 @@ export async function getSpaceDashboardSummary(
             playerCount: rosterPlayerIdsByTeam.get(id)?.size ?? 0,
             official: stats?.official ?? { ...EMPTY_MATCH_STATS },
             friendly: stats?.friendly ?? { ...EMPTY_MATCH_STATS },
+            recentResults: keepRecentResults(stats?.recent ?? []),
             ranking: rankingByTeam.get(id) ?? [],
             rankingPhase: normalizeFfbbPhase(latestPhaseByTeam.get(id)),
             // Rempli plus bas (nextEventsByTeamId), une fois le jour propre
@@ -863,6 +908,7 @@ export async function getSpaceDashboardSummary(
     teamCount: teamIds === null ? (teamCountRes as { count: number | null }).count ?? 0 : null,
     official,
     friendly,
+    recentResults,
     nextEvents,
     seasonLabel,
   };

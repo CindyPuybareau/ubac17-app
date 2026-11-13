@@ -2,10 +2,11 @@
 
 import { useRef, useState } from "react";
 import Image from "next/image";
-import { Camera, Percent, Users, ShieldCheck, TrendingDown, TrendingUp, Trophy } from "lucide-react";
+import { Camera, Users, ShieldCheck, Target, TrendingDown, TrendingUp, Trophy } from "lucide-react";
 import { uploadTeamPhoto } from "@/lib/team-photo-upload";
 import AnimatedNumber from "./animated-number";
 import { AttendanceHero } from "./attendance-hero";
+import MatchFormHero from "./match-form-hero";
 import { DayEventCard, type WeekStripEvent } from "./week-strip-banner";
 import TeamSelectorPills from "./team-selector-pills";
 import { looseFamilyKey, splitTeamName } from "@/lib/teams";
@@ -161,6 +162,14 @@ export default function SpaceDashboardSummary({
             points: effectiveOfficialStats.points + effectiveFriendlyStats.points,
             won: effectiveOfficialStats.won + effectiveFriendlyStats.won,
           };
+
+  // Forme du moment (retour de Cindy du 13/11, "un peu de fun") : mêmes
+  // matchs que les chiffres ci-dessus, filtrés selon Officiels / Amicaux /
+  // Tous, du plus récent au plus ancien.
+  const effectiveRecentResults = (activeTeam ? activeTeam.recentResults : summary.recentResults).filter(
+    (r) => filter === "all" || (filter === "official" ? r.eventType === "MATCH" : r.eventType === "FRIENDLY")
+  );
+  const pointsPerMatch = stats.played > 0 ? stats.points / stats.played : 0;
 
   async function onPhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -382,17 +391,11 @@ export default function SpaceDashboardSummary({
               photo), le taux de victoire remplace "Joueurs", qui doublait
               "Membres actifs" juste au-dessus. Suit le filtre Officiels/
               Amicaux/Tous comme les trois autres pastilles. */}
-          {showPhoto ? (
+          {/* Retour de Cindy du 13/11 : le % de victoires est maintenant
+              l'anneau du bandeau "matchs" juste en dessous -- plus de case
+              "Matchs gagnés" ici. */}
+          {showPhoto && (
             <KpiTile icon={Users} iconClass="text-navy" iconBgClass="bg-navy/10" value={effectivePlayerCount} label="Joueurs" />
-          ) : (
-            <KpiTile
-              icon={Percent}
-              iconClass="text-navy"
-              iconBgClass="bg-navy/10"
-              value={stats.played > 0 ? (stats.won / stats.played) * 100 : 0}
-              kind="percent"
-              label="Matchs gagnés"
-            />
           )}
           <KpiTile
             icon={Trophy}
@@ -406,7 +409,9 @@ export default function SpaceDashboardSummary({
               null) -- celle-ci s'applique partout (club entier ou une
               seule équipe), et complète mieux "Matchs joués"/"Points
               marqués" dans une grille 2x2 qui n'a plus de case creuse. */}
-          <KpiTile icon={ShieldCheck} iconClass="text-court-green" iconBgClass="bg-court-green/10" value={stats.won} label="Victoires" />
+          {!showPhoto && (
+            <KpiTile icon={ShieldCheck} iconClass="text-court-green" iconBgClass="bg-court-green/10" value={stats.won} label="Victoires" />
+          )}
           <KpiTile
             icon={Trophy}
             iconClass="text-coral"
@@ -414,8 +419,24 @@ export default function SpaceDashboardSummary({
             value={stats.points}
             label="Points marqués"
           />
+          {/* Nouveau chiffre "fun" (retour de Cindy du 13/11). */}
+          <KpiTile
+            icon={Target}
+            iconClass="text-ubac-yellow-dark"
+            iconBgClass="bg-ubac-yellow/15"
+            value={pointsPerMatch}
+            label="Points / match"
+          />
         </div>
       </div>
+
+      <MatchFormHero
+        title={filter === "official" ? "Matchs officiels" : filter === "friendly" ? "Matchs amicaux" : "Tous les matchs"}
+        played={stats.played}
+        won={stats.won}
+        results={effectiveRecentResults}
+        showTeamName={!activeTeam && !summary.singleTeamId}
+      />
       {uploadError && <p className="text-xs text-red-600">{uploadError}</p>}
 
       {/* Retour de Cindy du 12/11 ("taux de présence aux entraînements...
