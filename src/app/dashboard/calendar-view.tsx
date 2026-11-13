@@ -68,7 +68,7 @@ import WeekendStrip, {
 } from "./weekend-strip";
 import MatchCountdown from "./match-countdown";
 import BirthdayCelebration from "./birthday-celebration";
-import { BirthdayCorner, DaySymbols, SymbolLegend, symbolFor, type DaySymbolItem } from "./day-symbols";
+import { BirthdayCorner, DaySymbols, symbolFor, type DaySymbolItem } from "./day-symbols";
 import TeamFilterDropdown from "./team-filter-dropdown";
 import EventTypeFilterDropdown from "./event-type-filter-dropdown";
 import { sendEventPush } from "./event-push";
@@ -3730,7 +3730,6 @@ export default function CalendarView({
             const symbolItems: DaySymbolItem[] = dayEvents.map((e) => ({
               eventType: e.event_type,
               cancelled: Boolean(e.cancelledAt),
-              ring: !e.cancelledAt && needsOrganizing(e) ? "warn" : null,
               result:
                 showResultDots && e.teamScore !== null && e.opponentScore !== null
                   ? e.teamScore > e.opponentScore
@@ -3822,8 +3821,6 @@ export default function CalendarView({
         </div>
       </div>
       )}
-
-      {view === "month" && <SymbolLegend showWarn />}
 
       {view === "list" && (
         // gap-4 (retour de Cindy du 2026-08-25, "pas assez de marges entre

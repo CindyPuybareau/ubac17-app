@@ -48,7 +48,6 @@ import WeekendStrip, { buildWeekendMatches } from "@/app/dashboard/weekend-strip
 import {
   BirthdayCorner,
   DaySymbols,
-  SymbolLegend,
   symbolFor,
   type DaySymbolItem,
 } from "@/app/dashboard/day-symbols";
@@ -471,12 +470,11 @@ export default function ChildCalendarTab({
               // toujours sur la teinte, même règle que là-bas.
               const holiday = schoolHolidayFor(d);
               // Symboles par type (retour de Cindy du 13/11), mêmes que les
-              // autres espaces (day-symbols.tsx) : contour doré = match à
-              // domicile, couleur verte / rouge = match gagné / perdu.
+              // autres espaces (day-symbols.tsx) : couleur verte / rouge =
+              // match gagné / perdu.
               const symbolItems: DaySymbolItem[] = dayEvents.map((e) => ({
                 eventType: e.eventType,
                 cancelled: Boolean(e.cancelledAt),
-                ring: !e.cancelledAt && isHomeMatch(e) ? "home" : null,
                 result:
                   e.teamScore !== null && e.opponentScore !== null
                     ? e.teamScore > e.opponentScore
@@ -548,8 +546,6 @@ export default function ChildCalendarTab({
           </div>
         </div>
       )}
-
-      {view === "month" && <SymbolLegend showHome />}
 
       {view === "month" && (
         <div className="flex flex-col gap-2">
