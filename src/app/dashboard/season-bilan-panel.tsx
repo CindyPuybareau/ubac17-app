@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Dumbbell, Users } from "lucide-react";
+import { CalendarDays, Dumbbell, Handshake, Sparkles, Trophy, Users } from "lucide-react";
+import AnimatedNumber from "./animated-number";
 import { createClient } from "@/lib/supabase/client";
 import { getCurrentSeasonWindow } from "@/lib/season";
 import { sortTeamsByGroup, teamLabel } from "@/lib/teams";
@@ -266,43 +267,94 @@ function TeamParticipationSummary({
         totals[k] = Math.max(totals[k], t[k].total);
       });
     }
-  });
-  // Même présentation que la carte "Entraînements du mois" du tableau de
-  // bord (retour de Cindy du 13/11, "on peut mieux présenter... comme sur
-  // le tableau de bord") : grand pourcentage avec son petit titre, puis le
-  // nombre de rendez-vous de la saison en cases.
+  });  // Retour de Cindy du 13/11 ("plus touchy, plus sexy") : bandeau bleu de
+  // l'appli avec un anneau de progression coloré selon le taux (vert / orange
+  // / rouge, mêmes seuils que les barres des joueurs), puis le nombre de
+  // rendez-vous de la saison en cases à icône de couleur.
   const counts = [
-    { key: "training", label: trainings > 1 ? "Entraînements" : "Entraînement", value: trainings },
-    { key: "official", label: totals.official > 1 ? "Matchs officiels" : "Match officiel", value: totals.official },
-    { key: "friendly", label: totals.friendly > 1 ? "Amicaux" : "Amical", value: totals.friendly },
-    { key: "tournament", label: totals.tournament > 1 ? "Tournois" : "Tournoi", value: totals.tournament },
-    { key: "other", label: "Autres", value: totals.other },
+    { key: "training", label: trainings > 1 ? "Entraînements" : "Entraînement", value: trainings, Icon: Dumbbell, tone: "bg-court-green/10 text-court-green" },
+    { key: "official", label: totals.official > 1 ? "Officiels" : "Officiel", value: totals.official, Icon: Trophy, tone: "bg-navy/10 text-navy" },
+    { key: "friendly", label: totals.friendly > 1 ? "Amicaux" : "Amical", value: totals.friendly, Icon: Handshake, tone: "bg-blue-50 text-blue-600" },
+    { key: "tournament", label: totals.tournament > 1 ? "Tournois" : "Tournoi", value: totals.tournament, Icon: Sparkles, tone: "bg-ubac-yellow/20 text-ubac-yellow-dark" },
+    { key: "other", label: totals.other > 1 ? "Autres" : "Autre", value: totals.other, Icon: CalendarDays, tone: "bg-zinc-100 text-zinc-600" },
   ].filter((c) => c.key === "training" || c.value > 0);
-  const rate = expected > 0 ? Math.round((present / expected) * 100) : null;
+  const rate = expected > 0 ? (present / expected) * 100 : null;
+  const verdict =
+    rate === null
+      ? null
+      : rate < 50
+        ? { label: "À surveiller", className: "bg-red-500/20 text-red-200" }
+        : rate < 80
+          ? { label: "Correct", className: "bg-amber-400/20 text-amber-200" }
+          : { label: "Excellent", className: "bg-emerald-400/20 text-emerald-200" };
   return (
-    <div className="mb-3 flex flex-col gap-3 rounded-2xl border border-zinc-100 bg-white px-4 py-3 shadow-sm md:flex-row md:items-center md:justify-between md:shadow-none">
-      <div className="flex items-center gap-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-court-green/10">
-          <Dumbbell className="h-4 w-4 text-court-green" />
-        </span>
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-700">Entraînements de la saison</p>
-          <p className="text-xl font-bold leading-tight text-zinc-900">
-            {rate === null ? "—" : `${rate} %`}
-            <span className="ml-1 text-sm font-medium text-zinc-500">de présence</span>
-          </p>
+    <div className="mb-3 overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm md:flex md:items-stretch">
+      <div className="flex items-center gap-4 bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-4 md:min-w-[18rem]">
+        <ProgressRing rate={rate} />
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-ubac-yellow">Entraînements de la saison</p>
+          <p className="mt-0.5 text-sm font-medium text-white/85">de présence en moyenne</p>
+          {verdict && (
+            <span className={`mt-1.5 inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${verdict.className}`}>
+              {verdict.label}
+            </span>
+          )}
         </div>
       </div>
-      <div className="flex flex-wrap gap-2">
-        {counts.map((c) => (
-          <div key={c.key} className="min-w-fit flex-1 rounded-lg bg-zinc-50 px-2.5 py-1.5 md:flex-none">
-            <p className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
-              {c.label}
-            </p>
-            <p className="text-sm font-bold tabular-nums text-zinc-900">{c.value}</p>
+      {/* 4 cases : 2 x 2 plutôt que 3 + 1 seule sur sa ligne. */}
+      <div
+        className={`grid flex-1 gap-2 p-3 md:flex md:items-center md:gap-3 md:px-4 ${
+          counts.length === 1 ? "grid-cols-1" : counts.length === 2 || counts.length === 4 ? "grid-cols-2" : "grid-cols-3"
+        }`}
+      >
+        {counts.map(({ key, label, value, Icon, tone }) => (
+          <div
+            key={key}
+            className="flex flex-col items-center gap-1 rounded-xl bg-zinc-50 px-1.5 py-2 text-center md:min-w-[6.5rem]"
+          >
+            <span className={`flex h-7 w-7 items-center justify-center rounded-full ${tone}`}>
+              <Icon className="h-3.5 w-3.5" />
+            </span>
+            <span className="text-lg font-bold leading-none tabular-nums text-zinc-900">{value}</span>
+            <span className="text-[11px] font-medium leading-tight text-zinc-500">{label}</span>
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// Anneau de progression : se remplit à l'apparition (sauf "réduire les
+// animations"), le pourcentage grimpe en même temps (AnimatedNumber).
+function ProgressRing({ rate }: { rate: number | null }) {
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setShown(rate ?? 0));
+    return () => cancelAnimationFrame(frame);
+  }, [rate]);
+  const radius = 30;
+  const circumference = 2 * Math.PI * radius;
+  const stroke =
+    rate === null ? "stroke-white/30" : rate < 50 ? "stroke-red-400" : rate < 80 ? "stroke-amber-400" : "stroke-emerald-400";
+  return (
+    <div className="relative h-[76px] w-[76px] shrink-0">
+      <svg viewBox="0 0 76 76" className="h-full w-full -rotate-90" aria-hidden>
+        <circle cx="38" cy="38" r={radius} fill="none" strokeWidth="7" className="stroke-white/15" />
+        <circle
+          cx="38"
+          cy="38"
+          r={radius}
+          fill="none"
+          strokeWidth="7"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference * (1 - Math.min(shown, 100) / 100)}
+          className={`${stroke} transition-[stroke-dashoffset] duration-[900ms] ease-out motion-reduce:transition-none`}
+        />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center text-lg font-bold tabular-nums text-white">
+        {rate === null ? "—" : <AnimatedNumber value={rate} kind="percent" />}
+      </span>
     </div>
   );
 }
