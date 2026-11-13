@@ -515,13 +515,13 @@ export default function ChildCalendarTab({
                         return (
                           <span
                             key={e.id}
-                            title={isHomeMatch(e) ? "Match à domicile" : undefined}
-                            className={`inline-flex items-center justify-center gap-0.5 truncate whitespace-nowrap rounded px-1 py-0.5 text-[10px] font-semibold leading-none ${styleFor(e.eventType).pill} ${
+                            title={isHomeMatch(e) ? `${pillLabel(e)} · match à domicile` : (pillLabel(e) ?? undefined)}
+                            className={`flex w-full min-w-0 items-center justify-start gap-0.5 whitespace-nowrap rounded px-1 py-0.5 text-left text-[10px] font-semibold leading-none ${styleFor(e.eventType).pill} ${
                               isHomeMatch(e) ? "ring-1 ring-ubac-yellow" : ""
                             }`}
                           >
                             {isHomeMatch(e) ? <Home className="h-2.5 w-2.5 shrink-0" /> : <Icon className="h-2.5 w-2.5 shrink-0" />}
-                            {pillLabel(e)}
+                            <span className="min-w-0 truncate">{pillLabel(e)}</span>
                           </span>
                         );
                       })}

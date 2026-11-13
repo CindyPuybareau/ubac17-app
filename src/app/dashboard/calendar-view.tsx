@@ -3778,10 +3778,10 @@ export default function CalendarView({
                             e.cancelledAt
                               ? `Annulé${e.cancelledReason ? ` — ${e.cancelledReason}` : ""}`
                               : needsOrganizing(e)
-                                ? "Besoin d'organisation non pourvu"
-                                : undefined
+                                ? `${pillLabel(e)} · besoin d'organisation non pourvu`
+                                : (pillLabel(e) ?? undefined)
                           }
-                          className={`inline-flex items-center justify-center gap-0.5 truncate whitespace-nowrap rounded px-1 py-0.5 text-[10px] font-semibold leading-none ${styleFor(e.event_type).pill} ${
+                          className={`flex w-full min-w-0 items-center justify-start gap-0.5 whitespace-nowrap rounded px-1 py-0.5 text-left text-[10px] font-semibold leading-none ${styleFor(e.event_type).pill} ${
                             e.cancelledAt ? "line-through opacity-60" : ""
                           }`}
                         >
@@ -3792,7 +3792,7 @@ export default function CalendarView({
                           ) : (
                             <Icon className="h-2.5 w-2.5 shrink-0" />
                           )}
-                          {pillLabel(e)}
+                          <span className="min-w-0 truncate">{pillLabel(e)}</span>
                         </span>
                       );
                     })}
