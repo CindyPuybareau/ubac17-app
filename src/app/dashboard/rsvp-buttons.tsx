@@ -52,7 +52,12 @@ export default function RsvpButtons({
     setError(null);
   }
 
+  // Petit rebond de la coche au clic sur "Présent" (retour de Cindy du
+  // 13/11) : la clé change à chaque clic, ce qui rejoue l'animation.
+  const [popKey, setPopKey] = useState(0);
+
   async function respond(newStatus: "PRESENT" | "ABSENT") {
+    if (newStatus === "PRESENT") setPopKey((k) => k + 1);
     // Affichage optimiste (retour de Cindy du 28/08, "l'affichage au clic
     // est trop long") : le bouton changeait d'apparence seulement une fois
     // l'aller-retour serveur terminé, ressenti comme un bouton qui traîne
@@ -109,7 +114,7 @@ export default function RsvpButtons({
             status === "PRESENT" ? SEGMENT_PRESENT_ON : SEGMENT_OFF
           }`}
         >
-          <Check className="h-3.5 w-3.5 shrink-0" />
+          <Check key={popKey} className={`h-3.5 w-3.5 shrink-0 ${popKey > 0 ? "animate-ubac-pop" : ""}`} />
           Présent
         </button>
         <button

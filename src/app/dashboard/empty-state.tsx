@@ -29,7 +29,10 @@ export default function EmptyState({
       />
       <div className="relative flex flex-col items-center gap-2">
         {Icon && (
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-navy/5 text-navy/40">
+          // Icône qui flotte doucement (retour de Cindy du 13/11, "un peu
+          // de fun") -- immobile si l'utilisateur préfère moins
+          // d'animations (globals.css).
+          <span className="flex h-10 w-10 animate-ubac-float items-center justify-center rounded-full bg-navy/5 text-navy/40">
             <Icon className="h-5 w-5" />
           </span>
         )}

@@ -203,7 +203,15 @@ export default function SeasonBilanPanel({
               </p>
               {shownTab === "joueurs" ? (
                 participation === undefined ? (
-                  <p className="py-6 text-center text-sm text-zinc-400">Calcul en cours…</p>
+                  // Formes grises animées plutôt que "Calcul en cours…"
+                  // (retour de Cindy du 13/11) : la page garde sa forme
+                  // pendant le chargement.
+                  <div className="flex flex-col gap-2" aria-label="Chargement du bilan">
+                    <div className="h-28 animate-pulse rounded-2xl bg-zinc-200/70 motion-reduce:animate-none" />
+                    {[0, 1, 2].map((i) => (
+                      <div key={i} className="h-20 animate-pulse rounded-2xl bg-zinc-200/50 motion-reduce:animate-none" />
+                    ))}
+                  </div>
                 ) : participation === "error" ? (
                   <p className="py-6 text-center text-sm text-red-600">
                     Le bilan n&apos;a pas pu être calculé. Rechargez la page pour réessayer.
