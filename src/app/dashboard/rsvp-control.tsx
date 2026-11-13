@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, Clock, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import AbsenceReasonField, { clearAbsenceReason } from "./absence-reason-field";
 import {
   SEGMENT_ABSENT_ON,
   SEGMENT_BUTTON,
@@ -85,6 +86,9 @@ export default function RsvpControl({
       );
 
     setSaving(false);
+    if (!writeError && next === "PRESENT" && previous === "ABSENT") {
+      void clearAbsenceReason(eventId, playerId);
+    }
     if (writeError) {
       // Message générique par le passé, sans la vraie cause — même
       // correctif que rsvp-buttons.tsx (retour de Cindy du 2026-08-20).
@@ -139,6 +143,7 @@ export default function RsvpControl({
         </button>
       </div>
 
+      {status === "ABSENT" && <AbsenceReasonField eventId={eventId} playerId={playerId} />}
       {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   );

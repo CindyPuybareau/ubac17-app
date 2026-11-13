@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import AbsenceReasonField, { clearAbsenceReason } from "./absence-reason-field";
 import {
   SEGMENT_ABSENT_ON,
   SEGMENT_BUTTON,
@@ -84,6 +85,9 @@ export default function RsvpButtons({
       );
 
     setLoading(false);
+    if (!writeError && newStatus === "PRESENT" && previousStatus === "ABSENT") {
+      void clearAbsenceReason(eventId, playerId);
+    }
     if (writeError) {
       // Message générique par le passé, sans la vraie cause — retour de
       // Cindy du 2026-08-20 (même famille de bug que event_tasks/
@@ -128,6 +132,7 @@ export default function RsvpButtons({
           Absent
         </button>
       </div>
+      {status === "ABSENT" && <AbsenceReasonField eventId={eventId} playerId={playerId} />}
       {error && <p className="text-[11px] text-red-600">Réponse non enregistrée : {error}</p>}
     </div>
   );

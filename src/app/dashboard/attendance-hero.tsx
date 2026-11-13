@@ -87,8 +87,19 @@ export function ProgressRing({ rate, strokeClassName }: { rate: number | null; s
           className={`${stroke} transition-[stroke-dashoffset] duration-[900ms] ease-out motion-reduce:transition-none`}
         />
       </svg>
-      <span className="absolute inset-0 flex items-center justify-center text-lg font-bold tabular-nums text-white">
-        {rate === null ? "—" : <AnimatedNumber value={rate} kind="percent" />}
+      {/* Retour de Cindy du 13/11 ("100 % déborde de l'anneau") : taille
+          adaptée au nombre de chiffres, et le "%" en plus petit. */}
+      <span className="absolute inset-0 flex items-center justify-center whitespace-nowrap font-bold tabular-nums text-white">
+        {rate === null ? (
+          <span className="text-lg">—</span>
+        ) : (
+          <>
+            <span className={Math.round(rate) >= 100 ? "text-base" : "text-lg"}>
+              <AnimatedNumber value={rate} kind="integer" />
+            </span>
+            <span className="ml-0.5 text-[11px] font-semibold text-white/80">%</span>
+          </>
+        )}
       </span>
     </div>
   );

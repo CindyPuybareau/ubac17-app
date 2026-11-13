@@ -17,6 +17,7 @@ import {
   Euro,
   Eye,
   ExternalLink,
+  Info,
   LayoutGrid,
   List,
   Lock,
@@ -58,6 +59,7 @@ import MatchScore from "./match-score";
 import MatchEmarqueCode from "./match-emarque-code";
 import { MatchSheetsLink } from "./match-sheets-context";
 import TeamSelectorPills from "./team-selector-pills";
+import { clearAbsenceReason } from "./absence-reason-field";
 import TeamFilterDropdown from "./team-filter-dropdown";
 import EventTypeFilterDropdown from "./event-type-filter-dropdown";
 import { sendEventPush } from "./event-push";
@@ -339,6 +341,36 @@ function RsvpPlayersList({
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Motifs d'absence (retour de Cindy du 13/11) : lus seulement quand la
+  // liste des absents est dépliée (une requête pour tout l'événement),
+  // jamais au chargement de la page. Les règles d'accès ne renvoient un
+  // motif qu'au coach de l'équipe, au Bureau et à la famille du joueur --
+  // un "i" n'apparaît donc que pour eux, et seulement si un motif existe.
+  const absentIdsKey =
+    variant === "absent" && eventId ? players.map((p) => p.id).sort().join(",") : "";
+  const [reasons, setReasons] = useState<{ key: string; byPlayerId: Record<string, string> } | null>(null);
+  const [openReasonId, setOpenReasonId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!absentIdsKey || !eventId) return;
+    let stale = false;
+    createClient()
+      .from("rsvp_absence_reasons")
+      .select("player_id, reason")
+      .eq("event_id", eventId)
+      .in("player_id", absentIdsKey.split(","))
+      .then(({ data }) => {
+        if (stale || !data) return;
+        setReasons({
+          key: absentIdsKey,
+          byPlayerId: Object.fromEntries(data.map((r) => [r.player_id as string, r.reason as string])),
+        });
+      });
+    return () => {
+      stale = true;
+    };
+  }, [absentIdsKey, eventId]);
+  const reasonByPlayerId = reasons?.key === absentIdsKey ? reasons.byPlayerId : {};
+
   async function setStatus(p: RsvpPlayersListPlayer, previousStatus: string, newStatus: "PRESENT" | "ABSENT") {
     if (!eventId) return;
     // Optimiste avant l'écriture (même geste que rsvp-buttons.tsx) :
@@ -352,6 +384,9 @@ function RsvpPlayersList({
       .from("rsvps")
       .upsert({ event_id: eventId, player_id: p.id, status: newStatus }, { onConflict: "event_id,player_id" });
     setSavingId(null);
+    if (!writeError && newStatus === "PRESENT" && previousStatus === "ABSENT") {
+      void clearAbsenceReason(eventId, p.id);
+    }
     if (writeError) {
       setError(writeError.message);
       setHiddenIds((prev) => {
@@ -419,6 +454,49 @@ function RsvpPlayersList({
               : "bg-status-urgent/10 text-status-urgent-dark";
             const hoverClass = isPresent ? "hover:bg-status-success/20" : "hover:bg-status-urgent/20";
 
+            const reason = !isPresent ? reasonByPlayerId[p.id] : undefined;
+            const reasonButton = reason ? (
+              <button
+                type="button"
+                onClick={() => setOpenReasonId((id) => (id === p.id ? null : p.id))}
+                title="Voir le motif de l'absence"
+                aria-label={`Motif de l'absence de ${formatFirstName(p.firstName)}`}
+                aria-expanded={openReasonId === p.id}
+                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                  openReasonId === p.id
+                    ? "border-status-urgent-dark bg-status-urgent-dark text-white"
+                    : "border-status-urgent/40 bg-white text-status-urgent-dark hover:bg-status-urgent/10"
+                }`}
+              >
+                <Info className="h-3 w-3" />
+              </button>
+            ) : null;
+
+            if (reasonButton) {
+              return (
+                <span key={p.id} className="inline-flex items-center gap-1">
+                  {canManage && eventId ? (
+                    <button
+                      type="button"
+                      disabled={savingId === p.id}
+                      onClick={() => setStatus(p, "ABSENT", "PRESENT")}
+                      title="Marquer présent"
+                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-opacity disabled:opacity-50 ${colorClass} ${hoverClass}`}
+                    >
+                      {formatFirstName(p.firstName)}{" "}
+                      <span className="font-bold uppercase">{formatLastName(p.lastName)}</span>
+                    </button>
+                  ) : (
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${colorClass}`}>
+                      {formatFirstName(p.firstName)}{" "}
+                      <span className="font-bold uppercase">{formatLastName(p.lastName)}</span>
+                    </span>
+                  )}
+                  {reasonButton}
+                </span>
+              );
+            }
+
             return canManage && eventId ? (
               <button
                 key={p.id}
@@ -444,6 +522,17 @@ function RsvpPlayersList({
             );
           })}
         </div>
+      {openReasonId && reasonByPlayerId[openReasonId] && (
+        <p className="rounded-xl bg-status-urgent/5 px-3 py-2 text-xs text-zinc-700">
+          <span className="font-semibold">
+            {(() => {
+              const p = visiblePlayers.find((x) => x.id === openReasonId);
+              return p ? `${formatFirstName(p.firstName)} ${formatLastName(p.lastName)}` : "";
+            })()}
+          </span>{" "}
+          : {reasonByPlayerId[openReasonId]}
+        </p>
+      )}
       {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   );
