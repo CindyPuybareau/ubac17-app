@@ -62,7 +62,11 @@ import MatchEmarqueCode from "./match-emarque-code";
 import { MatchSheetsLink } from "./match-sheets-context";
 import TeamSelectorPills from "./team-selector-pills";
 import { clearAbsenceReason } from "./absence-reason-field";
-import WeekendStrip, { type WeekendMatch } from "./weekend-strip";
+import WeekendStrip, {
+  buildWeekendMatches,
+  weekendWindow,
+  type WeekendSourceEvent,
+} from "./weekend-strip";
 import MatchCountdown from "./match-countdown";
 import BirthdayCelebration from "./birthday-celebration";
 import TeamFilterDropdown from "./team-filter-dropdown";
@@ -2037,36 +2041,72 @@ export default function CalendarView({
   const detailEvents = eventsByDate.get(selectedKey) ?? [];
   const detailBirthdays = birthdaysByMonthDay.get(monthDayKey(selectedDate)) ?? [];
 
-  // "Ce week-end au club" (retour de Cindy du 13/11) : matchs et tournois
-  // du samedi-dimanche qui vient (ou en cours), pas encore terminés, parmi
-  // les événements déjà affichés (mêmes filtres équipe/type que la grille).
-  const weekendMatches: WeekendMatch[] = (() => {
-    const base = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const dow = base.getDay();
-    const saturday = new Date(base);
-    saturday.setDate(base.getDate() + (dow === 0 ? -1 : 6 - dow));
-    const monday = new Date(saturday);
-    monday.setDate(saturday.getDate() + 2);
-    return visibleEvents
-      .filter((e) => {
-        if (e.cancelledAt) return false;
-        if (!isMatchType(e.event_type) && e.event_type !== "TOURNAMENT") return false;
-        const start = new Date(e.start_time);
-        if (start < saturday || start >= monday) return false;
-        const end = e.end_time ? new Date(e.end_time).getTime() : start.getTime() + 2 * 60 * 60 * 1000;
-        return end > today.getTime();
-      })
-      .map((e) => ({
-        id: e.id,
-        dayKey: toKey(new Date(e.start_time)),
-        startTime: e.start_time,
-        endTime: e.end_time,
-        teamName: e.teamName,
-        opponent: isMatchType(e.event_type) ? parseMatchTitle(e.title).opponent : (e.title ?? null),
-        isHome: isMatchType(e.event_type) ? resolveIsHome(e) : null,
-        isTournament: e.event_type === "TOURNAMENT",
-      }));
-  })();
+  // "Ce week-end au club" (retour de Cindy du 13/11), calculé dans
+  // weekend-strip.tsx (même calcul que l'espace Enfant).
+  // - Bureau : tous les matchs du week-end parmi les événements affichés.
+  // - Coach / Famille : "Venez encourager !" -- les matchs officiels à
+  //   domicile de TOUT le club ce week-end, même hors de leurs équipes, lus
+  //   en une seule petite requête au chargement du calendrier (week-end
+  //   seulement, matchs non annulés), complétés par leurs propres matchs.
+  const toWeekendSource = (e: AdminUpcomingEvent): WeekendSourceEvent => ({
+    id: e.id,
+    eventType: e.event_type,
+    startTime: e.start_time,
+    endTime: e.end_time,
+    title: e.title,
+    teamName: e.teamName,
+    isHome: e.isHome,
+    salle: e.salle,
+    location: e.location,
+    awayVenueAddress: e.awayVenueAddress,
+    cancelledAt: e.cancelledAt,
+  });
+  const [clubWeekendEvents, setClubWeekendEvents] = useState<WeekendSourceEvent[]>([]);
+  useEffect(() => {
+    if (isBureau || forcedView) return;
+    let stale = false;
+    const { start, end } = weekendWindow(new Date());
+    createClient()
+      .from("events")
+      .select("id, title, event_type, start_time, end_time, is_home, salle, location, away_venue_address, cancelled_at, teams(name)")
+      .eq("event_type", "MATCH")
+      .is("cancelled_at", null)
+      .gte("start_time", start.toISOString())
+      .lt("start_time", end.toISOString())
+      .then(({ data }) => {
+        if (stale || !data) return;
+        setClubWeekendEvents(
+          data.map((e) => {
+            const team = e.teams as unknown as { name: string | null } | { name: string | null }[] | null;
+            return {
+              id: e.id as string,
+              eventType: e.event_type as string | null,
+              startTime: e.start_time as string,
+              endTime: (e.end_time as string | null) ?? null,
+              title: (e.title as string | null) ?? null,
+              teamName: (Array.isArray(team) ? team[0]?.name : team?.name) ?? null,
+              isHome: (e.is_home as boolean | null) ?? null,
+              salle: (e.salle as string | null) ?? null,
+              location: (e.location as string | null) ?? null,
+              awayVenueAddress: (e.away_venue_address as string | null) ?? null,
+              cancelledAt: null,
+            };
+          })
+        );
+      });
+    return () => {
+      stale = true;
+    };
+  }, [isBureau, forcedView]);
+  const weekendMatches = isBureau
+    ? buildWeekendMatches(visibleEvents.map(toWeekendSource), today)
+    : buildWeekendMatches(
+        [
+          ...clubWeekendEvents,
+          ...visibleEvents.map(toWeekendSource).filter((e) => !clubWeekendEvents.some((c) => c.id === e.id)),
+        ],
+        today
+      );
 
   // Un appui sur un match de la bande "Ce week-end" ouvre son jour dans la
   // grille du mois et fait défiler jusqu'au détail du jour.
@@ -3405,11 +3445,15 @@ export default function CalendarView({
         />
       )}
 
-      {/* Bureau seulement (retour de Cindy du 13/11) : Coach / Famille ont
-          déjà leurs propres matchs sous les yeux. */}
-      {!forcedView && isBureau && (view === "month" || view === "list") && (
-        <WeekendStrip matches={weekendMatches} onSelectDay={selectDayKey} />
-      )}
+      {/* Bureau : tous les matchs du week-end. Coach / Famille : "Venez
+          encourager !", matchs à domicile de tout le club (retours de Cindy
+          du 13/11). */}
+      {!forcedView && (view === "month" || view === "list") &&
+        (isBureau ? (
+          <WeekendStrip matches={weekendMatches} onSelectDay={selectDayKey} />
+        ) : (
+          <WeekendStrip matches={weekendMatches} variant="club" />
+        ))}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
