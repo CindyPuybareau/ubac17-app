@@ -321,3 +321,39 @@ h4 {
     animation: none;
   }
 }
+
+/* Calendrier (retour de Cindy du 13/11, "calendrier fun") : la grille du
+   mois glisse depuis la droite (mois suivant) ou la gauche (mois
+   précédent). Rien si moins d'animations demandées. */
+@keyframes ubac-slide-from-right {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+@keyframes ubac-slide-from-left {
+  from {
+    transform: translateX(-24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+.animate-ubac-slide-from-right {
+  animation: ubac-slide-from-right 0.28s ease-out;
+}
+.animate-ubac-slide-from-left {
+  animation: ubac-slide-from-left 0.28s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-ubac-slide-from-right,
+  .animate-ubac-slide-from-left {
+    animation: none;
+  }
+}
