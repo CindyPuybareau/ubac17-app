@@ -13,6 +13,7 @@ import {
   FileText,
   Flame,
   Mail,
+  MoreHorizontal,
   MoreVertical,
   Phone,
   RefreshCw,
@@ -124,6 +125,7 @@ export default function MembersTable({
   // cocher n'apparaissent qu'en mode "Sélectionner" -- elles ne servent
   // qu'aux actions groupées et prenaient de la place sur chaque carte.
   const [selectMode, setSelectMode] = useState(false);
+  const [toolsMenuOpen, setToolsMenuOpen] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   // Retour de Cindy du 07/09 ("bug au responsive quand je clique sur les
   // trois petits points") : ce menu ⋮ vivait dans un <td className="relative">,
@@ -783,7 +785,113 @@ export default function MembersTable({
           </button>
         </div>
       )}
-      <div className="flex flex-wrap items-center gap-3">
+      {/* Téléphone/tablette (retour de Cindy du 13/11, "et ses infos ?
+          onglets ? boutons ?") : la barre d'ordinateur s'empilait sur 5-6
+          lignes et coupait "Toutes les équipes". Ici : recherche pleine
+          largeur ; équipe + archivés + compteur ; puis Ajouter /
+          Sélectionner / ⋯ (Exporter, rarement utile sur téléphone). */}
+      <div className="flex flex-col gap-2 xl:hidden">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rechercher un membre..."
+            className="w-full rounded-full border border-zinc-200 bg-white py-2 pl-9 pr-3 text-sm focus:border-ubac-yellow focus:outline-none"
+          />
+        </div>
+        <div className="flex items-center gap-3">
+          <SelectDropdown
+            options={[
+              { value: "", label: "Toutes les équipes" },
+              ...teams.map((t) => ({ value: t.id, label: teamLabel(t) })),
+            ]}
+            value={teamFilter}
+            onChange={setTeamFilter}
+          />
+          <label className="flex items-center gap-1.5 text-xs font-medium text-zinc-500">
+            <input
+              type="checkbox"
+              checked={showArchived}
+              onChange={(e) => setShowArchived(e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
+            />
+            Archivés
+          </label>
+          <span className="ml-auto shrink-0 text-xs font-medium text-zinc-400">
+            {filtered.length} membre{filtered.length > 1 ? "s" : ""}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowAddMember(true)}
+            className="flex shrink-0 items-center gap-1.5 rounded-full bg-ubac-yellow px-3.5 py-1.5 text-sm font-semibold text-navy shadow-sm transition-colors hover:bg-ubac-yellow-dark"
+          >
+            <UserPlus className="h-4 w-4" />
+            Ajouter un membre
+          </button>
+          {filtered.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                if (selectMode) setSelectedIds(new Set());
+                setSelectMode((v) => !v);
+              }}
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-semibold transition-colors ${
+                selectMode
+                  ? "border-navy bg-navy text-white"
+                  : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
+              }`}
+            >
+              {selectMode ? "Terminer" : "Sélectionner"}
+            </button>
+          )}
+          <div className="relative ml-auto">
+            <button
+              type="button"
+              onClick={() => setToolsMenuOpen((v) => !v)}
+              title="Plus d'actions"
+              aria-label="Plus d'actions"
+              aria-expanded={toolsMenuOpen}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-600 transition-colors hover:bg-zinc-50"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+            {toolsMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setToolsMenuOpen(false)} />
+                <div className="absolute right-0 z-40 mt-2 w-56 rounded-2xl border border-zinc-100 bg-white p-1.5 shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setToolsMenuOpen(false);
+                      exportMembers();
+                    }}
+                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50"
+                  >
+                    <FileText className="h-4 w-4 shrink-0" />
+                    Exporter (Excel)
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+        {selectMode && filtered.length > 0 && (
+          <label className="flex items-center gap-2 px-1 text-xs font-medium text-zinc-500">
+            <input
+              type="checkbox"
+              checked={allFilteredSelected}
+              onChange={toggleAll}
+              className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
+            />
+            Tout sélectionner
+          </label>
+        )}
+      </div>
+
+      <div className="hidden flex-wrap items-center gap-3 xl:flex">
         <button
           onClick={() => setShowAddMember(true)}
           className="flex shrink-0 items-center gap-1.5 rounded-full bg-ubac-yellow px-3.5 py-1.5 text-sm font-semibold text-navy shadow-sm transition-colors hover:bg-ubac-yellow-dark"
@@ -1148,31 +1256,6 @@ export default function MembersTable({
           coche verte incompréhensible sans survol. Séparateurs A, B, C...
           (tri alphabétique). Cases à cocher seulement en mode Sélectionner. */}
       <div className="flex flex-col gap-2 xl:hidden">
-        {filtered.length > 0 && (
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                if (selectMode) setSelectedIds(new Set());
-                setSelectMode((v) => !v);
-              }}
-              className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50"
-            >
-              {selectMode ? "Terminer la sélection" : "Sélectionner"}
-            </button>
-            {selectMode && (
-              <label className="flex items-center gap-2 text-xs font-medium text-zinc-500">
-                <input
-                  type="checkbox"
-                  checked={allFilteredSelected}
-                  onChange={toggleAll}
-                  className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
-                />
-                Tout sélectionner
-              </label>
-            )}
-          </div>
-        )}
         {filtered.map((m, index) => {
           const letter = m.archivedAt ? null : (normalizeNameForMatching(m.lastName).charAt(0).toUpperCase() || "#");
           const prev = index > 0 ? filtered[index - 1] : null;
