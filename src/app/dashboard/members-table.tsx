@@ -35,7 +35,7 @@ import PlayerYearBadge from "./player-year-badge";
 import SelectDropdown from "./select-dropdown";
 import WhatsAppDirectButton from "./whatsapp-direct-button";
 import { useToast } from "./toast-context";
-import { formatFirstName, formatLastName, formatPersonName, sortByLastName } from "@/lib/names";
+import { formatFirstName, formatLastName, formatPersonName, normalizeNameForMatching, sortByLastName } from "@/lib/names";
 import { formatLocalDateFr } from "@/lib/local-date";
 import type { AdminAccessProfile, AdminMember, AdminMemberTeam } from "./page";
 
@@ -120,6 +120,10 @@ export default function MembersTable({
   const [showArchived, setShowArchived] = useState(false);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Cartes sur téléphone/tablette (retour de Cindy du 13/11) : les cases à
+  // cocher n'apparaissent qu'en mode "Sélectionner" -- elles ne servent
+  // qu'aux actions groupées et prenaient de la place sur chaque carte.
+  const [selectMode, setSelectMode] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   // Retour de Cindy du 07/09 ("bug au responsive quand je clique sur les
   // trois petits points") : ce menu ⋮ vivait dans un <td className="relative">,
@@ -1136,64 +1140,82 @@ export default function MembersTable({
           les colonnes qui n'ont plus de sens en carte (# et case à cocher
           "tout sélectionner" restent, la sélection groupée garde son
           utilité même sur mobile/tablette/laptop). */}
-      <div className="flex flex-col gap-3 xl:hidden">
+      {/* Retour de Cindy du 13/11 ("les fiches membres sur téléphone") :
+          cartes compactes sur 2 lignes -- nom + pastilles, équipes ; à
+          droite deux ronds Appeler/WhatsApp assez gros pour le pouce. Plus
+          de "#1", d'e-mail (dans la fiche) ni de bordure jaune sans
+          signification. "Jamais connecté(e)" en clair à la place de la
+          coche verte incompréhensible sans survol. Séparateurs A, B, C...
+          (tri alphabétique). Cases à cocher seulement en mode Sélectionner. */}
+      <div className="flex flex-col gap-2 xl:hidden">
         {filtered.length > 0 && (
-          <label className="flex items-center gap-2 self-start text-xs font-medium text-zinc-500">
-            <input
-              type="checkbox"
-              checked={allFilteredSelected}
-              onChange={toggleAll}
-              className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
-            />
-            Tout sélectionner
-          </label>
-        )}
-        {filtered.map((m, index) => (
-          <div
-            key={m.id}
-            onClick={() => setDetailMemberId(m.id)}
-            className={`rounded-2xl border border-l-4 border-zinc-100 border-l-ubac-yellow bg-white p-3.5 shadow-sm transition-colors ${
-              m.archivedAt && openMenuId !== m.id ? "opacity-50" : ""
-            }`}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex min-w-0 items-start gap-2">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                if (selectMode) setSelectedIds(new Set());
+                setSelectMode((v) => !v);
+              }}
+              className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50"
+            >
+              {selectMode ? "Terminer la sélection" : "Sélectionner"}
+            </button>
+            {selectMode && (
+              <label className="flex items-center gap-2 text-xs font-medium text-zinc-500">
                 <input
                   type="checkbox"
-                  checked={selectedIds.has(m.id)}
-                  onChange={() => toggleOne(m.id)}
-                  onClick={(e) => e.stopPropagation()}
-                  aria-label={`Sélectionner ${formatPersonName(m.firstName, m.lastName, "ce membre")}`}
-                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
+                  checked={allFilteredSelected}
+                  onChange={toggleAll}
+                  className="h-4 w-4 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
                 />
-                <div className="min-w-0">
+                Tout sélectionner
+              </label>
+            )}
+          </div>
+        )}
+        {filtered.map((m, index) => {
+          const letter = m.archivedAt ? null : (normalizeNameForMatching(m.lastName).charAt(0).toUpperCase() || "#");
+          const prev = index > 0 ? filtered[index - 1] : null;
+          const prevLetter = prev && !prev.archivedAt
+            ? (normalizeNameForMatching(prev.lastName).charAt(0).toUpperCase() || "#")
+            : null;
+          const showLetter = letter !== null && letter !== prevLetter;
+          const phoneDigits = (m.phone ?? "").replace(/[^\d+]/g, "");
+          return (
+            <div key={m.id} className="flex flex-col gap-2">
+              {showLetter && (
+                <p className="mt-1 px-1 text-xs font-bold uppercase tracking-wide text-zinc-900">{letter}</p>
+              )}
+              <div
+                onClick={() => (selectMode ? toggleOne(m.id) : setDetailMemberId(m.id))}
+                className={`flex items-center gap-2 rounded-2xl border bg-white px-3 py-2.5 shadow-sm transition-colors ${
+                  selectMode && selectedIds.has(m.id) ? "border-ubac-yellow-dark bg-ubac-yellow/5" : "border-zinc-100"
+                } ${m.archivedAt && openMenuId !== m.id ? "opacity-50" : ""}`}
+              >
+                {selectMode && (
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(m.id)}
+                    onChange={() => toggleOne(m.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label={`Sélectionner ${formatPersonName(m.firstName, m.lastName, "ce membre")}`}
+                    className="h-4 w-4 shrink-0 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
+                  />
+                )}
+                <div className="min-w-0 flex-1">
                   <p className="flex flex-wrap items-center gap-1 font-semibold text-zinc-900">
-                    <span
-                      title={
-                        m.lastLoginAt
-                          ? `Déjà connecté(e) — dernière connexion le ${formatLastLogin(m.lastLoginAt)}`
-                          : "Jamais connecté(e) à l'application"
-                      }
-                      className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center ${
-                        m.lastLoginAt ? "text-emerald-500" : "text-zinc-300"
-                      }`}
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                    </span>
                     <span className="truncate">
                       {fullLastName(m)} {m.firstName ? formatFirstName(m.firstName) : ""}
                     </span>
-                    {m.bureauRole && (
-                      <Shield className="h-3.5 w-3.5 shrink-0 text-ubac-yellow-dark" />
-                    )}
+                    {m.bureauRole && <Shield className="h-3.5 w-3.5 shrink-0 text-ubac-yellow-dark" aria-label="Bureau" />}
                     {m.isSalarie && (
-                      <Briefcase
-                        className="h-3.5 w-3.5 shrink-0 text-blue-600"
-                        aria-label="Salarié du club"
-                      />
+                      <Briefcase className="h-3.5 w-3.5 shrink-0 text-blue-600" aria-label="Salarié du club" />
                     )}
-                    {m.isBurned && (
-                      <Flame className="h-3.5 w-3.5 shrink-0 text-orange-500" aria-label="Brûlé" />
+                    {m.isBurned && <Flame className="h-3.5 w-3.5 shrink-0 text-orange-500" aria-label="Brûlé" />}
+                    {!m.lastLoginAt && (
+                      <span className="inline-flex shrink-0 items-center whitespace-nowrap rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-zinc-500">
+                        Jamais connecté(e)
+                      </span>
                     )}
                     {m.archivedAt && (
                       <span className="inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none text-zinc-500">
@@ -1201,52 +1223,53 @@ export default function MembersTable({
                       </span>
                     )}
                   </p>
-                  <p className="text-[11px] text-zinc-400">#{index + 1}</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-1">
+                    {m.teams.map((t) => (
+                      <span
+                        key={`m-player-${t.id}`}
+                        className="inline-flex max-w-full items-center justify-center truncate whitespace-nowrap rounded-full bg-navy/10 px-2 py-0.5 text-[11px] font-semibold leading-none text-navy"
+                      >
+                        {t.category ?? t.name ?? "Équipe"}
+                      </span>
+                    ))}
+                    {[...m.coachTeams, ...m.pendingCoachTeams].map((t) => (
+                      <span
+                        key={`m-coach-${t.id}`}
+                        className="inline-flex items-center justify-center whitespace-nowrap rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-semibold leading-none text-purple-700"
+                      >
+                        Coach {t.category ?? t.name ?? "Équipe"}
+                      </span>
+                    ))}
+                    <PlayerYearBadge birthDate={m.birthDate} category={m.teams[0]?.category ?? m.category} />
+                  </div>
                 </div>
-              </div>
-              <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
-                {renderMemberMenu(m)}
-              </div>
-            </div>
-
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              {m.teams.map((t) => (
-                <span
-                  key={`m-player-${t.id}`}
-                  className="inline-flex max-w-full items-center justify-center truncate whitespace-nowrap rounded-full bg-navy/10 px-2 py-0.5 text-xs font-semibold leading-none text-navy"
-                >
-                  {t.category ?? t.name ?? "Équipe"}
-                </span>
-              ))}
-              {[...m.coachTeams, ...m.pendingCoachTeams].map((t) => (
-                <span
-                  key={`m-coach-${t.id}`}
-                  className="inline-flex items-center justify-center whitespace-nowrap rounded-full bg-purple-100 px-2 py-0.5 text-xs font-semibold leading-none text-purple-700"
-                >
-                  Coach {t.category ?? t.name ?? "Équipe"}
-                </span>
-              ))}
-              <PlayerYearBadge birthDate={m.birthDate} category={m.teams[0]?.category ?? m.category} />
-            </div>
-
-            {(m.email || m.phone) && (
-              <div className="mt-2 flex flex-col gap-1 border-t border-zinc-50 pt-2 text-xs text-zinc-600">
-                {m.email && <p className="truncate">{m.email}</p>}
-                {m.phone && (
-                  <p className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                    <Phone className="h-3 w-3 shrink-0 text-zinc-400" />
-                    {m.phone}
-                    <WhatsAppDirectButton
-                      phone={m.phone}
-                      message={`Bonjour ${m.firstName ? formatFirstName(m.firstName) : ""}, ici l'UBAC.`}
-                      playerId={m.id}
-                    />
-                  </p>
+                {!selectMode && (
+                  <div className="flex shrink-0 items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                    {phoneDigits.replace(/\D/g, "").length >= 8 && (
+                      <a
+                        href={`tel:${phoneDigits}`}
+                        title={`Appeler ${m.phone}`}
+                        className="flex h-9 w-9 items-center justify-center rounded-full border border-navy/20 bg-navy/5 text-navy transition-colors hover:bg-navy/10"
+                      >
+                        <Phone className="h-4 w-4" />
+                      </a>
+                    )}
+                    {m.phone && (
+                      <WhatsAppDirectButton
+                        phone={m.phone}
+                        message={`Bonjour ${m.firstName ? formatFirstName(m.firstName) : ""}, ici l'UBAC.`}
+                        playerId={m.id}
+                        className="flex h-9 w-9 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 transition-colors hover:bg-emerald-100"
+                        iconClassName="h-4 w-4"
+                      />
+                    )}
+                    <div className="relative">{renderMemberMenu(m)}</div>
+                  </div>
                 )}
               </div>
-            )}
-          </div>
-        ))}
+            </div>
+          );
+        })}
         {filtered.length === 0 && (
           <EmptyState icon={User} message="Aucun membre trouvé." className="rounded-2xl border border-zinc-100 bg-white" />
         )}
