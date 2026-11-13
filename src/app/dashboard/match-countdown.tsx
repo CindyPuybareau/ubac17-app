@@ -31,7 +31,17 @@ function countdownLabel(start: Date, end: Date | null, now: Date): { text: strin
   return { text: `Dans ${days} jours`, live: false, soon: false };
 }
 
-export default function MatchCountdown({ startTime, endTime }: { startTime: string; endTime?: string | null }) {
+export default function MatchCountdown({
+  startTime,
+  endTime,
+  onYellow = false,
+}: {
+  startTime: string;
+  endTime?: string | null;
+  // Sur une carte déjà jaune (match à domicile, bande "Ce week-end au club") :
+  // pastille bleu marine pour rester visible.
+  onYellow?: boolean;
+}) {
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {
     const frame = requestAnimationFrame(() => setNow(new Date()));
@@ -49,7 +59,9 @@ export default function MatchCountdown({ startTime, endTime }: { startTime: stri
       className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
         label.live
           ? "bg-red-500 text-white"
-          : label.soon
+          : onYellow
+            ? "bg-navy text-ubac-yellow"
+            : label.soon
             ? "bg-ubac-yellow text-navy"
             : "bg-ubac-yellow/20 text-ubac-yellow-dark"
       }`}

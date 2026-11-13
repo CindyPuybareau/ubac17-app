@@ -29,7 +29,9 @@ import {
   RotateCcw,
   Sparkles,
   StickyNote,
+  Sun,
   Trash2,
+  Trophy,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -60,6 +62,9 @@ import MatchEmarqueCode from "./match-emarque-code";
 import { MatchSheetsLink } from "./match-sheets-context";
 import TeamSelectorPills from "./team-selector-pills";
 import { clearAbsenceReason } from "./absence-reason-field";
+import WeekendStrip, { type WeekendMatch } from "./weekend-strip";
+import MatchCountdown from "./match-countdown";
+import BirthdayCelebration from "./birthday-celebration";
 import TeamFilterDropdown from "./team-filter-dropdown";
 import EventTypeFilterDropdown from "./event-type-filter-dropdown";
 import { sendEventPush } from "./event-push";
@@ -1064,6 +1069,22 @@ export default function CalendarView({
       : today;
   const [viewMonth, setViewMonth] = useState<Date>(initialViewMonth);
   const [selectedDate, setSelectedDate] = useState<Date>(today);
+  // Calendrier "fun" (retour de Cindy du 13/11) : sens du dernier changement
+  // de mois (la grille glisse depuis la droite ou la gauche), heure du
+  // téléphone pour la ligne "Maintenant" du jour (lue seulement après
+  // montage, jamais au rendu serveur, puis chaque minute), et point de
+  // départ du doigt pour changer de mois en glissant.
+  const [slideDir, setSlideDir] = useState(0);
+  const [nowMs, setNowMs] = useState<number | null>(null);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setNowMs(Date.now()));
+    const interval = window.setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearInterval(interval);
+    };
+  }, []);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   // Retour de Cindy/Sandrine Manzelle du 2026-08-24 : "les entraînements
   // polluent le calendrier" — un cumul Bureau + joueuse + parent voit tout
   // empilé, et les entraînements (2-3 par semaine et par équipe) noient
@@ -1983,6 +2004,7 @@ export default function CalendarView({
   }
 
   function step(amount: number) {
+    setSlideDir(amount);
     const d = new Date(viewMonth);
     d.setMonth(d.getMonth() + amount);
     setViewMonth(d);
@@ -2014,6 +2036,84 @@ export default function CalendarView({
 
   const detailEvents = eventsByDate.get(selectedKey) ?? [];
   const detailBirthdays = birthdaysByMonthDay.get(monthDayKey(selectedDate)) ?? [];
+
+  // "Ce week-end au club" (retour de Cindy du 13/11) : matchs et tournois
+  // du samedi-dimanche qui vient (ou en cours), pas encore terminés, parmi
+  // les événements déjà affichés (mêmes filtres équipe/type que la grille).
+  const weekendMatches: WeekendMatch[] = (() => {
+    const base = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const dow = base.getDay();
+    const saturday = new Date(base);
+    saturday.setDate(base.getDate() + (dow === 0 ? -1 : 6 - dow));
+    const monday = new Date(saturday);
+    monday.setDate(saturday.getDate() + 2);
+    return visibleEvents
+      .filter((e) => {
+        if (e.cancelledAt) return false;
+        if (!isMatchType(e.event_type) && e.event_type !== "TOURNAMENT") return false;
+        const start = new Date(e.start_time);
+        if (start < saturday || start >= monday) return false;
+        const end = e.end_time ? new Date(e.end_time).getTime() : start.getTime() + 2 * 60 * 60 * 1000;
+        return end > today.getTime();
+      })
+      .map((e) => ({
+        id: e.id,
+        dayKey: toKey(new Date(e.start_time)),
+        startTime: e.start_time,
+        endTime: e.end_time,
+        teamName: e.teamName,
+        opponent: isMatchType(e.event_type) ? parseMatchTitle(e.title).opponent : (e.title ?? null),
+        isHome: isMatchType(e.event_type) ? resolveIsHome(e) : null,
+        isTournament: e.event_type === "TOURNAMENT",
+      }));
+  })();
+
+  // Un appui sur un match de la bande "Ce week-end" ouvre son jour dans la
+  // grille du mois et fait défiler jusqu'au détail du jour.
+  function selectDayKey(dayKey: string) {
+    const [y, m, d] = dayKey.split("-").map(Number);
+    const date = new Date(y, m - 1, d);
+    setSelectedDate(date);
+    if (date.getMonth() !== viewMonth.getMonth() || date.getFullYear() !== viewMonth.getFullYear()) {
+      setSlideDir(date > viewMonth ? 1 : -1);
+      setViewMonth(date);
+      navigateToMonth(date);
+    }
+    if (view !== "month") setView("month");
+    requestAnimationFrame(() =>
+      document.getElementById("calendar-day-detail")?.scrollIntoView({ behavior: "smooth", block: "start" })
+    );
+  }
+
+  // Changer de mois en glissant le doigt sur la grille (retour de Cindy du
+  // 13/11). Garde-fous : un geste qui part tout près d'un bord de l'écran
+  // est ignoré (geste "retour" de l'iPhone / d'Android), et seul un geste
+  // franchement horizontal et assez long compte -- faire défiler la page
+  // vers le bas ne change jamais de mois. Les flèches restent.
+  function onGridTouchStart(e: React.TouchEvent) {
+    const t = e.touches[0];
+    if (!t || t.clientX < 24 || t.clientX > window.innerWidth - 24) {
+      touchStartRef.current = null;
+      return;
+    }
+    touchStartRef.current = { x: t.clientX, y: t.clientY };
+  }
+  function onGridTouchEnd(e: React.TouchEvent) {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    const t = e.changedTouches[0];
+    if (!start || !t || isMonthPending) return;
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    if (e.cancelable) e.preventDefault();
+    step(dx < 0 ? 1 : -1);
+  }
+
+  // Points vert / rouge des résultats dans la grille : jamais pour le Bureau
+  // sur "toutes les équipes" (illisible avec 17 équipes), seulement dès
+  // qu'il restreint le filtre ; toujours pour Coach / Famille.
+  const showResultDots = !isBureau || selectedResultTeamIds.size < sortedResultsTeams.length;
 
   // Vue Liste : tout ce qui reste à venir, du plus proche au plus lointain.
   // Le seuil est le début de la journée pour qu'un match du matin ne
@@ -2414,6 +2514,10 @@ export default function CalendarView({
                 {effectiveStyle.solid && <Lock className="h-2.5 w-2.5 shrink-0" />}
                 {reunionLabel}
               </span>
+              {/* Compte à rebours (retour de Cindy du 13/11). */}
+              {(isMatchType(event.event_type) || event.event_type === "TOURNAMENT") && !event.cancelledAt && (
+                <MatchCountdown startTime={event.start_time} endTime={event.end_time} />
+              )}
               {/* "Besoins d'organisation en visuel" (retour de Cindy du
                   24/09) : même prédicat que le calendrier Mois
                   (needsOrganizing) -- réutilise organisationData déjà
@@ -3244,16 +3348,27 @@ export default function CalendarView({
   // couleur à gauche, ombre légère) pour s'intégrer au même fil sans
   // détonner, coloré rose/festif pour rester identifiable au premier coup
   // d'œil.
-  function renderBirthdayCard(member: BirthdaySource) {
+  // celebrate (retour de Cindy du 13/11) : le jour J, côté Coach / Famille
+  // seulement -- "Joyeux anniversaire !" et confettis une fois par jour.
+  function renderBirthdayCard(member: BirthdaySource, celebrate = false) {
     return (
       <div
         key={`bday-${member.id}`}
-        className="flex items-center gap-3 rounded-2xl border border-pink-100 bg-pink-50/60 p-4 shadow-sm border-l-4 border-l-pink-400"
+        className={`flex items-center gap-3 rounded-2xl border p-4 shadow-sm border-l-4 border-l-pink-400 ${
+          celebrate ? "border-pink-200 bg-gradient-to-r from-pink-100 via-pink-50 to-ubac-yellow/20" : "border-pink-100 bg-pink-50/60"
+        }`}
       >
-        <PartyPopper className="h-5 w-5 shrink-0 text-pink-500" />
+        {celebrate && <BirthdayCelebration celebrationKey={`${toKey(selectedDate)}-${member.id}`} />}
+        {celebrate ? (
+          <span className="flex h-10 w-10 shrink-0 animate-ubac-float items-center justify-center rounded-full bg-pink-500 text-white shadow-sm">
+            <Cake className="h-5 w-5" />
+          </span>
+        ) : (
+          <PartyPopper className="h-5 w-5 shrink-0 text-pink-500" />
+        )}
         <div className="flex flex-col gap-1">
           <span className="w-fit rounded-full bg-pink-100 px-2 py-0.5 text-[10px] font-bold uppercase text-pink-700">
-            Anniversaire
+            {celebrate ? "Joyeux anniversaire !" : "Anniversaire"}
           </span>
           <span className="font-semibold text-zinc-900">
             {formatFirstName(member.firstName)}{" "}
@@ -3288,6 +3403,10 @@ export default function CalendarView({
           activeId={activeResultsTeamIdResolved}
           onSelect={setActiveResultsTeamId}
         />
+      )}
+
+      {!forcedView && (view === "month" || view === "list") && (
+        <WeekendStrip matches={weekendMatches} compact={isBureau} onSelectDay={selectDayKey} />
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -3511,7 +3630,11 @@ export default function CalendarView({
       )}
 
       {view === "month" && (
-      <div className="w-full max-w-full overflow-hidden">
+      <div
+        className="w-full max-w-full overflow-hidden"
+        onTouchStart={onGridTouchStart}
+        onTouchEnd={onGridTouchEnd}
+      >
         <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
           {weekdayLabels.map((label) => (
             <div
@@ -3523,7 +3646,12 @@ export default function CalendarView({
             </div>
           ))}
         </div>
-        <div className="mt-1 grid grid-cols-7 gap-1 sm:gap-1.5">
+        <div
+          key={monthParamFor(viewMonth)}
+          className={`mt-1 grid grid-cols-7 gap-1 sm:gap-1.5 ${
+            slideDir > 0 ? "animate-ubac-slide-from-right" : slideDir < 0 ? "animate-ubac-slide-from-left" : ""
+          }`}
+        >
           {gridDays.map((d) => {
             const key = toKey(d);
             const dayEvents = eventsByDate.get(key) ?? [];
@@ -3545,6 +3673,25 @@ export default function CalendarView({
             // fond crème général de l'appli — teinte nettement plus soutenue
             // ici pour rester visible au premier coup d'œil.
             const holiday = schoolHolidayFor(d);
+            // Calendrier "fun" (13/11) : jours passés plus pâles, trophée
+            // sur les jours de match (un seul par jour, quel que soit le
+            // nombre de matchs), point vert/rouge par résultat connu.
+            const isPast = key < todayKey;
+            const dayMatches = dayEvents.filter(
+              (e) => !e.cancelledAt && (isMatchType(e.event_type) || e.event_type === "TOURNAMENT")
+            );
+            const dayResults = showResultDots
+              ? dayMatches
+                  .filter((e) => e.teamScore !== null && e.opponentScore !== null)
+                  .slice(0, 3)
+                  .map((e) =>
+                    (e.teamScore as number) > (e.opponentScore as number)
+                      ? { id: e.id, className: "bg-emerald-500", label: "Victoire" }
+                      : (e.teamScore as number) < (e.opponentScore as number)
+                        ? { id: e.id, className: "bg-red-500", label: "Défaite" }
+                        : { id: e.id, className: "bg-zinc-400", label: "Nul" }
+                  )
+              : [];
 
             return (
               <button
@@ -3557,14 +3704,30 @@ export default function CalendarView({
                     : holiday
                       ? "border-orange-300 bg-orange-200 hover:border-ubac-yellow/50"
                       : "border-zinc-100 bg-white hover:border-ubac-yellow/50"
-                } ${!isCurrentMonth ? "opacity-40" : ""}`}
+                } ${!isCurrentMonth ? "opacity-40" : isPast && !isSelected ? "opacity-60" : ""} ${
+                  isToday ? "ring-2 ring-ubac-yellow ring-offset-1" : ""
+                }`}
               >
-                <span
-                  className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold sm:h-6 sm:w-6 sm:text-xs ${
-                    isToday ? "bg-ubac-yellow text-navy" : "text-zinc-700"
-                  }`}
-                >
-                  {d.getDate()}
+                <span className="flex w-full min-w-0 items-center gap-0.5">
+                  {/* Rond du jour assez grand pour deux chiffres (retour de
+                      Cindy du 13/11, "rond jaune pas centré au chiffre"). */}
+                  <span
+                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold leading-none tabular-nums sm:h-6 sm:w-6 sm:text-xs ${
+                      isToday ? "bg-ubac-yellow text-navy" : "text-zinc-700"
+                    }`}
+                  >
+                    {d.getDate()}
+                  </span>
+                  {dayMatches.length > 0 && (
+                    <Trophy className="h-2.5 w-2.5 shrink-0 text-ubac-yellow-dark sm:h-3 sm:w-3" aria-label="Jour de match" />
+                  )}
+                  {dayResults.map((r) => (
+                    <span
+                      key={r.id}
+                      title={r.label}
+                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${r.className}`}
+                    />
+                  ))}
                 </span>
                 <div className="flex w-full min-w-0 flex-col gap-0.5">
                   {/* gap-1 plutôt que gap-0.5 (retour de Cindy du 24/09,
@@ -3598,9 +3761,12 @@ export default function CalendarView({
                         }`}
                       />
                     ))}
-                    {dayBirthdays.length > 0 && (
-                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-purple-400" />
-                    )}
+                    {dayBirthdays.length > 0 &&
+                      (isBureau ? (
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-purple-400" />
+                      ) : (
+                        <Cake className="h-2.5 w-2.5 shrink-0 text-purple-500" aria-label="Anniversaire" />
+                      ))}
                   </div>
                   <div className="hidden sm:flex sm:flex-col sm:gap-0.5">
                     {visible.map((e) => (
@@ -3868,7 +4034,7 @@ export default function CalendarView({
       )}
 
       {view === "month" && (
-      <div className="flex flex-col gap-2">
+      <div id="calendar-day-detail" className="flex scroll-mt-4 flex-col gap-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-zinc-900">
           {selectedKey === todayKey
             ? "Aujourd'hui"
@@ -3880,11 +4046,60 @@ export default function CalendarView({
         </p>
 
         {detailEvents.length === 0 && detailBirthdays.length === 0 ? (
-          <p className="text-sm text-zinc-500">Aucun événement ce jour-là.</p>
+          // Journée vide (retour de Cindy du 13/11) : un petit mot plutôt
+          // qu'un "Aucun événement" sec.
+          <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-zinc-200 bg-white/60 px-4 py-6 text-center">
+            <span className="flex h-10 w-10 animate-ubac-float items-center justify-center rounded-full bg-ubac-yellow/20 text-ubac-yellow-dark">
+              <Sun className="h-5 w-5" />
+            </span>
+            <p className="text-sm font-semibold text-zinc-800">
+              {selectedKey === todayKey
+                ? "Rien de prévu aujourd'hui"
+                : selectedKey < todayKey
+                  ? "Rien ce jour-là"
+                  : selectedDate.getDay() === 0 || selectedDate.getDay() === 6
+                    ? "Week-end tranquille"
+                    : "Rien de prévu ce jour-là"}
+            </p>
+            <p className="text-xs text-zinc-500">
+              {selectedKey === todayKey
+                ? "Journée repos, profitez-en !"
+                : selectedKey < todayKey
+                  ? "Aucun entraînement ni match ce jour-là."
+                  : "Pas d'entraînement ni de match."}
+            </p>
+          </div>
         ) : (
           <div className="flex flex-col gap-4">
-            {detailBirthdays.map((m) => renderBirthdayCard(m))}
-            {detailEvents.map((event) => renderEventCard(event))}
+            {detailBirthdays.map((m) => renderBirthdayCard(m, selectedKey === todayKey && !isBureau))}
+            {(() => {
+              // "Aujourd'hui" en direct (retour de Cindy du 13/11) : une
+              // ligne "Maintenant" s'intercale entre les événements passés
+              // et à venir de la journée.
+              const showNow = selectedKey === todayKey && nowMs !== null;
+              const nowIndex = showNow
+                ? (() => {
+                    const i = detailEvents.findIndex((e) => new Date(e.start_time).getTime() > (nowMs as number));
+                    return i < 0 ? detailEvents.length : i;
+                  })()
+                : -1;
+              const nowLine = showNow ? (
+                <div key="now-line" className="flex items-center gap-2" aria-label="Maintenant">
+                  <span className="relative flex h-2.5 w-2.5 shrink-0">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75 motion-reduce:animate-none" />
+                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
+                  </span>
+                  <span className="h-px flex-1 bg-red-300" />
+                  <span className="text-[11px] font-bold uppercase tracking-wide text-red-500">
+                    Maintenant ·{" "}
+                    {new Date(nowMs as number).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }).replace(":", "h")}
+                  </span>
+                </div>
+              ) : null;
+              const cards = detailEvents.map((event) => renderEventCard(event));
+              if (nowIndex >= 0 && nowLine) cards.splice(nowIndex, 0, nowLine);
+              return cards;
+            })()}
           </div>
         )}
       </div>
