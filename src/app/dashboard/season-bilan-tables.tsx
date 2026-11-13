@@ -100,19 +100,24 @@ function SortableHeader<K extends string>({
 // blanche par personne, bande de couleur à gauche comme les cartes
 // entraînement/match, et les compteurs rangés en deux colonnes alignées
 // (icône, libellé, nombre) sous un petit titre de rubrique -- chaque rôle
-// reste nommé à part, jamais regroupé (retour du 24/09).
+// reste nommé à part, jamais regroupé (retour du 24/09). Libellé et chiffre
+// dans une même case teintée (retour du 13/11, "trop d'écarts" entre le
+// nom et le nombre quand ils flottaient aux deux bouts de la colonne).
 type CardStat = { key: string; label: string; icon: React.ReactNode; value: string };
 
 function CardStatSection({ title, stats }: { title: string; stats: CardStat[] }) {
   return (
-    <div className="mt-3 border-t border-zinc-100 pt-2.5">
+    <div className="mt-3">
       <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">{title}</p>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+      <div className="flex flex-wrap gap-1.5">
         {stats.map((s) => (
-          <div key={s.key} className="flex min-w-0 items-center gap-1.5 text-sm text-zinc-700">
+          <div
+            key={s.key}
+            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-zinc-50 px-2.5 py-1.5 text-sm text-zinc-700"
+          >
             {s.icon}
-            <span className="truncate">{s.label}</span>
-            <span className="ml-auto shrink-0 font-semibold tabular-nums text-zinc-900">{s.value}</span>
+            {s.label}
+            <span className="ml-1 font-bold tabular-nums text-navy">{s.value}</span>
           </div>
         ))}
       </div>
