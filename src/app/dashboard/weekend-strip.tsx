@@ -193,7 +193,7 @@ export default function WeekendStrip({
             <span className={`whitespace-nowrap text-[10px] font-semibold uppercase tracking-wide text-ubac-yellow`}>
               {isClub ? "Venez encourager !" : "Ce week-end au club"}
             </span>
-            <span className="truncate whitespace-nowrap text-base font-bold text-white">
+            <span className="truncate whitespace-nowrap text-sm font-bold text-white min-[400px]:text-base">
               {isClub
                 ? `${shown.length} match${shown.length > 1 ? "s" : ""} à domicile ce WE`
                 : `${shown.length} match${shown.length > 1 ? "s" : ""}`}
