@@ -95,6 +95,31 @@ function SortableHeader<K extends string>({
 // Onglet "Joueurs" : assiduité (déjà existante) + participation par type
 // d'événement (retour de Cindy du 24/09 -- l'ancien tableau ne comptait que
 // des rôles Maillots/Table de marque, un catalogue vide depuis longtemps).
+// Cartes téléphone du bilan (retour de Cindy du 13/11, "c'est un peu le
+// bordel... comme les cartes entraînement, on doit être pro") : une carte
+// blanche par personne, bande de couleur à gauche comme les cartes
+// entraînement/match, et les compteurs rangés en deux colonnes alignées
+// (icône, libellé, nombre) sous un petit titre de rubrique -- chaque rôle
+// reste nommé à part, jamais regroupé (retour du 24/09).
+type CardStat = { key: string; label: string; icon: React.ReactNode; value: string };
+
+function CardStatSection({ title, stats }: { title: string; stats: CardStat[] }) {
+  return (
+    <div className="mt-3 border-t border-zinc-100 pt-2.5">
+      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">{title}</p>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+        {stats.map((s) => (
+          <div key={s.key} className="flex min-w-0 items-center gap-1.5 text-sm text-zinc-700">
+            {s.icon}
+            <span className="truncate">{s.label}</span>
+            <span className="ml-auto shrink-0 font-semibold tabular-nums text-zinc-900">{s.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 type ParticipationSortKey = "name" | "attendance" | "official" | "friendly" | "tournament" | "other";
 type MatchKind = "official" | "friendly" | "tournament" | "other";
 
@@ -233,39 +258,65 @@ export function ParticipationTable({
             </button>
           ))}
         </div>
-        <ul className="divide-y divide-zinc-100 rounded-xl border border-zinc-100">
-          {rows.map((r) => (
-            <li key={r.id} className="flex flex-col gap-1.5 px-3 py-2.5">
-              <p className="truncate text-sm font-semibold text-zinc-900">
-                {r.name}
-                {teamNameByPlayerId?.[r.id] && (
-                  <span className="ml-1.5 text-xs font-normal text-zinc-400">· {teamNameByPlayerId[r.id]}</span>
-                )}
-              </p>
-              <div className="flex items-center gap-2">
-                <span className="flex shrink-0 items-center gap-1 text-xs text-zinc-500">
-                  <Activity className="h-3.5 w-3.5 shrink-0" />
-                  Entraînements
-                </span>
-                <AttendanceBar present={r.attendance.present} total={r.attendance.total} wide />
-              </div>
-              {visibleKinds.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {visibleKinds.map(({ key, label, Icon, colorClass }) => (
-                    <RatioChip
-                      key={key}
-                      icon={<Icon className="h-3 w-3" />}
-                      label={label}
-                      present={r.tally[key].present}
-                      total={r.tally[key].total}
-                      colorClass={colorClass}
-                    />
-                  ))}
+        <div className="flex flex-col gap-2">
+          {rows.map((r) => {
+            const rate = r.attendance.total > 0 ? r.attendance.present / r.attendance.total : null;
+            const accent =
+              rate === null
+                ? "border-l-zinc-300"
+                : rate < 0.5
+                  ? "border-l-red-500"
+                  : rate < 0.8
+                    ? "border-l-amber-500"
+                    : "border-l-emerald-500";
+            const rateColor =
+              rate === null
+                ? "text-zinc-400"
+                : rate < 0.5
+                  ? "text-red-600"
+                  : rate < 0.8
+                    ? "text-amber-600"
+                    : "text-emerald-700";
+            return (
+              <div
+                key={r.id}
+                className={`rounded-2xl border border-l-4 border-zinc-100 bg-white p-3.5 shadow-sm ${accent}`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="min-w-0 truncate text-sm font-semibold text-zinc-900">
+                    {r.name}
+                    {teamNameByPlayerId?.[r.id] && (
+                      <span className="ml-1.5 text-xs font-normal text-zinc-400">· {teamNameByPlayerId[r.id]}</span>
+                    )}
+                  </p>
+                  {rate !== null && (
+                    <span className={`shrink-0 text-sm font-bold tabular-nums ${rateColor}`}>
+                      {Math.round(rate * 100)} %
+                    </span>
+                  )}
                 </div>
-              )}
-            </li>
-          ))}
-        </ul>
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="flex shrink-0 items-center gap-1.5 text-sm text-zinc-700">
+                    <Activity className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                    Entraînements
+                  </span>
+                  <AttendanceBar present={r.attendance.present} total={r.attendance.total} wide />
+                </div>
+                {visibleKinds.length > 0 && (
+                  <CardStatSection
+                    title="Matchs"
+                    stats={visibleKinds.map(({ key, label, Icon }) => ({
+                      key,
+                      label,
+                      icon: <Icon className="h-3.5 w-3.5 shrink-0 text-navy" />,
+                      value: `${r.tally[key].present}/${r.tally[key].total}`,
+                    }))}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <div className="hidden w-full overflow-x-auto rounded-xl border border-zinc-100 md:block">
@@ -445,66 +496,73 @@ export function VolunteerTable({
         {rows.length === 0 ? (
           <p className="py-4 text-center text-sm text-zinc-400">Aucun joueur dans cette équipe</p>
         ) : (
-          <ul className="divide-y divide-zinc-100 rounded-xl border border-zinc-100">
-            {rows.map((r) => {
-              const roles = [
-                ...CLASSIQUE_COLUMNS.map((role) => ({
-                  key: `role:${role.code}`,
-                  label: role.label,
-                  icon: <RoleIcon icon={role.icon} className="h-3 w-3 shrink-0" />,
-                  count: r.tally.byRoleCode[role.code] ?? 0,
-                  colorClass: "bg-emerald-50 text-emerald-700",
-                })),
-                ...OFFICIAL_COLUMNS.map((role) => ({
+          <>
+            {rows
+              .filter((r) => r.total > 0)
+              .map((r) => {
+                const organisation: CardStat[] = [
+                  ...CLASSIQUE_COLUMNS.map((role) => ({
+                    key: `role:${role.code}`,
+                    label: role.label,
+                    icon: <RoleIcon icon={role.icon} className="h-3.5 w-3.5 shrink-0 text-emerald-600" />,
+                    count: r.tally.byRoleCode[role.code] ?? 0,
+                  })),
+                  {
+                    key: "covoiturage",
+                    label: "Covoiturage",
+                    icon: <Car className="h-3.5 w-3.5 shrink-0 text-blue-600" />,
+                    count: r.tally.covoiturage,
+                  },
+                ]
+                  .filter((s) => s.count > 0)
+                  .map((s) => ({ key: s.key, label: s.label, icon: s.icon, value: String(s.count) }));
+                const officiels: CardStat[] = OFFICIAL_COLUMNS.map((role) => ({
                   key: `official:${role.code}`,
                   label: role.label,
-                  icon: <RoleIcon icon={role.icon} className="h-3 w-3 shrink-0" />,
+                  icon: <RoleIcon icon={role.icon} className="h-3.5 w-3.5 shrink-0 text-terracotta" />,
                   count: r.tally.byOfficialCode[role.code] ?? 0,
-                  colorClass: "bg-terracotta/10 text-terracotta-dark",
-                })),
-                {
-                  key: "covoiturage",
-                  label: "Covoiturage",
-                  icon: <Car className="h-3 w-3 shrink-0" />,
-                  count: r.tally.covoiturage,
-                  colorClass: "bg-blue-50 text-blue-700",
-                },
-              ].filter((role) => role.count > 0);
-              return (
-                <li key={r.id} className="flex flex-col gap-1.5 px-3 py-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="flex min-w-0 items-center gap-1.5 text-sm font-semibold text-zinc-900">
-                      <span className="truncate">{r.name}</span>
-                      {r.isGuest && (
-                        <span className="shrink-0 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-500">
-                          Invité·e
-                        </span>
-                      )}
-                    </p>
-                    <span
-                      className={`shrink-0 text-xs font-semibold tabular-nums ${r.total === 0 ? "text-zinc-400" : "text-zinc-900"}`}
-                    >
-                      {r.total === 0 ? "Aucune" : `${r.total} participation${r.total > 1 ? "s" : ""}`}
-                    </span>
-                  </div>
-                  {roles.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {roles.map((role) => (
-                        <span
-                          key={role.key}
-                          className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ${role.colorClass}`}
-                        >
-                          {role.icon}
-                          <span className="font-medium">{role.label}</span>
-                          <span>×{role.count}</span>
-                        </span>
-                      ))}
+                }))
+                  .filter((s) => s.count > 0)
+                  .map((s) => ({ key: s.key, label: s.label, icon: s.icon, value: String(s.count) }));
+                return (
+                  <div
+                    key={r.id}
+                    className="rounded-2xl border border-l-4 border-zinc-100 border-l-navy bg-white p-3.5 shadow-sm"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="flex min-w-0 items-center gap-1.5 text-sm font-semibold text-zinc-900">
+                        <span className="truncate">{r.name}</span>
+                        {r.isGuest && (
+                          <span className="shrink-0 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                            Invité·e
+                          </span>
+                        )}
+                      </p>
+                      <span className="shrink-0 rounded-full bg-navy/10 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-navy">
+                        {r.total} participation{r.total > 1 ? "s" : ""}
+                      </span>
                     </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+                    {organisation.length > 0 && <CardStatSection title="Organisation" stats={organisation} />}
+                    {officiels.length > 0 && <CardStatSection title="Matchs officiels" stats={officiels} />}
+                  </div>
+                );
+              })}
+            {/* Sans participation : regroupés dans une seule carte plutôt
+                qu'une carte vide par personne. */}
+            {rows.some((r) => r.total === 0) && (
+              <div className="rounded-2xl border border-l-4 border-zinc-100 border-l-zinc-300 bg-white p-3.5 shadow-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                  Pas encore de participation ({rows.filter((r) => r.total === 0).length})
+                </p>
+                <p className="mt-1.5 text-sm leading-relaxed text-zinc-600">
+                  {rows
+                    .filter((r) => r.total === 0)
+                    .map((r) => r.name)
+                    .join(" · ")}
+                </p>
+              </div>
+            )}
+          </>
         )}
       </div>
 
