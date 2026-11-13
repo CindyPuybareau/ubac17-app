@@ -1,10 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import {
   Cake,
   CalendarDays,
-  ChevronDown,
   Dumbbell,
   Handshake,
   Sparkles,
@@ -38,9 +36,6 @@ export function symbolFor(eventType: string | null) {
 export type DaySymbolItem = {
   eventType: string | null;
   cancelled: boolean;
-  // Anneau autour du symbole : "warn" = besoin d'organisation non pourvu
-  // (orange), "home" = match à domicile (doré, espace Enfant).
-  ring?: "warn" | "home" | null;
   // Résultat connu d'un match : colore le symbole (vert / rouge).
   result?: "win" | "loss" | "draw" | null;
 };
@@ -69,11 +64,6 @@ export function DaySymbols({ items }: { items: DaySymbolItem[] }) {
             : scored.length > 0 && scored.length === active.length && losses === scored.length
               ? "text-red-500"
               : null;
-        const ring = active.some((i) => i.ring === "warn")
-          ? "ring-1 ring-amber-500"
-          : active.some((i) => i.ring === "home")
-            ? "ring-1 ring-ubac-yellow"
-            : "";
         const title = [
           `${list.length} ${label.toLowerCase()}${list.length > 1 ? "s" : ""}`,
           allCancelled ? "annulé" : null,
@@ -88,9 +78,9 @@ export function DaySymbols({ items }: { items: DaySymbolItem[] }) {
             title={title}
             className={`inline-flex items-center gap-px ${allCancelled ? "opacity-35" : ""}`}
           >
-            <span className={`flex h-3.5 w-3.5 items-center justify-center rounded-full ${ring}`}>
-              <Icon className={`h-3 w-3 ${allCancelled ? "text-zinc-400" : (resultColor ?? color)}`} aria-label={title} />
-            </span>
+            {/* Pas de cercle autour du symbole (retour de Cindy du 13/11, "on
+                ne comprend pas le cercle") : le symbole seul. */}
+            <Icon className={`h-3 w-3 ${allCancelled ? "text-zinc-400" : (resultColor ?? color)}`} aria-label={title} />
             {list.length > 1 && (
               <span className="text-[9px] font-bold leading-none tabular-nums text-zinc-500">{list.length}</span>
             )}
@@ -119,92 +109,5 @@ export function BirthdayCorner({ count }: { count: number }) {
           13/11) : le gâteau seul, le détail s'affiche en ouvrant le jour. */}
       <Cake className="h-2.5 w-2.5 text-pink-500 sm:h-3 sm:w-3" aria-label="Anniversaire" />
     </span>
-  );
-}
-
-// Légende repliable sous la grille (retour de Cindy du 13/11) : la même
-// partout, avec seulement les repères qui existent sur ce calendrier.
-export function SymbolLegend({ showWarn = false, showHome = false }: { showWarn?: boolean; showHome?: boolean }) {
-  const [open, setOpen] = useState(false);
-  const entries: { key: string; node: React.ReactNode; label: string }[] = [
-    ...ORDER.map((type) => {
-      const { Icon, color, label } = EVENT_SYMBOLS[type];
-      return { key: type, node: <Icon className={`h-3.5 w-3.5 ${color}`} />, label };
-    }),
-    {
-      key: "result",
-      node: (
-        <span className="flex items-center gap-0.5">
-          <Trophy className="h-3.5 w-3.5 text-emerald-600" />
-          <Trophy className="h-3.5 w-3.5 text-red-500" />
-        </span>
-      ),
-      label: "Match gagné / perdu",
-    },
-    { key: "bday", node: <Cake className="h-3.5 w-3.5 text-pink-500" />, label: "Anniversaire (en haut à droite)" },
-    {
-      key: "count",
-      node: (
-        <span className="flex items-center gap-px">
-          <Dumbbell className="h-3.5 w-3.5 text-court-green" />
-          <span className="text-[10px] font-bold text-zinc-500">2</span>
-        </span>
-      ),
-      label: "Chiffre = plusieurs ce jour-là",
-    },
-    {
-      key: "cancel",
-      node: <Dumbbell className="h-3.5 w-3.5 text-zinc-400 opacity-50" />,
-      label: "Grisé = annulé",
-    },
-    ...(showWarn
-      ? [
-          {
-            key: "warn",
-            node: (
-              <span className="flex h-4 w-4 items-center justify-center rounded-full ring-1 ring-amber-500">
-                <Trophy className="h-3 w-3 text-navy" />
-              </span>
-            ),
-            label: "Contour orange = besoin d'organisation",
-          },
-        ]
-      : []),
-    ...(showHome
-      ? [
-          {
-            key: "home",
-            node: (
-              <span className="flex h-4 w-4 items-center justify-center rounded-full ring-1 ring-ubac-yellow">
-                <Trophy className="h-3 w-3 text-navy" />
-              </span>
-            ),
-            label: "Contour doré = match à domicile",
-          },
-        ]
-      : []),
-  ];
-  return (
-    <div className="rounded-xl border border-zinc-100 bg-white/70">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs font-semibold text-zinc-600"
-      >
-        Que veulent dire les symboles ?
-        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-      {open && (
-        <ul className="grid grid-cols-1 gap-x-4 gap-y-1.5 px-3 pb-3 min-[400px]:grid-cols-2">
-          {entries.map((e) => (
-            <li key={e.key} className="flex items-center gap-2 text-xs text-zinc-700">
-              <span className="flex w-8 shrink-0 justify-center">{e.node}</span>
-              {e.label}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
   );
 }
