@@ -16,16 +16,16 @@ function fullName(p: RosterPlayer) {
 // Barre de progression colorée plutôt qu'un simple "12/15" brut -- l'oeil
 // repère en un coup d'oeil qui a une assiduité faible sans lire le chiffre
 // (retour de Cindy du 24/09, "trouver une maquette sympa niveau visuel").
-function AttendanceBar({ present, total }: { present: number; total: number }) {
+function AttendanceBar({ present, total, wide = false }: { present: number; total: number; wide?: boolean }) {
   if (total === 0) {
-    return <span className="text-xs text-zinc-300">—</span>;
+    return <span className="text-xs text-zinc-400">Aucun entraînement passé</span>;
   }
   const rate = present / total;
   const barColor = rate < 0.5 ? "bg-red-500" : rate < 0.8 ? "bg-amber-500" : "bg-emerald-500";
   const textColor = rate < 0.5 ? "text-red-600" : rate < 0.8 ? "text-amber-600" : "text-emerald-700";
   return (
-    <div className="flex items-center gap-2">
-      <div className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-zinc-100">
+    <div className={`flex items-center gap-2 ${wide ? "min-w-0 flex-1" : ""}`}>
+      <div className={`h-1.5 overflow-hidden rounded-full bg-zinc-100 ${wide ? "min-w-0 flex-1" : "w-16 shrink-0"}`}>
         <div className={`h-full rounded-full ${barColor}`} style={{ width: `${Math.round(rate * 100)}%` }} />
       </div>
       <span className={`shrink-0 text-xs font-semibold tabular-nums ${textColor}`}>
@@ -96,6 +96,49 @@ function SortableHeader<K extends string>({
 // d'événement (retour de Cindy du 24/09 -- l'ancien tableau ne comptait que
 // des rôles Maillots/Table de marque, un catalogue vide depuis longtemps).
 type ParticipationSortKey = "name" | "attendance" | "official" | "friendly" | "tournament" | "other";
+type MatchKind = "official" | "friendly" | "tournament" | "other";
+
+// Retour de Cindy du 13/11 : les matchs en "présent/total" comme les
+// entraînements ("Officiels 1" ne disait pas sur combien), et une colonne
+// n'apparaît que si l'équipe a eu au moins un rendez-vous de ce type
+// (Amicaux/Tournois souvent à 0 pour tout le monde = du gris pour rien).
+const MATCH_KINDS: {
+  key: MatchKind;
+  label: string;
+  Icon: typeof Trophy;
+  colorClass: string;
+}[] = [
+  { key: "official", label: "Officiels", Icon: Trophy, colorClass: "bg-navy/10 text-navy" },
+  { key: "friendly", label: "Amicaux", Icon: Handshake, colorClass: "bg-blue-50 text-blue-700" },
+  { key: "tournament", label: "Tournois", Icon: Sparkles, colorClass: "bg-ubac-yellow/20 text-ubac-yellow-dark" },
+  { key: "other", label: "Autres", Icon: CalendarDays, colorClass: "bg-zinc-100 text-zinc-600" },
+];
+
+function RatioChip({
+  icon,
+  present,
+  total,
+  colorClass,
+  label,
+}: {
+  icon: React.ReactNode;
+  present: number;
+  total: number;
+  colorClass: string;
+  label?: string;
+}) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ${
+        present === 0 ? "bg-zinc-50 text-zinc-400" : colorClass
+      }`}
+    >
+      {icon}
+      {label && <span className="font-medium">{label}</span>}
+      {present}/{total}
+    </span>
+  );
+}
 
 export function ParticipationTable({
   roster,
@@ -114,8 +157,7 @@ export function ParticipationTable({
   const [sortKey, setSortKey] = useState<ParticipationSortKey>("attendance");
   // desc (retour de Cindy du 24/09, "mettre ceux qui viennent le plus...
   // en premier") : la présence aux entraînements la PLUS FORTE apparaît en
-  // premier par défaut -- inverse du choix initial (la plus faible en
-  // premier, pour repérer qui manque le plus).
+  // premier par défaut.
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   function toggleSort(key: ParticipationSortKey) {
@@ -151,100 +193,135 @@ export function ParticipationTable({
         const diff = (rateA - rateB) * dir;
         return diff !== 0 ? diff : a.name.localeCompare(b.name, "fr");
       }
-      // Bureau/Coach : tri sur le nombre de présences (raison d'être de ce
-      // classement), pas sur le total de matchs de ce type -- rester
-      // cohérent avec l'affichage CountChip juste en dessous.
       const diff = (a.tally[sortKey].present - b.tally[sortKey].present) * dir;
       return diff !== 0 ? diff : a.name.localeCompare(b.name, "fr");
     });
   }, [roster, attendanceByPlayerId, tallyByPlayerId, sortKey, sortDir]);
 
+  const visibleKinds = MATCH_KINDS.filter((k) => rows.some((r) => r.tally[k.key].total > 0));
+
+  if (rows.length === 0) {
+    return <p className="py-4 text-center text-sm text-zinc-400">Aucun joueur dans cette équipe</p>;
+  }
+
   return (
-    <div className="w-full overflow-x-auto rounded-xl border border-zinc-100">
-      <table className="w-full table-auto border-collapse text-sm">
-        <thead>
-          <tr className="border-b border-zinc-100 bg-zinc-50 text-left text-xs font-semibold text-zinc-400">
-            <SortableHeader sortKey="name" currentKey={sortKey} currentDir={sortDir} label="Joueur" onSort={toggleSort} />
-            <SortableHeader
-              sortKey="attendance"
-              currentKey={sortKey}
-              currentDir={sortDir}
-              label="Entraînements"
-              icon={<Activity className="h-3.5 w-3.5 shrink-0" />}
-              onSort={toggleSort}
-            />
-            <SortableHeader
-              sortKey="official"
-              currentKey={sortKey}
-              currentDir={sortDir}
-              label="Officiels"
-              icon={<Trophy className="h-3.5 w-3.5 shrink-0" />}
-              onSort={toggleSort}
-            />
-            <SortableHeader
-              sortKey="friendly"
-              currentKey={sortKey}
-              currentDir={sortDir}
-              label="Amicaux"
-              icon={<Handshake className="h-3.5 w-3.5 shrink-0" />}
-              onSort={toggleSort}
-            />
-            <SortableHeader
-              sortKey="tournament"
-              currentKey={sortKey}
-              currentDir={sortDir}
-              label="Tournois"
-              icon={<Sparkles className="h-3.5 w-3.5 shrink-0" />}
-              onSort={toggleSort}
-            />
-            <SortableHeader
-              sortKey="other"
-              currentKey={sortKey}
-              currentDir={sortDir}
-              label="Autres"
-              icon={<CalendarDays className="h-3.5 w-3.5 shrink-0" />}
-              onSort={toggleSort}
-            />
-          </tr>
-        </thead>
-        <tbody>
+    <>
+      {/* Téléphone (retour de Cindy du 13/11) : une carte par joueur plutôt
+          qu'un tableau qui défilait de côté (noms sur 2 lignes, colonnes
+          coupées). */}
+      <div className="flex flex-col gap-2 md:hidden">
+        <div className="flex items-center gap-1.5 text-xs text-zinc-500">
+          Trier par
+          {(
+            [
+              { key: "attendance", label: "Présence" },
+              { key: "name", label: "Nom" },
+            ] as const
+          ).map((s) => (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => toggleSort(s.key)}
+              className={`rounded-full border px-2.5 py-1 font-semibold transition-colors ${
+                sortKey === s.key
+                  ? "border-navy bg-navy text-white"
+                  : "border-navy/25 bg-navy/5 text-navy hover:bg-navy/10"
+              }`}
+            >
+              {s.label}
+              {sortKey === s.key && <span className="ml-1 text-[10px]">{sortDir === "asc" ? "▲" : "▼"}</span>}
+            </button>
+          ))}
+        </div>
+        <ul className="divide-y divide-zinc-100 rounded-xl border border-zinc-100">
           {rows.map((r) => (
-            <tr key={r.id} className="border-b border-zinc-50 last:border-0">
-              <td className="w-auto px-3 py-2.5 font-semibold text-zinc-800">
+            <li key={r.id} className="flex flex-col gap-1.5 px-3 py-2.5">
+              <p className="truncate text-sm font-semibold text-zinc-900">
                 {r.name}
                 {teamNameByPlayerId?.[r.id] && (
-                  <span className="ml-1.5 text-xs font-normal text-zinc-400">
-                    · {teamNameByPlayerId[r.id]}
-                  </span>
+                  <span className="ml-1.5 text-xs font-normal text-zinc-400">· {teamNameByPlayerId[r.id]}</span>
                 )}
-              </td>
-              <td className="whitespace-nowrap px-3 py-2.5">
-                <AttendanceBar present={r.attendance.present} total={r.attendance.total} />
-              </td>
-              <td className="whitespace-nowrap px-3 py-2.5">
-                <CountChip icon={<Trophy className="h-3 w-3" />} count={r.tally.official.present} colorClass="bg-navy/10 text-navy" />
-              </td>
-              <td className="whitespace-nowrap px-3 py-2.5">
-                <CountChip icon={<Handshake className="h-3 w-3" />} count={r.tally.friendly.present} colorClass="bg-blue-50 text-blue-700" />
-              </td>
-              <td className="whitespace-nowrap px-3 py-2.5">
-                <CountChip icon={<Sparkles className="h-3 w-3" />} count={r.tally.tournament.present} colorClass="bg-ubac-yellow/20 text-ubac-yellow-dark" />
-              </td>
-              <td className="whitespace-nowrap px-3 py-2.5">
-                <CountChip icon={<CalendarDays className="h-3 w-3" />} count={r.tally.other.present} colorClass="bg-zinc-100 text-zinc-600" />
-              </td>
-            </tr>
+              </p>
+              <div className="flex items-center gap-2">
+                <span className="flex shrink-0 items-center gap-1 text-xs text-zinc-500">
+                  <Activity className="h-3.5 w-3.5 shrink-0" />
+                  Entraînements
+                </span>
+                <AttendanceBar present={r.attendance.present} total={r.attendance.total} wide />
+              </div>
+              {visibleKinds.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {visibleKinds.map(({ key, label, Icon, colorClass }) => (
+                    <RatioChip
+                      key={key}
+                      icon={<Icon className="h-3 w-3" />}
+                      label={label}
+                      present={r.tally[key].present}
+                      total={r.tally[key].total}
+                      colorClass={colorClass}
+                    />
+                  ))}
+                </div>
+              )}
+            </li>
           ))}
-          {rows.length === 0 && (
-            <tr>
-              <td colSpan={6} className="px-3 py-4 text-center text-sm text-zinc-400">
-                Aucun joueur dans cette équipe
-              </td>
+        </ul>
+      </div>
+
+      <div className="hidden w-full overflow-x-auto rounded-xl border border-zinc-100 md:block">
+        <table className="w-full table-auto border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-zinc-100 bg-zinc-50 text-left text-xs font-semibold text-zinc-500">
+              <SortableHeader sortKey="name" currentKey={sortKey} currentDir={sortDir} label="Joueur" onSort={toggleSort} />
+              <SortableHeader
+                sortKey="attendance"
+                currentKey={sortKey}
+                currentDir={sortDir}
+                label="Entraînements"
+                icon={<Activity className="h-3.5 w-3.5 shrink-0" />}
+                onSort={toggleSort}
+              />
+              {visibleKinds.map(({ key, label, Icon }) => (
+                <SortableHeader
+                  key={key}
+                  sortKey={key}
+                  currentKey={sortKey}
+                  currentDir={sortDir}
+                  label={label}
+                  icon={<Icon className="h-3.5 w-3.5 shrink-0" />}
+                  onSort={toggleSort}
+                />
+              ))}
             </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.id} className="border-b border-zinc-50 last:border-0">
+                <td className="w-auto px-3 py-2.5 font-semibold text-zinc-900">
+                  {r.name}
+                  {teamNameByPlayerId?.[r.id] && (
+                    <span className="ml-1.5 text-xs font-normal text-zinc-400">· {teamNameByPlayerId[r.id]}</span>
+                  )}
+                </td>
+                <td className="whitespace-nowrap px-3 py-2.5">
+                  <AttendanceBar present={r.attendance.present} total={r.attendance.total} />
+                </td>
+                {visibleKinds.map(({ key, Icon, colorClass }) => (
+                  <td key={key} className="whitespace-nowrap px-3 py-2.5">
+                    <RatioChip
+                      icon={<Icon className="h-3 w-3" />}
+                      present={r.tally[key].present}
+                      total={r.tally[key].total}
+                      colorClass={colorClass}
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 

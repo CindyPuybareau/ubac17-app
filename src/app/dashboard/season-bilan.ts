@@ -254,3 +254,41 @@ export async function getSeasonVolunteerTallyByEventIds(
 
   return { tallyByPlayerId, guestEntries };
 }
+
+// Retour de Cindy du 13/11 : le bilan Bureau/Coach ne voyait que les
+// entraînements chargés pour le Calendrier (depuis le mois précédent), pas
+// la saison -- le calcul est désormais fait en base sur la saison entière
+// (fonction season_participation, une seule requête par équipe affichée).
+// Remet ses lignes dans la même forme que computeSeasonParticipation, pour
+// que l'affichage n'ait rien à changer. Un joueur sans aucune ligne
+// (équipe sans rendez-vous passé) reste à 0/0.
+export type SeasonParticipationRow = {
+  player_id: string;
+  kind: string;
+  present_count: number;
+  total_count: number;
+};
+
+export function seasonParticipationFromRows(
+  rows: SeasonParticipationRow[],
+  playerIds: string[]
+): {
+  attendanceByPlayerId: Record<string, SeasonAttendance>;
+  participationByPlayerId: Record<string, SeasonParticipationTally>;
+} {
+  const attendanceByPlayerId: Record<string, SeasonAttendance> = {};
+  const participationByPlayerId: Record<string, SeasonParticipationTally> = {};
+  playerIds.forEach((id) => {
+    attendanceByPlayerId[id] = { present: 0, total: 0 };
+    participationByPlayerId[id] = emptyParticipationTally();
+  });
+  rows.forEach((row) => {
+    if (!attendanceByPlayerId[row.player_id]) return;
+    const stat = { present: row.present_count, total: row.total_count };
+    if (row.kind === "training") attendanceByPlayerId[row.player_id] = stat;
+    else if (row.kind === "official" || row.kind === "friendly" || row.kind === "tournament" || row.kind === "other") {
+      participationByPlayerId[row.player_id][row.kind] = stat;
+    }
+  });
+  return { attendanceByPlayerId, participationByPlayerId };
+}

@@ -1,11 +1,28 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { sortTeamsByGroup } from "@/lib/teams";
+import { useEffect, useMemo, useState } from "react";
+import { Users } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { getCurrentSeasonWindow } from "@/lib/season";
+import { sortTeamsByGroup, teamLabel } from "@/lib/teams";
+import SelectDropdown from "./select-dropdown";
 import TeamSelectorPills from "./team-selector-pills";
 import { ParticipationTable, VolunteerTable } from "./season-bilan-tables";
-import { computeSeasonParticipation } from "./season-bilan";
-import type { SeasonGuestVolunteer, SeasonVolunteerTally } from "./season-bilan";
+import { seasonParticipationFromRows } from "./season-bilan";
+import type {
+  SeasonAttendance,
+  SeasonGuestVolunteer,
+  SeasonParticipationRow,
+  SeasonParticipationTally,
+  SeasonVolunteerTally,
+} from "./season-bilan";
+
+type TeamParticipation =
+  | {
+      attendanceByPlayerId: Record<string, SeasonAttendance>;
+      participationByPlayerId: Record<string, SeasonParticipationTally>;
+    }
+  | "error";
 import type { RosterPlayer } from "./team-manager";
 import type { AdminUpcomingEvent } from "./page";
 
@@ -70,6 +87,36 @@ export default function SeasonBilanPanel({
   const visibleTeams =
     sortedTeams.length > 1 ? teams.filter((t) => t.team.id === activeTeamIdResolved) : teams;
 
+  // Participation sur la SAISON (retour de Cindy du 13/11) : calculée en
+  // base (season_participation), une requête par équipe affichée, gardée
+  // en mémoire par équipe. `events`/`rsvpStatusByKey` changent à chaque
+  // rafraîchissement temps réel (router.refresh) : on recalcule alors,
+  // pour qu'un "présent" saisi ailleurs se voie ici aussi.
+  const supabase = useMemo(() => createClient(), []);
+  const [participationByTeamId, setParticipationByTeamId] = useState<Record<string, TeamParticipation>>({});
+  // Clés texte plutôt que l'objet équipe : `teams` est reconstruit à chaque
+  // rendu du parent, ce qui relancerait la requête pour rien.
+  const activeTeamKey = visibleTeams[0]?.team.id ?? "";
+  const activeRosterKey = visibleTeams[0]?.roster.map((p) => p.id).join(",") ?? "";
+  useEffect(() => {
+    if (shownTab !== "joueurs" || !activeTeamKey) return;
+    const teamId = activeTeamKey;
+    const playerIds = activeRosterKey ? activeRosterKey.split(",") : [];
+    let stale = false;
+    supabase
+      .rpc("season_participation", { p_team_ids: [teamId], p_from: getCurrentSeasonWindow().startIso })
+      .then(({ data, error }) => {
+        if (stale) return;
+        setParticipationByTeamId((prev) => ({
+          ...prev,
+          [teamId]: error ? "error" : seasonParticipationFromRows((data ?? []) as SeasonParticipationRow[], playerIds),
+        }));
+      });
+    return () => {
+      stale = true;
+    };
+  }, [shownTab, activeTeamKey, activeRosterKey, supabase, events, rsvpStatusByKey]);
+
   if (teams.length === 0) {
     return (
       <p className="text-sm text-zinc-500">
@@ -117,37 +164,60 @@ export default function SeasonBilanPanel({
         </div>
       )}
 
-      <TeamSelectorPills teams={sortedTeams} activeId={activeTeamIdResolved} onSelect={setActiveTeamId} />
+      {/* Téléphone (retour de Cindy du 13/11) : un menu plutôt que 4-5
+          lignes de pastilles avant d'arriver au tableau. */}
+      {sortedTeams.length > 1 && (
+        <div className="md:hidden">
+          <SelectDropdown
+            icon={Users}
+            options={sortedTeams.map((t) => ({ value: t.id, label: teamLabel(t) }))}
+            value={activeTeamIdResolved ?? ""}
+            onChange={setActiveTeamId}
+          />
+        </div>
+      )}
+      <div className="hidden md:block">
+        <TeamSelectorPills teams={sortedTeams} activeId={activeTeamIdResolved} onSelect={setActiveTeamId} />
+      </div>
 
       <p className="text-xs text-zinc-500">
         {shownTab === "joueurs"
-          ? "Présence aux entraînements et participation aux matchs/tournois depuis le début de la saison. Cliquez sur une colonne pour trier — par défaut, la présence aux entraînements la plus forte apparaît en premier."
+          ? "Depuis le début de la saison. Une absence de réponse compte comme une absence."
           : "Bénévolat depuis le début de la saison, classé du plus au moins actif."}
       </p>
 
       <div className="flex flex-col gap-4">
         {visibleTeams.map(({ team, roster }) => {
-          const playerIds = roster.map((p) => p.id);
-          const { attendanceByPlayerId, participationByPlayerId } = computeSeasonParticipation(
-            events,
-            (eventId, playerId) => rsvpStatusByKey[`${eventId}:${playerId}`],
-            playerIds,
-            [team.id]
-          );
+          const participation = participationByTeamId[team.id];
           return (
             <div key={team.id} className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm sm:p-5">
-              <p className="mb-3 text-sm font-semibold text-zinc-900">
+              <p className="mb-1 text-sm font-semibold text-zinc-900">
                 {team.name ?? "Équipe"}
                 {team.category && team.category !== team.name && (
                   <span className="text-xs font-medium text-zinc-400"> · {team.category}</span>
                 )}
               </p>
               {shownTab === "joueurs" ? (
-                <ParticipationTable
-                  roster={roster}
-                  attendanceByPlayerId={attendanceByPlayerId}
-                  tallyByPlayerId={participationByPlayerId}
-                />
+                participation === undefined ? (
+                  <p className="py-6 text-center text-sm text-zinc-400">Calcul en cours…</p>
+                ) : participation === "error" ? (
+                  <p className="py-6 text-center text-sm text-red-600">
+                    Le bilan n&apos;a pas pu être calculé. Rechargez la page pour réessayer.
+                  </p>
+                ) : (
+                  <>
+                    <TeamParticipationSummary
+                      roster={roster.map((p) => p.id)}
+                      attendanceByPlayerId={participation.attendanceByPlayerId}
+                      participationByPlayerId={participation.participationByPlayerId}
+                    />
+                    <ParticipationTable
+                      roster={roster}
+                      attendanceByPlayerId={participation.attendanceByPlayerId}
+                      tallyByPlayerId={participation.participationByPlayerId}
+                    />
+                  </>
+                )
               ) : (
                 <VolunteerTable
                   roster={roster}
@@ -160,5 +230,60 @@ export default function SeasonBilanPanel({
         })}
       </div>
     </div>
+  );
+}
+
+// Résumé de l'équipe en tête du tableau (retour de Cindy du 13/11) : nombre
+// d'entraînements et de matchs de la saison, et présence moyenne aux
+// entraînements (même règle que le tableau de bord : présents / effectif x
+// entraînements).
+function TeamParticipationSummary({
+  roster,
+  attendanceByPlayerId,
+  participationByPlayerId,
+}: {
+  roster: string[];
+  attendanceByPlayerId: Record<string, SeasonAttendance>;
+  participationByPlayerId: Record<string, SeasonParticipationTally>;
+}) {
+  let present = 0;
+  let expected = 0;
+  let trainings = 0;
+  const totals = { official: 0, friendly: 0, tournament: 0, other: 0 };
+  roster.forEach((id) => {
+    const a = attendanceByPlayerId[id];
+    if (a) {
+      present += a.present;
+      expected += a.total;
+      trainings = Math.max(trainings, a.total);
+    }
+    const t = participationByPlayerId[id];
+    if (t) {
+      (Object.keys(totals) as (keyof typeof totals)[]).forEach((k) => {
+        totals[k] = Math.max(totals[k], t[k].total);
+      });
+    }
+  });
+  const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : one}`;
+  const parts = [
+    plural(trainings, "entraînement", "entraînements"),
+    totals.official > 0 ? plural(totals.official, "match officiel", "matchs officiels") : null,
+    totals.friendly > 0 ? plural(totals.friendly, "amical", "amicaux") : null,
+    totals.tournament > 0 ? plural(totals.tournament, "tournoi", "tournois") : null,
+    totals.other > 0 ? plural(totals.other, "autre rendez-vous", "autres rendez-vous") : null,
+  ].filter(Boolean);
+  const rate = expected > 0 ? Math.round((present / expected) * 100) : null;
+  const rateColor =
+    rate === null ? "" : rate < 50 ? "text-red-600" : rate < 80 ? "text-amber-600" : "text-emerald-700";
+  return (
+    <p className="mb-3 text-xs text-zinc-500">
+      {parts.join(" · ")}
+      {rate !== null && (
+        <>
+          {" · "}
+          <span className={`font-semibold ${rateColor}`}>{rate} % de présence</span> aux entraînements
+        </>
+      )}
+    </p>
   );
 }
