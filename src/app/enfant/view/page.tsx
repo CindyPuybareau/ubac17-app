@@ -2,12 +2,12 @@ import { cookies } from "next/headers";
 import { createServiceClient } from "@/lib/supabase/service";
 import { CHILD_SESSION_COOKIE, verifyChildSession } from "@/lib/child-session";
 import { logQueryErrors } from "@/lib/query-errors";
-import { computePlayerYearStatus } from "@/lib/season";
+import { computePlayerYearStatus, getCurrentSeasonWindow } from "@/lib/season";
 import { teamOrClubWideFilter } from "@/app/dashboard/family-data";
 import { getClubOfficialMatches } from "@/lib/club-official-matches";
 import { getSpaceDashboardSummary } from "@/lib/space-dashboard";
 import { getActiveFeaturedHighlights } from "@/lib/featured-highlights";
-import { computeSeasonParticipation } from "@/app/dashboard/season-bilan";
+import { seasonParticipationFromRows, type SeasonParticipationRow } from "@/app/dashboard/season-bilan";
 import { getCachedTeams } from "@/lib/reference-cache";
 import { getSiblingTeamIds, splitTeamName } from "@/lib/teams";
 import ChildDashboard, {
@@ -106,6 +106,7 @@ export default async function ChildViewPage() {
     clubOfficialMatches,
     rawDashboardSummary,
     featuredHighlights,
+    seasonParticipationRes,
   ] = await Promise.all([
     teamIds.length > 0
       ? supabase.from("teams").select("id, name, category").in("id", teamIds)
@@ -190,6 +191,15 @@ export default async function ChildViewPage() {
     // façon la policy RLS "select all" (ouverte à tous), aucun souci de
     // visibilité.
     getActiveFeaturedHighlights(supabase),
+    // "Mes Présences" sur toute la saison (retour de Cindy du 13/11) :
+    // calculé en base (season_participation), en parallèle du reste.
+    teamIds.length > 0
+      ? supabase.rpc("season_participation", {
+          p_team_ids: teamIds,
+          p_from: getCurrentSeasonWindow().startIso,
+          p_player_ids: [playerId],
+        })
+      : Promise.resolve({ data: [] as SeasonParticipationRow[], error: null }),
   ]);
   // Retour de Cindy du 05/10 ("je souhaiterais de la lecture seule... cela
   // laisse croire qu'ils peuvent le faire") : neutralisation déjà en place
@@ -512,17 +522,12 @@ export default async function ChildViewPage() {
   // l'appli. events porte déjà teamId/targetTeamIds (camelCase) : reformaté
   // ici en event_type/start_time (snake_case) pour matcher la signature
   // partagée avec Bureau/Coach (AdminUpcomingEvent), sans requête de plus.
-  const { attendanceByPlayerId, participationByPlayerId } = computeSeasonParticipation(
-    events.map((e) => ({
-      id: e.id,
-      event_type: e.eventType,
-      start_time: e.startTime,
-      teamId: e.teamId,
-      targetTeamIds: e.targetTeamIds,
-    })),
-    (eventId, pid) => rsvpStatusByKey.get(`${eventId}:${pid}`),
-    [playerId],
-    teamIds
+  // Retour de Cindy du 13/11 : calcul fait en base sur la saison en cours
+  // (season_participation) -- l'ancien calcul en mémoire comptait tous les
+  // événements chargés, saisons passées et rendez-vous annulés compris.
+  const { attendanceByPlayerId, participationByPlayerId } = seasonParticipationFromRows(
+    ((seasonParticipationRes as { data: SeasonParticipationRow[] | null }).data ?? []),
+    [playerId]
   );
 
   const presence = {
