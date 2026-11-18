@@ -165,6 +165,7 @@ type ExistingPlayerRow = {
   player_charter_accepted: string | null;
   parent_charter_accepted: string | null;
   license_number: string | null;
+  archived_at: string | null;
 };
 
 // Même usage que ExistingPlayerRow ci-dessus, pour mergedCotisationFields
@@ -184,6 +185,11 @@ export default function ImportInscriptions() {
   const [rows, setRows] = useState<ParsedRow[] | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [existingById, setExistingById] = useState<Map<string, ExistingPlayerRow>>(new Map());
+  // Membres archivés retrouvés dans le fichier (retour de Cindy du 18/11,
+  // Alyssa LE MUEY : partie et remboursée, mais toujours dans le suivi du
+  // Bureau) : ils RESTENT archivés, sauf ceux cochés ici dans l'aperçu (un
+  // vrai retour au club). Avant, l'import les réactivait tous d'office.
+  const [reactivateIds, setReactivateIds] = useState<Set<string>>(new Set());
   const [duplicateCount, setDuplicateCount] = useState(0);
   // Coché par défaut (audit du 31/08) : applique les suggestions d'équipe
   // calculées ci-dessous à la confirmation de l'import — décochable pour
@@ -236,6 +242,20 @@ export default function ImportInscriptions() {
       headerRow.findIndex((h) => h.trim() === name);
     const findPrefix = (prefix: string) =>
       headerRow.findIndex((h) => h.startsWith(prefix));
+    // Fichier (13) du 18/11 (retour de Cindy) : la case d'en-tête "Prix à
+    // payer" est arrivée VIDE (juste un espace) -- sans ce repli, aucun
+    // tarif n'était lu (un nouveau membre arrivait sans tarif, un tarif
+    // corrigé par le Bureau n'était pas repris). Repli prudent : seulement
+    // la colonne JUSTE AVANT "Remise", et seulement si son titre est vide
+    // ou commence par "Prix" -- jamais une autre colonne au hasard.
+    const findPriceColumn = () => {
+      const byTitle = findPrefix("Prix à payer");
+      if (byTitle >= 0) return byTitle;
+      const remiseIndex = findPrefix("Remise\n");
+      if (remiseIndex <= 0) return -1;
+      const before = (headerRow[remiseIndex - 1] ?? "").trim();
+      return before === "" || before.toLowerCase().startsWith("prix") ? remiseIndex - 1 : -1;
+    };
     const findAny = (names: string[]) => {
       for (const name of names) {
         const i = findExact(name);
@@ -253,7 +273,7 @@ export default function ImportInscriptions() {
       categorie: findExact("Catégorie"),
       statutClub: findExact("Statut Club"),
       modePaiement: findExact("Mode Paiement"),
-      prix: findPrefix("Prix à payer\n"),
+      prix: findPriceColumn(),
       remise: findPrefix("Remise\n"),
       paiement: findPrefix("Paiement\n"),
       sexe: findExact("Sexe"),
@@ -439,7 +459,7 @@ export default function ImportInscriptions() {
     const { data: existingPlayers, error: existingError } = await supabase
       .from("players")
       .select(
-        "id, first_name, last_name, birth_date, category, pending_parent_email, sex, registration_email, registration_phone, address, postal_code, city, secondary_email, mother_phone, father_phone, other_phones, secondary_address, license_type, membership_type, fbi_status, medical_notes, other_notes, image_rights, player_charter_accepted, parent_charter_accepted, license_number"
+        "id, first_name, last_name, birth_date, category, pending_parent_email, sex, registration_email, registration_phone, address, postal_code, city, secondary_email, mother_phone, father_phone, other_phones, secondary_address, license_type, membership_type, fbi_status, medical_notes, other_notes, image_rights, player_charter_accepted, parent_charter_accepted, license_number, archived_at"
       );
 
     if (existingError) {
@@ -646,8 +666,9 @@ export default function ImportInscriptions() {
       }
     }
 
-    // Complète les champs vides avec le fichier (mergedPlayerFields), et
-    // un-archive le membre (il se réinscrit). .select("id") + vérification
+    // Complète les champs vides avec le fichier (mergedPlayerFields). Un
+    // membre archivé n'est réactivé que s'il a été coché dans l'aperçu
+    // (reactivateIds, retour de Cindy du 18/11) -- plus jamais d'office. .select("id") + vérification
     // du nombre de lignes (audit du 31/08) : RLS peut bloquer une écriture
     // sans erreur — sans ce contrôle, l'écran affichait "mis à jour" même
     // quand rien n'avait changé en base.
@@ -661,7 +682,10 @@ export default function ImportInscriptions() {
       toUpdate.map((r) => () =>
         supabase
           .from("players")
-          .update({ ...mergedPlayerFields(r), archived_at: null })
+          .update({
+            ...mergedPlayerFields(r),
+            ...(reactivateIds.has(r.id) ? { archived_at: null } : {}),
+          })
           .eq("id", r.id)
           .select("id")
       ),
@@ -942,6 +966,42 @@ export default function ImportInscriptions() {
                   </ul>
                 </details>
               )}
+              {(() => {
+                const archivedInFile = preview.toUpdate.filter((r) => existingById.get(r.id)?.archived_at);
+                if (archivedInFile.length === 0) return null;
+                return (
+                  <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5">
+                    <p className="text-xs font-semibold text-amber-800">
+                      {archivedInFile.length} membre{archivedInFile.length > 1 ? "s" : ""} archivé
+                      {archivedInFile.length > 1 ? "s" : ""} dans l&apos;appli {archivedInFile.length > 1 ? "sont" : "est"} dans
+                      le fichier : {archivedInFile.length > 1 ? "ils restent" : "il reste"} archivé
+                      {archivedInFile.length > 1 ? "s" : ""}. Cochez seulement un vrai retour au club.
+                    </p>
+                    <ul className="mt-1.5 flex flex-col gap-1">
+                      {archivedInFile.map((r) => (
+                        <li key={r.id}>
+                          <label className="flex items-center gap-2 text-xs text-zinc-700">
+                            <input
+                              type="checkbox"
+                              checked={reactivateIds.has(r.id)}
+                              onChange={() =>
+                                setReactivateIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(r.id)) next.delete(r.id);
+                                  else next.add(r.id);
+                                  return next;
+                                })
+                              }
+                              className="h-3.5 w-3.5 rounded border-zinc-300"
+                            />
+                            Réactiver {formatFirstName(r.firstName)} {r.lastName}
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })()}
               {preview.toUpdate.length > 0 && (
                 <details className="mt-2">
                   <summary className="cursor-pointer text-xs font-medium text-zinc-500 hover:text-zinc-700">
