@@ -213,45 +213,65 @@ export default function FamilyView({
   // le contentHeader habituel (juste au-dessus du contenu actif) sur les
   // autres onglets (Calendrier, Mes Équipes...). Toujours la même règle du
   // 22/08 : jamais de vue combinée, un seul enfant affiché à la fois.
+  // Retour de Cindy du 18/11 ("plusieurs enfants, que ce soit simple") :
+  // un grand onglet par enfant -- photo, prénom, et son ou ses équipes juste
+  // en dessous (plus d'étiquette "MES ENFANTS" ni d'encadré jaune des
+  // équipes séparé). L'onglet choisi est en bleu marine.
+  const childTeamLabel = (playerId: string) =>
+    Array.from(
+      new Set(
+        sortTeamsByGroup(
+          teamCards.filter((c) => c.playerId === playerId).map((c) => ({ ...c, name: c.teamName }))
+        ).map((c) => c.teamName ?? "")
+      )
+    )
+      .filter(Boolean)
+      .join(" · ");
   const childSelector = hasSeveralChildren ? (
-    <div className="flex flex-col items-start gap-2">
-      <span className="inline-flex w-fit items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ubac-yellow/15 px-3 py-1 text-xs font-semibold uppercase leading-none text-ubac-yellow-dark">
-        <Users className="h-3.5 w-3.5 shrink-0" />
-        {rsvpPlayers.length > 1 ? "Mes enfants" : "Enfant"}
-      </span>
-      <div className="flex flex-wrap items-center gap-2">
-        {rsvpPlayers.map((p) => {
-          const isActive = resolvedSelectedPlayerId === p.id;
-          const color = avatarColor(p.id);
-          return (
-            <button
-              key={p.id}
-              onClick={() => setSelectedPlayerId(p.id)}
-              className={`flex items-center gap-2 rounded-full border py-1 pl-1 pr-3 text-sm font-medium transition-colors ${
-                isActive
-                  ? "border-navy/30 bg-navy/10 ring-2 ring-navy/20"
-                  : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
-              }`}
-            >
-              {p.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={p.avatarUrl}
-                  alt=""
-                  className="h-6 w-6 shrink-0 rounded-full object-cover"
-                />
-              ) : (
-                <span
-                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${color}`}
-                >
-                  {p.name.charAt(0).toUpperCase()}
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] gap-2">
+      {rsvpPlayers.map((p) => {
+        const isActive = resolvedSelectedPlayerId === p.id;
+        const color = avatarColor(p.id);
+        const teams = childTeamLabel(p.id);
+        return (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => setSelectedPlayerId(p.id)}
+            aria-pressed={isActive}
+            className={`flex min-w-0 items-center gap-2.5 rounded-2xl border px-3 py-2 text-left transition-colors ${
+              isActive
+                ? "border-navy bg-navy text-white shadow-sm"
+                : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
+            }`}
+          >
+            {p.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={p.avatarUrl}
+                alt=""
+                className={`h-9 w-9 shrink-0 rounded-full object-cover ${isActive ? "ring-2 ring-white/70" : ""}`}
+              />
+            ) : (
+              <span
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${color} ${
+                  isActive ? "ring-2 ring-white/70" : ""
+                }`}
+              >
+                {p.name.charAt(0).toUpperCase()}
+              </span>
+            )}
+            <span className="flex min-w-0 flex-col leading-tight">
+              <span className="truncate text-sm font-semibold">{p.name}</span>
+              {teams && (
+                <span className={`truncate text-[11px] font-medium ${isActive ? "text-white/75" : "text-zinc-500"}`}>
+                  {teams}
                 </span>
               )}
-              <span className={isActive ? "font-semibold text-navy" : ""}>{p.name}</span>
-            </button>
-          );
-        })}
-      </div>
+            </span>
+          </button>
+        );
+      })}
     </div>
   ) : null;
   const visiblePlayers = useMemo(
