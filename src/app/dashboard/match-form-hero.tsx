@@ -94,7 +94,10 @@ export default function MatchFormHero({
           {form.length > 0 && (
             <div>
               <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
-                Forme du moment <span className="font-medium normal-case tracking-normal">· le plus récent à gauche</span>
+                {/* Retour de Cindy du 13/11 ("le plus récent à gauche, on ne
+                    comprend pas") : titre explicite, et "Dernier" écrit
+                    au-dessus de la pastille du match le plus récent. */}
+                {form.length > 1 ? `${form.length} derniers matchs` : "Dernier match"}
               </p>
               <div className="flex gap-2">
                 {form.map((r, i) => {
@@ -112,6 +115,13 @@ export default function MatchFormHero({
                       title={`${r.title ?? "Match"} · ${date} · ${r.teamScore}-${r.opponentScore}`}
                       className="flex min-w-0 flex-1 flex-col items-center gap-1"
                     >
+                      <span
+                        className={`text-[9px] font-bold uppercase leading-none tracking-wide ${
+                          i === 0 ? "text-navy" : "invisible"
+                        }`}
+                      >
+                        Dernier
+                      </span>
                       <span
                         className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-white shadow-sm ${color} ${
                           i === 0 ? "ring-2 ring-navy/30 ring-offset-2" : ""
