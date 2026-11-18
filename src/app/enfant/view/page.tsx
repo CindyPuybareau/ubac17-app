@@ -63,7 +63,7 @@ export default async function ChildViewPage() {
   const [playerRes, ownTeamLinksRes, penaliteRes] = await Promise.all([
     supabase
       .from("players")
-      .select("id, first_name, category, notifications_enabled, avatar_url")
+      .select("id, first_name, category, notifications_enabled, avatar_url, archived_at")
       .eq("id", playerId)
       .maybeSingle(),
     supabase.from("team_players").select("team_id").eq("player_id", playerId),
@@ -84,6 +84,17 @@ export default async function ChildViewPage() {
       <div className="flex flex-1 flex-col items-center justify-center bg-zinc-50 px-4 py-16 text-center">
         <p className="text-sm text-zinc-500">
           Profil introuvable. Redemande le lien à un parent et réessaie.
+        </p>
+      </div>
+    );
+  }
+
+  // Membre archivé = accès suspendu (retour de Cindy du 18/11).
+  if (player.archived_at) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center bg-zinc-50 px-4 py-16 text-center">
+        <p className="text-sm text-zinc-500">
+          Ton accès est suspendu. Pour toute question, demande à un parent de contacter le club.
         </p>
       </div>
     );
