@@ -37,6 +37,13 @@ export default function SectionLinkCard({
     // intercepter ces cas (même logique que next/link en interne).
     if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     e.preventDefault();
+    // Filtre à transmettre à la section d'arrivée (retour de Cindy du 18/11 :
+    // "Reste à encaisser" ouvre Cotisations déjà filtrée sur "En attente") :
+    // l'adresse est mise à jour AVANT d'afficher la section, pour que celle-ci
+    // lise ?statut= en s'ouvrant. Sans paramètre de ce genre, rien ne change.
+    if (new URL(href, window.location.href).searchParams.has("statut")) {
+      window.history.replaceState(null, "", href);
+    }
     requestSection(sectionKey);
   }
 

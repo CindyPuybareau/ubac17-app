@@ -16,6 +16,7 @@ import { formatPersonName } from "@/lib/names";
 import { KPI_GRID_CLASSES } from "./kpi-grid-classes";
 import { formatLocalDateFr } from "@/lib/local-date";
 import { balanceDue, computeStatus } from "./cotisation-shared";
+import { getCurrentSeasonLabel } from "@/lib/season";
 import AnimatedNumber from "./animated-number";
 import DeferredCalendar from "./deferred-calendar";
 import SectionLinkCard from "./section-link-card";
@@ -232,7 +233,17 @@ export function BureauKpiGrid({
   // Même périmètre que l'onglet Cotisations & Licences (KpiHeader) : les
   // stages/événements/boutique (collecteId non nul) ont leur propre suivi
   // dans l'onglet Collectes, pas la peine de les mélanger ici.
-  const seasonCotisations = cotisations.filter((c) => !c.collecteId);
+  // Retour de Cindy du 18/11 ("le montant en attente, je me demande à quoi
+  // il correspond") : même périmètre EXACT que la page Cotisations -- saison
+  // en cours seulement, et jamais un membre archivé (11 départs gonflaient
+  // le total de 1 505 € : 25 cotisations / 3 230 € affichées ici contre
+  // 14 / 1 725 € sur la page Cotisations). Les lignes des membres archivés
+  // restent en base, elles ne sont simplement plus comptées.
+  const currentSeason = getCurrentSeasonLabel();
+  const archivedPlayerIds = new Set(members.filter((m) => m.archivedAt).map((m) => m.id));
+  const seasonCotisations = cotisations.filter(
+    (c) => !c.collecteId && c.saison === currentSeason && !(c.playerId && archivedPlayerIds.has(c.playerId))
+  );
   const pending = seasonCotisations.filter((c) => {
     const status = computeStatus(c);
     return status === "EN_ATTENTE" || status === "PARTIEL";
@@ -298,7 +309,7 @@ export function BureauKpiGrid({
         value={pending.length}
         kind="integer"
         label="Cotisations en attente"
-        href="/dashboard?tab=admin&section=cotisations-licences"
+        href="/dashboard?tab=admin&section=cotisations-licences&statut=EN_ATTENTE"
         sectionKey="cotisations-licences"
         cornerBadge={pending.length > 0 && <RelanceRedirectButton />}
       />
@@ -308,8 +319,8 @@ export function BureauKpiGrid({
         iconBgClass="bg-amber-500/10"
         value={pendingAmount}
         kind="amount"
-        label="Montant en attente"
-        href="/dashboard?tab=admin&section=cotisations-licences"
+        label={`Reste à encaisser ${currentSeason}`}
+        href="/dashboard?tab=admin&section=cotisations-licences&statut=EN_ATTENTE"
         sectionKey="cotisations-licences"
       />
       {/* Retour de Cindy du 25/10 ("ajouter Total évènements payants
