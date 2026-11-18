@@ -162,15 +162,22 @@ function AidLine({
   onDelete?: () => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-      <span className="text-xs font-semibold text-zinc-800">{AID_KIND_LABEL[aid.kind]}</span>
-      {aid.code && <span className="font-mono text-xs text-zinc-600">{aid.code}</span>}
-      {aid.amount != null && <span className="text-xs font-semibold tabular-nums text-zinc-800">{formatAmount(aid.amount)}</span>}
-      <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${AID_STATUS_CLASS[aid.status]}`}>
-        {AID_STATUS_LABEL[aid.status]}
-        {aid.batch ? ` · lot ${aid.batch}` : ""}
-      </span>
-      <span className="ml-auto flex flex-wrap items-center gap-1.5">
+    // Même mise en page sur chaque carte (retour de Cindy du 18/11, "le
+    // responsive est à revoir") : à gauche le type, le code et le statut
+    // dessous ; à droite le bouton, centré verticalement.
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex min-w-0 flex-col gap-1">
+        <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs">
+          <span className="font-semibold text-zinc-800">{AID_KIND_LABEL[aid.kind]}</span>
+          {aid.code && <span className="break-all font-mono text-zinc-600">{aid.code}</span>}
+          {aid.amount != null && <span className="font-semibold tabular-nums text-zinc-800">{formatAmount(aid.amount)}</span>}
+        </p>
+        <span className={`w-fit rounded-full px-2 py-0.5 text-[11px] font-semibold ${AID_STATUS_CLASS[aid.status]}`}>
+          {AID_STATUS_LABEL[aid.status]}
+          {aid.batch ? ` · lot ${aid.batch}` : ""}
+        </span>
+      </div>
+      <span className="flex shrink-0 items-center gap-1">
         {aid.status === "A_DECLARER" && (
           <DeclareAidButton aid={aid} busy={busy} onDeclare={(batch) => actions.setAidStatus(aid, "DECLAREE", batch)} />
         )}
@@ -207,9 +214,14 @@ function RefundLine({
   onDelete?: () => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-      <span className="text-xs font-semibold tabular-nums text-zinc-800">{formatAmount(refund.amount)}</span>
-      {refund.reason && <span className="text-xs text-zinc-600">{refund.reason}</span>}
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex min-w-0 flex-col gap-1">
+      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs">
+        <span className="font-semibold text-zinc-800">Remboursement</span>
+        <span className="font-semibold tabular-nums text-zinc-800">{formatAmount(refund.amount)}</span>
+        {refund.reason && <span className="text-zinc-600">{refund.reason}</span>}
+      </p>
+      <div className="flex flex-wrap items-center gap-1.5">
       <span
         className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
           refund.status === "FAIT" ? "bg-court-green/15 text-court-green" : "bg-coral/15 text-coral-dark"
@@ -230,7 +242,9 @@ function RefundLine({
           {refund.ribReceived ? "RIB reçu" : "RIB attendu"}
         </button>
       )}
-      <span className="ml-auto flex items-center gap-1.5">
+      </div>
+      </div>
+      <span className="flex shrink-0 items-center gap-1">
         {refund.status === "A_FAIRE" && (
           <button
             type="button"
@@ -279,7 +293,9 @@ function CollapsiblePanel({
         </span>
         {open ? <ChevronUp className="h-4 w-4 shrink-0 text-zinc-500" /> : <ChevronDown className="h-4 w-4 shrink-0 text-zinc-500" />}
       </button>
-      {open && <div className="flex flex-col gap-2 border-t border-zinc-100 px-3 pb-3 pt-3">{children}</div>}
+      {open && (
+        <div className="grid gap-2 border-t border-zinc-100 px-3 pb-3 pt-3 sm:grid-cols-2 xl:grid-cols-3">{children}</div>
+      )}
     </div>
   );
 }
@@ -371,7 +387,7 @@ export function FollowUpPanels({
               </div>
             ))}
           {received > 0 && (
-            <p className="px-1 text-[11px] text-zinc-500">
+            <p className="col-span-full px-1 text-[11px] text-zinc-500">
               Les aides reçues restent visibles dans la fiche de chaque personne.
             </p>
           )}
@@ -398,7 +414,7 @@ export function FollowUpPanels({
               </div>
             ))}
           {refundItems.length > refundsToDo.length && (
-            <p className="px-1 text-[11px] text-zinc-500">
+            <p className="col-span-full px-1 text-[11px] text-zinc-500">
               {refundItems.length - refundsToDo.length} remboursement{refundItems.length - refundsToDo.length > 1 ? "s" : ""} déjà fait
               {refundItems.length - refundsToDo.length > 1 ? "s" : ""}, visible{refundItems.length - refundsToDo.length > 1 ? "s" : ""} dans la fiche de chaque personne.
             </p>
@@ -458,17 +474,13 @@ export function FollowUpEditor({ cotisation: c }: { cotisation: AdminCotisation 
           />
         ))}
         {refunds.map((refund) => (
-          <div key={refund.id} className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-zinc-500">Remb.</span>
-            <div className="min-w-0 flex-1">
-              <RefundLine
-                refund={refund}
-                busy={actions.busyId === refund.id}
-                actions={actions}
-                onDelete={() => setToDelete({ kind: "refund", id: refund.id, label: `remboursement de ${formatAmount(refund.amount)}` })}
-              />
-            </div>
-          </div>
+          <RefundLine
+            key={refund.id}
+            refund={refund}
+            busy={actions.busyId === refund.id}
+            actions={actions}
+            onDelete={() => setToDelete({ kind: "refund", id: refund.id, label: `remboursement de ${formatAmount(refund.amount)}` })}
+          />
         ))}
         {aids.length === 0 && refunds.length === 0 && adding === null && (
           <p className="text-xs text-zinc-400">Aucune aide ni aucun remboursement.</p>
