@@ -10,6 +10,7 @@ import {
   FileText,
   Lightbulb,
   Mail,
+  MessageCircle,
   MoreVertical,
   Paperclip,
   Pencil,
@@ -21,6 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { categoryTheme } from "./team-card";
 import { runBatched } from "@/lib/batch";
 import { getLogoBase64, PDF_COLORS } from "@/lib/pdf-brand";
@@ -429,9 +431,21 @@ function isIOS() {
 // zone via #receipt-print-area (voir le <style> dans ce même rendu),
 // jamais besoin de quitter la page.
 
+// Don via HelloAsso (retour de Cindy du 18/11, "des fois les gens versent
+// plus, c'est une sorte de don") : ce qui dépasse le prix moins la remise
+// sur une cotisation payée -- affiché "dont X € de don" plutôt qu'un
+// montant qui semble faux. Jamais pour une cotisation offerte.
+function donationOf(c: AdminCotisation) {
+  if (computeStatus(c) === "OFFERT") return 0;
+  const dueAmount = Math.max(0, (c.prix ?? 0) - (c.remise ?? 0));
+  if (dueAmount <= 0) return 0;
+  return Math.max(0, roundCents((c.paiement ?? 0) - dueAmount));
+}
+
 export default function CotisationParticipantsTable({
   cotisations,
   contactEmailByPlayerId,
+  contactPhoneByPlayerId = {},
   emptyLabel = "Aucune cotisation.",
   statusFilter: controlledStatusFilter,
   onStatusFilterChange,
@@ -441,6 +455,9 @@ export default function CotisationParticipantsTable({
 }: {
   cotisations: AdminCotisation[];
   contactEmailByPlayerId: Record<string, string>;
+  // Téléphone du membre (retour de Cindy du 18/11) : bouton WhatsApp de
+  // relance en un appui sur chaque ligne à encaisser.
+  contactPhoneByPlayerId?: Record<string, string>;
   emptyLabel?: string;
   // Retour de Cindy du 14/09 ("cartes KPI cliquables, réutilise le filtre
   // existant") : le filtre de statut peut être piloté depuis le parent
@@ -1623,6 +1640,20 @@ export default function CotisationParticipantsTable({
           tôt pour une tablette (ex. iPad portrait, ~768-820px), qui
           héritait donc du tableau complet. "lg" (1024px) laisse la carte
           jusqu'à l'écran de bureau. */}
+      {/* "Relancer les N" (retour de Cindy du 18/11) : sur "À encaisser",
+          un seul bouton pour préparer la relance par e-mail de toutes les
+          personnes affichées (même aperçu que "Relancer la sélection"). */}
+      {statusFilter === "EN_ATTENTE" && filtered.length > 0 && (
+        <button
+          type="button"
+          onClick={() => openRelancePreview(filtered.map((c) => c.id))}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-coral/40 bg-coral/10 px-4 py-2.5 text-sm font-semibold text-coral-dark transition-colors hover:bg-coral/15 sm:w-fit"
+        >
+          <Mail className="h-4 w-4 shrink-0" />
+          Relancer {filtered.length > 1 ? `les ${filtered.length} personnes` : "cette personne"} par e-mail
+        </button>
+      )}
+
       <div className="hidden w-full overflow-x-auto rounded-2xl border border-l-4 border-zinc-100 border-l-ubac-yellow bg-white lg:block">
         <table className="w-full table-auto border-collapse text-sm">
           <thead>
@@ -1704,7 +1735,14 @@ export default function CotisationParticipantsTable({
                   </td>
                   <td className="whitespace-nowrap px-3 py-3 text-zinc-600">{formatAmount(c.prix)}</td>
                   <td className="whitespace-nowrap px-3 py-3 text-zinc-600">{formatAmount(c.remise)}</td>
-                  <td className="whitespace-nowrap px-3 py-3 text-zinc-600">{formatAmount(c.paiement)}</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-zinc-600">
+                    {formatAmount(c.paiement)}
+                    {donationOf(c) > 0 && (
+                      <span className="block text-[11px] font-medium text-court-green">
+                        dont {formatAmount(donationOf(c))} de don
+                      </span>
+                    )}
+                  </td>
                   <td className="whitespace-nowrap px-3 py-3 font-semibold text-zinc-900">
                     {formatAmount(balanceDue(c))}
                   </td>
@@ -1810,6 +1848,41 @@ export default function CotisationParticipantsTable({
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                  {/* Relance en un appui (retour de Cindy du 18/11) : WhatsApp
+                      (si un téléphone est connu) et e-mail, seulement pour
+                      une ligne qui reste à payer. */}
+                  {balance > 0 && (() => {
+                    const phone = c.playerId ? contactPhoneByPlayerId[c.playerId] : undefined;
+                    const whatsapp = phone
+                      ? buildWhatsAppLink(
+                          phone,
+                          `Bonjour, petit rappel de l'UBAC : la cotisation ${c.saison} de ${cotisationFirstName(c)} (${formatAmount(balance)}) reste à régler. Merci beaucoup !`
+                        )
+                      : null;
+                    return (
+                      <>
+                        {whatsapp && (
+                          <a
+                            href={whatsapp}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Relancer par WhatsApp"
+                            className="flex h-8 w-8 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700"
+                          >
+                            <MessageCircle className="h-4 w-4" />
+                          </a>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => openRelancePreview([c.id])}
+                          title="Relancer par e-mail"
+                          className="flex h-8 w-8 items-center justify-center rounded-full border border-navy/20 bg-navy/5 text-navy"
+                        >
+                          <Mail className="h-4 w-4" />
+                        </button>
+                      </>
+                    );
+                  })()}
                   <span className="flex flex-col items-end leading-tight">
                     {balance > 0 ? (
                       <>
@@ -1821,7 +1894,9 @@ export default function CotisationParticipantsTable({
                     ) : (
                       <>
                         <span className="text-sm font-semibold tabular-nums text-zinc-700">{formatAmount(c.paiement)}</span>
-                        <span className="text-[10px] font-medium text-zinc-400">réglé</span>
+                        <span className="text-[10px] font-medium text-zinc-400">
+                          {donationOf(c) > 0 ? `réglé · dont ${formatAmount(donationOf(c))} de don` : "réglé"}
+                        </span>
                       </>
                     )}
                   </span>
