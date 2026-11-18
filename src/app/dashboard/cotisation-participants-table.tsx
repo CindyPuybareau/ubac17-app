@@ -1751,13 +1751,28 @@ export default function CotisationParticipantsTable({
           </label>
         )}
         {filtered.map((c) => {
-          const status = statusBadge[computeStatus(c)];
+          const statusKey = computeStatus(c);
+          const status = statusBadge[statusKey];
           const contactEmail = (c.playerId ? contactEmailByPlayerId[c.playerId] : undefined) ?? null;
+          const balance = balanceDue(c);
+          // Retour de Cindy du 18/11 : une ligne courte par personne -- nom,
+          // équipe, statut, et à droite ce qui compte (reste à payer, ou ce
+          // qui a été réglé). Le détail (tarif, remise, payé, mode) s'ouvre
+          // d'un appui, dans le suivi de paiement. Bande de gauche à la
+          // couleur du statut (plus de bande jaune sans signification).
+          const accent =
+            statusKey === "PAYE"
+              ? "border-l-court-green"
+              : statusKey === "OFFERT"
+                ? "border-l-navy"
+                : statusKey === "PARTIEL"
+                  ? "border-l-parquet-dark"
+                  : "border-l-coral";
           return (
             <div
               key={c.id}
               onClick={() => openPayment([c.id])}
-              className="rounded-2xl border border-l-4 border-zinc-100 border-l-ubac-yellow bg-white p-3.5 shadow-sm"
+              className={`rounded-2xl border border-l-4 border-zinc-100 bg-white px-3 py-2.5 shadow-sm ${accent}`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex min-w-0 items-start gap-2">
@@ -1794,26 +1809,24 @@ export default function CotisationParticipantsTable({
                     </div>
                   </div>
                 </div>
-                <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
-                  {renderRowMenu(c, contactEmail)}
+                <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                  <span className="flex flex-col items-end leading-tight">
+                    {balance > 0 ? (
+                      <>
+                        <span className="text-sm font-bold tabular-nums text-coral-dark">{formatAmount(balance)}</span>
+                        <span className="text-[10px] font-medium text-zinc-400">à payer</span>
+                      </>
+                    ) : statusKey === "OFFERT" ? (
+                      <span className="text-xs font-semibold text-zinc-400">—</span>
+                    ) : (
+                      <>
+                        <span className="text-sm font-semibold tabular-nums text-zinc-700">{formatAmount(c.paiement)}</span>
+                        <span className="text-[10px] font-medium text-zinc-400">réglé</span>
+                      </>
+                    )}
+                  </span>
+                  <div className="relative">{renderRowMenu(c, contactEmail)}</div>
                 </div>
-              </div>
-
-              <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 border-t border-zinc-50 pt-2 text-xs text-zinc-600">
-                <span>
-                  Tarif <span className="font-semibold text-zinc-800">{formatAmount(c.prix)}</span>
-                </span>
-                <span>
-                  Remise <span className="font-semibold text-zinc-800">{formatAmount(c.remise)}</span>
-                </span>
-                <span>
-                  Payé <span className="font-semibold text-zinc-800">{formatAmount(c.paiement)}</span>
-                </span>
-                <span>
-                  Solde{" "}
-                  <span className="font-semibold text-zinc-900">{formatAmount(balanceDue(c))}</span>
-                </span>
-                <span className="col-span-2">Mode {c.mode_paiement ?? "—"}</span>
               </div>
             </div>
           );
