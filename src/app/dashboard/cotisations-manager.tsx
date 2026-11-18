@@ -33,6 +33,7 @@ import { formatPersonName } from "@/lib/names";
 import AnimatedNumber from "./animated-number";
 import CategoryTariffsEditor from "./category-tariffs-editor";
 import ConfirmDialog from "./confirm-dialog";
+import CotisationChecks from "./cotisation-checks";
 import CotisationParticipantsTable, {
   computeStatus,
   formatAmount,
@@ -1557,6 +1558,12 @@ export default function CotisationsManager({
             }
             statusFilter={mainStatusFilter}
             onStatusFilterChange={setMainStatusFilter}
+            renderAbove={(openCotisation) => (
+              <CotisationChecks
+                cotisations={seasonCotisations.filter((c) => c.saison === currentSeasonLabel)}
+                onOpen={openCotisation}
+              />
+            )}
           />
         </div>
       )}

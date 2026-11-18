@@ -422,6 +422,10 @@ export type AdminCotisation = {
   // garder visible même à 0 € sans RSVP "Présent" (visibleCollecteCotisations,
   // cotisations-manager.tsx), le trigger lui-même ne la supprime jamais.
   addedManually: boolean;
+  // Liste "À vérifier" de la page Cotisations (retour de Cindy du 18/11) :
+  // date à laquelle le Bureau a indiqué "C'est normal" -- null tant que
+  // personne n'a regardé (cotisation-checks.tsx).
+  verifieeLe?: string | null;
 };
 
 // Transforme une ligne brute de "cotisations" (avec ses jointures players/
@@ -442,6 +446,7 @@ function mapCotisationRow(
     collecte_id: string | null;
     created_at: string | null;
     added_manually: boolean;
+    verifiee_le?: string | null;
     players: unknown;
     collectes: unknown;
   },
@@ -481,6 +486,7 @@ function mapCotisationRow(
     isGuest: c.player_id === null,
     createdAt: c.created_at,
     addedManually: c.added_manually,
+    verifieeLe: c.verifiee_le ?? null,
     payments: paymentsByCotisationId.get(c.id) ?? [],
     membershipType: player?.membership_type ?? null,
     fbiStatus: player?.fbi_status ?? null,
@@ -1957,7 +1963,7 @@ export default async function DashboardPage({
               // ailleurs dans ce même lot (playersRes/teamPlayersRes/
               // teamsRes) : réunis en mémoire juste avant adminCotisations
               // plus bas, jamais réévalués via un embed imbriqué.
-              "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, guest_name, collecte_id, created_at, added_manually, collectes(id, name, type)"
+              "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, guest_name, collecte_id, created_at, added_manually, verifiee_le, collectes(id, name, type)"
             )
             .order("saison", { ascending: false })
             // Retour de l'audit du 08/10 : aucune limite sur cette requête,
@@ -4477,7 +4483,7 @@ export default async function DashboardPage({
               // part ci-dessous (cotisationPlayerFieldsRes/
               // cotisationPlayerTeamsRes), jamais réévalués via un embed
               // imbriqué.
-              "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, guest_name, collecte_id, created_at, added_manually, collectes(id, name, type)"
+              "id, saison, prix, remise, paiement, statut, mode_paiement, player_id, guest_name, collecte_id, created_at, added_manually, verifiee_le, collectes(id, name, type)"
             )
             .in("player_id", familyPlayerIds)
             .order("saison", { ascending: false })
