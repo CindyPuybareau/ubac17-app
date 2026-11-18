@@ -44,6 +44,10 @@ import {
   RELANCE_TEMPLATES,
   type RelanceTemplateKey,
   type StatusKey,
+  cotisationModeTags,
+  paymentModeExtra,
+  PAYMENT_MODE_TAGS,
+  OTHER_PAYMENT_MODE,
 } from "./cotisation-shared";
 import type { AdminCotisation, CotisationPayment } from "./page";
 import ConfirmDialog from "./confirm-dialog";
@@ -442,6 +446,30 @@ function donationOf(c: AdminCotisation) {
   return Math.max(0, roundCents((c.paiement ?? 0) - dueAmount));
 }
 
+// Modes de paiement en pastilles (retour de Cindy du 18/11) : les modes
+// reconnus, puis le texte d'origine en petit seulement quand il précise
+// quelque chose de plus (banque, "@Bettina", montant HelloAsso...).
+function PaymentModeChips({ cotisation, align = "start" }: { cotisation: AdminCotisation; align?: "start" | "end" }) {
+  const tags = cotisationModeTags(cotisation);
+  if (tags.length === 0) return <span className="text-zinc-400">—</span>;
+  const extra = paymentModeExtra(cotisation.mode_paiement);
+  return (
+    <div className={`flex flex-col gap-1 ${align === "end" ? "items-end text-right" : "items-start"}`}>
+      <div className={`flex flex-wrap gap-1 ${align === "end" ? "justify-end" : ""}`}>
+        {tags.map((t) => (
+          <span
+            key={t}
+            className="inline-flex items-center whitespace-nowrap rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold leading-none text-zinc-700"
+          >
+            {t}
+          </span>
+        ))}
+      </div>
+      {extra && <span className="text-[11px] leading-snug text-zinc-400">{extra}</span>}
+    </div>
+  );
+}
+
 export default function CotisationParticipantsTable({
   cotisations,
   contactEmailByPlayerId,
@@ -681,13 +709,19 @@ export default function CotisationParticipantsTable({
   // Retour du comptable du 25/10 : options du filtre mode -- un seul passage
   // sur localRows, recalculé seulement quand la liste change (pas à chaque
   // frappe de recherche).
-  const availableModes = useMemo(
-    () =>
-      Array.from(new Set(localRows.map((c) => c.mode_paiement).filter((m): m is string => Boolean(m)))).sort(
-        (a, b) => a.localeCompare(b, "fr")
-      ),
+  // Retour de Cindy du 18/11 : les modes RECONNUS (cotisationModeTags),
+  // plus les 34 écritures du fichier importé -- "Pass Sport / ANCV" regroupe
+  // enfin "HelloAsso + CS", "Espèces + PS"... avec le nombre de lignes.
+  const modeTagsById = useMemo(
+    () => new Map(localRows.map((c) => [c.id, cotisationModeTags(c)])),
     [localRows]
   );
+  const availableModes = useMemo(() => {
+    const counts = new Map<string, number>();
+    modeTagsById.forEach((tags) => tags.forEach((t) => counts.set(t, (counts.get(t) ?? 0) + 1)));
+    const order = [...PAYMENT_MODE_TAGS.map((m) => m.label as string), OTHER_PAYMENT_MODE];
+    return order.filter((label) => counts.has(label)).map((label) => ({ label, count: counts.get(label) ?? 0 }));
+  }, [modeTagsById]);
 
   const filtered = useMemo(() => {
     let list = localRows;
@@ -695,7 +729,7 @@ export default function CotisationParticipantsTable({
       list = list.filter((c) => computeStatus(c) === statusFilter);
     }
     if (modeFilter !== "ALL") {
-      list = list.filter((c) => c.mode_paiement === modeFilter);
+      list = list.filter((c) => (modeTagsById.get(c.id) ?? []).includes(modeFilter));
     }
     const q = search.trim().toLowerCase();
     if (q) {
@@ -706,7 +740,7 @@ export default function CotisationParticipantsTable({
       const cmp = key(a).localeCompare(key(b), "fr");
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [localRows, statusFilter, modeFilter, search, sortKey, sortDir]);
+  }, [localRows, statusFilter, modeFilter, modeTagsById, search, sortKey, sortDir]);
 
   // Retour du comptable du 25/10 ("un total du montant et du nombre de
   // lignes, qui tient compte du filtre appliqué") : recalculé à partir de
@@ -1583,7 +1617,7 @@ export default function CotisationParticipantsTable({
             <SelectDropdown
               options={[
                 { value: "ALL", label: "Tous les modes" },
-                ...availableModes.map((m) => ({ value: m, label: m })),
+                ...availableModes.map((m) => ({ value: m.label, label: `${m.label} (${m.count})` })),
               ]}
               value={modeFilter}
               onChange={setModeFilter}
@@ -1753,8 +1787,8 @@ export default function CotisationParticipantsTable({
                   <td className="whitespace-nowrap px-3 py-3 font-semibold text-zinc-900">
                     {formatAmount(balanceDue(c))}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-3 text-zinc-600">
-                    {c.mode_paiement ?? "—"}
+                  <td className="px-3 py-3 text-zinc-600">
+                    <PaymentModeChips cotisation={c} />
                   </td>
                   <td className="whitespace-nowrap px-3 py-3">
                     <span className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold leading-none ${status.className}`}>
@@ -1949,6 +1983,12 @@ export default function CotisationParticipantsTable({
                       <span>Tarif</span>
                       <span className="font-semibold text-zinc-800">{formatAmount(c.prix)}</span>
                     </div>
+                    {cotisationModeTags(c).length > 0 && (
+                      <div className="flex items-start justify-between gap-3">
+                        <span>Mode</span>
+                        <PaymentModeChips cotisation={c} align="end" />
+                      </div>
+                    )}
                     <div className="flex items-center justify-between">
                       <span>Remise</span>
                       <span className="flex items-center gap-1.5">
