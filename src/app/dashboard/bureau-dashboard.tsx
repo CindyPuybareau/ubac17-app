@@ -319,7 +319,7 @@ export function BureauKpiGrid({
         iconBgClass="bg-amber-500/10"
         value={pendingAmount}
         kind="amount"
-        label={`Reste à encaisser ${currentSeason}`}
+        label="Reste à encaisser"
         href="/dashboard?tab=admin&section=cotisations-licences&statut=EN_ATTENTE"
         sectionKey="cotisations-licences"
       />
