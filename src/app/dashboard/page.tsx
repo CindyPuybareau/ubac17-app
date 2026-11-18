@@ -101,6 +101,11 @@ export type AdminMemberTeam = {
   id: string;
   name: string | null;
   category: string | null;
+  // Équipes démo (is_demo) : elles ont un sort_order, donc restent dans
+  // canonicalTeamRefs (le Bureau y range les membres démo), mais ne
+  // comptent pas comme une catégorie à tarifer (retour de Cindy du 18/11,
+  // "16 tarifs définis sur 17 catégories" -- la 17e était "Démo").
+  isDemo?: boolean;
 };
 
 export type AdminPenalite = {
@@ -2447,7 +2452,7 @@ export default async function DashboardPage({
     allProfilesForAdmin = profilesRes.data ?? [];
     canonicalTeamRefs = (teamsRes.data ?? [])
       .filter((t) => t.sort_order !== null)
-      .map((t) => ({ id: t.id, name: t.name, category: t.category }));
+      .map((t) => ({ id: t.id, name: t.name, category: t.category, isDemo: Boolean(t.is_demo) }));
 
     (parentPlayerRes.data ?? []).forEach((pp) => {
       const phone = phoneByProfileId.get(pp.parent_id);

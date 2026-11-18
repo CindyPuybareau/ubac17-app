@@ -1523,7 +1523,10 @@ export default function CotisationsManager({
           {/* L'interrupteur des relances automatiques vit désormais dans
               l'onglet Accueil, avec les autres envois automatiques du
               club — un seul panneau de contrôle plutôt qu'un par onglet. */}
-          <CategoryTariffsEditor categories={canonicalTeamRefs} tariffs={categoryTariffs} />
+          <CategoryTariffsEditor
+            categories={canonicalTeamRefs.filter((t) => !t.isDemo)}
+            tariffs={categoryTariffs}
+          />
           {membersMissingCotisation.length > 0 && (
             <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
