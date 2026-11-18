@@ -99,6 +99,7 @@ type PlayerRow = {
   category: string | null;
   profile_id: string | null;
   avatar_url: string | null;
+  archived_at?: string | null;
 };
 
 type Person = { id: string; first_name: string | null; last_name: string | null };
@@ -1222,7 +1223,7 @@ export default async function DashboardPage({
       () =>
         supabase
           .from("parent_player")
-          .select("players(id, first_name, last_name, category, profile_id, avatar_url)")
+          .select("players(id, first_name, last_name, category, profile_id, avatar_url, archived_at)")
           .eq("parent_id", user.id),
       // This user's own player row, if any (players.profile_id = user.id) —
       // reused below both to also surface teams where THEY are only a
@@ -1246,7 +1247,7 @@ export default async function DashboardPage({
       () =>
         supabase
           .from("players")
-          .select("id, first_name, last_name, category, profile_id, avatar_url, team_players(team_id)")
+          .select("id, first_name, last_name, category, profile_id, avatar_url, archived_at, team_players(team_id)")
           .eq("profile_id", user.id)
           .maybeSingle(),
       ],
@@ -1472,15 +1473,25 @@ export default async function DashboardPage({
   // ce lien parent_player erroné -- toujours exclue ici, quelle que soit la
   // donnée côté parent_player : une fiche dont le profile_id est le sien
   // est TOUJOURS "Mon équipe", jamais "Mes enfants".
-  const childPlayerRows = (playerLinksResult.data ?? [])
+  const linkedChildRows = (playerLinksResult.data ?? [])
     .map((link) => link.players as unknown as PlayerRow | null)
     .filter((p): p is PlayerRow => Boolean(p))
     .filter((p) => p.profile_id !== user.id);
+  // Membre archivé = accès suspendu (retour de Cindy du 18/11, Alyssa LE
+  // MUEY partie et remboursée) : sa fiche disparaît de l'espace de ses
+  // parents et de son propre compte. Un parent dont TOUS les enfants sont
+  // archivés (et sans autre rôle) voit le message "accès suspendu" plus bas.
+  const childPlayerRows = linkedChildRows.filter((p) => !p.archived_at);
   // Un adulte inscrit lui-même (Séniors, Loisirs...) n'apparaît dans
   // aucune ligne parent_player : sans ce merge, il n'a ni enfant ni
   // équipe coachée ni accès Bureau, donc zéro onglet — voir le
   // commentaire sur ownPlayerRowResult plus haut.
-  const ownPlayerRow = ownPlayerRowResult.data as PlayerRow | null;
+  const ownPlayerRowRaw = ownPlayerRowResult.data as PlayerRow | null;
+  const ownPlayerRow = ownPlayerRowRaw?.archived_at ? null : ownPlayerRowRaw;
+  const onlyArchivedLinks =
+    childPlayerRows.length === 0 &&
+    !ownPlayerRow &&
+    (linkedChildRows.some((p) => p.archived_at) || Boolean(ownPlayerRowRaw?.archived_at));
   const playerRows =
     ownPlayerRow && !childPlayerRows.some((p) => p.id === ownPlayerRow.id)
       ? [...childPlayerRows, ownPlayerRow]
@@ -5730,7 +5741,23 @@ export default async function DashboardPage({
           bienveillant, pas un mur : explique la cause la plus probable et
           donne un contact direct plutôt qu'un simple "demande au Bureau"
           sans piste ni lien. */}
-      {tabs.length === 0 && (
+      {tabs.length === 0 && onlyArchivedLinks && (
+        <div className="rounded-2xl border border-zinc-100 bg-white p-5 text-sm text-zinc-600 shadow-sm">
+          <p className="font-semibold text-zinc-900">Ton accès est suspendu.</p>
+          <p className="mt-2">
+            La fiche liée à ce compte n&apos;est plus active au club. Pour toute question, contacte le
+            Bureau.
+          </p>
+          <a
+            href={`mailto:${EMAIL_REPLY_TO}?subject=${encodeURIComponent("Mon accès UBAC")}`}
+            className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-navy px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-navy-dark"
+          >
+            <Mail className="h-3.5 w-3.5 shrink-0" />
+            Contacter le Bureau
+          </a>
+        </div>
+      )}
+      {tabs.length === 0 && !onlyArchivedLinks && (
         <div className="rounded-2xl border border-zinc-100 bg-white p-5 text-sm text-zinc-600 shadow-sm">
           <p className="font-semibold text-zinc-900">
             Ton espace n&apos;est pas encore relié à ton compte.
