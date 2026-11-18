@@ -238,9 +238,13 @@ export function listTeamsForOfficialMatches<
 // rien" là-bas, ce qui donnerait ici de fausses sœurs). Une équipe sans
 // suffixe numéroté (rank 0, ex. "U13F" jouant directement sous son nom)
 // n'a par construction aucune sœur.
-export function getSiblingTeamIds<
-  T extends { id: string; name?: string | null; category?: string | null },
->(team: T, allTeams: T[]): string[] {
+// Pas de type générique : seuls id/name/category servent, et l'équipe
+// comme la liste peuvent être de formes différentes (TeamWithMembers
+// comparée à des AdminMemberTeam, par exemple).
+export function getSiblingTeamIds(
+  team: { id: string; name?: string | null; category?: string | null },
+  allTeams: readonly { id: string; name?: string | null; category?: string | null }[]
+): string[] {
   const label = team.name ?? team.category ?? "";
   const { rank } = splitTeamName(label);
   if (rank === 0) return [];

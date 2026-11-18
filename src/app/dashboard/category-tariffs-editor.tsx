@@ -90,6 +90,7 @@ export default function CategoryTariffsEditor({
   const definedCount = uniqueCategories.filter(
     (c) => (values[c] ?? "").trim() !== ""
   ).length;
+  const missingCategories = uniqueCategories.filter((c) => tariffByCategory.get(c) == null);
 
   function setValue(category: string, value: string) {
     setValues((v) => ({ ...v, [category]: value }));
@@ -139,6 +140,15 @@ export default function CategoryTariffsEditor({
               {definedCount} tarif{definedCount > 1 ? "s" : ""} défini
               {definedCount > 1 ? "s" : ""} sur {uniqueCategories.length} catégories
             </span>
+            {/* Retour de Cindy du 18/11 : la catégorie sans tarif nommée
+                tout de suite, sans déplier -- un membre affecté à une
+                catégorie sans tarif reçoit une cotisation à 0 €, donc
+                "Payé" sans aucun versement. */}
+            {missingCategories.length > 0 && (
+              <span className="text-xs font-semibold text-amber-700">
+                Sans tarif : {missingCategories.join(", ")}
+              </span>
+            )}
           </span>
         </span>
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-navy/15 bg-white text-navy">
