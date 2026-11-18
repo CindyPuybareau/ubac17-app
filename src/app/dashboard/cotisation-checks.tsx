@@ -11,7 +11,13 @@ import { useRouter } from "next/navigation";
 import { Check, ChevronDown, ChevronUp, ClipboardCheck, FileSearch } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { categoryTheme } from "./team-card";
-import { cotisationFirstName, cotisationLastName, formatAmount } from "./cotisation-shared";
+import {
+  UNSURE_SPORT_AID_MODE,
+  cotisationFirstName,
+  cotisationLastName,
+  cotisationModeTags,
+  formatAmount,
+} from "./cotisation-shared";
 import type { AdminCotisation } from "./page";
 
 const CENT = 0.009;
@@ -34,6 +40,12 @@ export function cotisationCheckReasons(c: AdminCotisation): string[] {
   // ligne en "Payé" sans aucun versement.
   if (c.statut !== "OFFERT" && remise > prix + CENT) {
     reasons.push(`Remise de ${formatAmount(remise)}, plus grande que le tarif (${formatAmount(prix)})`);
+  }
+  // Ancien choix combiné de la saisie (retour de Cindy du 18/11, Pass
+  // Sport et ANCV désormais séparés) : "Ouvrir" puis le crayon du
+  // règlement pour choisir le bon.
+  if (cotisationModeTags(c).includes(UNSURE_SPORT_AID_MODE)) {
+    reasons.push("Payé en « Pass Sport / ANCV » : préciser lequel des deux");
   }
   return reasons;
 }

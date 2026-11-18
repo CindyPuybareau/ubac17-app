@@ -46,8 +46,8 @@ import {
   type StatusKey,
   cotisationModeTags,
   paymentModeExtra,
-  PAYMENT_MODE_TAGS,
-  OTHER_PAYMENT_MODE,
+  PAYMENT_MODE_FILTER_ORDER,
+  UNSURE_SPORT_AID_MODE,
 } from "./cotisation-shared";
 import type { AdminCotisation, CotisationPayment } from "./page";
 import ConfirmDialog from "./confirm-dialog";
@@ -79,7 +79,11 @@ const statusBadge: Record<StatusKey, { label: string; className: string }> = {
 const paymentModes = [
   "Chèque",
   "Espèces",
-  "Pass Sport / ANCV",
+  // Séparés le 18/11 (retour de Cindy) -- l'ancien "Pass Sport / ANCV"
+  // reste lisible sur les règlements déjà saisis ("à préciser" dans le
+  // filtre, cotisation-shared.ts).
+  "Pass Sport",
+  "Coupon Sport ANCV",
   "TPE / CB (SumUp)",
   "HelloAsso",
   "Virement",
@@ -459,7 +463,9 @@ function PaymentModeChips({ cotisation, align = "start" }: { cotisation: AdminCo
         {tags.map((t) => (
           <span
             key={t}
-            className="inline-flex items-center whitespace-nowrap rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold leading-none text-zinc-700"
+            className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold leading-none ${
+              t === UNSURE_SPORT_AID_MODE ? "bg-amber-100 text-amber-800" : "bg-zinc-100 text-zinc-700"
+            }`}
           >
             {t}
           </span>
@@ -710,8 +716,8 @@ export default function CotisationParticipantsTable({
   // sur localRows, recalculé seulement quand la liste change (pas à chaque
   // frappe de recherche).
   // Retour de Cindy du 18/11 : les modes RECONNUS (cotisationModeTags),
-  // plus les 34 écritures du fichier importé -- "Pass Sport / ANCV" regroupe
-  // enfin "HelloAsso + CS", "Espèces + PS"... avec le nombre de lignes.
+  // plus les 34 écritures du fichier importé -- "Coupon Sport ANCV" regroupe
+  // enfin "HelloAsso + CS", "Chèque CIC + 2 CS"... avec le nombre de lignes.
   const modeTagsById = useMemo(
     () => new Map(localRows.map((c) => [c.id, cotisationModeTags(c)])),
     [localRows]
@@ -719,8 +725,7 @@ export default function CotisationParticipantsTable({
   const availableModes = useMemo(() => {
     const counts = new Map<string, number>();
     modeTagsById.forEach((tags) => tags.forEach((t) => counts.set(t, (counts.get(t) ?? 0) + 1)));
-    const order = [...PAYMENT_MODE_TAGS.map((m) => m.label as string), OTHER_PAYMENT_MODE];
-    return order.filter((label) => counts.has(label)).map((label) => ({ label, count: counts.get(label) ?? 0 }));
+    return PAYMENT_MODE_FILTER_ORDER.filter((label) => counts.has(label)).map((label) => ({ label, count: counts.get(label) ?? 0 }));
   }, [modeTagsById]);
 
   const filtered = useMemo(() => {
