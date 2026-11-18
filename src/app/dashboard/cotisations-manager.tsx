@@ -467,6 +467,13 @@ export default function CotisationsManager({
   const [showPendingOverview, setShowPendingOverview] = useState(false);
   const [pendingAutoSelect, setPendingAutoSelect] = useState(false);
 
+  const contactPhoneByPlayerId = useMemo(() => {
+    const map: Record<string, string> = {};
+    members.forEach((m) => {
+      if (m.phone) map[m.id] = m.phone;
+    });
+    return map;
+  }, [members]);
   const contactEmailByPlayerId = useMemo(() => {
     const map: Record<string, string> = {};
     members.forEach((m) => {
@@ -1505,6 +1512,7 @@ export default function CotisationsManager({
           <CotisationParticipantsTable
             cotisations={seasonCotisations}
             contactEmailByPlayerId={contactEmailByPlayerId}
+            contactPhoneByPlayerId={contactPhoneByPlayerId}
             emptyLabel={
               mainStatusFilter === "EN_ATTENTE"
                 ? "Rien à encaisser : tout le monde est à jour."
