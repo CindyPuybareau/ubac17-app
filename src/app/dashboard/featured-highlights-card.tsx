@@ -142,10 +142,16 @@ function SingleHighlightCard({
 }) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
+  // Jour de l'événement à l'heure de Paris (une soirée à 23 h UTC tombe
+  // déjà le lendemain en France) -- ?day= ouvre ce jour précis dans le
+  // calendrier (retour de Cindy du 18/11, "pas sur la bonne date").
+  const eventDay = highlight.eventStartTime
+    ? new Date(highlight.eventStartTime).toLocaleDateString("fr-CA", { timeZone: "Europe/Paris" })
+    : null;
   const href = highlight.linkUrl
     ? highlight.linkUrl
-    : highlight.eventId && highlight.eventStartTime
-      ? `?section=${calendarSectionKey}&month=${highlight.eventStartTime.slice(0, 7)}`
+    : highlight.eventId && eventDay
+      ? `?section=${calendarSectionKey}&month=${eventDay.slice(0, 7)}&day=${eventDay}`
       : null;
   const external = Boolean(highlight.linkUrl);
   const canEnlarge = !href && Boolean(highlight.imageUrl);

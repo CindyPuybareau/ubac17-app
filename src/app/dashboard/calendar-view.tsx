@@ -1074,7 +1074,35 @@ export default function CalendarView({
       ? new Date(Number(monthParam.slice(0, 4)), Number(monthParam.slice(5, 7)) - 1, 1)
       : today;
   const [viewMonth, setViewMonth] = useState<Date>(initialViewMonth);
-  const [selectedDate, setSelectedDate] = useState<Date>(today);
+  // ?day=YYYY-MM-DD (retour de Cindy du 18/11, "au clic sur l'affiche
+  // Noël, j'atterris sur décembre mais pas sur la bonne date") : un lien
+  // vers un événement précis (affiche "Événements à la une") ouvre
+  // directement ce jour-là dans la grille, puis fait défiler jusqu'au
+  // détail du jour.
+  const dayParam = searchParams.get("day");
+  const initialSelectedDate =
+    dayParam && /^\d{4}-\d{2}-\d{2}$/.test(dayParam)
+      ? new Date(Number(dayParam.slice(0, 4)), Number(dayParam.slice(5, 7)) - 1, Number(dayParam.slice(8, 10)))
+      : today;
+  const [selectedDate, setSelectedDate] = useState<Date>(initialSelectedDate);
+  // Calendrier déjà affiché quand le lien est suivi (simple changement
+  // d'adresse) : on se cale aussi sur le nouveau ?day= -- ajusté pendant le
+  // rendu (même schéma que rsvp-buttons.tsx), jamais dans un effet.
+  const [prevDayParam, setPrevDayParam] = useState(dayParam);
+  if (dayParam !== prevDayParam) {
+    setPrevDayParam(dayParam);
+    if (dayParam && /^\d{4}-\d{2}-\d{2}$/.test(dayParam)) {
+      setSelectedDate(initialSelectedDate);
+      setViewMonth(new Date(initialSelectedDate.getFullYear(), initialSelectedDate.getMonth(), 1));
+    }
+  }
+  useEffect(() => {
+    if (!dayParam) return;
+    const frame = requestAnimationFrame(() =>
+      document.getElementById("calendar-day-detail")?.scrollIntoView({ behavior: "smooth", block: "start" })
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [dayParam]);
   // Calendrier "fun" (retour de Cindy du 13/11) : sens du dernier changement
   // de mois (la grille glisse depuis la droite ou la gauche), heure du
   // téléphone pour la ligne "Maintenant" du jour (lue seulement après
