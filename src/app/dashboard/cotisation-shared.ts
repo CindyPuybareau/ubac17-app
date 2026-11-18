@@ -134,27 +134,49 @@ export function renderRelanceTemplate(text: string, c: AdminCotisation) {
 // LCL *2", "Espèces @Bettina", "Helloasso"...). On ne réécrit JAMAIS ces
 // textes en base (règle n°1) : on y reconnaît les modes connus, les mêmes
 // libellés que la liste de saisie de cotisation-participants-table.tsx, pour
-// les afficher en pastilles et filtrer correctement. CS (coupon sport ANCV)
-// et PS (Pass Sport) rejoignent "Pass Sport / ANCV", déjà regroupés ainsi
-// dans la saisie.
+// les afficher en pastilles et filtrer correctement.
+// Pass'Sport (PS) et Coupon Sport ANCV (CS) séparés (retour de Cindy du
+// 18/11, "je dirais séparé") : deux aides différentes, remboursées
+// différemment.
 export const PAYMENT_MODE_TAGS = [
   { label: "HelloAsso", pattern: /hello\s*asso/gi },
   { label: "Chèque", pattern: /ch[eè]ques?/gi },
   { label: "Espèces", pattern: /esp[eè]ces?/gi },
-  { label: "Pass Sport / ANCV", pattern: /pass'?\s*sport|ancv|\bps\b|\bcs\b|coupons?\s*sport/gi },
+  { label: "Pass Sport", pattern: /pass'?\s*sport|\bps\b/gi },
+  { label: "Coupon Sport ANCV", pattern: /ancv|\bcs\b|coupons?\s*sport/gi },
   { label: "TPE / CB (SumUp)", pattern: /\btpe\b|\bcb\b|sum\s*up|carte\s*bancaire/gi },
   { label: "Virement", pattern: /virements?/gi },
 ] as const;
 
+// L'ancien choix combiné "Pass Sport / ANCV" de la saisie (avant le 18/11) :
+// impossible de savoir lequel des deux -- signalé "à préciser" plutôt que
+// compté au hasard dans l'un ou l'autre.
+export const UNSURE_SPORT_AID_MODE = "Pass Sport ou ANCV ?";
+const UNSURE_SPORT_AID_PATTERN = /pass'?\s*sport\s*\/\s*ancv/gi;
+
 export const OTHER_PAYMENT_MODE = "Autre";
 
-// Modes reconnus dans UN texte, dans l'ordre de la liste ci-dessus ;
+export const PAYMENT_MODE_FILTER_ORDER: string[] = [
+  ...PAYMENT_MODE_TAGS.map((m) => m.label as string),
+  UNSURE_SPORT_AID_MODE,
+  OTHER_PAYMENT_MODE,
+];
+
+// Modes reconnus dans UN texte, dans l'ordre de PAYMENT_MODE_FILTER_ORDER ;
 // "Autre" si le texte n'est pas vide mais ne contient aucun mode connu.
 export function paymentModeTags(text: string | null | undefined): string[] {
-  const t = (text ?? "").trim();
-  if (!t) return [];
-  const tags = PAYMENT_MODE_TAGS.filter((m) => new RegExp(m.pattern.source, "i").test(t)).map((m) => m.label);
-  return tags.length > 0 ? tags : [OTHER_PAYMENT_MODE];
+  let rest = (text ?? "").trim();
+  if (!rest) return [];
+  const found = new Set<string>();
+  if (new RegExp(UNSURE_SPORT_AID_PATTERN.source, "i").test(rest)) {
+    found.add(UNSURE_SPORT_AID_MODE);
+    rest = rest.replace(new RegExp(UNSURE_SPORT_AID_PATTERN.source, "gi"), " ");
+  }
+  for (const m of PAYMENT_MODE_TAGS) {
+    if (new RegExp(m.pattern.source, "i").test(rest)) found.add(m.label);
+  }
+  if (found.size === 0) return [OTHER_PAYMENT_MODE];
+  return PAYMENT_MODE_FILTER_ORDER.filter((label) => found.has(label));
 }
 
 // Ce que le texte dit EN PLUS des modes reconnus (banque, n° de chèque,
@@ -163,6 +185,7 @@ export function paymentModeTags(text: string | null | undefined): string[] {
 export function paymentModeExtra(text: string | null | undefined): string {
   let rest = (text ?? "").trim();
   if (!rest) return "";
+  rest = rest.replace(new RegExp(UNSURE_SPORT_AID_PATTERN.source, "gi"), " ");
   for (const m of PAYMENT_MODE_TAGS) rest = rest.replace(new RegExp(m.pattern.source, "gi"), " ");
   rest = rest.replace(/^autre$/i, "").replace(/[+&,/]|\bet\b/gi, " ").replace(/\s+/g, " ").trim();
   return rest ? (text ?? "").trim() : "";
@@ -175,6 +198,5 @@ export function cotisationModeTags(c: AdminCotisation): string[] {
   for (const text of [c.mode_paiement, ...c.payments.map((p) => p.mode)]) {
     for (const tag of paymentModeTags(text)) found.add(tag);
   }
-  const order = [...PAYMENT_MODE_TAGS.map((m) => m.label as string), OTHER_PAYMENT_MODE];
-  return order.filter((label) => found.has(label));
+  return PAYMENT_MODE_FILTER_ORDER.filter((label) => found.has(label));
 }
