@@ -107,11 +107,6 @@ export type AdminMemberTeam = {
   id: string;
   name: string | null;
   category: string | null;
-  // Équipes démo (is_demo) : elles ont un sort_order, donc restent dans
-  // canonicalTeamRefs (le Bureau y range les membres démo), mais ne
-  // comptent pas comme une catégorie à tarifer (retour de Cindy du 18/11,
-  // "16 tarifs définis sur 17 catégories" -- la 17e était "Démo").
-  isDemo?: boolean;
 };
 
 export type AdminPenalite = {
@@ -1915,6 +1910,7 @@ export default async function DashboardPage({
     sort_order: number | null;
     pending_coach_names: string | null;
     trombinoscope_path?: string | null;
+    is_demo?: boolean | null;
   }[] = [];
   let adminTeamPlayersRaw: { team_id: string; player_id: string; position: string | null; is_burned: boolean }[] = [];
   let adminTeamCoachesRaw: { team_id: string; coach_id: string }[] = [];
@@ -2479,9 +2475,13 @@ export default async function DashboardPage({
         photoUrl: t.photo_url,
       }));
     allProfilesForAdmin = profilesRes.data ?? [];
+    // Équipes démo (retour de Cindy du 18/11, "tout ce qui concerne la démo,
+    // non visible") : elles ont un sort_order mais n'apparaissent nulle part
+    // côté Bureau (cases d'équipes de la fiche membre, filtres, tarifs...).
+    // Le compte démo lui-même n'est pas un compte Bureau.
     canonicalTeamRefs = (teamsRes.data ?? [])
-      .filter((t) => t.sort_order !== null)
-      .map((t) => ({ id: t.id, name: t.name, category: t.category, isDemo: Boolean(t.is_demo) }));
+      .filter((t) => t.sort_order !== null && !t.is_demo)
+      .map((t) => ({ id: t.id, name: t.name, category: t.category }));
 
     (parentPlayerRes.data ?? []).forEach((pp) => {
       const phone = phoneByProfileId.get(pp.parent_id);
@@ -3151,7 +3151,7 @@ export default async function DashboardPage({
     // coachSiblingTeamIds plus bas (même catalogue, mêmes exclusions).
     if (activeTab === "coach") {
       coachDashboardSummaryPromise = getCachedTeams().then((res) => {
-        const clubTeams = (res.data ?? []).filter((t) => t.sort_order !== null);
+        const clubTeams = (res.data ?? []).filter((t) => t.sort_order !== null && !t.is_demo);
         const siblings = Array.from(
           new Set(coachedTeams.flatMap((t) => getSiblingTeamIds(t, clubTeams)))
         ).filter((id) => !coachCalendarTeamIds.includes(id));
@@ -3290,13 +3290,15 @@ export default async function DashboardPage({
           bureauDataLoaded
             ? Promise.resolve({
                 data: adminTeamsRaw
-                  .filter((t) => t.sort_order !== null)
+                  .filter((t) => t.sort_order !== null && (!t.is_demo || coachCalendarTeamIds.includes(t.id)))
                   .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999)),
                 error: null,
               })
             : getCachedTeams().then((res) => ({
+                // Équipes démo (retour de Cindy du 18/11) : seulement pour le
+                // compte qui y est lui-même (le compte démo), jamais ailleurs.
                 data: (res.data ?? [])
-                  .filter((t) => t.sort_order !== null)
+                  .filter((t) => t.sort_order !== null && (!t.is_demo || coachCalendarTeamIds.includes(t.id)))
                   .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999)),
                 error: res.error,
               })),
@@ -4586,7 +4588,11 @@ export default async function DashboardPage({
       familyPenaliteRes,
     });
 
-    familyAllClubTeams = familyAllClubTeamsRes.data ?? [];
+    // Équipes démo (retour de Cindy du 18/11) : visibles seulement d'une
+    // famille dont un enfant y est (le compte démo), jamais des autres.
+    familyAllClubTeams = (familyAllClubTeamsRes.data ?? []).filter(
+      (t) => !t.is_demo || allTeamIds.includes(t.id)
+    );
     // Retour de Cindy du 30/09 ("équipes sœurs") : calculé ICI, une fois
     // familyAllClubTeamsRes déjà résolu par le lot ci-dessus (en mémoire,
     // aucun coût réseau) -- jamais avant le lot comme la première version

@@ -1233,7 +1233,7 @@ export default function CalendarView({
     const { data, error } = await supabase
       .from("events")
       .select(
-        "id, title, event_type, is_home, location, salle, away_venue_address, start_time, end_time, impact_time, ffbb_phase, series_id, notes, team_score, opponent_score, emarque_code, cancelled_at, cancelled_reason, team_id, teams(name)"
+        "id, title, event_type, is_home, location, salle, away_venue_address, start_time, end_time, impact_time, ffbb_phase, series_id, notes, team_score, opponent_score, emarque_code, cancelled_at, cancelled_reason, team_id, teams(name, is_demo)"
       )
       .eq("event_type", "MATCH")
       .gte("start_time", windowStart)
@@ -1244,8 +1244,14 @@ export default function CalendarView({
       setClubMatches([]);
       return;
     }
+    // Équipes démo (retour de Cindy du 18/11, "tout ce qui concerne la
+    // démo, non visible") : jamais dans "Tout le club". Le compte démo voit
+    // quand même les matchs de SON équipe démo, qui arrivent par son propre
+    // calendrier, pas par cette liste.
     setClubMatches(
-      (data ?? []).map((e) => {
+      (data ?? [])
+        .filter((e) => !(e.teams as unknown as { is_demo: boolean | null } | null)?.is_demo)
+        .map((e) => {
         const team = e.teams as unknown as { name: string | null } | null;
         return {
           id: e.id,
@@ -2098,7 +2104,7 @@ export default function CalendarView({
     const { start, end } = weekendWindow(new Date());
     createClient()
       .from("events")
-      .select("id, title, event_type, start_time, end_time, is_home, salle, location, away_venue_address, cancelled_at, teams(name)")
+      .select("id, title, event_type, start_time, end_time, is_home, salle, location, away_venue_address, cancelled_at, teams(name, is_demo)")
       .eq("event_type", "MATCH")
       .is("cancelled_at", null)
       .gte("start_time", start.toISOString())
@@ -2106,7 +2112,14 @@ export default function CalendarView({
       .then(({ data }) => {
         if (stale || !data) return;
         setClubWeekendEvents(
-          data.map((e) => {
+          // Jamais un match d'équipe démo (retour de Cindy du 18/11) -- même
+          // règle que "Tout le club" ci-dessus.
+          data
+            .filter((e) => {
+              const t = e.teams as unknown as { is_demo: boolean | null } | { is_demo: boolean | null }[] | null;
+              return !(Array.isArray(t) ? t[0]?.is_demo : t?.is_demo);
+            })
+            .map((e) => {
             const team = e.teams as unknown as { name: string | null } | { name: string | null }[] | null;
             return {
               id: e.id as string,
