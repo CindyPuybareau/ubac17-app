@@ -2579,6 +2579,9 @@ export default async function DashboardPage({
       let label: string | null;
       if (stored === "OFFERT") {
         label = "Offert";
+      } else if (stored === "PAYE_A_VERIFIER") {
+        // "Payé (-)" du Bureau (retour de Cindy du 18/11).
+        label = "Payé (écart à vérifier)";
       } else if (stored === null || stored === "PAYE" || stored === "EN_ATTENTE" || stored === "PARTIEL") {
         const dueAmount = Math.max(0, (row.prix ?? 0) - (row.remise ?? 0));
         const paid = row.paiement ?? 0;

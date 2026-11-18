@@ -69,6 +69,9 @@ function dateCellToISODate(d: Date): string {
 
 function normalizeStatut(raw: string | null): string | null {
   if (!raw) return null;
+  // "Payé (-)" (retour de Cindy du 18/11) : réglé selon le Bureau, avec un
+  // écart à vérifier -- voir PAID_TO_CHECK_STATUT (cotisation-shared.ts).
+  if (raw.includes("Payé") && raw.includes("(-)")) return "PAYE_A_VERIFIER";
   if (raw.includes("Payé")) return "PAYE";
   if (raw.toLowerCase().includes("attente")) return "EN_ATTENTE";
   if (raw.includes("Offerte")) return "OFFERT";

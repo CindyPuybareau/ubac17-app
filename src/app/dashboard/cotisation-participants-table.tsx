@@ -47,6 +47,8 @@ import {
   cotisationModeTags,
   paymentModeExtra,
   PAYMENT_MODE_FILTER_ORDER,
+  gapToCheck,
+  statutAfterAmounts,
   UNSURE_SPORT_AID_MODE,
 } from "./cotisation-shared";
 import type { AdminCotisation, CotisationPayment } from "./page";
@@ -709,7 +711,7 @@ export default function CotisationParticipantsTable({
       payments,
       paiement: total,
       mode_paiement: mostRecent?.mode ?? c.mode_paiement,
-      statut: c.statut === "OFFERT" ? c.statut : total >= due(c) ? "PAYE" : "EN_ATTENTE",
+      statut: statutAfterAmounts(c, total, due(c)),
     };
   }
 
@@ -838,7 +840,7 @@ export default function CotisationParticipantsTable({
         return;
       }
       const newPaid = roundCents((c.paiement ?? 0) + amount);
-      const newStatut = newPaid >= due(c) ? "PAYE" : "EN_ATTENTE";
+      const newStatut = statutAfterAmounts(c, newPaid, due(c));
       // .select("id") + vérification du nombre de lignes (audit du 31/08) :
       // RLS peut bloquer silencieusement cette écriture (0 ligne, pas
       // d'erreur) — le règlement serait déjà inséré dans l'historique mais
@@ -1015,7 +1017,7 @@ export default function CotisationParticipantsTable({
     const c = byId.get(remiseId);
     const paid = c?.paiement ?? 0;
     const newDue = Math.max(0, roundCents((c?.prix ?? 0) - amount));
-    const newStatut = paid >= newDue ? "PAYE" : "EN_ATTENTE";
+    const newStatut = statutAfterAmounts(c, paid, newDue);
     const { error, data } = await supabase
       .from("cotisations")
       .update({ remise: amount, statut: newStatut })
@@ -1048,7 +1050,7 @@ export default function CotisationParticipantsTable({
     const c = byId.get(id);
     const paid = c?.paiement ?? 0;
     const newDue = Math.max(0, roundCents(c?.prix ?? 0));
-    const newStatut = paid >= newDue ? "PAYE" : "EN_ATTENTE";
+    const newStatut = statutAfterAmounts(c, paid, newDue);
     const { error, data } = await supabase
       .from("cotisations")
       .update({ remise: 0, statut: newStatut })
@@ -1106,7 +1108,7 @@ export default function CotisationParticipantsTable({
     // Never silently clear a manual "Offert" override — it isn't an amount
     // concept, so a payment correction shouldn't be able to undo it.
     if (c?.statut !== "OFFERT") {
-      update.statut = total >= newDue ? "PAYE" : "EN_ATTENTE";
+      update.statut = statutAfterAmounts(c, total, newDue);
     }
     const { error: updateError, data: updateData } = await supabase
       .from("cotisations")
@@ -1807,6 +1809,11 @@ export default function CotisationParticipantsTable({
                   </td>
                   <td className="whitespace-nowrap px-3 py-3 font-semibold text-zinc-900">
                     {formatAmount(balanceDue(c))}
+                    {gapToCheck(c) > 0 && (
+                      <span className="block text-[11px] font-medium text-amber-700">
+                        écart {formatAmount(gapToCheck(c))} à vérifier
+                      </span>
+                    )}
                   </td>
                   <td className="px-3 py-3 text-zinc-600">
                     <PaymentModeChips cotisation={c} />
@@ -1902,7 +1909,13 @@ export default function CotisationParticipantsTable({
                         <>
                           <span className="text-sm font-semibold tabular-nums text-zinc-700">{formatAmount(c.paiement)}</span>
                           <span className="text-[10px] font-medium text-zinc-400">
-                            {donationOf(c) > 0 ? `réglé · dont ${formatAmount(donationOf(c))} de don` : "réglé"}
+                            {gapToCheck(c) > 0 ? (
+                              <span className="text-amber-700">réglé · écart {formatAmount(gapToCheck(c))} à vérifier</span>
+                            ) : donationOf(c) > 0 ? (
+                              `réglé · dont ${formatAmount(donationOf(c))} de don`
+                            ) : (
+                              "réglé"
+                            )}
                           </span>
                         </>
                       )}
@@ -2008,6 +2021,12 @@ export default function CotisationParticipantsTable({
                       <div className="flex items-start justify-between gap-3">
                         <span>Mode</span>
                         <PaymentModeChips cotisation={c} align="end" />
+                      </div>
+                    )}
+                    {gapToCheck(c) > 0 && (
+                      <div className="flex items-center justify-between text-amber-700">
+                        <span>Payé (-) selon le Bureau</span>
+                        <span className="font-semibold">écart {formatAmount(gapToCheck(c))} à vérifier</span>
                       </div>
                     )}
                     <div className="flex items-center justify-between">

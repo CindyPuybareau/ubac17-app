@@ -17,6 +17,7 @@ import {
   cotisationLastName,
   cotisationModeTags,
   formatAmount,
+  gapToCheck,
 } from "./cotisation-shared";
 import type { AdminCotisation } from "./page";
 
@@ -40,6 +41,12 @@ export function cotisationCheckReasons(c: AdminCotisation): string[] {
   // ligne en "Payé" sans aucun versement.
   if (c.statut !== "OFFERT" && remise > prix + CENT) {
     reasons.push(`Remise de ${formatAmount(remise)}, plus grande que le tarif (${formatAmount(prix)})`);
+  }
+  // "Payé (-)" du Bureau (retour de Cindy du 18/11, option A) : compté
+  // "Payé", mais l'écart reste à vérifier -- "C'est normal" une fois
+  // éclairci (assurance, frais, aide arrivée...).
+  if (gapToCheck(c) > 0) {
+    reasons.push(`Payé (-) selon le Bureau : écart de ${formatAmount(gapToCheck(c))} à vérifier`);
   }
   // Ancien choix combiné de la saisie (retour de Cindy du 18/11, Pass
   // Sport et ANCV désormais séparés) : "Ouvrir" puis le crayon du

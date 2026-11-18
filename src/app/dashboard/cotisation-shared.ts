@@ -19,8 +19,32 @@ export function due(c: AdminCotisation) {
   return Math.max(0, roundCents((c.prix ?? 0) - (c.remise ?? 0)));
 }
 
+// "Payé (-)" du fichier du Bureau (retour de Cindy du 18/11, option A) :
+// le Bureau considère la cotisation réglée, avec un écart qu'il garde "à
+// vérifier" (option d'assurance, frais, Pass Sport ou ANCV pas encore
+// arrivé...). L'appli respecte ce choix : "Payé", rien à encaisser, jamais
+// relancé -- l'écart reste affiché à part (gapToCheck).
+export const PAID_TO_CHECK_STATUT = "PAYE_A_VERIFIER";
+
 export function balanceDue(c: AdminCotisation) {
+  if (c.statut === PAID_TO_CHECK_STATUT) return 0;
   return Math.max(0, roundCents(due(c) - (c.paiement ?? 0)));
+}
+
+// Écart noté "à vérifier" par le Bureau (0 pour toute autre cotisation).
+export function gapToCheck(c: AdminCotisation) {
+  if (c.statut !== PAID_TO_CHECK_STATUT) return 0;
+  return Math.max(0, roundCents(due(c) - (c.paiement ?? 0)));
+}
+
+// Statut enregistré après un règlement ou une remise : "Offert" et
+// "Payé (-)" du Bureau ne sont jamais effacés par un simple recalcul de
+// montants -- seul un paiement complet fait passer "Payé (-)" à "Payé".
+export function statutAfterAmounts(c: AdminCotisation | undefined, paid: number, dueAmount: number) {
+  if (c?.statut === "OFFERT") return "OFFERT";
+  if (dueAmount <= 0 || paid >= dueAmount) return "PAYE";
+  if (c?.statut === PAID_TO_CHECK_STATUT) return PAID_TO_CHECK_STATUT;
+  return "EN_ATTENTE";
 }
 
 // Always derived live from the amounts — Payé (solde <= 0), Partiel (au
@@ -30,6 +54,7 @@ export function balanceDue(c: AdminCotisation) {
 // can never be derived and always wins regardless of what's been paid.
 export function computeStatus(c: AdminCotisation): StatusKey {
   if (c.statut === "OFFERT") return "OFFERT";
+  if (c.statut === PAID_TO_CHECK_STATUT) return "PAYE";
   const d = due(c);
   const paid = c.paiement ?? 0;
   if (d <= 0 || paid >= d) return "PAYE";
