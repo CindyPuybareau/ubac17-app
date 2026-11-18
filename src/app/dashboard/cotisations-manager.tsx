@@ -6,8 +6,6 @@ import {
   AlertTriangle,
   ArrowLeft,
   CalendarDays,
-  CheckCircle2,
-  Clock,
   ExternalLink,
   Folder,
   FolderInput,
@@ -16,17 +14,16 @@ import {
   Pencil,
   Plus,
   Search,
-  ShieldCheck,
   Tag,
   Target,
   Ticket,
   Trash2,
-  TrendingUp,
   Users,
   Wallet,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { ProgressRing } from "./attendance-hero";
 import { categoryTheme } from "./team-card";
 import { useScrollTopOnChange } from "@/lib/use-scroll-top-on-change";
 import { formatPersonName } from "@/lib/names";
@@ -38,7 +35,7 @@ import CotisationParticipantsTable, {
   formatAmount,
   roundCents,
 } from "./cotisation-participants-table";
-import type { StatusKey } from "./cotisation-shared";
+import { balanceDue, type StatusKey } from "./cotisation-shared";
 import { getCurrentSeasonLabel } from "@/lib/season";
 import PenalitesManager from "./penalites-manager";
 import type {
@@ -260,104 +257,86 @@ function KpiCard({
   );
 }
 
-function KpiHeader({
+// Résumé de la page Cotisations (retour de Cindy du 18/11, "7 cases, ça fait
+// beaucoup, certaines disent la même chose") : un seul bandeau -- anneau du
+// % encaissé, montants encaissés / attendus, reste à encaisser -- puis des
+// pastilles qui servent de filtre : À encaisser · Payés · Offerts (+ Partiels
+// seulement s'il y en a) · Tous. Même bandeau bleu que la présence aux
+// entraînements (attendance-hero.tsx).
+function CotisationSummary({
   cotisations,
   statusFilter,
   onStatusFilterChange,
 }: {
   cotisations: AdminCotisation[];
-  // Retour de Cindy du 14/09 ("les cartes KPI cliquables appliquent le
-  // même filtre que le select existant") : optionnels -- le 2e usage de
-  // KpiHeader (détail d'une collecte, plus bas dans ce fichier) n'a pas de
-  // filtre partagé avec un tableau et garde ses cartes non cliquables,
-  // exactement comme avant.
-  statusFilter?: StatusKey | "ALL";
-  onStatusFilterChange?: (value: StatusKey | "ALL") => void;
+  statusFilter: StatusKey | "ALL";
+  onStatusFilterChange: (value: StatusKey | "ALL") => void;
 }) {
   const kpis = useMemo(() => computeKpis(cotisations), [cotisations]);
-
-  // Un clic sur la carte déjà active revient à "Tous les statuts" --
-  // même bascule que si on recliquait la même option dans le <select>.
-  const toggleFilter = (key: StatusKey) => {
-    onStatusFilterChange?.(statusFilter === key ? "ALL" : key);
-  };
-
-  // 7 cartes sur 2 / 3 / 4 colonnes maximum (retour de Cindy du 07/09,
-  // "sur tablette ça ne fonctionne pas, les chiffres débordent") : la
-  // grille montait jusqu'à 7 colonnes égales dès 1024px (lg), pile dans la
-  // plage des tablettes en paysage -- bien trop étroit pour un montant en
-  // euros. Plafonnée à 4 colonnes à partir de md, quelle que soit la
-  // largeur d'écran au-delà : "Total attendu" reste sur 2 colonnes à
-  // toutes les tailles (col-span-2 sans variante lg qui l'annulait), ce
-  // qui referme exactement la rangée à 4+4 sans case vide (4 cartes
-  // simples + 1 carte simple + 1 carte double = 4 puis 4).
+  const toCollect = useMemo(
+    () =>
+      roundCents(
+        cotisations.reduce((sum, c) => {
+          const s = computeStatus(c);
+          return s === "EN_ATTENTE" || s === "PARTIEL" ? sum + balanceDue(c) : sum;
+        }, 0)
+      ),
+    [cotisations]
+  );
+  const peopleToCollect = kpis.enAttenteCount + kpis.partielCount;
+  const chips: { key: StatusKey | "ALL"; label: string; count: number; activeClass: string }[] = [
+    { key: "EN_ATTENTE", label: "À encaisser", count: kpis.enAttenteCount, activeClass: "border-coral-dark bg-coral text-white" },
+    ...(kpis.partielCount > 0
+      ? [{ key: "PARTIEL" as const, label: "Partiels", count: kpis.partielCount, activeClass: "border-parquet-dark bg-parquet-dark text-white" }]
+      : []),
+    { key: "PAYE", label: "Payés", count: kpis.payeCount, activeClass: "border-court-green bg-court-green text-white" },
+    { key: "OFFERT", label: "Offerts", count: kpis.offertCount, activeClass: "border-navy bg-navy text-white" },
+    { key: "ALL", label: "Tous", count: kpis.total, activeClass: "border-zinc-700 bg-zinc-700 text-white" },
+  ];
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-      <KpiCard
-        icon={TrendingUp}
-        iconClass="text-navy"
-        value={kpis.percentage}
-        kind="percent"
-        label="Collecté"
-      />
-      <KpiCard
-        icon={CheckCircle2}
-        iconClass="text-court-green"
-        value={kpis.payeCount}
-        kind="integer"
-        label="Payés"
-        onClick={onStatusFilterChange ? () => toggleFilter("PAYE") : undefined}
-        active={statusFilter === "PAYE"}
-        activeClassName="border-court-green bg-court-green/10"
-      />
-      <KpiCard
-        icon={Clock}
-        iconClass="text-parquet-dark"
-        value={kpis.partielCount}
-        kind="integer"
-        label="Partiels"
-        onClick={onStatusFilterChange ? () => toggleFilter("PARTIEL") : undefined}
-        active={statusFilter === "PARTIEL"}
-        activeClassName="border-parquet-dark bg-parquet/15"
-      />
-      <KpiCard
-        icon={ShieldCheck}
-        iconClass="text-navy"
-        value={kpis.offertCount}
-        kind="integer"
-        label="Offerts"
-        onClick={onStatusFilterChange ? () => toggleFilter("OFFERT") : undefined}
-        active={statusFilter === "OFFERT"}
-        activeClassName="border-navy bg-navy/10"
-      />
-      <KpiCard
-        icon={AlertTriangle}
-        iconClass="text-coral-dark"
-        value={kpis.enAttenteCount}
-        kind="integer"
-        label="En attente"
-        onClick={onStatusFilterChange ? () => toggleFilter("EN_ATTENTE") : undefined}
-        active={statusFilter === "EN_ATTENTE"}
-        activeClassName="border-coral-dark bg-coral/15"
-      />
-      <KpiCard
-        icon={Wallet}
-        iconClass="text-amber-700"
-        value={kpis.totalCollected}
-        kind="amount"
-        label="Total collecté"
-      />
-      <KpiCard
-        icon={Target}
-        iconClass="text-indigo-600"
-        value={kpis.totalDue}
-        kind="amount"
-        label="Total attendu"
-        wide
-      />
+    <div className="overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm">
+      <div className="flex items-center gap-4 bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-4">
+        <ProgressRing rate={kpis.total > 0 ? kpis.percentage : null} />
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-ubac-yellow">Encaissé</p>
+          <p className="mt-0.5 text-sm font-medium text-white/90">
+            <span className="font-bold text-white">{formatAmount(kpis.totalCollected)}</span> sur{" "}
+            {formatAmount(kpis.totalDue)}
+          </p>
+          {peopleToCollect > 0 ? (
+            <span className="mt-1.5 inline-flex rounded-full bg-coral/25 px-2 py-0.5 text-[11px] font-semibold text-white">
+              Reste {formatAmount(toCollect)} · {peopleToCollect} personne{peopleToCollect > 1 ? "s" : ""}
+            </span>
+          ) : (
+            <span className="mt-1.5 inline-flex rounded-full bg-emerald-400/20 px-2 py-0.5 text-[11px] font-semibold text-emerald-200">
+              Tout le monde est à jour
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2 p-3">
+        {chips.map((chip) => {
+          const active = statusFilter === chip.key;
+          return (
+            <button
+              key={chip.key}
+              type="button"
+              onClick={() => onStatusFilterChange(chip.key)}
+              aria-pressed={active}
+              className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold leading-none transition-colors ${
+                active ? chip.activeClass : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
+              }`}
+            >
+              {chip.label}
+              <span className={`tabular-nums ${active ? "opacity-90" : "text-zinc-400"}`}>{chip.count}</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
+
 
 type CotisationsTab = "cotisations" | "collectes" | "penalites";
 
@@ -413,7 +392,9 @@ export default function CotisationsManager({
   const [mainStatusFilter, setMainStatusFilter] = useState<StatusKey | "ALL">(
     statutParam === "EN_ATTENTE" || statutParam === "PARTIEL" || statutParam === "PAYE" || statutParam === "OFFERT"
       ? statutParam
-      : "ALL"
+      : // Ouverture sur "À encaisser" (retour de Cindy du 18/11) : les
+        // personnes à relancer d'abord, tout le monde reste à un appui.
+        "EN_ATTENTE"
   );
   const [error, setError] = useState<string | null>(null);
 
@@ -1516,7 +1497,7 @@ export default function CotisationsManager({
               </p>
             </div>
           )}
-          <KpiHeader
+          <CotisationSummary
             cotisations={seasonCotisations}
             statusFilter={mainStatusFilter}
             onStatusFilterChange={setMainStatusFilter}
@@ -1524,7 +1505,11 @@ export default function CotisationsManager({
           <CotisationParticipantsTable
             cotisations={seasonCotisations}
             contactEmailByPlayerId={contactEmailByPlayerId}
-            emptyLabel="Aucune cotisation pour la saison en cours."
+            emptyLabel={
+              mainStatusFilter === "EN_ATTENTE"
+                ? "Rien à encaisser : tout le monde est à jour."
+                : "Aucune cotisation pour la saison en cours."
+            }
             statusFilter={mainStatusFilter}
             onStatusFilterChange={setMainStatusFilter}
           />
