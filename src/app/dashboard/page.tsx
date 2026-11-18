@@ -2553,11 +2553,29 @@ export default async function DashboardPage({
     // cotisationsRes is ordered by saison desc, so the first row seen per
     // player is their most recent season's club status. Skip collecte-linked
     // rows (stage/event/boutique) — those aren't the season membership.
+    // Retour de Cindy du 18/11 : "Statut Club" de la fiche membre calculé à
+    // partir des montants, comme sur la page Cotisations (computeStatus) --
+    // la valeur enregistrée au départ n'était jamais mise à jour (2 membres
+    // tout payé affichaient encore "EN_ATTENTE"). "Offert" et les statuts
+    // écrits à la main (ex. "Ne souhaite plus s'engager") sont gardés tels
+    // quels ; libellés lisibles plutôt que les codes internes.
     const clubStatusByPlayerId = new Map<string, string | null>();
     (cotisationsRes.data ?? []).forEach((c) => {
       const playerId = (c as { player_id: string | null }).player_id;
       if (!playerId || c.collecte_id || clubStatusByPlayerId.has(playerId)) return;
-      clubStatusByPlayerId.set(playerId, c.statut);
+      const row = c as { statut: string | null; prix: number | null; remise: number | null; paiement: number | null };
+      const stored = row.statut;
+      let label: string | null;
+      if (stored === "OFFERT") {
+        label = "Offert";
+      } else if (stored === null || stored === "PAYE" || stored === "EN_ATTENTE" || stored === "PARTIEL") {
+        const dueAmount = Math.max(0, (row.prix ?? 0) - (row.remise ?? 0));
+        const paid = row.paiement ?? 0;
+        label = dueAmount <= 0 || paid >= dueAmount ? "Payé" : paid > 0 ? "Partiel" : "En attente";
+      } else {
+        label = stored;
+      }
+      clubStatusByPlayerId.set(playerId, label);
     });
 
     adminMembers = (playersRes.data ?? [])

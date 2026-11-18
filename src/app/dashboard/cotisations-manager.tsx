@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -405,7 +405,16 @@ export default function CotisationsManager({
   // même état -- uniquement pour l'onglet principal "Cotisations et
   // licences" ; le détail d'une collecte (plus bas) garde son propre
   // filtre interne, non concerné par cette demande.
-  const [mainStatusFilter, setMainStatusFilter] = useState<StatusKey | "ALL">("ALL");
+  // ?statut=EN_ATTENTE (retour de Cindy du 18/11) : les cartes "Cotisations
+  // en attente" / "Reste à encaisser" du tableau de bord ouvrent cette page
+  // déjà filtrée sur les cotisations à encaisser.
+  const searchParams = useSearchParams();
+  const statutParam = searchParams.get("statut");
+  const [mainStatusFilter, setMainStatusFilter] = useState<StatusKey | "ALL">(
+    statutParam === "EN_ATTENTE" || statutParam === "PARTIEL" || statutParam === "PAYE" || statutParam === "OFFERT"
+      ? statutParam
+      : "ALL"
+  );
   const [error, setError] = useState<string | null>(null);
 
   const [addingParticipants, setAddingParticipants] = useState(false);
