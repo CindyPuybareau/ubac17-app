@@ -3513,6 +3513,22 @@ export default function CalendarView({
           <WeekendStrip matches={weekendMatches} variant="club" />
         ))}
 
+      {/* Retour de Cindy du 18/11 ("le mois sous le bouton Créer un
+          événement, Liste/Mois à droite du mois, de beaux espaces aérés et
+          logiques") : l'action principale seule sur sa ligne, puis la ligne
+          du mois avec Liste/Mois à sa droite. */}
+      {canManage && view !== "officialMatches" && (
+        <div>
+          <button
+            onClick={() => setCreateOpen((v) => !v)}
+            className="flex items-center gap-1.5 rounded-full bg-ubac-yellow px-4 py-2 text-sm font-semibold text-navy shadow-sm transition-colors hover:bg-ubac-yellow-dark"
+          >
+            <Plus className="h-4 w-4 shrink-0" />
+            Créer un événement
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           {/* Retour de Cindy du 2026-08-22 : l'action principale de l'écran
@@ -3521,15 +3537,6 @@ export default function CalendarView({
           {/* Retour de Cindy du 21/09 : rien à créer manuellement depuis
               "Matchs officiels" -- ces événements viennent de la synchro
               FFBB (onglet FFBB), pas d'une création à la main ici. */}
-          {canManage && view !== "officialMatches" && (
-            <button
-              onClick={() => setCreateOpen((v) => !v)}
-              className="flex items-center gap-1.5 rounded-full bg-ubac-yellow px-4 py-2 text-sm font-semibold text-navy shadow-sm transition-colors hover:bg-ubac-yellow-dark"
-            >
-              <Plus className="h-4 w-4 shrink-0" />
-              Créer un événement
-            </button>
-          )}
 
           {view === "month" && (
             <div className="flex items-center gap-2">
@@ -3586,16 +3593,6 @@ export default function CalendarView({
               Coach/Famille -- ne reste ici QUE pour le Bureau, qui garde
               son dropdown "toutes les équipes du club" à son emplacement
               habituel (jamais déplacé dans l'encart, voir isBureau). */}
-          {!forcedView && isBureau && resultsTeams && resultsTeams.length > 1 && (
-            <div className="w-full sm:w-auto">
-              <TeamFilterDropdown
-                teams={sortedResultsTeams}
-                selectedIds={selectedResultTeamIds}
-                onChange={setSelectedResultTeamIds}
-                compact
-              />
-            </div>
-          )}
 
           {/* Retour de Cindy du 12/09 ("Matchs officiels du club") :
               "pour venir encourager les autres équipes du club" -- ne
@@ -3629,7 +3626,7 @@ export default function CalendarView({
               (retour de Cindy, "doublon") : le découpage "Match officiel
               (domicile)"/"(extérieur)" dans ce même menu couvre désormais
               ce besoin. */}
-          {((!forcedView && isBureau) || forcedView === "clubEvents") && (
+          {forcedView === "clubEvents" && (
             <EventTypeFilterDropdown
               hiddenTypes={hiddenEventTypes}
               onChange={updateHiddenEventTypes}
@@ -3673,6 +3670,26 @@ export default function CalendarView({
           )}
         </div>
       </div>
+
+      {/* Bureau (retour de Cindy du 18/11, "de beaux espaces aérés et
+          logiques") : même disposition que Coach / Famille -- le mois et
+          Liste/Mois sur une ligne, puis le choix d'équipes et le filtre par
+          type sur la ligne suivante. */}
+      {!forcedView && isBureau && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {resultsTeams && resultsTeams.length > 1 ? (
+            <TeamFilterDropdown
+              teams={sortedResultsTeams}
+              selectedIds={selectedResultTeamIds}
+              onChange={setSelectedResultTeamIds}
+              compact
+            />
+          ) : (
+            <span />
+          )}
+          <EventTypeFilterDropdown hiddenTypes={hiddenEventTypes} onChange={updateHiddenEventTypes} />
+        </div>
+      )}
 
       {/* Coach / Famille (retour de Cindy du 18/11, "matchs officiels de tout
           le club pas assez visible, texte trop long, filtre mal placé") :
