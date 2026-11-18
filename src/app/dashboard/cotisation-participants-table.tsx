@@ -452,6 +452,79 @@ function donationOf(c: AdminCotisation) {
   return Math.max(0, roundCents((c.paiement ?? 0) - dueAmount));
 }
 
+// Libellés courts des pastilles de mode (la valeur enregistrée ne change pas).
+const PAYMENT_MODE_SHORT_LABEL: Record<string, string> = {
+  "TPE / CB (SumUp)": "CB (SumUp)",
+};
+
+// Part du montant payé venue de l'import du fichier du Bureau (sans ligne
+// d'historique) -- même calcul que recomputeCotisationTotals.
+function importedPaidPart(c: AdminCotisation) {
+  return Math.max(0, roundCents((c.paiement ?? 0) - c.payments.reduce((sum, p) => sum + (p.amount ?? 0), 0)));
+}
+
+// Mode présélectionné à l'ouverture (retour de Cindy du 18/11, "toujours
+// sur Chèque") : celui du dernier règlement, sinon le premier mode reconnu
+// dans le fichier du Bureau, sinon Chèque.
+function likelyPaymentMode(c: AdminCotisation | undefined) {
+  if (!c) return paymentModes[0];
+  const last = [...c.payments].sort((a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime())[0];
+  if (last && paymentModes.includes(last.mode)) return last.mode;
+  const tag = cotisationModeTags(c).find((t) => paymentModes.includes(t));
+  return tag ?? paymentModes[0];
+}
+
+// Bandeau en haut de la fiche (retour de Cindy du 18/11, "on ne voit ni ce
+// qui est payé ni ce qui reste") : payé sur dû, reste, barre de progression.
+function PaymentProgress({ cotisation: c }: { cotisation: AdminCotisation }) {
+  const status = computeStatus(c);
+  const dueAmount = due(c);
+  const paid = c.paiement ?? 0;
+  const rest = balanceDue(c);
+  const gap = gapToCheck(c);
+  const percent = status === "OFFERT" || dueAmount <= 0 ? 100 : Math.min(100, Math.round((paid / dueAmount) * 100));
+  const barClass =
+    status === "OFFERT"
+      ? "bg-navy"
+      : gap > 0
+        ? "bg-amber-500"
+        : status === "PAYE"
+          ? "bg-court-green"
+          : status === "PARTIEL"
+            ? "bg-parquet-dark"
+            : "bg-coral";
+  return (
+    <div className="rounded-xl border border-zinc-100 bg-white p-3 shadow-sm">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <p className="text-sm text-zinc-600">
+          {status === "OFFERT" ? (
+            <span className="font-semibold text-navy">Cotisation offerte</span>
+          ) : (
+            <>
+              Payé <span className="font-bold tabular-nums text-zinc-900">{formatAmount(paid)}</span> sur{" "}
+              <span className="tabular-nums">{formatAmount(dueAmount)}</span>
+            </>
+          )}
+        </p>
+        {status !== "OFFERT" &&
+          (rest > 0 ? (
+            <span className="text-sm font-bold tabular-nums text-coral-dark">Reste {formatAmount(rest)}</span>
+          ) : gap > 0 ? (
+            <span className="text-xs font-semibold text-amber-700">Écart {formatAmount(gap)} à vérifier</span>
+          ) : (
+            <span className="text-sm font-semibold text-court-green">Réglé</span>
+          ))}
+      </div>
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-zinc-100">
+        <div className={`h-full rounded-full ${barClass}`} style={{ width: `${percent}%` }} />
+      </div>
+      {gap > 0 && (
+        <p className="mt-1.5 text-[11px] text-amber-700">Payé (-) selon le Bureau : compté comme réglé, jamais relancé.</p>
+      )}
+    </div>
+  );
+}
+
 // Modes de paiement en pastilles (retour de Cindy du 18/11) : les modes
 // reconnus, puis le texte d'origine en petit seulement quand il précise
 // quelque chose de plus (banque, "@Bettina", montant HelloAsso...).
@@ -803,7 +876,7 @@ export default function CotisationParticipantsTable({
     } else {
       setPaymentAmount("");
     }
-    setPaymentMode(paymentModes[0]);
+    setPaymentMode(ids.length === 1 ? likelyPaymentMode(byId.get(ids[0])) : paymentModes[0]);
     setPaymentDetail("");
     setPaymentExpectedCashDate("");
   }
@@ -1996,7 +2069,7 @@ export default function CotisationParticipantsTable({
         <Modal
           title={
             paymentIds.length === 1
-              ? `Cotisation & Paiements — ${byId.get(paymentIds[0])?.playerName ?? ""}`
+              ? (byId.get(paymentIds[0])?.playerName ?? "Cotisation")
               : `Marquer comme payé (${paymentIds.length} membres)`
           }
           onClose={() => setPaymentIds(null)}
@@ -2008,6 +2081,8 @@ export default function CotisationParticipantsTable({
                 if (!c) return null;
                 const contactEmail = (c.playerId ? contactEmailByPlayerId[c.playerId] : undefined) ?? null;
                 return (
+                  <>
+                  <PaymentProgress cotisation={c} />
                   <div className="rounded-lg border border-zinc-100 bg-zinc-50 p-2 text-xs text-zinc-600">
                     <div className="flex items-center justify-between">
                       <span>Catégorie</span>
@@ -2021,12 +2096,6 @@ export default function CotisationParticipantsTable({
                       <div className="flex items-start justify-between gap-3">
                         <span>Mode</span>
                         <PaymentModeChips cotisation={c} align="end" />
-                      </div>
-                    )}
-                    {gapToCheck(c) > 0 && (
-                      <div className="flex items-center justify-between text-amber-700">
-                        <span>Payé (-) selon le Bureau</span>
-                        <span className="font-semibold">écart {formatAmount(gapToCheck(c))} à vérifier</span>
                       </div>
                     )}
                     <div className="flex items-center justify-between">
@@ -2071,12 +2140,19 @@ export default function CotisationParticipantsTable({
                       </button>
                     </div>
                   </div>
+                  </>
                 );
               })()}
             {paymentIds.length === 1 &&
               (() => {
                 const c = byId.get(paymentIds[0]);
-                if (!c || c.payments.length === 0) return null;
+                if (!c) return null;
+                // Retour de Cindy du 18/11 ("où sont passés les 50 € ?") : la
+                // part importée du fichier du Bureau n'a pas de ligne
+                // d'historique -- affichée ici en gris, non modifiable, pour
+                // que tout l'argent reçu soit au même endroit.
+                const importedPart = importedPaidPart(c);
+                if (c.payments.length === 0 && importedPart <= 0) return null;
                 const history = [...c.payments].sort(
                   (a, b) => new Date(a.paidAt).getTime() - new Date(b.paidAt).getTime()
                 );
@@ -2086,6 +2162,15 @@ export default function CotisationParticipantsTable({
                       Règlements déjà enregistrés
                     </p>
                     <ul className="flex flex-col gap-1">
+                      {importedPart > 0 && (
+                        <li className="flex items-center justify-between gap-2 text-xs text-zinc-500">
+                          <span>
+                            Fichier du Bureau
+                            {c.payments.length === 0 && c.mode_paiement ? ` — ${c.mode_paiement.trim()}` : ""}
+                          </span>
+                          <span className="shrink-0 font-semibold text-zinc-600">{formatAmount(importedPart)}</span>
+                        </li>
+                      )}
                       {history.map((p) => (
                         <li key={p.id} className="flex items-center justify-between gap-2 text-xs text-zinc-600">
                           <span>
@@ -2112,9 +2197,6 @@ export default function CotisationParticipantsTable({
                         </li>
                       ))}
                     </ul>
-                    <p className="mt-1.5 text-xs font-semibold text-zinc-700">
-                      Solde restant dû : {formatAmount(balanceDue(c))}
-                    </p>
                   </div>
                 );
               })()}
@@ -2132,20 +2214,27 @@ export default function CotisationParticipantsTable({
               </div>
             )}
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">
-                Mode de paiement
-              </label>
-              <select
-                value={paymentMode}
-                onChange={(e) => setPaymentMode(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
-              >
+              <p className="mb-1.5 block text-xs font-medium text-zinc-600">Mode de paiement</p>
+              {/* Pastilles à toucher plutôt qu'un menu (retour de Cindy du
+                  18/11) : un appui, sans ouvrir de liste sur téléphone. */}
+              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Mode de paiement">
                 {paymentModes.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
+                  <button
+                    key={m}
+                    type="button"
+                    role="radio"
+                    aria-checked={paymentMode === m}
+                    onClick={() => setPaymentMode(m)}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      paymentMode === m
+                        ? "border-navy bg-navy text-white"
+                        : "border-zinc-200 bg-white text-zinc-700 hover:border-navy/40"
+                    }`}
+                  >
+                    {PAYMENT_MODE_SHORT_LABEL[m] ?? m}
+                  </button>
                 ))}
-              </select>
+              </div>
             </div>
             {paymentMode === "Autre" && (
               <div>
@@ -2210,7 +2299,7 @@ export default function CotisationParticipantsTable({
                   onClick={() => setPaymentIds(null)}
                   className="rounded-full px-3 py-1.5 text-sm font-semibold text-zinc-500 hover:bg-zinc-100"
                 >
-                  Terminé
+                  Fermer
                 </button>
               )}
             </div>
