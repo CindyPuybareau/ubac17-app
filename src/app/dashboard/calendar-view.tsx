@@ -28,6 +28,7 @@ import {
   Plus,
   RotateCcw,
   Sparkles,
+  SlidersHorizontal,
   StickyNote,
   Sun,
   Trash2,
@@ -1180,6 +1181,8 @@ export default function CalendarView({
   // chargement normal du calendrier pour ça. Un second clic masque de
   // nouveau sans tout recharger (clubMatches reste en mémoire).
   const [showClubMatches, setShowClubMatches] = useState(false);
+  // Menu "Filtres" (Coach / Famille, retour de Cindy du 18/11).
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [clubMatches, setClubMatches] = useState<AdminUpcomingEvent[] | null>(null);
   const [loadingClubMatches, setLoadingClubMatches] = useState(false);
 
@@ -3437,13 +3440,68 @@ export default function CalendarView({
           équipes" n'a pas de sens ici -- son propre filtre (dropdown,
           toutes les équipes du club) reste lui à sa place habituelle, plus
           bas, inchangé. */}
-      {!forcedView && !isBureau && resultsTeams && resultsTeams.length > 1 && (
-        <TeamSelectorPills
-          teams={sortedResultsTeams}
-          activeId={activeResultsTeamIdResolved}
-          onSelect={setActiveResultsTeamId}
-        />
-      )}
+      {/* Retour de Cindy du 18/11 ("plusieurs enfants, que ce soit simple") :
+          les VRAIES équipes (rôle Joueur / Coach) en pastilles seulement s'il
+          y en a plusieurs ; une équipe sœur (consultation seule, sans rôle,
+          ex. U13M-2 pour un joueur de U13M) n'est plus une pastille aussi
+          visible que la sienne -- juste un lien discret "Voir aussi U13M-2". */}
+      {!forcedView && !isBureau && resultsTeams && resultsTeams.length > 1 && (() => {
+        const ownTeams = sortedResultsTeams.filter((t) => t.role);
+        const sisterTeams = sortedResultsTeams.filter((t) => !t.role);
+        if (ownTeams.length === 0) {
+          return (
+            <TeamSelectorPills
+              teams={sortedResultsTeams}
+              activeId={activeResultsTeamIdResolved}
+              onSelect={setActiveResultsTeamId}
+            />
+          );
+        }
+        const activeSister = sisterTeams.find((t) => t.id === activeResultsTeamIdResolved);
+        const backTo = ownTeams[0];
+        return (
+          <div className="flex flex-col gap-2">
+            {ownTeams.length > 1 && (
+              <TeamSelectorPills
+                teams={ownTeams}
+                activeId={activeSister ? undefined : activeResultsTeamIdResolved}
+                onSelect={setActiveResultsTeamId}
+              />
+            )}
+            {sisterTeams.length > 0 && (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-xs">
+                {activeSister ? (
+                  <>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 font-semibold text-zinc-600">
+                      <Eye className="h-3 w-3" />
+                      Vous regardez {teamLabel(activeSister)} (consultation)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setActiveResultsTeamId(backTo.id)}
+                      className="font-semibold text-navy underline-offset-2 hover:underline"
+                    >
+                      ← Revenir à {teamLabel(backTo)}
+                    </button>
+                  </>
+                ) : (
+                  sisterTeams.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setActiveResultsTeamId(t.id)}
+                      className="inline-flex items-center gap-1 font-medium text-zinc-500 underline-offset-2 hover:text-navy hover:underline"
+                    >
+                      <Eye className="h-3 w-3" />
+                      Voir aussi {teamLabel(t)}
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Bureau : tous les matchs du week-end. Coach / Famille : "Venez
           encourager !", matchs à domicile de tout le club (retours de Cindy
@@ -3455,7 +3513,7 @@ export default function CalendarView({
           <WeekendStrip matches={weekendMatches} variant="club" />
         ))}
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="relative flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           {/* Retour de Cindy du 2026-08-22 : l'action principale de l'écran
               passe avant la navigation de date (flèches + mois), pas
@@ -3556,21 +3614,51 @@ export default function CalendarView({
               événements. Retour de Cindy du 12/09 (deuxième demande) :
               placé À GAUCHE de "Filtrer par type" (juste après le filtre
               équipe), pas après -- sur tous les espaces concernés. */}
+          {/* Coach / Famille (retour de Cindy du 18/11) : "Matchs officiels du
+              club" et "Filtrer par" regroupés dans un seul bouton "Filtres"
+              -- une pastille jaune signale qu'un filtre est actif. Le Bureau
+              garde ses réglages habituels. */}
           {!forcedView && !isBureau && (
-            <button
-              type="button"
-              onClick={toggleClubMatches}
-              disabled={loadingClubMatches}
-              title="Afficher aussi les matchs officiels des autres équipes du club, en lecture seule"
-              className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors disabled:opacity-60 ${
-                showClubMatches
-                  ? "border-transparent bg-ubac-yellow text-navy"
-                  : "border-ubac-yellow bg-ubac-yellow/10 text-ubac-yellow-dark hover:bg-ubac-yellow/20"
-              }`}
-            >
-              <Eye className="h-3.5 w-3.5 shrink-0" />
-              {loadingClubMatches ? "Chargement..." : "Matchs officiels du club"}
-            </button>
+            <div>
+              <button
+                type="button"
+                onClick={() => setFiltersOpen((v) => !v)}
+                aria-expanded={filtersOpen}
+                title="Filtres"
+                className="relative flex h-8 items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2.5 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-50"
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5 shrink-0" />
+                <span className="hidden sm:inline">Filtres</span>
+                {(showClubMatches || hiddenEventTypes.size > 0) && (
+                  <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-ubac-yellow" />
+                )}
+              </button>
+              {filtersOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setFiltersOpen(false)} />
+                  {/* Pleine largeur sous la barre sur téléphone (le menu sortait de
+                      l’écran), calé à droite sur grand écran. */}
+                  <div className="absolute left-0 right-0 top-full z-40 mt-2 flex flex-col gap-3 rounded-2xl border border-zinc-100 bg-white p-3 shadow-lg sm:left-auto sm:w-72">
+                    <label className="flex cursor-pointer items-start gap-2 text-sm text-zinc-700">
+                      <input
+                        type="checkbox"
+                        checked={showClubMatches}
+                        onChange={toggleClubMatches}
+                        disabled={loadingClubMatches}
+                        className="mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
+                      />
+                      <span>
+                        {loadingClubMatches ? "Chargement..." : "Voir aussi les matchs officiels des autres équipes du club"}
+                      </span>
+                    </label>
+                    <div className="flex flex-col gap-1.5 border-t border-zinc-100 pt-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Types d&apos;événements</p>
+                      <EventTypeFilterDropdown hiddenTypes={hiddenEventTypes} onChange={updateHiddenEventTypes} />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           )}
 
           {/* Remplace "Masquer les entraînements" (retour de Cindy du
@@ -3587,7 +3675,7 @@ export default function CalendarView({
               (retour de Cindy, "doublon") : le découpage "Match officiel
               (domicile)"/"(extérieur)" dans ce même menu couvre désormais
               ce besoin. */}
-          {(!forcedView || forcedView === "clubEvents") && (
+          {((!forcedView && isBureau) || forcedView === "clubEvents") && (
             <EventTypeFilterDropdown
               hiddenTypes={hiddenEventTypes}
               onChange={updateHiddenEventTypes}
@@ -3609,21 +3697,23 @@ export default function CalendarView({
             <div className="flex items-center gap-0.5 rounded-full border border-zinc-200 bg-white p-0.5">
               <button
                 onClick={() => setView("list")}
+                title="Liste"
                 className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
                   view === "list" ? "bg-navy text-white" : "text-zinc-500 hover:bg-zinc-50"
                 }`}
               >
                 <List className="h-3.5 w-3.5" />
-                Liste
+                <span className="hidden sm:inline">Liste</span>
               </button>
               <button
                 onClick={() => setView("month")}
+                title="Mois"
                 className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
                   view === "month" ? "bg-navy text-white" : "text-zinc-500 hover:bg-zinc-50"
                 }`}
               >
                 <LayoutGrid className="h-3.5 w-3.5" />
-                Mois
+                <span className="hidden sm:inline">Mois</span>
               </button>
             </div>
           )}
