@@ -28,10 +28,11 @@ import {
   Plus,
   RotateCcw,
   Sparkles,
-  SlidersHorizontal,
   StickyNote,
+  Users,
   Sun,
   Trash2,
+  Trophy,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -1181,8 +1182,6 @@ export default function CalendarView({
   // chargement normal du calendrier pour ça. Un second clic masque de
   // nouveau sans tout recharger (clubMatches reste en mémoire).
   const [showClubMatches, setShowClubMatches] = useState(false);
-  // Menu "Filtres" (Coach / Famille, retour de Cindy du 18/11).
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const [clubMatches, setClubMatches] = useState<AdminUpcomingEvent[] | null>(null);
   const [loadingClubMatches, setLoadingClubMatches] = useState(false);
 
@@ -3514,7 +3513,7 @@ export default function CalendarView({
           <WeekendStrip matches={weekendMatches} variant="club" />
         ))}
 
-      <div className="relative flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           {/* Retour de Cindy du 2026-08-22 : l'action principale de l'écran
               passe avant la navigation de date (flèches + mois), pas
@@ -3615,52 +3614,6 @@ export default function CalendarView({
               événements. Retour de Cindy du 12/09 (deuxième demande) :
               placé À GAUCHE de "Filtrer par type" (juste après le filtre
               équipe), pas après -- sur tous les espaces concernés. */}
-          {/* Coach / Famille (retour de Cindy du 18/11) : "Matchs officiels du
-              club" et "Filtrer par" regroupés dans un seul bouton "Filtres"
-              -- une pastille jaune signale qu'un filtre est actif. Le Bureau
-              garde ses réglages habituels. */}
-          {!forcedView && !isBureau && (
-            <div>
-              <button
-                type="button"
-                onClick={() => setFiltersOpen((v) => !v)}
-                aria-expanded={filtersOpen}
-                title="Filtres"
-                className="relative flex h-8 items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2.5 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-50"
-              >
-                <SlidersHorizontal className="h-3.5 w-3.5 shrink-0" />
-                <span className="hidden sm:inline">Filtres</span>
-                {(showClubMatches || hiddenEventTypes.size > 0) && (
-                  <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-ubac-yellow" />
-                )}
-              </button>
-              {filtersOpen && (
-                <>
-                  <div className="fixed inset-0 z-30" onClick={() => setFiltersOpen(false)} />
-                  {/* Pleine largeur sous la barre sur téléphone (le menu sortait de
-                      l’écran), calé à droite sur grand écran. */}
-                  <div className="absolute left-0 right-0 top-full z-40 mt-2 flex flex-col gap-3 rounded-2xl border border-zinc-100 bg-white p-3 shadow-lg sm:left-auto sm:w-72">
-                    <label className="flex cursor-pointer items-start gap-2 text-sm text-zinc-700">
-                      <input
-                        type="checkbox"
-                        checked={showClubMatches}
-                        onChange={toggleClubMatches}
-                        disabled={loadingClubMatches}
-                        className="mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
-                      />
-                      <span>
-                        {loadingClubMatches ? "Chargement..." : "Voir aussi les matchs officiels des autres équipes du club"}
-                      </span>
-                    </label>
-                    <div className="flex flex-col gap-1.5 border-t border-zinc-100 pt-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Types d&apos;événements</p>
-                      <EventTypeFilterDropdown hiddenTypes={hiddenEventTypes} onChange={updateHiddenEventTypes} />
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
 
           {/* Remplace "Masquer les entraînements" (retour de Cindy du
               10/09) : filtre par type d'événement plutôt qu'un seul
@@ -3720,6 +3673,47 @@ export default function CalendarView({
           )}
         </div>
       </div>
+
+      {/* Coach / Famille (retour de Cindy du 18/11, "matchs officiels de tout
+          le club pas assez visible, texte trop long, filtre mal placé") :
+          un choix bien visible "Mes équipes | Tout le club" (Tout le club =
+          ajoute les matchs officiels des autres équipes, en consultation),
+          et le filtre par type d'événement à droite sur la même ligne. */}
+      {!forcedView && !isBureau && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-0.5 rounded-full border border-zinc-200 bg-white p-0.5 text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => {
+                if (showClubMatches) void toggleClubMatches();
+              }}
+              aria-pressed={!showClubMatches}
+              className={`flex items-center gap-1 rounded-full px-2.5 py-1.5 transition-colors ${
+                !showClubMatches ? "bg-navy text-white" : "text-zinc-500 hover:bg-zinc-50"
+              }`}
+            >
+              <Users className="h-3.5 w-3.5 shrink-0" />
+              Mes équipes
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!showClubMatches) void toggleClubMatches();
+              }}
+              disabled={loadingClubMatches}
+              aria-pressed={showClubMatches}
+              title="Ajoute les matchs officiels des autres équipes du club (consultation)"
+              className={`flex items-center gap-1 rounded-full px-2.5 py-1.5 transition-colors disabled:opacity-60 ${
+                showClubMatches ? "bg-ubac-yellow text-navy" : "text-zinc-500 hover:bg-zinc-50"
+              }`}
+            >
+              <Trophy className="h-3.5 w-3.5 shrink-0" />
+              {loadingClubMatches ? "Chargement…" : "Tout le club"}
+            </button>
+          </div>
+          <EventTypeFilterDropdown hiddenTypes={hiddenEventTypes} onChange={updateHiddenEventTypes} />
+        </div>
+      )}
 
       {/* Retour de Cindy du 09/11 ("redondant, on a déjà le bouton au clic
           qui nous indique l'équipe") : cette ligne "Événements de X, Y, Z
