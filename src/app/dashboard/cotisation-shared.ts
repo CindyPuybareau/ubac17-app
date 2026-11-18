@@ -127,3 +127,54 @@ export function renderRelanceTemplate(text: string, c: AdminCotisation) {
     .replace(/\{solde\}/g, formatPlaceholderAmount(balanceDue(c)))
     .replace(/\{evenement\}/g, c.collecteName ?? "votre cotisation");
 }
+
+// Modes de paiement en choix fixes (retour de Cindy du 18/11, point 2 de la
+// page Cotisations) : l'import du fichier "Suivi des licenciés" écrit le
+// mode en texte libre -- 34 façons différentes ("HelloAsso + CS", "Chèque
+// LCL *2", "Espèces @Bettina", "Helloasso"...). On ne réécrit JAMAIS ces
+// textes en base (règle n°1) : on y reconnaît les modes connus, les mêmes
+// libellés que la liste de saisie de cotisation-participants-table.tsx, pour
+// les afficher en pastilles et filtrer correctement. CS (coupon sport ANCV)
+// et PS (Pass Sport) rejoignent "Pass Sport / ANCV", déjà regroupés ainsi
+// dans la saisie.
+export const PAYMENT_MODE_TAGS = [
+  { label: "HelloAsso", pattern: /hello\s*asso/gi },
+  { label: "Chèque", pattern: /ch[eè]ques?/gi },
+  { label: "Espèces", pattern: /esp[eè]ces?/gi },
+  { label: "Pass Sport / ANCV", pattern: /pass'?\s*sport|ancv|\bps\b|\bcs\b|coupons?\s*sport/gi },
+  { label: "TPE / CB (SumUp)", pattern: /\btpe\b|\bcb\b|sum\s*up|carte\s*bancaire/gi },
+  { label: "Virement", pattern: /virements?/gi },
+] as const;
+
+export const OTHER_PAYMENT_MODE = "Autre";
+
+// Modes reconnus dans UN texte, dans l'ordre de la liste ci-dessus ;
+// "Autre" si le texte n'est pas vide mais ne contient aucun mode connu.
+export function paymentModeTags(text: string | null | undefined): string[] {
+  const t = (text ?? "").trim();
+  if (!t) return [];
+  const tags = PAYMENT_MODE_TAGS.filter((m) => new RegExp(m.pattern.source, "i").test(t)).map((m) => m.label);
+  return tags.length > 0 ? tags : [OTHER_PAYMENT_MODE];
+}
+
+// Ce que le texte dit EN PLUS des modes reconnus (banque, n° de chèque,
+// "@Bettina", montant HelloAsso...) -- vide quand le texte ne contient que
+// des modes ("HelloAsso + CS"), pour ne pas répéter les pastilles.
+export function paymentModeExtra(text: string | null | undefined): string {
+  let rest = (text ?? "").trim();
+  if (!rest) return "";
+  for (const m of PAYMENT_MODE_TAGS) rest = rest.replace(new RegExp(m.pattern.source, "gi"), " ");
+  rest = rest.replace(/^autre$/i, "").replace(/[+&,/]|\bet\b/gi, " ").replace(/\s+/g, " ").trim();
+  return rest ? (text ?? "").trim() : "";
+}
+
+// Tous les modes d'une cotisation : le texte importé ET chaque règlement
+// saisi dans l'appli (le filtre ne regardait que le dernier règlement).
+export function cotisationModeTags(c: AdminCotisation): string[] {
+  const found = new Set<string>();
+  for (const text of [c.mode_paiement, ...c.payments.map((p) => p.mode)]) {
+    for (const tag of paymentModeTags(text)) found.add(tag);
+  }
+  const order = [...PAYMENT_MODE_TAGS.map((m) => m.label as string), OTHER_PAYMENT_MODE];
+  return order.filter((label) => found.has(label));
+}
