@@ -3490,9 +3490,10 @@ export default function CalendarView({
                       key={t.id}
                       type="button"
                       onClick={() => setActiveResultsTeamId(t.id)}
-                      className="inline-flex items-center gap-1 font-medium text-zinc-500 underline-offset-2 hover:text-navy hover:underline"
+                      className="inline-flex items-center gap-1 font-semibold text-ubac-blue underline-offset-2 hover:text-navy hover:underline"
                     >
-                      <Eye className="h-3 w-3" />
+                      {/* En bleu (retour de Cindy du 18/11, "plus de visibilité"). */}
+                      <Eye className="h-3.5 w-3.5" />
                       Voir aussi {teamLabel(t)}
                     </button>
                   ))
