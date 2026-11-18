@@ -452,6 +452,47 @@ function donationOf(c: AdminCotisation) {
   return Math.max(0, roundCents((c.paiement ?? 0) - dueAmount));
 }
 
+// Formulaire de règlement qui s'adapte au mode (retour de Cindy du 18/11) :
+// le champ "Détail" dit ce qu'on attend vraiment pour CE mode.
+const DETAIL_FIELD_BY_MODE: Record<string, { label: string; placeholder: string }> = {
+  Chèque: { label: "Banque et n° de chèque", placeholder: "Ex. CIC n° 4060241" },
+  Espèces: { label: "Remis à", placeholder: "Ex. Bettina (optionnel)" },
+  "Pass Sport": { label: "N° du Pass Sport", placeholder: "Optionnel" },
+  "Coupon Sport ANCV": { label: "N° des coupons", placeholder: "Optionnel" },
+  "TPE / CB (SumUp)": { label: "Référence SumUp", placeholder: "Optionnel" },
+  HelloAsso: { label: "N° de commande HelloAsso", placeholder: "Optionnel" },
+  Virement: { label: "Référence du virement", placeholder: "Optionnel" },
+};
+
+function todayISODate() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// Même jour, N mois plus tard (le 31 retombe au dernier jour du mois).
+function addMonthsISODate(iso: string, months: number) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const target = new Date(y, m - 1 + months, 1);
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  target.setDate(Math.min(d, lastDay));
+  return `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, "0")}-${String(target.getDate()).padStart(2, "0")}`;
+}
+
+type InstallmentLine = { amount: string; cashDate: string; chequeNumber: string };
+
+// "Payer en plusieurs fois" (retour de Cindy du 18/11) : parts égales au
+// centime près (le reste des centimes sur le 1er chèque), un encaissement
+// par mois à partir de la date choisie.
+function buildInstallments(total: number, count: number, firstCashDate: string): InstallmentLine[] {
+  const cents = Math.max(0, Math.round(total * 100));
+  const base = Math.floor(cents / count);
+  return Array.from({ length: count }, (_, i) => ({
+    amount: String((base + (i === 0 ? cents - base * count : 0)) / 100),
+    cashDate: addMonthsISODate(firstCashDate, i),
+    chequeNumber: "",
+  }));
+}
+
 // Libellés courts des pastilles de mode (la valeur enregistrée ne change pas).
 const PAYMENT_MODE_SHORT_LABEL: Record<string, string> = {
   "TPE / CB (SumUp)": "CB (SumUp)",
@@ -700,6 +741,18 @@ export default function CotisationParticipantsTable({
   const [paymentModeOther, setPaymentModeOther] = useState("");
   const [paymentDetail, setPaymentDetail] = useState("");
   const [paymentExpectedCashDate, setPaymentExpectedCashDate] = useState("");
+  // Date du règlement (retour de Cindy du 18/11) : aujourd'hui par défaut,
+  // modifiable pour un chèque reçu la semaine dernière.
+  const [paymentPaidAt, setPaymentPaidAt] = useState(todayISODate);
+  // Chèques en plusieurs fois (retour de Cindy du 18/11) : 1 = un seul
+  // règlement ; 2 à 4 = autant de chèques, créés en une seule fois.
+  const [installmentCount, setInstallmentCount] = useState(1);
+  const [installmentLines, setInstallmentLines] = useState<InstallmentLine[]>([]);
+
+  function changeInstallments(count: number, total = Number(paymentAmount), start = paymentExpectedCashDate) {
+    setInstallmentCount(count);
+    setInstallmentLines(count > 1 ? buildInstallments(total || 0, count, start || todayISODate()) : []);
+  }
   const [paymentSaving, setPaymentSaving] = useState(false);
   const effectivePaymentMode =
     paymentMode === "Autre" ? paymentModeOther.trim() || "Autre" : paymentMode;
@@ -879,6 +932,9 @@ export default function CotisationParticipantsTable({
     setPaymentMode(ids.length === 1 ? likelyPaymentMode(byId.get(ids[0])) : paymentModes[0]);
     setPaymentDetail("");
     setPaymentExpectedCashDate("");
+    setPaymentPaidAt(todayISODate());
+    setInstallmentCount(1);
+    setInstallmentLines([]);
   }
 
   async function confirmPayment() {
@@ -894,19 +950,45 @@ export default function CotisationParticipantsTable({
       // Pass Sport...) with each one kept as its own record.
       const id = paymentIds[0];
       const c = byId.get(id);
-      const amount = Number(paymentAmount);
-      if (!c || Number.isNaN(amount) || amount <= 0) {
+      // Midi heure locale : la date choisie ne glisse jamais au jour d'avant
+      // en passant en UTC.
+      const paidAtIso = new Date(`${paymentPaidAt || todayISODate()}T12:00:00`).toISOString();
+      const isInstallments = paymentMode === "Chèque" && installmentCount > 1;
+      // Plusieurs chèques (retour de Cindy du 18/11) : un règlement par
+      // chèque, tous envoyés en UNE seule requête (jamais une par chèque,
+      // CLAUDE.md règle n°6).
+      const newPayments = isInstallments
+        ? installmentLines.map((line, i) => ({
+            amount: roundCents(Number(line.amount)),
+            detail:
+              [`Chèque ${i + 1}/${installmentLines.length}`, paymentDetail.trim(), line.chequeNumber.trim() ? `n° ${line.chequeNumber.trim()}` : ""]
+                .filter(Boolean)
+                .join(" · ") || null,
+            expectedCashDate: line.cashDate || null,
+          }))
+        : [
+            {
+              amount: roundCents(Number(paymentAmount)),
+              detail: paymentDetail.trim() || null,
+              expectedCashDate: paymentMode === "Chèque" ? paymentExpectedCashDate || null : null,
+            },
+          ];
+      const amount = roundCents(newPayments.reduce((sum, np) => sum + np.amount, 0));
+      if (!c || newPayments.some((np) => Number.isNaN(np.amount) || np.amount <= 0)) {
         setPaymentSaving(false);
-        setActionError("Montant invalide.");
+        setActionError(isInstallments ? "Chaque chèque doit avoir un montant." : "Montant invalide.");
         return;
       }
-      const { error: paymentError } = await supabase.from("cotisation_payments").insert({
-        cotisation_id: id,
-        amount,
-        mode: effectivePaymentMode,
-        detail: paymentDetail || null,
-        expected_cash_date: paymentExpectedCashDate || null,
-      });
+      const { error: paymentError } = await supabase.from("cotisation_payments").insert(
+        newPayments.map((np) => ({
+          cotisation_id: id,
+          amount: np.amount,
+          mode: effectivePaymentMode,
+          detail: np.detail,
+          expected_cash_date: np.expectedCashDate,
+          paid_at: paidAtIso,
+        }))
+      );
       if (paymentError) {
         setPaymentSaving(false);
         setActionError(`Paiement impossible : ${paymentError.message}`);
@@ -947,14 +1029,14 @@ export default function CotisationParticipantsTable({
         mode_paiement: effectivePaymentMode,
         statut: newStatut,
         payments: [
-          {
+          ...newPayments.map((np) => ({
             id: `optimistic-${crypto.randomUUID()}`,
-            amount,
+            amount: np.amount,
             mode: effectivePaymentMode,
-            detail: paymentDetail || null,
-            expectedCashDate: paymentExpectedCashDate || null,
-            paidAt: new Date().toISOString(),
-          },
+            detail: np.detail,
+            expectedCashDate: np.expectedCashDate,
+            paidAt: paidAtIso,
+          })),
           ...prev.payments,
         ],
       }));
@@ -973,7 +1055,10 @@ export default function CotisationParticipantsTable({
       setPaymentModeOther("");
       setPaymentDetail("");
       setPaymentExpectedCashDate("");
-      showToast("Règlement ajouté.");
+      setPaymentPaidAt(todayISODate());
+      setInstallmentCount(1);
+      setInstallmentLines([]);
+      showToast(newPayments.length > 1 ? `${newPayments.length} chèques ajoutés.` : "Règlement ajouté.");
       router.refresh();
       return;
     } else {
@@ -2208,7 +2293,10 @@ export default function CotisationParticipantsTable({
                 <input
                   type="number"
                   value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  onChange={(e) => {
+                    setPaymentAmount(e.target.value);
+                    if (installmentCount > 1) changeInstallments(installmentCount, Number(e.target.value));
+                  }}
                   className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
               </div>
@@ -2224,7 +2312,10 @@ export default function CotisationParticipantsTable({
                     type="button"
                     role="radio"
                     aria-checked={paymentMode === m}
-                    onClick={() => setPaymentMode(m)}
+                    onClick={() => {
+                      setPaymentMode(m);
+                      if (m !== "Chèque" && installmentCount > 1) changeInstallments(1);
+                    }}
                     className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
                       paymentMode === m
                         ? "border-navy bg-navy text-white"
@@ -2251,26 +2342,147 @@ export default function CotisationParticipantsTable({
             )}
             {paymentIds.length === 1 && (
               <>
+                {/* Champs adaptés au mode choisi (retour de Cindy du 18/11). */}
+                {paymentMode === "Chèque" && (
+                  <div>
+                    <p className="mb-1.5 text-xs font-medium text-zinc-600">Nombre de chèques</p>
+                    <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Nombre de chèques">
+                      {[1, 2, 3, 4].map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          role="radio"
+                          aria-checked={installmentCount === n}
+                          onClick={() => changeInstallments(n)}
+                          className={`min-w-10 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                            installmentCount === n
+                              ? "border-navy bg-navy text-white"
+                              : "border-zinc-200 bg-white text-zinc-700 hover:border-navy/40"
+                          }`}
+                        >
+                          {n === 1 ? "1 chèque" : `${n} fois`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {paymentMode !== "Autre" && (
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-zinc-600">
+                      {paymentMode === "Chèque" && installmentCount > 1
+                        ? "Banque"
+                        : (DETAIL_FIELD_BY_MODE[paymentMode]?.label ?? "Détail")}
+                    </label>
+                    <input
+                      type="text"
+                      value={paymentDetail}
+                      onChange={(e) => setPaymentDetail(e.target.value)}
+                      placeholder={
+                        paymentMode === "Chèque" && installmentCount > 1
+                          ? "Ex. CIC (optionnel)"
+                          : (DETAIL_FIELD_BY_MODE[paymentMode]?.placeholder ?? "Optionnel")
+                      }
+                      className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+                    />
+                  </div>
+                )}
+                {paymentMode === "Chèque" && installmentCount > 1 ? (
+                  <div className="flex flex-col gap-2">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-zinc-600">
+                        Encaissement du 1er chèque
+                      </label>
+                      <input
+                        type="date"
+                        value={paymentExpectedCashDate || installmentLines[0]?.cashDate || ""}
+                        onChange={(e) => {
+                          setPaymentExpectedCashDate(e.target.value);
+                          changeInstallments(installmentCount, Number(paymentAmount), e.target.value);
+                        }}
+                        className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+                      />
+                    </div>
+                    <ul className="flex flex-col gap-1.5 rounded-lg border border-zinc-100 bg-zinc-50 p-2">
+                      {installmentLines.map((line, i) => (
+                        <li key={i} className="grid grid-cols-[auto_1fr_1fr] items-center gap-1.5">
+                          <span className="w-14 text-xs font-semibold text-zinc-600">Chèque {i + 1}</span>
+                          <input
+                            type="number"
+                            aria-label={`Montant du chèque ${i + 1}`}
+                            value={line.amount}
+                            onChange={(e) =>
+                              setInstallmentLines((prev) =>
+                                prev.map((l, j) => (j === i ? { ...l, amount: e.target.value } : l))
+                              )
+                            }
+                            className="min-w-0 rounded-lg border border-zinc-200 bg-white px-2 py-1 text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                          />
+                          <input
+                            type="date"
+                            aria-label={`Encaissement du chèque ${i + 1}`}
+                            value={line.cashDate}
+                            onChange={(e) =>
+                              setInstallmentLines((prev) =>
+                                prev.map((l, j) => (j === i ? { ...l, cashDate: e.target.value } : l))
+                              )
+                            }
+                            className="min-w-0 rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs"
+                          />
+                          <span />
+                          <input
+                            type="text"
+                            aria-label={`N° du chèque ${i + 1}`}
+                            value={line.chequeNumber}
+                            onChange={(e) =>
+                              setInstallmentLines((prev) =>
+                                prev.map((l, j) => (j === i ? { ...l, chequeNumber: e.target.value } : l))
+                              )
+                            }
+                            placeholder="N° de chèque (optionnel)"
+                            className="col-span-2 min-w-0 rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs"
+                          />
+                        </li>
+                      ))}
+                      {(() => {
+                        const sum = roundCents(installmentLines.reduce((t, l) => t + (Number(l.amount) || 0), 0));
+                        const expected = roundCents(Number(paymentAmount) || 0);
+                        return (
+                          <li
+                            className={`text-right text-xs font-semibold ${
+                              Math.abs(sum - expected) > 0.009 ? "text-amber-700" : "text-zinc-600"
+                            }`}
+                          >
+                            Total des chèques : {formatAmount(sum)}
+                            {Math.abs(sum - expected) > 0.009 && ` (montant saisi : ${formatAmount(expected)})`}
+                          </li>
+                        );
+                      })()}
+                    </ul>
+                  </div>
+                ) : (
+                  paymentMode === "Chèque" && (
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-zinc-600">
+                        Date d&apos;encaissement prévue
+                      </label>
+                      <input
+                        type="date"
+                        value={paymentExpectedCashDate}
+                        onChange={(e) => setPaymentExpectedCashDate(e.target.value)}
+                        className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+                      />
+                    </div>
+                  )
+                )}
                 <div>
                   <label className="mb-1 block text-xs font-medium text-zinc-600">
-                    Détail (n° chèque, banque...)
-                  </label>
-                  <input
-                    type="text"
-                    value={paymentDetail}
-                    onChange={(e) => setPaymentDetail(e.target.value)}
-                    placeholder="Optionnel"
-                    className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-zinc-600">
-                    Date d&apos;encaissement prévue
+                    {paymentMode === "Chèque" && installmentCount > 1 ? "Chèques reçus le" : "Date du règlement"}
                   </label>
                   <input
                     type="date"
-                    value={paymentExpectedCashDate}
-                    onChange={(e) => setPaymentExpectedCashDate(e.target.value)}
+                    value={paymentPaidAt}
+                    max={todayISODate()}
+                    onChange={(e) => setPaymentPaidAt(e.target.value)}
                     className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
                   />
                 </div>
@@ -2291,7 +2503,9 @@ export default function CotisationParticipantsTable({
                 {paymentSaving
                   ? "Enregistrement..."
                   : paymentIds.length === 1
-                    ? "Ajouter ce règlement"
+                    ? paymentMode === "Chèque" && installmentCount > 1
+                      ? `Ajouter les ${installmentCount} chèques`
+                      : "Ajouter ce règlement"
                     : "Confirmer"}
               </button>
               {paymentIds.length === 1 && (
