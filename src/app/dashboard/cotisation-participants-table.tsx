@@ -694,7 +694,13 @@ export default function CotisationParticipantsTable({
     c: AdminCotisation,
     payments: CotisationPayment[]
   ): AdminCotisation {
-    const total = roundCents(payments.reduce((sum, p) => sum + (p.amount ?? 0), 0));
+    // Part venue de l'import (sans ligne d'historique) conservée -- même
+    // correctif du 18/11 que recomputeCotisationTotals.
+    const importedPart = Math.max(
+      0,
+      roundCents((c.paiement ?? 0) - c.payments.reduce((sum, p) => sum + (p.amount ?? 0), 0))
+    );
+    const total = roundCents(importedPart + payments.reduce((sum, p) => sum + (p.amount ?? 0), 0));
     const mostRecent = [...payments].sort(
       (a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime()
     )[0];
@@ -1080,12 +1086,22 @@ export default function CotisationParticipantsTable({
       return;
     }
     const rows = data ?? [];
-    const total = roundCents(rows.reduce((sum, p) => sum + (p.amount ?? 0), 0));
     const c = byId.get(cotisationId);
+    // Bug trouvé le 18/11 (retour de Cindy, fichier du Bureau qui fait foi) :
+    // le total était recalculé à partir de l'historique SEUL -- or le
+    // montant venu de l'import du fichier du Bureau n'a pas de ligne
+    // d'historique. Supprimer un règlement de 2,09 € saisi dans l'appli
+    // ramenait donc une cotisation de 162,09 € à 0 € au lieu de 160 €. La
+    // part importée (payé avant l'édition moins la somme des règlements
+    // connus avant l'édition) est conservée, seuls les règlements changent.
+    const importedPart = c
+      ? Math.max(0, roundCents((c.paiement ?? 0) - c.payments.reduce((sum, p) => sum + (p.amount ?? 0), 0)))
+      : 0;
+    const total = roundCents(importedPart + rows.reduce((sum, p) => sum + (p.amount ?? 0), 0));
     const newDue = c ? due(c) : 0;
     const update: { paiement: number; mode_paiement: string | null; statut?: string } = {
       paiement: total,
-      mode_paiement: rows[0]?.mode ?? null,
+      mode_paiement: rows[0]?.mode ?? c?.mode_paiement ?? null,
     };
     // Never silently clear a manual "Offert" override — it isn't an amount
     // concept, so a payment correction shouldn't be able to undo it.
