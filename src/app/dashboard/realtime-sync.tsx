@@ -14,6 +14,9 @@ const WATCHED_TABLES = [
   "event_carpool_reservations",
   "cotisations",
   "cotisation_payments",
+  // Aides Pass Sport / ANCV et remboursements (retour de Cindy du 18/11).
+  "cotisation_aids",
+  "cotisation_refunds",
   "team_players",
   "team_coaches",
   "players",

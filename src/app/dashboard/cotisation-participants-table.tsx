@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
+import { FollowUpEditor } from "./cotisation-followups";
 import { categoryTheme } from "./team-card";
 import { runBatched } from "@/lib/batch";
 import { getLogoBase64, PDF_COLORS } from "@/lib/pdf-brand";
@@ -2284,6 +2285,14 @@ export default function CotisationParticipantsTable({
                     </ul>
                   </div>
                 );
+              })()}
+            {/* Aides Pass Sport / ANCV et remboursements (retour de Cindy du
+                18/11) -- le suivi comptable de la personne, avant la saisie
+                d'un nouveau règlement. */}
+            {paymentIds.length === 1 &&
+              (() => {
+                const c = byId.get(paymentIds[0]);
+                return c && !c.collecteId ? <FollowUpEditor cotisation={c} /> : null;
               })()}
             {paymentIds.length === 1 && (
               <div>

@@ -34,6 +34,7 @@ import AnimatedNumber from "./animated-number";
 import CategoryTariffsEditor from "./category-tariffs-editor";
 import ConfirmDialog from "./confirm-dialog";
 import CotisationChecks from "./cotisation-checks";
+import { FollowUpPanels } from "./cotisation-followups";
 import CotisationParticipantsTable, {
   computeStatus,
   formatAmount,
@@ -1562,10 +1563,18 @@ export default function CotisationsManager({
             statusFilter={mainStatusFilter}
             onStatusFilterChange={setMainStatusFilter}
             renderAbove={(openCotisation) => (
-              <CotisationChecks
-                cotisations={seasonCotisations.filter((c) => c.saison === currentSeasonLabel)}
-                onOpen={openCotisation}
-              />
+              <>
+                <CotisationChecks
+                  cotisations={seasonCotisations.filter((c) => c.saison === currentSeasonLabel)}
+                  onOpen={openCotisation}
+                />
+                {/* Aides Pass Sport / ANCV et remboursements (retour de Cindy
+                    du 18/11, "si j'étais comptable"). */}
+                <FollowUpPanels
+                  cotisations={seasonCotisations.filter((c) => c.saison === currentSeasonLabel)}
+                  onOpen={openCotisation}
+                />
+              </>
             )}
           />
         </div>
