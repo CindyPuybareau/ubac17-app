@@ -4,6 +4,9 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
+  ShieldCheck,
+  Clock,
+  CheckCircle2,
   ArrowLeft,
   CalendarDays,
   ExternalLink,
@@ -284,16 +287,8 @@ function CotisationSummary({
     [cotisations]
   );
   const peopleToCollect = kpis.enAttenteCount + kpis.partielCount;
-  const chips: { key: StatusKey | "ALL"; label: string; count: number; activeClass: string }[] = [
-    { key: "EN_ATTENTE", label: "À encaisser", count: kpis.enAttenteCount, activeClass: "border-coral-dark bg-coral text-white" },
-    ...(kpis.partielCount > 0
-      ? [{ key: "PARTIEL" as const, label: "Partiels", count: kpis.partielCount, activeClass: "border-parquet-dark bg-parquet-dark text-white" }]
-      : []),
-    { key: "PAYE", label: "Payés", count: kpis.payeCount, activeClass: "border-court-green bg-court-green text-white" },
-    { key: "OFFERT", label: "Offerts", count: kpis.offertCount, activeClass: "border-navy bg-navy text-white" },
-    { key: "ALL", label: "Tous", count: kpis.total, activeClass: "border-zinc-700 bg-zinc-700 text-white" },
-  ];
   return (
+    <div className="flex flex-col gap-3">
     <div className="overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm">
       <div className="flex items-center gap-4 bg-gradient-to-br from-navy via-navy to-navy-dark px-4 py-4">
         <ProgressRing rate={kpis.total > 0 ? kpis.percentage : null} />
@@ -304,8 +299,11 @@ function CotisationSummary({
             {formatAmount(kpis.totalDue)}
           </p>
           {peopleToCollect > 0 ? (
-            <span className="mt-1.5 inline-flex rounded-full bg-coral/25 px-2 py-0.5 text-[11px] font-semibold text-white">
-              Reste {formatAmount(toCollect)} · {peopleToCollect} personne{peopleToCollect > 1 ? "s" : ""}
+            // Une seule ligne (retour de Cindy du 18/11, la pastille se
+            // coupait) : le nombre de personnes est déjà sur la carte
+            // "À encaisser" juste en dessous.
+            <span className="mt-1.5 inline-flex whitespace-nowrap rounded-full bg-coral/25 px-2 py-0.5 text-[11px] font-semibold text-white">
+              Reste {formatAmount(toCollect)}
             </span>
           ) : (
             <span className="mt-1.5 inline-flex rounded-full bg-emerald-400/20 px-2 py-0.5 text-[11px] font-semibold text-emerald-200">
@@ -314,25 +312,64 @@ function CotisationSummary({
           )}
         </div>
       </div>
-      <div className="flex flex-wrap gap-2 p-3">
-        {chips.map((chip) => {
-          const active = statusFilter === chip.key;
-          return (
-            <button
-              key={chip.key}
-              type="button"
-              onClick={() => onStatusFilterChange(chip.key)}
-              aria-pressed={active}
-              className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold leading-none transition-colors ${
-                active ? chip.activeClass : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
-              }`}
-            >
-              {chip.label}
-              <span className={`tabular-nums ${active ? "opacity-90" : "text-zinc-400"}`}>{chip.count}</span>
-            </button>
-          );
-        })}
-      </div>
+    </div>
+    {/* Cartes blanches cliquables, comme le tableau de bord (retour de Cindy
+        du 18/11, "plus joli") -- un appui filtre la liste, un 2e appui sur
+        la carte active revient à "Tous". "Partiels" seulement s'il y en a. */}
+    <div className={`grid grid-cols-2 gap-3 ${kpis.partielCount > 0 ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}>
+      <KpiCard
+        icon={AlertTriangle}
+        iconClass="text-coral-dark"
+        value={kpis.enAttenteCount}
+        kind="integer"
+        label="À encaisser"
+        onClick={() => onStatusFilterChange(statusFilter === "EN_ATTENTE" ? "ALL" : "EN_ATTENTE")}
+        active={statusFilter === "EN_ATTENTE"}
+        activeClassName="border-coral-dark bg-coral/15"
+      />
+      {kpis.partielCount > 0 && (
+        <KpiCard
+          icon={Clock}
+          iconClass="text-parquet-dark"
+          value={kpis.partielCount}
+          kind="integer"
+          label="Partiels"
+          onClick={() => onStatusFilterChange(statusFilter === "PARTIEL" ? "ALL" : "PARTIEL")}
+          active={statusFilter === "PARTIEL"}
+          activeClassName="border-parquet-dark bg-parquet/15"
+        />
+      )}
+      <KpiCard
+        icon={CheckCircle2}
+        iconClass="text-court-green"
+        value={kpis.payeCount}
+        kind="integer"
+        label="Payés"
+        onClick={() => onStatusFilterChange(statusFilter === "PAYE" ? "ALL" : "PAYE")}
+        active={statusFilter === "PAYE"}
+        activeClassName="border-court-green bg-court-green/10"
+      />
+      <KpiCard
+        icon={ShieldCheck}
+        iconClass="text-navy"
+        value={kpis.offertCount}
+        kind="integer"
+        label="Offerts"
+        onClick={() => onStatusFilterChange(statusFilter === "OFFERT" ? "ALL" : "OFFERT")}
+        active={statusFilter === "OFFERT"}
+        activeClassName="border-navy bg-navy/10"
+      />
+      <KpiCard
+        icon={Users}
+        iconClass="text-zinc-600"
+        value={kpis.total}
+        kind="integer"
+        label="Tous"
+        onClick={() => onStatusFilterChange("ALL")}
+        active={statusFilter === "ALL"}
+        activeClassName="border-zinc-500 bg-zinc-100"
+      />
+    </div>
     </div>
   );
 }
