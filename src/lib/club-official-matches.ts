@@ -19,7 +19,7 @@ export async function getClubOfficialMatches(supabase: SupabaseClient): Promise<
   const { data, error } = await supabase
     .from("events")
     .select(
-      "id, title, event_type, is_home, location, salle, away_venue_address, start_time, end_time, impact_time, team_id, team_score, opponent_score, cancelled_at, cancelled_reason, teams(name)"
+      "id, title, event_type, is_home, location, salle, away_venue_address, start_time, end_time, impact_time, team_id, team_score, opponent_score, cancelled_at, cancelled_reason, teams(name, is_demo)"
     )
     .eq("event_type", "MATCH")
     .gte("start_time", windowStart)
@@ -28,7 +28,12 @@ export async function getClubOfficialMatches(supabase: SupabaseClient): Promise<
     console.error("[getClubOfficialMatches] échec:", error);
     return [];
   }
-  return (data ?? []).map((e) => {
+  // Jamais un match d'équipe démo (retour de Cindy du 18/11, "tout ce qui
+  // concerne la démo, non visible") : un enfant de l'équipe démo voit quand
+  // même ses propres matchs, qui arrivent par son calendrier à lui.
+  return (data ?? [])
+    .filter((e) => !(e.teams as unknown as { is_demo: boolean | null } | null)?.is_demo)
+    .map((e) => {
     const team = e.teams as unknown as { name: string | null } | null;
     return {
       id: e.id,
