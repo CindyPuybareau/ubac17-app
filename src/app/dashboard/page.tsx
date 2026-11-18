@@ -1,3 +1,9 @@
+import {
+  mapAidRow,
+  mapRefundRow,
+  type CotisationAid,
+  type CotisationRefund,
+} from "@/lib/cotisation-followups";
 import { redirect } from "next/navigation";
 import { Mail } from "lucide-react";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
@@ -431,6 +437,10 @@ export type AdminCotisation = {
   // date à laquelle le Bureau a indiqué "C'est normal" -- null tant que
   // personne n'a regardé (cotisation-checks.tsx).
   verifieeLe?: string | null;
+  // Suivis comptables (retour de Cindy du 18/11) : aides Pass Sport / ANCV
+  // et remboursements -- chargés pour le Bureau seulement.
+  aids?: CotisationAid[];
+  refunds?: CotisationRefund[];
 };
 
 // Transforme une ligne brute de "cotisations" (avec ses jointures players/
@@ -455,7 +465,8 @@ function mapCotisationRow(
     players: unknown;
     collectes: unknown;
   },
-  paymentsByCotisationId: Map<string, CotisationPayment[]>
+  paymentsByCotisationId: Map<string, CotisationPayment[]>,
+  followUps?: { aids: Map<string, CotisationAid[]>; refunds: Map<string, CotisationRefund[]> }
 ): AdminCotisation {
   const player = c.players as unknown as {
     first_name: string | null;
@@ -493,6 +504,8 @@ function mapCotisationRow(
     addedManually: c.added_manually,
     verifieeLe: c.verifiee_le ?? null,
     payments: paymentsByCotisationId.get(c.id) ?? [],
+    aids: followUps?.aids.get(c.id) ?? [],
+    refunds: followUps?.refunds.get(c.id) ?? [],
     membershipType: player?.membership_type ?? null,
     fbiStatus: player?.fbi_status ?? null,
     collecteId: c.collecte_id,
@@ -1931,6 +1944,8 @@ export default async function DashboardPage({
       penalitesRes,
       buvetteRes,
       accessProfilesRes,
+      cotisationAidsRes,
+      cotisationRefundsRes,
     ] = await runBatched(
       [
         // Mis en cache 45s (voir reference-cache.ts) : liste d'équipes
@@ -2091,6 +2106,18 @@ export default async function DashboardPage({
         // Mis en cache 45s (voir reference-cache.ts) : profils d'accès,
         // identiques pour tout le Bureau, créés/modifiés rarement.
         () => getCachedAccessProfiles(),
+        // Suivis comptables (retour de Cindy du 18/11) : deux requêtes en
+        // tout, jamais une par cotisation.
+        () =>
+          supabase
+            .from("cotisation_aids")
+            .select("id, cotisation_id, kind, code, amount, status, batch")
+            .order("created_at", { ascending: true }),
+        () =>
+          supabase
+            .from("cotisation_refunds")
+            .select("id, cotisation_id, amount, reason, rib_received, status, done_at, import_key")
+            .order("created_at", { ascending: true }),
       ],
       // dbLimit (voir sa définition plus haut) : UN seul plafond partagé
       // avec tous les autres blocs de cette page (Coach, Famille, les
@@ -2127,6 +2154,8 @@ export default async function DashboardPage({
       inventoryRes,
       penalitesRes,
       accessProfilesRes,
+      cotisationAidsRes,
+      cotisationRefundsRes,
     });
 
     // is_demo (retour de Cindy du 11/11, "des faux entraînements/matchs...
@@ -2764,6 +2793,21 @@ export default async function DashboardPage({
     // paid_at desc order from the query above is preserved here (most
     // recent payment first per cotisation), which is what the payment
     // history list in the "Enregistrer un paiement" modal wants to show.
+    const cotisationFollowUps = {
+      aids: new Map<string, CotisationAid[]>(),
+      refunds: new Map<string, CotisationRefund[]>(),
+    };
+    (cotisationAidsRes.data ?? []).forEach((a) => {
+      const list = cotisationFollowUps.aids.get(a.cotisation_id) ?? [];
+      list.push(mapAidRow(a));
+      cotisationFollowUps.aids.set(a.cotisation_id, list);
+    });
+    (cotisationRefundsRes.data ?? []).forEach((r) => {
+      const list = cotisationFollowUps.refunds.get(r.cotisation_id) ?? [];
+      list.push(mapRefundRow(r));
+      cotisationFollowUps.refunds.set(r.cotisation_id, list);
+    });
+
     const paymentsByCotisationId = new Map<string, CotisationPayment[]>();
     (cotisationPaymentsRes.data ?? []).forEach((p) => {
       const list = paymentsByCotisationId.get(p.cotisation_id) ?? [];
@@ -2810,7 +2854,8 @@ export default async function DashboardPage({
               }
             : null,
         },
-        paymentsByCotisationId
+        paymentsByCotisationId,
+        cotisationFollowUps
       );
     });
 

@@ -6,6 +6,14 @@ import * as XLSX from "xlsx";
 import { createClient } from "@/lib/supabase/client";
 import { runBatched } from "@/lib/batch";
 import { getCurrentSeasonLabel } from "@/lib/season";
+import {
+  AID_STATUS_RANK,
+  REFUND_STATUS_RANK,
+  mapAidRow,
+  mapRefundRow,
+  parseAidsFromFile,
+  parseRefundFromFile,
+} from "@/lib/cotisation-followups";
 import { suggestTeamCategory } from "@/lib/team-assignment";
 import { notifyCoachesOfNewTeamMember } from "@/lib/member-notifications";
 import { formatFirstName, normalizeNameForMatching } from "@/lib/names";
@@ -22,6 +30,11 @@ type ParsedRow = {
   paiement: number | null;
   statutClub: string | null;
   modePaiement: string | null;
+  // Suivis comptables (retour de Cindy du 18/11) : texte brut des colonnes
+  // "Pass et/ou Chèque Sport", "Statut Pass et/ou Sport" et "Remboursement".
+  aidsText: string | null;
+  aidsStatusText: string | null;
+  refundText: string | null;
   sex: string | null;
   registrationEmail: string | null;
   registrationPhone: string | null;
@@ -276,6 +289,9 @@ export default function ImportInscriptions() {
       categorie: findExact("Catégorie"),
       statutClub: findExact("Statut Club"),
       modePaiement: findExact("Mode Paiement"),
+      aidsCodes: findPrefix("Pass et/ou Chèque Sport"),
+      aidsStatus: findExact("Statut Pass et/ou Sport"),
+      remboursement: findExact("Remboursement"),
       prix: findPriceColumn(),
       remise: findPrefix("Remise\n"),
       paiement: findPrefix("Paiement\n"),
@@ -403,6 +419,9 @@ export default function ImportInscriptions() {
           idx.modePaiement >= 0
             ? (r[idx.modePaiement] as string | null)
             : null,
+        aidsText: strOrNull(get(r, idx.aidsCodes)),
+        aidsStatusText: strOrNull(get(r, idx.aidsStatus)),
+        refundText: strOrNull(get(r, idx.remboursement)),
         sex,
         registrationEmail: strOrNull(get(r, idx.email)),
         registrationPhone: formatPhoneValue(get(r, idx.licencie)),
@@ -818,6 +837,163 @@ export default function ImportInscriptions() {
       (res) => (res.data?.length ?? 0) === 0
     ).length;
 
+    // Aides Pass Sport / ANCV et remboursements du fichier (retour de Cindy
+    // du 18/11). Ajout ou mise à jour seulement -- jamais de suppression
+    // (règle n°1), et jamais de retour en arrière : une aide "Reçue" ou un
+    // remboursement "Fait" saisis dans l'appli le restent. Requêtes groupées
+    // (CLAUDE.md règle n°6) : 1 lecture des cotisations, 2 lectures en
+    // parallèle, puis au plus 4 écritures, quel que soit le nombre de lignes.
+    let aidsWritten = 0;
+    let refundsWritten = 0;
+    const followUpRows = allRows.filter((r) => r.aidsText || r.refundText);
+    if (followUpRows.length > 0) {
+      const { data: seasonCotisations, error: seasonCotisationsError } = await supabase
+        .from("cotisations")
+        .select("id, player_id")
+        .eq("saison", season)
+        .is("collecte_id", null)
+        .in(
+          "player_id",
+          followUpRows.map((r) => r.id)
+        );
+      if (seasonCotisationsError) {
+        setLoading(false);
+        setError(seasonCotisationsError.message);
+        return;
+      }
+      const cotisationIdOf = new Map((seasonCotisations ?? []).map((c) => [c.player_id, c.id]));
+      const followUpCotisationIds = Array.from(new Set(cotisationIdOf.values()));
+      const [existingAidsRes, existingRefundsRes] =
+        followUpCotisationIds.length > 0
+          ? await Promise.all([
+              supabase
+                .from("cotisation_aids")
+                .select("id, cotisation_id, kind, code, amount, status, batch, status_changed_at")
+                .in("cotisation_id", followUpCotisationIds),
+              supabase
+                .from("cotisation_refunds")
+                .select("id, cotisation_id, amount, reason, rib_received, status, done_at, import_key")
+                .in("cotisation_id", followUpCotisationIds)
+                .eq("import_key", "fichier"),
+            ])
+          : [{ data: [], error: null }, { data: [], error: null }];
+      const followUpReadError = existingAidsRes.error ?? existingRefundsRes.error;
+      if (followUpReadError) {
+        setLoading(false);
+        setError(followUpReadError.message);
+        return;
+      }
+
+      const nowIso = new Date().toISOString();
+      const existingAidByKey = new Map(
+        (existingAidsRes.data ?? []).map((a) => [`${a.cotisation_id}|${a.kind}|${a.code}`, a])
+      );
+      const aidsToInsert: Record<string, unknown>[] = [];
+      const aidsToUpdate: Record<string, unknown>[] = [];
+      const seenAidKeys = new Set<string>();
+      followUpRows.forEach((r) => {
+        const cotisationId = cotisationIdOf.get(r.id);
+        if (!cotisationId) return;
+        parseAidsFromFile(r.aidsText, r.aidsStatusText).forEach((aid) => {
+          const key = `${cotisationId}|${aid.kind}|${aid.code}`;
+          if (seenAidKeys.has(key)) return;
+          seenAidKeys.add(key);
+          const existing = existingAidByKey.get(key);
+          if (!existing) {
+            aidsToInsert.push({
+              cotisation_id: cotisationId,
+              kind: aid.kind,
+              code: aid.code,
+              status: aid.status,
+              batch: aid.batch,
+              status_changed_at: nowIso,
+            });
+            return;
+          }
+          const existingRank = AID_STATUS_RANK[mapAidRow(existing).status];
+          const moveForward = AID_STATUS_RANK[aid.status] > existingRank;
+          const newBatch = existing.batch ?? aid.batch;
+          if (moveForward || newBatch !== existing.batch) {
+            aidsToUpdate.push({
+              id: existing.id,
+              cotisation_id: existing.cotisation_id,
+              kind: existing.kind,
+              code: existing.code,
+              amount: existing.amount,
+              status: moveForward ? aid.status : existing.status,
+              batch: newBatch,
+              status_changed_at: moveForward ? nowIso : existing.status_changed_at,
+            });
+          }
+        });
+      });
+
+      const existingRefundByCotisation = new Map(
+        (existingRefundsRes.data ?? []).map((ref) => [ref.cotisation_id, ref])
+      );
+      const refundsToInsert: Record<string, unknown>[] = [];
+      const refundsToUpdate: Record<string, unknown>[] = [];
+      const todayIso = nowIso.slice(0, 10);
+      followUpRows.forEach((r) => {
+        const cotisationId = cotisationIdOf.get(r.id);
+        const parsed = parseRefundFromFile(r.refundText);
+        if (!cotisationId || !parsed) return;
+        const existing = existingRefundByCotisation.get(cotisationId);
+        if (!existing) {
+          refundsToInsert.push({
+            cotisation_id: cotisationId,
+            amount: parsed.amount,
+            reason: parsed.reason,
+            rib_received: parsed.ribReceived,
+            status: parsed.status,
+            done_at: parsed.status === "FAIT" ? todayIso : null,
+            import_key: "fichier",
+          });
+          return;
+        }
+        const current = mapRefundRow(existing);
+        const status = REFUND_STATUS_RANK[parsed.status] > REFUND_STATUS_RANK[current.status] ? parsed.status : current.status;
+        const ribReceived = current.ribReceived || parsed.ribReceived;
+        const reason = parsed.reason ?? current.reason;
+        if (
+          status !== current.status ||
+          ribReceived !== current.ribReceived ||
+          Math.abs(parsed.amount - current.amount) > 0.009 ||
+          reason !== current.reason
+        ) {
+          refundsToUpdate.push({
+            id: existing.id,
+            cotisation_id: existing.cotisation_id,
+            amount: parsed.amount,
+            reason,
+            rib_received: ribReceived,
+            status,
+            done_at: status === "FAIT" ? (existing.done_at ?? todayIso) : null,
+            import_key: "fichier",
+          });
+        }
+      });
+
+      const followUpWrites = await Promise.all([
+        aidsToInsert.length > 0 ? supabase.from("cotisation_aids").insert(aidsToInsert).select("id") : null,
+        aidsToUpdate.length > 0
+          ? supabase.from("cotisation_aids").upsert(aidsToUpdate, { onConflict: "id" }).select("id")
+          : null,
+        refundsToInsert.length > 0 ? supabase.from("cotisation_refunds").insert(refundsToInsert).select("id") : null,
+        refundsToUpdate.length > 0
+          ? supabase.from("cotisation_refunds").upsert(refundsToUpdate, { onConflict: "id" }).select("id")
+          : null,
+      ]);
+      const followUpWriteError = followUpWrites.find((w) => w?.error)?.error;
+      if (followUpWriteError) {
+        setLoading(false);
+        setError(`Aides / remboursements : ${followUpWriteError.message}`);
+        return;
+      }
+      aidsWritten = (followUpWrites[0]?.data?.length ?? 0) + (followUpWrites[1]?.data?.length ?? 0);
+      refundsWritten = (followUpWrites[2]?.data?.length ?? 0) + (followUpWrites[3]?.data?.length ?? 0);
+    }
+
     // Affectation d'équipe suggérée (audit du 31/08, retour de Cindy) :
     // toujours additive — un insert dans team_players, jamais un retrait
     // ni un déplacement d'une affectation existante (déjà garanti par
@@ -882,8 +1058,12 @@ export default function ImportInscriptions() {
       applyTeamSuggestions && teamAssignedCount > 0
         ? ` ${teamAssignedCount} affecté${teamAssignedCount > 1 ? "s" : ""} automatiquement à leur équipe.`
         : "";
+    const followUpNote =
+      aidsWritten + refundsWritten > 0
+        ? ` Aides Pass Sport / ANCV : ${aidsWritten} ajoutée${aidsWritten > 1 ? "s" : ""} ou mise${aidsWritten > 1 ? "s" : ""} à jour ; remboursements : ${refundsWritten}.`
+        : "";
     setResult(
-      `${toInsert.length} nouveau${toInsert.length > 1 ? "x" : ""} membre${toInsert.length > 1 ? "s" : ""}, ${toUpdate.length} mis à jour, pour la saison ${season}.${teamNote}${reviewNote}${blockedNote}`
+      `${toInsert.length} nouveau${toInsert.length > 1 ? "x" : ""} membre${toInsert.length > 1 ? "s" : ""}, ${toUpdate.length} mis à jour, pour la saison ${season}.${teamNote}${followUpNote}${reviewNote}${blockedNote}`
     );
     setRows(null);
     setPreview(null);
