@@ -580,6 +580,9 @@ export default function ImportInscriptions() {
 
     function computeSuggestion(playerId: string, r: ParsedRow) {
       if (playersWithTeam.has(playerId)) return { category: null, teamId: null };
+      // Membre archivé (retiré de ses équipes à l'archivage) : aucune équipe
+      // proposée (bug du 18/11, voir teamLinksToInsert plus bas).
+      if (byId.get(playerId)?.archived_at) return { category: null, teamId: null };
       const category = suggestTeamCategory({
         birthDate: r.birthDate,
         sex: r.sex,
@@ -1001,8 +1004,13 @@ export default function ImportInscriptions() {
     let teamAssignedCount = 0;
     let blockedTeamAssignments = 0;
     if (applyTeamSuggestions) {
+      // Jamais pour un membre archivé resté archivé (bug du 18/11 : Alyssa
+      // LE MUEY, partie et remboursée, retirée de U13F à l'archivage puis
+      // remise dans U13F par l'import, parce qu'elle figure encore dans le
+      // fichier du Bureau). Seulement s'il est coché "Réactiver".
       const teamLinksToInsert = allRows
         .filter((r) => r.suggestedTeamId)
+        .filter((r) => !existingById.get(r.id)?.archived_at || reactivateIds.has(r.id))
         .map((r) => ({ team_id: r.suggestedTeamId as string, player_id: r.id }));
       if (teamLinksToInsert.length > 0) {
         const { error: teamLinksError, data: insertedTeamLinks } = await supabase
