@@ -452,6 +452,7 @@ export default function CotisationParticipantsTable({
   toolbarExtra,
   belowToolbar,
   autoSelectAll = false,
+  renderAbove,
 }: {
   cotisations: AdminCotisation[];
   contactEmailByPlayerId: Record<string, string>;
@@ -486,6 +487,11 @@ export default function CotisationParticipantsTable({
   // le sous-ensemble voulu (pendingEventCotisations), pas besoin de refiltrer
   // par statut ici ni de faire naviguer la page.
   autoSelectAll?: boolean;
+  // Bloc affiché tout en haut, qui reçoit de quoi ouvrir la fiche
+  // "Cotisation & Paiements" d'une ligne (liste "À vérifier", retour de
+  // Cindy du 18/11) -- une fonction plutôt qu'un état piloté par le parent,
+  // pour ne pas dupliquer la fenêtre de paiement.
+  renderAbove?: (openCotisation: (id: string) => void) => ReactNode;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1527,6 +1533,7 @@ export default function CotisationParticipantsTable({
 
   return (
     <div className="flex flex-col gap-4">
+      {renderAbove?.((id) => openPayment([id]))}
       {actionError && (
         <div className="flex items-start justify-between gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">
           <span>{actionError}</span>
