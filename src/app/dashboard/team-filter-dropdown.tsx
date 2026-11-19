@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useDropdownAlign } from "./use-dropdown-align";
 import { ChevronDown, Users } from "lucide-react";
 import { teamLabel } from "@/lib/teams";
 
@@ -33,6 +34,7 @@ export default function TeamFilterDropdown({
   compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const { anchorRef, measure, alignClass } = useDropdownAlign<HTMLDivElement>(288);
 
   const allSelected = selectedIds.size === teams.length;
   const label = allSelected
@@ -49,14 +51,17 @@ export default function TeamFilterDropdown({
   }
 
   return (
-    <div className="relative">
+    <div ref={anchorRef} className="relative">
       {/* Retour de Cindy du 25/09 ("plus sympa aussi") : icône Users +
           accent doré dès qu'un filtre est actif (comme "Commissions (N)",
           commission-multi-select.tsx) -- neutre gris uniquement quand tout
           est coché, comme avant, pour ne pas donner l'impression trompeuse
           qu'un filtre est déjà appliqué par défaut. */}
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          if (!open) measure();
+          setOpen((o) => !o);
+        }}
         className={`flex items-center gap-1.5 rounded-full border font-medium transition-colors ${
           allSelected
             ? "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
@@ -74,7 +79,7 @@ export default function TeamFilterDropdown({
             className="fixed inset-0 z-30"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute left-0 z-40 mt-2 max-h-80 w-72 overflow-y-auto rounded-2xl border border-zinc-100 bg-white p-3 shadow-lg">
+          <div className={`absolute ${alignClass} z-40 mt-2 max-h-80 w-72 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-2xl border border-zinc-100 bg-white p-3 shadow-lg`}>
             <div className="mb-2 flex gap-2">
               <button
                 onClick={() => onChange(new Set(teams.map((t) => t.id)))}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useDropdownAlign } from "./use-dropdown-align";
 import { Navigation } from "lucide-react";
 
 // Chacun a son habitude : imposer Google Maps à qui navigue sur Waze
@@ -15,6 +16,7 @@ export default function ItineraryButton({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const { anchorRef, measure, alignClass } = useDropdownAlign<HTMLDivElement>(176);
 
   if (!query) return null;
 
@@ -30,10 +32,13 @@ export default function ItineraryButton({
   ];
 
   return (
-    <div className="relative w-fit">
+    <div ref={anchorRef} className="relative w-fit">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (!open) measure();
+          setOpen((v) => !v);
+        }}
         className={
           className ??
           // Retour de Cindy du 04/11 ("plus petit le bouton itinéraire") :
@@ -48,7 +53,7 @@ export default function ItineraryButton({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-20 mt-1 flex w-44 flex-col gap-1 rounded-xl border border-zinc-100 bg-white p-1.5 shadow-lg">
+        <div className={`absolute ${alignClass} top-full z-20 mt-1 flex w-44 max-w-[calc(100vw-2rem)] flex-col gap-1 rounded-xl border border-zinc-100 bg-white p-1.5 shadow-lg`}>
           {links.map((l) => (
             <a
               key={l.label}

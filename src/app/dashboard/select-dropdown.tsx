@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useDropdownAlign } from "./use-dropdown-align";
 import { ChevronDown, type LucideIcon } from "lucide-react";
 
 export type SelectOption = {
@@ -37,6 +38,7 @@ export default function SelectDropdown({
   icon?: LucideIcon;
 }) {
   const [open, setOpen] = useState(false);
+  const { anchorRef, measure, alignClass } = useDropdownAlign<HTMLDivElement>(256);
   const label = options.find((o) => o.value === value)?.label ?? "";
 
   function select(v: string) {
@@ -45,10 +47,13 @@ export default function SelectDropdown({
   }
 
   return (
-    <div className="relative">
+    <div ref={anchorRef} className="relative">
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          if (!open) measure();
+          setOpen((o) => !o);
+        }}
         className={`flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white font-medium text-zinc-700 hover:bg-zinc-50 ${
           compact ? "px-3 py-1 text-xs" : "px-3 py-1.5 text-sm"
         }`}
@@ -61,7 +66,7 @@ export default function SelectDropdown({
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 z-40 mt-2 max-h-80 w-64 overflow-y-auto rounded-2xl border border-zinc-100 bg-white p-1.5 shadow-lg">
+          <div className={`absolute ${alignClass} z-40 mt-2 max-h-80 w-64 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-2xl border border-zinc-100 bg-white p-1.5 shadow-lg`}>
             {options.map((o) => (
               <button
                 key={o.value}
