@@ -3078,7 +3078,10 @@ export default async function DashboardPage({
                       .map((p: RosterPlayer) => [p.id, p] as const)
                   ).values()
                 )
-              : unionRoster(rosterByTeam);
+              : // Jamais les joueurs démo dans les présences d'un événement "tout le
+                // club" (retour de Cindy du 19/11 : la réponse de test du compte
+                // démo apparaissait sur le Noël de l'UBAC).
+                unionRoster(rosterByTeam).filter((p) => !demoPlayerIds.has(p.id));
       const paidInfo = resolvePaidInfo(
         attachCotisationsToCollectes(e.collectes, adminPaidParticipantsByCollecteId)
       );
@@ -3131,7 +3134,17 @@ export default async function DashboardPage({
         ...(e.ask_companions
           ? (() => {
               const byPlayer = buildCompanionsByPlayer(rsvpsByEvent, e.id);
-              const links = parentPlayerRes.data ?? [];
+              // Un parent licencié (ex. Basile LAMOURET, Séniors) répond
+              // aussi pour lui-même : sa propre fiche (players.profile_id =
+              // son compte) rejoint la famille de ses enfants, pour un seul
+              // nombre d'accompagnants compté une fois (retour de Cindy du
+              // 19/11).
+              const links = [
+                ...(parentPlayerRes.data ?? []),
+                ...(playersRes.data ?? [])
+                  .filter((p) => p.profile_id)
+                  .map((p) => ({ parent_id: p.profile_id as string, player_id: p.id })),
+              ];
               const present = buildPresentPlayers(rsvpsByEvent, e.id, eventRoster);
               const presentById = new Map(present.map((p) => [p.id, p]));
               const families: CompanionsFamilyLine[] = groupByFamily(
@@ -4232,9 +4245,23 @@ export default async function DashboardPage({
         presentPlayers: buildPresentPlayers(rsvpsByEvent, e.id, ownTeamRoster),
         pendingPlayers: buildPendingPlayers(rsvpsByEvent, e.id, ownTeamRoster),
         absentPlayers: buildAbsentPlayers(rsvpsByEvent, e.id, ownTeamRoster),
-        companionsByPlayerId: e.ask_companions
-          ? buildCompanionsByPlayer(rsvpsByEvent, e.id, ownTeamRoster)
-          : undefined,
+        ...(e.ask_companions
+          ? (() => {
+              // Sa propre fiche et celles de ses enfants (même famille), y
+              // compris sur un événement "tout le club" sans effectif
+              // d'équipe -- retour de Cindy du 19/11.
+              const familyRoster = playerRows.map((p) => ({ id: p.id, first_name: p.first_name, last_name: p.last_name }));
+              const present = buildPresentPlayers(rsvpsByEvent, e.id, ownTeamRoster);
+              const familyPresent = buildPresentPlayers(rsvpsByEvent, e.id, familyRoster).filter(
+                (p) => !present.some((x) => x.id === p.id)
+              );
+              return {
+                presentPlayers: [...present, ...familyPresent],
+                companionsByPlayerId: buildCompanionsByPlayer(rsvpsByEvent, e.id, [...ownTeamRoster, ...familyRoster]),
+                companionsFamilyIds: familyRoster.map((p) => p.id),
+              };
+            })()
+          : {}),
         // Retour de Cindy du 30/09 ("équipes sœurs") : un match de
         // siblingMatchesRes ci-dessus (team.id dans siblingTeamIdSet) reste
         // strictement consultable -- même marqueur déjà utilisé par
@@ -5194,9 +5221,18 @@ export default async function DashboardPage({
           ownFamilyTeamIds.flatMap((id) => rosterByTeamId.get(id) ?? []).map((p) => [p.id, p] as const)
         ).values()
       );
-      e.presentPlayers = buildPresentPlayers(rsvpsByEvent, e.id, ownFamilyRoster);
+      // Événement "tout le club" (ni équipe ni équipes ciblées, ex. le Noël
+      // de l'UBAC) avec la question des accompagnants : aucun effectif
+      // d'équipe, donc les licenciés de CETTE famille seulement -- sinon le
+      // compteur disparaissait au premier rafraîchissement (retour de Cindy
+      // du 19/11).
+      const familyRosterForEvent =
+        e.askCompanions && !e.teamId && !e.targetTeamIds?.length
+          ? playerRows.map((p) => ({ id: p.id, first_name: p.first_name, last_name: p.last_name }))
+          : ownFamilyRoster;
+      e.presentPlayers = buildPresentPlayers(rsvpsByEvent, e.id, familyRosterForEvent);
       if (e.askCompanions) {
-        const myFamilyInEvent = ownFamilyRoster.filter((p) => familyPlayerIdSet.has(p.id));
+        const myFamilyInEvent = familyRosterForEvent.filter((p) => familyPlayerIdSet.has(p.id));
         e.companionsFamilyIds = myFamilyInEvent.map((p) => p.id);
         e.companionsByPlayerId = buildCompanionsByPlayer(rsvpsByEvent, e.id, myFamilyInEvent);
       }

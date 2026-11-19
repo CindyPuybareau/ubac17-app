@@ -2984,6 +2984,10 @@ export default function CalendarView({
                     initialValue={initial}
                     onSaved={(value) => setLocalCompanions(event.id, presentIds, value)}
                     familyPlayerIds={[...familyIds]}
+                    presentNames={(event.presentPlayers ?? [])
+                      .filter((p) => familyIds.has(p.id))
+                      .map((p) => (p.firstName ? formatFirstName(p.firstName) : ""))
+                      .filter(Boolean)}
                   />
                 );
               })()}
@@ -3204,14 +3208,25 @@ export default function CalendarView({
               />
               {event.askCompanions &&
                 event.event_type === "OTHER" &&
-                (event.presentPlayers ?? []).some((p) => p.id === selfPlayerId) && (
-                  <EventCompanionsField
-                    key={`${event.id}:${selfPlayerId}`}
-                    eventId={event.id}
-                    presentPlayerIds={[selfPlayerId]}
-                    initialValue={event.companionsByPlayerId?.[selfPlayerId] ?? 0}
-                  />
-                )}
+                (event.presentPlayers ?? []).some((p) => p.id === selfPlayerId) &&
+                (() => {
+                  // Même compteur que la famille (ses enfants), jamais un
+                  // deuxième -- retour de Cindy du 19/11.
+                  const familyIds = new Set([selfPlayerId, ...(event.companionsFamilyIds ?? [])]);
+                  const present = (event.presentPlayers ?? []).filter((p) => familyIds.has(p.id));
+                  return (
+                    <EventCompanionsField
+                      key={`${event.id}:companions`}
+                      eventId={event.id}
+                      presentPlayerIds={present.map((p) => p.id)}
+                      familyPlayerIds={[...familyIds]}
+                      initialValue={Math.max(0, ...present.map((p) => event.companionsByPlayerId?.[p.id] ?? 0))}
+                      presentNames={present
+                        .map((p) => (p.firstName ? formatFirstName(p.firstName) : ""))
+                        .filter(Boolean)}
+                    />
+                  );
+                })()}
             </div>
           );
         })()}
