@@ -6,7 +6,7 @@
 // UN seul nombre pour la famille : recopié sur la réponse de chaque enfant
 // présent de ce compte (une seule requête), et compté une fois par famille
 // dans le total du Bureau (src/lib/event-companions.ts).
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Minus, Plus, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { MAX_COMPANIONS } from "@/lib/event-companions";
@@ -42,16 +42,11 @@ export default function EventCompanionsField({
   initialValue: number;
 }) {
   const [value, setValue] = useState(initialValue);
-  const [saving, setSaving] = useState(false);
+  // Écriture en cours : une relecture qui arriverait pendant ce temps ne
+  // doit pas écraser le nombre qu'on est en train d'enregistrer.
+  const savingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Nouvelle valeur venue du serveur (rafraîchissement temps réel, autre
-  // parent qui a modifié) : reprise, sauf pendant une écriture en cours.
-  const [prevInitial, setPrevInitial] = useState(initialValue);
-  if (initialValue !== prevInitial) {
-    setPrevInitial(initialValue);
-    if (!saving) setValue(initialValue);
-  }
 
   // Relecture du vrai nombre de la famille à l'ouverture et quand la liste
   // des présents change (test du 19/11 : après un changement d'onglet
@@ -68,20 +63,24 @@ export default function EventCompanionsField({
       .eq("status", "PRESENT")
       .in("player_id", presentKey.split(","))
       .then(({ data }) => {
-        if (stale || !data) return;
+        if (stale || !data || savingRef.current) return;
         setValue(Math.max(0, ...data.map((r) => r.companions ?? 0)));
       });
     return () => {
       stale = true;
     };
-  }, [eventId, presentKey]);
+    // initialValue en dépendance : chaque rafraîchissement de la page (temps
+    // réel, autre parent qui a modifié) relit le VRAI nombre en base plutôt
+    // que de reprendre l'instantané de la page, parfois antérieur au dernier
+    // clic (test du 19/11 sur le Noël : 2 -> 0 -> 2 pendant une seconde).
+  }, [eventId, presentKey, initialValue]);
 
   async function change(next: number) {
     const clamped = Math.max(0, Math.min(MAX_COMPANIONS, next));
     if (clamped === value || presentPlayerIds.length === 0) return;
     const previous = value;
     setValue(clamped);
-    setSaving(true);
+    savingRef.current = true;
     setError(null);
     const { error: writeError, data } = await createClient()
       .from("rsvps")
@@ -90,7 +89,7 @@ export default function EventCompanionsField({
       .eq("status", "PRESENT")
       .in("player_id", familyIds)
       .select("player_id");
-    setSaving(false);
+    savingRef.current = false;
     if (writeError || !data || data.length === 0) {
       setValue(previous);
       setError("Nombre non enregistré, réessaie.");
