@@ -57,6 +57,7 @@ import MatchVenue from "./match-venue";
 import CreateEventForm from "./create-event-form";
 import RsvpButtons from "./rsvp-buttons";
 import EventCompanionsField from "./event-companions-field";
+import CompanionsSummary from "./companions-summary";
 import ItineraryButton from "./itinerary-button";
 import MatchTasksPanel from "./match-tasks-panel";
 import MatchScore from "./match-score";
@@ -2890,20 +2891,13 @@ export default function CalendarView({
             comptable) : licenciés présents + accompagnants, ces derniers
             comptés une fois par famille. */}
         {event.askCompanions && event.companionsTotal !== undefined && !event.cancelledAt && (
-          <p className="flex flex-wrap items-center gap-1.5 rounded-xl bg-navy/[0.04] px-3 py-2 text-xs text-zinc-700">
-            <Users className="h-3.5 w-3.5 shrink-0 text-navy" />
-            <span>
-              <span className="font-semibold tabular-nums">{rsvpCounts.present}</span> présent
-              {rsvpCounts.present > 1 ? "s" : ""} +{" "}
-              <span className="font-semibold tabular-nums">{event.companionsTotal}</span> accompagnant
-              {event.companionsTotal > 1 ? "s" : ""} ={" "}
-              <span className="font-bold tabular-nums text-navy">
-                {rsvpCounts.present + event.companionsTotal} personne
-                {rsvpCounts.present + event.companionsTotal > 1 ? "s" : ""} attendue
-                {rsvpCounts.present + event.companionsTotal > 1 ? "s" : ""}
-              </span>
-            </span>
-          </p>
+          <CompanionsSummary
+            eventTitle={event.title ?? "événement"}
+            eventStart={event.start_time}
+            presentCount={rsvpCounts.present}
+            companionsTotal={event.companionsTotal}
+            families={event.companionsFamilies ?? []}
+          />
         )}
         {hasRoster && !event.cancelledAt && (
           <RsvpAttendance
@@ -3058,7 +3052,7 @@ export default function CalendarView({
               <OrganisationCard defaultOpen={false} variant="terracotta">
                 <MatchOfficialsPanel
                   eventId={event.id}
-                  eventTitle={event.title}
+                  eventTitle={event.title ?? "événement"}
                   startTime={event.start_time}
                   teamId={event.teamId}
                   assignments={clubOfficialsByEventId[event.id] ?? emptyMatchOfficials}
@@ -3142,7 +3136,7 @@ export default function CalendarView({
                 <OrganisationCard defaultOpen={organisationDefaultOpen} variant="terracotta">
                   <MatchOfficialsPanel
                     eventId={event.id}
-                    eventTitle={event.title}
+                    eventTitle={event.title ?? "événement"}
                     startTime={event.start_time}
                     teamId={event.teamId}
                     assignments={matchOfficialRolesByEventId[event.id] ?? emptyMatchOfficials}
@@ -3319,7 +3313,7 @@ export default function CalendarView({
             <OrganisationCard defaultOpen={organisationDefaultOpen} variant="terracotta">
               <MatchOfficialsPanel
                 eventId={event.id}
-                eventTitle={event.title}
+                eventTitle={event.title ?? "événement"}
                 startTime={event.start_time}
                 teamId={event.teamId}
                 assignments={matchOfficialRolesByEventId[event.id] ?? emptyMatchOfficials}

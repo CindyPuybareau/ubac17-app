@@ -1,4 +1,4 @@
-import { familyCompanionsTotal } from "@/lib/event-companions";
+import { familyCompanionsTotal, groupByFamily, type CompanionsFamilyLine } from "@/lib/event-companions";
 import {
   mapAidRow,
   mapRefundRow,
@@ -10,7 +10,7 @@ import { Mail } from "lucide-react";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { chunkedQuery, runBatched, Semaphore } from "@/lib/batch";
 import { logQueryErrors } from "@/lib/query-errors";
-import { formatFirstName, formatPersonName } from "@/lib/names";
+import { formatFirstName, formatLastName, formatPersonName } from "@/lib/names";
 import { EMAIL_REPLY_TO } from "@/lib/email";
 import { localDateFromParts } from "@/lib/local-date";
 import { getSpaceDashboardSummary, type SpaceDashboardSummary } from "@/lib/space-dashboard";
@@ -640,6 +640,9 @@ export type AdminUpcomingEvent = {
   // Bureau seulement : total des accompagnants, compté une fois par
   // famille (src/lib/event-companions.ts).
   companionsTotal?: number;
+  // Bureau seulement : une ligne par famille présente (détail + export
+  // Excel pour le comptable, retour de Cindy du 19/11).
+  companionsFamilies?: CompanionsFamilyLine[];
   teamName: string;
   rsvpCounts: {
     present: number;
@@ -3128,9 +3131,31 @@ export default async function DashboardPage({
         ...(e.ask_companions
           ? (() => {
               const byPlayer = buildCompanionsByPlayer(rsvpsByEvent, e.id);
+              const links = parentPlayerRes.data ?? [];
+              const present = buildPresentPlayers(rsvpsByEvent, e.id, eventRoster);
+              const presentById = new Map(present.map((p) => [p.id, p]));
+              const families: CompanionsFamilyLine[] = groupByFamily(
+                present.map((p) => p.id),
+                links
+              )
+                .map((ids) => ({
+                  names: ids.map((id) => {
+                    const p = presentById.get(id);
+                    return [formatLastName(p?.lastName ?? null), p?.firstName ? formatFirstName(p.firstName) : ""]
+                      .filter(Boolean)
+                      .join(" ");
+                  }),
+                  teams: Array.from(
+                    new Set(ids.flatMap((id) => (teamsByPlayerId.get(id) ?? []).map((t) => t.name ?? t.category ?? "")))
+                  ).filter(Boolean),
+                  present: ids.length,
+                  companions: Math.max(0, ...ids.map((id) => byPlayer[id] ?? 0)),
+                }))
+                .sort((a, b) => (a.names[0] ?? "").localeCompare(b.names[0] ?? "", "fr"));
               return {
                 companionsByPlayerId: byPlayer,
-                companionsTotal: familyCompanionsTotal(byPlayer, parentPlayerRes.data ?? []),
+                companionsTotal: familyCompanionsTotal(byPlayer, links),
+                companionsFamilies: families,
               };
             })()
           : {}),

@@ -14,13 +14,10 @@ export const MAX_COMPANIONS = 10;
 // Familles = licenciés qui partagent au moins un parent dans l'appli
 // (parent_player), regroupés de proche en proche. Un licencié sans parent
 // rattaché (adulte inscrit lui-même) forme sa propre famille.
-export function familyCompanionsTotal(
-  companionsByPlayerId: Record<string, number>,
+export function groupByFamily(
+  playerIds: string[],
   parentLinks: { parent_id: string; player_id: string }[]
-): number {
-  const playerIds = Object.keys(companionsByPlayerId);
-  if (playerIds.length === 0) return 0;
-
+): string[][] {
   const root = new Map<string, string>(playerIds.map((id) => [id, id]));
   const find = (id: string): string => {
     let r = id;
@@ -40,13 +37,26 @@ export function familyCompanionsTotal(
     const b = find(player_id);
     if (a !== b) root.set(b, a);
   });
-
-  const maxByFamily = new Map<string, number>();
+  const groups = new Map<string, string[]>();
   playerIds.forEach((id) => {
     const family = find(id);
-    maxByFamily.set(family, Math.max(maxByFamily.get(family) ?? 0, companionsByPlayerId[id] ?? 0));
+    groups.set(family, [...(groups.get(family) ?? []), id]);
   });
-  let total = 0;
-  maxByFamily.forEach((n) => (total += n));
-  return total;
+  return Array.from(groups.values());
 }
+
+// Total des accompagnants : le plus grand nombre déclaré dans chaque
+// famille, une seule fois par famille.
+export function familyCompanionsTotal(
+  companionsByPlayerId: Record<string, number>,
+  parentLinks: { parent_id: string; player_id: string }[]
+): number {
+  return groupByFamily(Object.keys(companionsByPlayerId), parentLinks).reduce(
+    (total, ids) => total + Math.max(0, ...ids.map((id) => companionsByPlayerId[id] ?? 0)),
+    0
+  );
+}
+
+// Détail pour le Bureau et l'export du comptable : une ligne par famille
+// présente (licenciés présents + accompagnants).
+export type CompanionsFamilyLine = { names: string[]; teams: string[]; present: number; companions: number };
