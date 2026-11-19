@@ -7,7 +7,7 @@
 // présent de ce compte (une seule requête), et compté une fois par famille
 // dans le total du Bureau (src/lib/event-companions.ts).
 import { useEffect, useState } from "react";
-import { Minus, Plus, Users } from "lucide-react";
+import { Check, Minus, Plus, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { MAX_COMPANIONS } from "@/lib/event-companions";
 
@@ -33,6 +33,15 @@ export default function EventCompanionsField({
   const [value, setValue] = useState(initialValue);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // "Enregistré" affiché 2 secondes après chaque changement réussi (retour
+  // de Cindy du 19/11, "il y a un bouton valider ?") : tout s'enregistre
+  // au clic, ce petit signe le confirme sans ajouter d'étape.
+  const [savedTick, setSavedTick] = useState(0);
+  useEffect(() => {
+    if (savedTick === 0) return;
+    const timer = setTimeout(() => setSavedTick(0), 2000);
+    return () => clearTimeout(timer);
+  }, [savedTick]);
 
   // Nouvelle valeur venue du serveur (rafraîchissement temps réel, autre
   // parent qui a modifié) : reprise, sauf pendant une écriture en cours.
@@ -72,6 +81,7 @@ export default function EventCompanionsField({
     setValue(clamped);
     setSaving(true);
     setError(null);
+    setSavedTick(0);
     const { error: writeError, data } = await createClient()
       .from("rsvps")
       .update({ companions: clamped })
@@ -86,6 +96,7 @@ export default function EventCompanionsField({
       return;
     }
     onSaved?.(clamped);
+    setSavedTick((t) => t + 1);
   }
 
   const buttonClass =
@@ -124,6 +135,12 @@ export default function EventCompanionsField({
       </div>
       {presentPlayerIds.length > 1 && (
         <p className="text-[11px] text-zinc-500">Un seul nombre pour toute la famille.</p>
+      )}
+      {savedTick > 0 && !error && (
+        <p className="flex items-center justify-end gap-1 text-[11px] font-semibold text-court-green" role="status">
+          <Check className="h-3 w-3" />
+          Enregistré
+        </p>
       )}
       {error && <p className="text-[11px] font-semibold text-red-600">{error}</p>}
     </div>
