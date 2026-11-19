@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useDropdownAlign } from "./use-dropdown-align";
 import { ChevronDown } from "lucide-react";
 import { EVENT_TYPE_OPTIONS } from "./event-style";
 
@@ -44,6 +45,7 @@ export default function EventTypeFilterDropdown({
   onChange: (next: Set<string>) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const { anchorRef, measure, alignClass } = useDropdownAlign<HTMLDivElement>(256);
 
   const activeCount = hiddenTypes.size;
   const label = activeCount > 0 ? `Filtrer par (${activeCount})` : "Filtrer par";
@@ -56,9 +58,12 @@ export default function EventTypeFilterDropdown({
   }
 
   return (
-    <div className="relative">
+    <div ref={anchorRef} className="relative">
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          if (!open) measure();
+          setOpen((o) => !o);
+        }}
         className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
           activeCount > 0
             ? "border-navy/30 bg-navy/10 text-navy"
@@ -72,8 +77,11 @@ export default function EventTypeFilterDropdown({
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 z-40 mt-2 max-h-80 w-64 overflow-y-auto rounded-2xl border border-zinc-100 bg-white p-3 shadow-lg">
-            <div className="mb-2 flex gap-2">
+          {/* Côté d'ouverture choisi selon la place (retour de Cindy du 19/11 :
+              le bouton est à droite de l'écran, le menu dépassait et coupait
+              les libellés) -- jamais plus large que l'écran. */}
+          <div className={`absolute ${alignClass} z-40 mt-2 max-h-80 w-64 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-2xl border border-zinc-100 bg-white p-3 shadow-lg`}>
+            <div className="mb-2 flex flex-wrap gap-2">
               <button
                 onClick={() => onChange(new Set())}
                 className="rounded-full border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
@@ -97,7 +105,7 @@ export default function EventTypeFilterDropdown({
                       onChange={() => toggle(t.value)}
                       className="h-4 w-4 shrink-0 rounded border-zinc-300 text-ubac-yellow-dark focus:ring-ubac-yellow"
                     />
-                    <span className="truncate">{t.label}</span>
+                    <span className="leading-snug">{t.label}</span>
                   </label>
                 </li>
               ))}
