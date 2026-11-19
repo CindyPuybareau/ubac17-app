@@ -116,6 +116,11 @@ export default function TeamCard({
   // reste ouvert au Bureau même depuis cet onglet Équipes — seul un Coach
   // (coach-teams.tsx) le coupe explicitement.
   canManageParentLinks = true,
+  // Retour de Cindy du 19/11 (Alyssa LE MUEY) : un membre ARCHIVÉ encore
+  // dans l'équipe peut être retiré par le Bureau, même si "Retirer" reste
+  // désactivé pour tous les autres (retour du 21/08). Jamais côté Coach
+  // (coach-teams.tsx), qui n'a de toute façon pas le droit de supprimer.
+  canRemoveArchived = true,
   // Retour de Cindy du 30/08 : distinct de canManageTeamAndRoles (déjà à
   // false pour Bureau ET Coach depuis cet onglet Équipes — TeamManager
   // comme CoachTeams passent tous les deux par ce même TeamCard). Celui-ci
@@ -138,6 +143,7 @@ export default function TeamCard({
   clubTeams?: AdminMemberTeam[];
   canRemoveMembers?: boolean;
   canManageParentLinks?: boolean;
+  canRemoveArchived?: boolean;
   canEditFullProfile?: boolean;
 }) {
   const router = useRouter();
@@ -667,12 +673,12 @@ export default function TeamCard({
             utile, "Retirer", toujours proposé -- jamais la flèche
             "Affecter", qui n'a aucun sens pour quelqu'un parti du club. */}
         {m.player && !readOnly && m.player.isArchived ? (
-          canRemoveMembers && (
+          canRemoveArchived && (
             <button
               onClick={() => setRemoveTarget(m.player)}
-              className="shrink-0 rounded-full border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
+              className="shrink-0 whitespace-nowrap rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
             >
-              Retirer
+              Retirer de l&apos;équipe
             </button>
           )
         ) : m.player &&
@@ -741,7 +747,7 @@ export default function TeamCard({
               onClick={detail ? () => setDetailPlayerId(m.id) : undefined}
               className={`border-b border-zinc-50 last:border-0 ${
                 isStaff ? "bg-navy/[0.04]" : ""
-              } ${detail ? "cursor-pointer transition-colors hover:bg-slate-50" : ""}`}
+              } ${m.player?.isArchived ? "bg-zinc-50 text-zinc-400" : ""} ${detail ? "cursor-pointer transition-colors hover:bg-slate-50" : ""}`}
             >
               {/* La bordure vit sur la première cellule : sur un <tr> en
                   border-collapse, un bord gauche ne s'affiche pas. */}
@@ -766,7 +772,7 @@ export default function TeamCard({
                   )}
                   {m.player?.isArchived && (
                     <span className="inline-flex items-center rounded-full bg-zinc-200 px-2 py-0.5 text-[10px] font-semibold leading-none text-zinc-600">
-                      Archivé
+                      Archivé · a quitté le club
                     </span>
                   )}
                 </span>
@@ -883,8 +889,8 @@ export default function TeamCard({
       <div
         key={m.key}
         onClick={detail ? () => setDetailPlayerId(m.id) : undefined}
-        className={`rounded-2xl border border-l-4 border-zinc-100 bg-white p-3.5 shadow-sm ${
-          isStaff ? "border-l-navy" : "border-l-emerald-400"
+        className={`rounded-2xl border border-l-4 border-zinc-100 p-3.5 shadow-sm ${
+          m.player?.isArchived ? "border-l-zinc-300 bg-zinc-50" : isStaff ? "border-l-navy bg-white" : "border-l-emerald-400 bg-white"
         } ${detail ? "cursor-pointer" : ""}`}
       >
         <div className="flex items-start justify-between gap-2">
@@ -900,7 +906,7 @@ export default function TeamCard({
               )}
               {m.player?.isArchived && (
                     <span className="inline-flex items-center rounded-full bg-zinc-200 px-2 py-0.5 text-[10px] font-semibold leading-none text-zinc-600">
-                      Archivé
+                      Archivé · a quitté le club
                     </span>
                   )}
             </p>

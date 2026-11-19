@@ -107,6 +107,7 @@ export default function CoachTeams({
         canRemoveMembers={false}
         // Relier un compte parent à un enfant reste un geste du Bureau.
         canManageParentLinks={false}
+        canRemoveArchived={false}
         // Retour de Cindy du 30/08 : un coach ne corrige que les
         // coordonnées de contact d'un joueur qu'il gère, jamais le reste
         // de sa fiche (nom, catégorie, licence, notes médicales...) — voir
