@@ -662,7 +662,20 @@ export default function TeamCard({
             <Trash2 className="h-3.5 w-3.5" />
           </button>
         )}
-        {m.player &&
+        {/* Membre archivé encore dans l'équipe (retour de Cindy du 18/11,
+            Alyssa LE MUEY, "je n'arrive pas à l'enlever") : seul geste
+            utile, "Retirer", toujours proposé -- jamais la flèche
+            "Affecter", qui n'a aucun sens pour quelqu'un parti du club. */}
+        {m.player && !readOnly && m.player.isArchived ? (
+          canRemoveMembers && (
+            <button
+              onClick={() => setRemoveTarget(m.player)}
+              className="shrink-0 rounded-full border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
+            >
+              Retirer
+            </button>
+          )
+        ) : m.player &&
           !readOnly &&
           (isSecondaryTeam ? (
             <>
@@ -750,6 +763,11 @@ export default function TeamCard({
                       className="h-3.5 w-3.5 shrink-0 text-orange-500"
                       aria-label="Brûlé"
                     />
+                  )}
+                  {m.player?.isArchived && (
+                    <span className="inline-flex items-center rounded-full bg-zinc-200 px-2 py-0.5 text-[10px] font-semibold leading-none text-zinc-600">
+                      Archivé
+                    </span>
                   )}
                 </span>
               </td>
@@ -880,6 +898,11 @@ export default function TeamCard({
               {m.player?.isBurned && (
                 <Flame className="h-3.5 w-3.5 shrink-0 text-orange-500" aria-label="Brûlé" />
               )}
+              {m.player?.isArchived && (
+                    <span className="inline-flex items-center rounded-full bg-zinc-200 px-2 py-0.5 text-[10px] font-semibold leading-none text-zinc-600">
+                      Archivé
+                    </span>
+                  )}
             </p>
             <span className="mt-1 flex flex-wrap items-center gap-1">
               <span

@@ -29,6 +29,10 @@ export type RosterPlayer = Person & {
   // Optionnel : les objets construits ailleurs (calendrier, Bilan de la
   // saison...) n'ont pas besoin de le porter, false par défaut.
   isBurned?: boolean;
+  // Membre archivé encore rattaché à l'équipe (retour de Cindy du 18/11,
+  // Alyssa LE MUEY) : étiquette "Archivé" et bouton "Retirer" toujours
+  // proposé dans team-card.tsx.
+  isArchived?: boolean;
 };
 
 export type TeamWithMembers = {

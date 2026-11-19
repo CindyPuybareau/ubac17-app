@@ -2274,6 +2274,7 @@ export default async function DashboardPage({
         nextEventStatus: null,
         birthDate: player.birth_date,
         isBurned: burnedByPlayerId.get(tp.player_id) ?? false,
+        isArchived: Boolean((player as { archived_at?: string | null }).archived_at),
       });
       rosterByTeam.set(tp.team_id, list);
     });
