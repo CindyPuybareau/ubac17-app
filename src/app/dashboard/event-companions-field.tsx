@@ -11,14 +11,25 @@ import { Minus, Plus, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { MAX_COMPANIONS } from "@/lib/event-companions";
 
+// "Léonie", "Léonie et Raphaël", "Léonie, Raphaël et Basile".
+function joinNames(names: string[]) {
+  if (names.length <= 1) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} et ${names[names.length - 1]}`;
+}
+
 export default function EventCompanionsField({
   eventId,
   presentPlayerIds,
   initialValue,
   onSaved,
   familyPlayerIds,
+  presentNames = [],
 }: {
   eventId: string;
+  // Prénoms des licenciés de la famille déjà notés "Présent" (retour de
+  // Cindy du 19/11) : "Combien de personnes viennent en plus de Léonie et
+  // Raphaël ?" -- dit exactement qui est déjà compté.
+  presentNames?: string[];
   // Tous les licenciés de la famille (présents ou non à l'écran) : lecture
   // et écriture visent ceux qui sont PRÉSENTS EN BASE, jamais une liste
   // d'écran éventuellement en retard (changement d'onglet enfant).
@@ -96,7 +107,9 @@ export default function EventCompanionsField({
       <div className="flex items-center justify-between gap-3">
         <p className="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-zinc-700">
           <Users className="h-3.5 w-3.5 shrink-0 text-navy" />
-          Combien de personnes vous accompagnent ?
+          {presentNames.length > 0
+            ? `Combien de personnes viennent en plus de ${joinNames(presentNames)} ?`
+            : "Combien de personnes vous accompagnent ?"}
         </p>
         <div className="flex shrink-0 items-center gap-2">
           <button
@@ -122,9 +135,6 @@ export default function EventCompanionsField({
           </button>
         </div>
       </div>
-      {presentPlayerIds.length > 1 && (
-        <p className="text-[11px] text-zinc-500">Un seul nombre pour toute la famille.</p>
-      )}
       {error && <p className="text-[11px] font-semibold text-red-600">{error}</p>}
     </div>
   );
