@@ -977,6 +977,22 @@ export default function CalendarView({
   // localEvents, le même geste optimiste pour ces deux compteurs — le
   // prochain rafraîchissement temps réel écrasera cette approximation par
   // la vraie valeur serveur de toute façon.
+  function setLocalCompanions(eventId: string, playerIds: string[], value: number) {
+    setLocalEvents((prev) =>
+      prev.map((e) =>
+        e.id !== eventId
+          ? e
+          : {
+              ...e,
+              companionsByPlayerId: {
+                ...(e.companionsByPlayerId ?? {}),
+                ...Object.fromEntries(playerIds.map((id) => [id, value])),
+              },
+            }
+      )
+    );
+  }
+
   function updateLocalRsvpStatus(
     eventId: string,
     playerId: string,
@@ -1037,7 +1053,25 @@ export default function CalendarView({
           absent: absentPlayers?.length ?? e.rsvpCounts.absent,
           pending: pendingPlayers?.length ?? e.rsvpCounts.pending,
         };
-        return { ...e, rsvpCounts, presentPlayers, absentPlayers, pendingPlayers };
+        // Accompagnants (test du 19/11 sur la démo) : repasser "Absent"
+        // remet le nombre à 0 en base -- reflété tout de suite ici aussi,
+        // sinon un retour à "Présent" repartait de l'ancien nombre.
+        const familyIds = new Set(e.companionsFamilyIds ?? []);
+        const familyValue = familyIds.has(playerId)
+          ? Math.max(
+              0,
+              ...(e.presentPlayers ?? [])
+                .filter((p) => p.id !== playerId && familyIds.has(p.id))
+                .map((p) => e.companionsByPlayerId?.[p.id] ?? 0)
+            )
+          : 0;
+        const companionsByPlayerId = !e.askCompanions
+          ? e.companionsByPlayerId
+          : {
+              ...(e.companionsByPlayerId ?? {}),
+              [playerId]: newStatus === "PRESENT" ? familyValue : 0,
+            };
+        return { ...e, rsvpCounts, presentPlayers, absentPlayers, pendingPlayers, companionsByPlayerId };
       })
     );
   }
@@ -2919,6 +2953,16 @@ export default function CalendarView({
                     onStatusChange={(previousStatus, newStatus) =>
                       updateLocalRsvpStatus(event.id, p.id, p.name, previousStatus, newStatus)
                     }
+                    companionsFamilyIds={
+                      event.askCompanions && event.event_type === "OTHER"
+                        ? Array.from(
+                            new Set([
+                              ...rsvpVisiblePlayers.map((x) => x.id),
+                              ...(event.companionsFamilyIds ?? []),
+                            ])
+                          )
+                        : undefined
+                    }
                   />
                 </div>
               );
@@ -2929,7 +2973,10 @@ export default function CalendarView({
             {event.askCompanions &&
               event.event_type === "OTHER" &&
               (() => {
-                const familyIds = new Set(rsvpVisiblePlayers.map((p) => p.id));
+                const familyIds = new Set([
+                  ...rsvpVisiblePlayers.map((p) => p.id),
+                  ...(event.companionsFamilyIds ?? []),
+                ]);
                 const presentIds = (event.presentPlayers ?? [])
                   .map((p) => p.id)
                   .filter((id) => familyIds.has(id));
@@ -2937,10 +2984,12 @@ export default function CalendarView({
                 const initial = Math.max(0, ...presentIds.map((id) => event.companionsByPlayerId?.[id] ?? 0));
                 return (
                   <EventCompanionsField
-                    key={`${event.id}:${presentIds.join(",")}`}
+                    key={`${event.id}:companions`}
                     eventId={event.id}
                     presentPlayerIds={presentIds}
                     initialValue={initial}
+                    onSaved={(value) => setLocalCompanions(event.id, presentIds, value)}
+                    familyPlayerIds={[...familyIds]}
                   />
                 );
               })()}

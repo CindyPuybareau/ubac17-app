@@ -6,7 +6,7 @@
 // UN seul nombre pour la famille : recopié sur la réponse de chaque enfant
 // présent de ce compte (une seule requête), et compté une fois par famille
 // dans le total du Bureau (src/lib/event-companions.ts).
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Minus, Plus, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { MAX_COMPANIONS } from "@/lib/event-companions";
@@ -15,8 +15,17 @@ export default function EventCompanionsField({
   eventId,
   presentPlayerIds,
   initialValue,
+  onSaved,
+  familyPlayerIds,
 }: {
   eventId: string;
+  // Tous les licenciés de la famille (présents ou non à l'écran) : lecture
+  // et écriture visent ceux qui sont PRÉSENTS EN BASE, jamais une liste
+  // d'écran éventuellement en retard (changement d'onglet enfant).
+  familyPlayerIds?: string[];
+  // Prévient la carte de l'événement (calendar-view.tsx) : un frère ou une
+  // sœur qui passe "Présent" ensuite reçoit directement ce nombre.
+  onSaved?: (value: number) => void;
   // Licenciés PRÉSENTS de cette famille pour cet événement (au moins un).
   presentPlayerIds: string[];
   initialValue: number;
@@ -33,6 +42,29 @@ export default function EventCompanionsField({
     if (!saving) setValue(initialValue);
   }
 
+  // Relecture du vrai nombre de la famille à l'ouverture et quand la liste
+  // des présents change (test du 19/11 : après un changement d'onglet
+  // enfant, l'écran pouvait afficher un nombre en retard). Lecture seule.
+  const familyIds = familyPlayerIds && familyPlayerIds.length > 0 ? familyPlayerIds : presentPlayerIds;
+  const presentKey = [...familyIds].sort().join(",");
+  useEffect(() => {
+    if (!presentKey) return;
+    let stale = false;
+    void createClient()
+      .from("rsvps")
+      .select("companions")
+      .eq("event_id", eventId)
+      .eq("status", "PRESENT")
+      .in("player_id", presentKey.split(","))
+      .then(({ data }) => {
+        if (stale || !data) return;
+        setValue(Math.max(0, ...data.map((r) => r.companions ?? 0)));
+      });
+    return () => {
+      stale = true;
+    };
+  }, [eventId, presentKey]);
+
   async function change(next: number) {
     const clamped = Math.max(0, Math.min(MAX_COMPANIONS, next));
     if (clamped === value || presentPlayerIds.length === 0) return;
@@ -44,13 +76,16 @@ export default function EventCompanionsField({
       .from("rsvps")
       .update({ companions: clamped })
       .eq("event_id", eventId)
-      .in("player_id", presentPlayerIds)
+      .eq("status", "PRESENT")
+      .in("player_id", familyIds)
       .select("player_id");
     setSaving(false);
     if (writeError || !data || data.length === 0) {
       setValue(previous);
       setError("Nombre non enregistré, réessaie.");
+      return;
     }
+    onSaved?.(clamped);
   }
 
   const buttonClass =
