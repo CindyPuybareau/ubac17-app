@@ -56,6 +56,7 @@ import OpponentDisplay from "./opponent-display";
 import MatchVenue from "./match-venue";
 import CreateEventForm from "./create-event-form";
 import RsvpButtons from "./rsvp-buttons";
+import EventCompanionsField from "./event-companions-field";
 import ItineraryButton from "./itinerary-button";
 import MatchTasksPanel from "./match-tasks-panel";
 import MatchScore from "./match-score";
@@ -2851,6 +2852,25 @@ export default function CalendarView({
             seconde ligne qui répétait chaque chiffre. Un événement annulé
             n'affiche plus de présences du tout (le badge "Annulé" et le
             motif suffisent). */}
+        {/* Total pour le Bureau (retour de Cindy du 19/11, question du
+            comptable) : licenciés présents + accompagnants, ces derniers
+            comptés une fois par famille. */}
+        {event.askCompanions && event.companionsTotal !== undefined && !event.cancelledAt && (
+          <p className="flex flex-wrap items-center gap-1.5 rounded-xl bg-navy/[0.04] px-3 py-2 text-xs text-zinc-700">
+            <Users className="h-3.5 w-3.5 shrink-0 text-navy" />
+            <span>
+              <span className="font-semibold tabular-nums">{rsvpCounts.present}</span> présent
+              {rsvpCounts.present > 1 ? "s" : ""} +{" "}
+              <span className="font-semibold tabular-nums">{event.companionsTotal}</span> accompagnant
+              {event.companionsTotal > 1 ? "s" : ""} ={" "}
+              <span className="font-bold tabular-nums text-navy">
+                {rsvpCounts.present + event.companionsTotal} personne
+                {rsvpCounts.present + event.companionsTotal > 1 ? "s" : ""} attendue
+                {rsvpCounts.present + event.companionsTotal > 1 ? "s" : ""}
+              </span>
+            </span>
+          </p>
+        )}
         {hasRoster && !event.cancelledAt && (
           <RsvpAttendance
             counts={rsvpCounts}
@@ -2903,6 +2923,27 @@ export default function CalendarView({
                 </div>
               );
             })}
+            {/* "Combien de personnes vous accompagnent ?" (retour de Cindy du
+                19/11) : un seul compteur pour la famille, dès qu'au moins un
+                de ses licenciés est présent. */}
+            {event.askCompanions &&
+              event.event_type === "OTHER" &&
+              (() => {
+                const familyIds = new Set(rsvpVisiblePlayers.map((p) => p.id));
+                const presentIds = (event.presentPlayers ?? [])
+                  .map((p) => p.id)
+                  .filter((id) => familyIds.has(id));
+                if (presentIds.length === 0) return null;
+                const initial = Math.max(0, ...presentIds.map((id) => event.companionsByPlayerId?.[id] ?? 0));
+                return (
+                  <EventCompanionsField
+                    key={`${event.id}:${presentIds.join(",")}`}
+                    eventId={event.id}
+                    presentPlayerIds={presentIds}
+                    initialValue={initial}
+                  />
+                );
+              })()}
           </div>
         )}
 
@@ -3118,6 +3159,16 @@ export default function CalendarView({
                   updateLocalRsvpStatus(event.id, selfPlayerId, selfName, previousStatus, newStatus)
                 }
               />
+              {event.askCompanions &&
+                event.event_type === "OTHER" &&
+                (event.presentPlayers ?? []).some((p) => p.id === selfPlayerId) && (
+                  <EventCompanionsField
+                    key={`${event.id}:${selfPlayerId}`}
+                    eventId={event.id}
+                    presentPlayerIds={[selfPlayerId]}
+                    initialValue={event.companionsByPlayerId?.[selfPlayerId] ?? 0}
+                  />
+                )}
             </div>
           );
         })()}
