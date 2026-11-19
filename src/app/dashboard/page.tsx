@@ -1,3 +1,4 @@
+import { familyCompanionsTotal } from "@/lib/event-companions";
 import {
   mapAidRow,
   mapRefundRow,
@@ -90,7 +91,7 @@ import { MatchSheetsProvider } from "./match-sheets-context";
 // seul endroit (un oubli sur l'une des 8 copies faisait silencieusement
 // diverger ce qu'un rôle voit par rapport à un autre, voir CLAUDE.md §3).
 const EVENTS_SELECT_COLUMNS =
-  "id, title, event_type, is_home, location, salle, away_venue_address, start_time, end_time, impact_time, ffbb_phase, series_id, notes, attendance_requested_at, cancelled_at, cancelled_reason, team_score, opponent_score, emarque_code, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, open_to_club_helpers, teams(id, name, category), collectes(id, prix, payment_link)" as const;
+  "id, title, event_type, is_home, location, salle, away_venue_address, start_time, end_time, impact_time, ffbb_phase, series_id, notes, attendance_requested_at, cancelled_at, cancelled_reason, team_score, opponent_score, emarque_code, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, open_to_club_helpers, teams(id, name, category), collectes(id, prix, payment_link), ask_companions" as const;
 
 type PlayerRow = {
   id: string;
@@ -626,6 +627,15 @@ export type AdminUpcomingEvent = {
   // pour un entraînement explicitement ouvert, voir calendar-view.tsx/
   // club-helper-banner.tsx.
   openToClubHelpers: boolean;
+  // "Combien de personnes accompagnent ?" (retour de Cindy du 19/11) :
+  // seulement sur un Événement club dont le Bureau a coché la case.
+  askCompanions?: boolean;
+  // Nombre déclaré par licencié présent (> 0 seulement) -- pour le
+  // compteur de la famille sur la carte de l'événement.
+  companionsByPlayerId?: Record<string, number>;
+  // Bureau seulement : total des accompagnants, compté une fois par
+  // famille (src/lib/event-companions.ts).
+  companionsTotal?: number;
   teamName: string;
   rsvpCounts: {
     present: number;
@@ -921,15 +931,15 @@ function findNextEventIdByTeamId(
 // appelle buildRsvpCounts/buildPresentPlayers avec l'effectif de
 // l'événement concerné — c'est cet effectif, pas la requête, qui fait la
 // différence de prudence entre espaces.
-type RsvpEntry = { status: string | null };
+type RsvpEntry = { status: string | null; companions?: number };
 
 function buildRsvpStatusByEvent(
-  rows: { event_id: string; player_id: string; status: string | null }[]
+  rows: { event_id: string; player_id: string; status: string | null; companions?: number | null }[]
 ): Map<string, Map<string, RsvpEntry>> {
   const map = new Map<string, Map<string, RsvpEntry>>();
   rows.forEach((r) => {
     const byPlayer = map.get(r.event_id) ?? new Map<string, RsvpEntry>();
-    byPlayer.set(r.player_id, { status: r.status });
+    byPlayer.set(r.player_id, { status: r.status, companions: r.companions ?? 0 });
     map.set(r.event_id, byPlayer);
   });
   return map;
@@ -959,6 +969,26 @@ function buildRsvpCounts(
     late,
     pending: Math.max(0, roster.length - answered),
   };
+}
+
+// Accompagnants déclarés (retour de Cindy du 19/11) : licenciés PRÉSENTS
+// avec un nombre > 0, limités au roster passé s'il y en a un (Coach /
+// Famille : seulement ce que ce compte a le droit de voir).
+function buildCompanionsByPlayer(
+  statusByEvent: Map<string, Map<string, RsvpEntry>>,
+  eventId: string,
+  roster?: { id: string }[]
+) {
+  const out: Record<string, number> = {};
+  const statuses = statusByEvent.get(eventId);
+  if (!statuses) return out;
+  const allowed = roster ? new Set(roster.map((p) => p.id)) : null;
+  statuses.forEach((entry, playerId) => {
+    if (entry.status !== "PRESENT" || !entry.companions || entry.companions <= 0) return;
+    if (allowed && !allowed.has(playerId)) return;
+    out[playerId] = entry.companions;
+  });
+  return out;
 }
 
 function buildPresentPlayers(
@@ -1052,7 +1082,7 @@ async function fetchRsvpsByEvent(
     (chunk) =>
       supabase
         .from("rsvps")
-        .select("event_id, player_id, status")
+        .select("event_id, player_id, status, companions")
         .in("event_id", chunk),
     dbLimit
   );
@@ -3073,6 +3103,7 @@ export default async function DashboardPage({
         targetProfileNotes: e.target_profile_notes ?? null,
         restrictedAudience: (e.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
         openToClubHelpers: Boolean(e.open_to_club_helpers),
+        askCompanions: Boolean(e.ask_companions),
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, teamsById),
         rsvpCounts: buildRsvpCounts(rsvpsByEvent, e.id, eventRoster),
         // Retour de Cindy du 30/08 : "qui sera présent" visible partout, pas
@@ -3087,6 +3118,15 @@ export default async function DashboardPage({
         // aucun filtrage supplémentaire -- à la différence de
         // Coach/Famille plus bas.
         absentPlayers: buildAbsentPlayers(rsvpsByEvent, e.id, eventRoster),
+        ...(e.ask_companions
+          ? (() => {
+              const byPlayer = buildCompanionsByPlayer(rsvpsByEvent, e.id);
+              return {
+                companionsByPlayerId: byPlayer,
+                companionsTotal: familyCompanionsTotal(byPlayer, parentPlayerRes.data ?? []),
+              };
+            })()
+          : {}),
       };
     });
 
@@ -4150,6 +4190,7 @@ export default async function DashboardPage({
         targetProfileNotes: e.target_profile_notes ?? null,
         restrictedAudience: (e.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
         openToClubHelpers: Boolean(e.open_to_club_helpers),
+        askCompanions: Boolean(e.ask_companions),
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, clubTeamById),
         rsvpCounts: buildRsvpCounts(rsvpsByEvent, e.id, eventRoster),
         // Retour de Cindy du 30/08 : "qui sera présent" visible partout,
@@ -4159,6 +4200,9 @@ export default async function DashboardPage({
         presentPlayers: buildPresentPlayers(rsvpsByEvent, e.id, ownTeamRoster),
         pendingPlayers: buildPendingPlayers(rsvpsByEvent, e.id, ownTeamRoster),
         absentPlayers: buildAbsentPlayers(rsvpsByEvent, e.id, ownTeamRoster),
+        companionsByPlayerId: e.ask_companions
+          ? buildCompanionsByPlayer(rsvpsByEvent, e.id, ownTeamRoster)
+          : undefined,
         // Retour de Cindy du 30/09 ("équipes sœurs") : un match de
         // siblingMatchesRes ci-dessus (team.id dans siblingTeamIdSet) reste
         // strictement consultable -- même marqueur déjà utilisé par
@@ -4895,6 +4939,7 @@ export default async function DashboardPage({
         targetProfileNotes: e.target_profile_notes ?? null,
         restrictedAudience: (e.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
         openToClubHelpers: Boolean(e.open_to_club_helpers),
+        askCompanions: Boolean(e.ask_companions),
         teamName: resolveEventTeamName(team, e.target_team_ids ?? null, teamsById),
         rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
         // Retour de Cindy du 30/09 ("équipes sœurs") : un match de
@@ -4943,7 +4988,7 @@ export default async function DashboardPage({
             eventIds.length > 0 && allRosterPlayerIds.length > 0
               ? supabase
                   .from("rsvps")
-                  .select("event_id, player_id, status")
+                  .select("event_id, player_id, status, companions")
                   .in("event_id", eventIds)
                   .in("player_id", allRosterPlayerIds)
               : Promise.resolve(null),
@@ -5118,6 +5163,7 @@ export default async function DashboardPage({
         ).values()
       );
       e.presentPlayers = buildPresentPlayers(rsvpsByEvent, e.id, ownFamilyRoster);
+      if (e.askCompanions) e.companionsByPlayerId = buildCompanionsByPlayer(rsvpsByEvent, e.id, ownFamilyRoster);
       e.absentPlayers = buildAbsentPlayers(rsvpsByEvent, e.id, ownFamilyRoster);
       e.pendingPlayers = buildPendingPlayers(rsvpsByEvent, e.id, ownFamilyRoster);
     });

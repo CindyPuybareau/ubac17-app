@@ -82,7 +82,8 @@ export default function RsvpControl({
     const { error: writeError } = await supabase
       .from("rsvps")
       .upsert(
-        { event_id: eventId, player_id: playerId, status: next },
+        // Absent : plus personne ne l'accompagne (retour de Cindy du 19/11).
+        { event_id: eventId, player_id: playerId, status: next, ...(next === "ABSENT" ? { companions: 0 } : {}) },
         { onConflict: "event_id,player_id" }
       );
 

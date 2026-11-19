@@ -19,6 +19,7 @@ import {
   Euro,
   HeartHandshake,
   Plus,
+  Users,
   X,
 } from "lucide-react";
 import { EVENT_TYPE_OPTIONS, showsImpactTime, styleFor } from "./event-style";
@@ -274,6 +275,9 @@ export default function CreateEventForm({
   const [openToClubHelpers, setOpenToClubHelpers] = useState(
     () => editingEvent?.openToClubHelpers ?? false
   );
+  // "Combien de personnes accompagnent ?" (retour de Cindy du 19/11,
+  // question du comptable pour le Noël de l'UBAC) : Événement club seulement.
+  const [askCompanions, setAskCompanions] = useState(() => editingEvent?.askCompanions ?? false);
   // Portée de l'événement : un choix à plat, direct, plutôt que de faire
   // passer "équipes spécifiques" par un détour via "Tous les groupes" —
   // c'est ce détour qui donnait l'impression qu'on ne pouvait choisir
@@ -812,6 +816,7 @@ export default function CreateEventForm({
       target_profile_notes: { id: string; name: string; note: string }[] | null;
       restricted_audience?: "BUREAU" | "COACHS" | null;
       open_to_club_helpers: boolean;
+      ask_companions: boolean;
     } = {
       title: eventName,
       event_type: effectiveEventType,
@@ -838,6 +843,7 @@ export default function CreateEventForm({
       // "ouvert à tout le club pour accompagner" -- jamais vrai pour un
       // autre type, même si la case a été cochée puis le type changé.
       open_to_club_helpers: effectiveEventType === "TRAINING" ? openToClubHelpers : false,
+      ask_companions: effectiveEventType === "OTHER" ? askCompanions : false,
     };
     // La portée club-wide/équipes spécifiques n'est modifiable que par qui
     // peut créer un événement club (allowClubWide) — un coach n'a même pas
@@ -868,7 +874,7 @@ export default function CreateEventForm({
       : supabase.from("events").insert(eventPayload);
     const { data: inserted, error } = await query
       .select(
-        "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, ffbb_phase, series_id, notes, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, open_to_club_helpers"
+        "id, title, event_type, is_home, location, salle, start_time, end_time, impact_time, ffbb_phase, series_id, notes, team_id, target_team_ids, target_profile_ids, target_profile_notes, restricted_audience, open_to_club_helpers, ask_companions"
       )
       .single();
 
@@ -1048,6 +1054,7 @@ export default function CreateEventForm({
         targetProfileNotes: inserted.target_profile_notes,
         restrictedAudience: (inserted.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
         openToClubHelpers: inserted.open_to_club_helpers,
+        askCompanions: inserted.ask_companions,
         teamName,
       });
     } else {
@@ -1086,6 +1093,7 @@ export default function CreateEventForm({
         targetProfileNotes: inserted.target_profile_notes,
         restrictedAudience: (inserted.restricted_audience as "BUREAU" | "COACHS" | null) ?? null,
           openToClubHelpers: inserted.open_to_club_helpers,
+        askCompanions: inserted.ask_companions,
           teamName,
           rsvpCounts: { present: 0, absent: 0, late: 0, pending: 0 },
         },
@@ -1408,6 +1416,33 @@ export default function CreateEventForm({
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* "Combien de personnes accompagnent ?" (retour de Cindy du 19/11) --
+          juste sous le type, jamais dans "Options avancées" (repliées) :
+          Événement club seulement -- jamais un tournoi, un match ou un
+          entraînement. Les familles répondent sous "Présent", un seul
+          nombre par famille (voir event-companions-field.tsx). */}
+      {eventType === "OTHER" && (
+        <div className="flex flex-col gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3">
+          <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
+            <input
+              type="checkbox"
+              checked={askCompanions}
+              onChange={(e) => setAskCompanions(e.target.checked)}
+              className="h-4 w-4 rounded border-zinc-300 text-navy focus:ring-navy"
+            />
+            <Users className="h-3.5 w-3.5 shrink-0 text-navy" />
+            Demander combien de personnes accompagnent
+          </label>
+          {askCompanions && (
+            <p className="text-[11px] text-zinc-400">
+              En répondant « Présent », chaque famille indique combien de personnes
+              l&apos;accompagnent (un seul nombre par famille). Le Bureau voit le total
+              de personnes attendues sur l&apos;événement.
+            </p>
+          )}
         </div>
       )}
 
