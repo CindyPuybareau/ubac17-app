@@ -18,10 +18,17 @@ export default function RsvpButtons({
   playerId,
   currentStatus,
   onStatusChange,
+  companionsFamilyIds,
 }: {
   eventId: string;
   playerId: string;
   currentStatus: string;
+  // "Combien de personnes vous accompagnent ?" (retour de Cindy du 19/11) :
+  // licenciés de la famille. Au passage à "Présent", le nombre déjà déclaré
+  // par un frère ou une sœur présent est relu EN BASE (jamais depuis
+  // l'écran, qui peut être en retard après un changement d'onglet enfant)
+  // et enregistré avec la réponse.
+  companionsFamilyIds?: string[];
   // Retour de Cindy du 29/08 : les compteurs agrégés ("1 présent", "1
   // joueur/joueuse présent(e)s") vivaient uniquement du rafraîchissement
   // temps réel (realtime-sync.tsx), perçu comme trop lent alors que ce
@@ -74,6 +81,20 @@ export default function RsvpButtons({
     setError(null);
     const supabase = createClient();
 
+    let familyCompanions: number | undefined;
+    if (newStatus === "PRESENT" && companionsFamilyIds && companionsFamilyIds.length > 0) {
+      const others = companionsFamilyIds.filter((id) => id !== playerId);
+      if (others.length > 0) {
+        const { data: siblingRows } = await supabase
+          .from("rsvps")
+          .select("companions")
+          .eq("event_id", eventId)
+          .eq("status", "PRESENT")
+          .in("player_id", others);
+        familyCompanions = Math.max(0, ...(siblingRows ?? []).map((r) => r.companions ?? 0));
+      }
+    }
+
     // Vrai upsert : rsvps a maintenant une contrainte unique sur
     // (event_id, player_id), donc plus besoin de lire avant d'écrire pour
     // choisir insert/update — ça fermait la fenêtre où deux réponses
@@ -82,7 +103,16 @@ export default function RsvpButtons({
       .from("rsvps")
       .upsert(
         // Absent : plus personne ne l'accompagne (retour de Cindy du 19/11).
-        { event_id: eventId, player_id: playerId, status: newStatus, ...(newStatus === "ABSENT" ? { companions: 0 } : {}) },
+        {
+          event_id: eventId,
+          player_id: playerId,
+          status: newStatus,
+          ...(newStatus === "ABSENT"
+            ? { companions: 0 }
+            : familyCompanions !== undefined
+              ? { companions: familyCompanions }
+              : {}),
+        },
         { onConflict: "event_id,player_id" }
       );
 

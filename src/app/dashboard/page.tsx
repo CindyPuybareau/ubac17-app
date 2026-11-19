@@ -633,6 +633,10 @@ export type AdminUpcomingEvent = {
   // Nombre déclaré par licencié présent (> 0 seulement) -- pour le
   // compteur de la famille sur la carte de l'événement.
   companionsByPlayerId?: Record<string, number>;
+  // Espace Famille : les licenciés de CE compte (ses enfants, lui-même)
+  // concernés par l'événement -- le compteur est celui de la famille, même
+  // quand l'écran n'affiche qu'un enfant à la fois (onglets enfants).
+  companionsFamilyIds?: string[];
   // Bureau seulement : total des accompagnants, compté une fois par
   // famille (src/lib/event-companions.ts).
   companionsTotal?: number;
@@ -1526,6 +1530,9 @@ export default async function DashboardPage({
     ownPlayerRow && !childPlayerRows.some((p) => p.id === ownPlayerRow.id)
       ? [...childPlayerRows, ownPlayerRow]
       : childPlayerRows;
+  // Licenciés de ce compte (ses enfants, lui-même) -- "Combien de personnes
+  // vous accompagnent ?" (retour de Cindy du 19/11), voir companionsFamilyIds.
+  const familyPlayerIdSet = new Set(playerRows.map((p) => p.id));
   const players = playerRows.map((p) => ({
     id: p.id,
     name: p.first_name ? formatFirstName(p.first_name) : "Joueur",
@@ -5163,7 +5170,11 @@ export default async function DashboardPage({
         ).values()
       );
       e.presentPlayers = buildPresentPlayers(rsvpsByEvent, e.id, ownFamilyRoster);
-      if (e.askCompanions) e.companionsByPlayerId = buildCompanionsByPlayer(rsvpsByEvent, e.id, ownFamilyRoster);
+      if (e.askCompanions) {
+        const myFamilyInEvent = ownFamilyRoster.filter((p) => familyPlayerIdSet.has(p.id));
+        e.companionsFamilyIds = myFamilyInEvent.map((p) => p.id);
+        e.companionsByPlayerId = buildCompanionsByPlayer(rsvpsByEvent, e.id, myFamilyInEvent);
+      }
       e.absentPlayers = buildAbsentPlayers(rsvpsByEvent, e.id, ownFamilyRoster);
       e.pendingPlayers = buildPendingPlayers(rsvpsByEvent, e.id, ownFamilyRoster);
     });
