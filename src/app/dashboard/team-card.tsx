@@ -676,9 +676,11 @@ export default function TeamCard({
           canRemoveArchived && (
             <button
               onClick={() => setRemoveTarget(m.player)}
-              className="shrink-0 whitespace-nowrap rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
+              title={`Retirer de ${team.name ?? "cette équipe"}`}
+              aria-label={`Retirer de ${team.name ?? "cette équipe"}`}
+              className="shrink-0 rounded-full border border-red-200 bg-red-50 p-1.5 text-red-600 transition-colors hover:bg-red-100 hover:text-red-700"
             >
-              Retirer de l&apos;équipe
+              <Trash2 className="h-3.5 w-3.5" />
             </button>
           )
         ) : m.player &&
