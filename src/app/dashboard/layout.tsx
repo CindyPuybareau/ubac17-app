@@ -157,6 +157,9 @@ export default async function DashboardLayout({
                       <h1 className="truncate text-xl font-bold text-white sm:text-2xl">
                         {displayFirstName ? formatFirstName(displayFirstName) : "adhérent·e"}
                       </h1>
+                      {/* Téléphone : le guide passe sous le prénom (retour de
+                          Cindy du 20/11, l'icône à droite mangeait le prénom). */}
+                      {adminResult.data && <GuideButton variant="under-name" />}
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
