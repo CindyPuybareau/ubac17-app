@@ -1391,6 +1391,9 @@ export default function CalendarView({
     "list" | "month" | "results" | "officialMatches" | "clubEvents"
   >(forcedView ?? "month");
   const [createOpen, setCreateOpen] = useState(false);
+  // Jour choisi pour "Créer un événement ce jour-là" (vue Mois), null pour
+  // le petit bouton "+ Créer" (retour de Cindy du 20/11).
+  const [createDate, setCreateDate] = useState<string | null>(null);
 
   // Même ordre que "Mes Équipes" : l'équipe mère avant ses déclinaisons.
   const sortedResultsTeams = useMemo(
@@ -3629,21 +3632,6 @@ export default function CalendarView({
           <WeekendStrip matches={weekendMatches} variant="club" />
         ))}
 
-      {/* Retour de Cindy du 18/11 ("le mois sous le bouton Créer un
-          événement, Liste/Mois à droite du mois, de beaux espaces aérés et
-          logiques") : l'action principale seule sur sa ligne, puis la ligne
-          du mois avec Liste/Mois à sa droite. */}
-      {canManage && view !== "officialMatches" && (
-        <div>
-          <button
-            onClick={() => setCreateOpen((v) => !v)}
-            className="flex items-center gap-1.5 rounded-full bg-ubac-yellow px-4 py-2 text-sm font-semibold text-navy shadow-sm transition-colors hover:bg-ubac-yellow-dark"
-          >
-            <Plus className="h-4 w-4 shrink-0" />
-            Créer un événement
-          </button>
-        </div>
-      )}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
@@ -3742,6 +3730,27 @@ export default function CalendarView({
               (retour de Cindy, "doublon") : le découpage "Match officiel
               (domicile)"/"(extérieur)" dans ce même menu couvre désormais
               ce besoin. */}
+          {/* Retour de Cindy du 20/11 ("on ne crée pas des événements tous
+              les jours") : plus de grande ligne jaune en haut du
+              calendrier, un petit bouton à côté de Liste / Mois (rond "+"
+              sur téléphone). Toujours absent de "Matchs officiels", qui
+              viennent de la synchro FFBB. */}
+          {canManage && view !== "officialMatches" && (
+            <button
+              type="button"
+              onClick={() => {
+                setCreateDate(null);
+                setEditingEvent(null);
+                setCreateOpen((v) => !v);
+              }}
+              title="Créer un événement"
+              aria-label="Créer un événement"
+              className="flex h-8 items-center gap-1 rounded-full bg-ubac-yellow px-2 text-xs font-semibold text-navy shadow-sm transition-colors hover:bg-ubac-yellow-dark sm:px-3"
+            >
+              <Plus className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Créer</span>
+            </button>
+          )}
           {forcedView === "clubEvents" && (
             <EventTypeFilterDropdown
               hiddenTypes={hiddenEventTypes}
@@ -3862,7 +3871,8 @@ export default function CalendarView({
           // au retour en mode création) : ses champs se préremplissent via
           // de simples initialiseurs d'état plutôt qu'un useEffect qui
           // ferait setState après coup (voir create-event-form.tsx).
-          key={editingEvent?.id ?? "create"}
+          key={editingEvent?.id ?? `create-${createDate ?? ""}`}
+          initialDate={editingEvent ? null : createDate}
           teams={createTeams}
           existingNeeds={editingEvent ? (volunteerNeedsByEventId[editingEvent.id] ?? emptyVolunteerNeeds) : emptyVolunteerNeeds}
           allowClubWide={allowClubWide}
@@ -3870,6 +3880,7 @@ export default function CalendarView({
           editingEvent={editingEvent}
           onClose={() => {
             setCreateOpen(false);
+            setCreateDate(null);
             setEditingEvent(null);
           }}
           onCreated={(created) =>
@@ -4260,15 +4271,33 @@ export default function CalendarView({
 
       {view === "month" && (
       <div id="calendar-day-detail" className="flex scroll-mt-4 flex-col gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-zinc-900">
-          {selectedKey === todayKey
-            ? "Aujourd'hui"
-            : selectedDate.toLocaleDateString("fr-FR", {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
-              })}
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-900">
+            {selectedKey === todayKey
+              ? "Aujourd'hui"
+              : selectedDate.toLocaleDateString("fr-FR", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                })}
+          </p>
+          {/* Retour de Cindy du 20/11 : créer directement sur le jour choisi
+              (date déjà remplie) -- jamais sur un jour passé. */}
+          {canManage && createTeams && createTeams.length > 0 && selectedKey >= todayKey && (
+            <button
+              type="button"
+              onClick={() => {
+                setEditingEvent(null);
+                setCreateDate(selectedKey);
+                setCreateOpen(true);
+              }}
+              className="flex items-center gap-1 rounded-full border border-ubac-yellow/60 bg-ubac-yellow/15 px-2.5 py-1 text-xs font-semibold text-navy transition-colors hover:bg-ubac-yellow/30"
+            >
+              <Plus className="h-3.5 w-3.5 shrink-0" />
+              Créer un événement ce jour-là
+            </button>
+          )}
+        </div>
 
         {detailEvents.length === 0 && detailBirthdays.length === 0 ? (
           // Journée vide (retour de Cindy du 13/11) : un petit mot plutôt

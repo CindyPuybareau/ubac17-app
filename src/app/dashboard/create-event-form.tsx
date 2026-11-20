@@ -162,6 +162,7 @@ export default function CreateEventForm({
   allowClubWide = false,
   open,
   editingEvent,
+  initialDate = null,
   onClose,
   onCreated,
   onUpdated,
@@ -183,6 +184,10 @@ export default function CreateEventForm({
   // modification — non-null = mode édition, préremplit tous les champs
   // (y compris "Événement payant") et fait un UPDATE au lieu d'un INSERT.
   editingEvent?: AdminUpcomingEvent | null;
+  // "YYYY-MM-DD" : création lancée depuis un jour du calendrier (retour de
+  // Cindy du 20/11) -- date déjà remplie, heure par défaut à ajuster
+  // (18:00 en semaine, 10:00 le week-end).
+  initialDate?: string | null;
   onClose: () => void;
   // Affiche la ou les occurrences créées sur le calendrier dès la
   // validation, sans attendre le rafraîchissement temps réel (débounce
@@ -218,9 +223,14 @@ export default function CreateEventForm({
   );
   const [location, setLocation] = useState(() => editingEvent?.location ?? "");
   const [salle, setSalle] = useState(() => editingEvent?.salle ?? "");
-  const [startTime, setStartTime] = useState(() =>
-    editingEvent ? toDatetimeLocal(editingEvent.start_time) : ""
-  );
+  const [startTime, setStartTime] = useState(() => {
+    if (editingEvent) return toDatetimeLocal(editingEvent.start_time);
+    if (initialDate && /^\d{4}-\d{2}-\d{2}$/.test(initialDate)) {
+      const day = new Date(`${initialDate}T12:00`).getDay();
+      return `${initialDate}T${day === 0 || day === 6 ? "10:00" : "18:00"}`;
+    }
+    return "";
+  });
   const [endTime, setEndTime] = useState(() =>
     editingEvent?.end_time ? toTimeLocal(editingEvent.end_time) : ""
   );
