@@ -184,7 +184,7 @@ footer { margin-top: 28px; color: var(--ink-soft); font-size: 13px; }
     <p>Tout ce que l'appli du club fait pour le Bureau, expliqué tâche par tâche. Chaque partie dit où cliquer, ce qui se passe ensuite, et les pièges à éviter.</p>
     <div class="stage" aria-label="Étapes du guide">
       <span class="on">Étape 1 · Prise en main, calendrier, cotisations</span>
-      <span>Étape 2 · Membres, équipes, organisation des matchs</span>
+      <span class="on">Étape 2 · Membres, équipes, organisation des événements</span>
       <span>Étape 3 · Vie du club, bilan de saison</span>
     </div>
   </div>
@@ -194,7 +194,10 @@ footer { margin-top: 28px; color: var(--ink-soft); font-size: 13px; }
   <nav class="toc" aria-label="Sommaire">
     <a href="#prise-en-main"><b>Prise en main</b><small>Les trois espaces, le menu, la déconnexion</small></a>
     <a href="#calendrier"><b>Calendrier</b><small>Créer, filtrer, lire une carte de match</small></a>
-    <a href="#cotisations"><b>Cotisations &amp; Licences</b><small>Tarifs, import, règlements, vérifications</small></a>
+    <a href="#cotisations"><b>Cotisations &amp; Licences</b><small>Tarifs, import, règlements, relances</small></a>
+    <a href="#membres"><b>Membres</b><small>Fiches, ajout, archivage, comptes à rattacher</small></a>
+    <a href="#equipes"><b>Équipes</b><small>Coachs, joueurs, changement d'équipe</small></a>
+    <a href="#organisation"><b>Organisation</b><small>Présences, covoiturage, bénévoles, officiels</small></a>
   </nav>
 
   <!-- 1. PRISE EN MAIN -->
@@ -438,16 +441,243 @@ footer { margin-top: 28px; color: var(--ink-soft); font-size: 13px; }
           <li><b>Payé (-)</b> : réglé selon le Bureau, compté comme payé et jamais relancé, mais l'écart de montant reste à confirmer.</li>
           <li><b>Aides et remboursements</b> : sur la fiche d'un membre, les aides reçues (Pass Sport, ANCV) et les remboursements faits ou à faire.</li>
         </ul>
+        <h3 style="margin-top:12px">Relancer par email</h3>
+        <ol class="steps">
+          <li>Sélectionner les lignes à relancer, puis <b>Relancer la sélection</b>. Pour une seule personne : <b>Envoyer une relance</b> sur sa ligne.</li>
+          <li>Un aperçu de l'email s'ouvre : l'objet et le texte se modifient librement.</li>
+          <li>L'email ne part qu'au clic sur l'envoi. Rien n'est envoyé tout seul.</li>
+        </ol>
         <div class="tip"><b>Bon à savoir</b>Supprimer une cotisation ou un membre se fait toujours à la main, depuis l'appli, par une personne du Bureau. Aucune donnée n'est effacée automatiquement.</div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- 4. MEMBRES -->
+  <section class="chapter" id="membres">
+    <div class="chapter-head"><span class="num">4</span><h2>Membres</h2></div>
+    <p class="where">Où : menu › <code>Membres</code></p>
+    <p class="lead">La liste de toutes les personnes du club : joueurs, parents, coachs, bénévoles. Chaque fiche regroupe l'identité, la licence, la famille et la santé.</p>
+
+    <div class="task">
+      <div class="text">
+        <h3>Trouver et exporter</h3>
+        <ul class="plain">
+          <li><b>Rechercher un membre…</b> : par prénom ou nom.</li>
+          <li><b>Toutes les équipes</b> : pour n'afficher qu'une ou plusieurs équipes.</li>
+          <li>Les trois points (<b>Plus d'actions</b>) : <b>Exporter (Excel)</b> la liste affichée, recherche et filtres compris, ou <b>Afficher les archivés</b>.</li>
+          <li>L'étiquette <b>Jamais connecté(e)</b> repère les personnes qui n'ont pas encore ouvert l'appli.</li>
+        </ul>
+      </div>
+      <div class="screen" aria-label="Exemple : liste des membres">
+        <div class="cap">Exemple : liste des membres</div>
+        <div class="tablet">
+          <div class="tr"><span>Prénom Nom</span><span>Équipe</span><span>Statut</span></div>
+          <div class="tr"><span>Léa Martin</span><span>U11X</span><span><span class="chip c-green">Joueuse</span></span></div>
+          <div class="tr"><span>Hugo Bernard</span><span>U13M</span><span><span class="chip c-amber">Jamais connecté</span></span></div>
+          <div class="tr"><span>Paul Leroy</span><span>U9X</span><span><span class="chip c-navy">Coach</span></span></div>
+        </div>
+        <p class="note">Noms inventés pour l'exemple.</p>
+      </div>
+    </div>
+
+    <div class="task">
+      <div class="text">
+        <h3>La fiche d'un membre</h3>
+        <p>Un clic sur un nom ouvre sa fiche, rangée en quatre onglets :</p>
+        <ul class="plain">
+          <li><b>Identité</b> : nom, date de naissance, sexe, adresse, téléphones, emails.</li>
+          <li><b>Licence &amp; Équipe</b> : type de licence, n° de licence, validité, catégorie, équipe(s), statut au club, case <b>Brûlé</b> (règle FFBB des joueurs brûlés).</li>
+          <li><b>Parents &amp; Urgence</b> : les parents rattachés et les contacts d'urgence.</li>
+          <li><b>Santé &amp; Chartes</b> : certificat médical, particularités médicales, droit à l'image, charte joueur et charte parent.</li>
+        </ul>
+        <div class="tip"><b>Bon à savoir</b>Si on ferme la fiche avant d'enregistrer, l'appli prévient : « Modifications non enregistrées ».</div>
+      </div>
+      <div class="screen" aria-label="Exemple : onglets de la fiche membre">
+        <div class="cap">Exemple : fiche de Léa Martin</div>
+        <div class="pills"><span class="pill">Identité</span><span class="pill on">Licence &amp; Équipe</span><span class="pill">Parents &amp; Urgence</span><span class="pill">Santé &amp; Chartes</span></div>
+        <div class="stack" style="margin-top:10px">
+          <div class="tariff"><span>Type de licence</span><b>Joueur</b></div>
+          <div class="tariff"><span>Catégorie</span><b>U11X</b></div>
+          <div class="tariff"><span>Licence valable jusqu'au</span><b>30/06/2027</b></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="task">
+      <div class="text">
+        <h3>Ajouter, sélectionner, archiver</h3>
+        <ul class="plain">
+          <li><b>Ajouter un membre</b> : saisir l'identité et, si besoin, l'équipe. Pour un coach, cocher <b>Entraîneur/coach</b>. La plupart des fiches arrivent plutôt par l'import du fichier d'inscriptions (chapitre 3).</li>
+          <li><b>Sélectionner</b> : cocher plusieurs membres, puis <b>Envoyer un e-mail</b>, <b>Affecter à une équipe</b> (avec l'option de les retirer de leur équipe actuelle) ou <b>Archiver la sélection</b>.</li>
+        </ul>
+        <p><b>Archiver</b> un membre qui a quitté le club :</p>
+        <ul class="plain">
+          <li>il disparaît de la liste, mais toutes ses données sont conservées ;</li>
+          <li>il est retiré automatiquement de ses équipes, pas besoin de le faire deux fois ;</li>
+          <li>son accès à l'appli est suspendu ;</li>
+          <li>on peut le <b>réactiver</b> à tout moment depuis « Afficher les archivés ».</li>
+        </ul>
+        <div class="tip warn"><b>Supprimer définitivement</b>Seul un membre déjà archivé peut être supprimé pour de bon, depuis la liste des archivés. C'est irréversible : archiver suffit presque toujours.</div>
+      </div>
+      <div class="screen" aria-label="Exemple : archiver un membre">
+        <div class="cap">Exemple : confirmation</div>
+        <div class="stack" style="border:1px solid var(--line);border-radius:12px;padding:12px">
+          <b style="font-size:14px">Archiver ce membre ?</b>
+          <span class="meta" style="color:var(--ink-soft)">Il n'apparaîtra plus dans la liste par défaut, mais ses données restent conservées et tu peux réactiver à tout moment.</span>
+          <div class="pills"><span class="pill">Annuler</span><span class="pill on">Archiver</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="task solo">
+      <div class="text">
+        <h3>Les comptes à rattacher</h3>
+        <p>Quand quelqu'un crée un compte avec une adresse email que le club ne connaît pas encore, un bandeau <b>« compte(s) à rattacher »</b> apparaît en haut de la liste. Deux choix :</p>
+        <ul class="plain">
+          <li><b>Chercher sa fiche</b> : relier ce compte à la fiche existante (par exemple un parent qui s'est inscrit avec une autre adresse).</li>
+          <li>Supprimer le compte s'il ne fait pas partie du club.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. ÉQUIPES -->
+  <section class="chapter" id="equipes">
+    <div class="chapter-head"><span class="num">5</span><h2>Équipes</h2></div>
+    <p class="where">Où : menu › <code>Équipes</code></p>
+    <p class="lead">Une carte par équipe, avec ses coachs, ses joueurs et ses prochains événements.</p>
+
+    <div class="task">
+      <div class="text">
+        <h3>Lire une équipe</h3>
+        <ul class="plain">
+          <li>Les <b>Coachs</b> d'abord, puis les <b>Joueurs</b>, avec leur téléphone et leur email (un clic pour appeler ou écrire).</li>
+          <li>Les <b>Prochains événements</b> de l'équipe en bas de la carte.</li>
+          <li><b>Toutes les équipes</b> : pour n'afficher que certaines cartes.</li>
+        </ul>
+        <h3 style="margin-top:12px">Changer un joueur d'équipe</h3>
+        <ol class="steps">
+          <li>Sur la ligne du joueur, cliquer sur les deux flèches <b>Affecter à une autre équipe</b>.</li>
+          <li>Choisir la nouvelle équipe, puis valider.</li>
+        </ol>
+        <div class="tip"><b>Membre archivé</b>Un joueur archivé encore présent sur une carte apparaît en gris avec « Archivé · a quitté le club ». L'icône rouge de suppression le retire de l'équipe.</div>
+      </div>
+      <div class="screen" aria-label="Exemple : carte d'équipe">
+        <div class="cap">Exemple : carte d'équipe</div>
+        <div class="stack">
+          <span class="team" style="font-family:var(--font-display);font-size:20px;font-weight:700;color:var(--navy)">U11X</span>
+          <span style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--ink-soft)">Coachs</span>
+          <div class="tariff"><span>Paul Leroy</span><span class="btn-mini">Appeler</span></div>
+          <span style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--ink-soft)">Joueurs</span>
+          <div class="tariff"><span>Léa Martin</span><span class="btn-mini">⇄</span></div>
+          <div class="tariff"><span>Inès Petit</span><span class="btn-mini">⇄</span></div>
+          <div class="tariff" style="opacity:.6"><span>Tom Roux · <i>Archivé · a quitté le club</i></span><span class="btn-mini" style="color:var(--red)">Retirer</span></div>
+        </div>
+        <p class="note">⇄ = affecter à une autre équipe. Noms inventés.</p>
+      </div>
+    </div>
+
+    <div class="task solo">
+      <div class="text">
+        <h3>Nom de l'équipe, tarif et matchs FFBB</h3>
+        <ul class="plain">
+          <li>Le nom d'une catégorie (par exemple U9X) et son tarif se changent dans <b>Cotisations &amp; Licences › Tarifs par catégorie</b> (chapitre 3). Le nouveau nom s'affiche partout.</li>
+          <li>Les matchs officiels arrivent depuis la FFBB grâce au lien FFBB de l'équipe, géré dans <b>Matchs officiels › FFBB</b>.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. ORGANISATION -->
+  <section class="chapter" id="organisation">
+    <div class="chapter-head"><span class="num">6</span><h2>Organisation des événements</h2></div>
+    <p class="where">Où : sur la carte de chaque événement, dans le <code>Calendrier</code></p>
+    <p class="lead">Tout ce qui fait qu'un match ou un événement se passe bien : qui vient, qui conduit, qui aide. Chaque réponse s'affiche en direct pour le Bureau, les coachs et les familles concernés.</p>
+
+    <div class="task">
+      <div class="text">
+        <h3>Les présences</h3>
+        <ul class="plain">
+          <li>Chaque joueur (ou son parent) répond <b>Présent</b> ou <b>Absent</b> sur la carte de l'événement.</li>
+          <li>La carte affiche le nombre de présents, d'absents et de réponses en attente. Un clic déroule les noms.</li>
+          <li>Les familles qui n'ont pas répondu voient un rappel sur leur tableau de bord, jusqu'à ce qu'elles répondent.</li>
+        </ul>
+        <h3 style="margin-top:12px">Le covoiturage</h3>
+        <ul class="plain">
+          <li>Un parent qui conduit clique sur <b>Proposer un trajet</b> et indique le nombre de places.</li>
+          <li>Les autres familles <b>réservent</b> une place. Le conducteur peut modifier ou retirer son trajet.</li>
+        </ul>
+      </div>
+      <div class="screen" aria-label="Exemple : présences et covoiturage">
+        <div class="cap">Exemple : bloc Organisation</div>
+        <div class="row" style="display:flex;gap:6px;flex-wrap:wrap">
+          <span class="chip c-green">8 présents</span><span class="chip c-amber">2 en attente</span><span class="chip c-navy">1 absent</span>
+        </div>
+        <div class="pills" style="margin-top:8px"><span class="pill on">Présent</span><span class="pill">Absent</span></div>
+        <div class="stack" style="margin-top:10px">
+          <div class="tariff"><span>Trajet de Claire Martin</span><b>2 places libres</b></div>
+          <div class="pills"><span class="pill">Proposer un trajet</span><span class="pill on">Réserver</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="task">
+      <div class="text">
+        <h3>Les besoins en bénévoles</h3>
+        <ol class="steps">
+          <li>Sur la carte d'un match, d'un tournoi ou d'un événement club : <b>Ajouter un besoin</b>.</li>
+          <li>Choisir le besoin (Goûter / Encas, Buvette, Installation / Rangement, Lavage maillots) ou en écrire un autre, puis le <b>nombre de personnes requises</b>.</li>
+          <li>Les membres se proposent eux-mêmes. Le Bureau ou le coach peut aussi <b>Choisir un membre</b>, ou <b>Écrire un nom</b> pour quelqu'un qui n'a pas de compte.</li>
+        </ol>
+        <p>Tant qu'un besoin n'est pas complet, la carte affiche <b>Besoin non pourvu</b>. Une fois complet : « Nombre de bénévoles atteint ».</p>
+      </div>
+      <div class="screen" aria-label="Exemple : besoins bénévoles">
+        <div class="cap">Exemple : besoins du match</div>
+        <div class="stack">
+          <div class="tariff"><span>Goûter / Encas</span><b style="color:var(--green)">2 / 2</b></div>
+          <div class="tariff"><span>Buvette</span><b style="color:var(--amber)">1 / 3</b></div>
+          <div class="tariff"><span>Lavage maillots</span><b style="color:var(--amber)">0 / 1</b></div>
+        </div>
+        <div class="row" style="display:flex;gap:6px;margin-top:8px"><span class="chip c-amber">Besoin non pourvu</span></div>
+      </div>
+    </div>
+
+    <div class="task">
+      <div class="text">
+        <h3>Les officiels des matchs à domicile</h3>
+        <p>Pour chaque match officiel à domicile, la carte liste les rôles à tenir : <b>Arbitre 1</b>, <b>Arbitre 2</b>, <b>E-marque</b>, <b>Aide marqueur</b>, <b>Chronométreur</b>, <b>Délégué de club</b>, <b>Délégué Fair-play</b>.</p>
+        <ul class="plain">
+          <li>Un membre clique sur <b>Se proposer</b> pour un rôle libre.</li>
+          <li>Le Bureau peut désigner quelqu'un (<b>Choisir un membre</b> ou <b>Écrire un nom</b>), ou indiquer un <b>arbitre officiel</b> envoyé par la ligue.</li>
+        </ul>
+      </div>
+      <div class="screen" aria-label="Exemple : officiels du match">
+        <div class="cap">Exemple : officiels</div>
+        <div class="stack">
+          <div class="tariff"><span>Arbitre 1</span><b>Arbitre officiel</b></div>
+          <div class="tariff"><span>E-marque</span><b>Nadia Lopez</b></div>
+          <div class="tariff"><span>Chronométreur</span><span class="btn-mini">Se proposer</span></div>
+        </div>
+        <p class="note">Noms inventés.</p>
+      </div>
+    </div>
+
+    <div class="task solo">
+      <div class="text">
+        <h3>Les accompagnants</h3>
+        <ul class="plain">
+          <li><b>Événement club</b> (par exemple un Noël) : en cochant <b>Demander combien de personnes accompagnent</b> à la création, chaque famille indique un seul nombre (les licenciés de la famille sont déjà comptés). Le Bureau voit le total, le détail par famille, et peut l'<b>Exporter (Excel)</b>.</li>
+          <li><b>Entraînement</b> qui manque d'adultes : en cochant <b>Ouvert à tout le club pour accompagner</b>, un bandeau <b>Besoin accompagnant</b> apparaît sur le tableau de bord de tout le monde. N'importe qui écrit son prénom et son nom, puis <b>Je me propose</b>. Au bout de 3 personnes, le bandeau disparaît.</li>
+        </ul>
       </div>
     </div>
   </section>
 
   <section class="next" aria-label="Prochaines étapes du guide">
     <h2>Prochaines étapes</h2>
-    <p><b>Étape 2</b> : membres et archivage, équipes et coachs, organisation des matchs (présences, covoiturage, besoins bénévoles, accompagnants).</p>
     <p><b>Étape 3</b> : vie du club (affiches à la une, sponsors, boutique, buvette, pénalités, documents) et bilan de la saison.</p>
   </section>
 
-  <footer>Guide interne au Bureau de l'UBAC. Les écrans sont redessinés et les noms sont inventés. Version du 20 novembre 2026.</footer>
+  <footer>Guide interne au Bureau de l'UBAC. Les écrans sont redessinés et les noms sont inventés. Version du 20 novembre 2026 (étapes 1 et 2).</footer>
 </main>
