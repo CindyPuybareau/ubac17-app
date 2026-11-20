@@ -2553,10 +2553,10 @@ export default function CalendarView({
     );
     const matchActions = isMatchType(event.event_type) && (
       <>
-        {!matchHasScore && matchScoreField}
         {/* Retour du comptable de Cindy (30/10) : code e-Marque, matchs
             OFFICIELS à domicile uniquement -- saisi par le Bureau
-            (allowClubWide), lecture seule ailleurs si déjà renseigné. */}
+            (allowClubWide), lecture seule ailleurs si déjà renseigné.
+            En premier depuis le 20/11 (proposition du comptable). */}
         {event.event_type === "MATCH" && resolveIsHome(event) === true && (
           <MatchEmarqueCode
             eventId={event.id}
@@ -2565,9 +2565,50 @@ export default function CalendarView({
             onSaved={(code) => updateLocalEventEmarqueCode(event.id, code)}
           />
         )}
+        {!matchHasScore && matchScoreField}
         {/* Feuilles de match (12/11) : Bureau/Coach seulement. */}
         <MatchSheetsLink eventType={event.event_type} />
       </>
+    );
+    // Carte en mode résumé (proposition du comptable, retour de Cindy du
+    // 20/11) : les mêmes pièces, rangées différemment selon l'écran --
+    // grand écran : match, outils puis étiquettes, et en dessous date/lieu
+    // puis compte à rebours ; téléphone : match + "Besoin non pourvu",
+    // puis date, lieu, outils, et le type d'événement en petit à la fin.
+    const typeBadge = (
+      <span
+        className={`flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${effectiveStyle.badge}`}
+      >
+        {effectiveStyle.solid && <Lock className="h-2.5 w-2.5 shrink-0" />}
+        {reunionLabel}
+      </span>
+    );
+    // Compte à rebours (retour de Cindy du 13/11).
+    const countdownBadge = (isMatchType(event.event_type) || event.event_type === "TOURNAMENT") &&
+      !event.cancelledAt && <MatchCountdown startTime={event.start_time} endTime={event.end_time} />;
+    // "Besoins d'organisation en visuel" (retour de Cindy du 24/09) : même
+    // prédicat que le calendrier Mois (needsOrganizing).
+    const needBadge = needsOrganizing(event) && (
+      <span className="flex w-fit items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-800">
+        <AlertTriangle className="h-3 w-3 shrink-0" />
+        Besoin non pourvu
+      </span>
+    );
+    // "Événement payant" (retour de Cindy du 2026-08-25), tous les espaces.
+    const paidBadge = event.isPaid && (
+      <span className="flex w-fit items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-800">
+        <Euro className="h-3 w-3" />
+        Payant
+      </span>
+    );
+    // Retour de Cindy du 06/11 : titre masqué quand il répète la pastille
+    // ("ENTRAÎNEMENT" / "Entraînement").
+    const titleNode = isMatchType(event.event_type) ? (
+      <OpponentDisplay title={event.title} size="sm" />
+    ) : (
+      !isRedundantEventTitle(event.title, reunionLabel) && (
+        <span className="font-semibold text-zinc-900">{event.title ?? style.label}</span>
+      )
     );
     const toggleButton = (
       <button
@@ -2607,95 +2648,37 @@ export default function CalendarView({
           </span>
         )}
         <div className="flex items-start justify-between gap-2">
-          {/* min-w-0 : même correctif que renderResultCard plus bas — sans
-              lui, le nom d'adversaire le plus long forçait toute la carte
-              (et l'écran, en mobile) à déborder au lieu de tronquer. */}
-          <div
-            className={
-              allowClubWide
-                ? "flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5"
-                : "flex min-w-0 flex-col gap-1"
-            }
-          >
-            {/* Retour de Cindy du 06/11 ("mettre en bleu ubac pour plus de
-                visibilité") : gris (text-zinc-400) depuis l'origine de la
-                carte, trop discret une fois la pastille juste à côté sur
-                la même ligne compacte (allowClubWide) -- text-ubac-blue
-                même alias que resolveIsHome/MatchVenue plus bas dans ce
-                fichier, pas une nouvelle couleur. */}
-            <span className="text-xs font-semibold uppercase tracking-wide text-ubac-blue">
-              {event.teamName}
-            </span>
-            <span className="flex flex-wrap items-center gap-2">
-              <span
-                className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${effectiveStyle.badge}`}
-              >
-                {effectiveStyle.solid && <Lock className="h-2.5 w-2.5 shrink-0" />}
-                {reunionLabel}
+          {/* min-w-0 : sans lui, le nom d'adversaire le plus long forçait
+              toute la carte (et l'écran, en mobile) à déborder. */}
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
+              {/* Retour de Cindy du 06/11 : nom d'équipe en bleu UBAC. */}
+              <span className="text-xs font-semibold uppercase tracking-wide text-ubac-blue">
+                {event.teamName}
               </span>
-              {/* Compte à rebours (retour de Cindy du 13/11). */}
-              {(isMatchType(event.event_type) || event.event_type === "TOURNAMENT") && !event.cancelledAt && (
-                <MatchCountdown startTime={event.start_time} endTime={event.end_time} />
-              )}
-              {/* "Besoins d'organisation en visuel" (retour de Cindy du
-                  24/09) : même prédicat que le calendrier Mois
-                  (needsOrganizing) -- réutilise organisationData déjà
-                  chargé, aucune requête de plus. */}
-              {needsOrganizing(event) && (
-                <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-800">
-                  <AlertTriangle className="h-3 w-3 shrink-0" />
-                  Besoin non pourvu
-                </span>
-              )}
-              {/* Retour de Cindy du 2026-08-25 ("Créer un événement" ->
-                  "Événement payant") : badge visible sur tous les espaces
-                  (y compris Enfant, en lecture seule) — voir
-                  child-calendar-tab.tsx pour son équivalent. */}
-              {event.isPaid && (
-                <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-800">
-                  <Euro className="h-3 w-3" />
-                  Payant
-                </span>
-              )}
-            </span>
-            {isMatchType(event.event_type) ? (
-              <>
-                <OpponentDisplay title={event.title} size="sm" />
-                {/* Score déjà saisi : une information, reste à côté de
-                    l'adversaire sur tous les écrans. */}
-                {matchHasScore && matchScoreField}
-                {/* Actions (ajouter le score, code e-Marque, feuilles de
-                    match) : dans la ligne sur grand écran ; sur téléphone,
-                    regroupées en bas de carte (matchActionsMobile). */}
-                <span className="hidden sm:contents">{matchActions}</span>
-              </>
-            ) : (
-              // Retour de Cindy du 06/11 ("ENTRAÎNEMENT en pastille ET
-              // Entraînement en titre, c'est redondant") : la plupart des
-              // entraînements/réunions n'ont jamais de titre personnalisé
-              // (event.title null) -- le "?? style.label" ci-dessous
-              // retombe alors sur le même texte que la pastille
-              // (reunionLabel) juste au-dessus, répété pour rien. Masqué
-              // seulement quand c'est réellement le même texte -- un
-              // titre personnalisé ("Entraînement renforcement défense")
-              // continue de s'afficher normalement.
-              !isRedundantEventTitle(event.title, reunionLabel) && (
-                <span className="font-semibold text-zinc-900">
-                  {event.title ?? style.label}
-                </span>
-              )
-            )}
-            {allowClubWide && (
+              {titleNode}
+              {/* Score déjà saisi : une information, à côté de l'adversaire. */}
+              {matchHasScore && matchScoreField}
+              {/* Téléphone : "Besoin non pourvu" (à traiter) juste après
+                  l'adversaire, pour ne pas passer inaperçu. */}
+              <span className="contents sm:hidden">
+                {needBadge}
+                {paidBadge}
+              </span>
+              {/* Grand écran (capture du comptable) : outils, puis étiquettes. */}
               <span className="hidden sm:contents">
-                <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500">
-                  {dateRow}
-                  {impactTimeRow}
-                </span>
-                <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500">
-                  {locationRow}
-                </span>
+                {matchActions}
+                {typeBadge}
+                {needBadge}
+                {paidBadge}
               </span>
-            )}
+            </div>
+            <div className="hidden flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500 sm:flex">
+              {dateRow}
+              {impactTimeRow}
+              {locationRow}
+              {countdownBadge}
+            </div>
           </div>
           {canManageEvent && (
             // Retour de Cindy du 12/11 ("icônes trop grosses, pas assez en haut à
@@ -2749,21 +2732,23 @@ export default function CalendarView({
           )}
         </div>
 
-        {/* Retour de Cindy du 12/11 (capture téléphone : "le retour à la
-            ligne n'est pas beau") : sur téléphone, date et lieu quittent la
-            colonne du titre -- coincée à côté des 3 icônes Modifier/Annuler/
-            Supprimer, elle coupait "18h15 – 19h45" ou le nom du gymnase en
-            plein milieu -- pour leurs propres lignes pleine largeur sous
-            l'en-tête. Inchangé dès sm: (ligne fusionnée ci-dessus). */}
-        {allowClubWide && (
-          <div className="flex flex-col gap-1 text-sm text-zinc-500 sm:hidden">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              {dateRow}
-              {impactTimeRow}
-            </div>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">{locationRow}</div>
+        {/* Téléphone (retour de Cindy du 20/11) : une idée par ligne --
+            quand (avec le compte à rebours), où, les outils du match, puis
+            le type d'événement en petit. Date et lieu sur leurs propres
+            lignes pleine largeur (retour du 12/11 : coincés à côté des
+            icônes, ils se coupaient en plein milieu). */}
+        <div className="flex flex-col gap-1.5 sm:hidden">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500">
+            {dateRow}
+            {impactTimeRow}
+            {countdownBadge}
           </div>
-        )}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500">{locationRow}</div>
+          {isMatchType(event.event_type) && (
+            <div className="flex flex-wrap items-center gap-2 empty:hidden">{matchActions}</div>
+          )}
+          {typeBadge}
+        </div>
 
         {/* Retour de Cindy du 30/10 : même emplacement/forme que le badge
             "Besoin non pourvu" plus bas (needsOrganizing), en rouge plutôt
@@ -2780,22 +2765,6 @@ export default function CalendarView({
           </div>
         )}
 
-        {/* Côté Bureau (allowClubWide), date/heure, lieu/itinéraire et le
-            bouton "Voir plus" vivent déjà dans la ligne titre fusionnée
-            ci-dessus (dateRow/locationRow/toggleButton) -- jamais
-            redoublés ici. Coach/Famille gardent la structure d'origine,
-            chacun sur sa propre ligne pleine largeur. */}
-        {!allowClubWide && (
-          <>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-500">
-              {dateRow}
-              {impactTimeRow}
-            </div>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500">
-              {locationRow}
-            </div>
-          </>
-        )}
 
         {/* Retour de Cindy du 06/11 ("parfois en bout de ligne, parfois au
             milieu... je le veux en bas de carte à gauche") : sorti de la
@@ -2806,9 +2775,6 @@ export default function CalendarView({
         {/* Événement annulé (retour de Cindy du 12/11) : plus rien à
             déplier -- présences et réponses n'ont plus de sens, le motif
             est déjà affiché au-dessus. */}
-        {isMatchType(event.event_type) && (
-          <div className="flex flex-wrap items-center gap-2 empty:hidden sm:hidden">{matchActions}</div>
-        )}
 
         {allowClubWide && !event.cancelledAt && toggleButton}
 
