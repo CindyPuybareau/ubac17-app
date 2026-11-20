@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, ChevronDown, ChevronUp, Pencil, Settings, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import ConfirmDialog from "./confirm-dialog";
+import { refreshTeamsAndTariffsCache } from "./reference-cache-actions";
 import type { AdminCategoryTariff, AdminMemberTeam } from "./page";
 
 function buildValues(
@@ -118,6 +119,8 @@ export default function CategoryTariffsEditor({
         return;
       }
     }
+    // Cache partagé de 45 s vidé tout de suite (retour de Cindy du 20/11).
+    await refreshTeamsAndTariffsCache().catch(() => {});
     setSaving(false);
     setSaved(true);
     router.refresh();
@@ -161,6 +164,9 @@ export default function CategoryTariffsEditor({
       setConfirmRename(null);
       return;
     }
+    // Nouveau nom visible tout de suite, pas après les 45 s du cache
+    // partagé des équipes/tarifs (retour de Cindy du 20/11).
+    await refreshTeamsAndTariffsCache().catch(() => {});
     setConfirmRename(null);
     setEditingCategory(null);
     router.refresh();
