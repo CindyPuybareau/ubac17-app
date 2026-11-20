@@ -218,6 +218,11 @@ export default function WeekendStrip({
               <div className="grid grid-cols-1 gap-1.5 md:grid-cols-2">
                 {dayMatches.map((m) => {
                   const home = m.isHome === true;
+                  // Tournoi / plateau (retour de Cindy du 20/11, "on ne voit
+                  // pas le lieu") : ni domicile ni extérieur -- le lieu
+                  // renseigné s'affiche quand même, au lieu de "Lieu ?".
+                  const unknownSide = m.isHome === null;
+                  const showPlace = Boolean(m.place) && (home || unknownSide);
                   const content = (
                     <>
                       <span className="w-12 shrink-0 pt-0.5 text-sm font-bold tabular-nums text-navy">
@@ -226,7 +231,7 @@ export default function WeekendStrip({
                       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                         <span className="flex items-center justify-between gap-2">
                           <span className="text-xs font-bold uppercase tracking-wide text-ubac-blue">{m.teamName}</span>
-                          {!isClub && (
+                          {!isClub && !(unknownSide && m.place) && (
                             <span className={`${PILL} ${
                               home ? "bg-green-700 text-white" : m.isHome === false ? "bg-ubac-blue text-white" : "bg-zinc-100 text-zinc-500"
                             }`}>
@@ -239,7 +244,7 @@ export default function WeekendStrip({
                         <span className="break-words text-sm font-semibold leading-snug text-zinc-900">
                           {m.isTournament ? "Tournoi" : (m.opponent ?? "Match")}
                         </span>
-                        {home && m.place && (
+                        {showPlace && m.place && (
                           <span className="mt-0.5 flex items-center gap-1">
                             {m.place.isClubSalle ? (
                               <SalleBadge salle={m.place.label} />
