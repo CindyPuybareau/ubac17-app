@@ -62,10 +62,30 @@ export const SALLE_ADDRESS: Record<Salle, string> = {
 // "Domicile"/"Extérieur" seuls (retour de Cindy du 07/11, "les itinéraires
 // ne sont pas bons") : ces deux mots-là ne désignent aucun endroit,
 // les envoyer tels quels à un GPS n'a jamais eu de sens.
+// Lieu réduit à un nom de commune ("La jarrie") pour un événement sportif
+// (retour de Cindy du 20/11, "ça va m'envoyer n'importe où à La Jarrie ?") :
+// le GPS posait au centre du village. On cherche plutôt "Gymnase La
+// jarrie", que Waze / Google Maps résolvent en général vers le gymnase de
+// la commune. Filet de sécurité seulement : une adresse précise saisie
+// dans l'événement reste toujours prioritaire et n'est jamais modifiée.
+// Jamais pour un événement club (repas, soirée...) : une commune n'y
+// désigne pas forcément un gymnase.
+const SPORT_EVENT_TYPES = new Set(["TRAINING", "MATCH", "FRIENDLY", "TOURNAMENT"]);
+const PRECISE_PLACE_PATTERN =
+  /d|,|gymnase|salle|complexe|palais|halle|stade|dojo|espace|centre|rue|avenue|av.|boulevard|bd|chemin|route|allée|allee|place|impasse|quai|lieu-dit/i;
+function looksLikeBareTown(location: string) {
+  const text = location.trim();
+  if (!text || text.length > 40) return false;
+  if (PRECISE_PLACE_PATTERN.test(text)) return false;
+  return text.split(/s+/).length <= 4;
+}
+
 export function venueQuery(event: {
   salle: string | null;
   location: string | null;
   awayVenueAddress?: string | null;
+  eventType?: string | null;
+  event_type?: string | null;
 }): string | null {
   if (event.salle) {
     const known = SALLES.find((s) => normalize(s) === normalize(event.salle as string));
@@ -75,6 +95,10 @@ export function venueQuery(event: {
   const normalizedLocation = normalize(event.location ?? "");
   if (normalizedLocation === normalize("Extérieur") || normalizedLocation === normalize("Domicile")) {
     return null;
+  }
+  const type = event.eventType ?? event.event_type ?? null;
+  if (!event.salle && event.location && type && SPORT_EVENT_TYPES.has(type) && looksLikeBareTown(event.location)) {
+    return `Gymnase ${event.location.trim()}`;
   }
   const parts = [event.salle, event.location].filter(Boolean);
   return parts.length > 0 ? parts.join(", ") : null;
