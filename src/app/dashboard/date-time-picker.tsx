@@ -12,6 +12,14 @@ const MINUTE_STEP = 5;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const STANDARD_MINUTES = Array.from({ length: 60 / MINUTE_STEP }, (_, i) => i * MINUTE_STEP);
 
+// Heures rapides (retour de Cindy du 20/11, "l'heure en deux menus
+// déroulants, c'est pénible sur téléphone") : les heures de début les plus
+// utilisées par le club sur les 4 derniers mois (relevé en base le 20/11),
+// selon que le jour choisi est en semaine ou le week-end. Les menus
+// heure / minute restent là pour tout autre horaire.
+const QUICK_TIMES_WEEKDAY: [number, number][] = [[16, 30], [18, 0], [18, 30], [19, 30], [20, 0], [21, 0]];
+const QUICK_TIMES_WEEKEND: [number, number][] = [[9, 0], [10, 0], [11, 0], [13, 0], [15, 0], [20, 45]];
+
 function pad2(n: number) {
   return String(n).padStart(2, "0");
 }
@@ -137,6 +145,12 @@ export default function DateTimePicker({
     onChange(toLocalValue(y, m, d, h, min));
   }
 
+  function commitTime(h: number, min: number) {
+    const y = parsed?.y ?? viewYear;
+    const m = parsed?.m ?? viewMonth;
+    const d = parsed?.d ?? fallbackDay();
+    onChange(toLocalValue(y, m, d, h, min));
+  }
   function commitMinute(min: number) {
     const y = parsed?.y ?? viewYear;
     const m = parsed?.m ?? viewMonth;
@@ -239,7 +253,7 @@ export default function DateTimePicker({
                       isSelected
                         ? "bg-navy font-semibold text-white"
                         : isToday
-                          ? "border border-navy/40 font-semibold text-navy"
+                          ? "bg-ubac-yellow/30 font-semibold text-navy"
                           : inMonth
                             ? "text-zinc-700 hover:bg-zinc-100"
                             : "text-zinc-300 hover:bg-zinc-50"
@@ -251,8 +265,38 @@ export default function DateTimePicker({
               })}
             </div>
 
-            <div className="mt-4 flex items-center gap-2 border-t border-zinc-100 pt-3">
-              <span className="text-xs font-medium text-zinc-500">Heure</span>
+            {(() => {
+              const dayOfWeek = parsed ? new Date(parsed.y, parsed.m, parsed.d).getDay() : null;
+              const quick = dayOfWeek === 0 || dayOfWeek === 6 ? QUICK_TIMES_WEEKEND : QUICK_TIMES_WEEKDAY;
+              return (
+                <div className="mt-4 flex flex-col gap-1.5 border-t border-zinc-100 pt-3">
+                  <span className="text-xs font-medium text-zinc-500">
+                    Heures courantes{dayOfWeek === 0 || dayOfWeek === 6 ? " (week-end)" : ""}
+                  </span>
+                  <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
+                    {quick.map(([h, min]) => {
+                      const active = parsed?.h === h && parsed?.min === min;
+                      return (
+                        <button
+                          key={`${h}:${min}`}
+                          type="button"
+                          onClick={() => commitTime(h, min)}
+                          className={`rounded-full border px-2 py-1.5 text-xs font-semibold tabular-nums transition-colors ${
+                            active
+                              ? "border-navy bg-navy text-white"
+                              : "border-zinc-200 text-navy hover:bg-navy/5"
+                          }`}
+                        >
+                          {h}h{min ? pad2(min) : ""}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+            <div className="mt-3 flex items-center gap-2">
+              <span className="text-xs font-medium text-zinc-500">Autre heure</span>
               <select
                 value={parsed?.h ?? ""}
                 onChange={(e) => commitHour(Number(e.target.value))}
