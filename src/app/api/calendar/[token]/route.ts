@@ -66,6 +66,7 @@ function buildIcs(rows: FeedRow[]) {
       salle: row.salle,
       location: row.location,
       awayVenueAddress: row.away_venue_address,
+      eventType: row.event_type,
     });
 
     lines.push(
