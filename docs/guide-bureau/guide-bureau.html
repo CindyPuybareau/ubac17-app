@@ -161,6 +161,32 @@ ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 66
 .next h2 { font-size: 26px; color: var(--navy); text-transform: uppercase; }
 footer { margin-top: 28px; color: var(--ink-soft); font-size: 13px; }
 
+
+/* Tableau « Qui voit quoi » */
+.matrix-wrap { margin-top: 20px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); -webkit-overflow-scrolling: touch; }
+table.matrix { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 760px; font-size: 13.5px; }
+.matrix thead th { position: sticky; top: 0; background: #203090; color: #fff; font-weight: 700; text-align: center; padding: 10px 8px; font-size: 13px; letter-spacing: .02em; }
+.matrix thead th:first-child { text-align: left; border-top-left-radius: 13px; }
+.matrix thead th:last-child { border-top-right-radius: 13px; }
+.matrix thead th span { display: block; font-weight: 500; font-size: 11px; color: #c9cff0; }
+.matrix tbody th[scope="row"] { text-align: left; font-weight: 600; padding: 8px 10px; border-top: 1px solid var(--line); background: var(--surface); position: sticky; left: 0; z-index: 1; min-width: 190px; }
+.matrix tr.grp th { text-align: left; background: var(--surface-2); color: var(--navy); font-family: var(--font-display); font-size: 17px; text-transform: uppercase; letter-spacing: .03em; padding: 8px 10px; border-top: 1px solid var(--line); position: sticky; left: 0; }
+.matrix td.cell { border-top: 1px solid var(--line); padding: 7px 6px; text-align: center; vertical-align: middle; }
+.matrix td.cell .mk { display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; border-radius: 999px; padding: 2px 9px; }
+.matrix td.cell small { display: block; margin-top: 3px; color: var(--ink-soft); font-size: 11.5px; line-height: 1.3; }
+.matrix td.m .mk { background: var(--chip-green-bg); color: var(--green); }
+.matrix td.v .mk { background: var(--chip-navy-bg); color: var(--navy); }
+.matrix td.n .mk { color: var(--ink-soft); background: transparent; }
+.swipe-hint { display: none; margin-top: 10px; font-size: 13px; color: var(--ink-soft); font-style: italic; }
+@media (max-width: 760px) { .swipe-hint { display: block; } }
+@media print { .swipe-hint { display: none !important; } }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 12px; font-size: 14px; color: var(--ink-soft); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend .mk { font-size: 11px; font-weight: 700; text-transform: uppercase; border-radius: 999px; padding: 2px 9px; }
+.legend .m { background: var(--chip-green-bg); color: var(--green); }
+.legend .v { background: var(--chip-navy-bg); color: var(--navy); }
+@media print { .matrix-wrap { overflow: visible; border: 0; } table.matrix { min-width: 0; font-size: 9pt; } .matrix thead th, .matrix tr.grp th, .matrix td .mk { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .matrix tbody th[scope="row"] { position: static; min-width: 0; } .matrix tr { break-inside: avoid; } }
+
 @media (max-width: 760px) {
   .task { grid-template-columns: minmax(0, 1fr); }
   .cover { padding-top: 28px; }
@@ -203,6 +229,7 @@ footer { margin-top: 28px; color: var(--ink-soft); font-size: 13px; }
     <a href="#matchs-officiels"><b>Matchs officiels</b><small>Championnat, FFBB, feuilles de match</small></a>
     <a href="#vie-du-club"><b>Vie du club</b><small>Sponsors, affiches, photos, documents</small></a>
     <a href="#bilan"><b>Bilan de la saison</b><small>Assiduité des joueurs, bénévolat</small></a>
+    <a href="#qui-voit-quoi"><b>Qui voit quoi</b><small>Les droits de chaque espace en un tableau</small></a>
   </nav>
 
   <!-- 1. PRISE EN MAIN -->
@@ -887,6 +914,86 @@ footer { margin-top: 28px; color: var(--ink-soft); font-size: 13px; }
           <div><div style="display:flex;justify-content:space-between"><span>Tom Roux</span><b class="num">4/15</b></div><div style="height:6px;border-radius:4px;background:var(--surface-2)"><div style="width:27%;height:6px;border-radius:4px;background:var(--red)"></div></div></div>
         </div>
         <p class="note">Noms et chiffres inventés.</p>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- 12. QUI VOIT QUOI -->
+  <section class="chapter" id="qui-voit-quoi">
+    <div class="chapter-head"><span class="num">12</span><h2>Qui voit quoi</h2></div>
+    <p class="lead">Ce que chaque personne voit et peut modifier dans l'appli, selon son espace. Un membre du Bureau qui coache ou qui a un enfant licencié cumule les colonnes correspondantes.</p>
+    <div class="legend" aria-label="Légende">
+      <span><span class="mk m">Modifie</span> voit et peut changer</span>
+      <span><span class="mk v">Voit</span> lecture seule</span>
+      <span><b>—</b> ne voit pas</span>
+    </div>
+    <p class="swipe-hint">Sur téléphone, faire glisser le tableau vers la gauche pour voir les autres colonnes. La colonne « Fonction » reste visible.</p>
+    <div class="matrix-wrap" role="region" aria-label="Tableau des droits" tabindex="0">
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th scope="col">Fonction</th>
+            <th scope="col">Bureau</th>
+            <th scope="col">Coach</th>
+            <th scope="col">Joueur<span>licencié adulte</span></th>
+            <th scope="col">Parent</th>
+            <th scope="col">Enfant<span>Espace Enfant</span></th>
+          </tr>
+        </thead>
+        <tbody>
+            <tr class="grp"><th colspan="6" scope="colgroup">Calendrier</th></tr>
+            <tr><th scope="row">Voir les événements</th><td class="cell v"><span class="mk">Voit</span><small>tout le club</small></td><td class="cell v"><span class="mk">Voit</span><small>ses équipes</small></td><td class="cell v"><span class="mk">Voit</span><small>son équipe</small></td><td class="cell v"><span class="mk">Voit</span><small>équipes de ses enfants</small></td><td class="cell v"><span class="mk">Voit</span><small>son équipe</small></td></tr>
+            <tr><th scope="row">Créer, modifier, annuler un événement</th><td class="cell m"><span class="mk">Modifie</span><small>tous</small></td><td class="cell m"><span class="mk">Modifie</span><small>ses équipes</small></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td></tr>
+            <tr><th scope="row">Score d'un match</th><td class="cell m"><span class="mk">Modifie</span></td><td class="cell m"><span class="mk">Modifie</span><small>ses équipes</small></td><td class="cell v"><span class="mk">Voit</span></td><td class="cell v"><span class="mk">Voit</span></td><td class="cell v"><span class="mk">Voit</span></td></tr>
+            <tr><th scope="row">Code e-Marque (domicile)</th><td class="cell m"><span class="mk">Modifie</span></td><td class="cell v"><span class="mk">Voit</span></td><td class="cell v"><span class="mk">Voit</span></td><td class="cell v"><span class="mk">Voit</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td></tr>
+            <tr class="grp"><th colspan="6" scope="colgroup">Organisation</th></tr>
+            <tr><th scope="row">Répondre présent / absent</th><td class="cell m"><span class="mk">Modifie</span><small>pour tout le monde</small></td><td class="cell m"><span class="mk">Modifie</span><small>ses joueurs</small></td><td class="cell m"><span class="mk">Modifie</span><small>pour lui-même</small></td><td class="cell m"><span class="mk">Modifie</span><small>pour ses enfants</small></td><td class="cell v"><span class="mk">Voit</span><small>ses présences</small></td></tr>
+            <tr><th scope="row">Covoiturage</th><td class="cell v"><span class="mk">Voit</span></td><td class="cell v"><span class="mk">Voit</span></td><td class="cell m"><span class="mk">Modifie</span><small>propose, réserve</small></td><td class="cell m"><span class="mk">Modifie</span><small>propose, réserve</small></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td></tr>
+            <tr><th scope="row">Besoins bénévoles</th><td class="cell m"><span class="mk">Modifie</span><small>crée, désigne</small></td><td class="cell m"><span class="mk">Modifie</span><small>ses équipes</small></td><td class="cell m"><span class="mk">Modifie</span><small>se propose</small></td><td class="cell m"><span class="mk">Modifie</span><small>se propose</small></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td></tr>
+            <tr><th scope="row">Officiels des matchs à domicile</th><td class="cell m"><span class="mk">Modifie</span><small>désigne</small></td><td class="cell m"><span class="mk">Modifie</span><small>ses équipes</small></td><td class="cell m"><span class="mk">Modifie</span><small>se propose</small></td><td class="cell m"><span class="mk">Modifie</span><small>se propose</small></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td></tr>
+            <tr><th scope="row">Accompagnants (événement club)</th><td class="cell v"><span class="mk">Voit</span><small>total, export Excel</small></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell m"><span class="mk">Modifie</span><small>son nombre</small></td><td class="cell m"><span class="mk">Modifie</span><small>son nombre</small></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td></tr>
+            <tr class="grp"><th colspan="6" scope="colgroup">Membres et équipes</th></tr>
+            <tr><th scope="row">Liste des membres et fiches</th><td class="cell m"><span class="mk">Modifie</span><small>tout</small></td><td class="cell m"><span class="mk">Modifie</span><small>coordonnées de ses joueurs</small></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td></tr>
+            <tr><th scope="row">Archiver, réactiver, supprimer un membre</th><td class="cell m"><span class="mk">Modifie</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td></tr>
+            <tr><th scope="row">Composition des équipes</th><td class="cell m"><span class="mk">Modifie</span></td><td class="cell m"><span class="mk">Modifie</span><small>change un joueur d'équipe</small></td><td class="cell v"><span class="mk">Voit</span><small>son équipe</small></td><td class="cell v"><span class="mk">Voit</span><small>équipes de ses enfants</small></td><td class="cell v"><span class="mk">Voit</span><small>son équipe</small></td></tr>
+            <tr><th scope="row">Photo d'équipe</th><td class="cell m"><span class="mk">Modifie</span></td><td class="cell m"><span class="mk">Modifie</span><small>ses équipes</small></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td></tr>
+            <tr><th scope="row">Sa propre photo de profil</th><td class="cell m"><span class="mk">Modifie</span></td><td class="cell m"><span class="mk">Modifie</span></td><td class="cell m"><span class="mk">Modifie</span></td><td class="cell m"><span class="mk">Modifie</span></td><td class="cell m"><span class="mk">Modifie</span></td></tr>
+            <tr><th scope="row">Accès Espace Enfant (code)</th><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell m"><span class="mk">Modifie</span><small>pour ses enfants</small></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td></tr>
+            <tr class="grp"><th colspan="6" scope="colgroup">Paiements</th></tr>
+            <tr><th scope="row">Cotisations</th><td class="cell m"><span class="mk">Modifie</span><small>toutes</small></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell v"><span class="mk">Voit</span><small>la sienne</small></td><td class="cell v"><span class="mk">Voit</span><small>celles de ses enfants</small></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td></tr>
+            <tr><th scope="row">Tarifs, nom des catégories</th><td class="cell m"><span class="mk">Modifie</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td></tr>
+            <tr><th scope="row">Pénalités</th><td class="cell m"><span class="mk">Modifie</span></td><td class="cell v"><span class="mk">Voit</span><small>ses équipes</small></td><td class="cell v"><span class="mk">Voit</span><small>les siennes</small></td><td class="cell v"><span class="mk">Voit</span><small>celles de ses enfants</small></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td></tr>
+            <tr><th scope="row">Événements payants</th><td class="cell m"><span class="mk">Modifie</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell v"><span class="mk">Voit</span><small>les siens</small></td><td class="cell v"><span class="mk">Voit</span><small>ceux de ses enfants</small></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td></tr>
+            <tr><th scope="row">Buvette</th><td class="cell m"><span class="mk">Modifie</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td></tr>
+            <tr class="grp"><th colspan="6" scope="colgroup">Matchs officiels</th></tr>
+            <tr><th scope="row">Championnat (matchs, scores, classement)</th><td class="cell v"><span class="mk">Voit</span></td><td class="cell v"><span class="mk">Voit</span></td><td class="cell v"><span class="mk">Voit</span></td><td class="cell v"><span class="mk">Voit</span></td><td class="cell v"><span class="mk">Voit</span></td></tr>
+            <tr><th scope="row">Lien FFBB d'une équipe</th><td class="cell m"><span class="mk">Modifie</span><small>toutes</small></td><td class="cell m"><span class="mk">Modifie</span><small>ses équipes</small></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td></tr>
+            <tr><th scope="row">Import des inscriptions</th><td class="cell m"><span class="mk">Modifie</span><small>Cindy seulement</small></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td></tr>
+            <tr class="grp"><th colspan="6" scope="colgroup">Vie du club</th></tr>
+            <tr><th scope="row">Affiches à la une</th><td class="cell m"><span class="mk">Modifie</span></td><td class="cell v"><span class="mk">Voit</span></td><td class="cell v"><span class="mk">Voit</span></td><td class="cell v"><span class="mk">Voit</span></td><td class="cell v"><span class="mk">Voit</span></td></tr>
+            <tr><th scope="row">Sponsors</th><td class="cell m"><span class="mk">Modifie</span><small>fiches, contrats</small></td><td class="cell v"><span class="mk">Voit</span><small>offres membres</small></td><td class="cell v"><span class="mk">Voit</span><small>offres membres</small></td><td class="cell v"><span class="mk">Voit</span><small>offres membres</small></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td></tr>
+            <tr><th scope="row">Chartes, règlement intérieur</th><td class="cell v"><span class="mk">Voit</span></td><td class="cell v"><span class="mk">Voit</span></td><td class="cell v"><span class="mk">Voit</span></td><td class="cell v"><span class="mk">Voit</span></td><td class="cell v"><span class="mk">Voit</span></td></tr>
+            <tr><th scope="row">Comptes rendus</th><td class="cell m"><span class="mk">Modifie</span><small>mairies, Bureau, CD17</small></td><td class="cell m"><span class="mk">Modifie</span><small>ceux des coachs, lit les autres</small></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td></tr>
+            <tr><th scope="row">Inventaire du matériel</th><td class="cell m"><span class="mk">Modifie</span></td><td class="cell m"><span class="mk">Modifie</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td></tr>
+            <tr><th scope="row">Boutique en ligne</th><td class="cell v"><span class="mk">Voit</span><small>et suivi des ventes</small></td><td class="cell v"><span class="mk">Voit</span></td><td class="cell v"><span class="mk">Voit</span></td><td class="cell v"><span class="mk">Voit</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td></tr>
+            <tr class="grp"><th colspan="6" scope="colgroup">Suivi</th></tr>
+            <tr><th scope="row">Bilan de la saison</th><td class="cell v"><span class="mk">Voit</span><small>tout le club</small></td><td class="cell v"><span class="mk">Voit</span><small>ses équipes</small></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell v"><span class="mk">Voit</span><small>ses présences</small></td></tr>
+            <tr><th scope="row">Rappels automatiques (réglages)</th><td class="cell m"><span class="mk">Modifie</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="task solo">
+      <div class="text">
+        <h3>Joueur et parent : les différences</h3>
+        <ul class="plain">
+          <li>Ils ont le même espace, <b>Mon équipe</b>. Le joueur adulte agit pour lui-même ; le parent agit pour chacun de ses enfants (présences, covoiturage, bénévolat).</li>
+          <li>Un parent qui est aussi licencié voit les deux : ses propres équipes et celles de ses enfants.</li>
+          <li>Seul le parent crée le code d'accès à l'<b>Espace Enfant</b> de ses enfants.</li>
+        </ul>
+        <h3 style="margin-top:12px">L'Espace Enfant</h3>
+        <p>L'enfant se connecte avec le lien de sa famille et son code. Son espace est en lecture seule : son équipe, son calendrier, ses présences, le championnat, les documents et les affiches. La seule chose qu'il peut changer, c'est sa photo de profil.</p>
+        <div class="tip"><b>Bon à savoir</b>Ces droits sont vérifiés par la base de données elle-même, pas seulement par l'affichage : même en bricolant l'appli, un parent ne peut pas modifier ce qui n'est pas à lui.</div>
       </div>
     </div>
   </section>
