@@ -186,7 +186,7 @@ function weekSummary(events: WeekStripEvent[], weekStart: Date, weekEnd: Date): 
   // Retour de Cindy du 07/09 ("Cette semaine / Rien de prévu cette
   // semaine. c'est redondant") : l'eyebrow "CETTE SEMAINE" juste
   // au-dessus (voir plus bas) porte déjà cette précision.
-  if (inWeek.length === 0) return "Rien de prévu.";
+  if (inWeek.length === 0) return "Rien de prévu";
 
   let trainings = 0;
   let matches = 0;
@@ -218,15 +218,20 @@ function weekSummary(events: WeekStripEvent[], weekStart: Date, weekEnd: Date): 
     const day = new Date((soleMatch as WeekStripEvent).startTime).toLocaleDateString("fr-FR", {
       weekday: "long",
     });
-    const loc = (soleMatch as WeekStripEvent).location;
-    suffix = ` ${day}${loc ? ` à ${loc}` : ""}`;
+    const loc = (soleMatch as WeekStripEvent).location?.trim();
+    // Retour de Cindy du 20/11 ("toujours le point dans le titre") : plus
+    // de point au milieu de la phrase, le détail du match passe entre
+    // parenthèses ("6 entraînements et 1 match (dimanche, à Saint Rogatien)").
+    suffix = ` (${day}${loc ? `, à ${loc}` : ""})`;
   }
 
   // Retour de Cindy du 07/09 ("Cette semaine / Cette semaine : 4
   // entraînements... c'est redondant") : même correctif que la branche
   // "rien de prévu" juste au-dessus -- l'eyebrow "CETTE SEMAINE" porte déjà
   // cette précision, plus besoin de la répéter dans la phrase elle-même.
-  return `${parts.join(", ")}.${suffix}`;
+  const list =
+    parts.length > 1 ? `${parts.slice(0, -1).join(", ")} et ${parts[parts.length - 1]}` : parts[0];
+  return `${list}${suffix}`;
 }
 
 // Même habillage que EventRow (child-calendar-tab.tsx) et renderEventCard
@@ -597,7 +602,13 @@ export default function WeekStripBanner({
         <div className="grid grid-cols-7 gap-1.5 lg:w-auto lg:shrink-0">
           {days.map((d) => {
             const isToday = isSameDay(d, today);
-            const hasEvents = events.some((e) => isSameDay(new Date(e.startTime), d));
+            // Retour de Cindy du 20/11 ("plusieurs événements dans un seul
+            // point") : le nombre d'événements du jour quand il y en a
+            // plusieurs, un simple point quand il n'y en a qu'un ; jours
+            // déjà passés grisés.
+            const dayCount = events.filter((e) => isSameDay(new Date(e.startTime), d)).length;
+            const hasEvents = dayCount > 0;
+            const isPast = !isToday && d < today;
             const key = d.toISOString();
             const isSelected = selectedKey === key;
             return (
@@ -607,7 +618,7 @@ export default function WeekStripBanner({
                 onClick={() => setSelectedKey(isSelected ? null : key)}
                 className={`flex cursor-pointer flex-col items-center gap-1 rounded-xl px-1.5 py-1.5 text-center transition-colors hover:brightness-110 ${
                   isToday ? "bg-ubac-yellow text-navy-dark" : "bg-white/10 text-white/70"
-                } ${isSelected ? "ring-2 ring-white" : ""}`}
+                } ${isSelected ? "ring-2 ring-white" : ""} ${isPast ? "opacity-45" : ""}`}
               >
                 <span className="text-[10px] font-semibold uppercase">
                   {DAY_LETTERS[(d.getDay() + 6) % 7]}
@@ -617,11 +628,22 @@ export default function WeekStripBanner({
                     (pas par type d'événement) pour rester lisible quel que
                     soit le fond de la pastille (aujourd'hui en jaune, les
                     autres jours en blanc translucide). */}
-                <span
-                  className={`h-1.5 w-1.5 rounded-full ${
-                    hasEvents ? (isToday ? "bg-navy-dark" : "bg-ubac-yellow") : "bg-transparent"
-                  }`}
-                />
+                {dayCount > 1 ? (
+                  <span
+                    className={`flex h-3.5 min-w-3.5 items-center justify-center rounded-full px-1 text-[9px] font-bold leading-none tabular-nums ${
+                      isToday ? "bg-navy-dark text-white" : "bg-ubac-yellow text-navy-dark"
+                    }`}
+                    aria-label={`${dayCount} événements`}
+                  >
+                    {dayCount}
+                  </span>
+                ) : (
+                  <span
+                    className={`my-1 h-1.5 w-1.5 rounded-full ${
+                      hasEvents ? (isToday ? "bg-navy-dark" : "bg-ubac-yellow") : "bg-transparent"
+                    }`}
+                  />
+                )}
               </button>
             );
           })}
