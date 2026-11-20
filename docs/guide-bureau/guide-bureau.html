@@ -26,18 +26,8 @@
   --font-display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
   --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0e1226; --surface: #161b36; --surface-2: #1d2347; --ink: #eef0fa; --ink-soft: #a9b0cf;
-    --line: #2b3260; --navy: #5b6fd6; --navy-deep: #1a2150; --chip-green-bg: #173326; --chip-amber-bg: #3a2a0c;
-    --chip-navy-bg: #232b5c; --green: #5fbf86; --amber: #f2b552; --red: #f08a5d; color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #0e1226; --surface: #161b36; --surface-2: #1d2347; --ink: #eef0fa; --ink-soft: #a9b0cf;
-  --line: #2b3260; --navy: #5b6fd6; --navy-deep: #1a2150; --chip-green-bg: #173326; --chip-amber-bg: #3a2a0c;
-  --chip-navy-bg: #232b5c; --green: #5fbf86; --amber: #f2b552; --red: #f08a5d; color-scheme: dark;
-}
+/* Toujours en clair, comme l'appli (retour de Cindy du 20/11 : fond noir sur un téléphone en mode sombre). */
+:root, :root[data-theme="dark"] { color-scheme: light; }
 
 * { box-sizing: border-box; }
 body {
@@ -65,8 +55,9 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--gold); outline-
 .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; color: #f4c430; }
 .cover h1 { font-size: clamp(40px, 7vw, 68px); font-weight: 800; letter-spacing: .01em; text-transform: uppercase; }
 .cover p { max-width: 62ch; color: #d8dcf2; font-size: 17px; }
-.stage { display: inline-flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
-.stage span { font-size: 13px; font-weight: 600; padding: 4px 12px; border-radius: 999px; background: rgba(255,255,255,.12); color: #fff; }
+.stage { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 6px; max-width: 960px; }
+.stage span { font-size: 13px; font-weight: 600; padding: 8px 12px; border-radius: 12px; background: rgba(255,255,255,.12); color: #fff; text-align: center; display: flex; align-items: center; justify-content: center; }
+@media (max-width: 760px) { .stage { grid-template-columns: minmax(0, 1fr); } }
 .stage span.on { background: #f4c430; color: #162365; }
 
 /* Sommaire */
