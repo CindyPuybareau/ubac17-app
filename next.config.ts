@@ -45,6 +45,12 @@ const nextConfig: NextConfig = {
   // techno utilisée à quiconque inspecte les réponses.
   poweredByHeader: false,
 
+  // Guide du Bureau (retour de Cindy du 20/11) : la page /guide-bureau lit
+  // ce fichier à la demande -- embarqué explicitement au déploiement.
+  outputFileTracingIncludes: {
+    "/guide-bureau": ["./docs/guide-bureau/guide-bureau.html"],
+  },
+
   // Désactivé (retour de Cindy du 15/09, capture montrant l'indicateur de
   // dev Next.js chevauchant le bandeau "Nouvelle version disponible", voir
   // version-watcher.tsx) -- le déplacer dans un autre coin ne suffisait

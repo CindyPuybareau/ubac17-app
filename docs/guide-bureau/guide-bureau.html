@@ -1,0 +1,453 @@
+<title>Guide du Bureau UBAC</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Mise en page : une colonne de lecture (≈ 68 caractères), chapitres séparés
+   par un bandeau « feuille de match » marine/or, écrans d'exemple redessinés
+   à côté des étapes sur grand écran, empilés sur téléphone. */
+:root {
+  --navy: #203090;
+  --navy-deep: #162365;
+  --gold: #f4c430;
+  --green: #3e8f5f;
+  --amber: #b45309;
+  --red: #c2410c;
+  --bg: #f6f7fb;
+  --surface: #ffffff;
+  --surface-2: #eef0f8;
+  --ink: #141a33;
+  --ink-soft: #4a5170;
+  --line: #dde1ef;
+  --chip-green-bg: #e3f2e9;
+  --chip-amber-bg: #fdf0d5;
+  --chip-navy-bg: #e5e8f7;
+  --on-navy: #ffffff;
+  --font-display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1226; --surface: #161b36; --surface-2: #1d2347; --ink: #eef0fa; --ink-soft: #a9b0cf;
+    --line: #2b3260; --navy: #5b6fd6; --navy-deep: #1a2150; --chip-green-bg: #173326; --chip-amber-bg: #3a2a0c;
+    --chip-navy-bg: #232b5c; --green: #5fbf86; --amber: #f2b552; --red: #f08a5d; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1226; --surface: #161b36; --surface-2: #1d2347; --ink: #eef0fa; --ink-soft: #a9b0cf;
+  --line: #2b3260; --navy: #5b6fd6; --navy-deep: #1a2150; --chip-green-bg: #173326; --chip-amber-bg: #3a2a0c;
+  --chip-navy-bg: #232b5c; --green: #5fbf86; --amber: #f2b552; --red: #f08a5d; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+.wrap { max-width: 1040px; margin: 0 auto; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; line-height: 1.05; margin: 0; }
+p { margin: 0; }
+a { color: var(--navy); }
+a:focus-visible, button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; border-radius: 6px; }
+
+/* En-tête */
+.cover {
+  margin: 0 calc(-1 * max(16px, env(safe-area-inset-left, 0px))) 0;
+  background: #203090; color: #fff; padding: 40px max(16px, env(safe-area-inset-left, 0px)) 36px;
+  position: relative; overflow: hidden;
+}
+.cover::after {
+  content: ""; position: absolute; right: -120px; top: -120px; width: 360px; height: 360px; border-radius: 50%;
+  border: 3px solid rgba(244,196,48,.35); box-shadow: 0 0 0 40px rgba(244,196,48,.06);
+}
+.cover .wrap { position: relative; z-index: 1; display: grid; gap: 14px; }
+.eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; color: #f4c430; }
+.cover h1 { font-size: clamp(40px, 7vw, 68px); font-weight: 800; letter-spacing: .01em; text-transform: uppercase; }
+.cover p { max-width: 62ch; color: #d8dcf2; font-size: 17px; }
+.stage { display: inline-flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.stage span { font-size: 13px; font-weight: 600; padding: 4px 12px; border-radius: 999px; background: rgba(255,255,255,.12); color: #fff; }
+.stage span.on { background: #f4c430; color: #162365; }
+
+/* Sommaire */
+.toc { margin-top: 28px; display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.toc a {
+  display: grid; gap: 4px; text-decoration: none; color: var(--ink); background: var(--surface); border: 1px solid var(--line);
+  border-radius: 14px; padding: 16px 18px;
+}
+.toc a:hover { border-color: var(--navy); }
+.toc b { font-family: var(--font-display); font-size: 24px; font-weight: 700; color: var(--navy); text-transform: uppercase; }
+.toc small { color: var(--ink-soft); font-size: 14px; }
+
+/* Chapitres */
+.chapter { margin-top: 56px; }
+.chapter-head { display: flex; align-items: baseline; gap: 14px; border-bottom: 3px solid var(--gold); padding-bottom: 10px; flex-wrap: wrap; }
+.chapter-head .num { font-family: var(--font-display); font-weight: 800; font-size: 44px; color: var(--gold); line-height: 1; }
+.chapter-head h2 { font-size: clamp(30px, 4.6vw, 42px); text-transform: uppercase; color: var(--navy); font-weight: 800; }
+.where { margin-top: 12px; color: var(--ink-soft); font-size: 15px; }
+.where code, .path {
+  font-family: var(--font-body); font-size: 14px; font-weight: 600; background: var(--chip-navy-bg); color: var(--navy);
+  padding: 2px 8px; border-radius: 6px; white-space: nowrap;
+}
+.lead { margin-top: 10px; max-width: 68ch; font-size: 17px; }
+
+.task { margin-top: 32px; display: grid; gap: 24px; grid-template-columns: minmax(0, 1fr) minmax(0, 380px); align-items: start; }
+.task.solo { grid-template-columns: minmax(0, 1fr); }
+.task h3 { font-size: 27px; font-weight: 700; color: var(--ink); }
+.task .text { min-width: 0; display: grid; gap: 12px; }
+.task .text > p { max-width: 68ch; }
+ol.steps { margin: 0; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 10px; }
+ol.steps li { counter-increment: s; position: relative; padding-left: 40px; max-width: 64ch; }
+ol.steps li::before {
+  content: counter(s); position: absolute; left: 0; top: 1px; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--navy); color: var(--on-navy); font-weight: 700; font-size: 13px; display: grid; place-items: center;
+}
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 66ch; }
+.tip {
+  background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--green); border-radius: 10px;
+  padding: 12px 16px; max-width: 68ch; font-size: 15px;
+}
+.tip.warn { border-left-color: var(--amber); }
+.tip b:first-child { display: block; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--green); margin-bottom: 2px; }
+.tip.warn b:first-child { color: var(--amber); }
+
+/* Écrans d'exemple (redessinés, noms inventés) */
+.screen {
+  min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 14px;
+  box-shadow: 0 6px 20px rgba(20, 26, 51, .07); font-size: 13px; line-height: 1.4;
+}
+.screen .cap { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; margin-bottom: 10px; }
+.chip { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; border-radius: 999px; padding: 2px 8px; letter-spacing: .02em; }
+.c-navy { background: var(--chip-navy-bg); color: var(--navy); }
+.c-green { background: var(--chip-green-bg); color: var(--green); }
+.c-amber { background: var(--chip-amber-bg); color: var(--amber); }
+.c-solid { background: #203090; color: #fff; }
+.c-gold { background: #f4c430; color: #162365; }
+.ev { border: 1px solid var(--line); border-left: 4px solid #203090; border-radius: 12px; padding: 10px 12px; display: grid; gap: 6px; background: var(--surface); }
+.ev.train { border-left-color: var(--green); }
+.ev .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.ev .team { font-size: 11px; font-weight: 700; color: var(--navy); text-transform: uppercase; letter-spacing: .05em; }
+.ev .title { font-weight: 600; }
+.ev .meta { color: var(--ink-soft); }
+.btn-mini { font-size: 11px; font-weight: 600; border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; color: var(--ink); background: var(--surface-2); }
+.stack { display: grid; gap: 8px; }
+.types { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.type { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 7px 9px; font-weight: 600; font-size: 12.5px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.kpi { border: 1px solid var(--line); border-radius: 10px; padding: 8px; text-align: center; }
+.kpi b { display: block; font-family: var(--font-display); font-size: 22px; line-height: 1; font-variant-numeric: tabular-nums; }
+.kpi.hot { background: var(--chip-amber-bg); border-color: transparent; }
+.ring { display: flex; align-items: center; gap: 12px; background: #203090; color: #fff; border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; }
+.ring .pct { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 15px;
+  background: conic-gradient(#5fd08f 0 93%, rgba(255,255,255,.2) 93% 100%); position: relative; }
+.ring .pct span { position: relative; z-index: 1; }
+.ring .pct::before { content: ""; position: absolute; inset: 6px; border-radius: 50%; background: #203090; }
+.ring small { color: #f4c430; font-weight: 700; letter-spacing: .08em; font-size: 10px; }
+.tariffs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.tariff { display: flex; justify-content: space-between; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 9px; padding: 6px 8px; background: var(--surface-2); }
+.tariff b { font-variant-numeric: tabular-nums; color: var(--navy); }
+.pen { color: var(--ink-soft); font-size: 11px; }
+.tablet { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.tablet .tr { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, .8fr) minmax(0, 1fr); gap: 6px; padding: 7px 9px; border-top: 1px solid var(--line); align-items: center; }
+.tablet .tr:first-child { border-top: 0; background: var(--surface-2); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-soft); }
+.num { font-variant-numeric: tabular-nums; }
+.pills { display: flex; flex-wrap: wrap; gap: 5px; }
+.pill { font-size: 11.5px; border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px; }
+.pill.on { background: #203090; color: #fff; border-color: #203090; }
+.note { color: var(--ink-soft); font-size: 11.5px; margin-top: 8px; font-style: italic; }
+
+.next { margin-top: 56px; background: var(--surface); border: 1px dashed var(--line); border-radius: 16px; padding: 20px 22px; display: grid; gap: 10px; }
+.next h2 { font-size: 26px; color: var(--navy); text-transform: uppercase; }
+footer { margin-top: 28px; color: var(--ink-soft); font-size: 13px; }
+
+@media (max-width: 760px) {
+  .task { grid-template-columns: minmax(0, 1fr); }
+  .cover { padding-top: 28px; }
+}
+@media print {
+  body { background: #fff; padding: 0; font-size: 11pt; }
+  .cover { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .chapter { break-before: page; margin-top: 0; padding-top: 8mm; }
+  .task, .tip, .screen, .ev { break-inside: avoid; }
+  .screen, .ring, .chip, .pill.on, .kpi.hot, ol.steps li::before, .stage span.on { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .screen { box-shadow: none; }
+  .toc a { break-inside: avoid; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<header class="cover">
+  <div class="wrap">
+    <span class="eyebrow">Union Basket Angoulins Châtelaillon Saint-Vivien · Saison 2026-2027</span>
+    <h1>Guide du Bureau</h1>
+    <p>Tout ce que l'appli du club fait pour le Bureau, expliqué tâche par tâche. Chaque partie dit où cliquer, ce qui se passe ensuite, et les pièges à éviter.</p>
+    <div class="stage" aria-label="Étapes du guide">
+      <span class="on">Étape 1 · Prise en main, calendrier, cotisations</span>
+      <span>Étape 2 · Membres, équipes, organisation des matchs</span>
+      <span>Étape 3 · Vie du club, bilan de saison</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <nav class="toc" aria-label="Sommaire">
+    <a href="#prise-en-main"><b>Prise en main</b><small>Les trois espaces, le menu, la déconnexion</small></a>
+    <a href="#calendrier"><b>Calendrier</b><small>Créer, filtrer, lire une carte de match</small></a>
+    <a href="#cotisations"><b>Cotisations &amp; Licences</b><small>Tarifs, import, règlements, vérifications</small></a>
+  </nav>
+
+  <!-- 1. PRISE EN MAIN -->
+  <section class="chapter" id="prise-en-main">
+    <div class="chapter-head"><span class="num">1</span><h2>Prise en main</h2></div>
+    <p class="lead">L'appli s'ouvre dans un navigateur, sur téléphone comme sur ordinateur, à l'adresse <span class="path">ubac17-app.vercel.app</span>. Chacun se connecte avec son adresse email.</p>
+
+    <div class="task">
+      <div class="text">
+        <h3>Les trois espaces</h3>
+        <p>En haut de l'écran, trois boutons permettent de changer de point de vue. Un membre du Bureau qui coache ou qui a un enfant licencié les voit tous les trois.</p>
+        <ul class="plain">
+          <li><b>Bureau</b> : tout le club, toutes les équipes, l'administration (cotisations, membres, accès…).</li>
+          <li><b>Coach</b> : seulement les équipes que la personne entraîne.</li>
+          <li><b>Mon équipe</b> (ou Famille) : seulement les équipes de ses propres enfants, comme un parent les voit.</li>
+        </ul>
+        <div class="tip"><b>Bon à savoir</b>Tout le monde lit les mêmes données. Un maillot attribué côté Coach apparaît aussitôt côté Bureau et côté Famille, sans recharger la page.</div>
+      </div>
+      <div class="screen" aria-label="Exemple : sélecteur d'espaces">
+        <div class="cap">Exemple d'écran</div>
+        <div class="pills">
+          <span class="pill on">Bureau</span><span class="pill">Coach</span><span class="pill">Mon équipe</span>
+        </div>
+        <p class="note">Le bouton foncé indique l'espace affiché.</p>
+      </div>
+    </div>
+
+    <div class="task">
+      <div class="text">
+        <h3>Le menu du Bureau</h3>
+        <p>Le menu s'ouvre avec le rond jaune en haut à droite. Il est rangé par grands thèmes :</p>
+        <ul class="plain">
+          <li><b>Tableau de bord</b> : chiffres clés, affiches à la une, semaine en cours.</li>
+          <li><b>Calendrier général</b>, <b>Membres</b>, <b>Équipes</b>.</li>
+          <li><b>Bilan de la saison</b> : joueurs et bénévoles.</li>
+          <li><b>Paiements</b> : Cotisations &amp; Licences, Événements payants, Pénalités, Buvette.</li>
+          <li><b>Matchs officiels</b> : championnat, FFBB.</li>
+          <li><b>Vie du club</b> : sponsors, événements à la une, photos d'équipe, documents, inventaire, suivi des ventes.</li>
+        </ul>
+        <div class="tip"><b>Se déconnecter</b>Le bouton <b>Déconnexion</b> est toujours en bas du menu, sur téléphone comme sur ordinateur.</div>
+      </div>
+      <div class="screen" aria-label="Exemple : menu du Bureau">
+        <div class="cap">Exemple d'écran</div>
+        <div class="stack" style="background:#203090;color:#fff;border-radius:12px;padding:10px 12px;font-size:13px">
+          <span style="font-size:10px;letter-spacing:.12em;opacity:.7">MENU</span>
+          <span>Tableau de bord</span><span>Calendrier général</span><span>Membres</span><span>Équipes</span>
+          <span>Bilan de la saison ›</span>
+          <span>Paiements ⌄</span>
+          <span style="padding-left:14px;color:#f4c430;font-weight:600">Cotisations &amp; Licences</span>
+          <span style="padding-left:14px;opacity:.85">Événements payants</span>
+          <span>Matchs officiels ›</span><span>Vie du club ›</span>
+          <span style="border-top:1px solid rgba(255,255,255,.2);padding-top:6px">Déconnexion</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. CALENDRIER -->
+  <section class="chapter" id="calendrier">
+    <div class="chapter-head"><span class="num">2</span><h2>Calendrier</h2></div>
+    <p class="where">Où : menu › <code>Calendrier général</code></p>
+    <p class="lead">Un seul calendrier pour tout le club. Le Bureau voit tout ; chaque coach et chaque famille ne voient que ce qui concerne leurs équipes.</p>
+
+    <div class="task">
+      <div class="text">
+        <h3>Lire et filtrer</h3>
+        <ul class="plain">
+          <li><b>Liste</b> ou <b>Mois</b> : deux façons d'afficher. En vue Mois, un clic sur un jour montre les événements de ce jour.</li>
+          <li><b>Toutes les équipes</b> : pour n'afficher qu'une ou plusieurs équipes.</li>
+          <li><b>Filtrer par</b> : pour masquer certains types (par exemple les entraînements).</li>
+        </ul>
+        <p>Chaque type d'événement a sa couleur, la même partout dans l'appli :</p>
+        <div class="types" style="max-width:420px">
+          <span class="type"><span class="dot" style="background:#3e8f5f"></span>Entraînement</span>
+          <span class="type"><span class="dot" style="background:#203090"></span>Match officiel</span>
+          <span class="type"><span class="dot" style="background:#5aa9e6"></span>Match amical</span>
+          <span class="type"><span class="dot" style="background:#f4c430"></span>Tournoi / Plateau</span>
+          <span class="type"><span class="dot" style="background:#e0a05c"></span>Événement club</span>
+          <span class="type"><span class="dot" style="background:#7c3aed"></span>Réunion Bureau</span>
+        </div>
+      </div>
+      <div class="screen" aria-label="Exemple : carte de match">
+        <div class="cap">Exemple : une carte de match</div>
+        <div class="ev">
+          <div class="row"><span class="team">U13M-1</span><span class="title">vs BC Exemple</span></div>
+          <div class="row"><span class="btn-mini">e-Marque</span><span class="btn-mini">Score</span><span class="btn-mini">Feuilles</span></div>
+          <div class="row"><span class="chip c-solid">Match officiel</span><span class="chip c-amber">Besoin non pourvu</span></div>
+          <div class="row meta"><span>sam. 28 nov. · 14h00</span><span>Arrivée 13h15</span></div>
+          <div class="row meta"><span>Gymnase de Châtelaillon</span><span class="btn-mini">Itinéraire</span><span class="chip c-navy">J-8</span></div>
+        </div>
+        <p class="note">Équipe et adversaire, outils du match, étiquettes, puis date, heure d'arrivée, lieu et compte à rebours.</p>
+      </div>
+    </div>
+
+    <div class="task">
+      <div class="text">
+        <h3>Créer un événement</h3>
+        <ol class="steps">
+          <li>Cliquer sur <b>+ Créer un événement</b>.</li>
+          <li>Choisir le <b>type</b>. La couleur affichée est celle qu'aura l'événement dans le calendrier.</li>
+          <li>Choisir <b>pour qui</b> : une équipe, des équipes précises, tout le club, le Bureau seul, les coachs seuls ou des personnes précises.</li>
+          <li>Renseigner la date, l'heure, le lieu (domicile ou extérieur pour un match).</li>
+          <li>Ouvrir les options si besoin, puis enregistrer.</li>
+        </ol>
+        <p>Options possibles :</p>
+        <ul class="plain">
+          <li><b>Répéter cet événement</b> : toutes les semaines, toutes les 2 semaines ou tous les mois. Pratique pour les entraînements.</li>
+          <li><b>Événement payant</b> : l'étiquette « Payant » apparaît et les règlements se suivent dans Paiements › Événements payants.</li>
+          <li><b>Demander combien de personnes accompagnent</b> (Événement club) : chaque famille indique un seul nombre ; le Bureau voit le total et peut l'exporter en Excel.</li>
+        </ul>
+      </div>
+      <div class="screen" aria-label="Exemple : choix du type d'événement">
+        <div class="cap">Exemple : créer un événement</div>
+        <div class="types">
+          <span class="type" style="border-color:#3e8f5f;background:var(--chip-green-bg)"><span class="dot" style="background:#3e8f5f"></span>Entraînement</span>
+          <span class="type"><span class="dot" style="background:#203090"></span>Match officiel</span>
+          <span class="type"><span class="dot" style="background:#e0a05c"></span>Événement club</span>
+          <span class="type"><span class="dot" style="background:#f4c430"></span>Tournoi</span>
+        </div>
+        <div class="pills" style="margin-top:10px">
+          <span class="pill on">Une équipe</span><span class="pill">Tout le club</span><span class="pill">Bureau seul</span>
+        </div>
+        <div class="tariff" style="margin-top:10px"><span>Répéter cet événement</span><b>Toutes les semaines</b></div>
+      </div>
+    </div>
+
+    <div class="task solo">
+      <div class="text">
+        <h3>Les matchs FFBB</h3>
+        <p>Les matchs officiels arrivent tout seuls depuis le site de la FFBB, grâce au lien FFBB enregistré sur chaque équipe. Quand la FFBB change un horaire, un score ou un gymnase, l'appli met le match à jour sans rien perdre : présences, maillots, goûters et covoiturage restent attachés au match.</p>
+        <div class="tip warn"><b>En cas de doublon</b>Si un match apparaît deux fois (saisi à la main avant que la FFBB ne le publie, ou après un changement de poule), c'est toujours la version FFBB qui fait foi. L'appli ne supprime jamais rien d'elle-même : c'est au Bureau de supprimer l'autre, depuis la carte de l'événement.</div>
+        <div class="tip"><b>Code e-Marque</b>Pour les matchs officiels à domicile, le Bureau saisit le code e-Marque directement sur la carte du match. Les coachs le voient ensuite en lecture.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. COTISATIONS -->
+  <section class="chapter" id="cotisations">
+    <div class="chapter-head"><span class="num">3</span><h2>Cotisations &amp; Licences</h2></div>
+    <p class="where">Où : menu › Paiements › <code>Cotisations &amp; Licences</code></p>
+    <p class="lead">Le suivi de toutes les cotisations de la saison : qui a payé, combien, comment, et ce qu'il reste à encaisser.</p>
+
+    <div class="task">
+      <div class="text">
+        <h3>Lire le tableau de bord</h3>
+        <ul class="plain">
+          <li>L'anneau <b>Encaissé</b> donne le pourcentage déjà reçu, le montant sur le total attendu et le <b>reste</b>.</li>
+          <li>Les compteurs servent aussi de filtres : <b>À encaisser</b>, <b>Partiels</b>, <b>Payés</b>, <b>Offerts</b>, <b>Tous</b>. Un clic sur un compteur n'affiche que ces lignes.</li>
+          <li><b>Exporter (Excel)</b> sort la liste des cotisations dans un fichier Excel, pour la comptabilité.</li>
+        </ul>
+      </div>
+      <div class="screen" aria-label="Exemple : résumé des cotisations">
+        <div class="cap">Exemple (montants fictifs)</div>
+        <div class="ring"><div class="pct"><span>93%</span></div><div><small>ENCAISSÉ</small><br><b>18 600 €</b> sur 20 000 €<br><span class="chip c-gold" style="margin-top:4px">Reste 1 400 €</span></div></div>
+        <div class="kpis">
+          <div class="kpi hot"><b>12</b>À encaisser</div>
+          <div class="kpi"><b>3</b>Partiels</div>
+          <div class="kpi"><b>140</b>Payés</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="task">
+      <div class="text">
+        <h3>Les tarifs par catégorie</h3>
+        <p>Chaque catégorie (Babys, U9X, U11X, U13F…) a son tarif. Il s'applique automatiquement à la cotisation dès qu'un membre est ajouté ou rattaché à une équipe de cette catégorie.</p>
+        <ol class="steps">
+          <li>Ouvrir le bloc <b>Tarifs par catégorie</b>.</li>
+          <li>Taper les montants, puis <b>Enregistrer les tarifs</b>.</li>
+        </ol>
+        <p><b>Renommer une catégorie</b> : le petit crayon à côté du nom. Le nouveau nom s'applique partout d'un coup (équipe, ses déclinaisons numérotées, tarif, fiches joueurs, calendrier, espaces Coach et Famille). Joueurs, coachs, présences et liens FFBB ne bougent pas.</p>
+        <div class="tip warn"><b>À surveiller</b>Une ligne orange « Sans tarif : … » sous le titre signale une catégorie sans prix. Tant que le prix n'est pas saisi, les cotisations de cette catégorie n'ont pas de montant à encaisser.</div>
+      </div>
+      <div class="screen" aria-label="Exemple : tarifs par catégorie">
+        <div class="cap">Exemple : tarifs par catégorie</div>
+        <div class="tariffs">
+          <div class="tariff"><span>Babys <span class="pen">✎</span></span><b>95 €</b></div>
+          <div class="tariff"><span>U9X <span class="pen">✎</span></span><b>130 €</b></div>
+          <div class="tariff"><span>U11X <span class="pen">✎</span></span><b>150 €</b></div>
+          <div class="tariff"><span>U13F <span class="pen">✎</span></span><b>160 €</b></div>
+        </div>
+        <p class="note">✎ = renommer la catégorie. Une confirmation est demandée avant tout changement.</p>
+      </div>
+    </div>
+
+    <div class="task">
+      <div class="text">
+        <h3>Importer le fichier des inscriptions</h3>
+        <p>Le fichier Excel de suivi des inscriptions (feuille « Suivi Inscriptions ») met à jour toutes les fiches d'un coup. <b>Le fichier fait foi.</b></p>
+        <ol class="steps">
+          <li>Cliquer sur <b>Importer les inscriptions (fichier officiel)</b> et choisir le fichier.</li>
+          <li>Lire le récapitulatif : nouveaux membres, fiches mises à jour, cas douteux à vérifier.</li>
+          <li>Pour chaque nouveau membre, l'appli propose une équipe d'après l'âge, le sexe et le type de licence. Vérifier, puis valider.</li>
+        </ol>
+        <ul class="plain">
+          <li>Les membres archivés (partis du club) ne sont pas réinscrits sans qu'on coche leur ligne.</li>
+          <li>Les aides (Pass Sport, Coupon Sport ANCV) et les remboursements du fichier sont repris eux aussi.</li>
+        </ul>
+      </div>
+      <div class="screen" aria-label="Exemple : récapitulatif d'import">
+        <div class="cap">Exemple : récapitulatif d'import</div>
+        <div class="stack">
+          <div class="tariff"><span>Nouveaux membres</span><b>4</b></div>
+          <div class="tariff"><span>Fiches mises à jour</span><b>186</b></div>
+          <div class="tariff"><span>À vérifier</span><b style="color:var(--amber)">1</b></div>
+          <div class="tariff"><span>Léa Martin → équipe proposée</span><b>U11X</b></div>
+        </div>
+        <p class="note">Noms inventés pour l'exemple.</p>
+      </div>
+    </div>
+
+    <div class="task">
+      <div class="text">
+        <h3>Enregistrer un règlement</h3>
+        <ol class="steps">
+          <li>Cliquer sur la ligne du membre.</li>
+          <li>Choisir le <b>mode de paiement</b> : HelloAsso, Chèque, Espèces, Pass Sport, Coupon Sport ANCV, TPE / CB (SumUp), Virement. On peut en cumuler plusieurs.</li>
+          <li>Pour des chèques en plusieurs fois, indiquer le nombre de chèques : l'appli prépare les échéances.</li>
+          <li>Saisir le montant reçu, puis <b>Fermer</b>. Le statut (payé, partiel, à encaisser) se calcule tout seul.</li>
+        </ol>
+        <p><b>Cotisation offerte</b> : à cocher pour un membre qui ne paie pas (par exemple un coach). Elle sort des montants à encaisser.</p>
+      </div>
+      <div class="screen" aria-label="Exemple : fiche de règlement">
+        <div class="cap">Exemple : règlement d'Hugo Bernard</div>
+        <div class="tablet">
+          <div class="tr"><span>Membre</span><span>Montant</span><span>Statut</span></div>
+          <div class="tr"><span>Hugo Bernard · U13M</span><span class="num">160 €</span><span><span class="chip c-green">Payé</span></span></div>
+          <div class="tr"><span>Inès Petit · U9X</span><span class="num">65 / 130 €</span><span><span class="chip c-amber">Partiel</span></span></div>
+        </div>
+        <div class="pills" style="margin-top:10px">
+          <span class="pill on">Chèque</span><span class="pill on">Pass Sport</span><span class="pill">Espèces</span><span class="pill">Virement</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="task solo">
+      <div class="text">
+        <h3>Les vérifications</h3>
+        <ul class="plain">
+          <li>Le bloc <b>À vérifier</b> liste les cotisations qui demandent un coup d'œil : par exemple un « Payé (-) » du fichier dont le montant ne correspond pas, ou un ancien « Pass Sport / ANCV » où il faut préciser lequel des deux. Une fois vérifiée, la ligne sort de la liste.</li>
+          <li><b>Payé (-)</b> : réglé selon le Bureau, compté comme payé et jamais relancé, mais l'écart de montant reste à confirmer.</li>
+          <li><b>Aides et remboursements</b> : sur la fiche d'un membre, les aides reçues (Pass Sport, ANCV) et les remboursements faits ou à faire.</li>
+        </ul>
+        <div class="tip"><b>Bon à savoir</b>Supprimer une cotisation ou un membre se fait toujours à la main, depuis l'appli, par une personne du Bureau. Aucune donnée n'est effacée automatiquement.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="next" aria-label="Prochaines étapes du guide">
+    <h2>Prochaines étapes</h2>
+    <p><b>Étape 2</b> : membres et archivage, équipes et coachs, organisation des matchs (maillots, goûters, covoiturage, besoins, accompagnants).</p>
+    <p><b>Étape 3</b> : vie du club (affiches à la une, sponsors, boutique, buvette, pénalités, documents) et bilan de la saison.</p>
+  </section>
+
+  <footer>Guide interne au Bureau de l'UBAC. Les écrans sont redessinés et les noms sont inventés. Version du 20 novembre 2026.</footer>
+</main>
