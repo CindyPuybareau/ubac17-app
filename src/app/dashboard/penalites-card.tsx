@@ -33,15 +33,25 @@ export default function PenalitesCard({
   penalites,
   showPlayerName = false,
   emptyLabel = "Aucune pénalité.",
+  showStatus = false,
 }: {
   title?: string;
   penalites: PenaliteLike[];
   showPlayerName?: boolean;
   emptyLabel?: string;
+  // Tableau de bord du Coach (retour de Cindy du 20/11, "voir qui a payé et
+  // qui n'a pas payé") : résumé chiffré en haut, étiquette écrite par ligne
+  // (À régler / Payé par le joueur / Payé par le club) et pénalités à
+  // régler en premier. Famille et Enfant restent inchangés.
+  showStatus?: boolean;
 }) {
   const totalDue = penalites
     .filter((p) => !isPaidStatut(p.statut))
     .reduce((sum, p) => sum + p.amount, 0);
+  const unpaidCount = penalites.filter((p) => !isPaidStatut(p.statut)).length;
+  const rows = showStatus
+    ? [...penalites].sort((a, b) => Number(isPaidStatut(a.statut)) - Number(isPaidStatut(b.statut)))
+    : penalites;
 
   return (
     <div className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
@@ -54,13 +64,30 @@ export default function PenalitesCard({
         <p className="mt-2 text-sm text-zinc-500">{emptyLabel}</p>
       ) : (
         <>
-          {totalDue > 0 && (
-            <p className="mt-1 text-xs font-semibold text-status-urgent-dark">
-              {formatAmount(totalDue)} restant à régler
+          {showStatus ? (
+            <p className="mt-1 text-xs text-zinc-600">
+              {penalites.length} pénalité{penalites.length > 1 ? "s" : ""} ·{" "}
+              <span className="font-semibold text-status-success">
+                {penalites.length - unpaidCount} réglée{penalites.length - unpaidCount > 1 ? "s" : ""}
+              </span>
+              {unpaidCount > 0 && (
+                <>
+                  {" "}·{" "}
+                  <span className="font-semibold text-status-urgent-dark">
+                    {unpaidCount} à régler ({formatAmount(totalDue)})
+                  </span>
+                </>
+              )}
             </p>
+          ) : (
+            totalDue > 0 && (
+              <p className="mt-1 text-xs font-semibold text-status-urgent-dark">
+                {formatAmount(totalDue)} restant à régler
+              </p>
+            )
           )}
           <div className="mt-2 flex flex-col gap-1.5">
-            {penalites.map((p) => {
+            {rows.map((p) => {
               // Retour de Cindy du 29/08 : lien HelloAsso pour payer CETTE
               // pénalité directement depuis l'espace du joueur/parent —
               // jamais une fois "Payée", et jamais côté Enfant (paymentLink
@@ -93,6 +120,19 @@ export default function PenalitesCard({
                         {p.penaliteDate ? formatLocalDateFr(p.penaliteDate) : ""}
                         {p.notes ? ` · ${p.notes}` : ""}
                       </span>
+                      {showStatus && (
+                        <span
+                          className={`mt-1 w-fit rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                            p.statut === "PAYE_CLUB"
+                              ? "bg-navy/10 text-navy"
+                              : isPaidStatut(p.statut)
+                                ? "bg-status-success/10 text-status-success"
+                                : "bg-status-urgent/10 text-status-urgent-dark"
+                          }`}
+                        >
+                          {p.statut === "PAYE_CLUB" ? "Payé par le club" : isPaidStatut(p.statut) ? "Payé par le joueur" : "À régler"}
+                        </span>
+                      )}
                     </div>
                     {/* Retour de Cindy du 09/09 (phase 1 UX, couleurs
                         sémantiques) : status-* (globals.css) plutôt
