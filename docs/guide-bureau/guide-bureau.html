@@ -180,6 +180,14 @@ table.matrix { border-collapse: separate; border-spacing: 0; width: 100%; min-wi
 .swipe-hint { display: none; margin-top: 10px; font-size: 13px; color: var(--ink-soft); font-style: italic; }
 @media (max-width: 760px) { .swipe-hint { display: block; } }
 @media print { .swipe-hint { display: none !important; } }
+.start { margin-top: 28px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px 22px; display: grid; gap: 12px; }
+.start h2 { font-size: 28px; color: var(--navy); text-transform: uppercase; font-weight: 800; }
+.lexique summary { cursor: pointer; font-weight: 700; color: var(--navy); }
+.lexique dl { margin: 10px 0 0; display: grid; grid-template-columns: minmax(0, 12rem) minmax(0, 1fr); gap: 8px 16px; }
+.lexique dt { font-weight: 700; }
+.lexique dd { margin: 0; color: var(--ink-soft); max-width: 60ch; }
+@media (max-width: 760px) { .lexique dl { grid-template-columns: minmax(0, 1fr); } .lexique dd { margin-bottom: 6px; } }
+@media print { .lexique dl { display: grid !important; } .start { break-inside: avoid; } }
 .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 12px; font-size: 14px; color: var(--ink-soft); }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .legend .mk { font-size: 11px; font-weight: 700; text-transform: uppercase; border-radius: 999px; padding: 2px 9px; }
@@ -232,6 +240,31 @@ table.matrix { border-collapse: separate; border-spacing: 0; width: 100%; min-wi
     <a href="#qui-voit-quoi"><b>Qui voit quoi</b><small>Les droits de chaque espace en un tableau</small></a>
   </nav>
 
+  <section class="start" aria-label="Par où commencer">
+    <h2>Nouveau au Bureau&nbsp;? Par où commencer</h2>
+    <ol class="steps">
+      <li><b>Se connecter</b> avec l'adresse email donnée au club, puis vérifier en haut de l'écran que son rôle au Bureau s'affiche au-dessus de son prénom.</li>
+      <li><b>Ouvrir le Tableau de bord</b> : la semaine en cours, les affiches, les chiffres clés.</li>
+      <li><b>Parcourir le Calendrier général</b> (chapitre 2) : c'est l'écran le plus utilisé.</li>
+      <li><b>Lire le tableau « Qui voit quoi »</b> (chapitre 12) pour savoir ce que voient les coachs et les familles avant de leur répondre.</li>
+      <li>Pour le reste, lire le chapitre qui correspond à sa mission (trésorerie : chapitres 3 et 8 ; sportif : chapitres 2, 6 et 9 ; vie du club : chapitre 10).</li>
+    </ol>
+    <div class="tip"><b>Rien ne se casse</b>Aucune donnée n'est effacée sans une confirmation, et les suppressions se font toujours à la main. Un doute ou un bug : prévenir Cindy.</div>
+    <details class="lexique">
+      <summary>Petit lexique du club</summary>
+      <dl>
+        <dt>U9, U11, U13…</dt><dd>Catégories d'âge : « U » veut dire « moins de » (U11 = moins de 11 ans). Le X de U9X ou U11X indique une équipe mixte, F féminine, M masculine.</dd>
+        <dt>FFBB, CD17, Ligue</dt><dd>La Fédération française de basket, le Comité départemental de Charente-Maritime et la Ligue régionale.</dd>
+        <dt>Poule</dt><dd>Le groupe d'équipes contre lequel une équipe joue son championnat. Elle peut changer en cours de saison.</dd>
+        <dt>e-Marque</dt><dd>La feuille de match électronique de la FFBB. Chaque match officiel à domicile a son code.</dd>
+        <dt>Joueur brûlé</dt><dd>Règle FFBB : un joueur parmi les meilleurs d'une équipe ne peut pas jouer dans une équipe de niveau inférieur du club.</dd>
+        <dt>Pass Sport, Coupon Sport ANCV</dt><dd>Aides qui payent une partie de la cotisation : le Pass Sport vient de l'État, le Coupon Sport ANCV est un chèque sport.</dd>
+        <dt>HelloAsso, SumUp</dt><dd>HelloAsso : paiement en ligne des cotisations et des événements. SumUp : le terminal de paiement par carte du club.</dd>
+        <dt>Équipes sœurs</dt><dd>Les équipes d'une même catégorie (U13M-1 et U13M-2) : elles voient les matchs l'une de l'autre.</dd>
+      </dl>
+    </details>
+  </section>
+
   <!-- 1. PRISE EN MAIN -->
   <section class="chapter" id="prise-en-main">
     <div class="chapter-head"><span class="num">1</span><h2>Prise en main</h2></div>
@@ -260,7 +293,7 @@ table.matrix { border-collapse: separate; border-spacing: 0; width: 100%; min-wi
     <div class="task">
       <div class="text">
         <h3>Le menu du Bureau</h3>
-        <p>Le menu s'ouvre avec le rond jaune en haut à droite. Il est rangé par grands thèmes :</p>
+        <p>Sur ordinateur, le menu est toujours affiché à gauche de l'écran. Sur téléphone et tablette, il s'ouvre avec le rond jaune en haut à droite. Il est rangé par grands thèmes :</p>
         <ul class="plain">
           <li><b>Tableau de bord</b> : chiffres clés, affiches à la une, semaine en cours.</li>
           <li><b>Calendrier général</b>, <b>Membres</b>, <b>Équipes</b>.</li>
@@ -268,6 +301,11 @@ table.matrix { border-collapse: separate; border-spacing: 0; width: 100%; min-wi
           <li><b>Paiements</b> : Cotisations &amp; Licences, Événements payants, Pénalités, Buvette.</li>
           <li><b>Matchs officiels</b> : championnat, FFBB.</li>
           <li><b>Vie du club</b> : sponsors, événements à la une, photos d'équipe, documents, inventaire, suivi des ventes.</li>
+        </ul>
+        <ul class="plain">
+          <li><b>La cloche</b>, en haut à droite : les notifications (nouveau besoin bénévole, match modifié ou annulé…).</li>
+          <li><b>Sa photo</b>, en haut à gauche : un clic dessus pour la changer.</li>
+          <li><b>Le petit livre</b>, à côté de l'organigramme : ce guide, à rouvrir quand on veut.</li>
         </ul>
         <div class="tip"><b>Se déconnecter</b>Le bouton <b>Déconnexion</b> est toujours en bas du menu, sur téléphone comme sur ordinateur.</div>
       </div>
@@ -378,7 +416,7 @@ table.matrix { border-collapse: separate; border-spacing: 0; width: 100%; min-wi
         <h3>Lire le tableau de bord</h3>
         <ul class="plain">
           <li>L'anneau <b>Encaissé</b> donne le pourcentage déjà reçu, le montant sur le total attendu et le <b>reste</b>.</li>
-          <li>Les compteurs servent aussi de filtres : <b>À encaisser</b>, <b>Partiels</b>, <b>Payés</b>, <b>Offerts</b>, <b>Tous</b>. Un clic sur un compteur n'affiche que ces lignes.</li>
+          <li>Les compteurs servent aussi de filtres : <b>À encaisser</b>, <b>Partiels</b>, <b>Payés</b>, <b>Offerts</b>, <b>Tous</b>. Un clic sur un compteur n'affiche que ces lignes, un second clic revient à « Tous ». « Partiels » n'apparaît que s'il y en a.</li>
           <li><b>Exporter (Excel)</b> sort la liste des cotisations dans un fichier Excel, pour la comptabilité.</li>
         </ul>
       </div>
@@ -453,7 +491,7 @@ table.matrix { border-collapse: separate; border-spacing: 0; width: 100%; min-wi
           <li>Pour des chèques en plusieurs fois, indiquer le nombre de chèques : l'appli prépare les échéances.</li>
           <li>Saisir le montant reçu, puis <b>Fermer</b>. Le statut (payé, partiel, à encaisser) se calcule tout seul.</li>
         </ol>
-        <p><b>Cotisation offerte</b> : à cocher pour un membre qui ne paie pas (par exemple un coach). Elle sort des montants à encaisser.</p>
+        <p><b>Cotisation offerte</b> : quand le fichier des inscriptions indique « Offerte » (par exemple pour un coach), la cotisation est marquée offerte à l'import. Elle compte dans « Offerts » et sort des montants à encaisser.</p>
       </div>
       <div class="screen" aria-label="Exemple : fiche de règlement">
         <div class="cap">Exemple : règlement d'Hugo Bernard</div>
@@ -472,9 +510,9 @@ table.matrix { border-collapse: separate; border-spacing: 0; width: 100%; min-wi
       <div class="text">
         <h3>Les vérifications</h3>
         <ul class="plain">
-          <li>Le bloc <b>À vérifier</b> liste les cotisations qui demandent un coup d'œil : par exemple un « Payé (-) » du fichier dont le montant ne correspond pas, ou un ancien « Pass Sport / ANCV » où il faut préciser lequel des deux. Une fois vérifiée, la ligne sort de la liste.</li>
+          <li>Le bloc <b>À vérifier</b> liste les cotisations qui demandent un coup d'œil : par exemple un « Payé (-) » du fichier dont le montant ne correspond pas, ou un ancien « Pass Sport / ANCV » où il faut préciser lequel des deux. Pour chaque ligne : corriger la cotisation, ou cliquer sur <b>C'est normal</b> si tout est en ordre. La ligne sort alors de la liste.</li>
           <li><b>Payé (-)</b> : réglé selon le Bureau, compté comme payé et jamais relancé, mais l'écart de montant reste à confirmer.</li>
-          <li><b>Aides et remboursements</b> : sur la fiche d'un membre, les aides reçues (Pass Sport, ANCV) et les remboursements faits ou à faire.</li>
+          <li><b>Aides Pass Sport / ANCV</b> et <b>Remboursements · à faire</b> : deux blocs sur la page Cotisations, avec la liste des aides reçues et des remboursements à faire. On coche « RIB reçu » quand la famille l'a envoyé. Le détail se retrouve aussi dans la fenêtre de chaque cotisation.</li>
         </ul>
         <h3 style="margin-top:12px">Relancer par email</h3>
         <ol class="steps">
