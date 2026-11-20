@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Megaphone, X } from "lucide-react";
 import type { FeaturedHighlight } from "@/lib/featured-highlights";
 
@@ -22,6 +22,15 @@ import type { FeaturedHighlight } from "@/lib/featured-highlights";
 // affiches existantes" plutôt que de buter sur un reliquat.
 const VISIBLE_COUNT = 2;
 
+// Retour de Cindy du 20/11 ("que le diapo bascule de lui-même à l'affiche
+// suivante quand 3 affiches en place") : dès qu'il y a des affiches à faire
+// tourner (3 ou plus, mêmes conditions que les flèches), la fenêtre avance
+// d'un cran toute seule. En pause tant que la souris est dessus / le doigt
+// pose, qu'une affiche est agrandie, que l'onglet n'est pas affiché, ou si
+// l'appareil demande moins d'animations. Un clic sur une flèche relance
+// le compte à rebours (pas de double saut juste après).
+const AUTO_ADVANCE_MS = 5000;
+
 export default function FeaturedHighlightsCard({
   highlights,
   calendarSectionKey,
@@ -33,6 +42,20 @@ export default function FeaturedHighlightsCard({
   calendarSectionKey: string;
 }) {
   const [start, setStart] = useState(0);
+  const [hovered, setHovered] = useState(false);
+  const [enlargedCount, setEnlargedCount] = useState(0);
+
+  const autoAdvance = highlights.length > VISIBLE_COUNT && !hovered && enlargedCount === 0;
+  useEffect(() => {
+    if (!autoAdvance) return;
+    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const timer = window.setTimeout(() => {
+      if (document.visibilityState !== "visible") return;
+      setStart((prev) => (prev + 1) % highlights.length);
+    }, AUTO_ADVANCE_MS);
+    return () => window.clearTimeout(timer);
+    // start : chaque cran (auto ou flèche) relance un compte à rebours complet.
+  }, [autoAdvance, start, highlights.length]);
 
   if (highlights.length === 0) return null;
 
@@ -81,7 +104,11 @@ export default function FeaturedHighlightsCard({
   // sur téléphone, 2 ou 5 colonnes KPI sur tablette/PC), jamais besoin
   // de connaître cette largeur à l'avance.
   return (
-    <div className="relative w-full">
+    <div
+      className="relative w-full"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       {canRotate && (
         <button
           type="button"
@@ -103,6 +130,7 @@ export default function FeaturedHighlightsCard({
             key={`${h.id}:${i}`}
             highlight={h}
             calendarSectionKey={calendarSectionKey}
+            onEnlargedChange={(open) => setEnlargedCount((n) => Math.max(0, n + (open ? 1 : -1)))}
           />
         ))}
       </div>
@@ -136,11 +164,20 @@ export default function FeaturedHighlightsCard({
 function SingleHighlightCard({
   highlight,
   calendarSectionKey,
+  onEnlargedChange,
 }: {
   highlight: FeaturedHighlight;
   calendarSectionKey: string;
+  // Défilement automatique en pause pendant qu'une affiche est agrandie
+  // (sinon la carte changerait de place et l'agrandissement se fermerait).
+  onEnlargedChange?: (open: boolean) => void;
 }) {
-  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxOpen, setLightboxOpenState] = useState(false);
+  function setLightboxOpen(open: boolean) {
+    if (open === lightboxOpen) return;
+    setLightboxOpenState(open);
+    onEnlargedChange?.(open);
+  }
 
   // Jour de l'événement à l'heure de Paris (une soirée à 23 h UTC tombe
   // déjà le lendemain en France) -- ?day= ouvre ce jour précis dans le
