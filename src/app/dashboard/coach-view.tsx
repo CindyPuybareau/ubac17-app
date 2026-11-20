@@ -372,6 +372,7 @@ export default function CoachView({
             title="Pénalités de mes joueurs"
             penalites={penalites}
             showPlayerName
+            showStatus
             emptyLabel="Aucune pénalité pour tes joueurs."
           />
           <CalendarSubscribe />
