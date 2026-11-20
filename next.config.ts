@@ -49,6 +49,7 @@ const nextConfig: NextConfig = {
   // ce fichier à la demande -- embarqué explicitement au déploiement.
   outputFileTracingIncludes: {
     "/guide-bureau": ["./docs/guide-bureau/guide-bureau.html"],
+    "/guide-coach": ["./docs/guide-coach/guide-coach.html"],
   },
 
   // Désactivé (retour de Cindy du 15/09, capture montrant l'indicateur de
