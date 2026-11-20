@@ -588,10 +588,26 @@ export default function ImportInscriptions() {
         sex: r.sex,
         licenseType: r.licenseType,
       });
-      const teamId = category ? (teamIdByCategory.get(category.toLowerCase()) ?? null) : null;
+      const exactId = category ? (teamIdByCategory.get(category.toLowerCase()) ?? null) : null;
+      if (exactId) return { category, teamId: exactId };
+      // Catégorie renommée depuis Tarifs par catégorie (retour de Cindy du
+      // 20/11 : "U9 Mixte" -> "U9X") : même tranche d'âge ("U9", "U11"),
+      // à condition qu'UNE SEULE catégorie du club y corresponde -- U13F /
+      // U13M restent départagées par le sexe, jamais devinées.
+      const band = category?.match(/^U\d+/i)?.[0]?.toLowerCase();
+      if (band) {
+        const candidates = [...teamIdByCategory.entries()].filter(
+          ([c]) => c.startsWith(band) && !/\d/.test(c.charAt(band.length))
+        );
+        if (candidates.length === 1) {
+          const [matchedKey, teamId] = candidates[0];
+          const label = teamsData?.find((t) => t.category?.trim().toLowerCase() === matchedKey)?.category?.trim();
+          return { category: label ?? category, teamId };
+        }
+      }
       // Ne montrer une suggestion que si une équipe réelle y correspond
       // vraiment — sinon silence total, comme avant cette fonctionnalité.
-      return teamId ? { category, teamId } : { category: null, teamId: null };
+      return { category: null, teamId: null };
     }
 
     const toInsert: MatchedRow[] = [];
