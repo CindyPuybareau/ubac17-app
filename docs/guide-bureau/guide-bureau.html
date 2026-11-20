@@ -196,6 +196,28 @@ table.matrix { border-collapse: separate; border-spacing: 0; width: 100%; min-wi
 .start { margin-top: 28px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px 22px; display: grid; gap: 12px; }
 .start h2 { font-size: 28px; color: var(--navy); text-transform: uppercase; font-weight: 800; }
 @media print { .start { break-inside: avoid; } }
+/* Navigation (retour du comptable, 20/11) : sommaire fixe à gauche sur
+   grand écran, bouton flottant « Sommaire » ailleurs. */
+html { scroll-behavior: smooth; }
+section.chapter, #sommaire { scroll-margin-top: 16px; }
+.side-toc { display: none; }
+@media (min-width: 1180px) {
+  main.wrap { margin-left: max(244px, calc((100vw - 32px - 1040px) / 2)); margin-right: auto; max-width: min(1040px, calc(100vw - 32px - 244px)); }
+  .side-toc { display: block; position: fixed; top: 24px; left: max(16px, calc((100vw - 1040px) / 2 - 236px)); width: 220px; max-height: calc(100vh - 48px); overflow-y: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; font-size: 13.5px; z-index: 5; }
+  .side-toc .side-top { display: block; font-family: var(--font-display); font-weight: 800; text-transform: uppercase; color: var(--navy); font-size: 16px; text-decoration: none; padding: 2px 6px 8px; border-bottom: 2px solid var(--gold); margin-bottom: 6px; }
+  .side-toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .side-toc li a { display: flex; gap: 8px; align-items: baseline; padding: 5px 6px; border-radius: 8px; color: var(--ink); text-decoration: none; line-height: 1.3; }
+  .side-toc li a span { color: var(--gold); font-weight: 800; min-width: 1.4em; font-variant-numeric: tabular-nums; }
+  .side-toc li a:hover { background: var(--surface-2); }
+  .side-toc li a[aria-current="true"] { background: #203090; color: #fff; }
+  .side-toc li a[aria-current="true"] span { color: #f4c430; }
+  .to-top { display: none !important; }
+}
+.to-top { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 6; display: flex; align-items: center; gap: 6px; padding: 10px 14px; border-radius: 999px; background: #203090; color: #fff; font-weight: 700; font-size: 13px; text-decoration: none; box-shadow: 0 6px 18px rgba(20,26,51,.25); opacity: 0; pointer-events: none; transform: translateY(8px); transition: opacity .2s, transform .2s; }
+.to-top.show { opacity: 1; pointer-events: auto; transform: none; }
+.to-top svg { color: #f4c430; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .to-top { transition: none; } }
+@media print { .side-toc, .to-top { display: none !important; } }
 .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 12px; font-size: 14px; color: var(--ink-soft); }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .legend .mk { font-size: 11px; font-weight: 700; text-transform: uppercase; border-radius: 999px; padding: 2px 9px; }
@@ -232,8 +254,56 @@ table.matrix { border-collapse: separate; border-spacing: 0; width: 100%; min-wi
   </div>
 </header>
 
+<nav class="side-toc" aria-label="Chapitres">
+  <a class="side-top" href="#sommaire">Guide du Bureau</a>
+  <ol>
+    <li><a href="#prise-en-main" data-target="prise-en-main"><span>1</span>Prise en main</a></li>
+    <li><a href="#calendrier" data-target="calendrier"><span>2</span>Calendrier</a></li>
+    <li><a href="#cotisations" data-target="cotisations"><span>3</span>Cotisations &amp; Licences</a></li>
+    <li><a href="#membres" data-target="membres"><span>4</span>Membres</a></li>
+    <li><a href="#equipes" data-target="equipes"><span>5</span>Équipes</a></li>
+    <li><a href="#organisation" data-target="organisation"><span>6</span>Organisation des événements</a></li>
+    <li><a href="#tableau-de-bord" data-target="tableau-de-bord"><span>7</span>Tableau de bord</a></li>
+    <li><a href="#paiements" data-target="paiements"><span>8</span>Autres paiements</a></li>
+    <li><a href="#matchs-officiels" data-target="matchs-officiels"><span>9</span>Matchs officiels</a></li>
+    <li><a href="#vie-du-club" data-target="vie-du-club"><span>10</span>Vie du club</a></li>
+    <li><a href="#bilan" data-target="bilan"><span>11</span>Bilan de la saison</a></li>
+    <li><a href="#qui-voit-quoi" data-target="qui-voit-quoi"><span>12</span>Qui voit quoi</a></li>
+  </ol>
+</nav>
+<a class="to-top" href="#sommaire" aria-label="Revenir au sommaire">
+  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <span>Sommaire</span>
+</a>
+<script>
+(function () {
+  if (document.readyState === "loading") { document.addEventListener("DOMContentLoaded", arguments.callee); return; }
+  var top = document.querySelector(".to-top");
+  var links = Array.prototype.slice.call(document.querySelectorAll(".side-toc a[data-target]"));
+  function onScroll() {
+    if (top) top.classList.toggle("show", window.scrollY > 600);
+  }
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+  if (!("IntersectionObserver" in window) || !links.length) return;
+  var byId = {};
+  links.forEach(function (a) { byId[a.getAttribute("data-target")] = a; });
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) { a.removeAttribute("aria-current"); });
+      var a = byId[e.target.id];
+      if (a) a.setAttribute("aria-current", "true");
+    });
+  }, { rootMargin: "-20% 0px -70% 0px" });
+  Object.keys(byId).forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) io.observe(el);
+  });
+})();
+</script>
 <main class="wrap">
-  <nav class="toc" aria-label="Sommaire">
+  <nav class="toc" id="sommaire" aria-label="Sommaire">
     <a href="#prise-en-main"><b>Prise en main</b><small>Les trois espaces, le menu, la déconnexion</small></a>
     <a href="#calendrier"><b>Calendrier</b><small>Créer, filtrer, lire une carte de match</small></a>
     <a href="#cotisations"><b>Cotisations &amp; Licences</b><small>Tarifs, import, règlements, relances</small></a>
@@ -362,7 +432,7 @@ table.matrix { border-collapse: separate; border-spacing: 0; width: 100%; min-wi
       <div class="text">
         <h3>Créer un événement</h3>
         <ol class="steps">
-          <li>Cliquer sur le petit bouton jaune <b>+ Créer</b>, à côté de <b>Liste / Mois</b> (un rond <b>+</b> sur téléphone). Ou, en vue <b>Mois</b>, cliquer sur un jour puis <b>Créer un événement ce jour-là</b> : la date est déjà remplie, l'heure est à ajuster.</li>
+          <li>Cliquer sur le petit bouton jaune <b>+ Créer</b>, à côté de <b>Liste / Mois</b> (un rond <b>+</b> sur téléphone).</li>
           <li>Choisir le <b>type</b>. La couleur affichée est celle qu'aura l'événement dans le calendrier.</li>
           <li>Choisir <b>pour qui</b> : une équipe, des équipes précises, tout le club, le Bureau seul, les coachs seuls ou des personnes précises.</li>
           <li>Renseigner la date, l'heure, le lieu (domicile ou extérieur pour un match).</li>

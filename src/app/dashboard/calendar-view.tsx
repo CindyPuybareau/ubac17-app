@@ -1391,9 +1391,6 @@ export default function CalendarView({
     "list" | "month" | "results" | "officialMatches" | "clubEvents"
   >(forcedView ?? "month");
   const [createOpen, setCreateOpen] = useState(false);
-  // Jour choisi pour "Créer un événement ce jour-là" (vue Mois), null pour
-  // le petit bouton "+ Créer" (retour de Cindy du 20/11).
-  const [createDate, setCreateDate] = useState<string | null>(null);
 
   // Même ordre que "Mes Équipes" : l'équipe mère avant ses déclinaisons.
   const sortedResultsTeams = useMemo(
@@ -3739,7 +3736,6 @@ export default function CalendarView({
             <button
               type="button"
               onClick={() => {
-                setCreateDate(null);
                 setEditingEvent(null);
                 setCreateOpen((v) => !v);
               }}
@@ -3871,8 +3867,7 @@ export default function CalendarView({
           // au retour en mode création) : ses champs se préremplissent via
           // de simples initialiseurs d'état plutôt qu'un useEffect qui
           // ferait setState après coup (voir create-event-form.tsx).
-          key={editingEvent?.id ?? `create-${createDate ?? ""}`}
-          initialDate={editingEvent ? null : createDate}
+          key={editingEvent?.id ?? "create"}
           teams={createTeams}
           existingNeeds={editingEvent ? (volunteerNeedsByEventId[editingEvent.id] ?? emptyVolunteerNeeds) : emptyVolunteerNeeds}
           allowClubWide={allowClubWide}
@@ -3880,7 +3875,6 @@ export default function CalendarView({
           editingEvent={editingEvent}
           onClose={() => {
             setCreateOpen(false);
-            setCreateDate(null);
             setEditingEvent(null);
           }}
           onCreated={(created) =>
@@ -4281,22 +4275,6 @@ export default function CalendarView({
                   month: "long",
                 })}
           </p>
-          {/* Retour de Cindy du 20/11 : créer directement sur le jour choisi
-              (date déjà remplie) -- jamais sur un jour passé. */}
-          {canManage && createTeams && createTeams.length > 0 && selectedKey >= todayKey && (
-            <button
-              type="button"
-              onClick={() => {
-                setEditingEvent(null);
-                setCreateDate(selectedKey);
-                setCreateOpen(true);
-              }}
-              className="flex items-center gap-1 rounded-full border border-ubac-yellow/60 bg-ubac-yellow/15 px-2.5 py-1 text-xs font-semibold text-navy transition-colors hover:bg-ubac-yellow/30"
-            >
-              <Plus className="h-3.5 w-3.5 shrink-0" />
-              Créer un événement ce jour-là
-            </button>
-          )}
         </div>
 
         {detailEvents.length === 0 && detailBirthdays.length === 0 ? (
