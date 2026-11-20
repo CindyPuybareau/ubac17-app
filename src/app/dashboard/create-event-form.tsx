@@ -553,7 +553,7 @@ export default function CreateEventForm({
   const hasAdvancedOptions =
     (!isEditing && !isPersonalTask) ||
     (!isReunion && !isPersonalTask) ||
-    (allowClubWide && scopeMode !== "profiles");
+    (allowClubWide && scopeMode !== "profiles" && targetProfileIds.length > 0);
 
   // Retour de Cindy du 12/09 (revue du champ "Heure d'impact") : tant que
   // le raccourci "X min avant" est actif (impactMinutesBefore non vide,
@@ -1871,8 +1871,13 @@ export default function CreateEventForm({
           avancées") : ce bloc vit désormais dans l'accordéon, dont l'en-tête
           (hasAdvancedOptions) exige déjà scopeMode !== "profiles" pour
           s'afficher (chacune de ses trois clauses l'exige) -- la revérifier
-          ici est devenu redondant (TypeScript le prouve, TS2367), retirée. */}
-      {allowClubWide && (
+          ici est devenu redondant (TypeScript le prouve, TS2367), retirée.
+          Retour de Cindy du 20/11 ("on ne comprend pas ça, est-ce utile ?") :
+          jamais utilisé en base depuis sa création -- retiré du formulaire.
+          Reste affiché seulement pour un ancien événement qui aurait déjà
+          des personnes incluses, pour pouvoir les retirer ; rien n'est
+          supprimé en base. */}
+      {allowClubWide && targetProfileIds.length > 0 && (
         <div className="flex flex-col gap-1.5">
           <span className="text-xs font-medium text-zinc-600">
             Inclure des personnes en plus
