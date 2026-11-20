@@ -143,6 +143,7 @@ export default function VolunteerNeedsPanel({
                   guestName: null,
                   playerName: member.name,
                   source: "ADMIN" as const,
+                  createdBy: null,
                 },
               ],
             }
@@ -183,6 +184,7 @@ export default function VolunteerNeedsPanel({
                   guestName: name,
                   playerName: name,
                   source: "ADMIN" as const,
+                  createdBy: null,
                 },
               ],
             }
@@ -273,6 +275,7 @@ export default function VolunteerNeedsPanel({
                   guestName: null,
                   playerName: "",
                   source: "VOLUNTEER",
+                  createdBy: null,
                 },
               ],
             }
