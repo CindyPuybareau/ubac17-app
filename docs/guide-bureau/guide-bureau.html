@@ -168,9 +168,31 @@ table.matrix { border-collapse: separate; border-spacing: 0; width: 100%; min-wi
 .matrix td.m .mk { background: var(--chip-green-bg); color: var(--green); }
 .matrix td.v .mk { background: var(--chip-navy-bg); color: var(--navy); }
 .matrix td.n .mk { color: var(--ink-soft); background: transparent; }
-.swipe-hint { display: none; margin-top: 10px; font-size: 13px; color: var(--ink-soft); font-style: italic; }
-@media (max-width: 760px) { .swipe-hint { display: block; } }
-@media print { .swipe-hint { display: none !important; } }
+/* Téléphone (retour de Cindy du 20/11 : "on ne comprend pas qu'il faut
+   scroller à droite") : le tableau laisse place à un choix de profil, puis
+   la liste de ce que ce profil voit et modifie. Construit en JS à partir du
+   tableau lui-même (une seule source) ; sans JS, le tableau reste affiché. */
+.role-view { display: none; margin-top: 16px; }
+@media (max-width: 760px) {
+  .js .role-view { display: block; }
+  .js .matrix-wrap { display: none; }
+}
+@media print { .role-view { display: none !important; } .js .matrix-wrap { display: block !important; } }
+.role-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; background: var(--surface-2); border-radius: 12px; padding: 4px; }
+.role-tabs button { font: inherit; font-size: 12.5px; font-weight: 700; border: 0; border-radius: 9px; padding: 9px 2px; background: transparent; color: var(--ink-soft); cursor: pointer; }
+.role-tabs button[aria-pressed="true"] { background: #203090; color: #fff; }
+.role-tabs button:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
+.role-intro { margin-top: 10px; font-size: 14px; color: var(--ink-soft); }
+.role-group { margin-top: 14px; }
+.role-group h4 { margin: 0 0 6px; font-family: var(--font-display); font-size: 17px; text-transform: uppercase; color: var(--navy); letter-spacing: .03em; }
+.role-item { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); margin-top: 6px; }
+.role-item .what { font-weight: 600; font-size: 14px; min-width: 0; }
+.role-item .what small { display: block; font-weight: 400; color: var(--ink-soft); font-size: 12.5px; margin-top: 2px; }
+.role-item .mk { flex: none; font-size: 11px; font-weight: 700; text-transform: uppercase; border-radius: 999px; padding: 3px 10px; }
+.role-item.m .mk { background: var(--chip-green-bg); color: var(--green); }
+.role-item.v .mk { background: var(--chip-navy-bg); color: var(--navy); }
+.role-item.n { opacity: .55; }
+.role-item.n .mk { color: var(--ink-soft); }
 .start { margin-top: 28px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px 22px; display: grid; gap: 12px; }
 .start h2 { font-size: 28px; color: var(--navy); text-transform: uppercase; font-weight: 800; }
 @media print { .start { break-inside: avoid; } }
@@ -940,7 +962,6 @@ table.matrix { border-collapse: separate; border-spacing: 0; width: 100%; min-wi
       <span><span class="mk v">Voit</span> lecture seule</span>
       <span><b>—</b> ne voit pas</span>
     </div>
-    <p class="swipe-hint">Sur téléphone, faire glisser le tableau vers la gauche pour voir les autres colonnes. La colonne « Fonction » reste visible.</p>
     <div class="matrix-wrap" role="region" aria-label="Tableau des droits" tabindex="0">
       <table class="matrix">
         <thead>
@@ -996,6 +1017,70 @@ table.matrix { border-collapse: separate; border-spacing: 0; width: 100%; min-wi
         </tbody>
       </table>
     </div>
+    <div class="role-view" id="role-view" aria-live="polite"></div>
+    <script>
+    (function () {
+      var root = document.documentElement;
+      var table = document.querySelector("table.matrix");
+      var view = document.getElementById("role-view");
+      if (!table || !view) return;
+      root.classList.add("js");
+      var roles = ["Bureau", "Coach", "Joueur", "Parent", "Enfant"];
+      var intros = {
+        Bureau: "Un membre du Bureau (président, trésorier, secrétaire, membre du Bureau).",
+        Coach: "Un coach, pour les équipes qu'il entraîne.",
+        Joueur: "Un licencié adulte, avec son propre compte (espace « Mon équipe »).",
+        Parent: "Un parent, pour ses enfants licenciés (espace « Mon équipe »).",
+        Enfant: "Un enfant connecté à l'Espace Enfant avec le code de sa famille."
+      };
+      var groups = [];
+      var current = null;
+      Array.prototype.forEach.call(table.tBodies[0].rows, function (tr) {
+        if (tr.classList.contains("grp")) { current = { name: tr.textContent.trim(), items: [] }; groups.push(current); return; }
+        var cells = tr.querySelectorAll("td");
+        current.items.push({
+          label: tr.querySelector("th").textContent.trim(),
+          cells: Array.prototype.map.call(cells, function (td) {
+            var kind = td.classList.contains("m") ? "m" : td.classList.contains("v") ? "v" : "n";
+            var small = td.querySelector("small");
+            return { kind: kind, note: small ? small.textContent.trim() : "" };
+          })
+        });
+      });
+      var tabs = document.createElement("div");
+      tabs.className = "role-tabs";
+      tabs.setAttribute("role", "group");
+      tabs.setAttribute("aria-label", "Choisir un profil");
+      var list = document.createElement("div");
+      var intro = document.createElement("p");
+      intro.className = "role-intro";
+      view.appendChild(tabs); view.appendChild(intro); view.appendChild(list);
+      function esc(t) { var d = document.createElement("div"); d.textContent = t; return d.innerHTML; }
+      function show(i) {
+        Array.prototype.forEach.call(tabs.children, function (b, j) { b.setAttribute("aria-pressed", j === i ? "true" : "false"); });
+        intro.textContent = intros[roles[i]];
+        var html = "";
+        groups.forEach(function (g) {
+          html += '<div class="role-group"><h4>' + esc(g.name) + "</h4>";
+          g.items.forEach(function (it) {
+            var c = it.cells[i];
+            var mk = c.kind === "m" ? "Modifie" : c.kind === "v" ? "Voit" : "—";
+            html += '<div class="role-item ' + c.kind + '"><span class="what">' + esc(it.label) + (c.note ? "<small>" + esc(c.note) + "</small>" : "") + '</span><span class="mk">' + mk + "</span></div>";
+          });
+          html += "</div>";
+        });
+        list.innerHTML = html;
+      }
+      roles.forEach(function (r, i) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.textContent = r;
+        b.addEventListener("click", function () { show(i); });
+        tabs.appendChild(b);
+      });
+      show(0);
+    })();
+    </script>
     <div class="task solo">
       <div class="text">
         <h3>Joueur et parent : les différences</h3>
