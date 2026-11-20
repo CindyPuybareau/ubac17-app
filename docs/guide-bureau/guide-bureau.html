@@ -513,6 +513,29 @@ footer { margin-top: 28px; color: var(--ink-soft); font-size: 13px; }
 
     <div class="task">
       <div class="text">
+        <h3>Donner un accès Bureau</h3>
+        <p>Dans la fiche du membre, onglet <b>Licence &amp; Équipe</b>, le champ <b>Rôle au Bureau / Administration</b> décide de ce qu'il voit :</p>
+        <ul class="plain">
+          <li><b>Président / Vice-Président</b>, <b>Trésorier / Trésorier Adjoint</b>, <b>Secrétaire / Secrétaire Adjoint</b>, <b>Membre du Bureau</b> : accès Bureau complet.</li>
+          <li><b>Comité directeur</b> : accès Bureau limité. On coche les parties qu'il peut voir (par exemple Calendrier général, Membres, Cotisations, Pénalités, les comptes rendus) ; le reste du menu Bureau lui est masqué.</li>
+          <li><b>Aucun (Par défaut)</b> : pas d'espace Bureau, seulement ses espaces Coach ou Famille.</li>
+        </ul>
+        <p>Son rôle s'affiche ensuite en haut de son écran, au-dessus de son prénom.</p>
+      </div>
+      <div class="screen" aria-label="Exemple : rôle au Bureau">
+        <div class="cap">Exemple : accès limité</div>
+        <div class="tariff"><span>Rôle au Bureau</span><b>Comité directeur</b></div>
+        <div class="stack" style="margin-top:8px">
+          <div class="tariff"><span>☑ Calendrier général</span></div>
+          <div class="tariff"><span>☑ Cotisations</span></div>
+          <div class="tariff"><span>☐ Membres</span></div>
+          <div class="tariff"><span>☑ Compte rendu — Bureau</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="task">
+      <div class="text">
         <h3>Ajouter, sélectionner, archiver</h3>
         <ul class="plain">
           <li><b>Ajouter un membre</b> : saisir l'identité et, si besoin, l'équipe. Pour un coach, cocher <b>Entraîneur/coach</b>. La plupart des fiches arrivent plutôt par l'import du fichier d'inscriptions (chapitre 3).</li>
