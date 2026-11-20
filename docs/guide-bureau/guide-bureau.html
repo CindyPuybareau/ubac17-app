@@ -202,8 +202,8 @@ html { scroll-behavior: smooth; }
 section.chapter, #sommaire { scroll-margin-top: 16px; }
 .side-toc { display: none; }
 @media (min-width: 1180px) {
-  main.wrap { margin-left: max(244px, calc((100vw - 32px - 1040px) / 2)); margin-right: auto; max-width: min(1040px, calc(100vw - 32px - 244px)); }
-  .side-toc { display: block; position: fixed; top: 24px; left: max(16px, calc((100vw - 1040px) / 2 - 236px)); width: 220px; max-height: calc(100vh - 48px); overflow-y: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; font-size: 13.5px; z-index: 5; }
+  main.wrap, .cover .wrap { margin-left: max(252px, calc((100vw - 32px - 1040px) / 2)); margin-right: auto; max-width: min(1040px, calc(100vw - 32px - 252px)); }
+  .side-toc { display: block; position: fixed; top: 24px; left: max(16px, calc((100vw - 1040px) / 2 - 252px)); width: 220px; max-height: calc(100vh - 48px); overflow-y: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; font-size: 13.5px; z-index: 5; }
   .side-toc .side-top { display: block; font-family: var(--font-display); font-weight: 800; text-transform: uppercase; color: var(--navy); font-size: 16px; text-decoration: none; padding: 2px 6px 8px; border-bottom: 2px solid var(--gold); margin-bottom: 6px; }
   .side-toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
   .side-toc li a { display: flex; gap: 8px; align-items: baseline; padding: 5px 6px; border-radius: 8px; color: var(--ink); text-decoration: none; line-height: 1.3; }
@@ -211,7 +211,6 @@ section.chapter, #sommaire { scroll-margin-top: 16px; }
   .side-toc li a:hover { background: var(--surface-2); }
   .side-toc li a[aria-current="true"] { background: #203090; color: #fff; }
   .side-toc li a[aria-current="true"] span { color: #f4c430; }
-  .to-top { display: none !important; }
 }
 .to-top { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 6; display: flex; align-items: center; gap: 6px; padding: 10px 14px; border-radius: 999px; background: #203090; color: #fff; font-weight: 700; font-size: 13px; text-decoration: none; box-shadow: 0 6px 18px rgba(20,26,51,.25); opacity: 0; pointer-events: none; transform: translateY(8px); transition: opacity .2s, transform .2s; }
 .to-top.show { opacity: 1; pointer-events: auto; transform: none; }
