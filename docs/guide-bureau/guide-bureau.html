@@ -185,7 +185,7 @@ footer { margin-top: 28px; color: var(--ink-soft); font-size: 13px; }
     <div class="stage" aria-label="Étapes du guide">
       <span class="on">Étape 1 · Prise en main, calendrier, cotisations</span>
       <span class="on">Étape 2 · Membres, équipes, organisation des événements</span>
-      <span>Étape 3 · Vie du club, bilan de saison</span>
+      <span class="on">Étape 3 · Vie du club, paiements, matchs officiels, bilan</span>
     </div>
   </div>
 </header>
@@ -198,6 +198,11 @@ footer { margin-top: 28px; color: var(--ink-soft); font-size: 13px; }
     <a href="#membres"><b>Membres</b><small>Fiches, ajout, archivage, comptes à rattacher</small></a>
     <a href="#equipes"><b>Équipes</b><small>Coachs, joueurs, changement d'équipe</small></a>
     <a href="#organisation"><b>Organisation</b><small>Présences, covoiturage, bénévoles, officiels</small></a>
+    <a href="#tableau-de-bord"><b>Tableau de bord</b><small>Chiffres clés, affiches, rappels automatiques</small></a>
+    <a href="#paiements"><b>Autres paiements</b><small>Événements payants, pénalités, buvette</small></a>
+    <a href="#matchs-officiels"><b>Matchs officiels</b><small>Championnat, FFBB, feuilles de match</small></a>
+    <a href="#vie-du-club"><b>Vie du club</b><small>Sponsors, affiches, photos, documents</small></a>
+    <a href="#bilan"><b>Bilan de la saison</b><small>Assiduité des joueurs, bénévolat</small></a>
   </nav>
 
   <!-- 1. PRISE EN MAIN -->
@@ -387,6 +392,8 @@ footer { margin-top: 28px; color: var(--ink-soft); font-size: 13px; }
       <div class="text">
         <h3>Importer le fichier des inscriptions</h3>
         <p>Le fichier Excel de suivi des inscriptions (feuille « Suivi Inscriptions ») met à jour toutes les fiches d'un coup. <b>Le fichier fait foi.</b></p>
+        <div class="tip warn"><b>Réservé à Cindy pour l'instant</b>Seule Cindy fait cet import. Les autres membres du Bureau n'ont rien à faire ici : ils voient simplement les fiches et les cotisations se mettre à jour. À terme, les inscriptions se feront directement dans l'appli, sans fichier.</div>
+        <p class="where" style="margin-top:0">Où : menu › Matchs officiels › <code>FFBB</code></p>
         <ol class="steps">
           <li>Cliquer sur <b>Importer les inscriptions (fichier officiel)</b> et choisir le fichier.</li>
           <li>Lire le récapitulatif : nouveaux membres, fiches mises à jour, cas douteux à vérifier.</li>
@@ -674,10 +681,203 @@ footer { margin-top: 28px; color: var(--ink-soft); font-size: 13px; }
     </div>
   </section>
 
-  <section class="next" aria-label="Prochaines étapes du guide">
-    <h2>Prochaines étapes</h2>
-    <p><b>Étape 3</b> : vie du club (affiches à la une, sponsors, boutique, buvette, pénalités, documents) et bilan de la saison.</p>
+
+  <!-- 7. TABLEAU DE BORD -->
+  <section class="chapter" id="tableau-de-bord">
+    <div class="chapter-head"><span class="num">7</span><h2>Tableau de bord</h2></div>
+    <p class="where">Où : menu › <code>Tableau de bord</code></p>
+    <p class="lead">La page d'accueil du Bureau : l'état du club en un coup d'œil.</p>
+
+    <div class="task">
+      <div class="text">
+        <h3>Ce qu'on y trouve</h3>
+        <ul class="plain">
+          <li><b>Les chiffres clés</b> : total de la buvette, total des pénalités…</li>
+          <li><b>Boutique en ligne</b> : le lien vers la boutique du club, avec <b>Suivi des ventes</b> pour le Bureau.</li>
+          <li><b>Exclu sponsor</b> : les offres réservées aux membres par nos sponsors.</li>
+          <li><b>Les affiches à la une</b> : les 2 plus récentes, les anciennes avec la flèche de gauche (voir chapitre 10).</li>
+          <li><b>Cette semaine</b> : les entraînements et matchs de la semaine, jour par jour.</li>
+        </ul>
+      </div>
+      <div class="screen" aria-label="Exemple : tableau de bord">
+        <div class="cap">Exemple (chiffres fictifs)</div>
+        <div class="kpis" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+          <div class="kpi"><b>2 950 €</b>Total buvette</div>
+          <div class="kpi"><b>180 €</b>Total pénalités</div>
+        </div>
+        <div class="kpis" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-top:6px">
+          <div class="kpi" style="background:#203090;color:#fff;border-color:#203090">Boutique en ligne</div>
+          <div class="kpi" style="background:#f4c430;color:#162365;border-color:#f4c430">Exclu sponsor</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="task solo">
+      <div class="text">
+        <h3>Notifications et rappels automatiques</h3>
+        <p>En bas du tableau de bord, le Bureau choisit ce que l'appli envoie toute seule. Chaque ligne s'active ou se coupe d'un clic :</p>
+        <ul class="plain">
+          <li><b>Rappels de match (la veille)</b> : notification aux joueurs, parents et coachs la veille de chaque match.</li>
+          <li><b>Alertes licence &amp; certificat médical</b> : email aux membres dont un document arrive à échéance en fin d'année.</li>
+          <li><b>Relance pénalités</b> : email de rappel tous les 14 jours pour chaque cotisation ou pénalité encore due.</li>
+          <li><b>Besoins bénévoles</b> : notification à l'équipe concernée (nouveau besoin, besoin non pourvu à J-7 puis J-3, événement modifié ou annulé).</li>
+          <li><b>Le Bureau reçoit aussi les besoins de toutes les équipes</b> : pour suivre aussi les équipes que le Bureau ne gère pas directement.</li>
+        </ul>
+      </div>
+    </div>
   </section>
 
-  <footer>Guide interne au Bureau de l'UBAC. Les écrans sont redessinés et les noms sont inventés. Version du 20 novembre 2026 (étapes 1 et 2).</footer>
+  <!-- 8. AUTRES PAIEMENTS -->
+  <section class="chapter" id="paiements">
+    <div class="chapter-head"><span class="num">8</span><h2>Autres paiements</h2></div>
+    <p class="where">Où : menu › Paiements › <code>Événements payants</code>, <code>Pénalités</code>, <code>Buvette</code></p>
+
+    <div class="task">
+      <div class="text">
+        <h3>Événements payants</h3>
+        <p>Chaque événement créé avec l'option <b>Événement payant</b> (chapitre 2) apparaît ici avec ses participants, pour suivre qui a réglé et combien il reste à encaisser.</p>
+        <h3 style="margin-top:12px">Pénalités</h3>
+        <ol class="steps">
+          <li><b>Ajouter une pénalité</b> : choisir le joueur, le montant, le motif. Un lien de paiement HelloAsso peut être ajouté.</li>
+          <li>Suivre le statut : <b>En attente</b>, <b>Payé par le joueur</b> ou <b>Payé par le club</b>.</li>
+        </ol>
+        <p>Le joueur, sa famille et son coach voient la pénalité tant qu'elle n'est pas réglée. Le rappel automatique tous les 14 jours se règle dans le tableau de bord.</p>
+      </div>
+      <div class="screen" aria-label="Exemple : pénalité">
+        <div class="cap">Exemple : pénalités</div>
+        <div class="tablet">
+          <div class="tr"><span>Joueur</span><span>Montant</span><span>Statut</span></div>
+          <div class="tr"><span>Hugo Bernard</span><span class="num">45 €</span><span><span class="chip c-amber">En attente</span></span></div>
+          <div class="tr"><span>Tom Roux</span><span class="num">30 €</span><span><span class="chip c-green">Payé</span></span></div>
+        </div>
+        <p class="note">Noms inventés.</p>
+      </div>
+    </div>
+
+    <div class="task">
+      <div class="text">
+        <h3>Buvette</h3>
+        <ol class="steps">
+          <li>Après chaque permanence : <b>Ajouter une recette</b>.</li>
+          <li>Saisir les montants par moyen de paiement : <b>Espèces</b>, <b>CB / SumUp</b>, <b>Autre</b> (chèque, virement), et une note si besoin.</li>
+        </ol>
+        <p>Le total de la buvette remonte dans les chiffres du tableau de bord.</p>
+      </div>
+      <div class="screen" aria-label="Exemple : recette buvette">
+        <div class="cap">Exemple : recette du samedi</div>
+        <div class="stack">
+          <div class="tariff"><span>Espèces</span><b>142,50 €</b></div>
+          <div class="tariff"><span>CB / SumUp</span><b>87,00 €</b></div>
+          <div class="tariff"><span>Autre</span><b>0,00 €</b></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9. MATCHS OFFICIELS -->
+  <section class="chapter" id="matchs-officiels">
+    <div class="chapter-head"><span class="num">9</span><h2>Matchs officiels</h2></div>
+    <p class="where">Où : menu › Matchs officiels › <code>Championnat</code>, <code>FFBB</code></p>
+
+    <div class="task solo">
+      <div class="text">
+        <h3>Championnat</h3>
+        <p>Tous les matchs officiels du club, à venir et joués, avec leurs scores et le classement des équipes. C'est le même calendrier que le Calendrier général, limité aux matchs officiels.</p>
+        <h3 style="margin-top:12px">FFBB</h3>
+        <ul class="plain">
+          <li><b>Le lien FFBB de chaque équipe</b> : c'est lui qui fait arriver les matchs dans l'appli. À mettre à jour quand une équipe change de poule.</li>
+          <li><b>La synchronisation</b> se fait toute seule chaque lundi à 10 h. Le bouton <b>Tout synchroniser</b> la lance tout de suite, par exemple après un changement d'horaire. Chaque équipe affiche la date de sa dernière synchronisation.</li>
+          <li><b>Feuilles de match (Google Drive)</b> : le lien du dossier où sont déposées les feuilles de match. Il apparaît ensuite sur les cartes de match (bouton « Feuilles »).</li>
+          <li><b>Importer les inscriptions</b> : voir chapitre 3, réservé à Cindy pour l'instant.</li>
+        </ul>
+        <div class="tip"><b>Rappel</b>Une synchronisation ne supprime jamais rien : présences, covoiturage et bénévoles restent attachés au match même si l'horaire ou le gymnase change.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 10. VIE DU CLUB -->
+  <section class="chapter" id="vie-du-club">
+    <div class="chapter-head"><span class="num">10</span><h2>Vie du club</h2></div>
+    <p class="where">Où : menu › <code>Vie du club</code></p>
+
+    <div class="task">
+      <div class="text">
+        <h3>Événements à la une (les affiches)</h3>
+        <ol class="steps">
+          <li><b>Ajouter une affiche</b> : un titre (pour s'y retrouver, il ne s'affiche pas sur l'affiche) et l'image.</li>
+          <li>En option : un <b>lien externe</b> (par exemple HelloAsso), un <b>événement du calendrier</b> à rattacher, une <b>date de fin</b>.</li>
+          <li>Enregistrer : l'affiche apparaît tout de suite sur le tableau de bord de tout le club.</li>
+        </ol>
+        <ul class="plain">
+          <li>Les 2 affiches les plus récentes s'affichent. À chaque nouvelle affiche, la plus ancienne sort par la gauche ; la flèche de gauche permet de la revoir.</li>
+          <li>Au clic, l'affiche ouvre son lien, sinon le jour de l'événement dans le calendrier, sinon elle s'agrandit en plein écran.</li>
+          <li>Passé sa date de fin, l'affiche disparaît toute seule, sans être supprimée.</li>
+        </ul>
+      </div>
+      <div class="screen" aria-label="Exemple : affiches à la une">
+        <div class="cap">Exemple : 3 affiches en place</div>
+        <div style="display:grid;grid-template-columns:auto 1fr 1fr;gap:6px;align-items:center">
+          <span class="btn-mini">‹</span>
+          <div style="aspect-ratio:3/4;border-radius:10px;background:#203090;color:#fff;display:grid;place-items:center;font-weight:700;font-size:12px;text-align:center;padding:6px">Noël du club</div>
+          <div style="aspect-ratio:3/4;border-radius:10px;background:#f4c430;color:#162365;display:grid;place-items:center;font-weight:700;font-size:12px;text-align:center;padding:6px">Tournoi de printemps</div>
+        </div>
+        <p class="note">La 3ᵉ affiche, la plus ancienne, se trouve derrière la flèche ‹.</p>
+      </div>
+    </div>
+
+    <div class="task solo">
+      <div class="text">
+        <h3>Sponsors</h3>
+        <ul class="plain">
+          <li>Pour chaque sponsor : nom, contact, lien vers son site, formule choisie et date de renouvellement.</li>
+          <li><b>Contrat</b> : visible uniquement par le Bureau.</li>
+          <li><b>Offre / remise membre</b> : visible par tout le club, dans la carte <b>Exclu sponsor</b> du tableau de bord.</li>
+        </ul>
+        <h3 style="margin-top:12px">Photos d'équipe</h3>
+        <p>Toutes les équipes d'un coup d'œil : celles sans photo affichent le logo du club. Un bouton <b>Ajouter</b> ou <b>Remplacer</b> par équipe. Les coachs peuvent aussi changer la photo de leur équipe.</p>
+        <h3 style="margin-top:12px">Documents</h3>
+        <ul class="plain">
+          <li>Les documents du club : charte joueur, charte parent, règlement intérieur, trombinoscopes.</li>
+          <li><b>Comptes rendus</b> des mairies, du Bureau et des coachs, rédigés directement dans l'appli.</li>
+          <li>Les documents reçus du <b>CD17 et de la Ligue</b>, déposés tels quels.</li>
+        </ul>
+        <h3 style="margin-top:12px">Inventaire et Suivi des ventes</h3>
+        <ul class="plain">
+          <li><b>Inventaire</b> : la liste du matériel du club (nom et quantité), tenue par le Bureau et les coachs.</li>
+          <li><b>Suivi des ventes</b> : le lien vers l'espace vendeur de la boutique en ligne. On s'y connecte avec ses propres identifiants : l'appli ne les voit ni ne les garde.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 11. BILAN -->
+  <section class="chapter" id="bilan">
+    <div class="chapter-head"><span class="num">11</span><h2>Bilan de la saison</h2></div>
+    <p class="where">Où : menu › Bilan de la saison › <code>Joueurs</code>, <code>Bénévoles</code></p>
+
+    <div class="task">
+      <div class="text">
+        <h3>Joueurs</h3>
+        <p>Pour chaque équipe, l'assiduité de chaque joueur aux entraînements passés, avec une barre de couleur : on repère tout de suite qui vient rarement.</p>
+        <h3 style="margin-top:12px">Bénévoles</h3>
+        <p>Par famille ou par joueur, tout ce qui a été donné pendant la saison : covoiturage, besoins bénévoles, rôles d'officiel, avec un total. Utile pour remercier les familles les plus impliquées, ou relancer celles qu'on ne voit jamais.</p>
+      </div>
+      <div class="screen" aria-label="Exemple : assiduité">
+        <div class="cap">Exemple : assiduité U11X</div>
+        <div class="stack">
+          <div><div style="display:flex;justify-content:space-between"><span>Léa Martin</span><b class="num">14/15</b></div><div style="height:6px;border-radius:4px;background:var(--surface-2)"><div style="width:93%;height:6px;border-radius:4px;background:var(--green)"></div></div></div>
+          <div><div style="display:flex;justify-content:space-between"><span>Inès Petit</span><b class="num">9/15</b></div><div style="height:6px;border-radius:4px;background:var(--surface-2)"><div style="width:60%;height:6px;border-radius:4px;background:var(--amber)"></div></div></div>
+          <div><div style="display:flex;justify-content:space-between"><span>Tom Roux</span><b class="num">4/15</b></div><div style="height:6px;border-radius:4px;background:var(--surface-2)"><div style="width:27%;height:6px;border-radius:4px;background:var(--red)"></div></div></div>
+        </div>
+        <p class="note">Noms et chiffres inventés.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="next" aria-label="À venir">
+    <h2>À venir</h2>
+    <p>Les inscriptions se feront directement dans l'appli, sans passer par le fichier Excel. Ce guide sera complété à chaque nouvelle fonctionnalité.</p>
+  </section>
+
+  <footer>Guide interne au Bureau de l'UBAC. Les écrans sont redessinés et les noms sont inventés. Version du 20 novembre 2026.</footer>
 </main>
