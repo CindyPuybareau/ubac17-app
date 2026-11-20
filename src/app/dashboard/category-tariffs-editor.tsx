@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronUp, Settings } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Pencil, Settings, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import ConfirmDialog from "./confirm-dialog";
 import type { AdminCategoryTariff, AdminMemberTeam } from "./page";
 
 function buildValues(
@@ -122,6 +123,51 @@ export default function CategoryTariffsEditor({
     router.refresh();
   }
 
+  // Renommer une catégorie (retour de Cindy du 20/11, demande du comptable
+  // "U9 Mixte" -> "U9X") : crayon à côté du nom, puis confirmation --
+  // fonction rename_team_category (migration 20261121140000), tout ou rien.
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const [newName, setNewName] = useState("");
+  const [confirmRename, setConfirmRename] = useState<{ from: string; to: string } | null>(null);
+  const [renaming, setRenaming] = useState(false);
+  const [renameError, setRenameError] = useState<string | null>(null);
+
+  function askRename(from: string) {
+    const to = newName.trim();
+    setRenameError(null);
+    if (!to || to === from) {
+      setEditingCategory(null);
+      return;
+    }
+    const taken = uniqueCategories.some((c) => c !== from && c.toLowerCase() === to.toLowerCase());
+    if (taken) {
+      setRenameError(`La catégorie « ${to} » existe déjà.`);
+      return;
+    }
+    setConfirmRename({ from, to });
+  }
+
+  async function doRename() {
+    if (!confirmRename) return;
+    setRenaming(true);
+    setRenameError(null);
+    const { error: rpcError } = await createClient().rpc("rename_team_category", {
+      old_name: confirmRename.from,
+      new_name: confirmRename.to,
+    });
+    setRenaming(false);
+    if (rpcError) {
+      setRenameError(rpcError.message);
+      setConfirmRename(null);
+      return;
+    }
+    setConfirmRename(null);
+    setEditingCategory(null);
+    router.refresh();
+  }
+
+  const teamsInCategory = (category: string) => categories.filter((t) => t.category === category).length;
+
   return (
     <div className="overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm">
       <button
@@ -162,15 +208,64 @@ export default function CategoryTariffsEditor({
             membre est ajouté ou assigné à cette catégorie.
           </p>
           {error && <p className="text-sm text-red-600">{error}</p>}
+          {renameError && <p className="text-sm font-semibold text-red-600">{renameError}</p>}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {uniqueCategories.map((c) => (
-              <label
+              <div
                 key={c}
                 className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-slate-50 p-2.5 transition-colors focus-within:border-ubac-yellow"
               >
-                <span className="min-w-0 truncate text-sm font-medium text-slate-800">
-                  {c}
-                </span>
+                {editingCategory === c ? (
+                  <span className="flex min-w-0 flex-1 items-center gap-1">
+                    <input
+                      autoFocus
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") askRename(c);
+                        if (e.key === "Escape") setEditingCategory(null);
+                      }}
+                      aria-label={`Nouveau nom pour « ${c} »`}
+                      className="min-w-0 flex-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm font-medium text-slate-800 outline-none focus:border-navy"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => askRename(c)}
+                      title="Valider le nouveau nom"
+                      className="shrink-0 rounded-full p-1.5 text-court-green hover:bg-court-green/10"
+                    >
+                      <Check className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingCategory(null);
+                        setRenameError(null);
+                      }}
+                      title="Annuler"
+                      className="shrink-0 rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </span>
+                ) : (
+                  <span className="flex min-w-0 items-center gap-1">
+                    <span className="min-w-0 truncate text-sm font-medium text-slate-800">{c}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingCategory(c);
+                        setNewName(c);
+                        setRenameError(null);
+                      }}
+                      title={`Renommer « ${c} »`}
+                      className="shrink-0 rounded-full p-1 text-zinc-400 hover:bg-zinc-100 hover:text-navy"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  </span>
+                )}
+                {editingCategory !== c && (
                 <span className="flex shrink-0 items-center gap-0.5 rounded-md border border-zinc-200 bg-white pr-2">
                   <input
                     type="number"
@@ -183,7 +278,8 @@ export default function CategoryTariffsEditor({
                   />
                   <span className="text-xs font-semibold text-zinc-400">€</span>
                 </span>
-              </label>
+                )}
+              </div>
             ))}
           </div>
           <div className="flex items-center gap-2">
@@ -198,6 +294,20 @@ export default function CategoryTariffsEditor({
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={confirmRename !== null}
+        title="Renommer la catégorie ?"
+        message={
+          confirmRename
+            ? `« ${confirmRename.from} » deviendra « ${confirmRename.to} » partout dans l'appli : ${teamsInCategory(confirmRename.from)} équipe${teamsInCategory(confirmRename.from) > 1 ? "s" : ""} (et ses déclinaisons numérotées), le tarif et les fiches joueurs. Les anciennes notifications gardent l'ancien nom.`
+            : ""
+        }
+        confirmLabel="Renommer"
+        pending={renaming}
+        pendingLabel="Renommage..."
+        onCancel={() => setConfirmRename(null)}
+        onConfirm={doRename}
+      />
     </div>
   );
 }
