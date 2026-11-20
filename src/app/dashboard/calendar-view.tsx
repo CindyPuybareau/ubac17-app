@@ -2659,12 +2659,6 @@ export default function CalendarView({
               {titleNode}
               {/* Score déjà saisi : une information, à côté de l'adversaire. */}
               {matchHasScore && matchScoreField}
-              {/* Téléphone : "Besoin non pourvu" (à traiter) juste après
-                  l'adversaire, pour ne pas passer inaperçu. */}
-              <span className="contents sm:hidden">
-                {needBadge}
-                {paidBadge}
-              </span>
               {/* Grand écran (capture du comptable) : outils, puis étiquettes. */}
               <span className="hidden sm:contents">
                 {matchActions}
@@ -2747,7 +2741,13 @@ export default function CalendarView({
           {isMatchType(event.event_type) && (
             <div className="flex flex-wrap items-center gap-2 empty:hidden">{matchActions}</div>
           )}
-          {typeBadge}
+          {/* Étiquettes à la fin, comme sur grand écran (retour de Cindy du
+              20/11 : "Besoin non pourvu" aussi, même sur téléphone). */}
+          <div className="flex flex-wrap items-center gap-2">
+            {typeBadge}
+            {needBadge}
+            {paidBadge}
+          </div>
         </div>
 
         {/* Retour de Cindy du 30/10 : même emplacement/forme que le badge
