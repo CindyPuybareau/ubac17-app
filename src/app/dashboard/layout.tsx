@@ -67,7 +67,7 @@ export default async function DashboardLayout({
     redirect("/connexion");
   }
 
-  const [profileResult, ownPlayerRowResult, adminResult] = await Promise.all([
+  const [profileResult, ownPlayerRowResult, adminResult, coachTeamsResult] = await Promise.all([
     supabase
       .from("profiles")
       .select("first_name, avatar_url")
@@ -89,7 +89,11 @@ export default async function DashboardLayout({
       .select("club_function")
       .eq("email", (user.email ?? "").toLowerCase())
       .maybeSingle(),
+    // Guide des coachs (retour de Cindy du 20/11) : un simple comptage,
+    // sans lire de ligne.
+    supabase.from("team_coaches").select("team_id", { count: "exact", head: true }).eq("coach_id", user.id),
   ]);
+  const isCoach = (coachTeamsResult.count ?? 0) > 0;
 
   logQueryErrors("layout dashboard (header)", { profileResult, ownPlayerRowResult, adminResult });
 
@@ -160,7 +164,7 @@ export default async function DashboardLayout({
                       {/* Guide du Bureau (retour de Cindy du 20/11) : Bureau
                           seulement, sous le prénom sur tous les écrans (à
                           droite, l'icône mangeait le prénom sur téléphone). */}
-                      {adminResult.data && <GuideButton />}
+                      {adminResult.data ? <GuideButton /> : isCoach ? <GuideButton audience="coach" /> : null}
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">

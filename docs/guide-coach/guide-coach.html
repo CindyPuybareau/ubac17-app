@@ -1,0 +1,599 @@
+<title>Guide des coachs UBAC</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Mise en page : une colonne de lecture (≈ 68 caractères), chapitres séparés
+   par un bandeau « feuille de match » marine/or, écrans d'exemple redessinés
+   à côté des étapes sur grand écran, empilés sur téléphone. */
+:root {
+  --navy: #203090;
+  --navy-deep: #162365;
+  --gold: #f4c430;
+  --green: #3e8f5f;
+  --amber: #b45309;
+  --red: #c2410c;
+  --bg: #f6f7fb;
+  --surface: #ffffff;
+  --surface-2: #eef0f8;
+  --ink: #141a33;
+  --ink-soft: #4a5170;
+  --line: #dde1ef;
+  --chip-green-bg: #e3f2e9;
+  --chip-amber-bg: #fdf0d5;
+  --chip-navy-bg: #e5e8f7;
+  --on-navy: #ffffff;
+  --font-display: "Poppins", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+/* Toujours en clair, comme l'appli (retour de Cindy du 20/11 : fond noir sur un téléphone en mode sombre). */
+:root, :root[data-theme="dark"] { color-scheme: light; }
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+.wrap { max-width: 1040px; margin: 0 auto; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; line-height: 1.05; margin: 0; }
+p { margin: 0; }
+a { color: var(--navy); }
+a:focus-visible, button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; border-radius: 6px; }
+
+/* En-tête */
+.cover {
+  margin: 0 calc(-1 * max(16px, env(safe-area-inset-left, 0px))) 0;
+  background: #203090; color: #fff; padding: 40px max(16px, env(safe-area-inset-left, 0px)) 36px;
+  position: relative; overflow: hidden;
+}
+.cover::after {
+  content: ""; position: absolute; right: -120px; top: -120px; width: 360px; height: 360px; border-radius: 50%;
+  border: 3px solid rgba(244,196,48,.35); box-shadow: 0 0 0 40px rgba(244,196,48,.06);
+}
+.cover .wrap { position: relative; z-index: 1; display: grid; gap: 14px; }
+.eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; color: #f4c430; }
+.cover h1 { font-size: clamp(32px, 5.6vw, 54px); font-weight: 800; letter-spacing: -.01em; }
+.cover p { max-width: 62ch; color: #d8dcf2; font-size: 17px; }
+.stage { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 6px; }
+.stage span { font-size: 13px; font-weight: 600; padding: 8px 12px; border-radius: 12px; background: rgba(255,255,255,.12); color: #fff; text-align: center; display: flex; align-items: center; justify-content: center; }
+.stage span.on { background: #f4c430; color: #162365; }
+
+/* Sommaire */
+.toc { margin-top: 28px; display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.toc a {
+  display: grid; gap: 4px; text-decoration: none; color: var(--ink); background: var(--surface); border: 1px solid var(--line);
+  border-radius: 14px; padding: 16px 18px;
+}
+.toc a:hover { border-color: var(--navy); }
+.toc b { font-family: var(--font-display); font-size: 18px; font-weight: 700; color: var(--navy); line-height: 1.25; }
+.toc small { color: var(--ink-soft); font-size: 14px; }
+
+/* Chapitres */
+.chapter { margin-top: 56px; }
+.chapter-head { display: flex; align-items: baseline; gap: 14px; border-bottom: 3px solid var(--gold); padding-bottom: 10px; flex-wrap: wrap; }
+.chapter-head .num { font-family: var(--font-display); font-weight: 800; font-size: 44px; color: var(--gold); line-height: 1; }
+.chapter-head h2 { font-size: clamp(24px, 3.4vw, 32px); color: var(--navy); font-weight: 800; }
+.where { margin-top: 12px; color: var(--ink-soft); font-size: 15px; }
+.where code, .path {
+  font-family: var(--font-body); font-size: 14px; font-weight: 600; background: var(--chip-navy-bg); color: var(--navy);
+  padding: 2px 8px; border-radius: 6px; white-space: nowrap;
+}
+.lead { margin-top: 10px; max-width: 68ch; font-size: 17px; }
+
+.task { margin-top: 32px; display: grid; gap: 24px; grid-template-columns: minmax(0, 1fr) minmax(0, 380px); align-items: start; }
+.task.solo { grid-template-columns: minmax(0, 1fr); }
+.task h3 { font-size: 20px; font-weight: 700; color: var(--ink); }
+.task .text { min-width: 0; display: grid; gap: 12px; }
+.task .text > p { max-width: 68ch; }
+ol.steps { margin: 0; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 10px; }
+ol.steps li { counter-increment: s; position: relative; padding-left: 40px; max-width: 64ch; }
+ol.steps li::before {
+  content: counter(s); position: absolute; left: 0; top: 1px; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--navy); color: var(--on-navy); font-weight: 700; font-size: 13px; display: grid; place-items: center;
+}
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 66ch; }
+.tip {
+  background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--green); border-radius: 10px;
+  padding: 12px 16px; max-width: 68ch; font-size: 15px;
+}
+.tip.warn { border-left-color: var(--amber); }
+.tip b:first-child { display: block; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--green); margin-bottom: 2px; }
+.tip.warn b:first-child { color: var(--amber); }
+
+/* Écrans d'exemple (redessinés, noms inventés) */
+.screen {
+  min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 14px;
+  box-shadow: 0 6px 20px rgba(20, 26, 51, .07); font-size: 13px; line-height: 1.4;
+}
+.screen .cap { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; margin-bottom: 10px; }
+.chip { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; border-radius: 999px; padding: 2px 8px; letter-spacing: .02em; }
+.c-navy { background: var(--chip-navy-bg); color: var(--navy); }
+.c-green { background: var(--chip-green-bg); color: var(--green); }
+.c-amber { background: var(--chip-amber-bg); color: var(--amber); }
+.c-solid { background: #203090; color: #fff; }
+.c-gold { background: #f4c430; color: #162365; }
+.ev { border: 1px solid var(--line); border-left: 4px solid #203090; border-radius: 12px; padding: 10px 12px; display: grid; gap: 6px; background: var(--surface); }
+.ev.train { border-left-color: var(--green); }
+.ev .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.ev .team { font-size: 11px; font-weight: 700; color: var(--navy); text-transform: uppercase; letter-spacing: .05em; }
+.ev .title { font-weight: 600; }
+.ev .meta { color: var(--ink-soft); }
+.btn-mini { font-size: 11px; font-weight: 600; border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; color: var(--ink); background: var(--surface-2); }
+.stack { display: grid; gap: 8px; }
+.types { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.type { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 7px 9px; font-weight: 600; font-size: 12.5px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.kpi { border: 1px solid var(--line); border-radius: 10px; padding: 8px; text-align: center; }
+.kpi b { display: block; font-family: var(--font-display); font-size: 22px; line-height: 1; font-variant-numeric: tabular-nums; }
+.kpi.hot { background: var(--chip-amber-bg); border-color: transparent; }
+.ring { display: flex; align-items: center; gap: 12px; background: #203090; color: #fff; border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; }
+.ring .pct { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 15px;
+  background: conic-gradient(#5fd08f 0 93%, rgba(255,255,255,.2) 93% 100%); position: relative; }
+.ring .pct span { position: relative; z-index: 1; }
+.ring .pct::before { content: ""; position: absolute; inset: 6px; border-radius: 50%; background: #203090; }
+.ring small { color: #f4c430; font-weight: 700; letter-spacing: .08em; font-size: 10px; }
+.tariffs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.tariff { display: flex; justify-content: space-between; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 9px; padding: 6px 8px; background: var(--surface-2); }
+.tariff b { font-variant-numeric: tabular-nums; color: var(--navy); }
+.pen { color: var(--ink-soft); font-size: 11px; }
+.tablet { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.tablet .tr { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, .8fr) minmax(0, 1fr); gap: 6px; padding: 7px 9px; border-top: 1px solid var(--line); align-items: center; }
+.tablet .tr:first-child { border-top: 0; background: var(--surface-2); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-soft); }
+.num { font-variant-numeric: tabular-nums; }
+.pills { display: flex; flex-wrap: wrap; gap: 5px; }
+.pill { font-size: 11.5px; border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px; }
+.pill.on { background: #203090; color: #fff; border-color: #203090; }
+.note { color: var(--ink-soft); font-size: 11.5px; margin-top: 8px; font-style: italic; }
+
+.next { margin-top: 56px; background: var(--surface); border: 1px dashed var(--line); border-radius: 16px; padding: 20px 22px; display: grid; gap: 10px; }
+.next h2 { font-size: 20px; color: var(--navy); }
+footer { margin-top: 28px; color: var(--ink-soft); font-size: 13px; }
+
+
+/* Tableau « Qui voit quoi » */
+.matrix-wrap { margin-top: 20px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); -webkit-overflow-scrolling: touch; }
+table.matrix { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 760px; font-size: 13.5px; }
+.matrix thead th { position: sticky; top: 0; background: #203090; color: #fff; font-weight: 700; text-align: center; padding: 10px 8px; font-size: 13px; letter-spacing: .02em; }
+.matrix thead th:first-child { text-align: left; border-top-left-radius: 13px; }
+.matrix thead th:last-child { border-top-right-radius: 13px; }
+.matrix thead th span { display: block; font-weight: 500; font-size: 11px; color: #c9cff0; }
+.matrix tbody th[scope="row"] { text-align: left; font-weight: 600; padding: 8px 10px; border-top: 1px solid var(--line); background: var(--surface); position: sticky; left: 0; z-index: 1; min-width: 190px; }
+.matrix tr.grp th { text-align: left; background: var(--surface-2); color: var(--navy); font-family: var(--font-display); font-size: 17px; text-transform: uppercase; letter-spacing: .03em; padding: 8px 10px; border-top: 1px solid var(--line); position: sticky; left: 0; }
+.matrix td.cell { border-top: 1px solid var(--line); padding: 7px 6px; text-align: center; vertical-align: middle; }
+.matrix td.cell .mk { display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; border-radius: 999px; padding: 2px 9px; }
+.matrix td.cell small { display: block; margin-top: 3px; color: var(--ink-soft); font-size: 11.5px; line-height: 1.3; }
+.matrix td.m .mk { background: var(--chip-green-bg); color: var(--green); }
+.matrix td.v .mk { background: var(--chip-navy-bg); color: var(--navy); }
+.matrix td.n .mk { color: var(--ink-soft); background: transparent; }
+/* Téléphone (retour de Cindy du 20/11 : "on ne comprend pas qu'il faut
+   scroller à droite") : le tableau laisse place à un choix de profil, puis
+   la liste de ce que ce profil voit et modifie. Construit en JS à partir du
+   tableau lui-même (une seule source) ; sans JS, le tableau reste affiché. */
+.role-view { display: none; margin-top: 16px; }
+@media (max-width: 760px) {
+  .js .role-view { display: block; }
+  .js .matrix-wrap { display: none; }
+}
+@media print { .role-view { display: none !important; } .js .matrix-wrap { display: block !important; } }
+.role-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; background: var(--surface-2); border-radius: 12px; padding: 4px; }
+.role-tabs button { font: inherit; font-size: 12.5px; font-weight: 700; border: 0; border-radius: 9px; padding: 9px 2px; background: transparent; color: var(--ink-soft); cursor: pointer; }
+.role-tabs button[aria-pressed="true"] { background: #203090; color: #fff; }
+.role-tabs button:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
+.role-intro { margin-top: 10px; font-size: 14px; color: var(--ink-soft); }
+.role-group { margin-top: 14px; }
+.role-group h4 { margin: 0 0 6px; font-family: var(--font-display); font-size: 17px; text-transform: uppercase; color: var(--navy); letter-spacing: .03em; }
+.role-item { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); margin-top: 6px; }
+.role-item .what { font-weight: 600; font-size: 14px; min-width: 0; }
+.role-item .what small { display: block; font-weight: 400; color: var(--ink-soft); font-size: 12.5px; margin-top: 2px; }
+.role-item .mk { flex: none; font-size: 11px; font-weight: 700; text-transform: uppercase; border-radius: 999px; padding: 3px 10px; }
+.role-item.m .mk { background: var(--chip-green-bg); color: var(--green); }
+.role-item.v .mk { background: var(--chip-navy-bg); color: var(--navy); }
+.role-item.n { opacity: .55; }
+.role-item.n .mk { color: var(--ink-soft); }
+.start { margin-top: 28px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px 22px; display: grid; gap: 12px; }
+.start h2 { font-size: 22px; color: var(--navy); font-weight: 800; }
+@media print { .start { break-inside: avoid; } }
+/* Navigation (retour du comptable, 20/11) : sommaire fixe à gauche sur
+   grand écran, bouton flottant « Sommaire » ailleurs. */
+html { scroll-behavior: smooth; }
+section.chapter, #sommaire { scroll-margin-top: 16px; }
+.side-toc { display: none; }
+@media (min-width: 1180px) {
+  main.wrap, .cover .wrap { margin-left: max(252px, calc((100vw - 32px - 1040px) / 2)); margin-right: auto; max-width: min(1040px, calc(100vw - 32px - 252px)); }
+  .side-toc { display: block; position: fixed; top: 24px; left: max(16px, calc((100vw - 1040px) / 2 - 252px)); width: 220px; max-height: calc(100vh - 48px); overflow-y: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; font-size: 13.5px; z-index: 5; }
+  .side-toc .side-top { display: block; font-family: var(--font-display); font-weight: 800; text-transform: uppercase; color: var(--navy); font-size: 16px; text-decoration: none; padding: 2px 6px 8px; border-bottom: 2px solid var(--gold); margin-bottom: 6px; }
+  .side-toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .side-toc li a { display: flex; gap: 8px; align-items: baseline; padding: 5px 6px; border-radius: 8px; color: var(--ink); text-decoration: none; line-height: 1.3; }
+  .side-toc li a span { color: var(--gold); font-weight: 800; min-width: 1.4em; font-variant-numeric: tabular-nums; }
+  .side-toc li a:hover { background: var(--surface-2); }
+  .side-toc li a[aria-current="true"] { background: #203090; color: #fff; }
+  .side-toc li a[aria-current="true"] span { color: #f4c430; }
+}
+.to-top { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 6; display: flex; align-items: center; gap: 6px; padding: 10px 14px; border-radius: 999px; background: #203090; color: #fff; font-weight: 700; font-size: 13px; text-decoration: none; box-shadow: 0 6px 18px rgba(20,26,51,.25); opacity: 0; pointer-events: none; transform: translateY(8px); transition: opacity .2s, transform .2s; }
+.to-top.show { opacity: 1; pointer-events: auto; transform: none; }
+.to-top svg { color: #f4c430; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .to-top { transition: none; } }
+@media print { .side-toc, .to-top { display: none !important; } }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 12px; font-size: 14px; color: var(--ink-soft); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend .mk { font-size: 11px; font-weight: 700; text-transform: uppercase; border-radius: 999px; padding: 2px 9px; }
+.legend .m { background: var(--chip-green-bg); color: var(--green); }
+.legend .v { background: var(--chip-navy-bg); color: var(--navy); }
+@media print { .matrix-wrap { overflow: visible; border: 0; } table.matrix { min-width: 0; font-size: 9pt; } .matrix thead th, .matrix tr.grp th, .matrix td .mk { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .matrix tbody th[scope="row"] { position: static; min-width: 0; } .matrix tr { break-inside: avoid; } }
+
+@media (max-width: 760px) {
+  .task { grid-template-columns: minmax(0, 1fr); }
+  .cover { padding-top: 28px; }
+}
+@media print {
+  body { background: #fff; padding: 0; font-size: 11pt; }
+  .cover { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .chapter { break-before: page; margin-top: 0; padding-top: 8mm; }
+  .task, .tip, .screen, .ev { break-inside: avoid; }
+  .screen, .ring, .chip, .pill.on, .kpi.hot, ol.steps li::before, .stage span.on { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .screen { box-shadow: none; }
+  .toc a { break-inside: avoid; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<header class="cover">
+  <div class="wrap">
+    <span class="eyebrow">Union Basket Angoulins Châtelaillon Saint-Vivien · Saison 2026-2027</span>
+    <h1>Guide des coachs</h1>
+    <p>Ce que l'appli du club fait pour toi en tant que coach : préparer tes entraînements et tes matchs, savoir qui vient, organiser les bénévoles et suivre ton équipe.</p>
+  </div>
+</header>
+
+<nav class="side-toc" aria-label="Chapitres">
+  <a class="side-top" href="#sommaire">Guide des coachs</a>
+  <ol>
+    <li><a href="#prise-en-main" data-target="prise-en-main"><span>1</span>Prise en main</a></li>
+    <li><a href="#tableau-de-bord" data-target="tableau-de-bord"><span>2</span>Tableau de bord</a></li>
+    <li><a href="#calendrier" data-target="calendrier"><span>3</span>Calendrier</a></li>
+    <li><a href="#organisation" data-target="organisation"><span>4</span>Présences et organisation</a></li>
+    <li><a href="#equipe" data-target="equipe"><span>5</span>Mon équipe</a></li>
+    <li><a href="#matchs-officiels" data-target="matchs-officiels"><span>6</span>Matchs officiels</a></li>
+    <li><a href="#vie-du-club" data-target="vie-du-club"><span>7</span>Vie du club</a></li>
+    <li><a href="#bilan" data-target="bilan"><span>8</span>Bilan de la saison</a></li>
+    <li><a href="#familles" data-target="familles"><span>9</span>Ce que voient les familles</a></li>
+  </ol>
+</nav>
+<a class="to-top" href="#sommaire" aria-label="Revenir au sommaire">
+  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <span>Sommaire</span>
+</a>
+<script>
+(function () {
+  if (document.readyState === "loading") { document.addEventListener("DOMContentLoaded", arguments.callee); return; }
+  var top = document.querySelector(".to-top");
+  var links = Array.prototype.slice.call(document.querySelectorAll(".side-toc a[data-target]"));
+  function onScroll() {
+    if (top) top.classList.toggle("show", window.scrollY > 600);
+  }
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+  if (!("IntersectionObserver" in window) || !links.length) return;
+  var byId = {};
+  links.forEach(function (a) { byId[a.getAttribute("data-target")] = a; });
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) { a.removeAttribute("aria-current"); });
+      var a = byId[e.target.id];
+      if (a) a.setAttribute("aria-current", "true");
+    });
+  }, { rootMargin: "-20% 0px -70% 0px" });
+  Object.keys(byId).forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) io.observe(el);
+  });
+})();
+</script>
+<main class="wrap">
+  <nav class="toc" id="sommaire" aria-label="Sommaire">
+    <a href="#prise-en-main"><b>Prise en main</b><small>Ton espace Coach, le menu</small></a>
+    <a href="#tableau-de-bord"><b>Tableau de bord</b><small>Ta semaine, tes pénalités, ta photo d'équipe</small></a>
+    <a href="#calendrier"><b>Calendrier</b><small>Créer, modifier, annuler tes événements</small></a>
+    <a href="#organisation"><b>Présences et organisation</b><small>Qui vient, covoiturage, bénévoles, officiels</small></a>
+    <a href="#equipe"><b>Mon équipe</b><small>Joueurs, coordonnées, changement d'équipe</small></a>
+    <a href="#matchs-officiels"><b>Matchs officiels</b><small>Championnat, lien FFBB</small></a>
+    <a href="#vie-du-club"><b>Vie du club</b><small>Documents, comptes rendus, inventaire</small></a>
+    <a href="#bilan"><b>Bilan de la saison</b><small>Assiduité, bénévolat des familles</small></a>
+    <a href="#familles"><b>Ce que voient les familles</b><small>Pour répondre aux parents</small></a>
+  </nav>
+
+  <section class="start" aria-label="Par où commencer">
+    <h2>Nouveau coach&nbsp;? Par où commencer</h2>
+    <ol class="steps">
+      <li><b>Se connecter</b> avec l'adresse email donnée au club, puis choisir l'espace <b>Coach</b> en haut de l'écran.</li>
+      <li><b>Regarder le Tableau de bord</b> : ta semaine d'un coup d'œil.</li>
+      <li><b>Vérifier ton équipe</b> (menu <b>Équipe</b>) : joueurs et coordonnées.</li>
+      <li><b>Ouvrir le Calendrier général</b> : tes entraînements et matchs, et les réponses des familles.</li>
+    </ol>
+    <div class="tip"><b>Rien ne se casse</b>Aucune donnée n'est effacée sans une confirmation. Un doute ou un bug : prévenir le Bureau.</div>
+  </section>
+
+  <section class="chapter" id="prise-en-main">
+    <div class="chapter-head"><span class="num">1</span><h2>Prise en main</h2></div>
+    
+    <p class="lead">L'appli s'ouvre dans un navigateur, sur téléphone comme sur ordinateur, à l'adresse <span class="path">ubac17-app.vercel.app</span>.</p>
+
+    <div class="task">
+      <div class="text">
+        <h3>Ton espace Coach</h3>
+        <p>En haut de l'écran, le bouton <b>Coach</b> ouvre ton espace : seulement les équipes que tu entraînes. Si tu as aussi un enfant licencié ou si tu joues, le bouton <b>Mon équipe</b> te montre l'appli comme la voit une famille.</p>
+        <p>Le menu (à gauche sur ordinateur, le rond jaune en haut à droite sur téléphone) contient :</p>
+        <ul class="plain">
+          <li><b>Tableau de bord</b>, <b>Calendrier général</b>, <b>Équipe</b> (ou <b>Équipes</b> si tu en entraînes plusieurs) ;</li>
+          <li><b>Bilan de la saison</b> : joueurs et bénévoles ;</li>
+          <li><b>Matchs officiels</b> : championnat et lien FFBB ;</li>
+          <li><b>Vie du club</b> : documents et inventaire ;</li>
+          <li><b>Déconnexion</b>, toujours en bas du menu.</li>
+        </ul>
+        <ul class="plain">
+          <li><b>La cloche</b> : tes notifications (nouveau besoin bénévole, match modifié…).</li>
+          <li><b>Ta photo</b> : un clic dessus pour la changer.</li>
+          <li><b>Le petit livre jaune</b> sous ton prénom : ce guide.</li>
+        </ul>
+      </div>
+      <div class="screen" aria-label="Exemple : sélecteur d'espaces">
+        <div class="cap">Exemple d'écran</div>
+        <div class="pills"><span class="pill on">Coach</span><span class="pill">Mon équipe</span></div>
+        <p class="note">Le bouton foncé indique l'espace affiché.</p>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="chapter" id="tableau-de-bord">
+    <div class="chapter-head"><span class="num">2</span><h2>Tableau de bord</h2></div>
+    <p class="where">Où : menu › <code>Tableau de bord</code></p>
+    <p class="lead">Ta page d'accueil : ce qui se passe cette semaine pour tes équipes.</p>
+
+    <div class="task">
+      <div class="text">
+        <h3>Ce qu'on y trouve</h3>
+        <ul class="plain">
+          <li><b>Ma semaine</b> : tes entraînements et matchs, jour par jour. Un point sous un jour = un événement, un chiffre = plusieurs ; les jours passés sont grisés. Un clic sur un jour affiche ses événements.</li>
+          <li><b>La photo de ton équipe</b> : tu peux l'ajouter ou la changer directement.</li>
+          <li><b>Les affiches à la une</b> du club, la <b>boutique en ligne</b> et les offres <b>Exclu sponsor</b>.</li>
+          <li><b>Calendrier UBAC dans ton agenda</b> : pour retrouver les événements dans l'agenda de ton téléphone (iPhone, Android, Google…).</li>
+        </ul>
+        <h3 style="margin-top:12px">Pénalités de mes joueurs</h3>
+        <p>La carte liste toutes les pénalités des joueurs de tes équipes : un résumé en haut (combien sont réglées, combien restent <b>à régler</b> et le montant), puis chaque joueur avec son étiquette <b>À régler</b>, <b>Payé par le joueur</b> ou <b>Payé par le club</b>, les pénalités à régler en premier. C'est le Bureau qui les crée et qui les marque payées.</p>
+      </div>
+      <div class="screen" aria-label="Exemple : pénalités de mes joueurs">
+        <div class="cap">Exemple : pénalités de mes joueurs</div>
+        <p style="font-size:12px;color:var(--ink-soft);margin-bottom:8px">2 pénalités · <b style="color:var(--green)">1 réglée</b> · <b style="color:var(--red)">1 à régler (45,00 €)</b></p>
+        <div class="tablet">
+          <div class="tr"><span>Hugo Bernard</span><span class="num">45 €</span><span><span class="chip c-amber">À régler</span></span></div>
+          <div class="tr"><span>Tom Roux</span><span class="num">30 €</span><span><span class="chip c-green">Payé</span></span></div>
+        </div>
+        <p class="note">Noms inventés.</p>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="chapter" id="calendrier">
+    <div class="chapter-head"><span class="num">3</span><h2>Calendrier</h2></div>
+    <p class="where">Où : menu › <code>Calendrier général</code></p>
+    <p class="lead">Les entraînements, matchs et événements de tes équipes, et ceux du club qui te concernent.</p>
+
+    <div class="task">
+      <div class="text">
+        <h3>Lire et filtrer</h3>
+        <ul class="plain">
+          <li><b>Liste</b> ou <b>Mois</b> : deux façons d'afficher.</li>
+          <li>Le bouton <b>Mes équipes / Tout le club</b> ajoute les matchs officiels de toutes les autres équipes du club, en consultation, pour aller encourager.</li>
+          <li><b>Filtrer par</b> : pour masquer certains types d'événements.</li>
+        </ul>
+        <h3 style="margin-top:12px">Créer un événement</h3>
+        <ol class="steps">
+          <li>Cliquer sur le petit bouton jaune <b>+ Créer</b>, à côté de Liste / Mois (un rond <b>+</b> sur téléphone).</li>
+          <li>Si tu entraînes plusieurs équipes, choisir l'équipe.</li>
+          <li>Choisir le <b>type</b> : entraînement, match officiel, match amical, tournoi / plateau, événement club.</li>
+          <li>Choisir le <b>lieu</b> : une de nos trois salles, ou <b>Autre lieu</b> pour taper l'adresse précise du gymnase (c'est elle qu'utilise le bouton Itinéraire).</li>
+          <li>Choisir la date et l'heure : des boutons proposent les <b>heures courantes</b> du club. Puis <b>Créer</b>.</li>
+        </ol>
+        <p>Dans <b>Options avancées</b> : <b>Répéter cet événement</b> (toutes les semaines, toutes les 2 semaines ou tous les mois, pratique pour les entraînements de la saison), <b>Événement payant</b>, et pour un entraînement <b>Ouvert à tout le club pour accompagner</b> (voir chapitre 4).</p>
+        <h3 style="margin-top:12px">Modifier ou annuler</h3>
+        <p>Sur la carte d'un événement de ton équipe, les petites icônes permettent de le <b>modifier</b>, de l'<b>annuler</b> (il reste visible, marqué « Annulé » avec son motif, et les familles reçoivent une notification) ou de le <b>supprimer</b>. Pour un événement répété, tu choisis de modifier cette séance seule ou celle-ci et les suivantes.</p>
+      </div>
+      <div class="screen" aria-label="Exemple : carte de match">
+        <div class="cap">Exemple : une carte de match</div>
+        <div class="ev">
+          <div class="row"><span class="team">U11X</span><span class="title">vs BC Exemple</span></div>
+          <div class="row"><span class="btn-mini">e-Marque</span><span class="btn-mini">Score</span><span class="btn-mini">Feuilles</span></div>
+          <div class="row"><span class="chip c-solid">Match officiel</span><span class="chip c-amber">Besoin non pourvu</span></div>
+          <div class="row meta"><span>sam. 28 nov. · 14h00</span><span>Arrivée 13h15</span></div>
+          <div class="row meta"><span>Salle de Châtelaillon</span><span class="btn-mini">Itinéraire</span><span class="chip c-navy">J-8</span></div>
+        </div>
+        <p class="note">Tu saisis le score de tes matchs. Le code e-Marque est saisi par le Bureau, tu le vois ensuite.</p>
+      </div>
+    </div>
+    <div class="task solo">
+      <div class="text">
+        <div class="tip"><b>Matchs FFBB</b>Tes matchs officiels arrivent tout seuls depuis la FFBB (chapitre 6). Pas besoin de les créer. Si un match apparaît en double (saisi à la main avant la FFBB), c'est la version FFBB qui fait foi : supprimer l'autre, ou demander au Bureau.</div>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="chapter" id="organisation">
+    <div class="chapter-head"><span class="num">4</span><h2>Présences et organisation</h2></div>
+    <p class="where">Où : sur la carte de chaque événement, dans le <code>Calendrier</code></p>
+    <p class="lead">Qui vient, qui conduit, qui aide : chaque réponse s'affiche en direct.</p>
+
+    <div class="task">
+      <div class="text">
+        <h3>Les présences</h3>
+        <ul class="plain">
+          <li>Les familles (ou les joueurs adultes) répondent <b>Présent</b> ou <b>Absent</b>.</li>
+          <li>La carte affiche le nombre de présents, d'absents et de réponses en attente ; un clic déroule les noms.</li>
+          <li>Tu peux <b>corriger la réponse d'un joueur</b> depuis cette liste (un parent qui t'a prévenu par message, par exemple).</li>
+          <li>Les familles qui n'ont pas répondu voient un rappel sur leur tableau de bord.</li>
+        </ul>
+        <h3 style="margin-top:12px">Le covoiturage</h3>
+        <p>Les parents qui conduisent cliquent sur <b>Proposer un trajet</b> avec leur nombre de places ; les autres <b>réservent</b>. Tu vois tout sur la carte.</p>
+      </div>
+      <div class="screen" aria-label="Exemple : présences">
+        <div class="cap">Exemple : bloc Organisation</div>
+        <div class="row" style="display:flex;gap:6px;flex-wrap:wrap">
+          <span class="chip c-green">8 présents</span><span class="chip c-amber">2 en attente</span><span class="chip c-navy">1 absent</span>
+        </div>
+        <div class="stack" style="margin-top:10px">
+          <div class="tariff"><span>Trajet de Claire Martin</span><b>2 places libres</b></div>
+        </div>
+      </div>
+    </div>
+    <div class="task">
+      <div class="text">
+        <h3>Les besoins en bénévoles</h3>
+        <ol class="steps">
+          <li>Sur la carte d'un match, d'un tournoi ou d'un événement club : <b>Ajouter un besoin</b>.</li>
+          <li>Choisir le besoin (Goûter / Encas, Buvette, Installation / Rangement, Lavage maillots) ou en écrire un autre, puis le <b>nombre de personnes</b>.</li>
+          <li>Les familles se proposent. Tu peux aussi <b>Choisir un membre</b>, ou <b>Écrire un nom</b> pour quelqu'un sans compte, et retirer un nom.</li>
+        </ol>
+        <p>Tant qu'un besoin n'est pas complet, la carte affiche <b>Besoin non pourvu</b>. Si le Bureau a activé les rappels, les familles de l'équipe reçoivent une notification (nouveau besoin, puis rappel à J-7 et J-3 s'il manque du monde).</p>
+        <h3 style="margin-top:12px">Les officiels des matchs à domicile</h3>
+        <p>Pour un match officiel à domicile, la carte liste <b>Arbitre 1</b>, <b>Arbitre 2</b>, <b>E-marque</b>, <b>Aide marqueur</b>, <b>Chronométreur</b>, <b>Délégué de club</b>, <b>Délégué Fair-play</b>. Les membres cliquent sur <b>Se proposer</b> ; tu peux aussi désigner quelqu'un.</p>
+      </div>
+      <div class="screen" aria-label="Exemple : besoins du match">
+        <div class="cap">Exemple : besoins du match</div>
+        <div class="stack">
+          <div class="tariff"><span>Goûter / Encas</span><b style="color:var(--green)">2 / 2</b></div>
+          <div class="tariff"><span>Lavage maillots</span><b style="color:var(--amber)">0 / 1</b></div>
+          <div class="tariff"><span>Chronométreur</span><span class="btn-mini">Se proposer</span></div>
+        </div>
+        <div class="row" style="display:flex;gap:6px;margin-top:8px"><span class="chip c-amber">Besoin non pourvu</span></div>
+      </div>
+    </div>
+    <div class="task solo">
+      <div class="text">
+        <h3>Besoin d'adultes à l'entraînement</h3>
+        <p>Seul avec beaucoup d'enfants ? En créant ou en modifiant un entraînement, coche <b>Ouvert à tout le club pour accompagner</b> (Options avancées). Un bandeau <b>Besoin accompagnant</b> apparaît alors sur le tableau de bord de <b>tout le club</b> : n'importe quel membre écrit son nom et clique sur <b>Je me propose</b>. Au bout de 3 personnes, le bandeau disparaît. Chacun peut retirer son propre nom avec la petite croix ; toi, tu peux retirer n'importe quel nom depuis la carte de l'entraînement.</p>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="chapter" id="equipe">
+    <div class="chapter-head"><span class="num">5</span><h2>Mon équipe</h2></div>
+    <p class="where">Où : menu › <code>Équipe</code> (ou <code>Équipes</code>)</p>
+    <p class="lead">Tes joueurs et tes co-coachs, avec leurs coordonnées.</p>
+
+    <div class="task">
+      <div class="text">
+        <ul class="plain">
+          <li>Les <b>Coachs</b> puis les <b>Joueurs</b>, avec téléphone et email : un clic pour appeler ou écrire.</li>
+          <li>Les <b>Prochains événements</b> de l'équipe.</li>
+          <li>Si tu entraînes plusieurs équipes, des boutons en haut permettent de passer de l'une à l'autre.</li>
+        </ul>
+        <h3 style="margin-top:12px">Ce que tu peux modifier</h3>
+        <ul class="plain">
+          <li><b>Les coordonnées</b> d'un de tes joueurs (téléphone, email…). Le reste de la fiche (identité, licence, santé, catégorie) est géré par le Bureau.</li>
+          <li><b>Changer un joueur d'équipe</b> : les deux flèches <b>Affecter à une autre équipe</b> sur sa ligne.</li>
+        </ul>
+        <div class="tip"><b>Joueur archivé</b>Un joueur qui a quitté le club apparaît en gris « Archivé · a quitté le club ». C'est le Bureau qui le retire de l'équipe.</div>
+      </div>
+      <div class="screen" aria-label="Exemple : carte d'équipe">
+        <div class="cap">Exemple : carte d'équipe</div>
+        <div class="stack">
+          <span style="font-family:var(--font-display);font-size:18px;font-weight:700;color:var(--navy)">U11X</span>
+          <div class="tariff"><span>Léa Martin</span><span class="btn-mini">⇄</span></div>
+          <div class="tariff"><span>Inès Petit</span><span class="btn-mini">⇄</span></div>
+        </div>
+        <p class="note">⇄ = affecter à une autre équipe. Noms inventés.</p>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="chapter" id="matchs-officiels">
+    <div class="chapter-head"><span class="num">6</span><h2>Matchs officiels</h2></div>
+    <p class="where">Où : menu › Matchs officiels › <code>Championnat</code>, <code>FFBB</code></p>
+    
+
+    <div class="task solo">
+      <div class="text">
+        <ul class="plain">
+          <li><b>Championnat</b> : les matchs officiels de tes équipes, à venir et joués, avec les scores et le classement. Les équipes d'une même catégorie (U13M-1 et U13M-2) y voient aussi les matchs l'une de l'autre.</li>
+          <li><b>FFBB</b> : le <b>lien FFBB</b> de chacune de tes équipes. C'est lui qui fait arriver les matchs dans l'appli : à mettre à jour si ton équipe change de poule (copier l'adresse de la page de l'équipe sur le site de la FFBB, puis <b>Enregistrer</b>). La synchronisation se fait toute seule chaque lundi.</li>
+          <li>Sur la carte d'un match, le bouton <b>Feuilles</b> ouvre le dossier des feuilles de match.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="chapter" id="vie-du-club">
+    <div class="chapter-head"><span class="num">7</span><h2>Vie du club</h2></div>
+    <p class="where">Où : menu › Vie du club › <code>Documents</code>, <code>Inventaire</code></p>
+    
+
+    <div class="task solo">
+      <div class="text">
+        <h3>Documents</h3>
+        <ul class="plain">
+          <li>La charte du joueur, la charte du parent, le règlement intérieur et les trombinoscopes.</li>
+          <li><b>Comptes rendus des coachs</b> : tu peux écrire les tiens (une réunion de coachs, un point d'équipe…) et lire ceux des autres coachs.</li>
+          <li>Tu peux aussi lire les comptes rendus du Bureau, des mairies, du CD17 et de la Ligue.</li>
+        </ul>
+        <h3 style="margin-top:12px">Inventaire</h3>
+        <p>La liste du matériel du club (nom et quantité), tenue par le Bureau et les coachs : tu peux ajouter ou corriger une ligne.</p>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="chapter" id="bilan">
+    <div class="chapter-head"><span class="num">8</span><h2>Bilan de la saison</h2></div>
+    <p class="where">Où : menu › Bilan de la saison › <code>Joueurs</code>, <code>Bénévoles</code></p>
+    
+
+    <div class="task">
+      <div class="text">
+        <ul class="plain">
+          <li><b>Joueurs</b> : l'assiduité de chacun de tes joueurs aux entraînements passés, avec une barre de couleur. On repère tout de suite qui vient rarement.</li>
+          <li><b>Bénévoles</b> : par famille, tout ce qui a été donné pendant la saison (covoiturage, besoins bénévoles, rôles d'officiel), avec un total.</li>
+        </ul>
+      </div>
+      <div class="screen" aria-label="Exemple : assiduité">
+        <div class="cap">Exemple : assiduité U11X</div>
+        <div class="stack">
+          <div><div style="display:flex;justify-content:space-between"><span>Léa Martin</span><b class="num">14/15</b></div><div style="height:6px;border-radius:4px;background:var(--surface-2)"><div style="width:93%;height:6px;border-radius:4px;background:var(--green)"></div></div></div>
+          <div><div style="display:flex;justify-content:space-between"><span>Tom Roux</span><b class="num">4/15</b></div><div style="height:6px;border-radius:4px;background:var(--surface-2)"><div style="width:27%;height:6px;border-radius:4px;background:var(--red)"></div></div></div>
+        </div>
+        <p class="note">Noms et chiffres inventés.</p>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="chapter" id="familles">
+    <div class="chapter-head"><span class="num">9</span><h2>Ce que voient les familles</h2></div>
+    
+    <p class="lead">Pour répondre aux questions des parents.</p>
+
+    <div class="task solo">
+      <div class="text">
+        <ul class="plain">
+          <li>Les familles voient le calendrier des équipes de leurs enfants, et peuvent ajouter les matchs officiels de tout le club avec le bouton <b>Tout le club</b>.</li>
+          <li>Elles répondent <b>Présent</b> ou <b>Absent</b> pour chacun de leurs enfants, proposent ou réservent un covoiturage et se proposent sur les besoins bénévoles.</li>
+          <li>Elles voient la composition de l'équipe, leur cotisation et leurs pénalités (avec un lien de paiement si le Bureau en a mis un).</li>
+          <li>Un joueur adulte fait tout ça pour lui-même.</li>
+          <li>Les enfants peuvent avoir leur propre <b>Espace Enfant</b>, en lecture seule, avec un code créé par leurs parents.</li>
+          <li>Les familles ne voient jamais les coordonnées ou les fiches des autres familles.</li>
+        </ul>
+        <div class="tip"><b>Une question que ce guide ne couvre pas ?</b>Le Bureau a un guide plus complet ; demande-lui.</div>
+      </div>
+    </div>
+  </section>
+
+
+  <footer>Guide des coachs de l'UBAC. Les écrans sont redessinés et les noms sont inventés. Version du 20 novembre 2026.</footer>
+</main>
