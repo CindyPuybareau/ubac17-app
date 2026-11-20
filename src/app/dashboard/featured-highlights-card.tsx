@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ChevronLeft, ChevronRight, Megaphone, X } from "lucide-react";
 import type { FeaturedHighlight } from "@/lib/featured-highlights";
 
@@ -21,15 +21,18 @@ import type { FeaturedHighlight } from "@/lib/featured-highlights";
 // [2,0]...), jamais de case vide ni d'affiche seule -- "fait tourner les
 // affiches existantes" plutôt que de buter sur un reliquat.
 const VISIBLE_COUNT = 2;
-
-// Retour de Cindy du 20/11 ("que le diapo bascule de lui-même à l'affiche
-// suivante quand 3 affiches en place") : dès qu'il y a des affiches à faire
-// tourner (3 ou plus, mêmes conditions que les flèches), la fenêtre avance
-// d'un cran toute seule. En pause tant que la souris est dessus / le doigt
-// pose, qu'une affiche est agrandie, que l'onglet n'est pas affiché, ou si
-// l'appareil demande moins d'animations. Un clic sur une flèche relance
-// le compte à rebours (pas de double saut juste après).
-const AUTO_ADVANCE_MS = 5000;
+//
+// Retour de Cindy du 20/11 ("je ne veux plus voir la première affiche,
+// sauf si je décide de cliquer sur la flèche de gauche ; à chaque ajout
+// d'affiche, une disparaît à gauche") : plus de rotation en boucle. Les
+// affiches sont rangées de la plus ancienne à la plus récente (sort_order,
+// une nouvelle affiche prend toujours le rang suivant -- voir
+// featured-highlights-manager.tsx) ; on montre par défaut les 2 DERNIÈRES,
+// la plus récente à droite. Flèche gauche = remonter vers les plus
+// anciennes, flèche droite = revenir vers les récentes ; chaque flèche
+// n'apparaît que s'il y a quelque chose de ce côté. La position est
+// comptée depuis la fin : une nouvelle affiche ajoutée s'affiche donc
+// tout de suite à droite, l'ancienne sort par la gauche.
 
 export default function FeaturedHighlightsCard({
   highlights,
@@ -41,38 +44,23 @@ export default function FeaturedHighlightsCard({
   // voir admin-view.tsx/coach-view.tsx/family-view.tsx/child-dashboard.tsx.
   calendarSectionKey: string;
 }) {
-  const [start, setStart] = useState(0);
-  const [hovered, setHovered] = useState(false);
-  const [enlargedCount, setEnlargedCount] = useState(0);
-
-  const autoAdvance = highlights.length > VISIBLE_COUNT && !hovered && enlargedCount === 0;
-  useEffect(() => {
-    if (!autoAdvance) return;
-    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
-    const timer = window.setTimeout(() => {
-      if (document.visibilityState !== "visible") return;
-      setStart((prev) => (prev + 1) % highlights.length);
-    }, AUTO_ADVANCE_MS);
-    return () => window.clearTimeout(timer);
-    // start : chaque cran (auto ou flèche) relance un compte à rebours complet.
-  }, [autoAdvance, start, highlights.length]);
+  // 0 = les plus récentes ; 1 = un cran vers les plus anciennes, etc.
+  const [stepsBack, setStepsBack] = useState(0);
 
   if (highlights.length === 0) return null;
 
   const total = highlights.length;
   const visibleCount = Math.min(VISIBLE_COUNT, total);
-  // Flèches seulement s'il reste au moins une affiche à découvrir par
-  // rotation -- avec 1 ou 2 affiches au total, tout est déjà visible en
-  // permanence, rien à faire tourner.
-  const canRotate = total > visibleCount;
-  const safeStart = start % total;
-  const visible = Array.from(
-    { length: visibleCount },
-    (_, i) => highlights[(safeStart + i) % total]
-  );
+  const maxStepsBack = total - visibleCount;
+  const safeStepsBack = Math.min(stepsBack, maxStepsBack);
+  const start = maxStepsBack - safeStepsBack;
+  const visible = highlights.slice(start, start + visibleCount);
+  const canGoOlder = safeStepsBack < maxStepsBack;
+  const canGoNewer = safeStepsBack > 0;
 
   function go(delta: number) {
-    setStart((prev) => (prev + delta + total) % total);
+    // delta -1 = flèche gauche (plus ancienne), +1 = flèche droite.
+    setStepsBack((prev) => Math.max(0, Math.min(maxStepsBack, Math.min(prev, maxStepsBack) - delta)));
   }
 
   // Retour de Cindy du 10/11 ("meme taille que les KPI... le diaporama
@@ -104,16 +92,12 @@ export default function FeaturedHighlightsCard({
   // sur téléphone, 2 ou 5 colonnes KPI sur tablette/PC), jamais besoin
   // de connaître cette largeur à l'avance.
   return (
-    <div
-      className="relative w-full"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      {canRotate && (
+    <div className="relative w-full">
+      {canGoOlder && (
         <button
           type="button"
           onClick={() => go(-1)}
-          aria-label="Affiches précédentes"
+          aria-label="Affiches plus anciennes"
           className="absolute left-2 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-navy shadow-md backdrop-blur-sm transition-colors hover:bg-white"
         >
           <ChevronLeft className="h-4 w-4" />
@@ -130,15 +114,14 @@ export default function FeaturedHighlightsCard({
             key={`${h.id}:${i}`}
             highlight={h}
             calendarSectionKey={calendarSectionKey}
-            onEnlargedChange={(open) => setEnlargedCount((n) => Math.max(0, n + (open ? 1 : -1)))}
           />
         ))}
       </div>
-      {canRotate && (
+      {canGoNewer && (
         <button
           type="button"
           onClick={() => go(1)}
-          aria-label="Affiches suivantes"
+          aria-label="Affiches plus récentes"
           className="absolute right-2 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-navy shadow-md backdrop-blur-sm transition-colors hover:bg-white"
         >
           <ChevronRight className="h-4 w-4" />
@@ -164,20 +147,11 @@ export default function FeaturedHighlightsCard({
 function SingleHighlightCard({
   highlight,
   calendarSectionKey,
-  onEnlargedChange,
 }: {
   highlight: FeaturedHighlight;
   calendarSectionKey: string;
-  // Défilement automatique en pause pendant qu'une affiche est agrandie
-  // (sinon la carte changerait de place et l'agrandissement se fermerait).
-  onEnlargedChange?: (open: boolean) => void;
 }) {
-  const [lightboxOpen, setLightboxOpenState] = useState(false);
-  function setLightboxOpen(open: boolean) {
-    if (open === lightboxOpen) return;
-    setLightboxOpenState(open);
-    onEnlargedChange?.(open);
-  }
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   // Jour de l'événement à l'heure de Paris (une soirée à 23 h UTC tombe
   // déjà le lendemain en France) -- ?day= ouvre ce jour précis dans le
