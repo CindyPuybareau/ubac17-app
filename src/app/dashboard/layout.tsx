@@ -4,6 +4,7 @@ import { logQueryErrors } from "@/lib/query-errors";
 import { formatFirstName } from "@/lib/names";
 import NotificationBell from "./notification-bell";
 import OrgChartButton from "./org-chart-button";
+import GuideButton from "./guide-button";
 import AvatarUpload from "./avatar-upload";
 import { MobileNavProvider } from "./mobile-nav-context";
 import { SectionNavProvider } from "./section-nav-context";
@@ -159,6 +160,8 @@ export default async function DashboardLayout({
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
+                    {/* Guide du Bureau (retour de Cindy du 20/11) : Bureau seulement. */}
+                    {adminResult.data && <GuideButton />}
                     <OrgChartButton />
                     <NotificationBell />
                     <MobileMenuButton />
