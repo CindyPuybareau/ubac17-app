@@ -3,7 +3,7 @@
 import { useState, useSyncExternalStore } from "react";
 import { HeartHandshake, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { volunteerAsGuest } from "./event-volunteer-needs";
+import { volunteerAsGuest, withdrawOwnGuestSignup } from "./event-volunteer-needs";
 import { formatEventTime, styleFor } from "./event-style";
 import SalleBadge from "./salle-badge";
 import { useSectionNav } from "./section-nav-context";
@@ -83,32 +83,60 @@ export type ClubHelperEvent = {
   endTime: string | null;
   salle: string | null;
   location: string | null;
-  signupNames: string[];
+  // mine : inscription faite depuis ce compte (retour de Cindy du 20/11) --
+  // seule celle-ci porte une croix pour se retirer.
+  signups: { id: string; name: string; mine: boolean }[];
 };
 
 function ClubHelperCard({ event, onDismiss }: { event: ClubHelperEvent; onDismiss: () => void }) {
-  const [names, setNames] = useState(event.signupNames);
+  const [signups, setSignups] = useState(event.signups);
+  // Rafraîchissement venu du serveur (temps réel, autre compte) : on repart
+  // de la liste à jour, sans perdre l'affichage immédiat d'un envoi en cours.
+  const [syncedFrom, setSyncedFrom] = useState(event.signups);
+  if (syncedFrom !== event.signups) {
+    setSyncedFrom(event.signups);
+    setSignups(event.signups);
+  }
   const [fullName, setFullName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [thanks, setThanks] = useState(false);
+  const [confirmWithdrawId, setConfirmWithdrawId] = useState<string | null>(null);
+  const [withdrawing, setWithdrawing] = useState(false);
 
   async function submit() {
     const trimmed = fullName.trim();
-    if (!trimmed) return;
+    if (!trimmed || submitting) return;
     setSubmitting(true);
     setError(null);
+    setThanks(false);
     const supabase = createClient();
-    const { error: writeError } = await volunteerAsGuest(supabase, event.needId, trimmed);
+    const { id, error: writeError } = await volunteerAsGuest(supabase, event.needId, trimmed);
     setSubmitting(false);
     if (writeError) {
       setError(writeError);
       return;
     }
-    // Affichage optimiste (même principe que RsvpButtons) -- le temps réel
-    // (realtime-sync.tsx, event_volunteer_signups) corrige silencieusement
-    // si besoin au prochain rafraîchissement chez ce même compte.
-    setNames((prev) => [...prev, trimmed]);
+    // Retour de Cindy du 20/11 ("le délai avant l'apparition du prénom a
+    // été long, il a fallu rafraîchir") : le nom s'affiche tout de suite,
+    // avec un mot de confirmation -- le temps réel met à jour les autres.
+    setSignups((prev) => [...prev, { id: id ?? `local-${Date.now()}`, name: trimmed, mine: Boolean(id) }]);
     setFullName("");
+    setThanks(true);
+  }
+
+  async function withdraw(signupId: string) {
+    setWithdrawing(true);
+    setError(null);
+    const { error: deleteError } = await withdrawOwnGuestSignup(createClient(), signupId);
+    setWithdrawing(false);
+    setConfirmWithdrawId(null);
+    if (deleteError) {
+      setError(deleteError);
+      return;
+    }
+    setThanks(false);
+    setSignups((prev) => prev.filter((s) => s.id !== signupId));
   }
 
   const style = styleFor(event.eventType);
@@ -150,10 +178,51 @@ function ClubHelperCard({ event, onDismiss }: { event: ClubHelperEvent; onDismis
         )}
       </div>
 
-      {names.length > 0 && (
-        <p className="text-xs text-zinc-600">
-          Déjà proposé{names.length > 1 ? "s" : ""} : {names.join(", ")}
-        </p>
+      {signups.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 text-xs text-zinc-600">
+          <span>Déjà proposé{signups.length > 1 ? "s" : ""} :</span>
+          {signups.map((s) =>
+            s.mine ? (
+              <span key={s.id} className="flex items-center gap-1 rounded-full bg-amber-100 py-0.5 pl-2 pr-1 font-semibold text-amber-900">
+                {s.name}
+                {confirmWithdrawId === s.id ? (
+                  <span className="flex items-center gap-1 pl-1 font-normal">
+                    Te retirer ?
+                    <button
+                      type="button"
+                      disabled={withdrawing}
+                      onClick={() => withdraw(s.id)}
+                      className="rounded-full bg-amber-700 px-1.5 py-0.5 font-semibold text-white disabled:opacity-60"
+                    >
+                      {withdrawing ? "…" : "Oui"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmWithdrawId(null)}
+                      className="rounded-full bg-white px-1.5 py-0.5 font-semibold text-zinc-600"
+                    >
+                      Non
+                    </button>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmWithdrawId(s.id)}
+                    aria-label={`Retirer ${s.name}`}
+                    title="Me retirer"
+                    className="flex h-4 w-4 items-center justify-center rounded-full text-amber-800 hover:bg-amber-200"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </span>
+            ) : (
+              <span key={s.id} className="rounded-full bg-zinc-100 px-2 py-0.5">
+                {s.name}
+              </span>
+            )
+          )}
+        </div>
       )}
 
       <div className="flex flex-wrap items-center gap-2">
@@ -165,6 +234,10 @@ function ClubHelperCard({ event, onDismiss }: { event: ClubHelperEvent; onDismis
           type="text"
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") submit();
+          }}
+          disabled={submitting}
           placeholder="Prénom Nom"
           className="min-w-0 flex-1 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs"
         />
@@ -174,10 +247,11 @@ function ClubHelperCard({ event, onDismiss }: { event: ClubHelperEvent; onDismis
           onClick={submit}
           className="flex shrink-0 items-center gap-1.5 rounded-full bg-amber-600 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-700 disabled:opacity-60"
         >
-          Je me propose
+          {submitting ? "Envoi…" : "Je me propose"}
         </button>
       </div>
-      {error && <p className="text-[11px] text-red-600">Inscription non enregistrée : {error}</p>}
+      {thanks && <p className="text-[11px] font-semibold text-green-700">Merci, c&apos;est noté ! Une croix à côté du nom permet de se retirer.</p>}
+      {error && <p className="text-[11px] text-red-600">Action non enregistrée : {error}</p>}
     </div>
   );
 }

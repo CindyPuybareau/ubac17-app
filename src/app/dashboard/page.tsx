@@ -5835,7 +5835,7 @@ export default async function DashboardPage({
         endTime: e.end_time,
         salle: e.salle,
         location: e.location,
-        signupNames: need.signups.map((s) => s.playerName),
+        signups: need.signups.map((s) => ({ id: s.id, name: s.playerName, mine: s.createdBy === user.id })),
       };
     })
     .filter((e): e is ClubHelperEvent => e !== null);

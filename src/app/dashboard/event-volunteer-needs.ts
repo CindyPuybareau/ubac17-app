@@ -175,6 +175,10 @@ export type VolunteerSignup = {
   // seul nom affiché dans ce composant avant l'ajout des bénévoles/invités.
   playerName: string;
   source: VolunteerSignupSource;
+  // Compte qui a fait l'inscription (retour de Cindy du 20/11) : permet à
+  // la personne de retirer elle-même un nom qu'elle a écrit. Null pour les
+  // inscriptions antérieures au 20/11.
+  createdBy: string | null;
 };
 
 export type VolunteerNeed = {
@@ -199,13 +203,33 @@ export async function volunteerAsGuest(
   supabase: SupabaseClient,
   needId: string,
   fullName: string
+): Promise<{ id: string | null; error: string | null }> {
+  const { data, error } = await supabase
+    .from("event_volunteer_signups")
+    .insert({
+      need_id: needId,
+      guest_name: fullName,
+      source: "VOLUNTEER",
+    })
+    .select("id")
+    .single();
+  return { id: (data?.id as string | undefined) ?? null, error: error?.message ?? null };
+}
+
+// Se retirer soi-même (retour de Cindy du 20/11) : la policy "self delete
+// own volunteer signup" n'autorise que l'auteur de l'inscription.
+export async function withdrawOwnGuestSignup(
+  supabase: SupabaseClient,
+  signupId: string
 ): Promise<{ error: string | null }> {
-  const { error } = await supabase.from("event_volunteer_signups").insert({
-    need_id: needId,
-    guest_name: fullName,
-    source: "VOLUNTEER",
-  });
-  return { error: error?.message ?? null };
+  const { data, error } = await supabase
+    .from("event_volunteer_signups")
+    .delete()
+    .eq("id", signupId)
+    .select("id");
+  if (error) return { error: error.message };
+  if (!data || data.length === 0) return { error: "Retrait impossible : seule la personne qui a écrit ce nom peut le retirer." };
+  return { error: null };
 }
 
 export async function getVolunteerNeedsByEventId(
@@ -274,7 +298,7 @@ export async function getVolunteerNeedsByEventId(
       (chunk) =>
         supabase
           .from("event_volunteer_signups")
-          .select("id, need_id, player_id, benevole_id, guest_name, source")
+          .select("id, need_id, player_id, benevole_id, guest_name, source, created_by")
           .in("need_id", chunk),
       dbLimit ?? 4
     );
@@ -356,6 +380,7 @@ export async function getVolunteerNeedsByEventId(
           guestName ??
           "Bénévole",
         source: (row.source as VolunteerSignupSource | null) ?? "VOLUNTEER",
+        createdBy: (row.created_by as string | null) ?? null,
       });
       signupsByNeedId.set(needId, list);
     });
