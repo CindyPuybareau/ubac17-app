@@ -1,16 +1,22 @@
-import { BookOpen } from "lucide-react";
+"use client";
 
-// Guide du Bureau (retour de Cindy du 20/11) : petit livre dans un rond
-// jaune un peu transparent, sous le prénom dans la bande bleue de l'en-tête,
-// seulement pour le Bureau (voir layout.tsx). Même présentation sur tous les
-// écrans ("sur grand écran aussi un rond jaune comme sur téléphone") ; à
-// droite à côté de l'organigramme, il mangeait le prénom sur téléphone.
-// Ouvert dans la même page (retour de Cindy du 21/11 : dans l'appli
-// installée sur téléphone, un nouvel onglet n'avait aucun bouton retour) --
-// le guide porte son propre bouton "Retour à l'appli" (src/lib/guide-page.ts).
-// Bureau : guide du Bureau ; coach (hors Bureau) : guide des coachs (retour
-// de Cindy du 20/11).
-export default function GuideButton({ audience = "bureau" }: { audience?: "bureau" | "coach" }) {
+import { BookOpen } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+
+// Petit livre jaune sous le prénom (retours de Cindy du 20-21/11) : ouvre le
+// guide qui correspond à l'espace affiché -- guide des coachs dans l'espace
+// Coach (même pour un membre du Bureau qui coache aussi, "Basile côté coach
+// voit le manuel Bureau ?"), guide du Bureau ailleurs pour le Bureau, guide
+// des coachs pour un coach qui n'est pas au Bureau. Rien pour les autres.
+// Même présentation sur tous les écrans (rond jaune un peu transparent sous
+// le prénom). Ouvert dans la même page (dans l'appli installée sur
+// téléphone, un nouvel onglet n'avait aucun bouton retour) -- le guide porte
+// son propre bouton "Retour à l'appli" (src/lib/guide-page.ts).
+export default function GuideButton({ isAdmin, isCoach }: { isAdmin: boolean; isCoach: boolean }) {
+  const tab = useSearchParams().get("tab");
+  const audience: "bureau" | "coach" | null =
+    tab === "coach" && isCoach ? "coach" : isAdmin ? "bureau" : isCoach ? "coach" : null;
+  if (!audience) return null;
   const href = audience === "coach" ? "/guide-coach" : "/guide-bureau";
   const label = audience === "coach" ? "Guide des coachs" : "Guide du Bureau";
   return (

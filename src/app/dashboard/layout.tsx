@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { logQueryErrors } from "@/lib/query-errors";
@@ -164,7 +165,9 @@ export default async function DashboardLayout({
                       {/* Guide du Bureau (retour de Cindy du 20/11) : Bureau
                           seulement, sous le prénom sur tous les écrans (à
                           droite, l'icône mangeait le prénom sur téléphone). */}
-                      {adminResult.data ? <GuideButton /> : isCoach ? <GuideButton audience="coach" /> : null}
+                      <Suspense fallback={null}>
+                        <GuideButton isAdmin={Boolean(adminResult.data)} isCoach={isCoach} />
+                      </Suspense>
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
