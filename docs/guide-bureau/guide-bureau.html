@@ -306,7 +306,7 @@ section.chapter, #sommaire { scroll-margin-top: 16px; }
     <a href="#calendrier"><b>Calendrier</b><small>Créer, filtrer, lire une carte de match</small></a>
     <a href="#cotisations"><b>Cotisations &amp; Licences</b><small>Tarifs, import, règlements, relances</small></a>
     <a href="#membres"><b>Membres</b><small>Fiches, ajout, archivage, comptes à rattacher</small></a>
-    <a href="#equipes"><b>Équipes</b><small>Coachs, joueurs, changement d'équipe</small></a>
+    <a href="#equipes"><b>Équipes</b><small>Coachs, joueurs, prêt de joueur, brûlés</small></a>
     <a href="#organisation"><b>Organisation</b><small>Présences, covoiturage, bénévoles, officiels</small></a>
     <a href="#tableau-de-bord"><b>Tableau de bord</b><small>Chiffres clés, affiches, rappels automatiques</small></a>
     <a href="#paiements"><b>Autres paiements</b><small>Événements payants, pénalités, buvette</small></a>
@@ -710,11 +710,30 @@ section.chapter, #sommaire { scroll-margin-top: 16px; }
           <li>Les <b>Prochains événements</b> de l'équipe en bas de la carte.</li>
           <li><b>Toutes les équipes</b> : pour n'afficher que certaines cartes.</li>
         </ul>
-        <h3 style="margin-top:12px">Changer un joueur d'équipe</h3>
+        <h3 style="margin-top:12px">Prêter un joueur à une autre équipe</h3>
         <ol class="steps">
           <li>Sur la ligne du joueur, cliquer sur les deux flèches <b>Affecter à une autre équipe</b>.</li>
-          <li>Choisir la nouvelle équipe, puis valider.</li>
+          <li>Choisir l'équipe (seulement une équipe de la même catégorie, par exemple U13M-1 vers U13M-2), puis valider.</li>
         </ol>
+        <p>Le joueur est <b>ajouté</b> à cette équipe et <b>reste dans la sienne</b> : c'est un prêt, pas un changement.</p>
+        <h3 style="margin-top:12px">Changer vraiment un joueur d'équipe</h3>
+        <ul class="plain">
+          <li>Dans sa fiche (menu Membres), onglet <b>Licence &amp; Équipe</b> : changer le champ <b>Équipe</b>.</li>
+          <li>Pour plusieurs joueurs d'un coup : menu Membres › <b>Sélectionner</b> › <b>Affecter à une équipe</b>, en cochant <b>Retirer aussi de leur(s) équipe(s) actuelle(s)</b>.</li>
+        </ul>
+        <h3 style="margin-top:12px">Noter un joueur brûlé</h3>
+        <p>Règle FFBB : un joueur parmi les meilleurs de l'équipe 1 d'une catégorie ne peut pas jouer en équipe 2.</p>
+        <ol class="steps">
+          <li>Dans Équipes (ou Membres), cliquer sur le <b>nom du joueur</b> pour ouvrir sa fiche, onglet <b>Licence &amp; Équipe</b>.</li>
+          <li>Cocher la case <b>« Brûlé sur U13M-1 — ne pourra jamais rejoindre U13M-2 »</b> (le nom des équipes s'adapte), puis enregistrer.</li>
+        </ol>
+        <ul class="plain">
+          <li>La case n'apparaît que pour un joueur de l'<b>équipe 1</b> d'une catégorie qui a deux équipes : il n'y a jamais de brûlé en équipe 2.</li>
+          <li>Une <b>petite flamme orange</b> s'affiche ensuite à côté de son nom, partout dans l'appli (Bureau, coachs, familles, Espace Enfant).</li>
+          <li>L'appli l'empêche alors d'être ajouté à l'équipe 2. Pour lever le statut, décocher la case.</li>
+          <li>Le Bureau et le coach de l'équipe peuvent cocher ou décocher la case.</li>
+        </ul>
+
         <div class="tip"><b>Membre archivé</b>Un joueur archivé encore présent sur une carte apparaît en gris avec « Archivé · a quitté le club ». L'icône rouge de suppression le retire de l'équipe.</div>
       </div>
       <div class="screen" aria-label="Exemple : carte d'équipe">
@@ -1059,9 +1078,10 @@ section.chapter, #sommaire { scroll-margin-top: 16px; }
             <tr class="grp"><th colspan="6" scope="colgroup">Membres et équipes</th></tr>
             <tr><th scope="row">Liste des membres et fiches</th><td class="cell m"><span class="mk">Modifie</span><small>tout</small></td><td class="cell m"><span class="mk">Modifie</span><small>coordonnées de ses joueurs</small></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td></tr>
             <tr><th scope="row">Archiver, réactiver, supprimer un membre</th><td class="cell m"><span class="mk">Modifie</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td></tr>
-            <tr><th scope="row">Composition des équipes</th><td class="cell m"><span class="mk">Modifie</span></td><td class="cell m"><span class="mk">Modifie</span><small>change un joueur d'équipe</small></td><td class="cell v"><span class="mk">Voit</span><small>son équipe</small></td><td class="cell v"><span class="mk">Voit</span><small>équipes de ses enfants</small></td><td class="cell v"><span class="mk">Voit</span><small>son équipe</small></td></tr>
+            <tr><th scope="row">Composition des équipes</th><td class="cell m"><span class="mk">Modifie</span></td><td class="cell m"><span class="mk">Modifie</span><small>prête un joueur à une équipe de sa catégorie</small></td><td class="cell v"><span class="mk">Voit</span><small>son équipe</small></td><td class="cell v"><span class="mk">Voit</span><small>équipes de ses enfants</small></td><td class="cell v"><span class="mk">Voit</span><small>son équipe</small></td></tr>
             <tr><th scope="row">Photo d'équipe</th><td class="cell m"><span class="mk">Modifie</span></td><td class="cell m"><span class="mk">Modifie</span><small>ses équipes</small></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td></tr>
             <tr><th scope="row">Sa propre photo de profil</th><td class="cell m"><span class="mk">Modifie</span></td><td class="cell m"><span class="mk">Modifie</span></td><td class="cell m"><span class="mk">Modifie</span></td><td class="cell m"><span class="mk">Modifie</span></td><td class="cell m"><span class="mk">Modifie</span></td></tr>
+            <tr><th scope="row">Joueur brûlé (case)</th><td class="cell m"><span class="mk">Modifie</span></td><td class="cell m"><span class="mk">Modifie</span><small>ses joueurs</small></td><td class="cell v"><span class="mk">Voit</span><small>la flamme</small></td><td class="cell v"><span class="mk">Voit</span><small>la flamme</small></td><td class="cell v"><span class="mk">Voit</span><small>la flamme</small></td></tr>
             <tr><th scope="row">Accès Espace Enfant (code)</th><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell m"><span class="mk">Modifie</span><small>pour ses enfants</small></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td></tr>
             <tr class="grp"><th colspan="6" scope="colgroup">Paiements</th></tr>
             <tr><th scope="row">Cotisations</th><td class="cell m"><span class="mk">Modifie</span><small>toutes</small></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td><td class="cell v"><span class="mk">Voit</span><small>la sienne</small></td><td class="cell v"><span class="mk">Voit</span><small>celles de ses enfants</small></td><td class="cell n"><span class="mk" aria-label="Ne voit pas">—</span></td></tr>
