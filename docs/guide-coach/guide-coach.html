@@ -98,8 +98,8 @@ ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 66
   padding: 12px 16px; max-width: 68ch; font-size: 15px;
 }
 .tip.warn { border-left-color: var(--amber); }
-.tip b:first-child { display: block; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--green); margin-bottom: 2px; }
-.tip.warn b:first-child { color: var(--amber); }
+.tip > b:first-child { display: block; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--green); margin-bottom: 2px; }
+.tip.warn > b:first-child { color: var(--amber); }
 
 /* Écrans d'exemple (redessinés, noms inventés) */
 .screen {
@@ -216,6 +216,9 @@ section.chapter, #sommaire { scroll-margin-top: 16px; }
 .to-top svg { color: #f4c430; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .to-top { transition: none; } }
 @media print { .side-toc, .to-top { display: none !important; } }
+.tip.ex { border-left-color: #f4c430; }
+.tip.ex > b:first-child { color: #9a7b12; }
+.tip.ex ol { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 4px; }
 .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 12px; font-size: 14px; color: var(--ink-soft); }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .legend .mk { font-size: 11px; font-weight: 700; text-transform: uppercase; border-radius: 999px; padding: 2px 9px; }
@@ -400,8 +403,14 @@ section.chapter, #sommaire { scroll-margin-top: 16px; }
           <li>Choisir la date et l'heure : des boutons proposent les <b>heures courantes</b> du club. Puis <b>Créer</b>.</li>
         </ol>
         <p>Dans <b>Options avancées</b> : <b>Répéter cet événement</b> (toutes les semaines, toutes les 2 semaines ou tous les mois, pratique pour les entraînements de la saison), <b>Événement payant</b>, et pour un entraînement <b>Ouvert à tout le club pour accompagner</b> (voir chapitre 4).</p>
+        <div class="tip ex"><b>Exemple · les entraînements de toute la saison en une fois</b>Tes U11X s'entraînent tous les mercredis de 18h30 à 20h à Châtelaillon.<ol>
+<li><b>+ Créer</b> › type <b>Entraînement</b> › lieu <b>Salle de Châtelaillon</b>.</li>
+<li>Début : mercredi prochain, bouton <b>18h30</b> ; fin : <b>20:00</b>.</li>
+<li><b>Options avancées</b> › cocher <b>Répéter cet événement</b> › <b>Toutes les semaines</b> › <b>Jusqu'à la fin de la saison</b>.</li>
+<li><b>Créer</b> : tous les mercredis apparaissent d'un coup dans le calendrier, et chaque famille peut répondre séance par séance.</li></ol></div>
         <h3 style="margin-top:12px">Modifier ou annuler</h3>
         <p>Sur la carte d'un événement de ton équipe, les petites icônes permettent de le <b>modifier</b>, de l'<b>annuler</b> (il reste visible, marqué « Annulé » avec son motif, et les familles reçoivent une notification) ou de le <b>supprimer</b>. Pour un événement répété, tu choisis de modifier cette séance seule ou celle-ci et les suivantes.</p>
+        <div class="tip ex"><b>Exemple · le gymnase est fermé ce soir</b>Sur la carte de l'entraînement, clique sur l'icône <b>Annuler</b>, écris le motif (« Gymnase fermé », il est obligatoire) et valide. La séance reste dans le calendrier marquée « Annulé » avec le motif, et les familles reçoivent une notification : pas besoin d'envoyer un message à chacune. Si finalement l'entraînement a lieu, un clic le rouvre.</div>
       </div>
       <div class="screen" aria-label="Exemple : carte de match">
         <div class="cap">Exemple : une carte de match</div>
@@ -437,6 +446,7 @@ section.chapter, #sommaire { scroll-margin-top: 16px; }
           <li>Tu peux <b>corriger la réponse d'un joueur</b> : voir l'exemple juste en dessous.</li>
           <li>Les familles qui n'ont pas répondu voient un rappel sur leur tableau de bord.</li>
         </ul>
+        <div class="tip ex"><b>Exemple · pourquoi Tom est absent ?</b>Clique sur la pastille <b>« 1 absent »</b> de la carte : si sa famille a donné une raison (« malade », « sortie scolaire »…), un petit <b>i</b> apparaît à côté de son nom. Un clic dessus affiche le motif. Seuls toi, le Bureau et sa famille le voient.</div>
         <h3 style="margin-top:12px">Le covoiturage</h3>
         <p>Les parents qui conduisent cliquent sur <b>Proposer un trajet</b> avec leur nombre de places ; les autres <b>réservent</b>. Tu vois tout sur la carte.</p>
       </div>
@@ -483,6 +493,7 @@ section.chapter, #sommaire { scroll-margin-top: 16px; }
           <li>Les familles se proposent. Tu peux aussi <b>Choisir un membre</b>, ou <b>Écrire un nom</b> pour quelqu'un sans compte, et retirer un nom.</li>
         </ol>
         <p>Tant qu'un besoin n'est pas complet, la carte affiche <b>Besoin non pourvu</b>. Si le Bureau a activé les rappels, les familles de l'équipe reçoivent une notification (nouveau besoin, puis rappel à J-7 et J-3 s'il manque du monde).</p>
+        <div class="tip ex"><b>Exemple · deux goûters pour le plateau de samedi</b>Sur la carte du plateau : <b>Ajouter un besoin</b> › <b>Goûter / Encas</b> › <b>2</b> personnes › valider. L'étiquette « Besoin non pourvu » s'affiche ; les familles se proposent depuis leur espace. Quand deux parents se sont inscrits, l'étiquette disparaît toute seule. Un parent t'a dit oui de vive voix ? <b>Choisir un membre</b> et l'inscrire toi-même.</div>
         <h3 style="margin-top:12px">Les officiels des matchs à domicile</h3>
         <p>Pour un match officiel à domicile, la carte liste <b>Arbitre 1</b>, <b>Arbitre 2</b>, <b>E-marque</b>, <b>Aide marqueur</b>, <b>Chronométreur</b>, <b>Délégué de club</b>, <b>Délégué Fair-play</b>. Les membres cliquent sur <b>Se proposer</b> ; tu peux aussi désigner quelqu'un.</p>
       </div>
@@ -500,6 +511,7 @@ section.chapter, #sommaire { scroll-margin-top: 16px; }
       <div class="text">
         <h3>Besoin d'adultes à l'entraînement</h3>
         <p>Seul avec beaucoup d'enfants ? En créant ou en modifiant un entraînement, coche <b>Ouvert à tout le club pour accompagner</b> (Options avancées). Un bandeau <b>Besoin accompagnant</b> apparaît alors sur le tableau de bord de <b>tout le club</b> : n'importe quel membre écrit son nom et clique sur <b>Je me propose</b>. Au bout de 3 personnes, le bandeau disparaît. Chacun peut retirer son propre nom avec la petite croix ; toi, tu peux retirer n'importe quel nom depuis la carte de l'entraînement.</p>
+        <div class="tip ex"><b>Exemple · seul avec 20 enfants samedi matin</b>Ouvre l'entraînement de samedi › <b>modifier</b> › <b>Options avancées</b> › coche <b>Ouvert à tout le club pour accompagner</b> › enregistrer. Le bandeau « Besoin accompagnant » apparaît chez tout le monde ; dès que 3 adultes se sont proposés, il disparaît et leurs noms sont sur la carte de l'entraînement.</div>
       </div>
     </div>
   </section>
@@ -522,6 +534,7 @@ section.chapter, #sommaire { scroll-margin-top: 16px; }
           <li><b>Les coordonnées</b> d'un de tes joueurs (téléphone, email…). Le reste de la fiche (identité, licence, santé, catégorie) est géré par le Bureau.</li>
           <li><b>Prêter un joueur</b> à une autre équipe de la même catégorie (par exemple U13M-1 vers U13M-2) : les deux flèches <b>Affecter à une autre équipe</b> sur sa ligne. Il est <b>ajouté</b> à l'autre équipe et <b>reste dans la sienne</b>. Pour le changer vraiment d'équipe, demander au Bureau.</li>
         </ul>
+        <div class="tip ex"><b>Exemple · il manque un joueur en U13M-2 samedi</b>Dans <b>Équipe</b>, sur la ligne d'Hugo (U13M-1), clique sur les deux flèches <b>Affecter à une autre équipe</b> › <b>U13M-2</b> › valider. Hugo apparaît aussi dans U13M-2 (il peut répondre à ses convocations) et reste dans U13M-1. Si Hugo a une <b>flamme</b> (brûlé), U13M-2 ne te sera pas proposée : c'est la règle FFBB.</div>
         <h3 style="margin-top:12px">Noter un joueur brûlé</h3>
         <p>Règle FFBB : un joueur parmi les meilleurs de l'équipe 1 d'une catégorie ne peut pas jouer en équipe 2.</p>
         <ol class="steps">
@@ -562,6 +575,7 @@ section.chapter, #sommaire { scroll-margin-top: 16px; }
           <li><b>FFBB</b> : le <b>lien FFBB</b> de chacune de tes équipes. C'est lui qui fait arriver les matchs dans l'appli : à mettre à jour si ton équipe change de poule (copier l'adresse de la page de l'équipe sur le site de la FFBB, puis <b>Enregistrer</b>). La synchronisation se fait toute seule chaque lundi.</li>
           <li>Sur la carte d'un match, le bouton <b>Feuilles</b> ouvre le dossier des feuilles de match.</li>
         </ul>
+        <div class="tip ex"><b>Exemple · ta poule change en janvier</b>Sur le site de la FFBB, ouvre la page de ton équipe dans sa nouvelle poule et copie l'adresse de la page. Dans l'appli : <b>Matchs officiels</b> › <b>FFBB</b> › colle l'adresse sur la ligne de ton équipe › <b>Enregistrer</b>. Les nouveaux matchs arrivent à la synchronisation du lundi (le Bureau peut la lancer plus tôt). Les matchs déjà joués restent, avec leurs scores.</div>
       </div>
     </div>
   </section>
@@ -580,6 +594,7 @@ section.chapter, #sommaire { scroll-margin-top: 16px; }
           <li><b>Comptes rendus des coachs</b> : tu peux écrire les tiens (une réunion de coachs, un point d'équipe…) et lire ceux des autres coachs.</li>
           <li>Tu peux aussi lire les comptes rendus du Bureau, des mairies, du CD17 et de la Ligue.</li>
         </ul>
+        <div class="tip ex"><b>Exemple · après la réunion des coachs</b><b>Vie du club</b> › <b>Documents</b> › <b>Comptes rendus des coachs</b> › <b>Nouveau</b> : écris ton compte rendu et enregistre. Les autres coachs et le Bureau le lisent aussitôt ; toi seul (et le Bureau) pouvez le modifier.</div>
         <h3 style="margin-top:12px">Inventaire</h3>
         <p>La liste du matériel du club (nom et quantité), tenue par le Bureau et les coachs : tu peux ajouter ou corriger une ligne.</p>
       </div>
