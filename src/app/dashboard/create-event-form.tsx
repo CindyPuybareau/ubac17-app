@@ -6,7 +6,7 @@ import { teamLabel } from "@/lib/teams";
 import { formatPersonName } from "@/lib/names";
 import { SALLES } from "./salles";
 import { sendEventPush } from "./event-push";
-import DateTimePicker from "./date-time-picker";
+import DateTimePicker, { TimePicker } from "./date-time-picker";
 import RoleIcon from "./role-icon";
 import ConfirmDialog from "./confirm-dialog";
 import {
@@ -1538,15 +1538,11 @@ export default function CreateEventForm({
               <span className="text-amber-600">*</span>
             )}
           </label>
-          <input
-            type="time"
-            required={
-              scopeMode !== "bureau" && scopeMode !== "coachs" && eventType === "TRAINING"
-            }
-            value={endTime}
-            onChange={(e) => setEndTime(e.target.value)}
-            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm [&::-webkit-calendar-picker-indicator]:hidden"
-          />
+          {/* Retour de Cindy du 21/11 : même sélecteur que le début (durées
+              toutes prêtes) -- plus l'horloge du téléphone ni le champ vide
+              sur ordinateur. Obligatoire pour un entraînement : vérifié à
+              l'envoi (voir handleSubmit). */}
+          <TimePicker value={endTime} onChange={setEndTime} startTime={startTime} />
         </div>
       </div>
 
