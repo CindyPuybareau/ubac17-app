@@ -14,8 +14,19 @@ import { useSearchParams } from "next/navigation";
 // son propre bouton "Retour à l'appli" (src/lib/guide-page.ts).
 export default function GuideButton({ isAdmin, isCoach }: { isAdmin: boolean; isCoach: boolean }) {
   const tab = useSearchParams().get("tab");
-  const audience: "bureau" | "coach" | null =
-    tab === "coach" && isCoach ? "coach" : isAdmin ? "bureau" : isCoach ? "coach" : null;
+  // Espaces parent / joueur ("Mon équipe", "Mes enfants") : pas de livre,
+  // même pour un membre du Bureau ou un coach (retour de Cindy du 21/11) --
+  // on y est vu comme une famille.
+  const familyTab = tab === "own-team" || tab === "children";
+  const audience: "bureau" | "coach" | null = familyTab
+    ? null
+    : tab === "coach" && isCoach
+      ? "coach"
+      : isAdmin
+        ? "bureau"
+        : isCoach
+          ? "coach"
+          : null;
   if (!audience) return null;
   const href = audience === "coach" ? "/guide-coach" : "/guide-bureau";
   const label = audience === "coach" ? "Guide des coachs" : "Guide du Bureau";
