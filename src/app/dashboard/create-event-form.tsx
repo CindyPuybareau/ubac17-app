@@ -6,7 +6,7 @@ import { teamLabel } from "@/lib/teams";
 import { formatPersonName } from "@/lib/names";
 import { SALLES } from "./salles";
 import { sendEventPush } from "./event-push";
-import DateTimePicker, { TimePicker } from "./date-time-picker";
+import DateTimePicker, { ARRIVAL_OFFSETS, TimePicker } from "./date-time-picker";
 import RoleIcon from "./role-icon";
 import ConfirmDialog from "./confirm-dialog";
 import {
@@ -1568,34 +1568,22 @@ export default function CreateEventForm({
           Heure d&apos;arrivée
         </label>
         <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={impactMinutesBefore}
-            onChange={(e) => {
-              const minutes = e.target.value;
-              setImpactMinutesBefore(minutes);
-              if (!minutes || !startTime) return;
-              const start = new Date(startTime);
-              start.setMinutes(start.getMinutes() - Number(minutes));
-              const pad = (n: number) => String(n).padStart(2, "0");
-              setImpactTime(`${pad(start.getHours())}:${pad(start.getMinutes())}`);
-            }}
-            className="rounded-lg border border-zinc-200 px-2 py-2 text-sm text-zinc-600"
-          >
-            <option value="0">À l&apos;heure du début</option>
-            <option value="15">15 min avant le début</option>
-            <option value="30">30 min avant le début</option>
-            <option value="45">45 min avant le début</option>
-            <option value="60">1h avant le début</option>
-          </select>
-          <input
-            type="time"
-            value={impactTime}
-            onChange={(e) => {
-              setImpactTime(e.target.value);
-              setImpactMinutesBefore("");
-            }}
-            className="rounded-lg border border-zinc-200 px-3 py-2 text-sm [&::-webkit-calendar-picker-indicator]:hidden"
-          />
+          {/* Retour de Cindy du 21/11 ("pareil") : même sélecteur que l'heure
+              de fin, avec les choix "avant le début" de l'ancien menu. Un
+              choix rapide garde impactMinutesBefore (l'heure suit le début
+              s'il change ensuite, voir handleStartTimeChange) ; une heure
+              choisie à la main le remet à "" (plus de recalcul). */}
+          <div className="min-w-0 flex-1">
+            <TimePicker
+              value={impactTime}
+              onChange={setImpactTime}
+              startTime={startTime}
+              offsets={ARRIVAL_OFFSETS}
+              offsetsTitle="Arrivée avant le début"
+              placeholder="Facultative"
+              onOffsetChange={(m) => setImpactMinutesBefore(m === null ? "" : String(-m))}
+            />
+          </div>
           {impactTime && (
             <button
               type="button"

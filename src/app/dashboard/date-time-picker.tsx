@@ -352,18 +352,37 @@ export default function DateTimePicker({
 // reste. Ouvert vers la gauche sur grand écran : ce champ est dans la
 // colonne de droite du formulaire.
 const QUICK_DURATIONS: [number, string][] = [[60, "1h"], [90, "1h30"], [120, "2h"]];
+// Heure d'arrivée (retour de Cindy du 21/11, "pareil") : décalages AVANT le
+// début, mêmes choix que l'ancien menu "X min avant le début".
+export const ARRIVAL_OFFSETS: [number, string][] = [
+  [0, "à l'heure"],
+  [-15, "15 min avant"],
+  [-30, "30 min avant"],
+  [-45, "45 min avant"],
+  [-60, "1h avant"],
+];
 
 export function TimePicker({
   value,
   onChange,
   startTime,
   placeholder = "Choisir l'heure",
+  offsets = QUICK_DURATIONS,
+  offsetsTitle = "Durée",
+  onOffsetChange,
 }: {
   value: string;
   onChange: (value: string) => void;
   // "YYYY-MM-DDTHH:mm" du début, pour proposer les durées.
   startTime?: string;
   placeholder?: string;
+  // Décalages en minutes par rapport au début (positifs = après, négatifs
+  // = avant), avec leur libellé.
+  offsets?: [number, string][];
+  offsetsTitle?: string;
+  // Décalage choisi (null = heure saisie à la main) : permet à l'appelant de
+  // faire suivre l'heure si le début change ensuite.
+  onOffsetChange?: (offsetMinutes: number | null) => void;
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -383,15 +402,18 @@ export function TimePicker({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
-  const set = (hh: number, mm: number) => onChange(`${pad2(hh)}:${pad2(mm)}`);
+  const set = (hh: number, mm: number) => {
+    onChange(`${pad2(hh)}:${pad2(mm)}`);
+    onOffsetChange?.(null);
+  };
   const minuteOptions =
     min !== null && !STANDARD_MINUTES.includes(min)
       ? [...STANDARD_MINUTES, min].sort((a, b) => a - b)
       : STANDARD_MINUTES;
   const quick = start
-    ? QUICK_DURATIONS.map(([minutes, label]) => {
-        const total = start.h * 60 + start.min + minutes;
-        return { hh: Math.floor(total / 60) % 24, mm: total % 60, label };
+    ? offsets.map(([minutes, label]) => {
+        const total = (((start.h * 60 + start.min + minutes) % 1440) + 1440) % 1440;
+        return { hh: Math.floor(total / 60), mm: total % 60, label, minutes };
       })
     : [];
 
@@ -419,7 +441,7 @@ export function TimePicker({
             <div className="mx-auto mb-3 h-1 w-10 shrink-0 rounded-full bg-zinc-200 sm:hidden" />
             <div className="flex flex-col gap-1.5">
               <span className="text-xs font-medium text-zinc-500">
-                {start ? "Durée" : "Choisis d'abord l'heure de début pour voir les durées"}
+                {start ? offsetsTitle : "Choisis d'abord l'heure de début pour voir les choix rapides"}
               </span>
               {quick.length > 0 && (
                 <div className="grid grid-cols-3 gap-1.5">
@@ -430,7 +452,8 @@ export function TimePicker({
                         key={q.label}
                         type="button"
                         onClick={() => {
-                          set(q.hh, q.mm);
+                          onChange(`${pad2(q.hh)}:${pad2(q.mm)}`);
+                          onOffsetChange?.(q.minutes);
                           setOpen(false);
                         }}
                         className={`flex flex-col items-center rounded-xl border px-2 py-1.5 text-xs font-semibold tabular-nums transition-colors ${
