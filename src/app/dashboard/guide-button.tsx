@@ -24,7 +24,14 @@ export default function GuideButton({ isAdmin, isCoach }: { isAdmin: boolean; is
       href={href}
       title={label}
       aria-label={`Ouvrir le ${label.charAt(0).toLowerCase()}${label.slice(1)}`}
-      className="mt-1 flex h-7 w-7 items-center justify-center rounded-full bg-ubac-yellow/30 text-ubac-yellow transition-colors hover:bg-ubac-yellow/45 sm:h-8 sm:w-8"
+      // Couleur par guide (retour de Cindy du 21/11, "qu'on voie la différence") :
+      // jaune pour le Bureau, blanc transparent pour les coachs (le vert a
+      // été jugé moche).
+      className={`mt-1 flex h-7 w-7 items-center justify-center rounded-full transition-colors sm:h-8 sm:w-8 ${
+        audience === "coach"
+          ? "bg-white/20 text-white hover:bg-white/30"
+          : "bg-ubac-yellow/30 text-ubac-yellow hover:bg-ubac-yellow/45"
+      }`}
     >
       <BookOpen className="h-4 w-4 shrink-0" />
     </a>
