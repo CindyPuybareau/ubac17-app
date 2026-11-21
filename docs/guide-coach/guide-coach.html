@@ -298,7 +298,7 @@ section.chapter, #sommaire { scroll-margin-top: 16px; }
     <a href="#tableau-de-bord"><b>Tableau de bord</b><small>Ta semaine, tes pénalités, ta photo d'équipe</small></a>
     <a href="#calendrier"><b>Calendrier</b><small>Créer, modifier, annuler tes événements</small></a>
     <a href="#organisation"><b>Présences et organisation</b><small>Qui vient, covoiturage, bénévoles, officiels</small></a>
-    <a href="#equipe"><b>Mon équipe</b><small>Joueurs, coordonnées, changement d'équipe</small></a>
+    <a href="#equipe"><b>Mon équipe</b><small>Joueurs, coordonnées, prêt de joueur, brûlés</small></a>
     <a href="#matchs-officiels"><b>Matchs officiels</b><small>Championnat, lien FFBB</small></a>
     <a href="#vie-du-club"><b>Vie du club</b><small>Documents, comptes rendus, inventaire</small></a>
     <a href="#bilan"><b>Bilan de la saison</b><small>Assiduité, bénévolat des familles</small></a>
@@ -496,8 +496,21 @@ section.chapter, #sommaire { scroll-margin-top: 16px; }
         <h3 style="margin-top:12px">Ce que tu peux modifier</h3>
         <ul class="plain">
           <li><b>Les coordonnées</b> d'un de tes joueurs (téléphone, email…). Le reste de la fiche (identité, licence, santé, catégorie) est géré par le Bureau.</li>
-          <li><b>Changer un joueur d'équipe</b> : les deux flèches <b>Affecter à une autre équipe</b> sur sa ligne.</li>
+          <li><b>Prêter un joueur</b> à une autre équipe de la même catégorie (par exemple U13M-1 vers U13M-2) : les deux flèches <b>Affecter à une autre équipe</b> sur sa ligne. Il est <b>ajouté</b> à l'autre équipe et <b>reste dans la sienne</b>. Pour le changer vraiment d'équipe, demander au Bureau.</li>
         </ul>
+        <h3 style="margin-top:12px">Noter un joueur brûlé</h3>
+        <p>Règle FFBB : un joueur parmi les meilleurs de l'équipe 1 d'une catégorie ne peut pas jouer en équipe 2.</p>
+        <ol class="steps">
+          <li>Dans Équipe, cliquer sur le <b>nom du joueur</b> pour ouvrir sa fiche, onglet <b>Licence &amp; Équipe</b>.</li>
+          <li>Cocher la case <b>« Brûlé sur U13M-1 — ne pourra jamais rejoindre U13M-2 »</b> (le nom des équipes s'adapte), puis enregistrer.</li>
+        </ol>
+        <ul class="plain">
+          <li>La case n'apparaît que pour un joueur de l'<b>équipe 1</b> d'une catégorie qui a deux équipes : il n'y a jamais de brûlé en équipe 2.</li>
+          <li>Une <b>petite flamme orange</b> s'affiche ensuite à côté de son nom, partout dans l'appli (Bureau, coachs, familles, Espace Enfant).</li>
+          <li>L'appli l'empêche alors d'être ajouté à l'équipe 2. Pour lever le statut, décocher la case.</li>
+          <li>Le Bureau et le coach de l'équipe peuvent cocher ou décocher la case.</li>
+        </ul>
+
         <div class="tip"><b>Joueur archivé</b>Un joueur qui a quitté le club apparaît en gris « Archivé · a quitté le club ». C'est le Bureau qui le retire de l'équipe.</div>
       </div>
       <div class="screen" aria-label="Exemple : carte d'équipe">
