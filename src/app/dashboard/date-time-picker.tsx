@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, Clock } from "lucide-react";
 
 const WEEKDAY_LABELS = ["Lu", "Ma", "Me", "Je", "Ve", "Sa", "Di"];
 const MONTH_LABELS = [
@@ -327,6 +327,158 @@ export default function DateTimePicker({
                 {minuteOptions.map((m) => (
                   <option key={m} value={m}>
                     {pad2(m)}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="ml-auto rounded-full bg-ubac-yellow px-3 py-1.5 text-xs font-semibold text-navy transition-colors hover:bg-ubac-yellow-dark"
+              >
+                Valider
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// Heure seule ("HH:mm"), même présentation que DateTimePicker (retour de
+// Cindy du 21/11 : "l'heure de fin sur téléphone montre une horloge, pas
+// pratique, et sur PC rien -- faire comme l'heure de début"). Durées toutes
+// prêtes calculées depuis le début (1h, 1h30, 2h), "Autre heure" pour le
+// reste. Ouvert vers la gauche sur grand écran : ce champ est dans la
+// colonne de droite du formulaire.
+const QUICK_DURATIONS: [number, string][] = [[60, "1h"], [90, "1h30"], [120, "2h"]];
+
+export function TimePicker({
+  value,
+  onChange,
+  startTime,
+  placeholder = "Choisir l'heure",
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  // "YYYY-MM-DDTHH:mm" du début, pour proposer les durées.
+  startTime?: string;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const match = value.match(/^(\d{2}):(\d{2})/);
+  const h = match ? Number(match[1]) : null;
+  const min = match ? Number(match[2]) : null;
+  const start = startTime ? parseLocal(startTime) : null;
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  const set = (hh: number, mm: number) => onChange(`${pad2(hh)}:${pad2(mm)}`);
+  const minuteOptions =
+    min !== null && !STANDARD_MINUTES.includes(min)
+      ? [...STANDARD_MINUTES, min].sort((a, b) => a - b)
+      : STANDARD_MINUTES;
+  const quick = start
+    ? QUICK_DURATIONS.map(([minutes, label]) => {
+        const total = start.h * 60 + start.min + minutes;
+        return { hh: Math.floor(total / 60) % 24, mm: total % 60, label };
+      })
+    : [];
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={`flex w-full items-center justify-between gap-2 rounded-lg border bg-white px-3 py-2 text-left text-sm transition-colors hover:border-zinc-300 ${
+          open ? "border-navy ring-1 ring-navy" : "border-zinc-200"
+        }`}
+      >
+        <span className={match ? "text-zinc-900" : "text-zinc-400"}>
+          {match ? `${pad2(h as number)}:${pad2(min as number)}` : placeholder}
+        </span>
+        <Clock className="h-4 w-4 shrink-0 text-zinc-400" />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/30 sm:bg-transparent" onClick={() => setOpen(false)} />
+          <div
+            className="fixed inset-x-0 bottom-0 z-50 max-h-[80vh] overflow-y-auto rounded-t-2xl border border-zinc-200 bg-white p-4 shadow-xl sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:mt-2 sm:w-72 sm:rounded-2xl"
+            style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
+          >
+            <div className="mx-auto mb-3 h-1 w-10 shrink-0 rounded-full bg-zinc-200 sm:hidden" />
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-zinc-500">
+                {start ? "Durée" : "Choisis d'abord l'heure de début pour voir les durées"}
+              </span>
+              {quick.length > 0 && (
+                <div className="grid grid-cols-3 gap-1.5">
+                  {quick.map((q) => {
+                    const active = h === q.hh && min === q.mm;
+                    return (
+                      <button
+                        key={q.label}
+                        type="button"
+                        onClick={() => {
+                          set(q.hh, q.mm);
+                          setOpen(false);
+                        }}
+                        className={`flex flex-col items-center rounded-xl border px-2 py-1.5 text-xs font-semibold tabular-nums transition-colors ${
+                          active ? "border-navy bg-navy text-white" : "border-zinc-200 text-navy hover:bg-navy/5"
+                        }`}
+                      >
+                        <span className="text-sm">
+                          {q.hh}h{pad2(q.mm)}
+                        </span>
+                        <span className={active ? "text-white/80" : "text-zinc-500"}>{q.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="mt-3 flex items-center gap-2">
+              <span className="text-xs font-medium text-zinc-500">Autre heure</span>
+              <select
+                value={h ?? ""}
+                onChange={(e) => set(Number(e.target.value), min ?? 0)}
+                className="rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-sm"
+              >
+                {h === null && (
+                  <option value="" disabled>
+                    --
+                  </option>
+                )}
+                {HOURS.map((x) => (
+                  <option key={x} value={x}>
+                    {pad2(x)}
+                  </option>
+                ))}
+              </select>
+              <span className="text-zinc-400">:</span>
+              <select
+                value={min ?? ""}
+                onChange={(e) => set(h ?? (start ? start.h : 0), Number(e.target.value))}
+                className="rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-sm"
+              >
+                {min === null && (
+                  <option value="" disabled>
+                    --
+                  </option>
+                )}
+                {minuteOptions.map((x) => (
+                  <option key={x} value={x}>
+                    {pad2(x)}
                   </option>
                 ))}
               </select>
