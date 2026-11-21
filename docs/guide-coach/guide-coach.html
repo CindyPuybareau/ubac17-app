@@ -434,7 +434,7 @@ section.chapter, #sommaire { scroll-margin-top: 16px; }
         <ul class="plain">
           <li>Les familles (ou les joueurs adultes) répondent <b>Présent</b> ou <b>Absent</b>.</li>
           <li>La carte affiche le nombre de présents, d'absents et de réponses en attente ; un clic déroule les noms.</li>
-          <li>Tu peux <b>corriger la réponse d'un joueur</b> depuis cette liste (un parent qui t'a prévenu par message, par exemple).</li>
+          <li>Tu peux <b>corriger la réponse d'un joueur</b> : voir l'exemple juste en dessous.</li>
           <li>Les familles qui n'ont pas répondu voient un rappel sur leur tableau de bord.</li>
         </ul>
         <h3 style="margin-top:12px">Le covoiturage</h3>
@@ -448,6 +448,30 @@ section.chapter, #sommaire { scroll-margin-top: 16px; }
         <div class="stack" style="margin-top:10px">
           <div class="tariff"><span>Trajet de Claire Martin</span><b>2 places libres</b></div>
         </div>
+      </div>
+    </div>
+    <div class="task">
+      <div class="text">
+        <h3>Corriger la réponse d'un joueur</h3>
+        <p><b>Exemple</b> : la maman de Léa t'écrit « Léa ne pourra pas venir samedi », mais elle n'a pas répondu dans l'appli.</p>
+        <ol class="steps">
+          <li>Dans le <b>Calendrier</b>, ouvrir la carte du match de samedi.</li>
+          <li>Cliquer sur la pastille <b>« 2 en attente »</b> : la liste des joueurs qui n'ont pas répondu s'ouvre.</li>
+          <li>À côté de <b>Léa Martin</b>, cliquer sur la croix <b>✕</b> (Marquer absent). Le ✓ la marque présente.</li>
+        </ol>
+        <p>Léa passe aussitôt dans les absents, et sa famille voit la réponse dans son espace. Pour corriger une réponse déjà donnée, cliquer sur la pastille « présents » ou « absents », puis sur le nom du joueur : il bascule de l'un à l'autre.</p>
+        <p class="note" style="font-style:normal">Tu peux le faire pour les joueurs de tes équipes ; le Bureau, pour tous les joueurs.</p>
+      </div>
+      <div class="screen" aria-label="Exemple : corriger une réponse">
+        <div class="cap">Exemple : carte du match de samedi</div>
+        <div class="row" style="display:flex;gap:6px;flex-wrap:wrap">
+          <span class="chip c-green">8 présents</span><span class="chip c-navy">1 absent</span><span class="chip c-amber" style="outline:2px solid var(--amber)">2 en attente</span>
+        </div>
+        <div class="stack" style="margin-top:10px">
+          <div class="tariff"><span>Hugo Bernard</span><span style="display:flex;gap:4px"><span class="btn-mini" style="color:var(--green)">✓</span><span class="btn-mini" style="color:var(--red)">✕</span></span></div>
+          <div class="tariff" style="border-color:var(--amber)"><span><b>Léa Martin</b></span><span style="display:flex;gap:4px"><span class="btn-mini" style="color:var(--green)">✓</span><span class="btn-mini" style="color:#fff;background:var(--red);border-color:var(--red)">✕</span></span></div>
+        </div>
+        <p class="note">✓ = présent, ✕ = absent. Noms inventés.</p>
       </div>
     </div>
     <div class="task">

@@ -797,6 +797,30 @@ section.chapter, #sommaire { scroll-margin-top: 16px; }
 
     <div class="task">
       <div class="text">
+        <h3>Corriger la réponse d'un joueur</h3>
+        <p><b>Exemple</b> : la maman de Léa t'écrit « Léa ne pourra pas venir samedi », mais elle n'a pas répondu dans l'appli.</p>
+        <ol class="steps">
+          <li>Dans le <b>Calendrier</b>, ouvrir la carte du match de samedi.</li>
+          <li>Cliquer sur la pastille <b>« 2 en attente »</b> : la liste des joueurs qui n'ont pas répondu s'ouvre.</li>
+          <li>À côté de <b>Léa Martin</b>, cliquer sur la croix <b>✕</b> (Marquer absent). Le ✓ la marque présente.</li>
+        </ol>
+        <p>Léa passe aussitôt dans les absents, et sa famille voit la réponse dans son espace. Pour corriger une réponse déjà donnée, cliquer sur la pastille « présents » ou « absents », puis sur le nom du joueur : il bascule de l'un à l'autre.</p>
+        <p class="note" style="font-style:normal">Le Bureau peut le faire pour tous les joueurs ; un coach, pour les joueurs de ses équipes.</p>
+      </div>
+      <div class="screen" aria-label="Exemple : corriger une réponse">
+        <div class="cap">Exemple : carte du match de samedi</div>
+        <div class="row" style="display:flex;gap:6px;flex-wrap:wrap">
+          <span class="chip c-green">8 présents</span><span class="chip c-navy">1 absent</span><span class="chip c-amber" style="outline:2px solid var(--amber)">2 en attente</span>
+        </div>
+        <div class="stack" style="margin-top:10px">
+          <div class="tariff"><span>Hugo Bernard</span><span style="display:flex;gap:4px"><span class="btn-mini" style="color:var(--green)">✓</span><span class="btn-mini" style="color:var(--red)">✕</span></span></div>
+          <div class="tariff" style="border-color:var(--amber)"><span><b>Léa Martin</b></span><span style="display:flex;gap:4px"><span class="btn-mini" style="color:var(--green)">✓</span><span class="btn-mini" style="color:#fff;background:var(--red);border-color:var(--red)">✕</span></span></div>
+        </div>
+        <p class="note">✓ = présent, ✕ = absent. Noms inventés.</p>
+      </div>
+    </div>
+    <div class="task">
+      <div class="text">
         <h3>Les besoins en bénévoles</h3>
         <ol class="steps">
           <li>Sur la carte d'un match, d'un tournoi ou d'un événement club : <b>Ajouter un besoin</b>.</li>
