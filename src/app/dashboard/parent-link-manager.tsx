@@ -44,6 +44,11 @@ export default function ParentLinkManager({
   onSuggestSecondaryEmail?: (email: string) => void;
 }) {
   const [linked, setLinked] = useState<LinkedParent[] | null>(null);
+  // Compte de la personne elle-même (players.profile_id), retour de Cindy du
+  // 24/11 : un joueur adulte qui se connecte avec son propre compte
+  // apparaissait "Aucun compte relié", et la suggestion proposait de relier
+  // ce même compte comme parent (la personne devenait son propre parent).
+  const [ownAccount, setOwnAccount] = useState<LinkedParent | null>(null);
   const [suggestion, setSuggestion] = useState<ProfileMatch | null>(null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ProfileMatch[]>([]);
@@ -53,10 +58,26 @@ export default function ParentLinkManager({
 
   async function loadLinked() {
     const supabase = createClient();
-    const { data } = await supabase
-      .from("parent_player")
-      .select("parent_id, profiles(id, first_name, last_name, email)")
-      .eq("player_id", playerId);
+    const [{ data }, { data: ownRow }] = await Promise.all([
+      supabase
+        .from("parent_player")
+        .select("parent_id, profiles(id, first_name, last_name, email)")
+        .eq("player_id", playerId),
+      supabase.from("players").select("profile_id").eq("id", playerId).maybeSingle(),
+    ]);
+    const ownProfileId = (ownRow?.profile_id as string | null | undefined) ?? null;
+    if (ownProfileId) {
+      const { data: own } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, email")
+        .eq("id", ownProfileId)
+        .maybeSingle();
+      setOwnAccount(
+        own ? { id: own.id, firstName: own.first_name, lastName: own.last_name, email: own.email } : null
+      );
+    } else {
+      setOwnAccount(null);
+    }
     setLinked(
       (data ?? [])
         .map((r) => {
@@ -108,6 +129,8 @@ export default function ParentLinkManager({
       const linkedIds = new Set(linked.map((p) => p.id));
       const match = (data ?? []).find((p) => {
         if (linkedIds.has(p.id)) return false;
+        // Jamais le compte de la personne elle-même comme "parent".
+        if (ownAccount && p.id === ownAccount.id) return false;
         const normalizedPhone = normalizePhone(p.phone);
         if (normalizedPhone && normalizedTargets.has(normalizedPhone)) return true;
         return Boolean(
@@ -131,7 +154,7 @@ export default function ParentLinkManager({
     return () => {
       cancelled = true;
     };
-  }, [linked, candidatePhones, candidateSecondaryEmail]);
+  }, [linked, ownAccount, candidatePhones, candidateSecondaryEmail]);
 
   useEffect(() => {
     const timeout = setTimeout(async () => {
@@ -211,6 +234,15 @@ export default function ParentLinkManager({
 
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-zinc-100 bg-zinc-50 p-3 sm:col-span-2">
+      {ownAccount && (
+        <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-status-success/30 bg-status-success/10 px-2.5 py-2 text-xs text-zinc-700">
+          <Check className="h-3.5 w-3.5 shrink-0 text-status-success" />
+          <span>
+            <b>{formatPersonName(ownAccount.firstName, ownAccount.lastName)}</b> se connecte avec son propre compte
+            {ownAccount.email ? ` (${ownAccount.email})` : ""} : rien à relier ici pour son propre compte.
+          </span>
+        </div>
+      )}
       <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
         Compte(s) parent relié(s)
       </p>
@@ -228,6 +260,9 @@ export default function ParentLinkManager({
             >
               {formatPersonName(p.firstName, p.lastName)}
               {p.email && <span className="font-normal text-zinc-400">· {p.email}</span>}
+              {ownAccount && p.id === ownAccount.id && (
+                <span className="font-normal text-zinc-400">(son propre compte)</span>
+              )}
               <button
                 type="button"
                 onClick={() => unlinkParent(p.id)}
@@ -275,7 +310,7 @@ export default function ParentLinkManager({
       {results.length > 0 && (
         <div className="flex flex-col gap-1">
           {results
-            .filter((r) => !linkedIds.has(r.id))
+            .filter((r) => !linkedIds.has(r.id) && !(ownAccount && r.id === ownAccount.id))
             .map((r) => (
               <button
                 key={r.id}
