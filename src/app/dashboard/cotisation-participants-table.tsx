@@ -687,7 +687,14 @@ export default function CotisationParticipantsTable({
   // calculées une fois à l'ouverture, pour positionner le menu en
   // position:fixed via un portail plutôt qu'en absolute ancré sur la ligne
   // (rogné par le conteneur scrollable du tableau, voir son commentaire).
-  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
+  // `bottom` (ouverture vers le HAUT) en plus de `top` : retour de Cindy
+  // du 25/11 (capture, dernière ligne de la liste) -- le menu s'ouvrait
+  // toujours vers le bas et sortait de l'écran sous les dernières lignes,
+  // sans moyen de le faire défiler (position fixe). Même correctif que
+  // members-table.tsx/renderMemberMenu.
+  const [menuPosition, setMenuPosition] = useState<
+    ({ top: number; right: number } | { bottom: number; right: number }) | null
+  >(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [clearRemiseTarget, setClearRemiseTarget] = useState<string | null>(null);
   const [deletePaymentTarget, setDeletePaymentTarget] = useState<
@@ -1655,7 +1662,16 @@ export default function CotisationParticipantsTable({
               return;
             }
             const rect = e.currentTarget.getBoundingClientRect();
-            setMenuPosition({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+            const right = window.innerWidth - rect.right;
+            // Jusqu'à 5 entrées (~200px) : marge généreuse plutôt que
+            // mesurer le menu avant qu'il n'existe dans le DOM.
+            const estimatedMenuHeight = 230;
+            const spaceBelow = window.innerHeight - rect.bottom;
+            setMenuPosition(
+              spaceBelow < estimatedMenuHeight
+                ? { bottom: window.innerHeight - rect.top + 4, right }
+                : { top: rect.bottom + 4, right }
+            );
             setOpenMenuId(c.id);
           }}
           className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
@@ -1669,7 +1685,11 @@ export default function CotisationParticipantsTable({
             <>
               <div className="fixed inset-0 z-30" onClick={() => setOpenMenuId(null)} />
               <div
-                style={{ top: menuPosition.top, right: menuPosition.right }}
+                style={
+                  "top" in menuPosition
+                    ? { top: menuPosition.top, right: menuPosition.right }
+                    : { bottom: menuPosition.bottom, right: menuPosition.right }
+                }
                 className="fixed z-40 w-64 rounded-xl border border-zinc-100 bg-white p-1.5 text-left shadow-lg"
               >
               <button
